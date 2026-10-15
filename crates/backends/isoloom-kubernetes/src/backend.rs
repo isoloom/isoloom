@@ -2,7 +2,8 @@
 //! and its files.
 
 use isoloom_plan::{Capabilities, Environment, Feature, Refusal, Requirement};
-use isoloom_render::backend::{Backend, Files, RenderError};
+use isoloom_render::Error as RenderError;
+use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
 
 use crate::{gpus, render};

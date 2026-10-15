@@ -52,7 +52,7 @@ pub(crate) struct Driver {
 /// and VM sizes are x86-64).
 #[must_use]
 pub fn refusal(env: &Environment) -> Option<String> {
-    isoloom_render::arm64_machine(env.spec()).map(|name| format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"))
+    crate::limits::arm64_machine(env.spec()).map(|name| format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"))
 }
 
 /// A Terraform module per cloud, in [`Cloud::ALL`]'s order: the Terraform side of the

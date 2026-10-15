@@ -1,6 +1,6 @@
-//! `.isoloomignore` in the Terraform outputs: the project's files the machines don't get,
-//! gitignore-style patterns read when Terraform runs, exactly as the Vagrantfiles read them
-//! (`vagrant_project.rb`), so every target leaves out the same files.
+//! The project copied into the machines, without what `.isoloomignore` leaves out: its rules
+//! ([`ignore`]), and the same rules in the Terraform outputs, read when Terraform runs, exactly as
+//! the Vagrantfiles read them (`vagrant_project.rb`), so every target leaves out the same files.
 //!
 //! - Proxmox writes the project's files through cloud-init: `local.project_paths`, the files
 //!   that go (not version control, the tools' state, or Isoloom's outputs).
@@ -9,6 +9,18 @@
 //!   exclusion list (`-X`, a file next to the module: `local_file.isoloom_project`). Each entry
 //!   starts with the project folder's name (the archive's top folder, stripped when unpacked),
 //!   since bsdtar (macOS, Windows) matches exclusions at any depth.
+
+pub mod ignore;
+
+/// How a Terraform module copies the project into its machines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Copy {
+    /// Each file written into the machine by its cloud-init (Proxmox): the files that go.
+    Files,
+    /// An archive made where Terraform runs, with `tar`: its exclusion list is a file too.
+    Archive,
+}
 
 /// The rules and both lists. `SKIP` is a regular expression of the paths Proxmox leaves out.
 const LISTS: &str = r##"
@@ -47,22 +59,31 @@ resource "local_file" "isoloom_project" {
 /// private keys), and Isoloom's outputs.
 const SKIP: &str = r"^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/";
 
-/// Adds the lists to a Terraform module that copies the project (Proxmox's cloud-init, or a
-/// cloud module's archive); other modules are left alone.
-pub fn terraform(tf: &mut String) {
-    let archive = tf.contains("local_file.isoloom_project.filename");
-    if !archive && !tf.contains("local.project_paths") {
-        return;
+/// The lists as a fixed HCL fragment, for a module that copies the project as `copy` says: an
+/// archive also gets `tar`'s exclusion file (the cloud modules), the files alone the lists only
+/// (Proxmox).
+#[must_use]
+pub fn lists(copy: Copy) -> String {
+    let lists = LISTS.replace("SKIP", SKIP);
+    match copy {
+        Copy::Files => lists,
+        Copy::Archive => lists + EXCLUSIONS,
     }
-    tf.push_str(&lists(archive));
 }
 
-/// The lists as a fixed HCL fragment, for a module that copies the project: with `archive`,
-/// also `tar`'s exclusion file (the cloud modules), else the lists only (Proxmox).
-pub fn lists(archive: bool) -> String {
-    let mut out = LISTS.replace("SKIP", SKIP);
-    if archive {
-        out.push_str(EXCLUSIONS);
+#[cfg(test)]
+mod tests {
+    use super::{Copy, lists};
+
+    #[test]
+    fn an_archive_also_lists_what_tar_leaves_out() {
+        let files = lists(Copy::Files);
+        assert!(files.contains("project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall(\"^\\\\.isoloom|(^|/)\\\\.(git|vagrant|terraform)/\", f)) == 0]"), "{files}");
+        assert!(!files.contains("local_file"), "{files}");
+        let archive = lists(Copy::Archive);
+        assert!(
+            archive.starts_with(&files) && archive.contains("resource \"local_file\" \"isoloom_project\""),
+            "{archive}"
+        );
     }
-    out
 }

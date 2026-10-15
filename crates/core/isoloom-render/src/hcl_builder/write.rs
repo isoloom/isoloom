@@ -5,8 +5,6 @@
 //! run and ends the current one). Leaf expressions are written by `hcl-rs` in its compact form;
 //! lists, objects and calls are laid out here.
 
-use std::fmt::Write as _;
-
 use hcl::expr::{Expression, FuncCall, Object, ObjectKey};
 use hcl::format::{Format, Formatter};
 use hcl::{Block, BlockLabel, Body, Structure};
@@ -33,6 +31,7 @@ enum Section {
 impl Module {
     /// A module starting with `preamble`, written as it is (comment lines, each ending with a
     /// newline).
+    #[must_use]
     pub fn new(preamble: impl Into<String>) -> Module {
         Module {
             preamble: preamble.into(),
@@ -48,7 +47,7 @@ impl Module {
     /// Adds a top-level block with a comment above it (each line of `comment` becomes a `#` line).
     pub fn commented(&mut self, comment: &str, block: Block) {
         self.sections.push(Section::Block {
-            comment: Some(comment.to_string()),
+            comment: Some(comment.to_owned()),
             block,
         });
     }
@@ -63,10 +62,15 @@ impl Module {
     /// Adds a fixed fragment of HCL, written as it is: for the static parts shared with modules
     /// not built here yet (the `.isoloomignore` lists).
     pub fn fragment(&mut self, hcl: &str) {
-        self.sections.push(Section::Fragment(hcl.trim_matches('\n').to_string()));
+        self.sections.push(Section::Fragment(hcl.trim_matches('\n').to_owned()));
     }
 
     /// The module as text.
+    ///
+    /// # Errors
+    ///
+    /// What `hcl-rs` reports when it can't write an expression (its formatting is documented as
+    /// infallible: the error is kept typed rather than assumed away).
     pub fn render(&self) -> Result<String, hcl::Error> {
         let mut out = self.preamble.clone();
         for (i, s) in self.sections.iter().enumerate() {
@@ -107,7 +111,9 @@ fn block(out: &mut String, b: &Block, indent: usize) -> Result<(), hcl::Error> {
         match l {
             BlockLabel::Identifier(i) => out.push_str(i.as_str()),
             BlockLabel::String(s) => {
-                let _ = write!(out, "\"{}\"", quoted_inside(s));
+                out.push('"');
+                out.push_str(&quoted_inside(s));
+                out.push('"');
             }
         }
     }
@@ -128,7 +134,7 @@ fn body(out: &mut String, body: &Body, indent: usize) -> Result<(), hcl::Error> 
         match s {
             Structure::Attribute(a) => {
                 let value = value(&strings_escaped(&a.expr), indent)?;
-                run.push((a.key.as_str().to_string(), value));
+                run.push((a.key.as_str().to_owned(), value));
             }
             Structure::Block(b) => {
                 entries(out, &std::mem::take(&mut run), indent);
@@ -140,27 +146,22 @@ fn body(out: &mut String, body: &Body, indent: usize) -> Result<(), hcl::Error> 
     Ok(())
 }
 
-/// `key = value` lines, the `=` of each run of one-line values aligned.
+/// `key = value` lines, the `=` of each run of one-line values aligned: a value written across
+/// lines ends its run (and takes no part in its alignment).
 fn entries(out: &mut String, entries: &[(String, String)], indent: usize) {
-    let mut start = 0;
-    while start < entries.len() {
-        let end = entries[start..]
-            .iter()
-            .position(|(_, v)| v.contains('\n'))
-            .map_or(entries.len(), |p| start + p + 1);
-        let run = &entries[start..end];
-        let width = run.iter().filter(|(_, v)| !v.contains('\n')).map(|(k, _)| k.chars().count()).max().unwrap_or(0);
+    for run in entries.split_inclusive(|(_, v)| v.contains('\n')) {
+        let one_line = |v: &str| !v.contains('\n');
+        let width = run.iter().filter(|(_, v)| one_line(v)).map(|(k, _)| k.chars().count()).max().unwrap_or(0);
         for (k, v) in run {
             pad(out, indent);
             out.push_str(k);
-            if !v.contains('\n') {
-                out.push_str(&" ".repeat(width - k.chars().count()));
+            if one_line(v) {
+                out.push_str(&" ".repeat(width.saturating_sub(k.chars().count())));
             }
             out.push_str(" = ");
             out.push_str(v);
             out.push('\n');
         }
-        start = end;
     }
 }
 
@@ -170,28 +171,22 @@ fn value(e: &Expression, indent: usize) -> Result<String, hcl::Error> {
     if flat.chars().count() <= WIDTH && !flat.contains('\n') {
         return Ok(flat);
     }
+    // An empty list, object or call is short: only a long one is laid out across lines.
     match e {
-        Expression::Array(items) if !items.is_empty() => array(items, indent),
-        Expression::Object(o) if !o.is_empty() => object(o, indent),
-        Expression::FuncCall(c) if !c.args.is_empty() => func_call(c, indent),
+        Expression::Array(items) => array(items, indent),
+        Expression::Object(o) => object(o, indent),
+        Expression::FuncCall(c) => func_call(c, indent),
         _ => Ok(flat),
     }
 }
 
-/// One item a line.
+/// One item a line, a comma after each but the last.
 fn array(items: &[Expression], indent: usize) -> Result<String, hcl::Error> {
-    let mut out = String::from("[\n");
-    for (i, item) in items.iter().enumerate() {
-        pad(&mut out, indent + 1);
-        out.push_str(&value(item, indent + 1)?);
-        if i + 1 < items.len() {
-            out.push(',');
-        }
-        out.push('\n');
-    }
-    pad(&mut out, indent);
-    out.push(']');
-    Ok(out)
+    let lines = items
+        .iter()
+        .map(|item| Ok(format!("{}{}", "  ".repeat(indent + 1), value(item, indent + 1)?)))
+        .collect::<Result<Vec<String>, hcl::Error>>()?;
+    Ok(format!("[\n{}\n{}]", lines.join(",\n"), "  ".repeat(indent)))
 }
 
 /// One item a line, aligned as a block's attributes are.
@@ -199,7 +194,7 @@ fn object(o: &Object<ObjectKey, Expression>, indent: usize) -> Result<String, hc
     let mut items = Vec::new();
     for (k, v) in o {
         let key = match k {
-            ObjectKey::Identifier(i) => i.as_str().to_string(),
+            ObjectKey::Identifier(i) => i.as_str().to_owned(),
             ObjectKey::Expression(e) => compact(e)?,
             // Non-exhaustive upstream: any other key as `hcl-rs` writes it.
             other => other.to_string(),
@@ -229,7 +224,7 @@ fn func_call(c: &FuncCall, indent: usize) -> Result<String, hcl::Error> {
 }
 
 /// `hcl-rs`'s one-line form of an expression.
-fn compact(e: &Expression) -> Result<String, hcl::Error> {
+pub(super) fn compact(e: &Expression) -> Result<String, hcl::Error> {
     let mut f = Formatter::builder().compact(true).build_vec();
     e.format_string(&mut f)
 }
@@ -296,6 +291,29 @@ mod tests {
     }
 
     #[test]
+    fn a_long_list_inside_an_object_is_indented_one_level_deeper() {
+        let long: Vec<_> = (0..12).map(|i| string(format!("command number {i}"))).collect();
+        let b = Block::builder("x")
+            .add_attribute(("o", object([("k", number(1)), ("inline", list(long))])))
+            .build();
+        let text = rendered(b);
+        assert!(
+            text.starts_with("x {\n  o = {\n    k = 1\n    inline = [\n      \"command number 0\",\n"),
+            "{text}"
+        );
+        assert!(text.ends_with("      \"command number 11\"\n    ]\n  }\n}\n"), "{text}");
+    }
+
+    #[test]
+    fn top_level_blocks_are_one_blank_line_apart() {
+        let mut m = Module::new("");
+        m.block(Block::builder("a").build());
+        m.block(Block::builder("b").build());
+        m.fragment("\nlocals {}\n");
+        assert_eq!(m.render().unwrap(), "a {}\n\nb {}\n\nlocals {}\n");
+    }
+
+    #[test]
     fn comments_and_blank_lines_between_blocks() {
         let mut m = Module::new("# head\n");
         m.commented("one\ntwo", Block::builder("a").build());
@@ -305,5 +323,12 @@ mod tests {
                 .build(),
         );
         assert_eq!(m.render().unwrap(), "# head\n\n# one\n# two\na {}\n\nb {\n  t = \"x${var.y}\"\n}\n");
+    }
+
+    #[test]
+    fn blocks_are_added_in_order() {
+        let mut m = Module::new("");
+        m.blocks([Block::builder("a").build(), Block::builder("b").build()]);
+        assert_eq!(m.render().unwrap(), "a {}\n\nb {}\n");
     }
 }

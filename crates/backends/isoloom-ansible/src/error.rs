@@ -1,7 +1,7 @@
 //! Why the `external` target's files aren't rendered, and how a backend reports it.
 
 use isoloom_plan::Refusal;
-use isoloom_render::backend::RenderError;
+use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
 
 /// Why the `external` target's files aren't rendered.

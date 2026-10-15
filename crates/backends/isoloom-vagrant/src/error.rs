@@ -1,8 +1,7 @@
 //! Why a Vagrantfile isn't rendered, and how a backend reports it.
 
 use isoloom_plan::Refusal;
-use isoloom_render::GenerateError;
-use isoloom_render::backend::RenderError;
+use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
 
 /// Why a Vagrantfile isn't rendered.
@@ -47,7 +46,7 @@ impl From<Error> for RenderError {
     fn from(e: Error) -> RenderError {
         match e {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
-            Error::Unsupported { target, reason } => RenderError::Generate(GenerateError::Unsupported { target, what: reason }),
+            Error::Unsupported { target, reason } => RenderError::Unsupported { target, what: reason },
         }
     }
 }

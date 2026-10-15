@@ -30,7 +30,7 @@
 //! A backend calls `inventory::render(env, &Access::vagrant())` and writes the text where its
 //! controller (or the user) runs Ansible; a header, if the file has one, is the caller's.
 
-use std::fmt::Write;
+use std::fmt;
 
 use indexmap::IndexMap;
 
@@ -45,6 +45,7 @@ pub const CONTROLLER_KEY: &str = "/etc/isoloom/id_ed25519";
 
 /// One host of the inventory: a machine Ansible reaches on this target.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Host<'a> {
     /// The machine's name, the inventory hostname.
     pub name: &'a str,
@@ -55,6 +56,7 @@ pub struct Host<'a> {
 }
 
 /// How a target reaches its hosts.
+#[non_exhaustive]
 pub struct Access<'a> {
     /// `[linux:vars]`, before the `ansible_become=true` every Linux host gets.
     pub linux: Vars,
@@ -64,8 +66,17 @@ pub struct Access<'a> {
     pub host: Box<dyn Fn(&Host<'_>) -> Vars + 'a>,
 }
 
+impl fmt::Debug for Access<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Access")
+            .field("linux", &self.linux)
+            .field("windows", &self.windows)
+            .finish_non_exhaustive()
+    }
+}
+
 fn vars(pairs: &[(&str, &str)]) -> Vars {
-    pairs.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect()
+    pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
 }
 
 /// WinRM's certificate check off and its timeouts longer than Ansible's defaults: a domain
@@ -77,6 +88,7 @@ const WINRM_PATIENCE: [(&str, &str); 3] = [
 ];
 
 /// The WinRM port, scheme and transport of a Windows machine that answers `winrm` that way.
+#[must_use]
 pub fn winrm_vars(winrm: Winrm) -> Vars {
     match winrm {
         Winrm::Ssl => vars(&[("ansible_port", "5986"), ("ansible_winrm_scheme", "https"), ("ansible_winrm_transport", "ntlm")]),
@@ -88,6 +100,7 @@ impl Access<'static> {
     /// Vagrant: the boxes' own `vagrant` account (password auth); WinRM set per box, so a lab
     /// can mix plain-HTTP and HTTPS Windows boxes, and a box reached over OpenSSH instead
     /// (`vm.image.winssh`) gets SSH with PowerShell on its line.
+    #[must_use]
     pub fn vagrant() -> Access<'static> {
         let account = [("ansible_user", "vagrant"), ("ansible_password", "vagrant")];
         let mut windows = vars(&account);
@@ -108,6 +121,7 @@ impl Access<'static> {
 
     /// External: each existing host's SSH user, port and key as its `external:` gives them;
     /// Windows hosts over SSH with PowerShell (OpenSSH on Windows), not WinRM.
+    #[must_use]
     pub fn external() -> Access<'static> {
         Access {
             linux: Vars::new(),
@@ -146,6 +160,7 @@ impl<'a> Access<'a> {
     /// Proxmox: the `isoloom` user cloud-init creates on each Linux VM, with the controller's
     /// key; on a Windows VM, the `isoloom` administrator its set-up makes, whose password is
     /// `windows_password` (a Terraform expression, as the module writes it), over WinRM.
+    #[must_use]
     pub fn proxmox(windows_password: &str) -> Access<'a> {
         Access {
             linux: vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
@@ -164,12 +179,13 @@ impl<'a> Access<'a> {
     /// controller's key; Windows over plain-HTTP WinRM as `isoloom`, whose password is
     /// `windows_password` (a Terraform expression, as the module writes it), authenticated as
     /// the cloud's images allow (`auth`, as Terraform's own connection does).
+    #[must_use]
     pub fn cloud(linux_user: impl Fn(&str) -> String + 'a, windows_password: &str, auth: WinrmAuth) -> Access<'a> {
         Access {
             linux: vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
             windows: isoloom_over_winrm(windows_password, auth),
             host: Box::new(move |h| match h.machine.os.as_deref() {
-                Some(os) if !h.machine.is_windows() => vec![("ansible_user".to_string(), linux_user(os))],
+                Some(os) if !h.machine.is_windows() => vec![("ansible_user".to_owned(), linux_user(os))],
                 _ => Vars::new(),
             }),
         }
@@ -194,6 +210,7 @@ fn external_vars(m: &MachinePlan) -> Vars {
 
 /// The machines Ansible reaches on the environment's target, in spec order: on `external`, the
 /// existing hosts (at their `external` address); elsewhere, the VMs (at their first address).
+#[must_use]
 pub fn hosts(env: &Environment) -> Vec<Host<'_>> {
     env.machines
         .iter()
@@ -211,47 +228,59 @@ pub fn hosts(env: &Environment) -> Vec<Host<'_>> {
 }
 
 /// The inventory of `env`, its hosts reached as `access` says.
+#[must_use]
 pub fn render(env: &Environment, access: &Access<'_>) -> String {
     let hosts = hosts(env);
     let (windows, linux): (Vec<&Host>, Vec<&Host>) = hosts.iter().partition(|h| h.machine.is_windows());
     let lines = |hs: &[&Host]| hs.iter().map(|h| host_line(h, access)).collect::<String>();
-    let mut inv = format!("[linux]\n{}\n[windows]\n{}\n[linux:vars]\n", lines(&linux), lines(&windows));
-    inv.push_str(&group_vars(&access.linux));
-    inv.push_str("ansible_become=true\n");
-    if !windows.is_empty() && !access.windows.is_empty() {
-        let _ = write!(inv, "\n[windows:vars]\n{}", group_vars(&access.windows));
-    }
-    for (group, members) in &env.inventory_groups {
-        let here: Vec<&str> = members.iter().map(String::as_str).filter(|m| hosts.iter().any(|h| h.name == *m)).collect();
-        let _ = write!(inv, "\n[{group}]\n{}\n", here.join("\n"));
-    }
-    inv
+    let windows_vars = if windows.is_empty() || access.windows.is_empty() {
+        String::new()
+    } else {
+        format!("\n[windows:vars]\n{}", group_vars(&access.windows))
+    };
+    let groups: String = env
+        .inventory_groups
+        .iter()
+        .map(|(group, members)| {
+            let here: Vec<&str> = members.iter().map(String::as_str).filter(|m| hosts.iter().any(|h| h.name == *m)).collect();
+            format!("\n[{group}]\n{}\n", here.join("\n"))
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    format!(
+        "[linux]\n{}\n[windows]\n{}\n[linux:vars]\n{}ansible_become=true\n{windows_vars}{groups}",
+        lines(&linux),
+        lines(&windows),
+        group_vars(&access.linux)
+    )
 }
 
 /// `k=v` lines of a `[group:vars]` section (written as is: Ansible reads the rest of the line).
 fn group_vars(vars: &Vars) -> String {
-    vars.iter().fold(String::new(), |mut s, (k, v)| {
-        let _ = writeln!(s, "{k}={v}");
-        s
-    })
+    vars.iter().map(|(k, v)| format!("{k}={v}\n")).collect::<Vec<_>>().concat()
 }
 
 /// A host's line: its name, `ansible_host`, the access's variables, then its `host_vars`.
 fn host_line(h: &Host<'_>, access: &Access<'_>) -> String {
-    let mut line = format!("{} ansible_host={}", h.name, host_value(&h.address));
-    for (k, v) in (access.host)(h) {
-        let _ = write!(line, " {k}={}", host_value(&v));
-    }
-    line.push_str(&host_vars_suffix(&h.machine.host_vars));
-    line.push('\n');
-    line
+    let own: String = (access.host)(h)
+        .iter()
+        .map(|(k, v)| format!(" {k}={}", host_value(v)))
+        .collect::<Vec<_>>()
+        .concat();
+    format!(
+        "{} ansible_host={}{own}{}\n",
+        h.name,
+        host_value(&h.address),
+        host_vars_suffix(&h.machine.host_vars)
+    )
 }
 
 /// A value on a host line: Ansible splits the line like a shell, so a value with a space, a
 /// quote or a comment character is single-quoted; a plain one is written as is.
+#[must_use]
 pub fn host_value(v: &str) -> String {
     let plain = !v.is_empty() && !v.chars().any(|c| c.is_whitespace() || matches!(c, '\'' | '"' | '\\' | '#' | ';'));
-    if plain { v.to_string() } else { single_quoted(v) }
+    if plain { v.to_owned() } else { single_quoted(v) }
 }
 
 /// Single-quoted for Ansible's shell-like split of a host line.
@@ -262,6 +291,7 @@ fn single_quoted(v: &str) -> String {
 /// A value as a Python literal, which is how Ansible reads a host line's values: a string
 /// quoted (so `"10"` stays a string), `True`, `False` and `None`, lists and dicts as Python
 /// spells them.
+#[must_use]
 pub fn python_literal(v: &serde_json::Value) -> String {
     use serde_json::Value;
     match v {
@@ -271,18 +301,23 @@ pub fn python_literal(v: &serde_json::Value) -> String {
         Value::String(_) => v.to_string(),
         Value::Array(a) => format!("[{}]", a.iter().map(python_literal).collect::<Vec<_>>().join(", ")),
         Value::Object(o) => {
-            let items: Vec<String> = o.iter().map(|(k, v)| format!("{}: {}", Value::String(k.clone()), python_literal(v))).collect();
+            let items: Vec<String> = o
+                .iter()
+                .map(|(k, item)| format!("{}: {}", Value::String(k.clone()), python_literal(item)))
+                .collect();
             format!("{{{}}}", items.join(", "))
         }
     }
 }
 
 /// The `host_vars` of one machine as ` key='value'` pairs, the way its inventory line ends.
+#[must_use]
 pub fn host_vars_suffix(host_vars: &IndexMap<String, serde_json::Value>) -> String {
-    host_vars.iter().fold(String::new(), |mut s, (k, v)| {
-        let _ = write!(s, " {k}={}", single_quoted(&python_literal(v)));
-        s
-    })
+    host_vars
+        .iter()
+        .map(|(k, v)| format!(" {k}={}", single_quoted(&python_literal(v))))
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 #[cfg(test)]

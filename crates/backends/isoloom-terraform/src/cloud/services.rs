@@ -11,8 +11,9 @@
 mod scripts;
 
 use isoloom_plan::{Capabilities, Environment};
-use isoloom_render::backend::{self, Backend, Files, RenderError};
-use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, header};
+use isoloom_render::Error as RenderError;
+use isoloom_render::backend::{self, Backend, Files};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 use isoloom_spec::model::{CloudServices, Spec, Target};
 use isoloom_spec::shell;
 
@@ -44,7 +45,10 @@ impl Backend for CloudServicesBackend {
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::CloudServices, env, &self.capabilities())?;
         let spec = env.spec();
-        let cloud = spec.cloud.as_ref().ok_or(GenerateError::NotPossible(Target::CloudServices))?;
+        let cloud = spec.cloud.as_ref().ok_or_else(|| RenderError::Unsupported {
+            target: Target::CloudServices,
+            what: "not possible for this spec (see `isoloom targets`)".to_owned(),
+        })?;
         Ok(files(spec, cloud))
     }
 }

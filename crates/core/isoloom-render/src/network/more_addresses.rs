@@ -3,29 +3,33 @@
 //! or the cloud configures only that one. A cloud that filters by address has been told of them
 //! by its own module (a secondary private address, an alias range).
 
-use std::fmt::Write as _;
-
 use isoloom_plan::more_addresses::MoreAddresses;
-
-use crate::shell::quote;
+use isoloom_spec::shell::quote;
 
 /// Shell that puts each further address on the interface holding the primary one. Idempotent
 /// (`replace`): a transport runs it again at every boot and whenever a link comes up.
+#[must_use]
 pub fn linux(addresses: &[MoreAddresses]) -> String {
-    let mut sh = String::new();
-    for a in addresses {
-        let find = quote(&format!(" inet {}/", a.primary));
-        let _ = writeln!(sh, "dev=$(ip -o -4 addr show | grep -F {find} | awk '{{print $2; exit}}')");
-        for more in &a.more {
-            let _ = writeln!(sh, "ip addr replace {more}/{} dev \"$dev\"", a.prefix);
-        }
-    }
-    sh
+    addresses
+        .iter()
+        .map(|a| {
+            let find = quote(&format!(" inet {}/", a.primary));
+            let added: String = a
+                .more
+                .iter()
+                .map(|more| format!("ip addr replace {more}/{} dev \"$dev\"\n", a.prefix))
+                .collect::<Vec<_>>()
+                .concat();
+            format!("dev=$(ip -o -4 addr show | grep -F {find} | awk '{{print $2; exit}}')\n{added}")
+        })
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 /// The same in PowerShell for a Windows VM: the interface found by the primary address, each
 /// further one added once (Windows keeps them across restarts) and never used as a source, so
 /// the machine's own connections still leave from its primary address.
+#[must_use]
 pub fn windows(addresses: &[MoreAddresses]) -> String {
     addresses
         .iter()

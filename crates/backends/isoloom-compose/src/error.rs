@@ -2,8 +2,7 @@
 
 use isoloom_manifest::ManifestError;
 use isoloom_plan::Refusal;
-use isoloom_render::GenerateError;
-use isoloom_render::backend::RenderError;
+use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
 
 /// Why a Compose file isn't rendered, or read back.
@@ -67,7 +66,7 @@ impl From<Error> for RenderError {
 }
 
 fn unsupported(target: Target, what: String) -> RenderError {
-    RenderError::Generate(GenerateError::Unsupported { target, what })
+    RenderError::Unsupported { target, what }
 }
 
 #[cfg(test)]

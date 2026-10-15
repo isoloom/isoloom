@@ -2,59 +2,14 @@
 //! [`Environment`] into files. Defined here, below every backend crate, so each can implement
 //! it; `isoloom-targets` keeps the registry.
 
-use std::fmt;
-
 use isoloom_manifest::Manifest;
-use isoloom_plan::{Capabilities, Environment, Refusal, refusal};
+use isoloom_plan::{Capabilities, Environment, refusal};
 use isoloom_spec::model::Target;
 
-use crate::{GenerateError, GeneratedFile};
+use crate::{Error, GeneratedFile, Result};
 
 /// The files a backend writes, paths relative to the project folder.
 pub type Files = Vec<GeneratedFile>;
-
-/// Why a backend didn't render an environment.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RenderError {
-    /// The environment needs a capability the backend lacks.
-    Refused {
-        /// The backend's target.
-        target: Target,
-        /// The requirement it can't meet.
-        refusal: Refusal,
-    },
-    /// A backend refused the spec for a reason of its own (a limit of its target).
-    Generate(GenerateError),
-}
-
-impl fmt::Display for RenderError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RenderError::Refused { target, refusal } => write!(f, "{}: {refusal}", target.id()),
-            RenderError::Generate(e) => e.fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for RenderError {}
-
-impl From<GenerateError> for RenderError {
-    fn from(e: GenerateError) -> RenderError {
-        RenderError::Generate(e)
-    }
-}
-
-impl From<RenderError> for GenerateError {
-    fn from(e: RenderError) -> GenerateError {
-        match e {
-            RenderError::Refused { target, refusal } => GenerateError::Unsupported {
-                target,
-                what: refusal.to_string(),
-            },
-            RenderError::Generate(e) => e,
-        }
-    }
-}
 
 /// A target's renderer.
 pub trait Backend: Sync {
@@ -64,9 +19,13 @@ pub trait Backend: Sync {
     /// What it can render.
     fn capabilities(&self) -> Capabilities;
 
-    /// The environment's files. Refuses (without writing anything) when the environment needs
-    /// a capability the backend lacks.
-    fn render(&self, env: &Environment) -> Result<Files, RenderError>;
+    /// The environment's files.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Refused`] (without writing anything) when the environment needs a capability
+    /// the backend lacks; [`Error::Unsupported`] for a limit of the backend's own target.
+    fn render(&self, env: &Environment) -> Result<Files>;
 
     /// Why it would refuse `env`, if it would: the plan's requirements against its
     /// capabilities, without rendering.
@@ -77,25 +36,68 @@ pub trait Backend: Sync {
     /// The run manifest the Isothrum runner executes (`.isoloom/<target>/run.json`), for a target
     /// that has one; its `lab.message` is left to the caller, who fills it from the resolved
     /// snapshot. `None` for the targets that have none yet.
-    fn run_manifest(&self, _env: &Environment) -> Result<Option<Manifest>, RenderError> {
+    ///
+    /// # Errors
+    ///
+    /// The backend's [`Error`] when the environment can't run on its target.
+    fn run_manifest(&self, _env: &Environment) -> Result<Option<Manifest>> {
         Ok(None)
     }
 }
 
-/// A refusal of a part a target is made of (another target's renderer), reported as `target`'s:
-/// the hybrid target's Vagrant VMs and Compose containers, say.
-pub fn as_target(e: impl Into<RenderError>, target: Target) -> RenderError {
-    match e.into() {
-        RenderError::Refused { refusal, .. } => RenderError::Refused { target, refusal },
-        RenderError::Generate(GenerateError::Unsupported { what, .. }) => RenderError::Generate(GenerateError::Unsupported { target, what }),
-        other @ RenderError::Generate(_) => other,
+/// `env` checked against `caps`, for a backend's `render`.
+///
+/// # Errors
+///
+/// [`Error::Refused`] with the first of the plan's requirements `caps` can't meet.
+pub fn check(target: Target, env: &Environment, caps: &Capabilities) -> Result<()> {
+    match refusal(&env.requirements, caps) {
+        Some(refusal) => Err(Error::Refused { target, refusal }),
+        None => Ok(()),
     }
 }
 
-/// `env` checked against `caps`: the refusal as a [`RenderError`], for a backend's `render`.
-pub fn check(target: Target, env: &Environment, caps: &Capabilities) -> Result<(), RenderError> {
-    match refusal(&env.requirements, caps) {
-        Some(refusal) => Err(RenderError::Refused { target, refusal }),
-        None => Ok(()),
+#[cfg(test)]
+mod tests {
+    use isoloom_plan::{Capabilities, Feature, Requirement};
+    use isoloom_spec::model::Target;
+
+    use super::{Backend, Files, check};
+    use crate::{Error, Result, testing};
+
+    /// A backend with no capability at all.
+    struct Bare;
+
+    impl Backend for Bare {
+        fn target(&self) -> Target {
+            Target::Kubernetes
+        }
+
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::of([])
+        }
+
+        fn render(&self, _env: &isoloom_plan::Environment) -> Result<Files> {
+            Ok(Vec::new())
+        }
+    }
+
+    const ALIASED: &str =
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, aliases: [www], app: { image: nginx } }\n";
+
+    #[test]
+    fn a_backend_refuses_the_first_requirement_it_lacks_and_says_why() {
+        let env = testing::env(ALIASED, Target::Kubernetes);
+        let refused = check(Target::Kubernetes, &env, &Capabilities::of([]));
+        assert!(
+            matches!(&refused, Err(Error::Refused { target: Target::Kubernetes, refusal }) if refusal.requirement == Requirement::MachineAliases),
+            "{refused:?}"
+        );
+        assert_eq!(check(Target::Kubernetes, &env, &Capabilities::of([Feature::MachineAliases])), Ok(()));
+        assert_eq!(
+            Bare.refusal(&env).as_deref(),
+            Some("machine `aliases` (dotted DNS names) aren't Kubernetes Service names")
+        );
+        assert_eq!(Bare.run_manifest(&env), Ok(None));
     }
 }

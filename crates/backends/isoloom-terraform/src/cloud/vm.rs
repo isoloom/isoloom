@@ -32,8 +32,9 @@ pub(crate) mod windows;
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
+use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::{Backend, Files, RenderError};
+use isoloom_render::backend::{Backend, Files};
 use isoloom_render::hcl_builder::{Block, Module};
 use isoloom_spec::model::Target;
 

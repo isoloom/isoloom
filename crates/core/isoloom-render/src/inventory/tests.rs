@@ -1,9 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)] // test helpers: a failing test is the report.
-
-use isoloom_plan::{Environment, Lab};
+use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 
 use super::*;
+use crate::testing;
 
 const SPEC: &str = r"
 version: 1
@@ -37,21 +36,20 @@ overrides:
 ";
 
 fn env(spec: &str, target: Target) -> Environment {
-    let lab = Lab::new(isoloom_spec::parse(spec).expect("parses"));
-    Environment::build(&lab.for_target(target), target, None)
+    testing::env(spec, target)
 }
 
+/// The lines of section `[name]`, up to the next section (its blank line kept).
 fn section<'a>(inv: &'a str, name: &str) -> &'a str {
-    let start = inv.find(&format!("[{name}]\n")).unwrap_or_else(|| panic!("[{name}] in\n{inv}")) + name.len() + 3;
-    let rest = &inv[start..];
-    &rest[..rest.find("\n[").map_or(rest.len(), |e| e + 1)]
+    let (_, rest) = inv.split_once(&format!("[{name}]\n")).unwrap_or_else(|| panic!("[{name}] in\n{inv}"));
+    rest.split_inclusive("\n[").next().map_or(rest, |s| s.strip_suffix('[').unwrap_or(s))
 }
 
 #[test]
 fn vms_are_hosts_at_their_first_address_and_containers_are_not() {
     let env = env(SPEC, Target::Vagrant);
     let hosts: Vec<(&str, String)> = hosts(&env).into_iter().map(|h| (h.name, h.address)).collect();
-    assert_eq!(hosts, [("web", "10.8.0.10".to_string()), ("dc", "10.9.0.20".to_string())]);
+    assert_eq!(hosts, [("web", "10.8.0.10".to_owned()), ("dc", "10.9.0.20".to_owned())]);
 }
 
 #[test]
@@ -148,4 +146,10 @@ fn host_values_are_quoted_only_when_the_split_needs_it() {
     assert_eq!(host_value("it's"), r#"'it'"'"'s'"#);
     assert_eq!(host_value(""), "''");
     assert_eq!(host_value("x#y"), "'x#y'");
+}
+
+#[test]
+fn an_access_shows_its_group_variables() {
+    let shown = format!("{:?}", Access::external());
+    assert!(shown.starts_with("Access { linux: [], windows: [(\"ansible_connection\", \"ssh\")"), "{shown}");
 }

@@ -3,42 +3,44 @@
 //! Each runs where the machine's process runs (its working directory, by default the project
 //! folder) with its environment and its inputs, as a container's process would.
 
-use std::fmt::Write as _;
-
 use isoloom_plan::{Environment, Health, HealthTest, MachinePlan};
 use isoloom_spec::model::CommandLine;
+use isoloom_spec::shell::quote;
 
-use super::{PROJECT_DIR, inputs_file};
+use super::{PROJECT_DIR, WINDOWS_PROJECT_DIR, inputs_file};
 use crate::boot::{self, Kind};
-use crate::ps;
-use crate::shell::quote;
-
-/// Where the project is on a Windows VM, and the machine's scripts with it.
-const WINDOWS_DIR: &str = "C:\\isoloom";
+use crate::powershell;
+use crate::secrets;
 
 /// The lines every script of the process starts with: its inputs, its environment, its
 /// directory.
 fn prelude(env: &Environment, machine: &str, mp: &MachinePlan) -> String {
-    let mut sh = String::new();
-    if let Some(file) = inputs_file(env, machine) {
-        let _ = writeln!(sh, "set -a; . {file}; set +a");
-    }
-    for (k, v) in &mp.settings.environment {
-        let _ = writeln!(sh, "export {k}={}", quote(v));
-    }
-    let dir = mp.process.working_dir.as_deref().unwrap_or(PROJECT_DIR);
-    let _ = writeln!(sh, "mkdir -p {d} && cd {d}", d = quote(dir));
-    sh
+    let inputs = inputs_file(env, machine).map(|file| format!("set -a; . {file}; set +a\n")).unwrap_or_default();
+    let exports: String = mp
+        .settings
+        .environment
+        .iter()
+        .map(|(k, v)| format!("export {k}={}\n", quote(v)))
+        .collect::<Vec<_>>()
+        .concat();
+    let dir = quote(mp.process.working_dir.as_deref().unwrap_or(PROJECT_DIR));
+    format!("{inputs}{exports}mkdir -p {dir} && cd {dir}\n")
+}
+
+/// The scripts at `paths` run in order with `sh`, from the project folder.
+fn scripts(paths: &[String]) -> String {
+    paths
+        .iter()
+        .map(|p| format!("sh {}\n", quote(&format!("{PROJECT_DIR}/{p}"))))
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 /// The `before` scripts, run in order now (a failure fails the set-up) and at every boot,
 /// before the command.
 pub(super) fn before(env: &Environment, machine: &str, paths: &[String]) -> Option<String> {
     let mp = env.machines.get(machine)?;
-    let mut script = format!("set -e\n{}", prelude(env, machine, mp));
-    for p in paths {
-        let _ = writeln!(script, "sh {}", quote(&format!("{PROJECT_DIR}/{p}")));
-    }
+    let script = format!("set -e\n{}{}", prelude(env, machine, mp), scripts(paths));
     Some(boot::service(
         "before",
         "The machine's before steps, ahead of its command",
@@ -67,12 +69,11 @@ const SETUP_DONE: &str = "/var/lib/isoloom/setup.done";
 /// set-up), as root, with its inputs and environment.
 pub(super) fn setup(env: &Environment, machine: &str, paths: &[String]) -> Option<String> {
     let mp = env.machines.get(machine)?;
-    let mut script = format!("[ -f {SETUP_DONE} ] || (\nset -e\n{}", prelude(env, machine, mp));
-    for p in paths {
-        let _ = writeln!(script, "sh {}", quote(&format!("{PROJECT_DIR}/{p}")));
-    }
-    let _ = writeln!(script, "mkdir -p /var/lib/isoloom && touch {SETUP_DONE}\n)");
-    Some(script)
+    Some(format!(
+        "[ -f {SETUP_DONE} ] || (\nset -e\n{}{}mkdir -p /var/lib/isoloom && touch {SETUP_DONE}\n)\n",
+        prelude(env, machine, mp),
+        scripts(paths)
+    ))
 }
 
 /// The `setup` scripts on Windows: each run once in order, from the project folder.
@@ -82,23 +83,19 @@ pub(super) fn windows_setup(paths: &[String]) -> String {
         .map(|p| {
             format!(
                 "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-                ps(p)
+                powershell::quote(p)
             )
         })
         .collect();
     format!(
-        "if (-not (Test-Path '{WINDOWS_DIR}\\setup.done')) {{ Set-Location {WINDOWS_DIR}; {}; Set-Content '{WINDOWS_DIR}\\setup.done' done }}",
+        "if (-not (Test-Path '{WINDOWS_PROJECT_DIR}\\setup.done')) {{ Set-Location {WINDOWS_PROJECT_DIR}; {}; Set-Content '{WINDOWS_PROJECT_DIR}\\setup.done' done }}",
         runs.join("; ")
     )
 }
 
 /// At boot, a machine's secrets are back in place before its `before` steps and command run.
 fn secrets_first(mp: &MachinePlan) -> Vec<&'static str> {
-    if mp.secrets.is_empty() {
-        Vec::new()
-    } else {
-        vec![crate::secrets::PLACE_SERVICE]
-    }
+    if mp.secrets.is_empty() { Vec::new() } else { vec![secrets::PLACE_SERVICE] }
 }
 
 /// On Windows, the secrets put in place by the script itself: Task Scheduler starts the
@@ -107,7 +104,7 @@ fn windows_secrets_first(mp: &MachinePlan) -> Vec<String> {
     if mp.secrets.is_empty() {
         Vec::new()
     } else {
-        vec![crate::secrets::windows::place_first()]
+        vec![secrets::windows::place_first()]
     }
 }
 
@@ -139,26 +136,26 @@ pub(super) fn healthy(env: &Environment, machine: &str) -> Option<String> {
 fn powershell(c: &CommandLine) -> String {
     match c {
         CommandLine::Shell(text) => text.clone(),
-        CommandLine::Exec(args) => format!("& {}", args.iter().map(|a| ps(a)).collect::<Vec<_>>().join(" ")),
+        CommandLine::Exec(args) => format!("& {}", args.iter().map(|a| powershell::quote(a)).collect::<Vec<_>>().join(" ")),
     }
 }
 
 /// A script under the project folder, written from `lines`.
 fn windows_script(name: &str, lines: &[String]) -> String {
     let body = lines.join("\n");
-    format!("Set-Content -Path '{WINDOWS_DIR}\\{name}.ps1' -Value {}", ps(&body))
+    format!("Set-Content -Path '{WINDOWS_PROJECT_DIR}\\{name}.ps1' -Value {}", powershell::quote(&body))
 }
 
 /// A startup task running `name.ps1` as SYSTEM, started now.
 fn startup_task(name: &str) -> String {
     format!(
-        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {WINDOWS_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
+        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {WINDOWS_PROJECT_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
     )
 }
 
 /// The working directory, on Windows.
 fn windows_dir(mp: &MachinePlan) -> String {
-    ps(mp.process.working_dir.as_deref().unwrap_or(WINDOWS_DIR))
+    powershell::quote(mp.process.working_dir.as_deref().unwrap_or(WINDOWS_PROJECT_DIR))
 }
 
 /// The `before` scripts on Windows: `before.ps1`, run now; the command's task runs it first at
@@ -173,17 +170,16 @@ pub(super) fn windows_before(env: &Environment, machine: &str, paths: &[String])
     lines.extend(paths.iter().map(|p| {
         format!(
             "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-            ps(&format!("{WINDOWS_DIR}\\{}", p.replace('/', "\\")))
+            powershell::quote(&format!("{WINDOWS_PROJECT_DIR}\\{}", p.replace('/', "\\")))
         )
     }));
-    let mut out = format!(
-        "{}; & powershell -NoProfile -ExecutionPolicy Bypass -File {WINDOWS_DIR}\\before.ps1; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
+    let run = format!(
+        "{}; & powershell -NoProfile -ExecutionPolicy Bypass -File {WINDOWS_PROJECT_DIR}\\before.ps1; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
         windows_script("before", &lines)
     );
-    if mp.process.command.is_none() {
-        let _ = write!(out, "; {}", startup_task("before"));
-    }
-    Some(out)
+    // With no command, the `before` scripts need a startup task of their own.
+    let task = mp.process.command.is_none().then(|| format!("; {}", startup_task("before")));
+    Some(run + &task.unwrap_or_default())
 }
 
 /// The command on Windows: a startup task (as SYSTEM) running `command.ps1`, after `before.ps1`.
@@ -194,7 +190,9 @@ pub(super) fn windows_command(env: &Environment, machine: &str) -> Option<String
         lines.extend(windows_secrets_first(mp));
     } else {
         // `before.ps1` places the secrets first.
-        lines.push(format!("& powershell -NoProfile -ExecutionPolicy Bypass -File {WINDOWS_DIR}\\before.ps1"));
+        lines.push(format!(
+            "& powershell -NoProfile -ExecutionPolicy Bypass -File {WINDOWS_PROJECT_DIR}\\before.ps1"
+        ));
     }
     lines.push(format!(
         "New-Item -ItemType Directory -Force {d} | Out-Null; Set-Location {d}",
@@ -210,13 +208,13 @@ pub(super) fn windows_healthy(env: &Environment, machine: &str) -> Option<String
     let h: &Health = mp.process.health.as_ref()?;
     let test = match &h.test {
         HealthTest::Http { port, path } => format!(
-            "(Invoke-WebRequest -UseBasicParsing -TimeoutSec {} -Uri 'http://127.0.0.1:{port}{}').StatusCode -lt 400",
+            "(Invoke-WebRequest -UseBasicParsing -TimeoutSec {} -Uri {}).StatusCode -lt 400",
             h.timeout,
-            path.replace('\'', "''")
+            powershell::quote(&format!("http://127.0.0.1:{port}{path}"))
         ),
         HealthTest::Command(c) => format!("Set-Location {}; {} | Out-Null; $LASTEXITCODE -eq 0", windows_dir(mp), powershell(c)),
     };
-    let failed = ps(&format!("{machine}: its healthcheck didn't pass after {} tries", h.retries));
+    let failed = powershell::quote(&format!("{machine}: its healthcheck didn't pass after {} tries", h.retries));
     Some(format!(
         "$ok = {{ try {{ {test} }} catch {{ $false }} }}; Start-Sleep -Seconds {}; $n = 0; while (-not (& $ok)) {{ $n++; if ($n -ge {}) {{ throw {failed} }}; Start-Sleep -Seconds {} }}; ",
         h.start_period, h.retries, h.interval
@@ -327,5 +325,73 @@ machines:
         let ready = super::super::windows(&env, "win", &Step::Ready).expect("renders");
         assert!(ready.contains("& 'python' 'check.py' | Out-Null; $LASTEXITCODE -eq 0"), "{ready}");
         assert!(ready.contains("Set-Content C:\\isoloom\\ready ready"), "{ready}");
+    }
+
+    /// `db` (Linux) and `iis` (Windows) get a secret, run a command of their own and say when
+    /// they are healthy: `db` by a command, `iis` by a page.
+    const KEPT: &str = r"
+version: 1
+name: kept
+secrets: { pw: { env: PW } }
+networks:
+  lan: { cidr: 10.84.0.0/24 }
+machines:
+  db:
+    networks: { lan: 10 }
+    os: debian@12
+    files: [{ path: /run/secrets/pw, secret: pw }]
+    command: postgres
+    healthcheck: { test: [pg_isready], timeout: 4s }
+  iis:
+    networks: { lan: 11 }
+    os: windows-server@2022
+    files: [{ path: 'C:\pw.txt', secret: pw }]
+    command: { run: [iis.exe, -x], cwd: /site }
+    healthcheck: { http: { port: 80, path: /it's }, retries: 3 }
+";
+
+    fn kept() -> Environment {
+        let lab = Lab::parse(KEPT).expect("the test spec parses");
+        assert_eq!(lab.problems(), [], "the test spec is valid");
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
+    }
+
+    #[test]
+    fn a_command_starts_once_its_secrets_are_back_in_place() {
+        let env = kept();
+        let linux = super::super::linux(&env, "db", &Step::Command).expect("renders");
+        assert!(
+            linux.contains("After=network-online.target isoloom-apply-secrets.service\nWants=network-online.target\nRequires=isoloom-apply-secrets.service\n"),
+            "{linux}"
+        );
+        assert!(linux.contains("mkdir -p '/opt/isoloom' && cd '/opt/isoloom'\nexec '/bin/sh' '-c' 'postgres'\n"), "{linux}");
+        let windows = super::super::windows(&env, "iis", &Step::Command).expect("renders");
+        assert!(
+            windows.starts_with("Set-Content -Path 'C:\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1'';"),
+            "{windows}"
+        );
+        assert!(
+            windows.contains("New-Item -ItemType Directory -Force ''/site'' | Out-Null; Set-Location ''/site''\n& ''iis.exe'' ''-x'''"),
+            "{windows}"
+        );
+    }
+
+    #[test]
+    fn a_command_healthcheck_runs_within_its_timeout() {
+        let env = kept();
+        let sh = super::super::linux(&env, "db", &Step::Ready).expect("renders");
+        assert!(sh.contains("timeout 4 sh -c ''\\''pg_isready'\\'''\n) >/dev/null 2>&1; }"), "{sh}");
+        assert!(sh.contains("echo 'db: its healthcheck didn'\\''t pass after 60 tries' >&2"), "{sh}");
+    }
+
+    #[test]
+    fn windows_tries_a_page_at_its_quoted_address() {
+        let env = kept();
+        let ps = super::super::windows(&env, "iis", &Step::Ready).expect("renders");
+        assert!(
+            ps.contains("(Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 -Uri 'http://127.0.0.1:80/it''s').StatusCode -lt 400"),
+            "{ps}"
+        );
+        assert!(ps.contains("if ($n -ge 3) { throw 'iis: its healthcheck didn''t pass after 3 tries' }"), "{ps}");
     }
 }

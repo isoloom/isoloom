@@ -1,11 +1,34 @@
 #[cfg(unix)]
-use super::{DELIVERED, KEPT_DIR, host_environment, wait};
-use super::{place, receive, step};
+use super::{DELIVERED, KEPT_DIR, host_environment};
+use super::{compose_variable, of_containers, place, receive, step, wait};
+use crate::testing;
 use isoloom_plan::SecretFile;
+use isoloom_spec::model::Target;
+
+/// Two secrets and an input's file: `web` (a container) gets `db-password` and the flag, `vm`
+/// (a Windows VM) gets `api-key`.
+const LAB: &str = r"
+version: 1
+name: s
+inputs: [FLAG]
+secrets:
+  api-key: { env: API_KEY }
+  db-password: { env: DB_PASSWORD }
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    app: { image: nginx }
+    files: [{ path: /run/secrets/db, secret: db-password }, { path: /flag, input: FLAG }]
+  vm:
+    networks: { lan: 11 }
+    os: windows-server@2022
+    files: [{ path: 'C:\key', secret: api-key }]
+";
 
 fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFile {
     SecretFile {
-        source: isoloom_plan::ValueSource::Secret(name.to_string()),
+        source: isoloom_plan::ValueSource::Secret(name.to_owned()),
         name: name.into(),
         path: path.into(),
         uid,
@@ -21,7 +44,7 @@ fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFi
 fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path::PathBuf) {
     use std::io::Write as _;
     let dir = std::env::temp_dir().join(format!("isoloom-secrets-{tag}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::remove_dir_all(&dir).ok();
     let script = script.replace(KEPT_DIR, &dir.display().to_string());
     let mut child = std::process::Command::new("sh")
         .arg("-c")
@@ -51,7 +74,7 @@ fn b64(s: &str) -> String {
 #[cfg(unix)]
 #[test]
 fn delivery_keeps_each_value_as_sent_then_marks_it() {
-    let names = vec!["db-password".to_string(), "api-key".to_string(), "empty".to_string()];
+    let names = vec!["db-password".to_owned(), "api-key".to_owned(), "empty".to_owned()];
     let values = ["p@ss 'word'\n", "line1\nline2", ""];
     let input: String = values.iter().map(|v| b64(v) + "\n").collect();
     let (out, dir) = run(&receive(&names, &[]), &input, "receive");
@@ -66,24 +89,24 @@ fn delivery_keeps_each_value_as_sent_then_marks_it() {
         assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
         assert_eq!(std::fs::metadata(dir.join("api-key")).unwrap().permissions().mode() & 0o777, 0o600);
     }
-    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
 #[cfg(unix)]
 #[test]
 fn a_missing_value_fails_the_delivery_without_the_mark() {
-    let names = vec!["a".to_string(), "b".to_string()];
+    let names = vec!["a".to_owned(), "b".to_owned()];
     let (out, dir) = run(&receive(&names, &[]), &format!("{}\n", b64("x")), "missing");
     assert!(!out.status.success());
     assert!(!dir.join(".delivered").exists());
-    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn no_value_is_in_a_script() {
     let files = [file("db", "/etc/app/db", Some(1000), Some(0o400))];
-    let sh = receive(&["db".to_string()], &files);
+    let sh = receive(&["db".to_owned()], &files);
     assert!(sh.contains("install -D -o 1000 -g 0 -m 0400 /var/lib/isoloom/secrets/db '/etc/app/db'"), "{sh}");
     assert_eq!(
         place(&[file("x", "/run/secrets/x", None, None)]),
@@ -108,38 +131,16 @@ fn the_wait_passes_once_delivered() {
     let (out, dir) = run(&format!("mkdir -p {KEPT_DIR} && touch {DELIVERED} && {}", wait("web")), "", "wait");
     assert!(out.status.success());
     assert!(out.stdout.is_empty(), "no waiting line once delivered");
-    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
 #[cfg(unix)]
 #[test]
 fn a_docker_host_reads_each_kept_value_into_its_variable() {
-    let spec = isoloom_spec::model::Spec {
-        version: 1,
-        name: "t".into(),
-        networks: indexmap::IndexMap::new(),
-        reach: Vec::new(),
-        dns: None,
-        inputs: Vec::new(),
-        plain_inputs: Vec::new(),
-        secrets: indexmap::IndexMap::new(),
-        machines: indexmap::IndexMap::new(),
-        cloud: None,
-        volumes: indexmap::IndexMap::new(),
-        constraints: None,
-        common: None,
-        groups: indexmap::IndexMap::new(),
-        provision: Vec::new(),
-        controller: None,
-        checks: Vec::new(),
-        targets: None,
-        message: None,
-        tools: indexmap::IndexMap::new(),
-        clones: indexmap::IndexMap::new(),
-    };
+    let spec = testing::spec(LAB);
     assert_eq!(host_environment(&spec, &[]), "");
-    let names = vec!["db-password".to_string()];
+    let names = vec!["db-password".to_owned()];
     let script = format!(
         "mkdir -p {KEPT_DIR} && printf 'v\\n\\n' > {KEPT_DIR}/db-password && touch {DELIVERED}\n{}printf '%s|' \"$ISOLOOM_SECRET_DB_PASSWORD\"",
         host_environment(&spec, &names)
@@ -147,5 +148,21 @@ fn a_docker_host_reads_each_kept_value_into_its_variable() {
     let (out, dir) = run(&script, "", "host");
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(String::from_utf8_lossy(&out.stdout), "v\n\n|");
-    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
+    let sh = wait("web");
+    assert!(sh.contains("if [ \"$n\" -gt 360 ]; then echo"), "{sh}");
+    assert!(sh.ends_with("sleep 5; done\n"), "{sh}");
+    assert!(sh.contains("'web: waiting for `isoloom run` to deliver its secrets'"), "{sh}");
+}
+
+#[test]
+fn a_docker_host_gets_the_secrets_of_its_containers_in_the_spec_s_order() {
+    let env = testing::env(LAB, Target::Hybrid);
+    assert_eq!(of_containers(&env), ["db-password", "input-flag"]);
+    assert_eq!(compose_variable(env.spec(), "db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
+    assert_eq!(compose_variable(env.spec(), "input-flag"), "FLAG", "an input's file reads the input itself");
 }

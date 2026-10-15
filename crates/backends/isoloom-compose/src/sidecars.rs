@@ -45,7 +45,7 @@ pub(crate) fn routes(env: &Environment, host: &str, m: Machine<'_>) -> Service {
         ..Service::default()
     };
     r.after(host, Condition::Started);
-    let ts = trunks::trunks(spec);
+    let ts = trunks::containers(spec);
     for t in trunks::of(&ts, m.name) {
         match vlans::switch_of(spec, &t.lan) {
             // A switch appliance: started (IOS reports no readiness of its own; checks through
@@ -97,12 +97,12 @@ fn on_tc(env: &Environment, m: Machine<'_>) -> bool {
 /// (or a gateway's own way out), no default route when offline, then `tc` on its interfaces.
 fn commands(env: &Environment, m: Machine<'_>) -> Vec<String> {
     let spec = env.spec();
-    let address = |n: &str, o: u8| isoloom_render::address(spec, n, o);
+    let address = |n: &str, o: u8| isoloom_plan::addressing::address(spec, n, o);
     // An appliance routes itself (IOS): its sidecar only hands the data addresses over to it.
     if m.is_appliance() {
         return appliances::sidecar_commands(appliances::ports(spec, m.name, m.spec, &address).len());
     }
-    let ts = trunks::trunks(spec);
+    let ts = trunks::containers(spec);
     let mut cmds: Vec<String> = trunks::of(&ts, m.name)
         .flat_map(|t| trunks::machine_commands(spec, m.spec, t, address, |n| networks::docker_address(env, n)))
         .map(|c| literal(&c))
@@ -146,7 +146,7 @@ fn ready(env: &Environment, m: Machine<'_>) -> String {
     if on_tc(env, m) {
         ready.push("tc qdisc show | grep -q netem".into());
     }
-    let ts = trunks::trunks(env.spec());
+    let ts = trunks::containers(env.spec());
     ready.extend(trunks::of(&ts, m.name).map(trunks::machine_ready));
     ready.join(" && ")
 }

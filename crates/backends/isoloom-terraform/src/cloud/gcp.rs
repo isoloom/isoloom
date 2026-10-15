@@ -6,7 +6,6 @@ pub(crate) mod docker;
 pub(crate) mod vm;
 
 use isoloom_plan::Environment;
-use isoloom_render::gcp_project_name;
 use isoloom_render::hcl_builder::{
     BinaryOperator, Block, Expression, Module, Template, attr, binary, boolean, conditional, index, null, number, reference, string,
 };
@@ -59,7 +58,7 @@ pub(crate) fn project(env: &Environment, m: &mut Module) -> Expression {
         "A project of its own when none is given: everything goes when the environment is destroyed.",
         resource("google_project", "env")
             .add_attribute(("count", own_project()))
-            .add_attribute(("name", string(gcp_project_name(&env.name))))
+            .add_attribute(("name", string(project_name(&env.name))))
             .add_attribute(("project_id", id.into_expression()))
             .add_attribute(("billing_account", reference("var.billing_account")))
             .add_attribute(("org_id", org))
@@ -86,4 +85,24 @@ pub(crate) fn project(env: &Environment, m: &mut Module) -> Expression {
 pub(crate) fn public_ip(id: &str) -> Expression {
     let nic = index(reference(&format!("google_compute_instance.{id}.network_interface")), 0);
     attr(index(attr(nic, "access_config"), 0), "nat_ip")
+}
+
+/// A Google Cloud project's display name: `isoloom-<environment>`, cut to the 30 characters
+/// Google allows (a longer one fails at plan time), without a trailing hyphen.
+fn project_name(env: &str) -> String {
+    let full = format!("isoloom-{env}");
+    full.chars().take(30).collect::<String>().trim_end_matches('-').to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_project_name_fits_google_s_limit() {
+        assert_eq!(super::project_name("web"), "isoloom-web");
+        let long = super::project_name("acme-web-2020-login-portal");
+        assert_eq!(long, "isoloom-acme-web-2020-login-po");
+        assert!(long.len() <= 30);
+        // Never ends on a hyphen once cut.
+        assert_eq!(super::project_name("abcdefghijklmnopqrstu-wxyz"), "isoloom-abcdefghijklmnopqrstu");
+    }
 }

@@ -45,14 +45,8 @@ pub(crate) fn password(name: &str) -> Block {
 }
 
 /// How a module's machines get the project's files, which decides the lists it ends with
-/// (`isoloom_render::project`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ProjectCopy {
-    /// An archive made where Terraform runs, with `tar`: its exclusion list is a file too.
-    Archive,
-    /// Each file written into the machine by its cloud-init (Proxmox).
-    Files,
-}
+/// (`isoloom_render::project`), under the name the modules use.
+pub(crate) use isoloom_render::project::Copy as ProjectCopy;
 
 /// A module, started with its header and how to start and stop it.
 pub(crate) fn start(usage: &Usage) -> Module {
@@ -62,7 +56,7 @@ pub(crate) fn start(usage: &Usage) -> Module {
 /// Module `m` of `target` as its file, `.isoloom/<folder>/main.tf`, ending with the project's
 /// lists.
 pub(crate) fn file(target: Target, folder: &str, mut m: Module, copy: ProjectCopy) -> Result<GeneratedFile> {
-    m.fragment(&project::lists(copy == ProjectCopy::Archive));
+    m.fragment(&project::lists(copy));
     let contents = m.render().map_err(|source| Error::Module {
         target,
         folder: folder.to_owned(),

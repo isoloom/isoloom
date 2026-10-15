@@ -1,8 +1,7 @@
 //! Why a target's Terraform isn't rendered: the target refuses the environment, or a module
 //! can't be written. A backend reports either as the rendering layer's [`RenderError`].
 
-use isoloom_render::GenerateError;
-use isoloom_render::backend::RenderError;
+use isoloom_render::Error as RenderError;
 use isoloom_render::hcl_builder;
 use isoloom_spec::model::Target;
 
@@ -43,7 +42,7 @@ impl From<Error> for RenderError {
             Error::Refused { target, reason } => (target, reason),
             Error::Module { target, folder, source } => (target, format!("the {folder} module couldn't be written: {source}")),
         };
-        RenderError::Generate(GenerateError::Unsupported { target, what })
+        RenderError::Unsupported { target, what }
     }
 }
 

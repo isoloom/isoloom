@@ -131,11 +131,11 @@ pub(crate) fn ports(spec: &Spec, name: &str, m: &Machine, address: &impl Fn(&str
             role: Role::Access(id),
         })
         .collect();
-    for t in trunks::trunks(spec).iter().filter(|t| t.lan == lan) {
+    for t in trunks::containers(spec).iter().filter(|t| t.lan == lan) {
         out.push(Port {
             network: trunks::link_network(t),
             address: None,
-            role: Role::Trunk(t.machine.clone(), t.vlans.iter().map(|(_, id, _)| *id).collect()),
+            role: Role::Trunk(t.machine.clone(), t.vlans.iter().map(|v| v.id).collect()),
         });
     }
     out

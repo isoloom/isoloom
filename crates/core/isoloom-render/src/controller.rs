@@ -1,74 +1,72 @@
-//! The controller's script that runs the environment's playbooks (`provision:`): one script for
-//! every target that runs playbooks (Vagrant, Proxmox, the clouds, `isoloom provision`), so they
-//! all retry the same way.
+//! The controller: the VM that runs the environment's playbooks (`provision:`) on every target
+//! that runs playbooks (Vagrant, Proxmox, the clouds, `isoloom provision`), with one script, so
+//! they all retry the same way.
 //!
 //! After a failed run, when no task failed on its own, the hosts that failed only because of the
 //! connection run the playbook again, on those hosts only (`--limit @<playbook>.retry`), after a
-//! pause, up to [`ATTEMPTS`] runs in all:
+//! pause, up to four runs in all:
 //! - unreachable hosts (a Windows host dropping WinRM for a minute after a domain join or an
 //!   update reboot);
 //! - hosts whose task was cut by a dropped connection: a failure whose message is in
-//!   [`TRANSIENT`] (WinRM's shell crashing mid-task, an SSH session reset).
+//!   the known list of dropped connections (WinRM's shell crashing mid-task, an SSH session
+//!   reset).
 //!
 //! A task that failed on its own is real: the setup stops at once, nothing is retried. So does a
 //! run with no recap (a playbook that doesn't parse). Every wait and run is logged, so the output
 //! explains what happened.
 
-use std::fmt::Write as _;
-
-use isoloom_spec::model::Spec;
+use isoloom_spec::model::{Provision, Spec};
 use isoloom_spec::shell;
 
 /// Runs of a playbook in all: the first and up to three again.
-pub const ATTEMPTS: u32 = 4;
+const ATTEMPTS: u32 = 4;
 
 /// Where Ansible writes its retry files (`<playbook>.retry`), and where `run_play` writes the
 /// hosts a playbook runs again on, in the same file and format.
-pub const RETRY_DIR: &str = "/tmp/isoloom-retry";
+const RETRY_DIR: &str = "/tmp/isoloom-retry";
 
-/// The script running the environment's playbooks, in order, with the inventory at
-/// /etc/isoloom/inventory.ini plus each step's own inventories.
+/// The controller's script running the environment's playbooks, in order, with the inventory
+/// at `/etc/isoloom/inventory.ini` plus each step's own inventories, as it runs when the
+/// environment comes up; `isoloom provision` runs it again on a running environment.
 ///
 /// `limit`: only these machines (`isoloom provision web`); every machine when empty.
-pub fn script(spec: &Spec, limit: &[String]) -> String {
+#[must_use]
+pub fn provision_script(spec: &Spec, limit: &[String]) -> String {
     let limit = if limit.is_empty() {
         String::new()
     } else {
         format!(" --limit {}", shell::quote(&limit.join(",")))
     };
-    let mut script = format!(
+    let head = format!(
         "set -e\nmkdir -p /tmp/isoloom-facts\n{ENVIRONMENT}\nmkdir -p {RETRY_DIR}\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH={RETRY_DIR}\n{}",
         helpers()
     );
-    for step in &spec.provision {
-        let (dir, file) = step.ansible.rsplit_once('/').unwrap_or((".", &step.ansible));
-        let extra = step.inventory.iter().fold(String::new(), |mut s, i| {
-            let _ = write!(s, " -i /opt/isoloom/{i}");
-            s
-        });
-        let requirements = match &step.requirements {
-            Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
-            None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
-        };
-        let _ = writeln!(
-            script,
-            "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{}{limit} {file}",
-            vars(step)
-        );
-    }
-    script
+    let plays: String = spec.provision.iter().map(|step| play(step, &limit)).collect();
+    head + &plays
+}
+
+/// One `provision:` step's lines: into its playbook's folder, its roles installed, the playbook
+/// run through `run_play`.
+fn play(step: &Provision, limit: &str) -> String {
+    let (dir, file) = step.ansible.rsplit_once('/').unwrap_or((".", &step.ansible));
+    let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect::<Vec<_>>().concat();
+    let requirements = match &step.requirements {
+        Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
+        None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
+    };
+    format!(
+        "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{}{limit} {file}\n",
+        vars(step)
+    )
 }
 
 /// A step's variables as one JSON `-e` (`-e k=v` splits values on spaces).
-fn vars(step: &isoloom_spec::model::Provision) -> String {
+fn vars(step: &Provision) -> String {
     if step.vars.is_empty() {
         return String::new();
     }
-    match serde_json::to_string(&step.vars) {
-        Ok(json) => format!(" -e {}", shell::quote(&json)),
-        // JSON values always serialize; nothing is better than a broken argument.
-        Err(_) => String::new(),
-    }
+    let json = serde_json::Value::Object(step.vars.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
+    format!(" -e {}", shell::quote(&json.to_string()))
 }
 
 /// Ansible's settings. Performance: facts gathered once and cached (the WinRM `setup` module is
@@ -84,7 +82,7 @@ ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=
 /// most of these as a failed task rather than an unreachable host: WinRM's shell crashing
 /// mid-task, a Windows host rebooting during a play (a domain join), an SSH session reset.
 /// Lowercase; none may hold a `'` (the list is single-quoted in the script).
-pub const TRANSIENT: &[&str] = &[
+const TRANSIENT: &[&str] = &[
     // WinRM: the shell or its HTTP transport went away under a task.
     "send_input failed",
     "the pipe has been ended",
@@ -116,7 +114,7 @@ pub const TRANSIENT: &[&str] = &[
 ///   (`--limit @<playbook>.retry`, in `ANSIBLE_RETRY_FILES_SAVE_PATH`, [`RETRY_DIR`] by default)
 ///   after a pause of 4 × `ISOLOOM_RETRY_PAUSE` (60 s by default; 2 × when no host was
 ///   unreachable, only cut), up to [`ATTEMPTS`] runs in all. Its exit code is the last run's.
-pub fn helpers() -> String {
+fn helpers() -> String {
     format!(
         "_isoloom_pause=${{ISOLOOM_RETRY_PAUSE:-15}}\n_isoloom_attempts={ATTEMPTS}\n_isoloom_transient='{}'\n{HELPER_FUNCTIONS}",
         TRANSIENT.join("|")
@@ -217,5 +215,5 @@ run_play() {
 }
 "#;
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests;

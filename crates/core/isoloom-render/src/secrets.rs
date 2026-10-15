@@ -8,14 +8,12 @@
 //! the target's own tool (`vagrant up`, `terraform apply`, cloud-init), so the step is a gate:
 //! it waits for the mark, and `isoloom run` delivers while the tool runs.
 
-use std::fmt::Write as _;
-
 use isoloom_plan::secrets::VM_DEFAULT_MODE;
 use isoloom_plan::{Environment, MachineShape, SecretFile};
 use isoloom_spec::model::{SecretSource, Spec, secret_variable};
+use isoloom_spec::shell::quote;
 
 use crate::boot;
-use crate::shell::quote;
 
 pub mod windows;
 
@@ -37,39 +35,45 @@ pub const PLACE_SERVICE: &str = "apply-secrets";
 /// secret of `names`, in that order, each value in base64 (so any text fits on one line); the
 /// script keeps each one, marks the delivery, then puts `files` in place (so a run again
 /// refreshes them). Nothing of a value reaches its command line or its output.
+#[must_use]
 pub fn receive(names: &[String], files: &[SecretFile]) -> String {
-    let mut sh = format!("set -e\numask 077\nmkdir -p {KEPT_DIR}\nchmod 700 {KEPT_DIR}\n");
-    for name in names {
-        let kept = format!("{KEPT_DIR}/{name}");
-        let _ = writeln!(
-            sh,
-            "IFS= read -r v || [ -n \"$v\" ]; printf '%s\\n' \"$v\" | base64 -d > {kept}.new; mv -f {kept}.new {kept}"
-        );
-    }
-    let _ = writeln!(sh, "unset v\ntouch {DELIVERED}");
-    sh.push_str(&place(files));
-    sh
+    let kept: String = names
+        .iter()
+        .map(|name| {
+            let kept = format!("{KEPT_DIR}/{name}");
+            format!("IFS= read -r v || [ -n \"$v\" ]; printf '%s\\n' \"$v\" | base64 -d > {kept}.new; mv -f {kept}.new {kept}\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    format!(
+        "set -e\numask 077\nmkdir -p {KEPT_DIR}\nchmod 700 {KEPT_DIR}\n{kept}unset v\ntouch {DELIVERED}\n{}",
+        place(files)
+    )
 }
 
 /// Each kept secret copied to its path, with its owner and mode (root and [`VM_DEFAULT_MODE`]
 /// unless the spec says), its folder made when missing.
+#[must_use]
 pub fn place(files: &[SecretFile]) -> String {
-    files.iter().fold(String::new(), |mut sh, f| {
-        let _ = writeln!(
-            sh,
-            "install -D -o {} -g {} -m {:04o} {KEPT_DIR}/{} {}",
-            f.uid.unwrap_or(0),
-            f.gid.unwrap_or(0),
-            f.mode.unwrap_or(VM_DEFAULT_MODE),
-            f.name,
-            quote(&f.path)
-        );
-        sh
-    })
+    files
+        .iter()
+        .map(|f| {
+            format!(
+                "install -D -o {} -g {} -m {:04o} {KEPT_DIR}/{} {}\n",
+                f.uid.unwrap_or(0),
+                f.gid.unwrap_or(0),
+                f.mode.unwrap_or(VM_DEFAULT_MODE),
+                f.name,
+                quote(&f.path)
+            )
+        })
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 /// Waits for the delivery mark, saying so once; fails after [`DELIVERY_TIMEOUT`] seconds with
 /// what to do. `who` names the machine in the messages.
+#[must_use]
 pub fn wait(who: &str) -> String {
     let waiting = quote(&format!("{who}: waiting for `isoloom run` to deliver its secrets"));
     let missing = quote(&format!(
@@ -82,8 +86,9 @@ pub fn wait(who: &str) -> String {
 }
 
 /// A VM's `Secrets` step: the wait, then its files put in place now and at every boot.
+#[must_use]
 pub fn step(machine: &str, files: &[SecretFile]) -> String {
-    let service = boot::at_boot(PLACE_SERVICE, "The machine's secrets, put in place", &place(files), false, &[]);
+    let service = boot::at_boot(PLACE_SERVICE, "The machine's secrets, put in place", &place(files), boot::Trigger::Boot, &[]);
     format!("set -e\n{}{service}", wait(machine))
 }
 
@@ -105,16 +110,20 @@ pub fn host_environment(spec: &Spec, names: &[String]) -> String {
     if names.is_empty() {
         return String::new();
     }
-    let mut sh = wait("the Docker host");
-    for name in names {
-        let var = compose_variable(spec, name);
-        let _ = writeln!(sh, "{var}=\"$(cat {KEPT_DIR}/{name}; printf x)\"; {var}=\"${{{var}%x}}\"; export {var}");
-    }
-    sh
+    let read: String = names
+        .iter()
+        .map(|name| {
+            let var = compose_variable(spec, name);
+            format!("{var}=\"$(cat {KEPT_DIR}/{name}; printf x)\"; {var}=\"${{{var}%x}}\"; export {var}\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    wait("the Docker host") + &read
 }
 
 /// The secrets a Docker host gets: those its containers get, in the order the spec declares
 /// them.
+#[must_use]
 pub fn of_containers(env: &Environment) -> Vec<String> {
     env.spec()
         .secrets

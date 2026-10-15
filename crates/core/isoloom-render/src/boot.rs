@@ -4,12 +4,21 @@
 //! applied now and again at every boot. A machine's own command and `before` steps run the same
 //! way, as a [`service`].
 
-use std::fmt::Write as _;
+use isoloom_spec::shell::quote;
 
-/// `script` saved as `/etc/isoloom/<name>.sh` and run now and at every boot by a systemd
-/// service (`isoloom-<name>`), `what` saying what it does. With `on_link_up`, it also runs
-/// whenever an interface comes up (ifupdown, networkd-dispatcher): bringing an interface down
-/// drops its routes, and some hypervisors (Vagrant) reconfigure interfaces after every boot.
+/// When a script kept with [`at_boot`] runs again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Trigger {
+    /// At every boot.
+    Boot,
+    /// At every boot, and whenever an interface comes up (ifupdown, networkd-dispatcher):
+    /// bringing an interface down drops its routes, and some hypervisors (Vagrant) reconfigure
+    /// interfaces after every boot.
+    BootAndLinkUp,
+}
+
+/// `script` saved as `/etc/isoloom/<name>.sh` and run now and again as `trigger` says, by a
+/// systemd service (`isoloom-<name>`), `what` saying what it does.
 ///
 /// `after`: the other such scripts it runs after at boot (routes through a trunk's interface
 /// after the trunks).
@@ -19,14 +28,14 @@ use std::fmt::Write as _;
 /// The script always succeeds (a route whose link isn't up yet, a VLAN interface already
 /// there): an interface hook failing would fail the interface's bring-up. It runs again at the
 /// next boot or link change.
-pub fn at_boot(name: &str, what: &str, script: &str, on_link_up: bool, after: &[&str]) -> String {
+#[must_use]
+pub fn at_boot(name: &str, what: &str, script: &str, trigger: Trigger, after: &[&str]) -> String {
     let path = format!("/etc/isoloom/{name}.sh");
-    let hooks = if on_link_up {
-        format!(
+    let hooks = match trigger {
+        Trigger::BootAndLinkUp => format!(
             "for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do\n  if [ -d \"$d\" ]; then ln -sf {path} \"$d/zz-isoloom-{name}\"; fi\ndone\n"
-        )
-    } else {
-        String::new()
+        ),
+        Trigger::Boot => String::new(),
     };
     install(&Unit {
         name,
@@ -58,6 +67,7 @@ pub enum Kind {
 ///
 /// Without systemd (OpenRC: Alpine), it runs from `/etc/local.d` at boot (in the background
 /// for a daemon, its output in `/var/log/isoloom-<name>.log`), and now.
+#[must_use]
 pub fn service(name: &str, what: &str, script: &str, kind: Kind, after: &[&str]) -> String {
     let path = format!("/etc/isoloom/{name}.sh");
     let (service, now) = match kind {
@@ -78,7 +88,7 @@ pub fn service(name: &str, what: &str, script: &str, kind: Kind, after: &[&str])
         service: &service,
         openrc: &format!(
             "mkdir -p /etc/local.d && printf '%s\\n' '#!/bin/sh' {} > {start} && chmod +x {start}\n",
-            crate::shell::quote(&now)
+            quote(&now)
         ),
         now: &now,
     })
@@ -104,14 +114,13 @@ struct Unit<'a> {
     now: &'a str,
 }
 
+/// The script written, then its systemd unit enabled and started, or OpenRC's way without
+/// systemd.
 fn install(u: &Unit) -> String {
     let (name, what, path) = (u.name, u.what, format!("/etc/isoloom/{}.sh", u.name));
     let unit = format!("isoloom-{name}.service");
     let marker = name.to_uppercase();
-    let after = u.after.iter().fold(String::new(), |mut s, a| {
-        let _ = write!(s, " isoloom-{a}.service");
-        s
-    });
+    let after: String = u.after.iter().map(|a| format!(" isoloom-{a}.service")).collect::<Vec<_>>().concat();
     let requires = if u.requires && !after.is_empty() {
         format!("\nRequires={}", after.trim_start())
     } else {
@@ -136,7 +145,7 @@ fn install(u: &Unit) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Kind, at_boot, service};
+    use super::{Kind, Trigger, at_boot, service};
 
     #[test]
     fn a_daemon_restarts_and_a_step_fails_its_setup() {
@@ -162,7 +171,7 @@ mod tests {
             "routes",
             "Routes to the other networks",
             "ip route replace 10.1.0.0/24 via 10.0.0.1\n",
-            true,
+            Trigger::BootAndLinkUp,
             &["trunks"],
         );
         assert!(
@@ -177,20 +186,23 @@ mod tests {
             sh.contains("zz-isoloom-routes") && sh.contains("After=network-online.target isoloom-trunks.service\n"),
             "{sh}"
         );
-        assert!(!at_boot("tc", "Link impairment", "tc qdisc\n", false, &[]).contains("if-up.d"));
+        assert!(!sh.contains("Requires="), "a kept script runs after the others without needing them: {sh}");
+        let tc = at_boot("tc", "Link impairment", "tc qdisc\n", Trigger::Boot, &[]);
+        assert!(!tc.contains("if-up.d") && !tc.contains("Requires="), "{tc}");
+        assert!(tc.contains("tc qdisc\nexit 0\nTC\n"), "a kept script always succeeds: {tc}");
     }
 
     #[test]
     fn it_runs_under_sh() {
         let dir = std::env::temp_dir().join(format!("isoloom-boot-{}", std::process::id()));
         // Only the file part: a test can't enable a systemd unit.
-        let sh = at_boot("t", "test", "echo ok\n", false, &[]).replace("/etc/isoloom", &dir.display().to_string());
-        let file_part: String = sh.split("if command -v systemctl").next().unwrap_or_default().to_string();
+        let sh = at_boot("t", "test", "echo ok\n", Trigger::Boot, &[]).replace("/etc/isoloom", &dir.display().to_string());
+        let file_part = sh.split("if command -v systemctl").next().unwrap_or_default().to_owned();
         let out = std::process::Command::new("sh")
             .arg("-c")
             .arg(format!("{file_part}{}/t.sh", dir.display()))
             .output();
-        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::remove_dir_all(&dir).ok();
         let out = out.expect("sh runs");
         assert_eq!(String::from_utf8_lossy(&out.stdout), "ok\n");
         assert!(out.status.success());

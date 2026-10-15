@@ -4,21 +4,26 @@
 
 pub mod backends;
 pub mod composite;
+mod error;
 pub mod report;
 pub mod resolved;
 
 pub use backends::{BACKENDS, backend};
+pub use error::GenerateError;
 pub use isoloom_plan::Environment;
-pub use isoloom_render::backend::{Backend, Files, RenderError};
+pub use isoloom_render::Error as RenderError;
+pub use isoloom_render::backend::{Backend, Files};
 
 pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, start_plan};
 pub use isoloom_kubernetes::{SECRETS as KUBERNETES_SECRETS, project_copies};
 pub use isoloom_render::container::{exec_runner, leaf_jobs, project_variables as compose_project_variables, start_commands};
-pub use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, constraints, machine_setup, provision_script, router_name};
+pub use isoloom_render::controller::provision_script;
+pub use isoloom_render::{GeneratedFile, OUTPUT_DIR, constraints};
 pub use isoloom_spec::validate::docker_cidrs;
 
+use isoloom_plan::addressing::{address, start_order};
 use isoloom_plan::checks;
-use isoloom_render::{address, router, start_order};
+use isoloom_render::router;
 use isoloom_spec::{groups, images, instance, model, validate};
 
 /// The network appliances' management network (see `docker.appliance`).

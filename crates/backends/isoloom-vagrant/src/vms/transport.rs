@@ -16,7 +16,8 @@ use std::net::Ipv4Addr;
 
 use isoloom_plan::lifecycle::Step;
 use isoloom_plan::{Environment, MachinePlan, Route};
-use isoloom_render::{boot, steps};
+use isoloom_render::boot::{self, Trigger};
+use isoloom_render::steps;
 
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
@@ -171,14 +172,19 @@ fn reboot(r: &mut Ruby) {
 fn persisted(r: &mut Ruby, env: &Environment, machine: &str, step: &Step) {
     let Some(script) = steps::linux(env, machine, step) else { return };
     // Its boot unit: name, what it does, whether it waits for the links, what it comes after.
-    let (name, what, on_link_up, after): (&str, &str, bool, &[&str]) = match step {
-        Step::Routes { .. } => ("routes", ROUTES, true, &["trunks"]),
-        Step::Trunks => ("trunks", "802.1Q interfaces of the isoloom trunks", true, &[]),
-        Step::Ipv6 { .. } => ("ipv6", "IPv6 addresses and routes on the isoloom networks", true, &["routes"]),
-        Step::MoreAddresses { .. } => ("addresses", "The machine's further addresses on the isoloom networks", true, &["trunks"]),
-        _ => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", false, &[]),
+    let (name, what, trigger, after): (&str, &str, Trigger, &[&str]) = match step {
+        Step::Routes { .. } => ("routes", ROUTES, Trigger::BootAndLinkUp, &["trunks"]),
+        Step::Trunks => ("trunks", "802.1Q interfaces of the isoloom trunks", Trigger::BootAndLinkUp, &[]),
+        Step::Ipv6 { .. } => ("ipv6", "IPv6 addresses and routes on the isoloom networks", Trigger::BootAndLinkUp, &["routes"]),
+        Step::MoreAddresses { .. } => (
+            "addresses",
+            "The machine's further addresses on the isoloom networks",
+            Trigger::BootAndLinkUp,
+            &["trunks"],
+        ),
+        _ => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", Trigger::Boot, &[]),
     };
-    shell(r, &label(step), &boot::at_boot(name, what, &script, on_link_up, after));
+    shell(r, &label(step), &boot::at_boot(name, what, &script, trigger, after));
 }
 
 /// What the routes' boot unit does.
@@ -188,7 +194,11 @@ const ROUTES: &str = "Routes to the other isoloom networks";
 fn default_route(r: &mut Ruby, env: &Environment, machine: &str, routes: Vec<Route>, via: Ipv4Addr) {
     let step = Step::Routes { routes, default: Some(via) };
     if let Some(script) = steps::linux(env, machine, &step) {
-        shell(r, "default route", &boot::at_boot("routes", ROUTES, &script, true, &["trunks"]));
+        shell(
+            r,
+            "default route",
+            &boot::at_boot("routes", ROUTES, &script, Trigger::BootAndLinkUp, &["trunks"]),
+        );
     }
 }
 

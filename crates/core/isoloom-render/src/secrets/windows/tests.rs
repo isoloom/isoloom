@@ -4,7 +4,7 @@ use super::{BOOTSTRAP, DELIVERED, KEPT_DIR, PLACE_SCRIPT, command_line, input, p
 
 fn file(name: &str, path: &str) -> SecretFile {
     SecretFile {
-        source: isoloom_plan::ValueSource::Secret(name.to_string()),
+        source: isoloom_plan::ValueSource::Secret(name.to_owned()),
         name: name.into(),
         path: path.into(),
         uid: None,
@@ -38,7 +38,7 @@ fn a_path_from_root_is_on_drive_c() {
 
 #[test]
 fn delivery_locks_the_folder_then_keeps_each_value_then_marks_it() {
-    let names = vec!["db-password".to_string(), "it's".to_string()];
+    let names = vec!["db-password".to_owned(), "it's".to_owned()];
     let ps = receive(&names, &[file("db-password", "/run/secrets/db-password")]);
     let lock = ps.find("Protect-IsoloomPath $k").expect("the folder is locked");
     let keep = ps.find("foreach ($n in @('db-password', 'it''s'))").expect("names in order, quoted");
@@ -90,11 +90,15 @@ fn the_command_line_is_the_bootstrap_alone() {
     // Nothing a remote shell (cmd or PowerShell) would expand or split differently.
     let line = command_line();
     assert!(line.chars().all(|c| c.is_ascii_alphanumeric() || " -+/=".contains(c)), "{line}");
+    assert_eq!(
+        line,
+        format!("powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}")
+    );
 }
 
 #[test]
 fn the_input_is_the_script_then_the_values() {
-    let names = vec!["db".to_string()];
+    let names = vec!["db".to_owned()];
     let files = [file("db", "/run/secrets/db")];
     let bytes = input(&names, &files, b"c2VjcmV0\n");
     let text = String::from_utf8(bytes).expect("text");

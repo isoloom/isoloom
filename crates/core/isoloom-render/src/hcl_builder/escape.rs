@@ -3,38 +3,31 @@
 //! reach Terraform as `${`. HCL's template scanner reads `$${` and `%%{` as the literal markers,
 //! left to right; every other character is itself, or a backslash escape.
 
-use std::fmt::Write as _;
-
 use hcl::expr::{Expression, Object, ObjectKey, Operation, TemplateExpr, TraversalOperator};
 
 /// The inside of a quoted string that reads as `s`: backslash escapes for quotes, backslashes
 /// and control characters, and `${` / `%{` written `$${` / `%%{`.
-pub fn quoted_inside(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    let mut chars = s.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => {
-                let _ = write!(out, "\\u{:04x}", u32::from(c));
-            }
-            '$' | '%' if chars.peek() == Some(&'{') => {
-                out.push(c);
-                out.push(c);
-            }
-            c => out.push(c),
-        }
-    }
-    out
+pub(super) fn quoted_inside(s: &str) -> String {
+    let next = s.chars().skip(1).map(Some).chain([None]);
+    s.chars()
+        .zip(next)
+        .map(|(c, after)| match c {
+            '"' => "\\\"".to_owned(),
+            '\\' => "\\\\".to_owned(),
+            '\n' => "\\n".to_owned(),
+            '\r' => "\\r".to_owned(),
+            '\t' => "\\t".to_owned(),
+            c if c.is_control() => format!("\\u{:04x}", u32::from(c)),
+            '$' | '%' if after == Some('{') => format!("{c}{c}"),
+            c => c.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 /// `e` with every string value turned into a quoted template escaped by [`quoted_inside`], so
 /// `hcl-rs` writes it as it is.
-pub fn strings_escaped(e: &Expression) -> Expression {
+pub(super) fn strings_escaped(e: &Expression) -> Expression {
     match e {
         Expression::String(s) => quoted(s),
         Expression::Array(items) => Expression::Array(items.iter().map(strings_escaped).collect()),
@@ -104,11 +97,38 @@ fn operation(o: &Operation) -> Expression {
 
 #[cfg(test)]
 mod tests {
-    use super::quoted_inside;
+    use hcl::expr::{BinaryOperator, Expression};
+
+    use super::{quoted_inside, strings_escaped};
+    use crate::hcl_builder::write::compact;
+    use crate::hcl_builder::{binary, boolean, call, conditional, for_list, index, list, not, object, reference, string};
 
     #[test]
     fn markers_are_escaped_every_time() {
         assert_eq!(quoted_inside("${a} $${b} %{c} $ %"), "$${a} $$${b} %%{c} $ %");
         assert_eq!(quoted_inside("\"\\\n\t\u{1}"), "\\\"\\\\\\n\\t\\u0001");
+    }
+
+    #[test]
+    fn a_string_is_escaped_wherever_it_stands() {
+        let marker = || string("${x}");
+        let tree = list([
+            marker(),
+            object([("k", marker())]),
+            call("f", [marker()]),
+            conditional(marker(), marker(), marker()),
+            binary(marker(), BinaryOperator::Eq, marker()),
+            not(marker()),
+            for_list("v", marker(), marker(), Some(marker())),
+            index(list([marker()]), 0),
+            Expression::Parenthesis(Box::new(marker())),
+        ]);
+        let written = compact(&strings_escaped(&tree)).expect("written");
+        assert_eq!(written.matches("$${x}").count(), 14, "{written}");
+        assert!(!written.replace("$${", "").contains("${"), "an interpolation slipped through: {written}");
+        assert_eq!(strings_escaped(&reference("var.a")), reference("var.a"));
+        assert_eq!(strings_escaped(&boolean(true)), boolean(true));
+        let key = compact(&strings_escaped(&object([("${k}", boolean(true))]))).expect("written");
+        assert_eq!(key, "{ \"$${k}\" = true }");
     }
 }

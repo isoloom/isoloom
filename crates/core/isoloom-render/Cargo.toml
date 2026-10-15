@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-render"
-description = "Shared pieces every Isoloom backend renders with."
+description = "What every Isoloom backend renders with: the backend port, the builders (HCL, Ruby, PowerShell, Dockerfile, the Ansible inventory), a VM's set-up steps, the network pieces and the containers' shared parts."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,6 +15,7 @@ isoloom-manifest.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
 hcl.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

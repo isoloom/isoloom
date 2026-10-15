@@ -6,10 +6,11 @@
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
+use isoloom_plan::addressing::{address, names_of};
 use isoloom_plan::{Controller, Environment, Step};
 use isoloom_render::hcl_builder::{Expression, Module, Template, call, reference, string};
 use isoloom_render::inventory::{self, Access, WinrmAuth};
-use isoloom_render::{address, ansible_runs, names_of, steps};
+use isoloom_render::{controller, steps};
 use isoloom_spec::validate::Cidr;
 
 use super::provisioner::{Connection, Provisioner, Upload};
@@ -85,7 +86,7 @@ pub(crate) fn hosts(env: &Environment) -> Option<String> {
 
 /// The playbooks, as the controller runs them.
 pub(crate) fn playbooks(env: &Environment) -> String {
-    ansible_runs(env.spec(), &[])
+    controller::provision_script(env.spec(), &[])
 }
 
 /// A cloud's inventory (the shared one, `isoloom_render::inventory`): each Linux VM as its

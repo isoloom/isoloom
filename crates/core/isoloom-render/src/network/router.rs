@@ -1,42 +1,39 @@
-//! The router both generators add when a spec has `reach` rules: a machine on every network
-//! at its last address, forwarding between networks and filtering with nftables. Machines
-//! route the networks they aren't on through it.
+//! The router both kinds of target add when a spec has `reach` rules: a machine on every network
+//! at its last address, forwarding between networks and filtering with nftables. Machines route
+//! the networks they aren't on through it.
 //!
-//! A network can instead name a machine of the environment as its `gateway` (an edge
-//! firewall): the router stays off it, and its machines route through that gateway.
+//! A network can instead name a machine of the environment as its `gateway` (an edge firewall):
+//! the router stays off it, and its machines route through that gateway.
+//!
+//! The facts (where the router stands, which networks it routes) are the plan's
+//! (`isoloom_plan::routing`), re-exported here beside what is rendered from them, so a backend
+//! reads the router in one place.
 
 use std::net::Ipv4Addr;
 
 pub use isoloom_plan::routing::{NAME, address, default_gateway, is_gateway, needed, networks, plain, routed, routes};
+use isoloom_spec::model::{Machine, Spec};
 
-use crate::model::{Machine, Spec};
-
-/// Shell commands that install those routes, then the default route through a gateway
-/// (`ip route replace` is idempotent).
-pub fn route_commands(spec: &Spec, name: &str, m: &Machine, with_default: bool) -> Vec<String> {
-    let mut cmds: Vec<String> = routes(spec, name, m)
-        .into_iter()
-        .map(|(cidr, via)| format!("ip route replace {cidr} via {via}"))
-        .collect();
-    if with_default && let Some(gw) = default_gateway(spec, name, m) {
-        cmds.push(format!("ip route replace default via {gw}"));
-    }
-    cmds
-}
+use super::ipv6;
 
 /// The nftables ruleset: forwarding between networks is dropped, except what `reach` allows
 /// (and replies to it).
+#[must_use]
 pub fn nftables(spec: &Spec) -> String {
     let body = forward_rules(spec).iter().map(|r| format!("    {r}")).collect::<Vec<_>>().join("\n");
     format!("table inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{body}\n  }}\n}}\n")
 }
 
-/// The rules of the router's forward chain: replies, then what each `reach` rule opens.
+/// The rules of the router's forward chain: replies, then what each `reach` rule between two
+/// networks it routes opens.
+#[must_use]
 pub fn forward_rules(spec: &Spec) -> Vec<String> {
-    let mut rules = vec!["ct state established,related accept".to_string()];
+    let mut rules = vec!["ct state established,related accept".to_owned()];
     for r in spec.reach.iter().filter(|r| plain(spec, &r.from) && plain(spec, &r.to)) {
-        let from = &spec.networks[&r.from].cidr;
-        let to = &spec.networks[&r.to].cidr;
+        let (Some(from), Some(to)) = (spec.networks.get(&r.from), spec.networks.get(&r.to)) else {
+            continue;
+        };
+        let (from, to) = (&from.cidr, &to.cidr);
         if r.ports.is_empty() {
             rules.push(format!("ip saddr {from} ip daddr {to} accept"));
         } else {
@@ -46,13 +43,14 @@ pub fn forward_rules(spec: &Spec) -> Vec<String> {
             ));
             rules.push(format!("ip saddr {from} ip daddr {to} icmp type echo-request accept"));
         }
-        rules.extend(crate::ipv6::forward_rules(spec, &r.from, &r.to, &r.ports));
+        rules.extend(ipv6::forward_rules(spec, &r.from, &r.to, &r.ports));
     }
     rules
 }
 
 /// Shell that applies each network's `tc` on the router's interface into it (found by the
 /// router's address there), or `None` when no network asks for it. Idempotent (`replace`).
+#[must_use]
 pub fn tc_script(spec: &Spec) -> Option<String> {
     netem_script(spec, networks(spec).map(|n| (n.as_str(), address(spec, n))))
 }
@@ -60,6 +58,7 @@ pub fn tc_script(spec: &Spec) -> Option<String> {
 /// The same on a machine's own interfaces (`addr`: its address on a network), so traffic
 /// between machines of one network (a direct cable, a LAN) is impaired too, not only what the
 /// router forwards into it: each end delays what it sends, `delay` is one-way.
+#[must_use]
 pub fn machine_tc_script(spec: &Spec, m: &Machine, addr: impl Fn(&str, u8) -> Ipv4Addr) -> Option<String> {
     netem_script(spec, m.networks.iter().map(|(n, octet)| (n.as_str(), addr(n, *octet))))
 }
@@ -67,7 +66,7 @@ pub fn machine_tc_script(spec: &Spec, m: &Machine, addr: impl Fn(&str, u8) -> Ip
 /// One line per interface (found by its address) on a network with `tc`.
 fn netem_script<'a>(spec: &Spec, at: impl Iterator<Item = (&'a str, Ipv4Addr)>) -> Option<String> {
     let lines: Vec<String> = at
-        .filter_map(|(n, a)| spec.networks[n].tc.as_ref().map(|t| (a, t)))
+        .filter_map(|(n, a)| spec.networks.get(n).and_then(|net| net.tc.as_ref()).map(|t| (a, t)))
         .map(|(a, t)| {
             let addr = a.to_string().replace('.', "\\.");
             format!(
@@ -79,15 +78,5 @@ fn netem_script<'a>(spec: &Spec, at: impl Iterator<Item = (&'a str, Ipv4Addr)>) 
     (!lines.is_empty()).then(|| format!("{}\n", lines.join("\n")))
 }
 
-/// A shell loop that waits until `host` answers on every port (bash's /dev/tcp, then nc),
-/// giving up after `timeout` seconds.
-pub fn wait_for(host: &str, ports: &[u16], timeout: u32) -> String {
-    let probes = ports
-        .iter()
-        .map(|p| format!("(bash -c '</dev/tcp/{host}/{p}' 2>/dev/null || nc -z -w 2 {host} {p} 2>/dev/null)"))
-        .collect::<Vec<_>>()
-        .join(" && ");
-    format!(
-        "i=0; until {probes}; do i=$((i+2)); if [ $i -ge {timeout} ]; then echo \"{host} didn't answer within {timeout}s\" >&2; exit 1; fi; sleep 2; done; echo \"{host} answers\""
-    )
-}
+#[cfg(test)]
+mod tests;

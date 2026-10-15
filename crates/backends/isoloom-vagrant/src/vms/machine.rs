@@ -3,9 +3,10 @@
 
 use std::net::Ipv4Addr;
 
+use isoloom_plan::addressing::netmask;
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::{GeneratedFile, netmask};
+use isoloom_render::GeneratedFile;
 use isoloom_spec::images::{self, VagrantBox};
 use isoloom_spec::model::Arch;
 use isoloom_spec::validate::Cidr;

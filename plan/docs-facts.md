@@ -186,3 +186,7 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **isothrum.com editor, ports:** a machine's ports field takes `80, 443/https, 53/udp` (1 to 65535, Isoloom's protocols, lowercase); an entry Isoloom couldn't take is listed with the lab's issues and left out of the topology.
 - **isothrum.com editor, link conditions:** read exactly as Isoloom reads them: a number as Rust reads one (`+.5ms`, `5.ms`, `1E-3gbit`, a negative one too), then one of Isoloom's units, case and all; a rate without its unit (`10`) is reported. A loss above 100% and a jitter without a delay are written unchanged, for Isoloom to report (no more capping or dropping); a rate that isn't whole kbit/s is written in bits.
 - **Isothrum pins Isoloom `7b93fef6`** for `isoloom-spec`, `isoloom-targets` and `isoloom-manifest`; the desktop app drops `isoloom-core` for `isoloom-spec` and `isoloom-targets` at the same commit.
+
+## Phase 1c: the core (plan, render)
+- **Windows VM steps:** a `provision` script's path and a healthcheck's page are written as PowerShell string literals with every kind of single quote doubled (`'`, and the typographic `‘ ’ ‚ ‛` PowerShell also reads as quotes), so a path holding one can't end its string early.
+- **`cargo xtask mutants`:** lints are capped while mutants build (`cap_lints`), so a mutant that replaces a function's body is tested instead of counted as unviable; a test run counts as a timeout only after 120 s (`minimum_test_timeout`).

@@ -81,7 +81,7 @@ fn isoloom_own(env: &Environment, name: &str) -> Option<(Role, Option<String>)> 
     if spec.tools.keys().any(|t| tool_service(t) == name) {
         return Some((Role::Tool, None));
     }
-    let switch = || trunks::trunks(spec).iter().any(|t| trunks::switch_name(&t.lan) == name);
+    let switch = || trunks::containers(spec).iter().any(|t| trunks::switch_name(&t.lan) == name);
     let probe = || [model::Arch::Amd64, model::Arch::Arm64].into_iter().any(|a| probe_service(a) == name);
     (name == router::NAME || name == FOLDERS_JOB || switch() || probe()).then_some((Role::Infra, None))
 }

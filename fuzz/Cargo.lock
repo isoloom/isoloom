@@ -172,6 +172,7 @@ dependencies = [
  "isoloom-plan",
  "isoloom-spec",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

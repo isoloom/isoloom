@@ -41,9 +41,9 @@ mod transport;
 mod windows;
 
 use indexmap::IndexMap;
-use isoloom_plan::{Environment, MachineShape};
+use isoloom_plan::{Controller, Environment, MachineShape};
 use isoloom_render::backend::Files;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, powershell};
 use isoloom_spec::model::{Spec, Target};
 
 use crate::backend::capabilities;
@@ -63,12 +63,13 @@ const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
 /// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`; on Windows
 /// unpacked by PowerShell (`untar.ps1`, as `IsoloomProject::UNTAR_PS1`). Every Vagrantfile
 /// Isoloom writes carries it, after `ROOT`.
-pub(crate) const PROJECT_RB: &str = concat!(
-    include_str!("vagrant_project.rb"),
-    "\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n",
-    include_str!("../../../core/isoloom-render/src/untar.ps1"),
-    "PS1\n"
-);
+pub(crate) fn project_rb() -> String {
+    format!(
+        "{}\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n{}PS1\n",
+        include_str!("vagrant_project.rb"),
+        powershell::UNTAR
+    )
+}
 
 /// Where a Vagrantfile goes and what it carries besides the environment's VMs: `hybrid` writes
 /// its VMs to `.isoloom/hybrid/`, with its Docker host as one more `config.vm.define` block.
@@ -168,7 +169,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.comment("This host's CPU as QEMU names it: a machine built for another one runs emulated there.");
     r.assign("HOST_ARCH", Value::raw(format!("{ARM_HOST} ? \"aarch64\" : \"x86_64\"")));
-    r.text(PROJECT_RB);
+    r.text(&project_rb());
     r.text(hyperv::HYPERV_RB);
     r.blank();
     vagrantfile::inputs(r, &env.spec().inputs);
@@ -179,7 +180,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
 /// QEMU's helpers ([`qemu::QEMU_RB`]) and its networks' hubs, when a VM needs them.
 fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu::Link>) {
     let machines = env.machines.values().any(|m| m.shape == MachineShape::Vm && m.size.disk_gb.is_some());
-    let controller = links.contains_key(CONTROLLER) && isoloom_render::controller_size(env.spec()).2.is_some();
+    let controller = links.contains_key(CONTROLLER) && Controller::of(env.spec()).disk_gb.is_some();
     let sized = machines || controller;
     if !qemu::needs_ruby(links, sized) {
         return;

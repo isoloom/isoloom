@@ -14,6 +14,6 @@ allow-indexing-slicing-in-tests = true
 # Product names written as their makers write them, not code (`doc_markdown` would want them in
 # backticks); `..` keeps clippy's own list.
 doc-valid-idents = [
-    "DigitalOcean", "ESXi", "ICMPv6", "IOSv", "NetBIOS", "NetworkManager", "NitroTPM", "OpenRC", "OrbStack", "PCIe",
+    "AlmaLinux", "CentOS", "DigitalOcean", "ESXi", "ICMPv6", "IOSv", "NetBIOS", "NetworkManager", "NitroTPM", "NVMe", "OpenRC", "OrbStack", "PCIe",
     "SeaBIOS", "VirtIO", "VirtualBox", "VMware", "VNet", "WinRM", "..",
 ]

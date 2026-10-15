@@ -683,6 +683,7 @@ dependencies = [
  "isoloom-spec",
  "proptest",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

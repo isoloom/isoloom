@@ -4,15 +4,14 @@
 //! their own, a failed task beside an unreachable host isn't retried, nor is a playbook that
 //! doesn't parse, and the runs stop after four.
 
-#![allow(clippy::unwrap_used)] // test helpers: a failing test is the report.
+// The helpers run on the Linux controller: their tests run where `sh` is the host's.
+#![cfg(unix)]
 
 use std::path::{Path, PathBuf};
 
-use std::fmt::Write as _;
-
 use isoloom_spec::shell::quote;
 
-use super::{ATTEMPTS, RETRY_DIR, TRANSIENT, helpers, script};
+use super::{ATTEMPTS, RETRY_DIR, TRANSIENT, helpers, provision_script};
 
 /// One run of the fake: what it prints and its exit code.
 struct Run {
@@ -25,14 +24,12 @@ type Host<'a> = (&'a str, u32, u32);
 
 /// A recap line per host.
 fn recap(hosts: &[Host]) -> String {
-    let mut out = String::from("\nPLAY RECAP *********************************************************************\n");
-    for (h, u, f) in hosts {
-        let _ = writeln!(
-            out,
-            "{h:<27}: ok=3    changed=1    unreachable={u}    failed={f}    skipped=0    rescued=0    ignored=0"
-        );
-    }
-    out
+    let lines: String = hosts
+        .iter()
+        .map(|(h, u, f)| format!("{h:<27}: ok=3    changed=1    unreachable={u}    failed={f}    skipped=0    rescued=0    ignored=0\n"))
+        .collect::<Vec<_>>()
+        .concat();
+    format!("\nPLAY RECAP *********************************************************************\n{lines}")
 }
 
 /// A `fatal:` line for `host` with `msg`, as the default callback writes it.
@@ -75,10 +72,12 @@ struct Outcome {
 fn play(runs: &[Run]) -> Outcome {
     let dir = std::env::temp_dir().join(format!("isoloom-playbooks-{}-{}", std::process::id(), unique()));
     std::fs::create_dir_all(&dir).unwrap();
-    let mut cases = String::new();
-    for (i, r) in runs.iter().enumerate() {
-        let _ = writeln!(cases, "    {}) printf '%s' {}; return {};;", i + 1, quote(&r.out), r.code);
-    }
+    let cases: String = runs
+        .iter()
+        .enumerate()
+        .map(|(i, r)| format!("    {}) printf '%s' {}; return {};;\n", i + 1, quote(&r.out), r.code))
+        .collect::<Vec<_>>()
+        .concat();
     let body = format!(
         "set -e\nD={d}\n{helpers}fake() {{\n  echo \"$*\" >> \"$D/calls\"\n  case \"$*\" in *--limit*) echo $(cat \"$D/site.retry\") >> \"$D/limits\";; esac\n  case $(wc -l < \"$D/calls\" | tr -d ' ') in\n{cases}    *) return 0;;\n  esac\n}}\nrun_play fake -i inv site.yml\necho after\n",
         d = dir.display(),
@@ -170,10 +169,10 @@ fn a_failed_task_is_not_retried_even_with_a_host_unreachable() {
     assert!(!o.out.contains("running it again"), "{}", o.out);
     cleanup(&o.dir);
     // A task that failed on its own (exit 2) isn't either.
-    let o = play(&[run(&[fatal("dc01", "no such user")], &[("web", 0, 0), ("dc01", 0, 1)], 2), ok()]);
-    assert_eq!((o.code, o.calls.len()), (2, 1), "{}", o.out);
-    assert!(!o.out.contains("after"));
-    cleanup(&o.dir);
+    let own = play(&[run(&[fatal("dc01", "no such user")], &[("web", 0, 0), ("dc01", 0, 1)], 2), ok()]);
+    assert_eq!((own.code, own.calls.len()), (2, 1), "{}", own.out);
+    assert!(!own.out.contains("after"));
+    cleanup(&own.dir);
 }
 
 #[test]
@@ -257,7 +256,7 @@ fn mixed_hosts_retry_only_the_cut_and_unreachable_ones() {
         4,
     );
     let o = play(&[mixed, ok()]);
-    assert_eq!((o.code, o.calls.clone()), (0, vec![FIRST.to_string(), AGAIN.to_string()]), "{}", o.out);
+    assert_eq!((o.code, o.calls.clone()), (0, vec![FIRST.to_owned(), AGAIN.to_owned()]), "{}", o.out);
     assert_eq!(o.limits, ["dc02 dc01"]);
     assert!(o.out.contains("unreachable: dc02 dc01; waiting 0 s"), "{}", o.out);
     // And a real failure anywhere stops it at once, whatever else was cut.
@@ -327,11 +326,11 @@ fn a_failed_download_is_tried_again() {
             .unwrap();
         (out.status.code(), String::from_utf8_lossy(&out.stdout).into_owned())
     };
-    let (code, out) = run("[ $n -ge 2 ]");
-    assert_eq!(code, Some(0), "{out}");
+    let (second_try, out) = run("[ $n -ge 2 ]");
+    assert_eq!(second_try, Some(0), "{out}");
     assert!(out.ends_with("calls=2\n"), "{out}");
-    let (code, _) = run("return 1");
-    assert_eq!(code, Some(1));
+    let (never, _) = run("return 1");
+    assert_eq!(never, Some(1));
 }
 
 #[test]
@@ -341,7 +340,7 @@ fn the_script_runs_each_playbook_through_run_play_with_retry_files_on() {
     )
     .unwrap();
     let spec = isoloom_plan::Lab::new(source).spec();
-    let s = script(&spec, &["web".into()]);
+    let s = provision_script(&spec, &["web".into()]);
     assert!(
         s.contains(&format!(
             "mkdir -p {RETRY_DIR}\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH={RETRY_DIR}\n"
@@ -353,4 +352,19 @@ fn the_script_runs_each_playbook_through_run_play_with_retry_files_on() {
         s.contains("cd /opt/isoloom/ansible\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -e '{\"greeting\":\"hi there\"}' --limit 'web' site.yml\n"),
         "{s}"
     );
+}
+
+#[test]
+fn every_machine_its_roles_and_its_inventories_unless_limited() {
+    let source = isoloom_spec::parse(
+        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lab: 10 }\n    os: debian@12\nprovision:\n  - ansible: site.yml\n    requirements: roles/requirements.yml\n    inventory: [extra.ini, more.ini]\n",
+    )
+    .unwrap();
+    let spec = isoloom_plan::Lab::new(source).spec();
+    let s = provision_script(&spec, &[]);
+    assert!(
+        s.ends_with("cd /opt/isoloom/.\nretry_download ansible-galaxy install -r /opt/isoloom/roles/requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/extra.ini -i /opt/isoloom/more.ini site.yml\n"),
+        "{s}"
+    );
+    assert!(provision_script(&spec, &["a".into(), "b".into()]).contains(" --limit 'a,b' site.yml\n"));
 }

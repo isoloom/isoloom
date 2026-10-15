@@ -3,8 +3,6 @@
 //! (`/opt/isoloom`, the same path a VM has), then each step. The project folder is the build
 //! context; only the paths the steps name are copied.
 
-use std::fmt::Write as _;
-
 use isoloom_plan::{Build, Environment, Image, MachineShape};
 use isoloom_spec::model::Generated;
 use isoloom_spec::os::by_name;
@@ -15,6 +13,7 @@ use crate::{GeneratedFile, header};
 
 /// The generated Dockerfiles of `env`'s containers, each at its path, its base image pulled
 /// through the registry mirrors.
+#[must_use]
 pub fn files(env: &Environment) -> Vec<GeneratedFile> {
     env.machines
         .iter()
@@ -33,19 +32,18 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
 }
 
 /// The Dockerfile of machine `machine`'s generated image, from `base`.
+#[must_use]
 pub fn render(machine: &str, base: &str, recipe: &Generated) -> String {
-    let mut out = header("#");
-    let _ = writeln!(out, "# The container form of machine `{machine}`: its OS's image and its steps.");
-    let _ = writeln!(out, "FROM {base}");
-    let _ = writeln!(out, "WORKDIR {PROJECT_DIR}");
-    for step in &recipe.steps {
-        out.push_str(&instructions(&recipe.os, step));
-    }
-    out
+    let installer = Installer::of(&recipe.os);
+    let steps: String = recipe.steps.iter().map(|step| instructions(installer, step)).collect();
+    format!(
+        "{}# The container form of machine `{machine}`: its OS's image and its steps.\nFROM {base}\nWORKDIR {PROJECT_DIR}\n{steps}",
+        header("#")
+    )
 }
 
 /// One step's instructions.
-fn instructions(os: &str, step: &Step) -> String {
+fn instructions(installer: Installer, step: &Step) -> String {
     match step {
         Step::Run { script, creates } => {
             let run = match creates {
@@ -55,32 +53,52 @@ fn instructions(os: &str, step: &Step) -> String {
             format!("COPY {script} {script}\nRUN {run}\n")
         }
         Step::Copy(c) => {
-            let mut flags = String::new();
-            if let Some(owner) = &c.owner {
-                let _ = write!(flags, "--chown={owner} ");
-            }
-            if let Some(mode) = c.mode {
-                let _ = write!(flags, "--chmod={mode} ");
-            }
-            format!("COPY {flags}{} {}\n", c.from, c.to)
+            let owner = c.owner.as_ref().map(|o| format!("--chown={o} ")).unwrap_or_default();
+            let mode = c.mode.map(|m| format!("--chmod={m} ")).unwrap_or_default();
+            format!("COPY {owner}{mode}{} {}\n", c.from, c.to)
         }
-        Step::Packages(names) => format!("{}\n", install(os, &names.join(" "))),
-        // Steps with no container form never reach a generated image: lowering refuses them.
+        Step::Packages(names) => format!("{}\n", installer.install(&names.join(" "))),
+        // A reboot or a playbook has no container form: lowering refuses it before a generated
+        // image, and so does any step that comes with no container form.
         _ => String::new(),
     }
 }
 
-/// The OS family's installer, its caches cleaned. Packages carry no version in the spec, so the
-/// pinning rules are waived on this line.
-fn install(os: &str, packages: &str) -> String {
-    let family = by_name(os).map_or("debian", |o| o.family);
-    match family {
-        "alpine" => format!("# hadolint ignore=DL3018\nRUN apk add --no-cache {packages}"),
-        "rocky" | "alma" | "fedora" => format!("# hadolint ignore=DL3041\nRUN dnf install -y {packages} && dnf clean all"),
-        "centos" => format!("# hadolint ignore=DL3033\nRUN yum install -y {packages} && yum clean all"),
-        _ => format!(
-            "# hadolint ignore=DL3008\nRUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends {packages} && rm -rf /var/lib/apt/lists/*"
-        ),
+/// How an OS family installs packages in its image.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Installer {
+    /// Alpine's `apk`.
+    Apk,
+    /// The RHEL family's `dnf` (Rocky, AlmaLinux, Fedora).
+    Dnf,
+    /// CentOS 7's `yum`.
+    Yum,
+    /// Debian's and Ubuntu's `apt-get`, and Kali's.
+    Apt,
+}
+
+impl Installer {
+    /// The installer of the image-table OS `os`.
+    fn of(os: &str) -> Installer {
+        match by_name(os).map(|o| o.family) {
+            Some("alpine") => Installer::Apk,
+            Some("rocky" | "alma" | "fedora") => Installer::Dnf,
+            Some("centos") => Installer::Yum,
+            _ => Installer::Apt,
+        }
+    }
+
+    /// The `RUN` line installing `packages`, its caches cleaned. Packages carry no version in
+    /// the spec, so the pinning rules are waived on this line.
+    fn install(self, packages: &str) -> String {
+        match self {
+            Installer::Apk => format!("# hadolint ignore=DL3018\nRUN apk add --no-cache {packages}"),
+            Installer::Dnf => format!("# hadolint ignore=DL3041\nRUN dnf install -y {packages} && dnf clean all"),
+            Installer::Yum => format!("# hadolint ignore=DL3033\nRUN yum install -y {packages} && yum clean all"),
+            Installer::Apt => format!(
+                "# hadolint ignore=DL3008\nRUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends {packages} && rm -rf /var/lib/apt/lists/*"
+            ),
+        }
     }
 }
 
@@ -122,6 +140,7 @@ mod tests {
             &recipe("debian-12", vec![Step::Packages(vec!["nginx".into()]), copy, run("provision/web.sh", None)]),
         );
         assert!(d.starts_with("# Generated by isoloom"));
+        assert!(d.contains("# The container form of machine `web`: its OS's image and its steps.\nFROM "), "{d}");
         assert!(d.contains("FROM debian:12@sha256:"));
         assert!(d.contains("WORKDIR /opt/isoloom\n"));
         assert!(d.contains("apt-get install -y --no-install-recommends nginx && rm -rf /var/lib/apt/lists/*"));
@@ -134,6 +153,24 @@ mod tests {
         let curl = || vec![Step::Packages(vec!["curl".into()])];
         assert!(render("a", &recipe("alpine-3.19", curl())).contains("RUN apk add --no-cache curl"));
         assert!(render("a", &recipe("rocky-9", curl())).contains("RUN dnf install -y curl && dnf clean all"));
+        assert!(render("a", &recipe("centos-7", curl())).contains("# hadolint ignore=DL3033\nRUN yum install -y curl && yum clean all\n"));
+        assert!(render("a", &recipe("ubuntu-24.04", curl())).contains("apt-get install -y --no-install-recommends curl"));
         assert!(render("a", &recipe("debian-12", vec![run("a.sh", Some("/done"))])).contains("RUN [ -e /done ] || sh a.sh"));
+    }
+
+    #[test]
+    fn each_container_built_from_steps_gets_its_dockerfile() {
+        let yaml = "version: 1\nname: d\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, app: { steps: [{ packages: [nginx] }] } }\n  img: { networks: { lan: 11 }, app: { image: nginx } }\n";
+        let built = files(&crate::testing::env(yaml, isoloom_spec::model::Target::Docker));
+        assert_eq!(
+            built.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(),
+            [".isoloom/docker/build/web/Dockerfile"]
+        );
+        assert!(built[0].contents.contains("FROM debian:12@sha256:") && built[0].contents.contains("install -y --no-install-recommends nginx"));
+        assert_eq!(
+            files(&crate::testing::env(yaml, isoloom_spec::model::Target::Vagrant)),
+            [],
+            "a VM sets itself up"
+        );
     }
 }

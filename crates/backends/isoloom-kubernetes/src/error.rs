@@ -2,8 +2,7 @@
 //! aren't made, and how a backend reports it.
 
 use isoloom_plan::Refusal;
-use isoloom_render::GenerateError;
-use isoloom_render::backend::RenderError;
+use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
 
 /// Why the Kubernetes files aren't rendered, or the chart's project copies aren't made.
@@ -76,10 +75,10 @@ impl From<Error> for RenderError {
             Error::Schema { source } => format!("the values' schema doesn't serialize: {source}"),
             read @ (Error::Read { .. } | Error::Kustomization { .. }) => read.to_string(),
         };
-        RenderError::Generate(GenerateError::Unsupported {
+        RenderError::Unsupported {
             target: Target::Kubernetes,
             what,
-        })
+        }
     }
 }
 

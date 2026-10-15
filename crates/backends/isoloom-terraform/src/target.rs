@@ -3,7 +3,8 @@
 //! then its files.
 
 use isoloom_plan::{Capabilities, Environment};
-use isoloom_render::backend::{self, RenderError};
+use isoloom_render::Error as RenderError;
+use isoloom_render::backend;
 use isoloom_spec::model::Target;
 
 use crate::{Error, Result};

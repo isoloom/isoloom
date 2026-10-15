@@ -9,6 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use isoloom_render::project::ignore::{self, Rules};
 use isoloom_spec::{Target, load};
 use isoloom_targets::{Lab, generate};
 
@@ -198,9 +199,10 @@ fn isoloomignore_leaves_paths_out() {
     // depth; `!logs/keep.txt` brings back a file of an ignored folder.
     assert_eq!(went, ["a.txt", "logs/keep.txt", "src/deeper/z.py", "vendor/small.txt", "datazjson"], "{list}");
     assert!(!list.contains("build/"), "an ignored folder's entry went in: {list}");
-    // Isoloom's own matcher (`isoloom run external`) agrees.
-    let rules = isoloom_render::ignore::Rules::read(&root);
-    let entries = isoloom_render::ignore::entries(&root, &rules).unwrap();
+    // Isoloom's own matcher (the runner's copies) agrees.
+    let rules = Rules::parse(&std::fs::read_to_string(root.join(ignore::FILE)).unwrap());
+    let mut entries = Vec::new();
+    walk(&root, "", &rules, &mut entries);
     let own: Vec<&str> = files.iter().copied().filter(|f| entries.iter().any(|e| e == f)).collect();
     assert_eq!(own, went);
     let _ = std::fs::remove_dir_all(&dir);
@@ -303,4 +305,30 @@ fn the_windows_extractor_unpacks_the_archive() {
         assert!(!dir.join(format!("{name}.tgz")).exists(), "{name}: the archive stays");
     }
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The project's entries a copy takes, as the runner walks it with Isoloom's matcher: parents
+/// first, version control and the tools' state left out at any depth, and what the rules leave
+/// out (a folder's contents still walked when a `!` may bring one back).
+fn walk(root: &Path, dir: &str, rules: &Rules, out: &mut Vec<String>) {
+    let mut names: Vec<String> = std::fs::read_dir(root.join(dir))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    for name in names.into_iter().filter(|n| ![".git", ".vagrant", ".terraform"].contains(&n.as_str())) {
+        let rel = if dir.is_empty() { name } else { format!("{dir}/{name}") };
+        if std::fs::symlink_metadata(root.join(&rel)).unwrap().is_dir() {
+            let folder = format!("{rel}/");
+            let ignored = rules.ignored(&folder);
+            if !ignored {
+                out.push(folder);
+            }
+            if !ignored || rules.brings_back() {
+                walk(root, &rel, rules, out);
+            }
+        } else if !rules.ignored(&rel) {
+            out.push(rel);
+        }
+    }
 }

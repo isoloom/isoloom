@@ -18,7 +18,7 @@
 
 use std::fmt;
 
-use isoloom_render::rb;
+use isoloom_render::ruby;
 
 /// One Ruby expression, already written.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub(crate) struct Value(String);
 impl Value {
     /// A string literal holding `text`, quoted by [`rb`].
     pub(crate) fn str(text: &str) -> Value {
-        Value(rb(text))
+        Value(ruby::quote(text))
     }
 
     /// Ruby code as written: an expression Isoloom composes itself, never user text.

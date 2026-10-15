@@ -17,8 +17,8 @@
 
 use std::net::Ipv4Addr;
 
+use isoloom_plan::addressing::netmask;
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_render::netmask;
 use isoloom_spec::images::{self, HyperVBox};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::windows::Tpm;

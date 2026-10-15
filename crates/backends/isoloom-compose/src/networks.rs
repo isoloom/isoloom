@@ -94,7 +94,7 @@ pub(crate) fn attachments(env: &Environment, plan: &MachinePlan) -> IndexMap<Str
 /// shared networks, and not across a network a trunk carries); they're reached through the
 /// router. A LAN's switch has no address on the environment's networks: no name to resolve.
 pub(crate) fn extra_hosts(env: &Environment, m: Machine<'_>) -> Vec<String> {
-    let ts = trunks::trunks(env.spec());
+    let ts = trunks::containers(env.spec());
     let shared = |other: &str, n: &str| m.spec.networks.contains_key(n) && !trunks::carried(&ts, m.name, n) && !trunks::carried(&ts, other, n);
     env.machines
         .iter()

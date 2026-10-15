@@ -63,10 +63,10 @@ fn switch_service(env: &Environment, ts: &[&trunks::Trunk]) -> Service {
     let spec = env.spec();
     let mut networks = IndexMap::new();
     for t in ts {
-        for (net, _, _) in &t.vlans {
-            networks.insert(net.clone(), Some(Attachment::at(trunks::switch_address(spec, net))));
+        for v in &t.vlans {
+            networks.insert(v.network.clone(), Some(Attachment::at(trunks::switch_address(spec, &v.network))));
         }
-        networks.insert(trunks::link_network(t), Some(Attachment::with_mac(trunks::mac(t, 1))));
+        networks.insert(trunks::link_network(t), Some(Attachment::with_mac(trunks::mac(t, trunks::End::Switch))));
     }
     Service {
         image: Some(env.images.pull(TC_IMAGE)),

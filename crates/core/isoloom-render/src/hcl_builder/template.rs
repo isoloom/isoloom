@@ -1,7 +1,5 @@
 //! Strings that hold Terraform expressions: text and interpolations, kept apart until written.
 
-use std::fmt::Write as _;
-
 use hcl::expr::{Expression, TemplateExpr};
 
 use super::escape::{quoted_inside, strings_escaped};
@@ -30,11 +28,13 @@ enum Part {
 
 impl Template {
     /// An empty template.
+    #[must_use]
     pub fn new() -> Template {
         Template::default()
     }
 
     /// A template made of `text` only.
+    #[must_use]
     pub fn text(text: impl Into<String>) -> Template {
         let mut t = Template::new();
         t.push_text(text);
@@ -89,11 +89,13 @@ impl Template {
     }
 
     /// Whether it is plain text (no interpolation).
+    #[must_use]
     pub fn is_text(&self) -> bool {
         self.parts.iter().all(|p| matches!(p, Part::Text(_)))
     }
 
     /// The template as an expression: a plain string when it has no interpolation.
+    #[must_use]
     pub fn into_expression(self) -> Expression {
         if self.is_text() {
             let text: String = self
@@ -106,24 +108,27 @@ impl Template {
                 .collect();
             return Expression::String(text);
         }
-        let mut raw = String::new();
-        for (i, p) in self.parts.iter().enumerate() {
-            match p {
+        let next = self.parts.iter().skip(1).map(Some).chain([None]);
+        let raw = self
+            .parts
+            .iter()
+            .zip(next)
+            .map(|(p, after)| match p {
+                // A `$` right before an interpolation would make it `$${`, a literal: written as
+                // its escape instead.
                 Part::Text(t) => {
-                    let mut text = quoted_inside(t);
-                    // A `$` right before an interpolation would make it `$${`, a literal: written
-                    // as its escape instead.
-                    if matches!(self.parts.get(i + 1), Some(Part::Expr(_))) && text.ends_with('$') {
-                        text.pop();
-                        text.push_str("\\u0024");
+                    let text = quoted_inside(t);
+                    if let Some(head) = text.strip_suffix('$').filter(|_| matches!(after, Some(Part::Expr(_)))) {
+                        format!("{head}\\u0024")
+                    } else {
+                        text
                     }
-                    raw.push_str(&text);
                 }
-                Part::Expr(e) => {
-                    let _ = write!(raw, "${{{}}}", strings_escaped(e));
-                }
-            }
-        }
+                // `hcl-rs` documents an expression's formatting as unable to fail.
+                Part::Expr(e) => format!("${{{}}}", strings_escaped(e)),
+            })
+            .collect::<Vec<_>>()
+            .concat();
         Expression::TemplateExpr(Box::new(TemplateExpr::QuotedString(raw)))
     }
 }
@@ -148,13 +153,35 @@ impl From<Template> for Expression {
 
 #[cfg(test)]
 mod tests {
-    use super::Template;
+    use super::{Piece, Template};
     use crate::hcl_builder::reference;
 
     #[test]
     fn text_is_escaped_and_expressions_interpolated() {
         let t = Template::text("echo \"${HOME}\" %{x}\n").with_expr(reference("var.slot")).with_text("!");
         assert_eq!(t.into_expression().to_string(), r#""echo \"$${HOME}\" %%{x}\n${var.slot}!""#);
+    }
+
+    #[test]
+    fn adjacent_text_is_one_piece_and_empty_text_none() {
+        let t = Template::text("a").with_text("b").with_text("").with_expr(reference("var.x")).with_text("");
+        let pieces: Vec<Piece<'_>> = t.pieces().collect();
+        assert_eq!(pieces, [Piece::Text("ab"), Piece::Expr(&reference("var.x"))]);
+        assert_eq!(Template::new().with_text("").pieces().count(), 0);
+        assert!(!t.is_text() && Template::text("x").is_text());
+    }
+
+    #[test]
+    fn a_dollar_before_an_interpolation_stays_a_dollar() {
+        let t = Template::text("cost: $").with_expr(reference("var.price"));
+        assert_eq!(t.into_expression().to_string(), r#""cost: \u0024${var.price}""#);
+    }
+
+    #[test]
+    fn appending_keeps_text_and_expressions_in_order() {
+        let mut t = Template::text("a");
+        t.append(Template::text("b").with_expr(reference("var.y")).with_text("c"));
+        assert_eq!(t.into_expression().to_string(), r#""ab${var.y}c""#);
     }
 
     #[test]

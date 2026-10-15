@@ -84,7 +84,8 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
     // A VLAN it reaches through a trunk isn't an interface of its own: the trunk is.
     svc.networks.retain(|k, _| !trunks::carried(ts, m.name, k));
     for t in trunks::of(ts, m.name) {
-        svc.networks.insert(trunks::link_network(t), Some(Attachment::with_mac(trunks::mac(t, 0))));
+        svc.networks
+            .insert(trunks::link_network(t), Some(Attachment::with_mac(trunks::mac(t, trunks::End::Machine))));
     }
     svc.networks.extend(outside::attachments(plan));
     if plan.is_gateway {
@@ -163,7 +164,7 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
     };
     let spec = env.spec();
     let name = m.name;
-    let w = appliances::wiring(spec, name, m.spec, kind, |n, o| isoloom_render::address(spec, n, o));
+    let w = appliances::wiring(spec, name, m.spec, kind, |n, o| isoloom_plan::addressing::address(spec, n, o));
     svc.volumes.clear();
     for f in w.files {
         files.push(GeneratedFile {
@@ -336,7 +337,7 @@ mod tests {
         )
         .expect("parses")
         .for_target(isoloom_spec::model::Target::Docker);
-        let ports = appliances::ports(&spec, "r", &spec.machines["r"], &|n, o| isoloom_render::address(&spec, n, o));
+        let ports = appliances::ports(&spec, "r", &spec.machines["r"], &|n, o| isoloom_plan::addressing::address(&spec, n, o));
         let nets = appliance_networks(&spec, "r", &ports);
         let order: Vec<(&str, Option<u32>)> = nets.iter().map(|(n, a)| (n.as_str(), a.as_ref().and_then(|a| a.priority))).collect();
         assert_eq!(order, [("isoloom-mgmt", Some(1000)), ("a", Some(999)), ("b", Some(998))]);

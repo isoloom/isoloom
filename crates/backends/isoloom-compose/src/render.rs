@@ -66,7 +66,7 @@ pub(crate) fn compose_file(target: Target, env: &Environment) -> Result<Rendered
         return Err(Error::Refused { target, refusal });
     }
     let mut out = Out::default();
-    let ts = trunks::trunks(env.spec());
+    let ts = trunks::containers(env.spec());
     router::services(env, &ts, &mut out.services);
     for m in Machine::containers(env) {
         service::machine(env, m, &ts, &mut out);

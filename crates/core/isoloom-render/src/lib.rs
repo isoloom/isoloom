@@ -1,216 +1,58 @@
-//! Shared pieces every Isoloom backend renders with: addresses and names, the generated
-//! files' header, the controller's playbook script, HCL and shell quoting, the project copy, the
-//! hosts' setup, the router, VLAN trunks and the image constraints.
+//! What every Isoloom backend renders with, so the targets render the same decisions the same
+//! way. It sits between the plan (`isoloom-plan`, the facts) and the backends (Compose,
+//! Kubernetes, Vagrant, Terraform, Ansible), which implement its
+//! [`Backend`](backend::Backend) port.
+//!
+//! - **The port:** [`backend`] (the [`Backend`](backend::Backend) trait a target's renderer
+//!   implements) and its [`Error`].
+//! - **The builders**, one per language a target writes: [`hcl_builder`] (Terraform), [`ruby`]
+//!   (a Vagrantfile's literals), [`powershell`] (a Windows machine's), [`dockerfile`] (the image
+//!   built from a machine's steps) and [`inventory`] (Ansible's); shell is
+//!   `isoloom_spec::shell`, below every crate.
+//! - **A VM's set-up:** [`steps`] (each [`Step`](isoloom_plan::Step) as Linux shell or
+//!   PowerShell), the scripts kept across restarts ([`boot`]), [`secrets`] delivered at run time,
+//!   the network's [`constraints`], the [`controller`] that runs the playbooks, and the
+//!   [`project`] copied in.
+//! - **The network pieces:** [`router`], VLAN [`trunks`], [`ipv6`] and a VM's
+//!   [`more_addresses`].
+//! - **The containers' shared parts:** [`container`]; where a check reaches its host:
+//!   [`checks`].
+//!
+//! Everything here is a pure function of the plan: no I/O, no clock, no environment.
+//!
+//! ```
+//! use isoloom_plan::{Environment, Lab, Step};
+//! use isoloom_spec::model::Target;
+//!
+//! let lab = Lab::parse(
+//!     "version: 1\nname: demo\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
+//! )
+//! .expect("the spec parses");
+//! let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+//! let ready = isoloom_render::steps::linux(&env, "web", &Step::Ready).expect("every VM gets ready");
+//! assert!(ready.ends_with("echo ready > /var/lib/isoloom/ready\n"));
+//! ```
 
 pub mod backend;
 pub mod boot;
 pub mod checks;
 pub mod constraints;
 pub mod container;
-pub mod disks;
+pub mod controller;
 pub mod dockerfile;
+mod error;
 pub mod hcl_builder;
-pub mod ignore;
 pub mod inventory;
-pub mod ipv6;
-pub mod machine_files;
-pub mod machine_setup;
-pub mod more_addresses;
-pub mod playbooks;
+mod network;
+mod output;
+pub mod powershell;
 pub mod project;
-pub mod router;
+pub mod ruby;
 pub mod secrets;
 pub mod steps;
-pub mod trunks;
-
-pub use isoloom_plan::addressing::{address, address_for, cidr, host_address, names_of, netmask, start_order};
-pub use isoloom_spec::files::GeneratedFile;
-use isoloom_spec::{model, shell, validate};
-/// The controller's script running the environment's playbooks, the same on every target (see
-/// [`playbooks`]).
-pub use playbooks::script as ansible_runs;
-use std::fmt;
-
-use crate::model::{Spec, Target};
-
-/// The `provision[].host_vars` of `machine`, as ` key='value'` pairs for its inventory line
-/// (see [`inventory::host_vars_suffix`]), for the generators that write their inventory from
-/// the spec until they render [`inventory::render`].
-pub fn host_vars(spec: &Spec, machine: &str) -> String {
-    inventory::host_vars_suffix(&isoloom_plan::ansible::host_vars(spec, machine))
-}
-
-/// The name of the router Isoloom adds (a Compose service, a VM) when `reach` rules need one.
-/// The controller's Vagrant box by default: Alpine, about 100 MB (Python, ansible-core and
-/// pywinrm run fine on it), for VirtualBox, libvirt, VMware and Parallels alike.
-pub const CONTROLLER_BOX: &str = "generic/alpine319";
-
-/// The controller's box: `controller.image.vagrant`, else [`CONTROLLER_BOX`].
-pub fn controller_box(spec: &Spec) -> (&str, Option<&str>) {
-    let image = spec.controller.as_ref().and_then(|c| c.image.as_ref());
-    match image.and_then(|i| i.vagrant.as_deref()) {
-        Some(b) => (b, image.and_then(|i| i.vagrant_version.as_deref())),
-        None => (CONTROLLER_BOX, None),
-    }
-}
-
-/// The controller's (CPUs, memory in MB, disk in GB if set): 1 CPU and 512 MB by default.
-pub fn controller_size(spec: &Spec) -> (u32, u32, Option<u32>) {
-    let r = spec.controller.as_ref().and_then(|c| c.resources.as_ref());
-    (
-        r.and_then(|r| r.cpus).unwrap_or(1),
-        r.and_then(|r| r.memory_mb).unwrap_or(512),
-        r.and_then(|r| r.disk_gb),
-    )
-}
-
-/// The controller's script that runs the environment's playbooks (`provision:`), as it runs
-/// when the environment comes up; with `limit`, only against those machines. `isoloom provision`
-/// runs it again on a running environment.
-pub fn provision_script(spec: &Spec, limit: &[String]) -> String {
-    ansible_runs(spec, limit)
-}
-
-/// The router's machine name, as the backends and the command line name its container or VM.
-pub fn router_name() -> &'static str {
-    router::NAME
-}
-
-/// Where generated files go, relative to the project folder.
-pub const OUTPUT_DIR: &str = ".isoloom";
-
-/// Why a target's files weren't generated.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GenerateError {
-    /// The spec's implementations don't allow this target (see `isoloom targets`).
-    NotPossible(Target),
-    /// The target is possible, but this generator doesn't support a feature the spec uses yet.
-    Unsupported {
-        /// The target that refuses.
-        target: Target,
-        /// What it doesn't support, as the refusal reads.
-        what: String,
-    },
-    /// No generator exists for this target yet.
-    NoGenerator(Target),
-}
-
-impl fmt::Display for GenerateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GenerateError::NotPossible(t) => write!(f, "{}: not possible for this spec (see `isoloom targets`)", t.id()),
-            GenerateError::Unsupported { target, what } => write!(f, "{}: {what}", target.id()),
-            GenerateError::NoGenerator(t) => write!(f, "{}: no generator yet", t.id()),
-        }
-    }
-}
-
-impl std::error::Error for GenerateError {}
-
-/// The first lines of every generated file (`comment` is the target language's marker).
-/// The first non-access machine on arm64, if any: the cloud and Proxmox targets refuse these
-/// for now (they still assume x86-64 images and instance types).
-pub fn arm64_machine(spec: &Spec) -> Option<&str> {
-    spec.machines
-        .iter()
-        // Only machines the cloud actually builds: an access machine with no implementation isn't
-        // instantiated, so its arch is moot, but one that declares a container or VM is built and
-        // must not be silently given an x86 image.
-        .filter(|(_, m)| m.docker.is_some() || m.vm.is_some())
-        .find(|(_, m)| m.arch == crate::model::Arch::Arm64)
-        .map(|(n, _)| n.as_str())
-}
-
-/// A Google Cloud project's display name: `isoloom-<environment>`, cut to the 30 characters
-/// Google allows (a longer one fails at plan time), without a trailing hyphen.
-pub fn gcp_project_name(env: &str) -> String {
-    let full = format!("isoloom-{env}");
-    full.chars().take(30).collect::<String>().trim_end_matches('-').to_string()
-}
-
-/// The first lines of every generated file: it is generated and how to change it (`comment`
-/// is the file's comment marker, `#` or `//`).
-pub fn header(comment: &str) -> String {
-    format!(
-        "{comment} Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run\n{comment} `isoloom generate`. `isoloom check` fails when this file is out of date.\n"
-    )
-}
-
-/// Features no generator supports yet, shared by both (none today: kept as the place to
-/// refuse a spec feature before a generator learns it).
-pub fn common_unsupported(spec: &Spec, target: Target) -> Result<(), GenerateError> {
-    if target == Target::Docker && !spec.provision.is_empty() {
-        return Err(GenerateError::Unsupported {
-            target,
-            what: "environment-level provisioning (`provision:`) runs on VM targets for now".into(),
-        });
-    }
-    if target == Target::Docker
-        && let Some(what) = container_checks_unsupported(spec)
-    {
-        return Err(GenerateError::Unsupported { target, what });
-    }
-    Ok(())
-}
-
-/// What the container outputs (Compose, Kubernetes) can't run as checks yet: Ansible playbooks
-/// (they run from the VM targets' controller) and `exec` from a machine with no container of its
-/// own (`exec` checks are piped into the machine: `docker compose exec`, `kubectl exec`).
-pub fn container_checks_unsupported(spec: &Spec) -> Option<String> {
-    isoloom_plan::requirements::container_checks(spec).map(|r| r.to_string())
-}
-
-/// Unpacks the project's tar.gz on Windows (`$archive`, `$dest`, `$strip` set before it).
-pub const UNTAR_PS1: &str = include_str!("untar.ps1");
-
-/// An HCL string literal (with Terraform's `${` and `%{` escaped).
-pub fn hcl(s: &str) -> String {
-    let escaped = s
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
-        .replace("${", "$${")
-        .replace("%{", "%%{");
-    format!("\"{escaped}\"")
-}
-
-/// A Ruby double-quoted string literal (a Vagrantfile's): backslashes and quotes escaped, and
-/// every `#` that could start an interpolation (`#{...}`, `#$global`, `#@ivar`) made literal.
-pub fn rb(s: &str) -> String {
-    let escaped = s
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace("#{", "\\#{")
-        .replace("#$", "\\#$")
-        .replace("#@", "\\#@");
-    format!("\"{escaped}\"")
-}
-
-/// A PowerShell single-quoted string literal: nothing inside is expanded. PowerShell takes the
-/// typographic single quotes (U+2018 to U+201B) as quotes too, so each of those is doubled as
-/// well as `'`.
-pub fn ps(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('\'');
-    for c in s.chars() {
-        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
-            out.push(c);
-        }
-        out.push(c);
-    }
-    out.push('\'');
-    out
-}
-
 #[cfg(test)]
-mod gcp_project_name_tests {
-    #[test]
-    fn fits_google_limit() {
-        assert_eq!(super::gcp_project_name("web"), "isoloom-web");
-        let long = super::gcp_project_name("acme-web-2020-login-portal");
-        assert_eq!(long, "isoloom-acme-web-2020-login-po");
-        assert!(long.len() <= 30);
-        // Never ends on a hyphen once cut.
-        assert_eq!(super::gcp_project_name("abcdefghijklmnopqrstu-wxyz"), "isoloom-abcdefghijklmnopqrstu");
-    }
-}
+mod testing;
+
+pub use error::{Error, Result};
+pub use network::{ipv6, more_addresses, router, trunks};
+pub use output::{GeneratedFile, OUTPUT_DIR, header};

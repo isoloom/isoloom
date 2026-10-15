@@ -9,8 +9,8 @@
 //! - `hybrid`: the Vagrant VMs and the containers' host, with the containers' Compose file.
 
 use isoloom_plan::{Capabilities, Environment};
-use isoloom_render::GenerateError;
-use isoloom_render::backend::{self, Backend, Files, RenderError};
+use isoloom_render::Error as RenderError;
+use isoloom_render::backend::{self, Backend, Files};
 use isoloom_spec::model::Target;
 use isoloom_vagrant::{docker_vm, hybrid};
 
@@ -105,9 +105,6 @@ impl Backend for HybridBackend {
         if let Some(r) = isoloom_plan::refusal(&env.requirements, &self.capabilities()) {
             return Some(r.to_string());
         }
-        match self.render(env).map_err(GenerateError::from) {
-            Err(GenerateError::Unsupported { what, .. }) => Some(what),
-            _ => None,
-        }
+        self.render(env).err().map(|e| e.reason())
     }
 }

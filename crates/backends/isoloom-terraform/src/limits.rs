@@ -3,6 +3,7 @@
 //! checks only it has (its images, its address rules) after them.
 
 use isoloom_plan::Environment;
+use isoloom_spec::model::{Arch, Spec};
 
 /// The features a VM target lacks, each with its reason (`None`: the target has it).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -24,7 +25,7 @@ impl Limits {
     /// playbook checks, link impairment, IPv6.
     pub(crate) fn refusal(&self, env: &Environment) -> Option<String> {
         let spec = env.spec();
-        if let (Some(why), Some(name)) = (self.arm64, isoloom_render::arm64_machine(spec)) {
+        if let (Some(why), Some(name)) = (self.arm64, arm64_machine(spec)) {
             return Some(format!("machine `{name}`: {why}"));
         }
         if let Some(why) = self.gateways.filter(|_| env.networks.values().any(|n| n.gateway.is_some())) {
@@ -39,6 +40,18 @@ impl Limits {
         let v6 = env.networks.iter().find(|(_, n)| n.ipv6.is_some());
         self.ipv6.zip(v6).map(|(why, (name, _))| format!("network `{name}` is IPv6: {why}"))
     }
+}
+
+/// The first machine the target builds on arm64, if any: the cloud and Proxmox targets refuse
+/// these for now (they still assume x86-64 images and instance types). Only machines that
+/// declare a container or a VM count: an access machine with neither isn't built, so its arch is
+/// moot, but one that declares a form is, and must not silently get an x86 image.
+pub(crate) fn arm64_machine(spec: &Spec) -> Option<&str> {
+    spec.machines
+        .iter()
+        .filter(|(_, m)| m.docker.is_some() || m.vm.is_some())
+        .find(|(_, m)| m.arch == Arch::Arm64)
+        .map(|(n, _)| n.as_str())
 }
 
 #[cfg(test)]

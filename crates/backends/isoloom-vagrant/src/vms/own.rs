@@ -4,13 +4,15 @@
 
 use std::net::Ipv4Addr;
 
-use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
+use isoloom_plan::{Controller, Environment};
+use isoloom_render::boot::{self, Trigger};
 use isoloom_render::inventory::{self, Access};
 use isoloom_render::router;
-use isoloom_render::{CONTROLLER_BOX, GeneratedFile, ansible_runs, boot, controller_box, controller_size};
+use isoloom_render::{GeneratedFile, controller};
 use isoloom_spec::images::HyperVBox;
+use isoloom_spec::model::Spec;
 use isoloom_spec::validate::Cidr;
 
 use super::hyperv::HyperV;
@@ -23,6 +25,19 @@ use crate::ruby::{Ruby, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
 const HELPER_BOX: &str = "bento/debian-12";
+
+/// The controller's box by default: Alpine, about 100 MB (Python, ansible-core and pywinrm run
+/// fine on it), for VirtualBox, libvirt, VMware and Parallels alike.
+const CONTROLLER_BOX: &str = "generic/alpine319";
+
+/// The controller's box and its version: `controller.image.vagrant`, else [`CONTROLLER_BOX`].
+fn controller_box(spec: &Spec) -> (&str, Option<&str>) {
+    let image = spec.controller.as_ref().and_then(|c| c.image.as_ref());
+    match image.and_then(|i| i.vagrant.as_deref()) {
+        Some(b) => (b, image.and_then(|i| i.vagrant_version.as_deref())),
+        None => (CONTROLLER_BOX, None),
+    }
+}
 /// The libvirt box of Isoloom's own Debian VMs (router, controller, tool shell).
 const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
 
@@ -85,11 +100,19 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
     let link = ctx.links.get(router::NAME).unwrap_or(&Link::None);
     let spec = env.spec();
     let tc = router::tc_script(spec)
-        .map(|t| boot::at_boot("tc", "Link impairment (networks.*.tc) on the isoloom router's interfaces", &t, false, &[]))
+        .map(|t| {
+            boot::at_boot(
+                "tc",
+                "Link impairment (networks.*.tc) on the isoloom router's interfaces",
+                &t,
+                Trigger::Boot,
+                &[],
+            )
+        })
         .unwrap_or_default();
     let pairs: Vec<_> = env.router6.iter().filter_map(|(n, v6)| Some((*routed.get(n)?, *v6))).collect();
     let v6 = isoloom_render::ipv6::router_linux(&pairs)
-        .map(|s| boot::at_boot("ipv6", "IPv6 addresses of the isoloom router", &s, true, &[]))
+        .map(|s| boot::at_boot("ipv6", "IPv6 addresses of the isoloom router", &s, Trigger::BootAndLinkUp, &[]))
         .unwrap_or_default();
     let script = format!(
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
@@ -155,8 +178,12 @@ const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add
 pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let env = ctx.env;
     let (bx, version) = controller_box(env.spec());
-    let (cpus, mem, disk) = controller_size(env.spec());
-    let size = Size { cpus, mem, disk };
+    let controller = Controller::of(env.spec());
+    let size = Size {
+        cpus: controller.cpus,
+        mem: controller.memory_mb,
+        disk: controller.disk_gb,
+    };
     let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
     let mut guest = helper(env, "controller", size, addresses(env, Cidr::controller), link);
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
@@ -204,7 +231,7 @@ fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     );
     shell(r, "controller", &setup);
     if !spec.provision.is_empty() {
-        shell(r, "ansible", &ansible_runs(spec, &[]));
+        shell(r, "ansible", &controller::provision_script(spec, &[]));
     }
     // Standing in for a user on offline networks, the controller goes offline too once it's
     // done installing (its checks would otherwise see its own NAT internet).
