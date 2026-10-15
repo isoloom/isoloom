@@ -12,7 +12,7 @@ pub use isoloom_plan::Environment;
 pub use isoloom_render::backend::{Backend, Files, RenderError};
 
 pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, start_plan};
-pub use isoloom_kubernetes::{project_copies, secrets::SECRETS as KUBERNETES_SECRETS};
+pub use isoloom_kubernetes::{SECRETS as KUBERNETES_SECRETS, project_copies};
 pub use isoloom_render::container::{exec_runner, leaf_jobs, project_variables as compose_project_variables, start_commands};
 pub use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, constraints, machine_setup, provision_script, router_name};
 pub use isoloom_spec::validate::docker_cidrs;

@@ -7,22 +7,24 @@ mod container;
 mod networking;
 mod pod;
 
-pub use container::{
+pub(crate) use container::{
     Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, HttpGet, KeyToPath, Limits, Probe, Resources, SecretKey, SecretSource, Volume,
     VolumeDevice, VolumeMount, VolumeSource,
 };
-pub use networking::{IpBlock, NetworkPolicySpec, Peer, PolicyPort, Rule, ServicePort, ServiceSpec};
-pub use pod::{Affinity, AffinityTerm, DnsConfig, DnsOption, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate};
+pub(crate) use networking::{IpBlock, NetworkPolicySpec, Peer, PolicyPort, Rule, ServicePort, ServiceSpec};
+pub(crate) use pod::{Affinity, AffinityTerm, DnsConfig, DnsOption, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate};
+
+use std::fmt::{self, Write as _};
 
 use indexmap::IndexMap;
 use serde::{Serialize, Serializer};
 
 /// Labels and selectors: ordered, as written.
-pub type Labels = IndexMap<String, String>;
+pub(crate) type Labels = IndexMap<String, String>;
 
 /// The YAML tag a Helm expression is serialized under, for the chart writer to find (see
 /// [`crate::chart`]). It never reaches a written file.
-pub const HELM_TAG: &str = "HelmExpression";
+pub(crate) const HELM_TAG: &str = "HelmExpression";
 
 /// A Helm expression (`index .Values.images "web"`), tagged for the chart writer.
 fn helm<S: Serializer>(serializer: S, expression: &str) -> Result<S::Ok, S::Error> {
@@ -31,7 +33,7 @@ fn helm<S: Serializer>(serializer: S, expression: &str) -> Result<S::Ok, S::Erro
 
 /// A string the chart may fill at install time.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Text {
+pub(crate) enum Text {
     /// Written as it is.
     Literal(String),
     /// A Helm expression, without its braces: the chart writer wraps it in `{{ }}`.
@@ -49,7 +51,7 @@ impl Serialize for Text {
 
 /// A container's image.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Image {
+pub(crate) enum Image {
     /// One of Isoloom's own (the probe, the waits, the check runner).
     Tool(String),
     /// The machine's image: a value of its own in the chart (`images.<machine>`).
@@ -75,40 +77,55 @@ impl Serialize for Image {
     }
 }
 
-/// `s` as a Go template string literal (a JSON string is one).
-pub fn go_string(s: &str) -> String {
-    let escaped: String = s
-        .chars()
-        .flat_map(|c| match c {
-            '"' | '\\' => vec!['\\', c],
-            _ => vec![c],
-        })
-        .collect();
-    format!("\"{escaped}\"")
+/// `s` as a Go template string literal: quoted, its quotes and backslashes escaped, and its
+/// control characters as escapes (a Go string holds no raw line break). Every escape it writes
+/// is JSON's too, so a JSON reader reads it back.
+pub(crate) fn go_string(s: &str) -> String {
+    GoString(s).to_string()
+}
+
+/// Text written as a Go string literal.
+struct GoString<'a>(&'a str);
+
+impl fmt::Display for GoString<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_char('"')?;
+        for c in self.0.chars() {
+            match c {
+                '"' | '\\' => write!(f, "\\{c}")?,
+                '\n' => f.write_str("\\n")?,
+                '\r' => f.write_str("\\r")?,
+                '\t' => f.write_str("\\t")?,
+                c if c.is_control() => write!(f, "\\u{:04x}", u32::from(c))?,
+                c => f.write_char(c)?,
+            }
+        }
+        f.write_char('"')
+    }
 }
 
 /// One object of the manifests.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Manifest {
+pub(crate) struct Manifest {
     /// Its API group and version.
-    pub api_version: &'static str,
+    pub(crate) api_version: &'static str,
     /// Its kind.
-    pub kind: &'static str,
+    pub(crate) kind: &'static str,
     /// Its name, labels and annotations.
-    pub metadata: Metadata,
+    pub(crate) metadata: Metadata,
     /// A Secret's type.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub secret_type: Option<&'static str>,
+    pub(crate) secret_type: Option<&'static str>,
     /// What the object is, for the kinds that have a spec.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub spec: Option<Spec>,
-    /// A ConfigMap's or Secret's entries.
+    pub(crate) spec: Option<Spec>,
+    /// A `ConfigMap`'s or Secret's entries.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub data: IndexMap<String, Text>,
-    /// A ConfigMap's entries, base64-encoded.
+    pub(crate) data: IndexMap<String, Text>,
+    /// A `ConfigMap`'s entries, base64-encoded.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub binary_data: IndexMap<String, Text>,
+    pub(crate) binary_data: IndexMap<String, Text>,
 }
 
 impl Manifest {
@@ -125,37 +142,37 @@ impl Manifest {
     }
 
     /// The environment's namespace.
-    pub fn namespace(name: &str) -> Manifest {
+    pub(crate) fn namespace(name: &str) -> Manifest {
         Manifest::new("v1", "Namespace", name, None)
     }
 
     /// A machine.
-    pub fn deployment(name: &str, spec: DeploymentSpec) -> Manifest {
+    pub(crate) fn deployment(name: &str, spec: DeploymentSpec) -> Manifest {
         Manifest::new("apps/v1", "Deployment", name, Some(Spec::Deployment(spec)))
     }
 
     /// A name (and ports) for pods.
-    pub fn service(name: &str, spec: ServiceSpec) -> Manifest {
+    pub(crate) fn service(name: &str, spec: ServiceSpec) -> Manifest {
         Manifest::new("v1", "Service", name, Some(Spec::Service(spec)))
     }
 
     /// Who may talk to whom.
-    pub fn network_policy(name: &str, spec: NetworkPolicySpec) -> Manifest {
+    pub(crate) fn network_policy(name: &str, spec: NetworkPolicySpec) -> Manifest {
         Manifest::new("networking.k8s.io/v1", "NetworkPolicy", name, Some(Spec::NetworkPolicy(spec)))
     }
 
     /// A volume's storage.
-    pub fn claim(name: &str, spec: ClaimSpec) -> Manifest {
+    pub(crate) fn claim(name: &str, spec: ClaimSpec) -> Manifest {
         Manifest::new("v1", "PersistentVolumeClaim", name, Some(Spec::Claim(spec)))
     }
 
     /// A run to completion (the checks).
-    pub fn job(name: &str, spec: JobSpec) -> Manifest {
+    pub(crate) fn job(name: &str, spec: JobSpec) -> Manifest {
         Manifest::new("batch/v1", "Job", name, Some(Spec::Job(spec)))
     }
 
     /// A bare pod (the chart's `helm test` hooks).
-    pub fn pod(metadata: Metadata, spec: PodSpec) -> Manifest {
+    pub(crate) fn pod(metadata: Metadata, spec: PodSpec) -> Manifest {
         Manifest {
             metadata,
             ..Manifest::new("v1", "Pod", "", Some(Spec::Pod(spec)))
@@ -163,7 +180,7 @@ impl Manifest {
     }
 
     /// Files for pods, base64-encoded (the chart fills them from its own files).
-    pub fn config_map(name: &str, binary_data: IndexMap<String, Text>) -> Manifest {
+    pub(crate) fn config_map(name: &str, binary_data: IndexMap<String, Text>) -> Manifest {
         Manifest {
             binary_data,
             ..Manifest::new("v1", "ConfigMap", name, None)
@@ -171,7 +188,7 @@ impl Manifest {
     }
 
     /// Text files for pods (a machine's `files` written in the spec).
-    pub fn text_config_map(name: &str, data: IndexMap<String, Text>) -> Manifest {
+    pub(crate) fn text_config_map(name: &str, data: IndexMap<String, Text>) -> Manifest {
         Manifest {
             data,
             ..Manifest::new("v1", "ConfigMap", name, None)
@@ -179,7 +196,7 @@ impl Manifest {
     }
 
     /// Secret values, base64-encoded.
-    pub fn secret(name: &str, data: IndexMap<String, Text>) -> Manifest {
+    pub(crate) fn secret(name: &str, data: IndexMap<String, Text>) -> Manifest {
         Manifest {
             secret_type: Some("Opaque"),
             data,
@@ -191,14 +208,14 @@ impl Manifest {
 /// An object's spec, by kind.
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
-pub enum Spec {
+pub(crate) enum Spec {
     /// A Deployment's.
     Deployment(DeploymentSpec),
     /// A Service's.
     Service(ServiceSpec),
-    /// A NetworkPolicy's.
+    /// A `NetworkPolicy`'s.
     NetworkPolicy(NetworkPolicySpec),
-    /// A PersistentVolumeClaim's.
+    /// A `PersistentVolumeClaim`'s.
     Claim(ClaimSpec),
     /// A Job's.
     Job(JobSpec),
@@ -208,109 +225,121 @@ pub enum Spec {
 
 /// An object's name, labels and annotations.
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct Metadata {
+pub(crate) struct Metadata {
     /// Its name (absent on a pod template).
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub name: String,
+    pub(crate) name: String,
     /// Its labels.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub labels: Labels,
+    pub(crate) labels: Labels,
     /// Its annotations.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub annotations: Labels,
+    pub(crate) annotations: Labels,
 }
 
 impl Metadata {
     /// Just a name.
-    pub fn named(name: &str) -> Metadata {
+    pub(crate) fn named(name: &str) -> Metadata {
         Metadata {
-            name: name.to_string(),
+            name: name.to_owned(),
             ..Metadata::default()
         }
     }
 
     /// Just labels (a pod template's).
-    pub fn labelled(labels: Labels) -> Metadata {
+    pub(crate) fn labelled(labels: Labels) -> Metadata {
         Metadata { labels, ..Metadata::default() }
     }
 }
 
 /// A Deployment's spec: one replica of a machine, replaced (not rolled) when it changes.
 #[derive(Debug, Clone, Serialize)]
-pub struct DeploymentSpec {
+pub(crate) struct DeploymentSpec {
     /// How many pods.
-    pub replicas: u32,
+    pub(crate) replicas: u32,
     /// How a change replaces the pod.
-    pub strategy: Strategy,
+    pub(crate) strategy: Strategy,
     /// The pods it owns.
-    pub selector: Selector,
+    pub(crate) selector: Selector,
     /// The pod.
-    pub template: PodTemplate,
+    pub(crate) template: PodTemplate,
 }
 
 /// A Deployment's update strategy.
 #[derive(Debug, Clone, Serialize)]
-pub struct Strategy {
-    /// `Recreate`: a machine is one pod at a time (its claim is ReadWriteOnce).
+pub(crate) struct Strategy {
+    /// `Recreate`: a machine is one pod at a time (its claim is `ReadWriteOnce`).
     #[serde(rename = "type")]
-    pub kind: &'static str,
+    pub(crate) kind: &'static str,
 }
 
 /// A label selector; empty selects every pod (`{}`).
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Selector {
+pub(crate) struct Selector {
     /// The labels a pod must carry.
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub match_labels: Labels,
+    pub(crate) match_labels: Labels,
 }
 
 impl Selector {
     /// Pods carrying `key: value`.
-    pub fn of(key: &str, value: &str) -> Selector {
+    pub(crate) fn of(key: &str, value: &str) -> Selector {
         Selector {
-            match_labels: Labels::from([(key.to_string(), value.to_string())]),
+            match_labels: Labels::from([(key.to_owned(), value.to_owned())]),
         }
     }
 }
 
-/// A PersistentVolumeClaim's spec.
+/// A `PersistentVolumeClaim`'s spec.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ClaimSpec {
+pub(crate) struct ClaimSpec {
     /// How nodes mount it.
-    pub access_modes: Vec<&'static str>,
+    pub(crate) access_modes: Vec<&'static str>,
     /// `Filesystem` (mounted) or `Block` (a raw device), when Isoloom says which.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub volume_mode: Option<&'static str>,
+    pub(crate) volume_mode: Option<&'static str>,
     /// Its size.
-    pub resources: ClaimResources,
+    pub(crate) resources: ClaimResources,
 }
 
 /// What a claim asks for.
 #[derive(Debug, Clone, Serialize)]
-pub struct ClaimResources {
+pub(crate) struct ClaimResources {
     /// Its storage.
-    pub requests: IndexMap<&'static str, String>,
+    pub(crate) requests: IndexMap<&'static str, String>,
 }
 
 /// A Job's spec: one pod, never retried.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct JobSpec {
+pub(crate) struct JobSpec {
     /// Retries (none: a failed check is the result).
-    pub backoff_limit: u32,
+    pub(crate) backoff_limit: u32,
     /// The pod.
-    pub template: PodTemplate,
+    pub(crate) template: PodTemplate,
 }
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
 
     #[test]
     fn a_go_string_escapes_quotes_and_backslashes() {
         assert_eq!(go_string(r#"a"b\c"#), r#""a\"b\\c""#);
+        assert_eq!(go_string("a\nb\u{1}"), r#""a\nb\u0001""#);
+    }
+
+    proptest! {
+        #[test]
+        fn a_go_string_reads_back_as_the_text(text in ".*") {
+            let quoted = go_string(&text);
+            prop_assert!(!quoted.contains('\n'), "{quoted}");
+            prop_assert_eq!(serde_json::from_str::<String>(&quoted).expect("a string literal"), text);
+        }
     }
 
     #[test]

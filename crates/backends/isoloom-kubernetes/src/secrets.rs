@@ -5,10 +5,8 @@
 //! A Secret volume's files belong to root: the fields that would give them an owner
 //! (`defaultUser`, `KeyToPath.user`) are alpha, behind a feature gate managed clusters don't
 //! open. So a secret with a `uid` or `gid` is copied by the pod's `secrets` init container
-//! (Isoloom's busybox, as root) into a memory-backed emptyDir with its owner and mode, and
+//! (Isoloom's busybox, as root) into a memory-backed `emptyDir` with its owner and mode, and
 //! mounted from there: like the Secret's own files, it never touches the node's disk.
-
-use std::fmt::Write as _;
 
 use isoloom_plan::Environment;
 use isoloom_plan::secrets::{DEFAULT_MODE, SecretFile};
@@ -21,10 +19,10 @@ use crate::objects::{Container, EmptyDir, Image, KeyToPath, Volume, VolumeMount,
 pub const SECRETS: &str = "isoloom-secrets";
 /// The pod volume a machine's secrets are mounted from.
 const VOLUME: &str = "isoloom-secrets";
-/// The memory-backed emptyDir holding the secrets with an owner, and the init container
+/// The memory-backed `emptyDir` holding the secrets with an owner, and the init container
 /// filling it.
 const OWNED: &str = "isoloom-secrets-owned";
-/// Where the init container sees the Secret's files and the emptyDir.
+/// Where the init container sees the Secret's files and the `emptyDir`.
 const DIR: &str = "/isoloom-secrets";
 
 /// Whether secret `s` has an owner of its own, so it is copied out of the Secret volume.
@@ -33,7 +31,7 @@ fn owned(s: &SecretFile) -> bool {
 }
 
 /// The pod's volumes of the machine's secrets, when it gets any: their keys of the Secret, each
-/// with its mode, and the emptyDir of those with an owner.
+/// with its mode, and the `emptyDir` of those with an owner.
 pub(crate) fn volumes(m: &Machine) -> Vec<Volume> {
     let mut out: Vec<Volume> = volume(m).into_iter().collect();
     if m.plan.secrets.iter().any(owned) {
@@ -48,7 +46,7 @@ pub(crate) fn volumes(m: &Machine) -> Vec<Volume> {
     out
 }
 
-/// The init container copying each secret with an owner into the emptyDir, with its owner and
+/// The init container copying each secret with an owner into the `emptyDir`, with its owner and
 /// mode; `None` when none has one.
 pub(crate) fn init_container(m: &Machine) -> Option<Container> {
     let script: Vec<String> = m
@@ -122,12 +120,9 @@ pub(crate) fn usage(env: &Environment, namespace: &str) -> Option<String> {
     if env.machines.values().all(|m| m.secrets.is_empty()) || names.is_empty() {
         return None;
     }
-    let mut out = format!(
-        "# Secrets: `isoloom run kubernetes` creates {SECRETS} from their stores; by hand, once the namespace exists (the pods wait for it):\n#   kubectl -n {namespace} create secret generic {SECRETS}"
-    );
-    for n in names {
-        let _ = write!(out, " --from-file={n}=<file>");
-    }
-    out.push('\n');
-    Some(out)
+    let files: Vec<String> = names.iter().map(|n| format!(" --from-file={n}=<file>")).collect();
+    Some(format!(
+        "# Secrets: `isoloom run kubernetes` creates {SECRETS} from their stores; by hand, once the namespace exists (the pods wait for it):\n#   kubectl -n {namespace} create secret generic {SECRETS}{}\n",
+        files.concat()
+    ))
 }

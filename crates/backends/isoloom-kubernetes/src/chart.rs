@@ -2,7 +2,7 @@
 //! objects as the plain manifests: the namespace is the release's, each machine's image a value
 //! (`images.<machine>`, typed by `values.schema.json`), the inputs a Secret from `inputs.<NAME>`, the checks `helm test` Pods
 //! (the `exec` ones, run inside a machine, stay with `isoloom test`), and the project's scripts
-//! read from `files/project/` (see [`crate::project_copies`]).
+//! read from `files/project/` (see [`project_copies`](crate::project_copies)).
 //!
 //! The chart's templates are valid YAML before Helm renders them: what Helm fills in is a
 //! quoted scalar (a [`Text::Helm`] or an [`Image::Value`] of the objects), and a `{{` already
@@ -10,17 +10,17 @@
 
 use indexmap::IndexMap;
 use isoloom_plan::Environment;
-use isoloom_render::backend::RenderError;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use serde::Serialize;
 use serde_yaml_ng::Value;
 
+use crate::error::{Error, Result};
 use crate::kustomize::{CHECK_SCRIPTS, SCRIPTS, key};
+use crate::layout::{CHART, CHART_PROJECT_FILES, DIR};
 use crate::machine::Machine;
 use crate::objects::{HELM_TAG, Image, Labels, Manifest, Metadata, Spec, Text, go_string};
 use crate::pod::INPUTS;
-use crate::render::{Rendered, document, generated, unwritable};
-use crate::{CHART, CHART_PROJECT_FILES, DIR};
+use crate::render::{Rendered, document, generated};
 
 /// `Chart.yaml`.
 #[derive(Debug, Serialize)]
@@ -44,7 +44,7 @@ struct Values {
 }
 
 /// The chart's files, under the target's folder.
-pub(crate) fn files(env: &Environment, r: &Rendered) -> Result<Vec<GeneratedFile>, RenderError> {
+pub(crate) fn files(env: &Environment, r: &Rendered) -> Result<Vec<GeneratedFile>> {
     let file = |path: &str, contents: String| GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/{CHART}/{path}"),
         contents,
@@ -70,7 +70,7 @@ pub(crate) fn files(env: &Environment, r: &Rendered) -> Result<Vec<GeneratedFile
     Ok(out)
 }
 
-fn chart_file(env: &Environment) -> Result<String, RenderError> {
+fn chart_file(env: &Environment) -> Result<String> {
     let chart = ChartFile {
         api_version: "v2",
         name: env.name.clone(),
@@ -85,9 +85,9 @@ fn chart_file(env: &Environment) -> Result<String, RenderError> {
 
 /// Each machine's image, as its manifests pull it (through the mirrors; a built one is local),
 /// and the inputs, empty.
-fn values(env: &Environment, inputs: bool) -> Result<String, RenderError> {
+fn values(env: &Environment, inputs: bool) -> Result<String> {
     let values = Values {
-        images: Machine::all(env).iter().map(|m| (m.name.to_string(), m.reference.to_string())).collect(),
+        images: Machine::all(env).iter().map(|m| (m.name.to_owned(), m.reference.to_owned())).collect(),
         inputs: inputs.then(|| env.spec().inputs.iter().map(|i| (i.clone(), String::new())).collect()),
     };
     let usage = "# images: each machine's image (images built from the project must be pushed where the\n# cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).\n";
@@ -95,7 +95,7 @@ fn values(env: &Environment, inputs: bool) -> Result<String, RenderError> {
 }
 
 /// The manifests but the namespace (the release's), each machine's image its value.
-fn environment(r: &Rendered) -> Result<String, RenderError> {
+fn environment(r: &Rendered) -> Result<String> {
     let objects: Vec<Manifest> = r.objects.iter().filter(|o| o.kind != "Namespace").map(with_image_values).collect();
     Ok(format!("{}{}", generated(), helm_documents(&objects)?))
 }
@@ -115,7 +115,7 @@ fn with_image_values(object: &Manifest) -> Manifest {
 }
 
 /// The project's scripts, from the chart's copies (a missing one fails the install, naming it).
-fn scripts(scripts: &[String]) -> Result<String, RenderError> {
+fn scripts(scripts: &[String]) -> Result<String> {
     let data = scripts.iter().map(|f| {
         let path = format!("{CHART_PROJECT_FILES}/{}", key(f));
         let missing = go_string(&format!("{path} is missing: run isoloom generate"));
@@ -127,7 +127,7 @@ fn scripts(scripts: &[String]) -> Result<String, RenderError> {
 }
 
 /// The inputs' Secret, from the values (an unset one is empty).
-fn secret(env: &Environment) -> Result<String, RenderError> {
+fn secret(env: &Environment) -> Result<String> {
     let data = env
         .spec()
         .inputs
@@ -136,10 +136,10 @@ fn secret(env: &Environment) -> Result<String, RenderError> {
     Ok(format!("{}{}", generated(), helm_documents(&[Manifest::secret(INPUTS, data.collect())])?))
 }
 
-/// The checks as `helm test` hooks: their runners' ConfigMap (from the chart's files), then a
+/// The checks as `helm test` hooks: their runners' `ConfigMap` (from the chart's files), then a
 /// Pod per Job, named after it (`helm test --logs` reads each test's logs from a pod of the
 /// hook's own name).
-fn tests(r: &Rendered) -> Result<String, RenderError> {
+fn tests(r: &Rendered) -> Result<String> {
     let runners = r.checks.runners.iter().map(|(name, _)| {
         (
             name.clone(),
@@ -148,8 +148,8 @@ fn tests(r: &Rendered) -> Result<String, RenderError> {
     });
     let mut objects = vec![Manifest::config_map(CHECK_SCRIPTS, runners.collect())];
     let hook = Labels::from([
-        ("helm.sh/hook".to_string(), "test".to_string()),
-        ("helm.sh/hook-delete-policy".to_string(), "before-hook-creation".to_string()),
+        ("helm.sh/hook".to_owned(), "test".to_owned()),
+        ("helm.sh/hook-delete-policy".to_owned(), "before-hook-creation".to_owned()),
     ]);
     for job in &r.checks.jobs {
         if let Some(Spec::Job(j)) = &job.spec {
@@ -190,13 +190,13 @@ fn literal(text: &str) -> String {
 }
 
 /// Chart templates, one file: every string as it is, but the Helm expressions.
-fn helm_documents(objects: &[Manifest]) -> Result<String, RenderError> {
+fn helm_documents(objects: &[Manifest]) -> Result<String> {
     let docs: Vec<String> = objects.iter().map(helm_document).collect::<Result<_, _>>()?;
     Ok(docs.join("---\n"))
 }
 
-fn helm_document(object: &Manifest) -> Result<String, RenderError> {
-    let mut value = serde_yaml_ng::to_value(object).map_err(|e| unwritable(&e))?;
+fn helm_document(object: &Manifest) -> Result<String> {
+    let mut value = serde_yaml_ng::to_value(object).map_err(|source| Error::Unwritable { source })?;
     templated(&mut value);
     document(&value)
 }
@@ -229,7 +229,32 @@ fn templated(value: &mut Value) {
 /// The expression of a value tagged [`HELM_TAG`].
 fn helm_expression(value: &Value) -> Option<String> {
     match value {
-        Value::Tagged(t) if t.tag == HELM_TAG => t.value.as_str().map(str::to_string),
+        Value::Tagged(t) if t.tag == HELM_TAG => t.value.as_str().map(str::to_owned),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::literal;
+
+    /// What Helm prints for each `{{ `{{` }}` action.
+    const ACTION: &str = "{{ `{{` }}";
+
+    #[test]
+    fn braces_in_the_text_are_printed_as_they_are() {
+        assert_eq!(literal("a {{ b }}"), "a {{ `{{` }} b }}");
+    }
+
+    proptest! {
+        #[test]
+        fn every_brace_pair_is_an_action_that_prints_it_back(text in "[a-z {}`]*") {
+            let template = literal(&text);
+            let pieces: Vec<&str> = template.split(ACTION).collect();
+            prop_assert!(pieces.iter().all(|p| !p.contains("{{")), "{template}");
+            prop_assert_eq!(pieces.join("{{"), text);
+        }
     }
 }

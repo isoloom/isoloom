@@ -35,13 +35,12 @@ pub(crate) fn anyone(env: &Environment, mp: &MachinePlan) -> Vec<IpBlock> {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::model::Target;
-
     use super::*;
+    use crate::testing::environment;
 
     #[test]
     fn families_follow_the_networks() {
-        let spec = isoloom_spec::parse(
+        let env = environment(
             "version: 1
 name: v6
 networks:
@@ -53,9 +52,7 @@ machines:
   b: { networks: { four: 11, dual: 11 }, docker: { image: nginx } }
   c: { networks: { six: 12 }, docker: { image: nginx } }
 ",
-        )
-        .unwrap();
-        let env = Environment::build(&spec, Target::Kubernetes, None);
+        );
         let of = |m: &str| families(&env, &env.machines[m]);
         assert_eq!(of("a"), (None, vec![]));
         assert_eq!(of("b"), (Some("PreferDualStack"), vec!["IPv4", "IPv6"]));

@@ -24,14 +24,14 @@ use crate::storage;
 // image, as on Compose.
 use isoloom_render::container::{PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE};
 
-/// The emptyDir holding Isoloom's probe, and the init container filling it.
-pub const PROBE_VOLUME: &str = "isoloom-probe";
+/// The `emptyDir` holding Isoloom's probe, and the init container filling it.
+pub(crate) const PROBE_VOLUME: &str = "isoloom-probe";
 /// Where a seed init container sees the claim it fills.
-pub const SEED_DIR: &str = "/isoloom-seed";
+pub(crate) const SEED_DIR: &str = "/isoloom-seed";
 /// In the claim while a seed copy runs (see [`seed_script`]).
-pub const SEED_MARKER: &str = ".isoloom-seeding";
+pub(crate) const SEED_MARKER: &str = ".isoloom-seeding";
 /// The Secret the machines' inputs are read from.
-pub const INPUTS: &str = "isoloom-inputs";
+pub(crate) const INPUTS: &str = "isoloom-inputs";
 /// A machine's image is only pulled when the node doesn't have it (a built one is only local).
 const IF_NOT_PRESENT: Option<&str> = Some("IfNotPresent");
 
@@ -52,7 +52,7 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
         .collect();
     let (dns_policy, dns_config) = crate::dns::config(m.spec.dns.as_ref());
     PodSpec {
-        hostname: Some(m.name.to_string()),
+        hostname: Some(m.name.to_owned()),
         subdomain: crate::dns::subdomain(m.spec.dns.as_ref()),
         affinity: beside_owners(m),
         // Namespaced sysctls are the pod's (the kubelet allows the safe ones; others need its
@@ -61,7 +61,7 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
         init_containers: init_containers(m),
         containers,
         // Scheduled on a node of the machine's architecture.
-        node_selector: Labels::from([("kubernetes.io/arch".to_string(), m.plan.arch.id().to_string())]),
+        node_selector: Labels::from([("kubernetes.io/arch".to_owned(), m.plan.arch.id().to_owned())]),
         // A resolver of its own (the lab's domain controller), or the cluster's with the
         // machine's search domains and options.
         dns_policy,
@@ -167,7 +167,7 @@ fn jobs_container(m: &Machine, mounts: &[VolumeMount]) -> Option<Container> {
     }
     let wait = m.probed().then(|| format!("until {}; do sleep 2; done", process::ready_test(m)));
     let run = m.init().iter().map(|script| format!("sh {SCRIPTS_DIR}/{}", key(script)));
-    let steps: Vec<String> = wait.into_iter().chain(run).chain(["exec sleep infinity".to_string()]).collect();
+    let steps: Vec<String> = wait.into_iter().chain(run).chain(["exec sleep infinity".to_owned()]).collect();
     let mut c = Container::new("init", m.image());
     c.image_pull_policy = IF_NOT_PRESENT;
     c.command = vec!["sh".into(), "-c".into(), steps.join(" && ")];
@@ -239,7 +239,7 @@ fn seed_container(m: &Machine, v: &str, path: &str) -> Container {
 /// claim too small for the image's files) fails the pod, and the next try finds the marker,
 /// clears what the last one left and copies again, instead of taking a half-filled claim as
 /// seeded.
-pub fn seed_script(path: &str) -> String {
+pub(crate) fn seed_script(path: &str) -> String {
     let src = shell::quote(&format!("{}/.", path.trim_end_matches('/')));
     format!(
         "d={SEED_DIR}; m=\"$d/{SEED_MARKER}\"; b={PROBE_DIR}/busybox; [ -d {path} ] || exit 0; for f in \"$d\"/* \"$d\"/.[!.]* \"$d\"/..?*; do if [ -e \"$f\" ] || [ -L \"$f\" ]; then case \"$f\" in \"$d/lost+found\" | \"$m\") ;; *) [ -e \"$m\" ] || exit 0; $b rm -rf \"$f\" ;; esac; fi; done; : > \"$m\" && $b cp -a {src} \"$d/\" && $b rm -f \"$m\"",
@@ -248,7 +248,7 @@ pub fn seed_script(path: &str) -> String {
 }
 
 /// A machine mounting shared volumes it doesn't own runs on their owners' node: one claim,
-/// mounted by every pod of that node (ReadWriteOnce allows it), on any storage class.
+/// mounted by every pod of that node (`ReadWriteOnce` allows it), on any storage class.
 fn beside_owners(m: &Machine) -> Option<Affinity> {
     let terms: Vec<AffinityTerm> = m
         .plan
@@ -299,7 +299,7 @@ pub(crate) fn scripts_volume() -> VolumeSource {
     config_map_volume(SCRIPTS)
 }
 
-/// A ConfigMap's files, executable.
+/// A `ConfigMap`'s files, executable.
 pub(crate) fn config_map_volume(name: &str) -> VolumeSource {
     VolumeSource::ConfigMap {
         name: name.into(),

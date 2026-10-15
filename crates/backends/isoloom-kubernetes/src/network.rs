@@ -1,4 +1,4 @@
-//! The environment's networks as labels and NetworkPolicies: a pod carries a label per network
+//! The environment's networks as labels and `NetworkPolicy` objects: a pod carries a label per network
 //! it is on; ingress is denied by default, then open within each network and along `reach`;
 //! offline pods keep their egress inside the environment (and DNS).
 
@@ -24,8 +24,8 @@ fn members(net: &str) -> Selector {
 /// The labels a pod on these networks carries (what the network policies select): the
 /// machine's name first, when it is one.
 pub(crate) fn pod_labels<'a>(machine: Option<&str>, nets: impl IntoIterator<Item = &'a String>) -> Labels {
-    let own = machine.map(|m| (MACHINE_LABEL.to_string(), m.to_string()));
-    own.into_iter().chain(nets.into_iter().map(|n| (net_label(n), "member".to_string()))).collect()
+    let own = machine.map(|m| (MACHINE_LABEL.to_owned(), m.to_owned()));
+    own.into_iter().chain(nets.into_iter().map(|n| (net_label(n), "member".to_owned()))).collect()
 }
 
 /// An egress policy for the pods `selector` matches: other pods of the environment, and DNS.

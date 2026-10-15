@@ -3,17 +3,15 @@
 //! an input it doesn't read, an empty image) instead of installing something else.
 
 use isoloom_plan::Environment;
-use isoloom_render::GenerateError;
-use isoloom_render::backend::RenderError;
-use isoloom_spec::model::Target;
 use serde_json::{Map, Value, json};
 
+use crate::error::{Error, Result};
 use crate::machine::Machine;
 
 /// The schema of the chart's values: each machine's image (a non-empty string, every one
 /// present), and the inputs when a machine reads some (a scalar each, no other name).
-pub(crate) fn schema(env: &Environment, inputs: bool) -> Result<String, RenderError> {
-    let machines: Vec<String> = Machine::all(env).iter().map(|m| m.name.to_string()).collect();
+pub(crate) fn schema(env: &Environment, inputs: bool) -> Result<String> {
+    let machines: Vec<String> = Machine::all(env).iter().map(|m| m.name.to_owned()).collect();
     let image = json!({ "type": "string", "minLength": 1 });
     let images = json!({
         "description": "Each machine's image, by machine.",
@@ -22,17 +20,17 @@ pub(crate) fn schema(env: &Environment, inputs: bool) -> Result<String, RenderEr
         "required": machines,
         "additionalProperties": false,
     });
-    let mut properties = Map::from_iter([("images".to_string(), images)]);
+    let mut properties = Map::from_iter([("images".to_owned(), images)]);
     if inputs {
         let scalar = json!({ "type": ["string", "number", "boolean"] });
         let names = env.spec().inputs.iter().map(|i| (i.clone(), scalar.clone()));
-        let inputs = json!({
+        let values = json!({
             "description": "The launch-time inputs, by name (an unset one is empty).",
             "type": "object",
             "properties": names.collect::<Map<String, Value>>(),
             "additionalProperties": false,
         });
-        properties.insert("inputs".to_string(), inputs);
+        properties.insert("inputs".to_owned(), values);
     }
     let schema = json!({
         "$schema": "https://json-schema.org/draft-07/schema#",
@@ -43,11 +41,6 @@ pub(crate) fn schema(env: &Environment, inputs: bool) -> Result<String, RenderEr
         "required": ["images"],
         "additionalProperties": false,
     });
-    let text = serde_json::to_string_pretty(&schema).map_err(|e| {
-        RenderError::Generate(GenerateError::Unsupported {
-            target: Target::Kubernetes,
-            what: format!("the values' schema doesn't serialize: {e}"),
-        })
-    })?;
+    let text = serde_json::to_string_pretty(&schema).map_err(|source| Error::Schema { source })?;
     Ok(format!("{text}\n"))
 }

@@ -20,7 +20,7 @@ pub(crate) fn config(dns: Option<&Dns>) -> (Option<&'static str>, Option<DnsConf
     let config = DnsConfig {
         nameservers: d.servers.clone(),
         searches: d.search.clone(),
-        options: d.options.iter().map(|o| DnsOption::parse(o)).collect(),
+        options: d.options.iter().map(|o| DnsOption::from(o.as_str())).collect(),
     };
     (policy, Some(config))
 }
@@ -36,36 +36,45 @@ pub(crate) fn subdomain(dns: Option<&Dns>) -> Option<String> {
         .take(63)
         .collect();
     let label = label.trim_matches('-');
-    (label.starts_with(|c: char| c.is_ascii_lowercase())).then(|| label.to_string())
+    (label.starts_with(|c: char| c.is_ascii_lowercase())).then(|| label.to_owned())
 }
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
 
     fn dns(servers: &[&str], search: &[&str], options: &[&str], domain: Option<&str>) -> Dns {
-        let own = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect();
+        let own = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect();
         Dns {
             servers: own(servers),
             search: own(search),
-            domain: domain.map(str::to_string),
+            domain: domain.map(str::to_owned),
             options: own(options),
         }
     }
 
     #[test]
-    fn own_servers_replace_the_cluster_resolver_and_the_rest_adds_to_it() {
+    fn own_servers_replace_the_cluster_resolver() {
         let (policy, resolver) = super::config(Some(&dns(&["10.0.0.2"], &[], &["ndots:2"], None)));
         assert_eq!(policy, Some("None"));
-        let c = resolver.unwrap();
+        let c = resolver.expect("a resolver of its own");
         assert_eq!(c.nameservers, ["10.0.0.2"]);
         assert_eq!((c.options[0].name.as_str(), c.options[0].value.as_deref()), ("ndots", Some("2")));
-        // Search domains and options only: the cluster's resolver stays, with them added.
+    }
+
+    #[test]
+    fn search_domains_and_options_add_to_the_cluster_resolver() {
         let (policy, resolver) = super::config(Some(&dns(&[], &["corp.local"], &["rotate"], None)));
         assert_eq!(policy, None);
-        let c = resolver.unwrap();
+        let c = resolver.expect("the cluster's resolver, with them added");
         assert_eq!(c.searches, ["corp.local"]);
         assert_eq!((c.options[0].name.as_str(), c.options[0].value.as_deref()), ("rotate", None));
+    }
+
+    #[test]
+    fn a_domain_alone_leaves_the_resolver_as_it_is() {
         assert_eq!(super::config(Some(&dns(&[], &[], &[], Some("corp.local")))).1.map(|_| ()), None);
         assert_eq!(super::config(None).0, None);
     }
@@ -78,5 +87,16 @@ mod tests {
         assert_eq!(subdomain(Some(&dns(&[], &[], &[], None))), None);
         let long = "a".repeat(70);
         assert_eq!(subdomain(Some(&dns(&[], &[], &[], Some(&long)))).map(|l| l.len()), Some(63));
+    }
+
+    proptest! {
+        #[test]
+        fn a_subdomain_is_always_one_dns_label(domain in ".{0,80}") {
+            if let Some(label) = subdomain(Some(&dns(&[], &[], &[], Some(&domain)))) {
+                prop_assert!(label.len() <= 63, "{label}");
+                prop_assert!(label.starts_with(|c: char| c.is_ascii_lowercase()) && !label.ends_with('-'), "{label}");
+                prop_assert!(label.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'), "{label}");
+            }
+        }
     }
 }

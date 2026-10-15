@@ -4,9 +4,10 @@
 //! scheduler picks the GPUs: a spec naming them (`ids`), asking for all of a node's or giving
 //! the runtime options is refused, with the reason.
 
-use isoloom_plan::{Environment, MachineShape};
+use isoloom_plan::Environment;
 use isoloom_spec::model::{GpuCount, Gpus};
 
+use crate::machine::Machine;
 use crate::objects::{Container, EnvVar, Limits, NameValue, Resources};
 
 /// The environment variable NVIDIA's container toolkit reads the capabilities from.
@@ -23,11 +24,10 @@ fn resource(driver: &str) -> Option<&'static str> {
 }
 
 /// Why Kubernetes can't give a container its GPUs as the spec asks, if it can't.
-pub fn refusal(env: &Environment) -> Option<String> {
-    env.machines
-        .iter()
-        .filter(|(_, mp)| mp.shape == MachineShape::Container)
-        .find_map(|(name, mp)| mp.hardware.gpus.as_ref().and_then(|g| why(name, g)))
+pub(crate) fn refusal(env: &Environment) -> Option<String> {
+    Machine::all(env)
+        .into_iter()
+        .find_map(|m| m.plan.hardware.gpus.as_ref().and_then(|g| why(m.name, g)))
 }
 
 fn why(name: &str, g: &Gpus) -> Option<String> {
@@ -61,13 +61,13 @@ fn why(name: &str, g: &Gpus) -> Option<String> {
 
 /// Adds the GPUs (a count of the driver's resource, in the limits) and NVIDIA's capabilities (in
 /// the environment) to the machine's container.
-pub fn apply(gpus: Option<&Gpus>, c: &mut Container) {
+pub(crate) fn apply(gpus: Option<&Gpus>, c: &mut Container) {
     let Some(g) = gpus else { return };
     let (Some(name), Some(count)) = (resource(g.driver()), g.fixed_count()) else {
         return;
     };
     let resources = c.resources.get_or_insert_with(|| Resources { limits: Limits::default() });
-    resources.limits.devices.insert(name.to_string(), count.to_string());
+    resources.limits.devices.insert(name.to_owned(), count.to_string());
     if !g.capabilities.is_empty() {
         c.env.push(EnvVar::Value(NameValue {
             name: NVIDIA_CAPABILITIES.into(),

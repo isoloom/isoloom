@@ -7,86 +7,86 @@ use super::{Labels, Selector};
 /// A Service's spec.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ServiceSpec {
+pub(crate) struct ServiceSpec {
     /// `LoadBalancer` when published; cluster-internal otherwise.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub kind: Option<&'static str>,
+    pub(crate) kind: Option<&'static str>,
     /// `PreferDualStack` or `SingleStack` on IPv6 networks; the cluster's default otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ip_family_policy: Option<&'static str>,
+    pub(crate) ip_family_policy: Option<&'static str>,
     /// `IPv4` and `IPv6`, or `IPv6` alone, on IPv6 networks.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub ip_families: Vec<&'static str>,
+    pub(crate) ip_families: Vec<&'static str>,
     /// The pods behind it.
-    pub selector: Labels,
+    pub(crate) selector: Labels,
     /// Its ports.
-    pub ports: Vec<ServicePort>,
+    pub(crate) ports: Vec<ServicePort>,
 }
 
 /// A Service's port.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ServicePort {
+pub(crate) struct ServicePort {
     /// Unique within the Service.
-    pub name: String,
+    pub(crate) name: String,
     /// The port the Service answers on.
-    pub port: u16,
+    pub(crate) port: u16,
     /// The pod's port.
-    pub target_port: u16,
+    pub(crate) target_port: u16,
     /// `UDP`; TCP (the default) is left out.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub protocol: Option<&'static str>,
+    pub(crate) protocol: Option<&'static str>,
 }
 
-/// A NetworkPolicy's spec.
+/// A `NetworkPolicy`'s spec.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct NetworkPolicySpec {
+pub(crate) struct NetworkPolicySpec {
     /// The pods it applies to.
-    pub pod_selector: Selector,
+    pub(crate) pod_selector: Selector,
     /// The directions it restricts (by default, those it has rules for).
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub policy_types: Vec<&'static str>,
+    pub(crate) policy_types: Vec<&'static str>,
     /// What may reach them.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub ingress: Vec<Rule>,
+    pub(crate) ingress: Vec<Rule>,
     /// What they may reach.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub egress: Vec<Rule>,
+    pub(crate) egress: Vec<Rule>,
 }
 
-/// A NetworkPolicy rule: peers (`from` for ingress, `to` for egress), on ports.
+/// A `NetworkPolicy` rule: peers (`from` for ingress, `to` for egress), on ports.
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct Rule {
+pub(crate) struct Rule {
     /// Ingress peers.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub from: Vec<Peer>,
+    pub(crate) from: Vec<Peer>,
     /// Egress peers.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub to: Vec<Peer>,
+    pub(crate) to: Vec<Peer>,
     /// The ports (all when empty).
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub ports: Vec<PolicyPort>,
+    pub(crate) ports: Vec<PolicyPort>,
 }
 
-/// A NetworkPolicy peer: pods of the namespace, every pod of other namespaces, or addresses.
+/// A `NetworkPolicy` peer: pods of the namespace, every pod of other namespaces, or addresses.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Peer {
+pub(crate) struct Peer {
     /// Pods of the namespace.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pod_selector: Option<Selector>,
+    pub(crate) pod_selector: Option<Selector>,
     /// Every pod of the namespaces matched.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub namespace_selector: Option<Selector>,
+    pub(crate) namespace_selector: Option<Selector>,
     /// Addresses.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ip_block: Option<IpBlock>,
+    pub(crate) ip_block: Option<IpBlock>,
 }
 
 impl Peer {
     /// The pods `selector` matches.
-    pub fn pods(selector: Selector) -> Peer {
+    pub(crate) fn pods(selector: Selector) -> Peer {
         Peer {
             pod_selector: Some(selector),
             ..Peer::default()
@@ -96,17 +96,17 @@ impl Peer {
 
 /// A block of addresses.
 #[derive(Debug, Clone, Serialize)]
-pub struct IpBlock {
+pub(crate) struct IpBlock {
     /// The block.
-    pub cidr: String,
+    pub(crate) cidr: String,
 }
 
-/// A NetworkPolicy port.
+/// A `NetworkPolicy` port.
 #[derive(Debug, Clone, Serialize)]
-pub struct PolicyPort {
+pub(crate) struct PolicyPort {
     /// The port.
-    pub port: u16,
+    pub(crate) port: u16,
     /// `TCP` or `UDP`; left out for TCP where the default says so.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub protocol: Option<&'static str>,
+    pub(crate) protocol: Option<&'static str>,
 }

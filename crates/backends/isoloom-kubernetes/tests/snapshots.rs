@@ -1,141 +1,133 @@
 //! The Kubernetes backend's rendering of a few examples, as snapshots (the manifests with their
 //! kustomizations and checks, and the Helm chart), its refusals and its determinism.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
-
-use std::fmt::Write;
+use std::error::Error;
 use std::path::Path;
 
-use isoloom_plan::{Environment, Feature};
+use isoloom_kubernetes::KubernetesBackend;
+use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 
-fn plan(example: &str) -> Environment {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example);
-    let spec = isoloom_spec::load(&dir).expect("the example loads");
-    assert!(isoloom_spec::validate(&spec).is_empty(), "the example is valid");
-    Environment::build(&spec, Target::Kubernetes, None)
+/// A test's outcome: a failed step is its report.
+type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+
+/// The environment of `spec`, which must be valid, planned for Kubernetes.
+fn planned(spec: &isoloom_spec::Spec) -> Outcome<Environment> {
+    let problems = isoloom_spec::validate(spec);
+    if !problems.is_empty() {
+        return Err(format!("the spec isn't valid: {problems:?}").into());
+    }
+    Ok(Environment::build(spec, Target::Kubernetes, None))
+}
+
+/// An example of the project, planned for Kubernetes.
+fn plan(example: &str) -> Outcome<Environment> {
+    planned(&isoloom_spec::load(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example),
+    )?)
+}
+
+/// A spec written in a test, planned for Kubernetes.
+fn parsed(yaml: &str) -> Outcome<Environment> {
+    planned(&isoloom_spec::parse(yaml)?)
 }
 
 /// The files the backend renders for an example, from its plan.
-fn render(example: &str) -> Vec<GeneratedFile> {
-    isoloom_kubernetes::render(&plan(example)).expect("Kubernetes renders the example")
+fn render(example: &str) -> Outcome<Vec<GeneratedFile>> {
+    Ok(KubernetesBackend.render(&plan(example)?)?)
 }
 
 /// The files whose path passes `keep`, one after the other under their path.
 fn joined(files: &[GeneratedFile], keep: impl Fn(&str) -> bool) -> String {
-    let mut out = String::new();
-    for f in files.iter().filter(|f| keep(&f.path)) {
-        let _ = write!(out, "=== {}\n{}\n", f.path, f.contents);
-    }
-    out
-}
-
-fn manifests(example: &str) -> String {
-    joined(&render(example), |p| !p.contains("/chart/"))
-}
-
-fn chart(example: &str) -> String {
-    joined(&render(example), |p| p.contains("/chart/"))
-}
-
-/// A machine with its own process: a command, a working directory, a `before` step and a
-/// healthcheck beside its port probe.
-const OWN_PROCESS: &str = r#"
-version: 1
-name: own-process
-inputs: [FLAG]
-networks: { lan: { cidr: 10.9.0.0/24 } }
-machines:
-  web:
-    networks: { lan: 10 }
-    inputs: [FLAG]
-    ports: [{ port: 8000 }]
-    docker: { image: "python:3-alpine" }
-    command: [python3, -m, http.server, "8000"]
-    working_dir: /srv
-    before: [flag.sh]
-    healthcheck: { test: "test -s /srv/flag && echo $FLAG", interval: 2s, retries: 30 }
-  api:
-    networks: { lan: 11 }
-    ports: [{ port: 9000 }]
-    docker: { image: "python:3-alpine" }
-    command: python3 -m http.server 9000
-    healthcheck: { http: { port: 9000, path: /health }, start_period: 1m }
-"#;
-
-#[test]
-fn a_machine_runs_its_own_process() {
-    let spec = isoloom_spec::parse(OWN_PROCESS).unwrap();
-    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-    let files = isoloom_kubernetes::render(&Environment::build(&spec, Target::Kubernetes, None)).unwrap();
-    insta::assert_snapshot!(joined(&files, |p| p.ends_with("environment.yaml")));
-}
-
-#[test]
-fn hello_stack_manifests() {
-    insta::assert_snapshot!(manifests("hello-stack"));
-}
-
-#[test]
-fn hello_stack_chart() {
-    insta::assert_snapshot!(chart("hello-stack"));
-}
-
-#[test]
-fn segmented_manifests() {
-    insta::assert_snapshot!(manifests("segmented"));
-}
-
-#[test]
-fn segmented_chart() {
-    insta::assert_snapshot!(chart("segmented"));
-}
-
-#[test]
-fn shared_files_manifests() {
-    insta::assert_snapshot!(manifests("shared-files"));
-}
-
-#[test]
-fn shared_files_chart() {
-    insta::assert_snapshot!(chart("shared-files"));
-}
-
-#[test]
-fn tuned_web_is_refused_for_its_ulimits() {
-    let err = isoloom_kubernetes::render(&plan("tuned-web")).expect_err("refused");
-    insta::assert_snapshot!(err.to_string());
-}
-
-#[test]
-fn the_refusal_comes_from_the_plan_without_rendering() {
-    let backend = isoloom_kubernetes::KubernetesBackend;
-    let why = backend.refusal(&plan("tuned-web")).expect("refused");
-    assert_eq!(why, "machine `web` sets `ulimits`: Kubernetes has no per-container process limits");
-    assert!(backend.refusal(&plan("hello-stack")).is_none());
-}
-
-#[test]
-fn rendering_twice_gives_the_same_files() {
-    for example in ["hello-stack", "segmented", "shared-files", "supplier-portal-api", "udp-dns"] {
-        assert_eq!(render(example), render(example), "{example}");
-    }
-}
-
-fn parsed(yaml: &str) -> Environment {
-    let spec = isoloom_spec::parse(yaml).expect("parses");
-    assert!(isoloom_spec::validate(&spec).is_empty(), "{:?}", isoloom_spec::validate(&spec));
-    Environment::build(&spec, Target::Kubernetes, None)
-}
-
-fn file<'a>(files: &'a [GeneratedFile], suffix: &str) -> &'a str {
-    &files
+    let parts: Vec<String> = files
         .iter()
-        .find(|f| f.path.ends_with(suffix))
-        .unwrap_or_else(|| panic!("no {suffix}"))
-        .contents
+        .filter(|f| keep(&f.path))
+        .map(|f| format!("=== {}\n{}\n", f.path, f.contents))
+        .collect();
+    parts.concat()
+}
+
+fn manifests(example: &str) -> Outcome<String> {
+    Ok(joined(&render(example)?, |p| !p.contains("/chart/")))
+}
+
+fn chart(example: &str) -> Outcome<String> {
+    Ok(joined(&render(example)?, |p| p.contains("/chart/")))
+}
+
+/// The text of the one file among `files` whose path ends with `suffix`.
+fn file<'a>(files: &'a [GeneratedFile], suffix: &str) -> Outcome<&'a str> {
+    let found = files.iter().find(|f| f.path.ends_with(suffix)).ok_or_else(|| format!("no {suffix}"))?;
+    Ok(&found.contents)
+}
+
+#[test]
+fn a_machine_runs_its_own_process() -> Outcome {
+    let fixture = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/own-process.yml"))?;
+    let files = KubernetesBackend.render(&parsed(&fixture)?)?;
+    insta::assert_snapshot!(joined(&files, |p| p.ends_with("environment.yaml")));
+    Ok(())
+}
+
+#[test]
+fn hello_stack_manifests() -> Outcome {
+    insta::assert_snapshot!(manifests("hello-stack")?);
+    Ok(())
+}
+
+#[test]
+fn hello_stack_chart() -> Outcome {
+    insta::assert_snapshot!(chart("hello-stack")?);
+    Ok(())
+}
+
+#[test]
+fn segmented_manifests() -> Outcome {
+    insta::assert_snapshot!(manifests("segmented")?);
+    Ok(())
+}
+
+#[test]
+fn segmented_chart() -> Outcome {
+    insta::assert_snapshot!(chart("segmented")?);
+    Ok(())
+}
+
+#[test]
+fn shared_files_manifests() -> Outcome {
+    insta::assert_snapshot!(manifests("shared-files")?);
+    Ok(())
+}
+
+#[test]
+fn shared_files_chart() -> Outcome {
+    insta::assert_snapshot!(chart("shared-files")?);
+    Ok(())
+}
+
+#[test]
+fn tuned_web_is_refused_for_its_ulimits() -> Outcome {
+    let err = KubernetesBackend.render(&plan("tuned-web")?).err().ok_or("rendered")?;
+    insta::assert_snapshot!(err.to_string());
+    Ok(())
+}
+
+#[test]
+fn the_refusal_comes_from_the_plan_without_rendering() -> Outcome {
+    let why = KubernetesBackend.refusal(&plan("tuned-web")?).ok_or("not refused")?;
+    assert_eq!(why, "machine `web` sets `ulimits`: Kubernetes has no per-container process limits");
+    assert!(KubernetesBackend.refusal(&plan("hello-stack")?).is_none());
+    Ok(())
+}
+
+#[test]
+fn rendering_twice_gives_the_same_files() -> Outcome {
+    for example in ["hello-stack", "segmented", "shared-files", "supplier-portal-api", "udp-dns"] {
+        assert_eq!(render(example)?, render(example)?, "{example}");
+    }
+    Ok(())
 }
 
 const MIRRORED: &str = "version: 1
@@ -157,51 +149,73 @@ constraints:
 ";
 
 #[test]
-fn every_pulled_image_goes_through_the_mirrors_but_the_built_ones() {
-    let files = isoloom_kubernetes::render(&parsed(MIRRORED)).unwrap();
-    let env = file(&files, "kubernetes/environment.yaml");
+fn every_pulled_image_goes_through_the_mirrors_but_the_built_ones() -> Outcome {
+    let files = KubernetesBackend.render(&parsed(MIRRORED)?)?;
+    let env = file(&files, "kubernetes/environment.yaml")?;
     assert!(env.contains("image: registry.corp/hub/library/nginx\n"), "{env}");
     assert!(env.contains("image: registry.corp/hub/library/busybox:1.37.0-musl\n"), "Isoloom's probe too");
     assert!(env.contains("image: registry.corp/hub/library/alpine:3.20\n"), "and its waits");
     assert!(env.contains("image: isoloom/shop-db\n"), "a built image is local");
     assert!(env.contains("#   docker build -t isoloom/shop-db db\n"), "{env}");
-    let jobs = file(&files, "checks/job.yaml");
+    let jobs = file(&files, "checks/job.yaml")?;
     assert!(jobs.contains("image: registry.corp/hub/curlimages/curl:8.11.1\n"), "{jobs}");
+    Ok(())
 }
 
 #[test]
-fn the_chart_templates_the_images_and_keeps_braces_as_they_are() {
-    let files = isoloom_kubernetes::render(&parsed(MIRRORED)).unwrap();
-    let env = file(&files, "chart/templates/environment.yaml");
+fn the_chart_templates_the_images_and_keeps_braces_as_they_are() -> Outcome {
+    let files = KubernetesBackend.render(&parsed(MIRRORED)?)?;
+    let env = file(&files, "chart/templates/environment.yaml")?;
     assert!(env.contains("image: '{{ index .Values.images \"web\" }}'\n"), "{env}");
     assert!(env.contains("image: '{{ index .Values.images \"db\" }}'\n"), "{env}");
     assert!(env.contains("image: registry.corp/hub/library/alpine:3.20\n"), "the waits are Isoloom's");
     assert!(env.contains("value: hi {{ `{{` }} there }}"), "{env}");
-    let values: serde_yaml_ng::Value = serde_yaml_ng::from_str(file(&files, "chart/values.yaml")).unwrap();
-    assert_eq!(values["images"]["web"].as_str(), Some("registry.corp/hub/library/nginx"));
-    assert_eq!(values["images"]["db"].as_str(), Some("isoloom/shop-db"));
-    // Every template is YAML before Helm renders it.
-    for f in files
+    let values: serde_yaml_ng::Value = serde_yaml_ng::from_str(file(&files, "chart/values.yaml")?)?;
+    assert_eq!(
+        values.get("images").and_then(|i| i.get("web")).and_then(serde_yaml_ng::Value::as_str),
+        Some("registry.corp/hub/library/nginx")
+    );
+    assert_eq!(
+        values.get("images").and_then(|i| i.get("db")).and_then(serde_yaml_ng::Value::as_str),
+        Some("isoloom/shop-db")
+    );
+    Ok(())
+}
+
+#[test]
+fn every_chart_template_is_yaml_before_helm_renders_it() -> Outcome {
+    let files = KubernetesBackend.render(&parsed(MIRRORED)?)?;
+    let templates = files
         .iter()
-        .filter(|f| f.path.contains("/chart/templates/") && std::path::Path::new(&f.path).extension().is_some_and(|e| e == "yaml"))
-    {
+        .filter(|f| f.path.contains("/chart/templates/") && Path::new(&f.path).extension().is_some_and(|e| e == "yaml"));
+    for f in templates {
         for doc in f.contents.split("---\n") {
-            serde_yaml_ng::from_str::<serde_yaml_ng::Value>(doc).unwrap_or_else(|e| panic!("{}: {e}", f.path));
+            serde_yaml_ng::from_str::<serde_yaml_ng::Value>(doc).map_err(|e| format!("{}: {e}", f.path))?;
         }
     }
+    Ok(())
 }
 
 #[test]
-fn braces_survive_a_double_quoted_string() {
+fn braces_survive_a_double_quoted_string() -> Outcome {
     let spec = MIRRORED.replace("'hi {{ there }}'", "\"x\\t{{ y }}\"");
-    let files = isoloom_kubernetes::render(&parsed(&spec)).unwrap();
-    let env = file(&files, "chart/templates/environment.yaml");
+    let files = KubernetesBackend.render(&parsed(&spec)?)?;
+    let env = file(&files, "chart/templates/environment.yaml")?;
     assert!(env.contains("value: \"x\\t{{ `{{` }} y }}\""), "{env}");
+    Ok(())
+}
+
+/// A spec with one machine, `web`, on one network, `lan`, and `extra` lines for the machine.
+const BASE: &str = "version: 1\nname: r\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    docker: { image: nginx }\n";
+
+/// What rendering `yaml` reports, as every backend reports it.
+fn refusal(yaml: &str) -> Outcome<String> {
+    let err = KubernetesBackend.render(&parsed(yaml)?).err().ok_or("rendered")?;
+    Ok(err.to_string())
 }
 
 #[test]
-fn each_unsupported_feature_is_refused_with_its_reason() {
-    let base = "version: 1\nname: r\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    docker: { image: nginx }\n";
+fn each_unsupported_feature_is_refused_with_its_reason() -> Outcome {
     let cases = [
         (
             "    aliases: [www.lab.test]\n",
@@ -213,72 +227,58 @@ fn each_unsupported_feature_is_refused_with_its_reason() {
         ),
     ];
     for (extra, why) in cases {
-        let err = isoloom_kubernetes::render(&parsed(&format!("{base}{extra}"))).expect_err("refused");
-        assert_eq!(err.to_string(), format!("kubernetes: {why}"));
+        assert_eq!(refusal(&format!("{BASE}{extra}"))?, format!("kubernetes: {why}"));
     }
-    let tc = base.replace("{ cidr: 10.9.0.0/24 }", "{ cidr: 10.9.0.0/24, tc: { delay: 50ms } }");
-    let err = isoloom_kubernetes::render(&parsed(&tc)).expect_err("refused");
+    let tc = BASE.replace("{ cidr: 10.9.0.0/24 }", "{ cidr: 10.9.0.0/24, tc: { delay: 50ms } }");
     assert_eq!(
-        err.to_string(),
+        refusal(&tc)?,
         "kubernetes: link impairment (`tc`) needs a router in the path; Kubernetes has none"
     );
-    // A gateway machine: the plan words it for hybrid, Kubernetes in its own terms.
-    let gateway = base
-        .replace("{ cidr: 10.9.0.0/24 }", "{ cidr: 10.9.0.0/24, gateway: web }")
-        .replace("{ lan: 10 }", "{ lan: 1 }");
-    let env = parsed(&gateway);
-    let why = "networks with a `gateway` machine on Kubernetes come later";
-    let err = isoloom_kubernetes::render(&env).expect_err("refused");
-    assert_eq!(err.to_string(), format!("kubernetes: {why}"));
-    assert_eq!(isoloom_kubernetes::KubernetesBackend.refusal(&env).as_deref(), Some(why));
+    Ok(())
 }
 
 #[test]
-fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() {
+fn a_gateway_machine_is_refused_in_kubernetes_words() -> Outcome {
+    // The plan words it for hybrid; Kubernetes in its own terms.
+    let gateway = BASE
+        .replace("{ cidr: 10.9.0.0/24 }", "{ cidr: 10.9.0.0/24, gateway: web }")
+        .replace("{ lan: 10 }", "{ lan: 1 }");
+    let why = "networks with a `gateway` machine on Kubernetes come later";
+    assert_eq!(refusal(&gateway)?, format!("kubernetes: {why}"));
+    assert_eq!(KubernetesBackend.refusal(&parsed(&gateway)?).as_deref(), Some(why));
+    Ok(())
+}
+
+#[test]
+fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() -> Outcome {
     let spec = MIRRORED
         .replace(
             "docker: { build: db }",
             "docker: { build: db, dockerfile: db/Dockerfile.dev, args: { V: \"1 2\" } }",
         )
         .replace("constraints:", "message: Open the shop.\nconstraints:");
-    let files = isoloom_kubernetes::render(&parsed(&spec)).unwrap();
-    let env = file(&files, "kubernetes/environment.yaml");
+    let files = KubernetesBackend.render(&parsed(&spec)?)?;
+    let env = file(&files, "kubernetes/environment.yaml")?;
     assert!(
         env.contains("#   docker build -t isoloom/shop-db -f db/Dockerfile.dev --build-arg 'V=1 2' db\n"),
         "{env}"
     );
     assert_eq!(
-        file(&files, "chart/templates/NOTES.txt"),
+        file(&files, "chart/templates/NOTES.txt")?,
         "Open the shop.\n\nChecks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}\n"
     );
-    assert_eq!(
-        isoloom_kubernetes::KubernetesBackend.capabilities(),
-        isoloom_plan::Capabilities::of([
-            Feature::Ipv6,
-            Feature::Ipv6Only,
-            Feature::Ipv6Auto,
-            Feature::Secrets,
-            Feature::SecretOwners,
-            Feature::OwnedProjectFiles,
-            Feature::MachineProcess,
-            Feature::ContainerGpus,
-            Feature::PersistentVolumes,
-            Feature::ExternalVolumes,
-            Feature::DataDisks,
-            Feature::RawDisks,
-        ])
-    );
+    Ok(())
 }
 
 /// A secret with an owner is copied out of the Secret volume by an init container, into a
-/// memory-backed emptyDir, and mounted from there; one without stays on the Secret's volume.
+/// memory-backed `emptyDir`, and mounted from there; one without stays on the Secret's volume.
 #[test]
-fn a_secret_with_an_owner_is_copied_into_memory_with_it() {
+fn a_secret_with_an_owner_is_copied_into_memory_with_it() -> Outcome {
     let env = parsed(
         "version: 1\nname: s\nsecrets: { db-password: { env: DB_PASSWORD }, api-key: { env: API_KEY } }\nnetworks: { lan: { cidr: 10.20.0.0/24 } }\nmachines:\n  db:\n    networks: { lan: 10 }\n    docker: { image: postgres }\n    secrets:\n      - { source: db-password, target: /run/secrets/pw, uid: 999, gid: 998, mode: '0400' }\n      - api-key\n",
-    );
-    let files = isoloom_kubernetes::render(&env).unwrap();
-    let manifests = file(&files, "kubernetes/environment.yaml");
+    )?;
+    let files = KubernetesBackend.render(&env)?;
+    let manifests = file(&files, "kubernetes/environment.yaml")?;
     assert!(
         manifests.contains("cp /isoloom-secrets/in/db-password /isoloom-secrets/out/db-password && chown 999:998 /isoloom-secrets/out/db-password && chmod 0400 /isoloom-secrets/out/db-password"),
         "{manifests}"
@@ -295,4 +295,5 @@ fn a_secret_with_an_owner_is_copied_into_memory_with_it() {
         manifests.contains("- name: isoloom-secrets\n          mountPath: /run/secrets/api-key\n"),
         "{manifests}"
     );
+    Ok(())
 }

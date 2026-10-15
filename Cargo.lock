@@ -639,6 +639,7 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
+ "proptest",
  "serde",
  "serde_json",
  "serde_yaml_ng",

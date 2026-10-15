@@ -15,7 +15,7 @@ use crate::machine::Machine;
 use crate::objects::{Container, Exec, HttpGet, Probe};
 
 /// Where the project's scripts are, in a container running them.
-pub const SCRIPTS_DIR: &str = "/isoloom/scripts";
+pub(crate) const SCRIPTS_DIR: &str = "/isoloom/scripts";
 
 /// The command, the working directory and the `before` scripts on the machine's container: a
 /// shell runs the scripts in order, then hands over to the command (`exec`).

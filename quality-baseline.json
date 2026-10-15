@@ -7,7 +7,6 @@
     "clippy/allow_attributes_without_reason": {
       "isoloom": 5,
       "isoloom-import": 4,
-      "isoloom-kubernetes": 1,
       "isoloom-manifest": 3,
       "isoloom-plan": 2,
       "isoloom-render": 5,
@@ -26,7 +25,6 @@
     "clippy/doc_markdown": {
       "isoloom": 1,
       "isoloom-import": 2,
-      "isoloom-kubernetes": 47,
       "isoloom-manifest": 10,
       "isoloom-plan": 2,
       "isoloom-render": 3,
@@ -48,7 +46,6 @@
     "clippy/let_underscore_must_use": {
       "isoloom": 10,
       "isoloom-import": 1,
-      "isoloom-kubernetes": 8,
       "isoloom-plan": 5,
       "isoloom-render": 85,
       "isoloom-spec": 16,
@@ -58,7 +55,6 @@
     },
     "clippy/missing_errors_doc": {
       "isoloom-import": 3,
-      "isoloom-kubernetes": 3,
       "isoloom-manifest": 13,
       "isoloom-plan": 1,
       "isoloom-render": 6,
@@ -68,7 +64,6 @@
     },
     "clippy/must_use_candidate": {
       "isoloom-import": 2,
-      "isoloom-kubernetes": 24,
       "isoloom-manifest": 24,
       "isoloom-plan": 78,
       "isoloom-render": 104,
@@ -82,7 +77,6 @@
     "clippy/shadow_unrelated": {
       "isoloom": 7,
       "isoloom-import": 9,
-      "isoloom-kubernetes": 5,
       "isoloom-manifest": 5,
       "isoloom-plan": 6,
       "isoloom-render": 7,
@@ -99,7 +93,6 @@
     "clippy/str_to_string": {
       "isoloom": 13,
       "isoloom-import": 38,
-      "isoloom-kubernetes": 44,
       "isoloom-manifest": 24,
       "isoloom-plan": 39,
       "isoloom-render": 40,
@@ -111,7 +104,6 @@
     "clippy/string_slice": {
       "isoloom": 2,
       "isoloom-import": 6,
-      "isoloom-kubernetes": 3,
       "isoloom-manifest": 4,
       "isoloom-plan": 3,
       "isoloom-render": 10,
@@ -122,7 +114,6 @@
     "dup/clone": {
       "isoloom": 7,
       "isoloom-import": 1,
-      "isoloom-kubernetes": 3,
       "isoloom-manifest": 2,
       "isoloom-plan": 2,
       "isoloom-render": 2,
@@ -143,7 +134,6 @@
     "rustc/unreachable_pub": {
       "isoloom": 66,
       "isoloom-import": 14,
-      "isoloom-kubernetes": 9,
       "isoloom-plan": 1,
       "isoloom-render": 2,
       "isoloom-spec": 2,

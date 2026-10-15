@@ -10,7 +10,7 @@ use crate::objects::{ClaimResources, ClaimSpec, EmptyDir, Labels, Manifest, Volu
 
 /// The label of the objects `isoloom down` keeps (`down --volumes` removes them too): the claims
 /// of persistent volumes, and the namespace holding them.
-pub const PERSISTENT_LABEL: &str = "isoloom.persistent";
+pub(crate) const PERSISTENT_LABEL: &str = "isoloom.persistent";
 
 /// What keeps a claim when its Helm release is uninstalled.
 const HELM_KEEP: (&str, &str) = ("helm.sh/resource-policy", "keep");
@@ -52,7 +52,7 @@ fn spec(size: String, volume_mode: Option<&'static str>) -> ClaimSpec {
 pub(crate) fn namespace_labels(machines: &[Machine]) -> Labels {
     let persistent = machines.iter().flat_map(|m| &m.plan.volumes).any(|v| v.lifetime == Lifetime::Persistent);
     if persistent {
-        Labels::from([(PERSISTENT_LABEL.to_string(), "true".to_string())])
+        Labels::from([(PERSISTENT_LABEL.to_owned(), "true".to_owned())])
     } else {
         Labels::new()
     }
@@ -136,17 +136,21 @@ pub(crate) fn tmpfs(m: &Machine) -> (Vec<VolumeMount>, Vec<Volume>) {
 
 /// A Docker size (`64m`, `1g`, bytes) as a Kubernetes quantity (`64Mi`, `1Gi`, bytes): in
 /// Kubernetes `m` is a thousandth.
-pub fn quantity(size: &str) -> String {
-    match size.chars().last().map(|c| c.to_ascii_lowercase()) {
-        Some('k') => format!("{}Ki", &size[..size.len() - 1]),
-        Some('m') => format!("{}Mi", &size[..size.len() - 1]),
-        Some('g') => format!("{}Gi", &size[..size.len() - 1]),
-        _ => size.to_string(),
-    }
+pub(crate) fn quantity(size: &str) -> String {
+    let mut digits = size.chars();
+    let unit = match digits.next_back().map(|c| c.to_ascii_lowercase()) {
+        Some('k') => "Ki",
+        Some('m') => "Mi",
+        Some('g') => "Gi",
+        _ => return size.to_owned(),
+    };
+    format!("{}{unit}", digits.as_str())
 }
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::quantity;
 
     #[test]
@@ -155,5 +159,19 @@ mod tests {
         assert_eq!(quantity("2G"), "2Gi");
         assert_eq!(quantity("512k"), "512Ki");
         assert_eq!(quantity("1048576"), "1048576");
+    }
+
+    proptest! {
+        #[test]
+        fn a_size_keeps_its_number_and_takes_the_binary_unit(n in 0u64..1_000_000, unit in "[kKmMgG]?") {
+            let docker = format!("{n}{unit}");
+            let binary = match unit.to_ascii_lowercase().as_str() {
+                "k" => "Ki",
+                "m" => "Mi",
+                "g" => "Gi",
+                _ => "",
+            };
+            prop_assert_eq!(quantity(&docker), format!("{n}{binary}"));
+        }
     }
 }

@@ -2,43 +2,42 @@
 //! objects, the networks' policies and the checks, written as plain manifests with their
 //! kustomizations, then as the Helm chart.
 
-use std::fmt::Write;
+use std::fmt;
 
 use isoloom_plan::{Environment, Refusal, Requirement};
-use isoloom_render::backend::{Files, RenderError};
-use isoloom_render::{GenerateError, GeneratedFile, header};
-use isoloom_spec::model::Target;
+use isoloom_render::backend::Files;
+use isoloom_render::{GeneratedFile, header};
 use serde::Serialize;
 
+use crate::backend::{capabilities, reason};
 use crate::checks::{self, Checks};
+use crate::error::{Error, Result};
+use crate::layout::output;
 use crate::machine::{self, Machine};
 use crate::objects::Manifest;
 use crate::pod::INPUTS;
-use crate::{capabilities, chart, kustomize, network, output};
+use crate::{chart, kustomize, network};
 
 /// The environment's objects and what goes with them.
 pub(crate) struct Rendered {
     /// Its namespace.
-    pub namespace: String,
+    pub(crate) namespace: String,
     /// Every object, the namespace first.
-    pub objects: Vec<Manifest>,
+    pub(crate) objects: Vec<Manifest>,
     /// The checks.
-    pub checks: Checks,
+    pub(crate) checks: Checks,
     /// The project's scripts the pods run (init jobs, checks), sorted, each once.
-    pub scripts: Vec<String>,
+    pub(crate) scripts: Vec<String>,
 }
 
 /// The files of `env` on Kubernetes: the manifests and their kustomization, the checks', then
 /// the chart. Refused, without rendering, when `env` needs what Kubernetes can't do.
-pub fn render(env: &Environment) -> Result<Files, RenderError> {
+pub(crate) fn render(env: &Environment) -> Result<Files> {
     if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
         return Err(refused(refusal));
     }
-    if let Some(what) = crate::gpus::refusal(env) {
-        return Err(RenderError::Generate(GenerateError::Unsupported {
-            target: Target::Kubernetes,
-            what,
-        }));
+    if let Some(reason) = crate::gpus::refusal(env) {
+        return Err(Error::Unsupported { reason });
     }
     let r = objects(env);
     let mut files = vec![
@@ -59,25 +58,10 @@ pub fn render(env: &Environment) -> Result<Files, RenderError> {
 
 /// The refusal as the backend reports it: the plan's, but in Kubernetes' own words where they
 /// differ from the plan's (see [`reason`]).
-fn refused(refusal: Refusal) -> RenderError {
+fn refused(refusal: Refusal) -> Error {
     match &refusal.requirement {
-        Requirement::Gateway { .. } => RenderError::Generate(GenerateError::Unsupported {
-            target: Target::Kubernetes,
-            what: reason(&refusal),
-        }),
-        _ => RenderError::Refused {
-            target: Target::Kubernetes,
-            refusal,
-        },
-    }
-}
-
-/// Why Kubernetes refuses: the plan's reason, but for gateway machines, which the plan words for
-/// the hybrid target.
-pub fn reason(refusal: &Refusal) -> String {
-    match refusal.requirement {
-        Requirement::Gateway { .. } => "networks with a `gateway` machine on Kubernetes come later".into(),
-        _ => refusal.to_string(),
+        Requirement::Gateway { .. } => Error::Unsupported { reason: reason(&refusal) },
+        _ => Error::Refused { refusal },
     }
 }
 
@@ -107,38 +91,49 @@ fn objects(env: &Environment) -> Rendered {
 
 /// The plain manifests, with how to start and stop them, the images to build first and the
 /// inputs' Secret to create.
-fn manifests(env: &Environment, r: &Rendered) -> Result<String, RenderError> {
-    let ns = &r.namespace;
-    let mut out = generated();
-    let _ = writeln!(
-        out,
-        "# Start:  kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -\n#         kubectl -n {ns} wait --for=condition=Available deployment --all --timeout=600s\n# Stop:   kubectl delete namespace {ns}"
-    );
-    let builds: Vec<String> = Machine::all(env).iter().filter_map(Machine::build_command).collect();
-    if !builds.is_empty() {
-        out.push_str("# Images built from the project, before starting (a local cluster sharing Docker's images:\n# OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):\n");
-        for b in &builds {
-            let _ = writeln!(out, "#   {b}");
-        }
-    }
-    if env.machines.values().any(|m| !m.inputs.is_empty()) {
-        let literals: Vec<String> = env.spec().inputs.iter().map(|n| format!("--from-literal={n}=…")).collect();
-        let _ = writeln!(
-            out,
-            "# Inputs (optional, unset ones are empty): kubectl -n {ns} create secret generic {INPUTS} {}",
-            literals.join(" ")
-        );
-    }
-    if let Some(usage) = crate::secrets::usage(env, ns) {
-        out.push_str(&usage);
-    }
-    out.push('\n');
-    out.push_str(&documents(&r.objects)?);
-    Ok(out)
+fn manifests(env: &Environment, r: &Rendered) -> Result<String> {
+    let usage = Usage { env, namespace: &r.namespace };
+    Ok(format!("{}{usage}\n{}", generated(), documents(&r.objects)?))
 }
 
-/// The environment's kustomization: its manifests, and the project's scripts as a ConfigMap.
-fn kustomization(r: &Rendered) -> Result<String, RenderError> {
+/// How to run the plain manifests, at their top: start and stop, the images built from the
+/// project, the inputs' Secret, the secrets' Secret.
+struct Usage<'a> {
+    env: &'a Environment,
+    namespace: &'a str,
+}
+
+impl fmt::Display for Usage<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (env, ns) = (self.env, self.namespace);
+        writeln!(
+            f,
+            "# Start:  kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -\n#         kubectl -n {ns} wait --for=condition=Available deployment --all --timeout=600s\n# Stop:   kubectl delete namespace {ns}"
+        )?;
+        let builds: Vec<String> = Machine::all(env).iter().filter_map(Machine::build_command).collect();
+        if !builds.is_empty() {
+            f.write_str("# Images built from the project, before starting (a local cluster sharing Docker's images:\n# OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):\n")?;
+            for b in &builds {
+                writeln!(f, "#   {b}")?;
+            }
+        }
+        if env.machines.values().any(|m| !m.inputs.is_empty()) {
+            let literals: Vec<String> = env.spec().inputs.iter().map(|n| format!("--from-literal={n}=…")).collect();
+            writeln!(
+                f,
+                "# Inputs (optional, unset ones are empty): kubectl -n {ns} create secret generic {INPUTS} {}",
+                literals.join(" ")
+            )?;
+        }
+        if let Some(usage) = crate::secrets::usage(env, ns) {
+            f.write_str(&usage)?;
+        }
+        Ok(())
+    }
+}
+
+/// The environment's kustomization: its manifests, and the project's scripts as a `ConfigMap`.
+fn kustomization(r: &Rendered) -> Result<String> {
     let mut out = generated();
     if !r.scripts.is_empty() {
         out.push_str("# The project's scripts the pods run (init jobs, checks), read from the project at apply time.\n");
@@ -153,20 +148,12 @@ pub(crate) fn generated() -> String {
 }
 
 /// One YAML document.
-pub(crate) fn document<T: Serialize>(value: &T) -> Result<String, RenderError> {
-    serde_yaml_ng::to_string(value).map_err(|e| unwritable(&e))
+pub(crate) fn document<T: Serialize>(value: &T) -> Result<String> {
+    serde_yaml_ng::to_string(value).map_err(|source| Error::Unwritable { source })
 }
 
 /// Several YAML documents, one file.
-pub(crate) fn documents(objects: &[Manifest]) -> Result<String, RenderError> {
-    let docs: Vec<String> = objects.iter().map(document).collect::<Result<_, _>>()?;
+pub(crate) fn documents(objects: &[Manifest]) -> Result<String> {
+    let docs: Vec<String> = objects.iter().map(document).collect::<Result<_>>()?;
     Ok(docs.join("---\n"))
-}
-
-/// A YAML error (an object that doesn't serialize), as the backend reports it.
-pub(crate) fn unwritable(e: &serde_yaml_ng::Error) -> RenderError {
-    RenderError::Generate(GenerateError::Unsupported {
-        target: Target::Kubernetes,
-        what: format!("a manifest doesn't serialize: {e}"),
-    })
 }

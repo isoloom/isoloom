@@ -1,18 +1,18 @@
 //! The checks: a Job per position, standing where that machine stands (its network labels, so
 //! the same policies apply), else on every network. Each runner is a sh script next to the
-//! Jobs, carried by a ConfigMap of their own; `exec` checks run inside the machine from a
+//! Jobs, carried by a `ConfigMap` of their own; `exec` checks run inside the machine from a
 //! runner of their own (`kubectl exec -i deploy/<machine> -- sh -s`), which the Jobs don't run.
 
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::RenderError;
 use isoloom_render::container::{CHECK_IMAGE, exec_runner};
 
+use crate::error::Result;
 use crate::kustomize::{CHECK_SCRIPTS, Kustomization, key};
+use crate::layout::output;
 use crate::network::{self, CHECK_LABEL};
 use crate::objects::{Container, Image, JobSpec, Manifest, Metadata, PodSpec, PodTemplate, Selector, Volume, VolumeMount};
-use crate::output;
 use crate::pod::{config_map_volume, scripts_volume};
 use crate::render::{document, documents, generated};
 
@@ -20,15 +20,15 @@ use crate::render::{document, documents, generated};
 #[derive(Default)]
 pub(crate) struct Checks {
     /// One Job per position, as the plain manifests run them (and the chart's tests).
-    pub jobs: Vec<Manifest>,
+    pub(crate) jobs: Vec<Manifest>,
     /// The Jobs' runners, as (file name, contents).
-    pub runners: Vec<(String, String)>,
+    pub(crate) runners: Vec<(String, String)>,
     /// Every runner file, the `exec` ones included, in the order they are written.
-    pub files: Vec<(String, String)>,
+    pub(crate) files: Vec<(String, String)>,
     /// The egress policies of the checks standing on offline networks.
-    pub policies: Vec<Manifest>,
+    pub(crate) policies: Vec<Manifest>,
     /// The project's scripts the checks run.
-    pub scripts: Vec<String>,
+    pub(crate) scripts: Vec<String>,
 }
 
 /// The environment's checks, grouped by position.
@@ -37,7 +37,7 @@ pub(crate) fn plan(env: &Environment) -> Checks {
     let default = checks::default_position(env.spec());
     for (pos, group) in checks::by_position(env.spec(), &env.checks) {
         let job = if pos == default {
-            "isoloom-check".to_string()
+            "isoloom-check".to_owned()
         } else {
             format!("isoloom-check-{}", pos.id())
         };
@@ -54,7 +54,7 @@ fn host(h: &Host, _: &Position) -> String {
     }
 }
 
-/// A project script, from the ConfigMap the pod mounts.
+/// A project script, from the `ConfigMap` the pod mounts.
 fn run_script(path: &str) -> String {
     format!("sh /isoloom/scripts/{}", key(path))
 }
@@ -85,7 +85,7 @@ fn position(env: &Environment, pos: &Position, job: &str, group: Vec<&Resolved>,
         out.policies.push(network::offline(&format!("offline-{job}"), Selector::of(CHECK_LABEL, job)));
     }
     let mut labels = network::pod_labels(None, nets);
-    labels.insert(CHECK_LABEL.to_string(), job.to_string());
+    labels.insert(CHECK_LABEL.to_owned(), job.to_owned());
     let check = Check {
         image: env.images.pull(CHECK_IMAGE),
         runner: &runner.0,
@@ -106,7 +106,7 @@ struct Check<'a> {
 }
 
 impl Check<'_> {
-    /// Its Job: the runner, from the runners' ConfigMap, and the project's scripts when it runs
+    /// Its Job: the runner, from the runners' `ConfigMap`, and the project's scripts when it runs
     /// some. Never retried: a failed check is the result.
     fn spec(&self, metadata: Metadata) -> JobSpec {
         let mut check = Container::new("check", Image::Tool(self.image.clone()));
@@ -140,7 +140,7 @@ impl Check<'_> {
 
 /// The plain checks' files in `.isoloom/kubernetes/checks/`: the runners, the Jobs (with how to
 /// run them) and their kustomization. None without checks.
-pub(crate) fn files(c: &Checks, namespace: &str) -> Result<Vec<GeneratedFile>, RenderError> {
+pub(crate) fn files(c: &Checks, namespace: &str) -> Result<Vec<GeneratedFile>> {
     if c.jobs.is_empty() {
         return Ok(Vec::new());
     }
