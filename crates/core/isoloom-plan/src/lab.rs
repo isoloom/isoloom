@@ -13,6 +13,8 @@ use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems};
 
 use crate::lower::{Lowered, Scope, lower};
 
+mod steps;
+
 /// An authored spec, ready to plan.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lab {
@@ -179,7 +181,7 @@ impl Lab {
             &mut out,
             isoloom_spec::validate_files(&lowered.spec, dir).iter().map(|p| translated(&lowered, p)),
         );
-        add(&mut out, copied_files(&self.source, dir));
+        add(&mut out, steps::step_files(&self.source, dir));
         self.sorted(out)
     }
 
@@ -302,33 +304,6 @@ fn code_of(message: &str) -> Code {
     }
 }
 
-/// The project files `copy` steps name, each present in `dir`.
-fn copied_files(source: &syntax::Spec, dir: &Path) -> Vec<Problem> {
-    let mut out = Vec::new();
-    for (name, m) in &source.machines {
-        let Some(app) = m.app() else { continue };
-        for (i, step) in app.steps.iter().enumerate() {
-            if let syntax::Step::Copy(c) = step {
-                let at = FieldPath::new("machines").key(name).key("app").key("steps").index(i).key("copy").key("from");
-                if c.from.starts_with('/') || c.from.split('/').any(|s| s == "..") {
-                    out.push(Problem::new(
-                        Code::InvalidValue,
-                        at,
-                        format!("`{}` must be a path inside the project folder", c.from),
-                    ));
-                } else if !dir.join(&c.from).exists() {
-                    out.push(Problem::new(
-                        Code::InvalidValue,
-                        at,
-                        format!("`{}` doesn't exist in the project folder", c.from),
-                    ));
-                }
-            }
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -396,22 +371,31 @@ mod tests {
     }
 
     #[test]
-    fn a_copy_step_takes_a_file_inside_the_project_that_exists() {
+    fn a_copy_step_takes_a_file_of_the_project_that_exists() {
         let dir = std::env::temp_dir().join(format!("isoloom-plan-copy-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("site")).expect("a project folder");
         let lab = testing::lab(
-            "version: 1\nname: t\nmachines:\n  web: { os: debian@12, app: { steps: [{ copy: { from: site, to: /srv } }, { copy: { from: /etc/x, to: /x } }, { copy: { from: a/../../b, to: /b } }, { copy: { from: missing, to: /m } }] } }\n",
+            "version: 1\nname: t\nmachines:\n  web: { os: debian@12, app: { steps: [{ copy: { from: site, to: /srv } }, { copy: { from: missing, to: /m } }] } }\n",
         );
-        let found: Vec<(String, String)> = copied_files(lab.source(), &dir).into_iter().map(|p| (p.path.to_string(), p.reason)).collect();
+        let found: Vec<(String, String)> = steps::step_files(lab.source(), &dir)
+            .into_iter()
+            .map(|p| (p.path.to_string(), p.reason))
+            .collect();
         std::fs::remove_dir_all(&dir).ok();
-        let at = |i: usize| format!("machines.web.app.steps[{i}].copy.from");
         assert_eq!(
             found,
-            [
-                (at(1), "`/etc/x` must be a path inside the project folder".to_owned()),
-                (at(2), "`a/../../b` must be a path inside the project folder".to_owned()),
-                (at(3), "`missing` doesn't exist in the project folder".to_owned()),
-            ]
+            [(
+                "machines.web.app.steps[1].copy.from".to_owned(),
+                "`missing` doesn't exist in the project folder".to_owned()
+            )]
         );
+        // A path outside the project is refused when the spec is read.
+        for outside in ["/etc/x", "a/../../b"] {
+            let refused = Lab::parse(&format!(
+                "version: 1\nname: t\nmachines:\n  web: {{ os: debian@12, app: {{ steps: [{{ copy: {{ from: {outside}, to: /x }} }}] }} }}\n"
+            ))
+            .expect_err("outside the project");
+            assert_eq!(refused[0].path.as_str(), "machines.web.app.steps[0].copy.from", "{outside}");
+        }
     }
 }

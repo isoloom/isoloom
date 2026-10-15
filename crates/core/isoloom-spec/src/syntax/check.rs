@@ -6,13 +6,17 @@
 
 mod messages;
 mod overrides;
+mod steps;
 mod values;
 
+pub use messages::{Unresolved, placeholder_problems};
+
 use super::Spec;
-use super::app::{Recipe, Step, has_extension};
+use super::app::Recipe;
 use super::machine::{Kind, Machine};
 use super::problem::{Code, FieldPath, Problem, Problems};
 use super::process::{HealthProbe, PortRef};
+use super::step::has_extension;
 
 /// The spec's problems, placed, in file order.
 #[must_use]
@@ -63,73 +67,13 @@ fn what_it_is(at: &FieldPath, m: &Machine, out: &mut Problems) {
     }
     if let Some(a) = m.app() {
         for (i, step) in a.steps.iter().enumerate() {
-            step_file(&at.key("app").key("steps").index(i), m, step, out);
+            steps::check(&at.key("app").key("steps").index(i), m, step, out);
         }
         if let Some(Recipe::Appliance(_)) = &a.container
             && !a.steps.is_empty()
         {
             out.push(Problem::new(Code::Conflict, at.key("app").key("steps"), "an appliance has no VM form for steps to set up").fix("leave `steps` out"));
         }
-    }
-}
-
-/// A step's file has the kind the step and the OS need.
-fn step_file(at: &FieldPath, m: &Machine, step: &Step, out: &mut Problems) {
-    let windows = m.os.is_some_and(super::os::OsRef::is_windows);
-    match step {
-        Step::Run { script, .. } if windows && !has_extension(script, "ps1") => {
-            out.push(Problem::new(
-                Code::InvalidValue,
-                at.key("run"),
-                format!("`{script}`: a Windows machine runs PowerShell scripts (`.ps1`)"),
-            ));
-        }
-        Step::Run { script, .. } if !windows && !has_extension(script, "sh") => {
-            out.push(
-                Problem::new(Code::InvalidValue, at.key("run"), format!("`{script}`: a step runs a shell script (`.sh`)"))
-                    .fix("a playbook is `{ playbook: <file>.yml }`"),
-            );
-        }
-        Step::Playbook(p) if windows => {
-            out.push(
-                Problem::new(
-                    Code::InvalidValue,
-                    at.key("playbook"),
-                    format!("`{p}`: a playbook runs on a Linux machine; a Windows machine's steps are PowerShell scripts"),
-                )
-                .fix("`{ run: <script>.ps1 }`"),
-            );
-        }
-        Step::Playbook(p) if !has_extension(p, "yml") && !has_extension(p, "yaml") => {
-            out.push(Problem::new(
-                Code::InvalidValue,
-                at.key("playbook"),
-                format!("`{p}`: a playbook is a `.yml` file"),
-            ));
-        }
-        Step::Copy(c) if !c.to.starts_with('/') && !crate::model::is_drive_path(&c.to) => {
-            out.push(Problem::new(
-                Code::InvalidValue,
-                at.key("copy").key("to"),
-                format!("`{}`: copy to an absolute path", c.to),
-            ));
-        }
-        Step::Packages(p) if windows || p.is_empty() => {
-            let why = if windows {
-                "Windows has no package installer Isoloom drives: install from a `.ps1` step"
-            } else {
-                "name the packages to install"
-            };
-            out.push(Problem::new(Code::InvalidValue, at.key("packages"), why));
-        }
-        Step::Reboot if windows => {
-            out.push(Problem::new(
-                Code::InvalidValue,
-                at.clone(),
-                "a Windows machine restarts from its own script, not a `reboot` step",
-            ));
-        }
-        _ => {}
     }
 }
 

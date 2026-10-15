@@ -196,11 +196,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
       "hybrid": "machine `decoy` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)"
     },
     "not_possible": {
-      "docker": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "hosted": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "docker-vm": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "cloud-docker": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "kubernetes": "machines.web.command: its steps install services, but nothing keeps one running in a container",
+      "docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "hosted": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "docker-vm": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "cloud-docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "kubernetes": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "left out by `targets:`"
     },

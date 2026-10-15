@@ -5,6 +5,7 @@
 use serde::de::DeserializeOwned;
 use serde_yaml_ng::{Mapping, Value};
 
+use super::mistake::Mistake;
 use super::problem::{Code, FieldPath, Problem, Problems, closest};
 use super::spans::Spans;
 use super::{Spec, old_keys};
@@ -183,6 +184,9 @@ fn typed_problem(at: &FieldPath, e: &serde_path_to_error::Error<serde_yaml_ng::E
         };
     }
     let message = e.inner().to_string();
+    if let Some(coded) = Mistake::decode(&message, &path) {
+        return coded;
+    }
     if let Some(rest) = message.strip_prefix("unknown field `") {
         let (field, expected) = rest.split_once('`').unwrap_or((rest, ""));
         let known: Vec<&str> = expected.split('`').skip(1).step_by(2).collect();

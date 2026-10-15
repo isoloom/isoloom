@@ -72,8 +72,8 @@ pub(crate) fn steps(spec: &Spec, machine: &str) -> Vec<String> {
             .steps
             .iter()
             .map(|s| match s {
-                Step::Run { script, .. } => script.clone(),
-                Step::Playbook(p) => p.clone(),
+                Step::Run { script, .. } => script.to_string(),
+                Step::Playbook(p) => p.to_string(),
                 other => format!("{other:?}"),
             })
             .collect(),

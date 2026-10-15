@@ -180,16 +180,16 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.command`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: its steps install services, but nothing keeps one running in a container
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: its steps install services, but no `service` step or `command` runs one in a container
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 
 ### `machines.*.app.steps[].copy`
 
-- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: lowering: a `copy` step on a VM comes with the configuration backends (Phase 4); containers build it today
+- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: lowering: a `copy` step on a VM is rendered by the configuration renderers, in Phase 4.2; until then a VM places a copy of one file, with its `mode` and owned by root, before any other kind of step
 
 ### `machines.*.app.steps[].packages`
 
-- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: lowering: a `packages` step on a VM comes with the configuration backends (Phase 4); containers build it today
+- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: lowering: a `packages` step on a VM is rendered by the configuration renderers, in Phase 4.2
 
 ### `machines.*.app.steps[].playbook`
 
@@ -281,7 +281,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.networks.*`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: its steps install services, but nothing keeps one running in a container
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: its steps install services, but no `service` step or `command` runs one in a container
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/digitalocean`: cloud: machine `m` has several addresses on `lan`: a Droplet has one address on its VPC (DigitalOcean has no secondary private address; a reserved IP is public)
 - `external`: capability `container-more-addresses`: machine `m` has several addresses on `lan`: an existing host keeps the addresses it has, which Isoloom doesn't change

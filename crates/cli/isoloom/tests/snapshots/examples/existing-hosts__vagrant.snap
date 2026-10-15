@@ -139,11 +139,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
     ],
     "refused": {},
     "not_possible": {
-      "docker": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "hosted": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "docker-vm": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "cloud-docker": "machines.web.command: its steps install services, but nothing keeps one running in a container",
-      "kubernetes": "machines.web.command: its steps install services, but nothing keeps one running in a container",
+      "docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "hosted": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "docker-vm": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "cloud-docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "kubernetes": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "hybrid": "only when some machines are containers and others are VMs",
       "cloud-services": "left out by `targets:`"
     },

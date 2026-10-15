@@ -670,6 +670,8 @@ dependencies = [
  "isoloom-spec",
  "proptest",
  "serde_json",
+ "serde_yaml_ng",
+ "thiserror",
 ]
 
 [[package]]

@@ -83,6 +83,25 @@ pub enum Error {
         /// The family's default version.
         default: &'static str,
     },
+    /// A `{{ path }}` placeholder whose path the grammar doesn't have.
+    #[error("`{{{{ {path} }}}}` isn't a placeholder Isoloom knows: {why}")]
+    Placeholder {
+        /// The path as written, trimmed.
+        path: String,
+        /// What the paths there are.
+        why: &'static str,
+    },
+    /// A `{{` without its `}}`.
+    #[error("a `{{{{` without its `}}}}`")]
+    Unclosed,
+    /// A placeholder the place it is written in can't name (a run-time value in a file).
+    #[error("`{{{{ {reference} }}}}`: {why}")]
+    NotHere {
+        /// What it names.
+        reference: crate::syntax::placeholder::Reference,
+        /// Why the place can't name it.
+        why: &'static str,
+    },
     /// A file mode that isn't octal digits up to `0777`.
     #[error("`{0}` isn't a file mode: octal digits up to 0777, like \"0444\"")]
     Mode(String),
@@ -119,15 +138,6 @@ pub enum Error {
     /// An appliance without its `image`.
     #[error("an appliance runs its `image` (`vrnetlab/cisco_iol:<version>`)")]
     ApplianceImage,
-    /// A step's `creates` without its `run`.
-    #[error("`creates` goes with `run`")]
-    CreatesWithoutRun,
-    /// A step that does nothing.
-    #[error("a step needs one of `run`, `copy`, `packages` and `playbook`")]
-    NoStep,
-    /// A step that does several things.
-    #[error("a step does one thing: one of `run`, `copy`, `packages` and `playbook` per step")]
-    SeveralSteps,
     /// A healthcheck with both a `test` and an `http` page.
     #[error("`test` and `http` are both given: a healthcheck is a `test` or an `http` page")]
     TestAndHttp,

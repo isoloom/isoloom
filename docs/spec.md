@@ -396,15 +396,23 @@ Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's of
 
 ### `machines.*.app.steps[].run`
 
-A project script (`.sh`; `.ps1` on Windows).
+A project script (`.sh`; `.ps1` on Windows), run as root from the project folder.
 
 - **Type:** string
+- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
 
 ### `machines.*.app.steps[].creates`
 
-With `run`: a path whose existence means the step already ran.
+With `run` or `command`: a path whose existence means the step already ran (absolute).
 
 - **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
+
+### `machines.*.app.steps[].unless`
+
+With `command`: a check that exits 0 when the step already ran (a text, or a list of arguments).
+
+- **Type:** string or list of strings
 
 ### `machines.*.app.steps[].copy`
 
@@ -417,37 +425,363 @@ A project file or folder copied into the machine.
 A file or folder of the project (a folder ends with `/`).
 
 - **Type:** string
+- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
 
 ### `machines.*.app.steps[].copy.to`
 
 Where it goes in the machine (absolute).
 
 - **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
 
 ### `machines.*.app.steps[].copy.owner`
 
-The owner, a user name (default root).
+The owner, a user name (default root). Not on Windows.
 
 - **Type:** string
+- **Limits:** matches `^[A-Za-z_][A-Za-z0-9_.-]{0,31}$`
 
 ### `machines.*.app.steps[].copy.mode`
 
-The mode, octal (default: as in the project).
+The mode, octal (default: as in the project). Not on Windows.
 
 - **Type:** value
 - **Limits:** matches `^0?[0-7]{1,3}$`
 
 ### `machines.*.app.steps[].packages`
 
-Packages to install with the OS's installer (`apt-get`, `apk`, `dnf`).
+Packages to install with the OS's installer (`apt-get`, `dnf`, `apk`; Windows features on Windows): names, or `{ name, version }` with the version the package manager writes.
 
-- **Type:** list of strings
+- **Type:** list of strings or mappings
+
+### `machines.*.app.steps[].packages[].name`
+
+The package's name.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z0-9][A-Za-z0-9+._:-]{0,127}$`
+
+### `machines.*.app.steps[].packages[].version`
+
+Its exact version, as the family's package manager writes it (`1.30.6-1~bookworm`, `1:2.4.62-1`, `1.30.6-r1`), quoted.
+
+- **Type:** value
+- **Limits:** matches `^[A-Za-z0-9][A-Za-z0-9.+~:_-]{0,127}$`
 
 ### `machines.*.app.steps[].playbook`
 
 An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`).
 
 - **Type:** string
+- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+
+### `machines.*.app.steps[].repository`
+
+A vendor's package repository (`{ name, url, key: { url, sha256 }, suite, components, priority }`), its key pinned by SHA-256. Not on Windows.
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].repository.name`
+
+Its name, in kebab case: it names the source and key files (`nginx`).
+
+- **Type:** string
+- **Limits:** matches `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`
+
+### `machines.*.app.steps[].repository.url`
+
+Its address (`https`).
+
+- **Type:** string
+- **Limits:** matches `^https://[^\s/]+\S*$`
+
+### `machines.*.app.steps[].repository.key`
+
+Its signing key: `{ url, sha256 }`, the SHA-256 of the key's file.
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].repository.key.url`
+
+Where the key is (`https`).
+
+- **Type:** string
+- **Limits:** matches `^https://[^\s/]+\S*$`
+
+### `machines.*.app.steps[].repository.key.sha256`
+
+The SHA-256 of the key's file (64 hex digits, as `sha256sum` prints it).
+
+- **Type:** string
+- **Limits:** matches `^[0-9a-f]{64}$`
+
+### `machines.*.app.steps[].repository.suite`
+
+The suite (apt only; default: the OS's codename, `bookworm`).
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z0-9][A-Za-z0-9._/-]{0,63}$`
+
+### `machines.*.app.steps[].repository.components`
+
+The components (apt only; default `[main]`).
+
+- **Type:** list of strings
+- **Limits:** each item matches `^[A-Za-z0-9][A-Za-z0-9._/-]{0,63}$`
+
+### `machines.*.app.steps[].repository.priority`
+
+Its priority over the OS's own packages: apt's pin priority, dnf's `priority`.
+
+- **Type:** integer
+
+### `machines.*.app.steps[].file`
+
+A path made a folder (`state: directory`), removed (`state: absent`), a link (`link`), or a download pinned by its SHA-256 (`url` and `sha256`).
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].file.path`
+
+The path in the machine (absolute).
+
+- **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
+
+### `machines.*.app.steps[].file.state`
+
+`directory` (a folder, with its parents) or `absent` (removed: the model's only removal). Not with `link` or `url`.
+
+- **Type:** string
+- **Allowed:**
+  - `directory`: A folder.
+  - `absent`: Removed.
+
+### `machines.*.app.steps[].file.link`
+
+A symbolic link to this target (absolute). Not on Windows.
+
+- **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
+
+### `machines.*.app.steps[].file.url`
+
+A file to download (`https`), with its `sha256`: every fetch is pinned.
+
+- **Type:** string
+- **Limits:** matches `^https://[^\s/]+\S*$`
+
+### `machines.*.app.steps[].file.sha256`
+
+The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it).
+
+- **Type:** string
+- **Limits:** matches `^[0-9a-f]{64}$`
+
+### `machines.*.app.steps[].file.owner`
+
+Its owner, a user name (default root). Not on Windows.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_][A-Za-z0-9_.-]{0,31}$`
+
+### `machines.*.app.steps[].file.group`
+
+Its group (default the owner's). Not on Windows.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$`
+
+### `machines.*.app.steps[].file.mode`
+
+Its mode, octal. Not on Windows, nor with `state: absent` or `link`.
+
+- **Type:** value
+- **Limits:** matches `^0?[0-7]{1,3}$`
+
+### `machines.*.app.steps[].template`
+
+A project file with its `{{ path }}` placeholders filled in, placed in the machine.
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].template.from`
+
+A file of the project holding `{{ path }}` placeholders: `{{ machine.name }}`, `{{ machine.addresses.<network> }}`, `{{ machines.<m>.addresses.<network> }}` and `{{ machines.<m>.ports.<name>.port }}`. Filled in when Isoloom generates; no logic.
+
+- **Type:** string
+- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+
+### `machines.*.app.steps[].template.to`
+
+Where the filled-in file goes in the machine (absolute).
+
+- **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
+
+### `machines.*.app.steps[].template.owner`
+
+Its owner, a user name (default root). Not on Windows.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_][A-Za-z0-9_.-]{0,31}$`
+
+### `machines.*.app.steps[].template.group`
+
+Its group (default the owner's). Not on Windows.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$`
+
+### `machines.*.app.steps[].template.mode`
+
+Its mode, octal (default `0644`). Not on Windows.
+
+- **Type:** value
+- **Limits:** matches `^0?[0-7]{1,3}$`
+
+### `machines.*.app.steps[].user`
+
+A local user: `{ name, uid, group, groups, home, shell, system, password }`.
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].user.name`
+
+Its name.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_][A-Za-z0-9_.-]{0,31}$`
+
+### `machines.*.app.steps[].user.uid`
+
+Its user id (default: the next free one).
+
+- **Type:** integer
+
+### `machines.*.app.steps[].user.group`
+
+Its primary group (default: one of its own name, or the system's default).
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$`
+
+### `machines.*.app.steps[].user.groups`
+
+The other groups it is a member of (`[sudo]`, `[Remote Desktop Users]`).
+
+- **Type:** list of strings
+- **Limits:** each item matches `^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$`
+
+### `machines.*.app.steps[].user.home`
+
+Its home folder (absolute; default the system's).
+
+- **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
+
+### `machines.*.app.steps[].user.shell`
+
+Its login shell (absolute; `/usr/sbin/nologin` for a service account).
+
+- **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
+
+### `machines.*.app.steps[].user.system`
+
+A system account (a low id, no ageing): a service's.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `machines.*.app.steps[].user.password`
+
+Its password, a literal: lab content, written in the generated files (hashed on Linux). A secret or an input is refused here: a catalogue entry's `users` setting takes those.
+
+- **Type:** value
+
+### `machines.*.app.steps[].group`
+
+A local group: `{ name, gid, system }`.
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].group.name`
+
+Its name.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$`
+
+### `machines.*.app.steps[].group.gid`
+
+Its group id (default: the next free one).
+
+- **Type:** integer
+
+### `machines.*.app.steps[].group.system`
+
+A system group (a low id).
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `machines.*.app.steps[].service`
+
+A daemon: a unit a package installs (`nginx`), or `{ name, run, user, cwd, enabled }` for one Isoloom defines. Enabled and started on VMs; the container's process in containers.
+
+- **Type:** string or mapping
+
+### `machines.*.app.steps[].service.name`
+
+The unit's name (`nginx`), or the name of the service `run` defines.
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,127}$`
+
+### `machines.*.app.steps[].service.run`
+
+Defines the service: the program and its arguments, in the foreground (`[/srv/api/bin/api, --port, "8000"]`). Without it, the unit comes from a package.
+
+- **Type:** list of strings
+
+### `machines.*.app.steps[].service.user`
+
+With `run`: the user it runs as (default root).
+
+- **Type:** string
+- **Limits:** matches `^[A-Za-z_][A-Za-z0-9_.-]{0,31}$`
+
+### `machines.*.app.steps[].service.cwd`
+
+With `run`: the folder it runs in (absolute).
+
+- **Type:** string
+- **Limits:** matches `^(/|[A-Za-z]:[\\/])[^\n]*$`
+
+### `machines.*.app.steps[].service.enabled`
+
+Started at boot and now (default `true`); `false` leaves it disabled and stopped.
+
+- **Type:** boolean
+
+### `machines.*.app.steps[].command`
+
+A command run once (a text the shell runs, or a list of arguments), with exactly one of `creates` and `unless` to tell it already ran.
+
+- **Type:** string or list of strings
+
+### `machines.*.app.steps[].firewall`
+
+Ports opened in the OS's own firewall when one runs: `{ allow: [<port name>, <number>, <number>/udp] }`.
+
+- **Type:** mapping
+
+### `machines.*.app.steps[].firewall.allow`
+
+The ports to open: the machine's port names (`http`), or `<number>` and `<number>/udp` (`8443`, `53/udp`). Allow rules only: deny rules are 1.x, and `reach` governs traffic between machines.
+
+- **Type:** list of integers or strings
 
 ### `machines.*.app.appliance`
 

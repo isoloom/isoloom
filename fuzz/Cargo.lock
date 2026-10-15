@@ -160,6 +160,7 @@ dependencies = [
  "indexmap",
  "isoloom-spec",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

@@ -90,6 +90,9 @@ macro_rules! name_type {
     };
 }
 
+// The step's names (`syntax::step::words`) follow the same pattern.
+pub(crate) use name_type;
+
 name_type!(
     /// A port's name (`site`, `dns-udp`): how messages, checks and outputs refer to it
     /// (`machines.web.ports.site.published`). Lowercase letters, digits and dashes, from a letter,

@@ -1,64 +1,85 @@
-//! The message's placeholders, resolved against the spec at validation: a typo or an index
-//! (`ports.0`) fails here, not at run time. The paths a message may use:
+//! The placeholders of the message and of an app's templates, read with the spec's one grammar
+//! ([`placeholder`](super::super::placeholder)) and resolved against the spec at validation: a
+//! typo or an index (`ports.0`) fails here, not at run time. The message may use
 //! `machines.<m>.ports.<name>.port`, `.published` and `.url` (an `http` or `https` port's),
-//! `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`.
+//! `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`; a template the machine's own
+//! `machine.name` and `machine.addresses.<network>`, and no run-time value.
 
 use super::super::Spec;
-use super::super::machine::Machine;
+use super::super::placeholder::{self, Place, PortField, Reference};
 use super::super::problem::{Code, FieldPath, Problem, Problems};
-use crate::placeholders::{self, Piece};
+use crate::Error;
 
 /// Every placeholder of the message.
 pub(super) fn check(spec: &Spec, out: &mut Problems) {
     let Some(message) = &spec.message else { return };
     let at = FieldPath::new("message");
-    for piece in placeholders::pieces(message) {
-        match piece {
-            Piece::Text(_) => {}
-            Piece::Placeholder(inner) => {
-                let path = inner.trim();
-                if let Some(why) = unresolved(spec, path) {
-                    out.push(Problem::new(Code::UnknownReference, at.clone(), format!("`{{{{ {path} }}}}`: {why}")).fix(example(spec)));
-                }
-            }
-            Piece::Unclosed(_) => out.push(Problem::new(Code::InvalidValue, at.clone(), "a `{{` without its `}}`")),
-        }
+    for found in placeholder_problems(spec, None, message, Place::Message) {
+        let code = if found.unclosed { Code::InvalidValue } else { Code::UnknownReference };
+        let p = Problem::new(code, at.clone(), found.reason);
+        out.push(if found.unclosed { p } else { p.fix(example(spec)) });
     }
 }
 
-/// Why `path` names nothing the message can show; `None` when it names something.
-fn unresolved(spec: &Spec, path: &str) -> Option<String> {
-    let parts: Vec<&str> = path.split('.').collect();
-    match parts.as_slice() {
-        ["cloud", "outputs", name] => match &spec.cloud {
-            Some(c) if c.outputs.contains_key(*name) => None,
-            Some(_) => Some(format!("`cloud.outputs` has no `{name}`")),
-            None => Some("the spec has no `cloud:`".into()),
-        },
-        ["machines", m, rest @ ..] => match spec.machines.get(*m) {
-            None => Some(format!("no machine named `{m}`")),
-            Some(machine) => unresolved_in(m, machine, rest),
-        },
-        _ => Some("not a path the message can show".into()),
-    }
+/// A placeholder that names nothing the spec has, or can't be read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unresolved {
+    /// Why, naming the placeholder.
+    pub reason: String,
+    /// Whether it is a `{{` without its `}}` (else a path naming nothing there).
+    pub unclosed: bool,
 }
 
-/// Why `rest`, a path inside machine `m`, names nothing; `None` when it names something.
-fn unresolved_in(m: &str, machine: &Machine, rest: &[&str]) -> Option<String> {
-    match rest {
-        ["addresses", n] if machine.networks.contains_key(*n) => None,
-        ["addresses", n] => Some(format!("`{m}` isn't on a network named `{n}`")),
-        ["ports", p, field] => {
-            let port = machine.ports.iter().find(|(k, _)| k.as_str() == *p).map(|(_, v)| v);
-            match (port, *field) {
-                (None, _) => Some(format!("`{m}` has no port named `{p}` (ports are named, never numbered)")),
-                (Some(_), "port" | "published") => None,
-                (Some(port), "url") if port.protocol.is_http() => None,
-                (Some(_), "url") => Some(format!("`{p}` isn't an `http` or `https` port, so it has no URL")),
-                (Some(_), other) => Some(format!("a port has `port`, `published` and `url`, not `{other}`")),
-            }
+/// The placeholders of `text`, written at `place`, that name nothing the spec has, in order:
+/// `machine` is the machine a template is for. Empty when each resolves.
+#[must_use]
+pub fn placeholder_problems(spec: &Spec, machine: Option<&str>, text: &str, place: Place) -> Vec<Unresolved> {
+    placeholder::placeholders(text, place)
+        .into_iter()
+        .filter_map(|found| match found {
+            Ok(r) => resolve(spec, machine, &r).err().map(|why| Unresolved {
+                reason: format!("`{{{{ {r} }}}}`: {why}"),
+                unclosed: false,
+            }),
+            Err(e) => Some(Unresolved {
+                unclosed: matches!(e, Error::Unclosed),
+                reason: e.to_string(),
+            }),
+        })
+        .collect()
+}
+
+/// Whether `r` names something of the spec (`template_of`: the machine a template is for),
+/// else why not. An entry's own paths are the catalogue's to resolve.
+fn resolve(spec: &Spec, template_of: Option<&str>, r: &Reference) -> Result<(), String> {
+    let on = |m: &str, n: &str| -> Result<(), String> {
+        let found = spec.machines.get(m).ok_or_else(|| format!("no machine named `{m}`"))?;
+        if found.networks.contains_key(n) {
+            Ok(())
+        } else {
+            Err(format!("`{m}` isn't on a network named `{n}`"))
         }
-        _ => Some("a machine's paths are `ports.<name>.port`, `.published`, `.url` and `addresses.<network>`".into()),
+    };
+    match r {
+        Reference::OwnAddress { network } => on(template_of.unwrap_or_default(), network),
+        Reference::Address { machine, network } => on(machine, network),
+        Reference::Port { machine, port, field } => {
+            let m = spec.machines.get(machine).ok_or_else(|| format!("no machine named `{machine}`"))?;
+            let p = m
+                .ports
+                .get(port)
+                .ok_or_else(|| format!("`{machine}` has no port named `{port}` (ports are named, never numbered)"))?;
+            if *field == PortField::Url && !p.protocol.is_http() {
+                return Err(format!("`{port}` isn't an `http` or `https` port, so it has no URL"));
+            }
+            Ok(())
+        }
+        Reference::CloudOutput(name) => match &spec.cloud {
+            Some(c) if c.outputs.contains_key(name) => Ok(()),
+            Some(_) => Err(format!("`cloud.outputs` has no `{name}`")),
+            None => Err("the spec has no `cloud:`".into()),
+        },
+        _ => Ok(()),
     }
 }
 

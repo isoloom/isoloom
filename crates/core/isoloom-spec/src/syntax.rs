@@ -11,19 +11,23 @@ mod forms;
 mod hardware;
 mod inputs;
 mod machine;
+mod mistake;
 mod names;
 mod old_keys;
 mod os;
 mod overrides;
 mod parse;
+pub mod placeholder;
 mod ports;
 mod problem;
 mod process;
 mod shared;
 mod spans;
+mod step;
+mod warning;
 
-pub use app::{App, ApplianceRecipe, Build, Copy, Recipe, Step};
-pub use check::check;
+pub use app::{App, ApplianceRecipe, Build, Recipe};
+pub use check::{Unresolved, check, placeholder_problems};
 pub use files::{File, FileSource, Mode};
 pub use forms::{Form, NoForm, container as container_form, reboots, vm as vm_form};
 pub use hardware::{Hardware, Tpm};
@@ -41,6 +45,12 @@ pub use problem::{Code, FieldPath, Problem, Problems, Span};
 pub use process::{Command, EnvValue, HealthPage, HealthProbe, Healthcheck, PortRef};
 pub use shared::{Group, Shared};
 pub use spans::Spans;
+pub use step::{
+    AbsPath, AptWord, Argv, CommandStep, Copy, FileState, FileStep, Firewall, FirewallPort, GroupName, GroupStep, Guard, HttpsUrl, Invocation, Package,
+    PackageName, PackageVersion, Password, ProjectPath, Repository, RepositoryKey, RepositoryName, Service, Sha256, Step, Template, UnitName, UserName,
+    UserStep,
+};
+pub use warning::Warning;
 
 use indexmap::IndexMap;
 use schemars::JsonSchema;

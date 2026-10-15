@@ -7,6 +7,7 @@
 //! Lowered for the lab as a whole ([`Scope::Lab`]), no target's own facts apply: that is the
 //! spec validation, the snapshot and the derived targets read.
 
+mod carry;
 mod forms;
 mod machine;
 mod overrides;

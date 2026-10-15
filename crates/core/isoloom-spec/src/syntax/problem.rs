@@ -156,13 +156,8 @@ impl Problem {
     /// The three lines an author reads, naming `file` (`isoloom.yml`) on the first.
     #[must_use]
     pub fn render(&self, file: &str) -> String {
-        let place = self.span.map(|s| format!("  ({file}:{}:{})", s.line, s.column)).unwrap_or_default();
-        let mut out = format!("error[{}] {}{place}\n  {}", self.code.id(), self.path, self.reason);
-        if let Some(fix) = &self.fix {
-            out.push_str("\n  fix: ");
-            out.push_str(fix);
-        }
-        out
+        let head = format!("error[{}] {}", self.code.id(), self.path);
+        lines(&head, self.span, file, &self.reason, self.fix.as_deref())
     }
 
     /// The problem on one line, its field then its reason (`machines.web.app.build: a Dockerfile
@@ -214,6 +209,18 @@ fn distance(a: &str, b: &str) -> usize {
         row = next;
     }
     row.last().copied().unwrap_or_default()
+}
+
+/// The three lines an author reads: `head` and the field's place in `file`, the reason, then
+/// the fix when there is one.
+pub(crate) fn lines(head: &str, span: Option<Span>, file: &str, reason: &str, fix: Option<&str>) -> String {
+    let place = span.map(|s| format!("  ({file}:{}:{})", s.line, s.column)).unwrap_or_default();
+    let mut out = format!("{head}{place}\n  {reason}");
+    if let Some(fix) = fix {
+        out.push_str("\n  fix: ");
+        out.push_str(fix);
+    }
+    out
 }
 
 #[cfg(test)]

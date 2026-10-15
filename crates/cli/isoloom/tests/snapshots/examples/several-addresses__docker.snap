@@ -3,7 +3,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 assertion_line: 219
 ---
 # isoloom targets
-✗ docker (machines.web.command: its steps install services, but nothing keeps one running in a container)
+✗ docker (machines.web.command: its steps install services, but no `service` step or `command` runs one in a container)
 
 # isoloom generate --target docker (exit 1)
-· docker: machines.web.command: its steps install services, but nothing keeps one running in a container
+· docker: machines.web.command: its steps install services, but no `service` step or `command` runs one in a container

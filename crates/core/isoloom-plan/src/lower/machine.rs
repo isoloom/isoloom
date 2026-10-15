@@ -311,11 +311,11 @@ fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine) -> Option<VmImpl> 
             a.steps
                 .iter()
                 .filter_map(|s| match s {
-                    Step::Run { script, .. } => Some(script.clone()),
+                    Step::Run { script, .. } => Some(script.to_string()),
                     Step::Reboot => Some(model::REBOOT_STEP.to_owned()),
-                    Step::Playbook(p) => Some(p.clone()),
-                    // Configuration steps (`copy`, `packages`) on a VM come in Phase 4: refused
-                    // there (`refusals`).
+                    Step::Playbook(p) => Some(p.to_string()),
+                    // The first copies are its files (`carry`); the other steps wait for the
+                    // configuration renderers, refused until then (`refusals`).
                     _ => None,
                 })
                 .collect()
@@ -332,6 +332,7 @@ fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine) -> Option<VmImpl> 
         },
         boot: m.hardware.boot.clone(),
         setup: m.setup.clone(),
+        copies: super::carry::copies(m),
     })
 }
 

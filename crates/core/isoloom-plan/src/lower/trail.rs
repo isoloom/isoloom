@@ -29,7 +29,11 @@ impl Trail {
             self.record(format!("{at}.ports[{i}]"), format!("{at}.ports.{p}"));
         }
         if let Some(app) = m.app() {
-            let vm_steps = app.steps.iter().enumerate().filter(|(_, s)| !matches!(s, Step::Copy(_) | Step::Packages(_)));
+            let vm_steps = app
+                .steps
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| matches!(s, Step::Run { .. } | Step::Reboot | Step::Playbook(_)));
             for (lowered, (written, _)) in vm_steps.enumerate() {
                 self.record(format!("{at}.vm.provision[{lowered}]"), format!("{at}.app.steps[{written}]"));
             }

@@ -233,17 +233,16 @@ fn steps_install_onto_a_known_os_with_files_of_its_kind() {
         "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.sh }, { playbook: p.yaml }, { copy: { from: a, to: /srv/a } }, { packages: [nginx] }, reboot] }\n",
     );
     assert_eq!(ok, []);
-    let wrong = problems(
-        "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ playbook: p.txt }, { copy: { from: a, to: srv/a } }, { packages: [] }] }\n",
-    );
-    for path in [
-        "machines.web.app.steps[0].playbook",
-        "machines.web.app.steps[1].copy.to",
-        "machines.web.app.steps[2].packages",
-    ] {
+    let wrong = problems("machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ playbook: p.txt }, { run: a.ps1 }] }\n");
+    for path in ["machines.web.app.steps[0].playbook", "machines.web.app.steps[1].run"] {
         assert!(has(&wrong, Code::InvalidValue, path), "{path}: {wrong:?}");
     }
-    assert_eq!(wrong.len(), 3, "{wrong:?}");
+    assert_eq!(wrong.len(), 2, "{wrong:?}");
+    // A relative destination and no packages are refused when the spec is read.
+    for step in ["{ copy: { from: a, to: srv/a } }", "{ packages: [] }"] {
+        let yaml = format!("version: 1\nname: t\nmachines:\n  web: {{ os: debian@12, app: {{ steps: [{step}] }} }}\n");
+        assert!(parse(&yaml).is_err(), "{step}");
+    }
 }
 
 #[test]
@@ -251,9 +250,9 @@ fn a_windows_machine_steps_with_powershell_and_restarts_itself() {
     let found = problems(
         "machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.ps1 }, { copy: { from: a, to: 'C:\\app\\a' } }, { packages: [x] }, reboot] }\n",
     );
-    assert!(has(&found, Code::InvalidValue, "machines.dc.app.steps[2].packages"), "{found:?}");
+    // Packages on Windows are its features.
     assert!(has(&found, Code::InvalidValue, "machines.dc.app.steps[3]"), "{found:?}");
-    assert_eq!(found.len(), 2, "{found:?}");
+    assert_eq!(found.len(), 1, "{found:?}");
 }
 
 #[test]
@@ -263,4 +262,45 @@ fn an_appliance_has_no_steps() {
     assert!(has(&found, Code::Conflict, "machines.r1.app.steps"), "{found:?}");
     let alone = problems("machines:\n  r1:\n    networks: { lab: 10 }\n    app: { appliance: cisco-iol, image: vrnetlab/cisco_iol:17 }\n");
     assert_eq!(alone, []);
+}
+
+#[test]
+fn a_firewall_step_opens_the_machines_own_ports() {
+    let found = problems(
+        "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    ports: { http: 80 }\n    app: { steps: [{ firewall: { allow: [http, https, 8443, 53/udp] } }] }\n",
+    );
+    assert_eq!(found, [(Code::UnknownReference, "machines.web.app.steps[0].firewall.allow[1]".to_owned())]);
+}
+
+#[test]
+fn a_suite_and_components_are_apts_alone() {
+    let key = format!("key: {{ url: \"https://a.test/k\", sha256: {} }}", "0".repeat(64));
+    let repo = |os: &str, extra: &str| {
+        problems(&format!(
+            "machines:\n  web:\n    os: {os}\n    networks: {{ lab: 10 }}\n    app: {{ steps: [{{ repository: {{ name: r, url: \"https://a.test/r\", {key}{extra} }} }}] }}\n"
+        ))
+    };
+    assert_eq!(
+        repo("rocky@9", ", suite: el9"),
+        [(Code::InvalidValue, "machines.web.app.steps[0].repository.suite".to_owned())]
+    );
+    assert_eq!(
+        repo("alpine", ", components: [main]"),
+        [(Code::InvalidValue, "machines.web.app.steps[0].repository.components".to_owned())]
+    );
+    assert_eq!(repo("ubuntu@24.04", ", suite: noble, components: [main]"), []);
+}
+
+#[test]
+fn a_linux_account_is_named_as_useradd_takes_it() {
+    let found = problems(
+        "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ user: { name: Alice } }, { group: { name: ops } }] }\n  dc:\n    os: windows-server@2022\n    networks: { lab: 11 }\n    app: { steps: [{ user: { name: Alice } }, { group: { name: Remote Desktop Users } }] }\n",
+    );
+    assert_eq!(found, [(Code::InvalidValue, "machines.web.app.steps[0].user.name".to_owned())]);
+}
+
+#[test]
+fn packages_on_windows_are_its_features() {
+    let found = problems("machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ packages: [Web-Server] }] }\n");
+    assert_eq!(found, []);
 }

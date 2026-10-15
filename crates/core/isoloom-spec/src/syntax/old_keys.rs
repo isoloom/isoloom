@@ -5,8 +5,8 @@
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::app::has_extension;
 use super::problem::{Code, FieldPath, Problem};
+use super::step::has_extension;
 
 /// The old keys of a spec document, each a `removed-field` problem with its fix (a list of
 /// ports is an `invalid-value`: the field stays, its shape changed).

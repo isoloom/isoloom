@@ -1,12 +1,15 @@
 //! What a target can't run, found while lowering: a machine without the form the target needs
-//! (named by the field that rules it out), a VM step a target doesn't render yet, a machine with
-//! no existing host on `external`. Each is a `refused` problem; the spec itself stays valid.
+//! (named by the field that rules it out), a step its family can't carry at all (a repository on
+//! Windows), a step the form the target uses doesn't render yet ([`super::carry`]), a machine
+//! with no existing host on `external`. Each is a `refused` problem; the spec itself stays valid.
 
 use isoloom_spec::model::{Shape, Target};
-use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Step};
+use isoloom_spec::syntax::{self, Code, FieldPath, Problem};
 
-use super::forms::{self, Vm};
+use super::carry;
+use super::forms::{self, Container, Vm};
 use super::overrides;
+use crate::configure::{self, DaemonTable};
 
 /// The machines `target` has no form for, in machine order.
 pub(super) fn forms(source: &syntax::Spec, target: Target) -> Vec<Problem> {
@@ -26,6 +29,8 @@ pub(super) fn of(source: &syntax::Spec, target: Target) -> Vec<Problem> {
         out.extend(form(source, name, m, target));
         if runs_as_vm(source, name, m, target) {
             out.extend(vm_steps(name, m));
+        } else if built_from_steps(source, name, m, target) {
+            out.extend(carry::container_refusals(name, m));
         }
     }
     out
@@ -69,25 +74,35 @@ fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Ta
     }
 }
 
-/// The configuration steps a VM doesn't run yet: the configuration backends that render them as
-/// shell and PowerShell come with the resource model (PLAN, Phase 4).
+/// Whether `target` runs machine `name` as a container built from its steps.
+fn built_from_steps(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) -> bool {
+    let steps = matches!(forms::container(m), Ok(Container::Steps { .. }));
+    match target.needs() {
+        Shape::Docker | Shape::Either => steps,
+        Shape::VmOrLxc => steps && overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
+        Shape::Vm | Shape::External | Shape::Cloud => false,
+    }
+}
+
+/// The steps machine `name`'s VM can't run: those its family can't carry at all, then those
+/// today's VM set-up doesn't carry yet.
 fn vm_steps(name: &str, m: &syntax::Machine) -> Vec<Problem> {
-    let Some(app) = m.app() else { return Vec::new() };
-    app.steps
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| matches!(s, Step::Copy(_) | Step::Packages(_)))
-        .map(|(i, s)| {
-            let what = if matches!(s, Step::Copy(_)) { "copy" } else { "packages" };
-            let at = FieldPath::new("machines").key(name).key("app").key("steps").index(i);
-            Problem::new(
-                Code::Refused,
-                at,
-                format!("a `{what}` step on a VM comes with the configuration backends (Phase 4); containers build it today"),
-            )
-            .fix("write it as a `run:` script for now, or use a container target")
-        })
-        .collect()
+    let Some(os) = m.os else { return Vec::new() };
+    let at = |i: usize| FieldPath::new("machines").key(name).key("app").key("steps").index(i);
+    let unportable = configure::recipe(os, m, &DaemonTable::common()).err().unwrap_or_default();
+    let mut later = carry::vm_refusals(name, m);
+    let steps = m.app().map(|a| a.steps.as_slice()).unwrap_or_default();
+    // In step order, each step once: what its family can't carry at all says it best.
+    let mut out = Vec::new();
+    for (i, step) in steps.iter().enumerate() {
+        if let Some(u) = unportable.iter().find(|u| u.step == i) {
+            let path = u.field.map_or_else(|| at(i), |f| at(i).key(step.kind()).key(f));
+            out.push(Problem::new(Code::Refused, path, u.reason.clone()).fix(u.fix.clone()));
+        } else if let Some(k) = later.iter().position(|p| p.path == at(i)) {
+            out.push(later.swap_remove(k));
+        }
+    }
+    out
 }
 
 #[cfg(test)]

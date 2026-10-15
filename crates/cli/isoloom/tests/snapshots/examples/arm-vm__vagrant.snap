@@ -99,11 +99,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
       "cloud-vm": "no cloud can run it (aws: machine `box`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); azure: machine `box`: arm64 on Azure comes later (Arm-based sizes and arm64 images); gcp: machine `box`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); digitalocean: machine `box`: arm64 on DigitalOcean comes later (it has no arm64 droplets); linode: machine `box`: arm64 on Linode comes later (it has no arm64 plans); oci: machine `box`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))"
     },
     "not_possible": {
-      "docker": "machines.box.command: its steps install services, but nothing keeps one running in a container",
-      "hosted": "machines.box.command: its steps install services, but nothing keeps one running in a container",
-      "docker-vm": "machines.box.command: its steps install services, but nothing keeps one running in a container",
-      "cloud-docker": "machines.box.command: its steps install services, but nothing keeps one running in a container",
-      "kubernetes": "machines.box.command: its steps install services, but nothing keeps one running in a container",
+      "docker": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "hosted": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "docker-vm": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "cloud-docker": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
+      "kubernetes": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.box: the external target reaches machines that exist already, and `box` names no host",
       "cloud-services": "left out by `targets:`"

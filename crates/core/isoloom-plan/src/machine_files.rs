@@ -11,10 +11,13 @@ use crate::environment::MachineShape;
 use crate::lifecycle::Step;
 use crate::requirements::Requirement;
 
-/// The step placing `m`'s files, when it has any.
+/// The step placing `m`'s files, when it has any: its own, then those its first `copy` steps
+/// place on its VM.
 #[must_use]
 pub fn step(m: &Machine) -> Option<Step> {
-    (!m.files.is_empty()).then(|| Step::Files { files: m.files.clone() })
+    let copies = m.vm.as_ref().map(|vm| vm.copies.as_slice()).unwrap_or_default();
+    let files: Vec<_> = m.files.iter().chain(copies).cloned().collect();
+    (!files.is_empty()).then_some(Step::Files { files })
 }
 
 /// Whether a VM's steps read the project: it runs scripts of its own (its app's or `setup`), or

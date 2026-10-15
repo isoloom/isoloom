@@ -49,6 +49,7 @@ mod tests {
             tpm: tpm_field,
             boot: None,
             setup: Vec::new(),
+            copies: Vec::new(),
         }
     }
 

@@ -6,7 +6,9 @@
 //! machine a target lowers without its form is always a refusal at that field, never a silent
 //! stand-in.
 
-use isoloom_spec::syntax::{self, Form, Kind, NoForm, OsRef, Recipe};
+use isoloom_spec::syntax::{self, Form, Kind, NoForm, OsRef, Recipe, Step};
+
+use crate::configure::{self, ContainerProcess, DaemonTable, NoProcess};
 
 /// What a machine's container runs from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +48,7 @@ pub(super) fn container(m: &syntax::Machine) -> Result<Container<'_>, NoForm> {
         Form::Service => Err(no_entry(m)),
         Form::Steps => {
             let (os, base) = official_image(m)?;
+            process(os, m)?;
             Ok(Container::Steps { os, base })
         }
         Form::Os => official_image(m).map(|(_, image)| Container::Os { image }),
@@ -70,6 +73,37 @@ fn official_image(m: &syntax::Machine) -> Result<(OsRef, &'static str), NoForm> 
         fix: "run it on a VM target, or give the app its own `app.image` or `app.build`".to_owned(),
     })?;
     Ok((os, image))
+}
+
+/// What the container built from the machine's steps runs (the configuration model's rule,
+/// design §3): refused when a service has no foreground form, or when it has ports and nothing
+/// serves them.
+fn process(os: OsRef, m: &syntax::Machine) -> Result<(), NoForm> {
+    // A step no form of the OS carries is the VM's refusal to report; a container of a Windows
+    // OS doesn't exist.
+    let Ok(recipe) = configure::recipe(os, m, &DaemonTable::common()) else {
+        return Ok(());
+    };
+    match ContainerProcess::of(&recipe, m) {
+        Ok(_) => Ok(()),
+        Err(NoProcess::NoForeground { unit }) => {
+            let steps = m.app().map(|a| a.steps.as_slice()).unwrap_or_default();
+            let i = steps
+                .iter()
+                .position(|s| matches!(s, Step::Service(svc) if *svc.name() == unit))
+                .unwrap_or_default();
+            Err(NoForm {
+                field: format!("app.steps[{i}].service"),
+                reason: format!("`{unit}` isn't in the daemon table, so a container can't run it"),
+                fix: format!("`{{ service: {{ name: {unit}, run: [<program>, <args>] }} }}`: the service in the foreground"),
+            })
+        }
+        Err(_) => Err(NoForm {
+            field: "command".to_owned(),
+            reason: "its steps install services, but no `service` step or `command` runs one in a container".to_owned(),
+            fix: "add `command:` (the service in the foreground); a `service` step runs one in containers from Phase 4.2".to_owned(),
+        }),
+    }
 }
 
 /// A form that needs the machine's OS, which it doesn't name.

@@ -240,3 +240,24 @@ fn the_controller_takes_its_vagrant_box_from_the_overrides() {
     let sized = controller("controller: { resources: { memory_mb: 768 } }\n").expect("the spec's controller");
     assert_eq!((sized.image, sized.resources.and_then(|r| r.memory_mb)), (None, Some(768)));
 }
+
+/// An app written in the configuration model (the design's parcel-tracker `api`, trimmed): valid,
+/// and each form refuses what waits for the renderers of Phase 4.2, at its step, in step order.
+#[test]
+fn the_configuration_model_waits_for_its_renderers_on_each_form() {
+    let yaml = "version: 1\nname: parcels\nnetworks: { lab: { cidr: 10.63.0.0/24 } }\nmachines:\n  api:\n    os: debian@12\n    networks: { lab: 20 }\n    ports: { api: { port: 8000, protocol: http } }\n    app:\n      steps:\n        - packages: [python3, python3-venv]\n        - group: { name: parcels, gid: 1500, system: true }\n        - copy: { from: api/, to: /srv/parcels/app/, owner: parcels }\n        - command: python3 -m venv /srv/parcels/venv\n          creates: /srv/parcels/venv/bin/python\n        - firewall: { allow: [api] }\n        - service: { name: parcels-api, run: [/srv/parcels/venv/bin/gunicorn, parcels.wsgi:app], user: parcels }\n";
+    let source = syntax::parse(yaml).unwrap_or_else(|p| panic!("{p:?}"));
+    assert_eq!(crate::Lab::new(source.clone()).problems(), []);
+    let refused = |t: Target| -> Vec<String> { lower(&source, Scope::Target(t)).refusals.iter().map(|r| r.path.to_string()).collect() };
+    let at = |i: usize| format!("machines.api.app.steps[{i}]");
+    // A container builds the packages and the copy, needs nothing for the firewall, and waits for
+    // the group, the command and the runner that runs the service.
+    assert_eq!(refused(Target::Docker), [at(1), at(3), at(5)]);
+    // A VM runs scripts only until then.
+    assert_eq!(refused(Target::Vagrant), [at(0), at(1), at(2), at(3), at(4), at(5)]);
+    let first = lower(&source, Scope::Target(Target::Vagrant)).refusals.remove(0);
+    assert_eq!(
+        first.reason,
+        "a `packages` step on a VM is rendered by the configuration renderers, in Phase 4.2"
+    );
+}

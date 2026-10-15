@@ -63,11 +63,11 @@ fn a_build_or_a_step_of_the_wrong_shape_says_what_is_expected() {
     assert!(build.contains("a project folder, or `{ context, dockerfile, target, args }`"), "{build}");
     let step = app("{ steps: [[a]] }").unwrap_err();
     assert!(
-        step.contains("`reboot`, or one of `{ run }`, `{ copy }`, `{ packages }` and `{ playbook }`"),
+        step.contains("`reboot`, or a map with one of `run`, `copy`, `packages`, `playbook`, `repository`"),
         "{step}"
     );
     let nothing = app("{ steps: [{}] }").unwrap_err();
-    assert!(nothing.contains("a step needs one of `run`, `copy`, `packages` and `playbook`"), "{nothing}");
+    assert!(nothing.contains("a step needs one of `run`, `copy`, `packages`, `playbook`"), "{nothing}");
 }
 
 #[test]

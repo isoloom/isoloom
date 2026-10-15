@@ -1,11 +1,13 @@
 //! The forms a machine takes, derived from what it is: a container (its image, its build, a
 //! Dockerfile generated from its steps, its OS's image) and a VM (a fresh VM of its OS, set up by
 //! its steps). A machine without one of them says why, naming the field that rules it out, so a
-//! target that needs that form refuses the machine with the reason.
+//! target that needs that form refuses the machine with the reason. What a container built from
+//! steps runs (its services, its command) is the configuration model's rule, in the plan.
 
-use super::app::{Recipe, Step};
+use super::app::Recipe;
 use super::machine::{Kind, Machine};
 use super::problem::{Code, FieldPath, Problem};
+use super::step::Step;
 
 /// How a machine is produced in one form.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,13 +101,6 @@ pub fn container(m: &Machine) -> Result<Form<'_>, NoForm> {
                     format!("app.steps[{i}]"),
                     why,
                     "give the container form its own recipe (`app.image` or `app.build`), or use a VM target",
-                )),
-                // Steps install services the way a VM starts them (its init system); a
-                // container has none, so what it serves needs a process in the foreground.
-                None if m.os.is_some() && !m.ports.is_empty() && m.command.is_none() => Err(NoForm::new(
-                    "command",
-                    "its steps install services, but nothing keeps one running in a container",
-                    "add `command:` (the service in the foreground), or use a catalogue `service:` (Phase 4)",
                 )),
                 None if m.os.is_some() => Ok(Form::Steps),
                 None => Err(NoForm::new("app.steps", "steps install onto an OS", "`os: debian@12`")),
@@ -220,21 +215,6 @@ mod tests {
         assert!(reboots(&rebooting));
         let both = machine("{ os: debian@12, app: { image: redis:7, steps: [reboot] } }");
         assert!(matches!(container(&both), Ok(Form::Recipe(_))) && vm(&both).is_ok());
-    }
-
-    /// Steps install services the VM way (an init system starts them); a container has no init,
-    /// so a machine with ports needs a `command` to answer on the container form.
-    #[test]
-    fn steps_that_install_a_service_need_a_command_to_serve_from_a_container() {
-        let served = machine("{ os: debian@12, ports: { web: 80 }, app: { steps: [{ run: web.sh }] } }");
-        let no = container(&served).unwrap_err();
-        assert_eq!(no.path("web").as_str(), "machines.web.command");
-        assert!(no.reason.contains("nothing keeps one running in a container"), "{}", no.reason);
-        assert_eq!(vm(&served), Ok(Form::Steps));
-        let commanded = machine("{ os: debian@12, ports: { web: 80 }, command: [nginx, -g, 'daemon off;'], app: { steps: [{ run: web.sh }] } }");
-        assert_eq!(container(&commanded), Ok(Form::Steps));
-        let portless = machine("{ os: debian@12, app: { steps: [{ run: tools.sh }] } }");
-        assert_eq!(container(&portless), Ok(Form::Steps));
     }
 
     #[test]

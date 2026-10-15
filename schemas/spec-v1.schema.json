@@ -783,7 +783,7 @@
         },
         {
           "$ref": "#/$defs/StepInput",
-          "description": "A step that runs, copies or installs something."
+          "description": "A step that ensures one state."
         }
       ],
       "description": "A step as written, for the schema."
@@ -804,11 +804,29 @@
       "properties": {
         "run": {
           "type": "string",
-          "description": "A project script (`.sh`; `.ps1` on Windows)."
+          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "description": "A project script (`.sh`; `.ps1` on Windows), run as root from the project folder."
         },
         "creates": {
           "type": "string",
-          "description": "With `run`: a path whose existence means the step already ran."
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
+          "description": "With `run` or `command`: a path whose existence means the step already ran (absolute)."
+        },
+        "unless": {
+          "description": "With `command`: a check that exits 0 when the step already ran (a text, or a list of\narguments).",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ]
         },
         "copy": {
           "description": "A project file or folder copied into the machine.",
@@ -817,16 +835,61 @@
         "packages": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/Package"
           },
-          "description": "Packages to install with the OS's installer (`apt-get`, `apk`, `dnf`)."
+          "description": "Packages to install with the OS's installer (`apt-get`, `dnf`, `apk`; Windows features on\nWindows): names, or `{ name, version }` with the version the package manager writes."
         },
         "playbook": {
           "type": "string",
+          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
           "description": "An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`)."
+        },
+        "repository": {
+          "description": "A vendor's package repository (`{ name, url, key: { url, sha256 }, suite, components,\npriority }`), its key pinned by SHA-256. Not on Windows.",
+          "$ref": "#/$defs/Repository"
+        },
+        "file": {
+          "description": "A path made a folder (`state: directory`), removed (`state: absent`), a link (`link`), or\na download pinned by its SHA-256 (`url` and `sha256`).",
+          "$ref": "#/$defs/FileStep"
+        },
+        "template": {
+          "description": "A project file with its `{{ path }}` placeholders filled in, placed in the machine.",
+          "$ref": "#/$defs/Template"
+        },
+        "user": {
+          "description": "A local user: `{ name, uid, group, groups, home, shell, system, password }`.",
+          "$ref": "#/$defs/UserStep"
+        },
+        "group": {
+          "description": "A local group: `{ name, gid, system }`.",
+          "$ref": "#/$defs/GroupStep"
+        },
+        "service": {
+          "description": "A daemon: a unit a package installs (`nginx`), or `{ name, run, user, cwd, enabled }` for\none Isoloom defines. Enabled and started on VMs; the container's process in containers.",
+          "$ref": "#/$defs/Service"
+        },
+        "command": {
+          "description": "A command run once (a text the shell runs, or a list of arguments), with exactly one of\n`creates` and `unless` to tell it already ran.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "firewall": {
+          "description": "Ports opened in the OS's own firewall when one runs: `{ allow: [<port name>, <number>,\n<number>/udp] }`.",
+          "$ref": "#/$defs/Firewall"
         }
       },
-      "description": "A step as written: `reboot`, or a map with one of `run`, `copy`, `packages` and `playbook`."
+      "description": "A step as written: one kind key, and its guard."
     },
     "Copy": {
       "type": "object",
@@ -834,15 +897,18 @@
       "properties": {
         "from": {
           "type": "string",
+          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
           "description": "A file or folder of the project (a folder ends with `/`)."
         },
         "to": {
           "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
           "description": "Where it goes in the machine (absolute)."
         },
         "owner": {
           "type": "string",
-          "description": "The owner, a user name (default root)."
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,31}$",
+          "description": "The owner, a user name (default root). Not on Windows."
         },
         "mode": {
           "type": [
@@ -851,14 +917,388 @@
             "null"
           ],
           "pattern": "^0?[0-7]{1,3}$",
-          "description": "The mode, octal (default: as in the project)."
+          "description": "The mode, octal (default: as in the project). Not on Windows."
         }
       },
       "required": [
         "from",
         "to"
       ],
-      "description": "A `copy` step."
+      "description": "A `copy` step: a project file or folder copied into the machine as it is."
+    },
+    "Package": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9+._:-]{0,127}$",
+          "description": "Its name: the version the package manager picks."
+        },
+        {
+          "$ref": "#/$defs/PackageFull",
+          "description": "Its name and its exact version."
+        }
+      ],
+      "description": "A package as written, for the schema."
+    },
+    "PackageFull": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9+._:-]{0,127}$",
+          "description": "The package's name."
+        },
+        "version": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.+~:_-]{0,127}$",
+          "description": "Its exact version, as the family's package manager writes it (`1.30.6-1~bookworm`,\n`1:2.4.62-1`, `1.30.6-r1`), quoted."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "description": "A package written in full."
+    },
+    "Repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Its name, in kebab case: it names the source and key files (`nginx`)."
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://[^\\s/]+\\S*$",
+          "description": "Its address (`https`)."
+        },
+        "key": {
+          "$ref": "#/$defs/RepositoryKey",
+          "description": "Its signing key: `{ url, sha256 }`, the SHA-256 of the key's file."
+        },
+        "suite": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,63}$",
+          "description": "The suite (apt only; default: the OS's codename, `bookworm`)."
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,63}$"
+          },
+          "description": "The components (apt only; default `[main]`)."
+        },
+        "priority": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Its priority over the OS's own packages: apt's pin priority, dnf's `priority`."
+        }
+      },
+      "required": [
+        "name",
+        "url",
+        "key"
+      ],
+      "description": "A `repository` step: a vendor's package repository added to the machine's package manager,\nits key pinned by the SHA-256 of its file. Its kind (apt, rpm or apk) is the OS family's."
+    },
+    "RepositoryKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^https://[^\\s/]+\\S*$",
+          "description": "Where the key is (`https`)."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The SHA-256 of the key's file (64 hex digits, as `sha256sum` prints it)."
+        }
+      },
+      "required": [
+        "url",
+        "sha256"
+      ],
+      "description": "A repository's signing key, pinned."
+    },
+    "FileStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
+          "description": "The path in the machine (absolute)."
+        },
+        "state": {
+          "description": "`directory` (a folder, with its parents) or `absent` (removed: the model's only removal).\nNot with `link` or `url`.",
+          "$ref": "#/$defs/StateWord"
+        },
+        "link": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
+          "description": "A symbolic link to this target (absolute). Not on Windows."
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://[^\\s/]+\\S*$",
+          "description": "A file to download (`https`), with its `sha256`: every fetch is pinned."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it)."
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,31}$",
+          "description": "Its owner, a user name (default root). Not on Windows."
+        },
+        "group": {
+          "type": "string",
+          "pattern": "^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$",
+          "description": "Its group (default the owner's). Not on Windows."
+        },
+        "mode": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ],
+          "pattern": "^0?[0-7]{1,3}$",
+          "description": "Its mode, octal. Not on Windows, nor with `state: absent` or `link`."
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "description": "A `file` step as written."
+    },
+    "StateWord": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "directory",
+          "description": "A folder."
+        },
+        {
+          "type": "string",
+          "const": "absent",
+          "description": "Removed."
+        }
+      ],
+      "description": "`state:` as written."
+    },
+    "Template": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "description": "A file of the project holding `{{ path }}` placeholders: `{{ machine.name }}`,\n`{{ machine.addresses.<network> }}`, `{{ machines.<m>.addresses.<network> }}` and\n`{{ machines.<m>.ports.<name>.port }}`. Filled in when Isoloom generates; no logic."
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
+          "description": "Where the filled-in file goes in the machine (absolute)."
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,31}$",
+          "description": "Its owner, a user name (default root). Not on Windows."
+        },
+        "group": {
+          "type": "string",
+          "pattern": "^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$",
+          "description": "Its group (default the owner's). Not on Windows."
+        },
+        "mode": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ],
+          "pattern": "^0?[0-7]{1,3}$",
+          "description": "Its mode, octal (default `0644`). Not on Windows."
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "description": "A `template` step as written."
+    },
+    "UserStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,31}$",
+          "description": "Its name."
+        },
+        "uid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Its user id (default: the next free one)."
+        },
+        "group": {
+          "type": "string",
+          "pattern": "^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$",
+          "description": "Its primary group (default: one of its own name, or the system's default)."
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$"
+          },
+          "description": "The other groups it is a member of (`[sudo]`, `[Remote Desktop Users]`).",
+          "default": []
+        },
+        "home": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
+          "description": "Its home folder (absolute; default the system's)."
+        },
+        "shell": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
+          "description": "Its login shell (absolute; `/usr/sbin/nologin` for a service account)."
+        },
+        "system": {
+          "type": "boolean",
+          "description": "A system account (a low id, no ageing): a service's.",
+          "default": false
+        },
+        "password": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ],
+          "minLength": 1,
+          "description": "Its password, a literal: lab content, written in the generated files (hashed on Linux).\nA secret or an input is refused here: a catalogue entry's `users` setting takes those."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "description": "A `user` step: a local user, created or brought in line, never deleted."
+    },
+    "GroupStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_]([A-Za-z0-9_. -]{0,62}[A-Za-z0-9_.-])?$",
+          "description": "Its name."
+        },
+        "gid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Its group id (default: the next free one)."
+        },
+        "system": {
+          "type": "boolean",
+          "description": "A system group (a low id).",
+          "default": false
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "description": "A `group` step: a local group, created or brought in line, never deleted."
+    },
+    "Service": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,127}$",
+          "description": "A unit a package installs (`nginx`), enabled and started."
+        },
+        {
+          "$ref": "#/$defs/ServiceFull",
+          "description": "A unit with its settings, or a service Isoloom defines from `run`."
+        }
+      ],
+      "description": "A service as written, for the schema."
+    },
+    "ServiceFull": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,127}$",
+          "description": "The unit's name (`nginx`), or the name of the service `run` defines."
+        },
+        "run": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Defines the service: the program and its arguments, in the foreground (`[/srv/api/bin/api,\n--port, \"8000\"]`). Without it, the unit comes from a package."
+        },
+        "user": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,31}$",
+          "description": "With `run`: the user it runs as (default root)."
+        },
+        "cwd": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$",
+          "description": "With `run`: the folder it runs in (absolute)."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Started at boot and now (default `true`); `false` leaves it disabled and stopped."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "description": "A service written in full."
+    },
+    "Firewall": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              {
+                "type": "string",
+                "pattern": "^([a-z][a-z0-9-]{0,30}|[0-9]{1,5}(/(udp|tcp))?)$"
+              }
+            ]
+          },
+          "description": "The ports to open: the machine's port names (`http`), or `<number>` and `<number>/udp`\n(`8443`, `53/udp`). Allow rules only: deny rules are 1.x, and `reach` governs traffic\nbetween machines."
+        }
+      },
+      "required": [
+        "allow"
+      ],
+      "description": "A `firewall` step: ports opened in the OS's own firewall, when one runs."
     },
     "Appliance": {
       "oneOf": [

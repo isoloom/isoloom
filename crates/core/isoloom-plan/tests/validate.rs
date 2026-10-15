@@ -489,7 +489,16 @@ fn external_user_with_an_at() {
 
 #[test]
 fn message_placeholder_not_a_path() {
-    assert_problem(&with_web_and("message: 'at {{ machines..web }}'\n"), "message", "no machine named ``");
+    assert_problem(
+        &with_web_and("message: 'at {{ machines..web }}'\n"),
+        "message",
+        "isn't a placeholder Isoloom knows",
+    );
+    assert_problem(
+        &with_web_and("message: 'at {{ machines.db.addresses.lab }}'\n"),
+        "message",
+        "no machine named `db`",
+    );
 }
 
 // Checks.
