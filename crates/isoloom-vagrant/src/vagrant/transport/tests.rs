@@ -19,18 +19,18 @@ networks:
 machines:
   fw:
     networks: { front: 2, back: 1 }
-    vm: { os: debian-12, provision: [fw.sh] }
+    vm: { os: debian@12, provision: [fw.sh] }
   app:
     networks: { back: 10 }
     inputs: [TOKEN]
     depends_on: [dc]
     ports: [{ port: 80 }]
-    vm: { os: debian-12, provision: [a.sh, reboot, site.yml] }
+    vm: { os: debian@12, provision: [a.sh, reboot, site.yml] }
   dc:
     networks: { front: 20 }
     ports: [{ port: 389 }]
     inputs: [TOKEN]
-    vm: { os: windows-server-2019, provision: [dc.ps1] }
+    vm: { os: windows-server@2019, provision: [dc.ps1] }
 ";
 
 fn env() -> Environment {

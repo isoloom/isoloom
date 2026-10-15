@@ -2,17 +2,18 @@
 //!
 //! ```yaml
 //! machines:
-//!   web: { os: debian@12, ... }        # a VM of Debian 12 (`vm: { os: debian-12 }`)
+//!   web: { os: debian@12, ... }        # a VM of Debian 12
 //!   dc01:
 //!     os: windows-server               # the family alone: its pinned default, 2022
 //!     vm: { provision: [dc.ps1] }      # `vm.os` defaults to the machine's `os`
 //! ```
 //!
-//! Each family's versions map onto the image table's names (`debian@12` is `debian-12`), which
-//! every target keeps reading, so those older names stay valid spellings too. A version left
-//! out resolves to the family's pinned default ([`Family::default`]), recorded in the resolved
-//! snapshot. The machine's `os` reaches its `vm:` on the YAML, before `common:` and the groups
-//! fold in ([`fill_vm`]), so a machine's own OS wins over a shared one, as its own `vm.os` does.
+//! Those are the only spellings. Once the spec is parsed, each `vm.os` holds the image table's
+//! name for its OS (`debian@12` is `debian-12`), the name every target reads ([`canonical`]). A
+//! version left out resolves to the family's pinned default ([`Family::default`]), recorded in
+//! the resolved snapshot. The machine's `os` reaches its `vm:` on the YAML, before `common:` and
+//! the groups fold in ([`fill_vm`]), so a machine's own OS wins over a shared one, as its own
+//! `vm.os` does.
 
 use serde_yaml_ng::{Mapping, Value};
 
@@ -158,15 +159,9 @@ impl Family {
     }
 }
 
-/// Resolves an OS as a spec writes it: `<family>@<version>`, `<family>` (its default version),
-/// or an image-table name (`debian-12`, `kali`).
+/// Resolves an OS as a spec writes it: `<family>@<version>`, or `<family>` for its default
+/// version.
 pub fn resolve(text: &str) -> Result<Os, OsError> {
-    if let Some(os) = FAMILIES
-        .iter()
-        .find_map(|f| f.versions.iter().find(|(_, n)| *n == text).and_then(|(v, _)| f.get(v)))
-    {
-        return Ok(os);
-    }
     let (family, version) = text.split_once('@').map_or((text, None), |(f, v)| (f, Some(v)));
     let Some(f) = FAMILIES.iter().find(|f| f.name == family) else {
         return Err(OsError::UnknownFamily {
@@ -183,22 +178,20 @@ pub fn resolve(text: &str) -> Result<Os, OsError> {
     })
 }
 
-/// Every spelling an `os` field takes: each family alone, each `<family>@<version>`, and each
-/// image-table name. The schema offers them for completion.
+/// The OS an image-table name (`debian-12`) stands for: how a parsed spec's `vm.os` names it.
+pub fn by_name(name: &str) -> Option<Os> {
+    FAMILIES
+        .iter()
+        .find_map(|f| f.versions.iter().find(|(_, n)| *n == name).and_then(|(v, _)| f.get(v)))
+}
+
+/// Every spelling an `os` field takes: each family alone and each `<family>@<version>`. The
+/// schema offers them for completion.
 pub fn spellings() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for f in FAMILIES {
         out.push(f.name.to_string());
         out.extend(f.versions.iter().map(|(v, _)| format!("{}@{v}", f.name)));
-    }
-    for f in FAMILIES {
-        out.extend(
-            f.versions
-                .iter()
-                .map(|(_, n)| (*n).to_string())
-                .filter(|n| !out.contains(n))
-                .collect::<Vec<_>>(),
-        );
     }
     out
 }
@@ -228,18 +221,18 @@ pub fn fill_vm(doc: &mut Value) {
 
 /// Writes each machine's OS in its resolved forms: the machine's `os` as `<family>@<version>`
 /// (the default version filled in), its `vm.os` as the image-table name every target reads.
-/// A value that doesn't resolve is left as written, for validation to report.
-pub fn canonical(spec: &mut Spec) {
-    for m in spec.machines.values_mut() {
-        if let Some(os) = m.os.as_deref().and_then(|t| resolve(t).ok()) {
-            m.os = Some(os.id());
+/// An OS that doesn't resolve is refused, naming its field; an empty `vm.os` is left for
+/// validation, which says how to name one.
+pub fn canonical(spec: &mut Spec) -> Result<(), String> {
+    for (name, m) in &mut spec.machines {
+        if let Some(text) = &m.os {
+            m.os = Some(resolve(text).map_err(|e| format!("machines.{name}.os: {e}"))?.id());
         }
-        if let Some(vm) = &mut m.vm
-            && let Ok(os) = resolve(&vm.os)
-        {
-            vm.os = os.name.to_string();
+        if let Some(vm) = m.vm.as_mut().filter(|vm| !vm.os.is_empty()) {
+            vm.os = resolve(&vm.os).map_err(|e| format!("machines.{name}.vm.os: {e}"))?.name.to_string();
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]

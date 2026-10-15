@@ -103,7 +103,7 @@ fn a_vm_takes_at_most_eight_folders() {
     let mounts: Vec<String> = (0..9).map(|i| format!("v{i}: /v{i}")).collect();
     let _ = writeln!(
         yaml,
-        "machines:\n  web: {{ networks: {{ lan: 10 }}, volumes: {{ {} }}, vm: {{ os: debian-12, provision: [s.sh] }} }}",
+        "machines:\n  web: {{ networks: {{ lan: 10 }}, volumes: {{ {} }}, vm: {{ os: debian@12, provision: [s.sh] }} }}",
         mounts.join(", ")
     );
     let why = refusal(&yaml);
@@ -113,7 +113,7 @@ fn a_vm_takes_at_most_eight_folders() {
 #[test]
 fn windows_is_refused_with_the_driver_it_lacks() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: { virtiofs: {} } }\nmachines:\n  dc: { networks: { lan: 10 }, volumes: { shared: /srv }, vm: { os: windows-server-2022, provision: [s.ps1] } }\n",
+        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: { virtiofs: {} } }\nmachines:\n  dc: { networks: { lan: 10 }, volumes: { shared: /srv }, vm: { os: windows-server@2022, provision: [s.ps1] } }\n",
     )
     .unwrap();
     let problems = format!("{:?}", isoloom_spec::validate(&spec));
@@ -123,7 +123,7 @@ fn windows_is_refused_with_the_driver_it_lacks() {
 #[test]
 fn a_mapping_id_is_one_proxmox_takes() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: { virtiofs: { mapping: '9 lives' } } }\nmachines:\n  web: { networks: { lan: 10 }, volumes: { shared: /srv }, vm: { os: debian-12, provision: [s.sh] } }\n",
+        "version: 1\nname: f\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nvolumes: { shared: { virtiofs: { mapping: '9 lives' } } }\nmachines:\n  web: { networks: { lan: 10 }, volumes: { shared: /srv }, vm: { os: debian@12, provision: [s.sh] } }\n",
     )
     .unwrap();
     let problems = format!("{:?}", isoloom_spec::validate(&spec));

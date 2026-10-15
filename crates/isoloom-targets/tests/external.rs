@@ -53,7 +53,7 @@ fn external_blocks_are_checked_and_optional() {
 #[test]
 fn existing_hosts_behind_a_gateway_machine_are_still_generated() {
     let spec = parse(
-        "version: 1\nname: gw\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { wan: 2, lan: 1 }\n    vm: { os: debian-12, provision: [fw.sh] }\n    external: { address: 192.168.1.2 }\n  pc:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [pc.sh] }\n    external: { address: 192.168.1.10 }\n",
+        "version: 1\nname: gw\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { wan: 2, lan: 1 }\n    vm: { os: debian@12, provision: [fw.sh] }\n    external: { address: 192.168.1.2 }\n  pc:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [pc.sh] }\n    external: { address: 192.168.1.10 }\n",
     )
     .unwrap();
     assert_eq!(validate(&spec), vec![]);

@@ -102,7 +102,7 @@ fn run_rejects_an_unknown_target() {
 
 /// A spec AWS refuses on `cloud-vm` (a /29 network: AWS subnets are /28 or larger) while other
 /// clouds run it.
-const SMALL_SUBNET: &str = "version: 1\nname: small\nnetworks:\n  lab: { cidr: 10.9.0.0/29 }\nmachines:\n  w:\n    networks: { lab: 2 }\n    vm: { os: debian-12, provision: [setup.sh] }\n";
+const SMALL_SUBNET: &str = "version: 1\nname: small\nnetworks:\n  lab: { cidr: 10.9.0.0/29 }\nmachines:\n  w:\n    networks: { lab: 2 }\n    vm: { os: debian@12, provision: [setup.sh] }\n";
 
 /// A project holding [`SMALL_SUBNET`] and its set-up script.
 fn small_subnet(name: &str) -> PathBuf {
@@ -212,7 +212,7 @@ machines:
     networks: { app: 10 }
     ports: [{ port: 80 }]
     docker: { image: nginx }
-    vm: { os: debian-12, provision: [setup.sh] }
+    vm: { os: debian@12, provision: [setup.sh] }
 ";
 
 /// A project with PROFILED and the given profiles.

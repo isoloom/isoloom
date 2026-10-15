@@ -177,10 +177,14 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Value {
 
 /// The machine's OS resolved, beside its image-table name in `os`: `os_family` and
 /// `os_version`, the pinned default when the spec left the version out (`debian` is 12). From
-/// its own `os`, else its `vm.os`; neither on a container without an `os`.
+/// its own `os`, else its `vm.os` (the image-table name parsing left there); neither on a
+/// container without an `os`.
 fn add_os(out: &mut Value, m: &Machine) {
-    let written = m.os.as_deref().or(m.vm.as_ref().map(|v| v.os.as_str()));
-    if let Some(os) = written.and_then(|t| isoloom_spec::os::resolve(t).ok()) {
+    let os = match m.os.as_deref() {
+        Some(text) => isoloom_spec::os::resolve(text).ok(),
+        None => m.vm.as_ref().and_then(|v| isoloom_spec::os::by_name(&v.os)),
+    };
+    if let Some(os) = os {
         out["os_family"] = json!(os.family);
         out["os_version"] = json!(os.version);
         out["os"] = json!(os.name);

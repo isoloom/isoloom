@@ -99,7 +99,7 @@ mod tests {
     use isoloom_plan::Environment;
     use isoloom_spec::model::Target;
 
-    const SPEC: &str = "version: 1\nname: e\nnetworks:\n  out: { cidr: 10.70.0.0/24 }\n  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }\nmachines:\n  fw: { networks: { out: 5, dmz: 1 }, vm: { os: debian-12 } }\n  web: { networks: { dmz: 10 }, vm: { os: debian-12 } }\n  x: { networks: { far: 10 }, vm: { os: debian-12 } }\n";
+    const SPEC: &str = "version: 1\nname: e\nnetworks:\n  out: { cidr: 10.70.0.0/24 }\n  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }\nmachines:\n  fw: { networks: { out: 5, dmz: 1 }, vm: { os: debian@12 } }\n  web: { networks: { dmz: 10 }, vm: { os: debian@12 } }\n  x: { networks: { far: 10 }, vm: { os: debian@12 } }\n";
 
     #[test]
     fn networks_beyond_one_slash_16_are_refused() {

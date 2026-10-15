@@ -40,12 +40,16 @@ fn a_family_alone_is_its_pinned_default() {
 }
 
 #[test]
-fn the_older_names_are_aliases() {
+fn an_image_table_name_is_its_os_once_parsed_never_a_spelling() {
     for name in KNOWN_OS {
-        let os = resolve(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let os = by_name(name).unwrap_or_else(|| panic!("{name}"));
         assert_eq!(os.name, *name);
-        assert_eq!(resolve(&os.id()), Ok(os), "{name} and {} are the same OS", os.id());
+        assert_eq!(resolve(&os.id()), Ok(os), "{name} is {}", os.id());
     }
+    for name in ["debian-12", "windows-server-2019", "almalinux-9", "ubuntu-24.04"] {
+        assert!(resolve(name).is_err(), "{name}");
+    }
+    assert_eq!(by_name("debian@12"), None);
 }
 
 #[test]
@@ -73,30 +77,23 @@ fn unknown_families_and_versions_list_the_known_ones() {
 #[test]
 fn spellings_cover_every_form_once() {
     let all = spellings();
-    for s in [
-        "debian",
-        "debian@12",
-        "debian-12",
-        "kali",
-        "kali@rolling",
-        "windows-server@2022",
-        "windows-server-2022",
-    ] {
+    for s in ["debian", "debian@12", "kali", "kali@rolling", "windows-server@2022"] {
         assert_eq!(all.iter().filter(|x| *x == s).count(), 1, "{s}");
     }
     assert!(all.iter().all(|s| resolve(s).is_ok()));
+    assert!(!all.iter().any(|s| s == "debian-12"), "image-table names are not spellings");
 }
 
 #[test]
 fn the_machines_os_reaches_its_vm_before_the_groups() {
     let mut doc: Value = serde_yaml_ng::from_str(
-        "machines:\n  a: { os: debian@12 }\n  b: { os: windows, vm: { provision: [x.ps1] } }\n  c: { os: debian, vm: { os: debian-13 } }\n  d: { os: debian, docker: { image: x } }\n",
+        "machines:\n  a: { os: debian@12 }\n  b: { os: windows, vm: { provision: [x.ps1] } }\n  c: { os: debian, vm: { os: debian@13 } }\n  d: { os: debian, docker: { image: x } }\n",
     )
     .unwrap();
     fill_vm(&mut doc);
     let vm = |m: &str| serde_yaml_ng::to_string(&doc["machines"][m].get("vm")).unwrap();
     assert_eq!(vm("a"), "os: debian@12\n");
     assert_eq!(vm("b"), "provision:\n- x.ps1\nos: windows\n");
-    assert_eq!(vm("c"), "os: debian-13\n", "its own vm.os stays, for validation to compare");
+    assert_eq!(vm("c"), "os: debian@13\n", "its own vm.os stays, for validation to compare");
     assert_eq!(vm("d"), "null\n", "a container keeps its `docker:` alone");
 }

@@ -9,7 +9,7 @@ use isoloom_targets::{GenerateError, generate};
 /// One machine with `extra` set, as a container and as a VM.
 fn spec(extra: &str) -> Spec {
     parse(&format!(
-        "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, docker: {{ image: nginx }}, vm: {{ os: debian-12, provision: [a.sh] }}, {extra} }}\n"
+        "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, docker: {{ image: nginx }}, vm: {{ os: debian@12, provision: [a.sh] }}, {extra} }}\n"
     ))
     .unwrap()
 }
@@ -17,7 +17,7 @@ fn spec(extra: &str) -> Spec {
 /// One VM-only machine with `extra` set.
 fn vm(extra: &str) -> Spec {
     parse(&format!(
-        "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, vm: {{ os: debian-12, provision: [a.sh] }}, {extra} }}\n"
+        "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, vm: {{ os: debian@12, provision: [a.sh] }}, {extra} }}\n"
     ))
     .unwrap()
 }

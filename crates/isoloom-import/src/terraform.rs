@@ -100,13 +100,13 @@ fn size(instance_type: &str) -> Option<(u32, u32)> {
 fn os_from(hint: &str) -> &'static str {
     let l = hint.to_ascii_lowercase();
     if l.contains("windows") || l.contains("2019-datacenter") || l.contains("2022-datacenter") {
-        if l.contains("2022") { "windows-server-2022" } else { "windows-server-2019" }
+        if l.contains("2022") { "windows-server@2022" } else { "windows-server@2019" }
     } else if l.contains("ubuntu") {
-        "ubuntu-24.04"
+        "ubuntu@24.04"
     } else if l.contains("kali") {
         "kali"
     } else {
-        "debian-12"
+        "debian@12"
     }
 }
 

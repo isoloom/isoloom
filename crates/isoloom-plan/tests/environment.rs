@@ -26,13 +26,13 @@ machines:
     ports: [{ port: 80, publish: 8080 }]
     volumes: { shared: /srv/data }
     docker: { image: nginx }
-    vm: { os: debian-12, provision: [web.sh] }
+    vm: { os: debian@12, provision: [web.sh] }
   db:
     networks: { back: 20, front: 20 }
     ports: [{ port: 5432 }]
     volumes: { shared: /var/data, own: /var/lib/db }
     docker: { image: postgres }
-    vm: { os: debian-12, provision: [setup.sh] }
+    vm: { os: debian@12, provision: [setup.sh] }
 ";
 
 fn env(target: Target) -> Environment {
@@ -153,7 +153,7 @@ fn gateways_ulimits_and_tc_are_required_in_that_order() {
 #[test]
 fn a_machine_process_is_required_and_planned_as_steps() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [web.sh] }\n    command: [serve]\n    before: [flag.sh]\n    healthcheck: { test: 'true', interval: 1m }\n",
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [web.sh] }\n    command: [serve]\n    before: [flag.sh]\n    healthcheck: { test: 'true', interval: 1m }\n",
     )
     .expect("parses");
     let env = Environment::build(&spec, Target::Vagrant, None);
@@ -171,7 +171,7 @@ fn a_machine_process_is_required_and_planned_as_steps() {
 #[test]
 fn secrets_come_before_what_reads_them_on_linux_and_windows() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nsecrets:\n  db: { env: DB }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [web.sh] }\n    files: [{ path: /etc/a, content: x }]\n    secrets: [db]\n    command: [serve]\n  win:\n    networks: { lan: 11 }\n    vm: { os: windows-server-2022 }\n    secrets: [db]\n",
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nsecrets:\n  db: { env: DB }\nmachines:\n  web:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [web.sh] }\n    files: [{ path: /etc/a, content: x }]\n    secrets: [db]\n    command: [serve]\n  win:\n    networks: { lan: 11 }\n    vm: { os: windows-server@2022 }\n    secrets: [db]\n",
     )
     .expect("parses");
     let env = Environment::build(&spec, Target::Vagrant, None);

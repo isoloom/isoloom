@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn the_first_address_is_the_primary_one() {
-        let s = spec("  web: { networks: { lan: [10, 11, 12] }, vm: { os: debian-12 } }\n  db: { networks: { lan: [20] }, vm: { os: debian-12 } }\n").unwrap();
+        let s = spec("  web: { networks: { lan: [10, 11, 12] }, vm: { os: debian@12 } }\n  db: { networks: { lan: [20] }, vm: { os: debian@12 } }\n").unwrap();
         assert_eq!(s.machines["web"].networks["lan"], 10);
         assert_eq!(s.machines["web"].more_addresses["lan"], vec![11, 12]);
         assert_eq!(s.machines["db"].networks["lan"], 20);
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn clones_shift_every_address() {
-        let s = spec("  ws: { count: 2, networks: { lan: [10, 20] }, vm: { os: debian-12 } }\n").unwrap();
+        let s = spec("  ws: { count: 2, networks: { lan: [10, 20] }, vm: { os: debian@12 } }\n").unwrap();
         assert_eq!(s.machines["ws-02"].networks["lan"], 11);
         assert_eq!(s.machines["ws-02"].more_addresses["lan"], vec![21]);
     }

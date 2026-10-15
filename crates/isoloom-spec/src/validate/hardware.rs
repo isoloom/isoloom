@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn sound_hardware_passes() {
-        let ok = "vm: { os: debian-12, provision: [a.sh] }, nested_virtualization: true, gpus: { ids: ['0000:01:00.0'], capabilities: [compute] }";
+        let ok = "vm: { os: debian@12, provision: [a.sh] }, nested_virtualization: true, gpus: { ids: ['0000:01:00.0'], capabilities: [compute] }";
         assert_eq!(problems(ok), Vec::<String>::new());
         assert_eq!(
             problems("docker: { image: x }, gpus: all, devices: [/dev/fuse, '/dev/a:/dev/b:rw']"),

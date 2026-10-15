@@ -120,7 +120,7 @@ fn rendering_twice_gives_the_same_files() {
 #[test]
 fn refusals_come_from_the_plan_and_match_rendering() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian-12 }\n",
+        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian@12 }\n",
     )
     .unwrap();
     // Proxmox runs it (an emulated aarch64 VM); every cloud refuses it, each with its reason.
@@ -154,7 +154,7 @@ fn one_vm(vm: &str) -> isoloom_spec::Spec {
 
 #[test]
 fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
-    let spec = one_vm("{ os: debian-12, provision: [a.sh], tpm: true }");
+    let spec = one_vm("{ os: debian@12, provision: [a.sh], tpm: true }");
     let e = Environment::build(&spec, Target::Proxmox, None);
     let files = ProxmoxBackend.render(&e).unwrap();
     assert!(files[0].contents.contains("tpm_state {"), "{}", files[0].contents);
@@ -182,7 +182,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
     );
     // Windows with a TPM: AWS refuses it, which drops only its module; Azure's trusted launch is
     // written.
-    let windows = one_vm("{ os: windows-server-2022, provision: [a.ps1], tpm: true }");
+    let windows = one_vm("{ os: windows-server@2022, provision: [a.ps1], tpm: true }");
     let env = Environment::build(&windows, Target::CloudVm, None);
     let refusals = isoloom_terraform::cloud_vm::cloud_refusals(&env);
     let aws = refusals[0].1.clone().expect("refused");
@@ -193,7 +193,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
     let azure = files.iter().find(|f| f.path.ends_with("cloud-vm/azure/main.tf")).expect("an Azure module");
     assert!(azure.contents.contains("vtpm_enabled"), "{}", azure.contents);
     // Windows 11 merely expects one: the clouds leave it out instead of refusing.
-    let wanted = one_vm("{ os: windows-11, provision: [a.ps1] }");
+    let wanted = one_vm("{ os: windows@11, provision: [a.ps1] }");
     let tpm = |e: &Environment| e.machines["w"].tpm;
     assert_eq!(
         tpm(&Environment::build(&wanted, Target::CloudVm, None)),
@@ -204,7 +204,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() {
 
 #[test]
 fn proxmox_refuses_what_its_windows_machines_cant_have_yet() {
-    let e = Environment::build(&one_vm("{ os: windows-server-2022, provision: [a.yml] }"), Target::Proxmox, None);
+    let e = Environment::build(&one_vm("{ os: windows-server@2022, provision: [a.yml] }"), Target::Proxmox, None);
     let why = ProxmoxBackend.refusal(&e).expect("refused");
     assert!(why.starts_with("machine `w`: Windows provisioning steps are PowerShell scripts"), "{why}");
 }
@@ -229,7 +229,7 @@ fn each_cloud_refuses_on_its_own() {
 fn a_cloud_refuses_from_the_plan_without_rendering() {
     use isoloom_terraform::cloud_vm::CLOUDS;
     let spec = isoloom_spec::parse(
-        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian-12 }\n",
+        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    arch: arm64\n    vm: { os: debian@12 }\n",
     )
     .unwrap();
     let e = Environment::build(&spec, Target::CloudVm, None);

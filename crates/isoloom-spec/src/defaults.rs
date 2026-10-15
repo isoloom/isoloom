@@ -8,7 +8,7 @@
 //! 5. the command line, `-s defaults.<key>=<value>`.
 //!
 //! Mappings deep-merge, so a file that sets one region leaves the others alone. The same `-s`
-//! without the `defaults.` prefix overrides the spec itself (`-s machines.web.vm.os=ubuntu-24.04`),
+//! without the `defaults.` prefix overrides the spec itself (`-s machines.web.vm.os=ubuntu@24.04`),
 //! for one run.
 //!
 //! ```yaml
@@ -194,7 +194,7 @@ pub fn from_env(vars: impl Iterator<Item = (String, String)>) -> Vec<(String, St
 pub fn parse_set(s: &str) -> Result<(&str, &str), String> {
     let (k, v) = s
         .split_once('=')
-        .ok_or_else(|| format!("`-s {s}`: expected key=value, like -s machines.web.vm.os=ubuntu-24.04"))?;
+        .ok_or_else(|| format!("`-s {s}`: expected key=value, like -s machines.web.vm.os=ubuntu@24.04"))?;
     if k.is_empty() || k.split('.').any(str::is_empty) {
         return Err(format!("`-s {s}`: the key is a dotted path, like cloud.aws.region"));
     }
@@ -247,7 +247,7 @@ pub fn leaves(v: &Value, prefix: &str) -> Vec<String> {
 }
 
 /// The spec's YAML with `-s key=value` overrides applied (keys without the `defaults.` prefix),
-/// before it is parsed: `machines.web.vm.os=ubuntu-24.04`, `networks.lab.internet=false`.
+/// before it is parsed: `machines.web.vm.os=ubuntu@24.04`, `networks.lab.internet=false`.
 pub fn override_spec(yaml: &str, sets: &[String]) -> Result<String, String> {
     override_spec_with(yaml, None, sets)
 }

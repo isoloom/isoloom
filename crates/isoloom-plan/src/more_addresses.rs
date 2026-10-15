@@ -93,7 +93,7 @@ version: 1
 name: t
 networks: { lan: { cidr: 10.0.0.0/24 }, dmz: { cidr: 10.0.1.0/24 } }
 machines:
-  web: { networks: { lan: [10, 11, 12], dmz: 10 }, docker: { image: nginx }, vm: { os: debian-12, provision: [s.sh] } }
+  web: { networks: { lan: [10, 11, 12], dmz: 10 }, docker: { image: nginx }, vm: { os: debian@12, provision: [s.sh] } }
 ";
 
     #[test]

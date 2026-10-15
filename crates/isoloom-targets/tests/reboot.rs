@@ -19,7 +19,7 @@ machines:
     networks: { front: 10, back: 10 }
     inputs: [TOKEN]
     vm:
-      os: debian-12
+      os: debian@12
       provision: [kernel.sh, reboot, middle.sh, reboot, last.sh]
 ";
 
@@ -41,7 +41,7 @@ fn at(text: &str, what: &str) -> usize {
 #[test]
 fn a_windows_machine_restarts_from_the_playbooks() {
     let spec = parse(
-        "version: 1\nname: w\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines:\n  dc:\n    networks: { lab: 10 }\n    vm: { os: windows-server-2022, provision: [a.ps1, reboot, b.ps1] }\n",
+        "version: 1\nname: w\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines:\n  dc:\n    networks: { lab: 10 }\n    vm: { os: windows-server@2022, provision: [a.ps1, reboot, b.ps1] }\n",
     )
     .unwrap();
     let problems = validate(&spec);
@@ -153,7 +153,7 @@ fn the_clouds_reconnect_after_each_reboot() {
 fn every_cloud_driver_splits_the_set_up_at_a_reboot() {
     // One machine on one network: every cloud takes it, DigitalOcean included.
     let spec = parse(
-        "version: 1\nname: solo\nnetworks: { lab: { cidr: 10.71.0.0/24 } }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian-12, provision: [kernel.sh, reboot, last.sh] }\n",
+        "version: 1\nname: solo\nnetworks: { lab: { cidr: 10.71.0.0/24 } }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian@12, provision: [kernel.sh, reboot, last.sh] }\n",
     )
     .unwrap();
     let files = generate(&spec, Target::CloudVm).unwrap();

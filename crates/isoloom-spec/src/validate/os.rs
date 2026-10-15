@@ -1,18 +1,16 @@
-//! A machine's `os`: a known family and version, and the same OS as its `vm.os` when both are
-//! set.
+//! A machine's `os` and its `vm.os` name the same OS when both are set. Parsing resolved both
+//! (an unknown OS is refused there, see [`crate::os::canonical`]).
 
 use super::Problems;
 use super::machines::Subject;
-use crate::os::resolve;
+use crate::os::{by_name, resolve};
 
-/// The machine's `os` resolves, and agrees with its `vm.os`.
+/// The machine's `os` agrees with its `vm.os`.
 pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
-    let Some(text) = &s.m.os else { return };
-    let os = match resolve(text) {
-        Ok(os) => os,
-        Err(e) => return p.add(format!("{}.os", s.at), e.to_string()),
+    let Some(os) = s.m.os.as_deref().and_then(|t| resolve(t).ok()) else {
+        return;
     };
-    let Some(vm) = s.m.vm.as_ref().and_then(|v| resolve(&v.os).ok()) else {
+    let Some(vm) = s.m.vm.as_ref().and_then(|v| by_name(&v.os)) else {
         return;
     };
     if vm.name != os.name {

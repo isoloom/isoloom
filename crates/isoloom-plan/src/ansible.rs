@@ -52,9 +52,9 @@ groups:
   web: { members: [w*] }
   all: { members: [web, db] }
 machines:
-  w1: { networks: { lab: 10 }, vm: { os: debian-12 } }
-  w2: { networks: { lab: 11 }, vm: { os: debian-12 } }
-  db: { networks: { lab: 20 }, vm: { os: debian-12 } }
+  w1: { networks: { lab: 10 }, vm: { os: debian@12 } }
+  w2: { networks: { lab: 11 }, vm: { os: debian@12 } }
+  db: { networks: { lab: 20 }, vm: { os: debian@12 } }
 provision:
   - ansible: a.yml
     groups: { web: [w2], dbs: [db] }

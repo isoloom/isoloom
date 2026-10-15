@@ -33,3 +33,10 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **`isoloom docs --spec` (docs/spec.md) lists each field from the schema only:** type, default, allowed values, limits, the schema's examples. The per-target "Rendered by / Refused by / Planned for" lines and the probe examples are gone.
 - **`isoloom import` notes:** every Compose key, Compose network key, top-level key or Terraform resource type the import doesn't read gets one note, "not read by the import: left out", under "Changed on the way in: check these". The note kind "Written by Isoloom when it generates" is gone.
 - **The examples have no committed `.isoloom/` outputs:** run `isoloom generate` to see them. The repository ignores `.isoloom/` and `.isoloom-*/`.
+- **No compatibility forms:** the spec reads only the current format; an old form fails to load, naming the field or value.
+  - **A machine's `services:` is refused** ("unknown field `services`, expected one of ..."): `ports:` is the only key. `isoloom validate` prints no warnings any more, and its `--json` output has no `warnings` key.
+  - **An OS is written `<family>@<version>` or `<family>` only,** in a machine's `os`, `vm.os`, `common:`/group `vm.os`, `-s machines.X.vm.os=...`, and the image table (`--images`, a defaults file's `images:`; its `os:` keys and `access.vm`). Image-table names (`debian-12`, `windows-server-2019`, `almalinux-9`) are refused.
+  - **An unknown OS is a load error** naming the field (`machines.web.vm.os: unknown OS ...`), no longer a validation problem listed with the others.
+  - **`appliance: cisco-viosl2` is refused:** the spelling is `cisco-vios-l2`.
+  - **`isoloom import` drafts write the OS as `<family>@<version>`** (`debian@12`, `windows-server@2019`).
+  - **Library:** `isoloom_targets::qemu_refusal` is gone (use `refusal_on(spec, Target::Vagrant, Some("qemu"))`), and so are `isoloom_spec::warnings` and `isoloom_spec::renamed`.

@@ -130,7 +130,7 @@ fn a_refusal_matches_rendering_and_drops_only_that_cloud() {
 #[test]
 fn an_os_without_an_image_is_refused() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    vm: { os: rocky-9 }\n",
+        "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    vm: { os: rocky@9 }\n",
     )
     .unwrap();
     let e = Environment::build(&spec, Target::CloudVm, None);

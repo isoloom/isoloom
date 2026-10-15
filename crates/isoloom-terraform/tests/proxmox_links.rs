@@ -40,8 +40,8 @@ machines:
     networks: { servers: 10 }
     rate_limit: 10mbit
     ports: [{ port: 80, publish: 8080 }]
-    vm: { os: debian-12, provision: [s.sh] }
-  admin: { networks: { office.vlan10: 50, office.vlan20: 50 }, vm: { os: debian-12, provision: [s.sh] } }
+    vm: { os: debian@12, provision: [s.sh] }
+  admin: { networks: { office.vlan10: 50, office.vlan20: 50 }, vm: { os: debian@12, provision: [s.sh] } }
 ";
 
 #[test]
@@ -79,14 +79,14 @@ fn the_firewall_enforces_reach_and_the_published_ports() {
 #[test]
 fn an_arm64_machine_is_an_emulated_aarch64_vm() {
     let tf = render(
-        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: debian-12, provision: [s.sh] } }\n",
+        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: debian@12, provision: [s.sh] } }\n",
     );
     assert!(tf.contains("debian-12-genericcloud-arm64.qcow2"), "{tf}");
     assert!(tf.contains("architecture = \"aarch64\""), "{tf}");
     assert!(tf.contains("bios"), "{tf}");
     assert!(tf.contains("\"serial0\""), "{tf}");
     let why = refusal(
-        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: rocky-9, provision: [s.sh] } }\n",
+        "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, arch: arm64, vm: { os: rocky@9, provision: [s.sh] } }\n",
     );
     assert!(why.contains("no arm64 Proxmox image for `rocky-9`"), "{why}");
 }
@@ -97,7 +97,7 @@ networks:
   lab: { cidr: 10.9.0.0/24 }
 machines:
   web: { networks: { lab: 10 }, ports: [{ port: 80 }], environment: { MODE: lab }, docker: { image: 'nginx:1.27', lxc: true } }
-  box: { networks: { lab: 11 }, depends_on: [web], vm: { os: debian-12, provision: [s.sh] } }
+  box: { networks: { lab: 11 }, depends_on: [web], vm: { os: debian@12, provision: [s.sh] } }
 ";
 
 #[test]

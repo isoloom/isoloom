@@ -130,12 +130,6 @@ pub struct Spec {
     #[serde(skip)]
     #[schemars(skip)]
     pub clones: IndexMap<String, Vec<String>>,
-    /// What the spec still writes the way it did before 1.0 (a machine's `services`, now
-    /// `ports`): read as the new form, reported by `isoloom validate` as warnings. Filled when
-    /// parsing.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub warnings: Vec<crate::validate::Problem>,
 }
 
 impl Spec {

@@ -14,11 +14,11 @@ machines:
   web:
     networks: { lab: 10 }
     ports: [{ port: 80, http: true, publish: 8080 }]
-    vm: { os: ubuntu-24.04, provision: [p.sh] }
+    vm: { os: ubuntu@24.04, provision: [p.sh] }
   db:
     networks: { lab: 11 }
     ports: [{ port: 5432, name: postgres }]
-    vm: { os: ubuntu-24.04, provision: [p.sh] }
+    vm: { os: ubuntu@24.04, provision: [p.sh] }
 ";
 
 const MULTI_NET: &str = r"version: 1
@@ -30,7 +30,7 @@ machines:
   web:
     networks: { front: 10, back: 10 }
     ports: [{ port: 80 }]
-    vm: { os: ubuntu-24.04, provision: [p.sh] }
+    vm: { os: ubuntu@24.04, provision: [p.sh] }
 ";
 
 fn oci_tf(yaml: &str) -> String {

@@ -74,7 +74,7 @@ fn a_mode_is_octal() {
 fn windows_paths_and_no_owner_on_windows() {
     let win = |files: &str| {
         spec(&format!(
-            "{{ networks: {{ lab: 5 }}, vm: {{ os: windows-server-2022, provision: [a.ps1] }}, files: {files} }}"
+            "{{ networks: {{ lab: 5 }}, vm: {{ os: windows-server@2022, provision: [a.ps1] }}, files: {files} }}"
         ))
     };
     let ok = problems(&win("[{ path: 'C:\\app\\a.ini', content: x }]"));

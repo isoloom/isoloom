@@ -354,14 +354,14 @@ machines:
     networks: { front: 10, back: 10 }
     aliases: [store]
     volumes: { shared: /srv/shared }
-    vm: { os: debian-12, provision: [steps/write.sh] }
+    vm: { os: debian@12, provision: [steps/write.sh] }
   reader:
     networks: { back: 11 }
     volumes: { shared: /data/shared }
-    vm: { os: debian-12, provision: [steps/look.sh] }
+    vm: { os: debian@12, provision: [steps/look.sh] }
   web:
     networks: { front: 12 }
-    vm: { os: debian-12, provision: [steps/web.sh] }
+    vm: { os: debian@12, provision: [steps/web.sh] }
 ";
 
     fn env() -> Environment {

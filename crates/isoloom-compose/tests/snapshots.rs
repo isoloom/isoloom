@@ -93,7 +93,7 @@ fn rendering_twice_gives_the_same_files() {
 #[test]
 fn provisioning_is_refused_without_rendering() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    docker: { image: alpine }\n    vm: { os: debian-12 }\nprovision:\n  - ansible: site.yml\n",
+        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    docker: { image: alpine }\n    vm: { os: debian@12 }\nprovision:\n  - ansible: site.yml\n",
     )
     .expect("parses");
     let env = Environment::build(&spec, Target::Docker, None);

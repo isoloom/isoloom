@@ -225,7 +225,7 @@ fn an_arm64_access_machine_that_is_actually_built_is_still_refused_on_the_cloud(
     // An access machine with no implementation isn't instantiated, so its arch is moot. One that
     // declares a VM is built, so arm64 must still be caught (the cloud images are x86-64 only).
     let spec = parse(
-        "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  kali:\n    networks: { lab: 10 }\n    access: true\n    arch: arm64\n    vm: { os: debian-12, provision: [p.sh] }\n",
+        "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  kali:\n    networks: { lab: 10 }\n    access: true\n    arch: arm64\n    vm: { os: debian@12, provision: [p.sh] }\n",
     )
     .expect("parses");
     assert!(
@@ -274,7 +274,7 @@ fn vagrant_moves_machines_behind_their_gateway_after_provisioning() {
 #[test]
 fn networks_outside_10_move_into_10_on_docker_keeping_last_octets() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24 }\n  dmz: { cidr: 172.18.5.0/24 }\n  taken: { cidr: 10.192.20.0/24 }\nmachines:\n  a: { networks: { corp: 10, dmz: 7, taken: 9 }, docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+        "version: 1\nname: t\nnetworks:\n  corp: { cidr: 192.168.20.0/24 }\n  dmz: { cidr: 172.18.5.0/24 }\n  taken: { cidr: 10.192.20.0/24 }\nmachines:\n  a: { networks: { corp: 10, dmz: 7, taken: 9 }, docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
@@ -306,7 +306,7 @@ fn a_network_can_name_its_docker_block() {
 #[test]
 fn windows_machines_use_winrm_and_powershell() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm:\n      os: windows-server-2019\n      provision: [provision/dc.ps1]\n  web:\n    networks: { lab: 20 }\n    depends_on: [dc01]\n    vm:\n      os: windows-server-2019\n      image: { vagrant: example/win2019, vagrant_version: '1.0' }\n      provision: [provision/web.ps1]\n",
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm:\n      os: windows-server@2019\n      provision: [provision/dc.ps1]\n  web:\n    networks: { lab: 20 }\n    depends_on: [dc01]\n    vm:\n      os: windows-server@2019\n      image: { vagrant: example/win2019, vagrant_version: '1.0' }\n      provision: [provision/web.ps1]\n",
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
@@ -330,7 +330,7 @@ fn windows_machines_use_winrm_and_powershell() {
 
 #[test]
 fn windows_refuses_what_it_cant_do_yet() {
-    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  NAME:\n    networks: { lab: 10 }\n    vm: { os: windows-server-2019, provision: [STEP] }\n";
+    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  NAME:\n    networks: { lab: 10 }\n    vm: { os: windows-server@2019, provision: [STEP] }\n";
     for (name, step, why) in [("dc01", "setup.yml", "PowerShell scripts"), ("averyveryverylongname", "a.ps1", "15 characters")] {
         let spec = isoloom_spec::parse(&base.replace("NAME", name).replace("STEP", step)).unwrap();
         let err = generate(&spec, Target::Vagrant).unwrap_err().to_string();
@@ -369,7 +369,7 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() {
 #[test]
 fn the_image_table_sits_between_built_in_images_and_the_spec() {
     let spec = example("hello-stack");
-    let table = isoloom_spec::images::Table::parse("os:\n  debian-12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
+    let table = isoloom_spec::images::Table::parse("os:\n  debian@12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
     let vagrant = contents(&generate(&table.apply(&spec), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(
         vagrant.contains("m.vm.box = \"my-org/debian-12\"\n    m.vm.box_version = \"1.2.0\""),
@@ -377,7 +377,7 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
     );
     // A spec's own vm.image still wins.
     let windows = example("windows-hello");
-    let table = isoloom_spec::images::Table::parse("os:\n  windows-server-2019: { vagrant: other/box }\n").unwrap();
+    let table = isoloom_spec::images::Table::parse("os:\n  windows-server@2019: { vagrant: other/box }\n").unwrap();
     let mut pinned = windows.clone();
     for m in pinned.machines.values_mut() {
         if let Some(vm) = &mut m.vm {
@@ -390,6 +390,11 @@ fn the_image_table_sits_between_built_in_images_and_the_spec() {
     let vagrant = contents(&generate(&table.apply(&pinned), Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(vagrant.contains("\"spec/box\"") && !vagrant.contains("other/box"));
     assert!(isoloom_spec::images::Table::parse("bogus: 1\n").is_err());
+    // The OS is written as a spec writes it.
+    let e = isoloom_spec::images::Table::parse("os:\n  debian-12: { vagrant: x }\n").unwrap_err();
+    assert!(e.contains("os.debian-12: unknown OS `debian-12`"), "{e}");
+    let e = isoloom_spec::images::Table::parse("access:\n  vm: ubuntu-24.04\n").unwrap_err();
+    assert!(e.starts_with("access: unknown OS `ubuntu-24.04`"), "{e}");
 }
 
 #[test]
@@ -409,7 +414,7 @@ fn proxmox_cloud_init_uses_the_machines_declared_resolver() {
     // A machine that points at the lab's own resolver (e.g. an AD member at the domain
     // controller) must get that in cloud-init, not a forced public resolver.
     let spec = parse(
-        "version: 1\nname: dns-lab\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  member:\n    networks: { lab: 10 }\n    dns: { servers: [10.60.0.2], domain: arm.lab }\n    vm: { os: debian-12, provision: [p.sh] }\n  plain:\n    networks: { lab: 11 }\n    vm: { os: debian-12, provision: [p.sh] }\n",
+        "version: 1\nname: dns-lab\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  member:\n    networks: { lab: 10 }\n    dns: { servers: [10.60.0.2], domain: arm.lab }\n    vm: { os: debian@12, provision: [p.sh] }\n  plain:\n    networks: { lab: 11 }\n    vm: { os: debian@12, provision: [p.sh] }\n",
     )
     .expect("parses");
     let tf = contents(&generate(&spec, Target::Proxmox).unwrap(), ".isoloom/proxmox/main.tf");
@@ -567,7 +572,7 @@ fn linux_machines_leave_windows_out_of_etc_hosts() {
     // A Linux member joining an AD domain must not have the Windows DC in /etc/hosts by its
     // short name: that shadows AD DNS and breaks the Kerberos SPN lookup on realm join.
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\n  lx01:\n    networks: { lab: 12 }\n    ports: [{ port: 22 }]\n    depends_on: [dc01]\n    vm: { os: ubuntu-24.04, provision: [p.sh] }\n",
+        "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server@2019, provision: [p.ps1] }\n  lx01:\n    networks: { lab: 12 }\n    ports: [{ port: 22 }]\n    depends_on: [dc01]\n    vm: { os: ubuntu@24.04, provision: [p.sh] }\n",
     )
     .unwrap();
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
@@ -708,7 +713,7 @@ fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
     // Python literals, single-quoted: Ansible reads these back with their types (checked with
     // ansible-inventory 2.x).
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      a: { code: \"10\", quote: \"it's\", n: 3, on: true, none: null, l: [x, 1], m: { k: v } }\n",
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      a: { code: \"10\", quote: \"it's\", n: 3, on: true, none: null, l: [x, 1], m: { k: v } }\n",
     )
     .unwrap();
     let vagrantfile = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
@@ -721,7 +726,7 @@ fn host_vars_go_on_each_machines_inventory_line_with_their_types() {
 #[test]
 fn host_vars_name_machines_and_variables() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      ghost: { x: 1 }\n      a: { \"bad name\": 1, 2go: 1, ok_1: 1 }\n",
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      ghost: { x: 1 }\n      a: { \"bad name\": 1, 2go: 1, ok_1: 1 }\n",
     )
     .unwrap();
     let problems: Vec<String> = isoloom_spec::validate(&spec).iter().map(std::string::ToString::to_string).collect();
@@ -796,9 +801,9 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
     // 4444 is the shell an exploit opens: `shell` has nothing else, `web` serves 80 too.
     let spec = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
-         shell: { networks: { lab: 5 }, ports: [{ port: 4444, dormant: true, publish: 4444 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
-         web: { networks: { lab: 10 }, ports: [{ port: 80 }, { port: 4444, dormant: true }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
-         app: { networks: { lab: 20 }, depends_on: [web], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+         shell: { networks: { lab: 5 }, ports: [{ port: 4444, dormant: true, publish: 4444 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
+         web: { networks: { lab: 10 }, ports: [{ port: 80 }, { port: 4444, dormant: true }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
+         app: { networks: { lab: 20 }, depends_on: [web], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
@@ -853,9 +858,9 @@ fn a_dormant_service_is_declared_but_never_waited_for() {
 fn udp_spec() -> isoloom_spec::Spec {
     let spec = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  far: { cidr: 10.9.1.0/24 }\nreach: [{ from: far, to: lab, ports: [53] }]\nmachines:\n  \
-         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
-         syslog: { networks: { lab: 6 }, ports: [{ port: 514, protocol: udp, publish: 1514 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n  \
-         app: { networks: { far: 20 }, depends_on: [dns], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
+         syslog: { networks: { lab: 6 }, ports: [{ port: 514, protocol: udp, publish: 1514 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n  \
+         app: { networks: { far: 20 }, depends_on: [dns], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
@@ -884,7 +889,7 @@ fn a_udp_and_a_tcp_service_sharing_a_name_stay_apart() {
     // `dns` and `dns-udp`, on Docker and on the clouds.
     let named = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
-         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, name: dns, publish: 10053 }, { port: 53, name: dns, publish: 1053 }], docker: { image: x }, vm: { os: debian-12, provision: [p.sh] } }\n",
+         dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, name: dns, publish: 10053 }, { port: 53, name: dns, publish: 1053 }], docker: { image: x }, vm: { os: debian@12, provision: [p.sh] } }\n",
     )
     .unwrap();
     assert_eq!(isoloom_spec::validate(&named), vec![]);
@@ -990,7 +995,7 @@ fn provider_block<'a>(vf: &'a str, vm: &str, provider: &str) -> &'a str {
 fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() {
     // GOAD-Mini's shape: one Windows DC and the controller running the lab's playbooks.
     let spec = parse(
-        "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server-2019, provision: [p.ps1] }\nprovision:\n  - ansible: ansible/main.yml\n",
+        "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    networks: { lab: 10 }\n    ports: [{ port: 389 }]\n    vm: { os: windows-server@2019, provision: [p.ps1] }\nprovision:\n  - ansible: ansible/main.yml\n",
     )
     .unwrap();
     assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
@@ -1104,14 +1109,14 @@ fn vagrant_on_hyperv_takes_windows_and_privileged_machines() {
     let hosts = example("existing-hosts");
     let v = contents(&generate(&hosts, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(!define_block(&v, "cache").contains("enable_virtualization_extensions"));
-    let nested = parse("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  hv: { networks: { lab: 10 }, nested_virtualization: true, vm: { os: debian-12, provision: [a.sh] } }\n").unwrap();
+    let nested = parse("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  hv: { networks: { lab: 10 }, nested_virtualization: true, vm: { os: debian@12, provision: [a.sh] } }\n").unwrap();
     let v = contents(&generate(&nested, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(define_block(&v, "hv").contains("v.enable_virtualization_extensions = true"), "{v}");
 }
 
 #[test]
 fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() {
-    let yaml = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian-13, provision: [setup.sh] }\n";
+    let yaml = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    networks: { lab: 10 }\n    vm: { os: debian@13, provision: [setup.sh] }\n";
     let spec = parse(yaml).unwrap();
     // Still generated for every other provider; the Hyper-V block says what is missing.
     let v = contents(&generate(&spec, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
@@ -1120,7 +1125,7 @@ fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() {
     let why = isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("hyperv")).expect("refused on Hyper-V");
     assert!(why.contains("machine `box`") && why.contains("vm.image.hyperv"), "{why}");
     // The spec's own box: its latest version with a Hyper-V build.
-    let own = parse(&yaml.replace("os: debian-13", "os: debian-13, image: { hyperv: my/debian13 }")).unwrap();
+    let own = parse(&yaml.replace("os: debian@13", "os: debian@13, image: { hyperv: my/debian13 }")).unwrap();
     assert_eq!(isoloom_targets::refusal_on(&own, Target::Vagrant, Some("hyperv")), None);
     let v = contents(&generate(&own, Target::Vagrant).unwrap(), ".isoloom/vagrant/Vagrantfile");
     assert!(v.contains("o.vm.box = \"my/debian13\"\n      o.vm.box_version = \">= 0\""), "{v}");

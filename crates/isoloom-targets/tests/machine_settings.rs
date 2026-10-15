@@ -76,7 +76,7 @@ machines:
   dc:
     networks: { app: 11 }
     sysctls: { net.core.somaxconn: 1 }
-    vm: { os: windows-server-2019, provision: [dc.ps1] }
+    vm: { os: windows-server@2019, provision: [dc.ps1] }
 ",
     )
     .unwrap();

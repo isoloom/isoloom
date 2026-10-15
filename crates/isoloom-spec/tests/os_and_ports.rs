@@ -1,9 +1,8 @@
-//! A machine's `os: <family>@<version>` and its `ports` (named `services` before 1.0), as a spec
-//! is parsed and validated.
+//! A machine's `os: <family>@<version>` and its `ports`, as a spec is parsed and validated.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // a failing test is the report.
 
-use isoloom_spec::{parse, validate, warnings};
+use isoloom_spec::{parse, validate};
 
 /// A spec with one network and these lines under `machines:`.
 fn spec(machines: &str) -> String {
@@ -17,47 +16,22 @@ fn problems(yaml: &str) -> Vec<String> {
         .collect()
 }
 
+/// The error loading `yaml` gives.
+fn refused(yaml: &str) -> String {
+    parse(yaml).map_or_else(|e| e.to_string(), |_| panic!("parsed: {yaml}"))
+}
+
 #[test]
-fn the_old_services_key_is_read_with_a_warning() {
+fn the_ports_key_is_the_only_one() {
     let s = parse(&spec(
-        "  web: { networks: { lab: 5 }, services: [{ port: 80, http: true }], docker: { image: nginx } }\n",
+        "  web: { networks: { lab: 5 }, ports: [{ port: 80, http: true }], docker: { image: nginx } }\n",
     ))
     .unwrap();
     assert_eq!(s.machines["web"].ports[0].port, 80);
     assert_eq!(validate(&s), vec![]);
-    let w: Vec<String> = warnings(&s).iter().map(ToString::to_string).collect();
-    assert_eq!(
-        w,
-        ["machines.web.services: `services` is now `ports`: rename the key (`services` is still read, with this warning, until a later release removes it)"]
-    );
-}
-
-#[test]
-fn the_old_key_reaches_clones_and_groups_like_the_new_one() {
-    let s = parse(&spec(
-        "  ws: { count: 2, networks: { lab: 5 }, services: [{ port: 22 }], docker: { image: x } }\n",
-    ))
-    .unwrap();
-    assert_eq!(s.machines["ws-02"].ports[0].port, 22);
-    assert_eq!(warnings(&s).len(), 1, "one warning for the machine as written");
-}
-
-#[test]
-fn a_machine_setting_both_keys_is_refused() {
-    let e = parse(&spec(
-        "  web: { networks: { lab: 5 }, services: [{ port: 80 }], ports: [{ port: 80 }], docker: { image: x } }\n",
-    ))
-    .unwrap_err();
-    assert_eq!(
-        e.to_string(),
-        "machines.web: sets both `ports` and `services`, its name before 1.0; keep `ports` only"
-    );
-}
-
-#[test]
-fn a_spec_with_ports_has_no_warning() {
-    let s = parse(&spec("  web: { networks: { lab: 5 }, ports: [{ port: 80 }], docker: { image: x } }\n")).unwrap();
-    assert_eq!(warnings(&s), []);
+    let e = refused(&spec("  web: { networks: { lab: 5 }, services: [{ port: 80 }], docker: { image: nginx } }\n"));
+    assert!(e.starts_with("unknown field `services`, expected one of"), "{e}");
+    assert!(e.contains("`ports`"), "{e}");
 }
 
 #[test]
@@ -84,7 +58,7 @@ fn vm_os_defaults_to_the_machines_and_takes_the_new_syntax() {
 #[test]
 fn the_machines_os_wins_over_a_shared_vm_os() {
     let s = parse(&format!(
-        "{}common: {{ vm: {{ os: debian-13 }} }}\n",
+        "{}common: {{ vm: {{ os: debian@13 }} }}\n",
         spec("  a: { os: ubuntu, networks: { lab: 5 }, vm: { provision: [a.sh] } }\n  b: { networks: { lab: 6 }, vm: { provision: [b.sh] } }\n")
     ))
     .unwrap();
@@ -95,7 +69,7 @@ fn the_machines_os_wins_over_a_shared_vm_os() {
 #[test]
 fn an_os_and_a_vm_os_that_disagree_are_refused_with_the_fix() {
     let p = problems(&spec(
-        "  a: { os: debian@12, networks: { lab: 5 }, vm: { os: ubuntu-24.04, provision: [a.sh] } }\n",
+        "  a: { os: debian@12, networks: { lab: 5 }, vm: { os: ubuntu@24.04, provision: [a.sh] } }\n",
     ));
     assert_eq!(
         p,
@@ -103,26 +77,43 @@ fn an_os_and_a_vm_os_that_disagree_are_refused_with_the_fix() {
             "machines.a.vm.os: `vm.os` is ubuntu@24.04 but the machine's `os` is debian@12: they must agree; leave `vm.os` out (it defaults to `os`) or write the same OS in both"
         ]
     );
-    // The same OS in two spellings agrees.
+    // The family alone and its default version agree.
     assert_eq!(
-        problems(&spec("  a: { os: debian, networks: { lab: 5 }, vm: { os: debian-12, provision: [a.sh] } }\n")),
+        problems(&spec("  a: { os: debian, networks: { lab: 5 }, vm: { os: debian@12, provision: [a.sh] } }\n")),
         Vec::<String>::new()
     );
 }
 
 #[test]
-fn unknown_families_and_versions_are_refused_once_with_the_known_ones() {
-    let p = problems(&spec("  a: { os: gentoo, networks: { lab: 5 }, vm: { provision: [a.sh] } }\n"));
-    assert_eq!(p.len(), 1, "{p:?}");
+fn unknown_families_and_versions_are_refused_with_the_known_ones() {
+    let e = refused(&spec("  a: { os: gentoo, networks: { lab: 5 }, vm: { provision: [a.sh] } }\n"));
     assert!(
-        p[0].starts_with("machines.a.os: unknown OS `gentoo`; write `<family>@<version>` with one of: debian (11, 12, 13)"),
-        "{p:?}"
+        e.starts_with("machines.a.os: unknown OS `gentoo`; write `<family>@<version>` with one of: debian (11, 12, 13)"),
+        "{e}"
     );
-    let p = problems(&spec("  a: { networks: { lab: 5 }, vm: { os: debian@10, provision: [a.sh] } }\n"));
     assert_eq!(
-        p,
-        ["machines.a.vm.os: debian has no version `10`; use one of: 11, 12, 13 (`debian` alone is debian@12)"]
+        refused(&spec("  a: { networks: { lab: 5 }, vm: { os: debian@10, provision: [a.sh] } }\n")),
+        "machines.a.vm.os: debian has no version `10`; use one of: 11, 12, 13 (`debian` alone is debian@12)"
     );
+}
+
+#[test]
+fn image_table_names_are_not_spellings() {
+    for (at, machine) in [
+        ("machines.a.os", "  a: { os: debian-12, networks: { lab: 5 }, vm: { provision: [a.sh] } }\n"),
+        (
+            "machines.a.vm.os",
+            "  a: { networks: { lab: 5 }, vm: { os: windows-server-2019, provision: [a.ps1] } }\n",
+        ),
+    ] {
+        let e = refused(&spec(machine));
+        assert!(e.starts_with(&format!("{at}: unknown OS `")), "{e}");
+    }
+    let e = refused(&format!(
+        "{}common: {{ vm: {{ os: ubuntu-24.04 }} }}\n",
+        spec("  b: { networks: { lab: 6 }, vm: { provision: [b.sh] } }\n")
+    ));
+    assert!(e.starts_with("machines.b.vm.os: unknown OS `ubuntu-24.04`"), "{e}");
 }
 
 #[test]

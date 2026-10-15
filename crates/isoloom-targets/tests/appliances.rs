@@ -57,7 +57,7 @@ fn appliances_are_docker_only_and_checked() {
     };
     let base = "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n";
     let p = problems(&format!(
-        "{base}  r: {{ networks: {{ lan: 1 }}, access: true, docker: {{ image: x, appliance: cisco-iol, idle: true }}, vm: {{ os: debian-12 }} }}\n"
+        "{base}  r: {{ networks: {{ lan: 1 }}, access: true, docker: {{ image: x, appliance: cisco-iol, idle: true }}, vm: {{ os: debian@12 }} }}\n"
     ));
     assert!(
         p.contains("Docker targets only") && p.contains("access machine") && p.contains("no `idle`"),
@@ -215,11 +215,6 @@ fn a_lans_switch_is_checked() {
     assert_eq!(problems(&spec(&format!("switch: sw, {vlans}"), good)), "");
     assert_eq!(
         problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x, appliance: cisco-vios-l2 } }")),
-        ""
-    );
-    // The image's own spelling, as the changelog had it.
-    assert_eq!(
-        problems(&spec(&format!("switch: sw, {vlans}"), "{ docker: { image: x, appliance: cisco-viosl2 } }")),
         ""
     );
     // Not a switch appliance.

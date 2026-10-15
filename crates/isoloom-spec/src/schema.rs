@@ -79,7 +79,7 @@ fn networks(s: &mut Value) {
     );
 }
 
-/// The machines: the OS spellings (`debian@12`, `debian`, `debian-12`), the last octet on each network, absolute volume paths.
+/// The machines: the OS spellings (`debian@12`, `debian`), the last octet on each network, absolute volume paths.
 fn machines(s: &mut Value) {
     let os = json!(crate::os::spellings());
     set(s, &["$defs", "VmImpl", "properties", "os"], "enum", os.clone());

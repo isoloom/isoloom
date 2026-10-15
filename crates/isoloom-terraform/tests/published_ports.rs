@@ -17,14 +17,14 @@ machines:
   web:
     networks: { lan: 10 }
     ports: [{ port: 80, publish: 18080 }, { port: 53, protocol: udp, publish: 18053 }]
-    vm: { os: debian-12, provision: [setup.sh] }
+    vm: { os: debian@12, provision: [setup.sh] }
   db:
     networks: { lan: 11 }
     ports: [{ port: 5432 }]
-    vm: { os: debian-12, provision: [setup.sh] }
+    vm: { os: debian@12, provision: [setup.sh] }
   cache:
     networks: { lan: 12 }
-    vm: { os: debian-12, provision: [setup.sh] }
+    vm: { os: debian@12, provision: [setup.sh] }
 ";
 
 /// Each `resource "<type>" "<name>"` block of a module: its name, and its text.

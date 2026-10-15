@@ -15,8 +15,8 @@ networks:
   back: { cidr: 10.67.20.0/24, ipv6: { cidr: \"fd00:67:20::/64\" } }
 reach: [{ from: front, to: back, ports: [80] }]
 machines:
-  web: { networks: { back: 10 }, ports: [{ port: 80 }], vm: { os: debian-12 } }
-  user: { networks: { front: 10 }, vm: { os: debian-12 } }
+  web: { networks: { back: 10 }, ports: [{ port: 80 }], vm: { os: debian@12 } }
+  user: { networks: { front: 10 }, vm: { os: debian@12 } }
 ";
 
 fn env(target: Target) -> Environment {

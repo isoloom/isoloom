@@ -53,16 +53,16 @@ fn number(v: Option<&Value>) -> Option<u32> {
 fn os_for_box(b: &str) -> (&'static str, bool) {
     let l = b.to_ascii_lowercase();
     match l.as_str() {
-        "bento/debian-12" | "generic/debian12" => ("debian-12", true),
-        "bento/ubuntu-24.04" => ("ubuntu-24.04", true),
+        "bento/debian-12" | "generic/debian12" => ("debian@12", true),
+        "bento/ubuntu-24.04" => ("ubuntu@24.04", true),
         "kalilinux/rolling" => ("kali", true),
-        "stefanscherer/windows_2019" => ("windows-server-2019", true),
-        _ if l.contains("windows") && l.contains("2022") => ("windows-server-2022", false),
-        _ if l.contains("windows") && (l.contains("11") || l.contains("win11")) => ("windows-11", false),
-        _ if l.contains("windows") || l.contains("win2019") => ("windows-server-2019", false),
+        "stefanscherer/windows_2019" => ("windows-server@2019", true),
+        _ if l.contains("windows") && l.contains("2022") => ("windows-server@2022", false),
+        _ if l.contains("windows") && (l.contains("11") || l.contains("win11")) => ("windows@11", false),
+        _ if l.contains("windows") || l.contains("win2019") => ("windows-server@2019", false),
         _ if l.contains("kali") => ("kali", false),
-        _ if l.contains("ubuntu") => ("ubuntu-24.04", false),
-        _ => ("debian-12", false),
+        _ if l.contains("ubuntu") => ("ubuntu@24.04", false),
+        _ => ("debian@12", false),
     }
 }
 
@@ -211,7 +211,7 @@ impl<'a> Import<'a> {
         let windows_hint = text(self.pick(vm, "communicator")).as_deref() == Some("winrm") || text(self.pick(vm, "guest")).as_deref() == Some("windows");
         let (mut os, builtin) = os_for_box(&boxname);
         if windows_hint && !os.starts_with("windows") {
-            os = "windows-server-2019";
+            os = "windows-server@2019";
         }
         let version = text(self.pick(vm, "box_version"));
         let image = if boxname.is_empty() {

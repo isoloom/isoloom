@@ -70,8 +70,6 @@ pub enum Appliance {
     /// Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
     CiscoVios,
     /// Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
-    /// `cisco-viosl2`, as the image is named, is read too.
-    #[serde(alias = "cisco-viosl2")]
     CiscoViosL2,
     /// Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
     CiscoCsr1000v,
@@ -85,8 +83,9 @@ pub enum Appliance {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VmImpl {
-    /// The OS, as `<family>@<version>` (`debian@12`), a family alone for its pinned default, or
-    /// an older name (`debian-12`); each target maps it to an image. Defaults to the machine's
+    /// The OS, as `<family>@<version>` (`debian@12`) or a family alone for its pinned default;
+    /// each target maps it to an image. Once parsed, it holds the image table's name for the OS
+    /// ([`KNOWN_OS`], see [`crate::os::canonical`]). Defaults to the machine's
     /// `os`, which it must agree with when both are set. May come from `common:` or a group
     /// (`vm: {}` in the machine).
     #[serde(default)]
@@ -256,9 +255,9 @@ pub struct Provision {
 }
 
 /// The image table's OS names, the ones every target maps to its own images (e.g. Windows from
-/// an evaluation ISO locally, a license-included image in the cloud). A spec writes them as
-/// `<family>@<version>` ([`crate::os`]), or by these names, which stay valid. In the order of
-/// [`crate::os::FAMILIES`].
+/// an evaluation ISO locally, a license-included image in the cloud). A spec writes the OS as
+/// `<family>@<version>` ([`crate::os`]); a parsed spec's `vm.os` holds one of these names. In
+/// the order of [`crate::os::FAMILIES`].
 pub const KNOWN_OS: &[&str] = &[
     "debian-11",
     "debian-12",

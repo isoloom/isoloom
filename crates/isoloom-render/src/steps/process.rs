@@ -209,14 +209,14 @@ machines:
     inputs: [FLAG]
     environment: { MODE: lab }
     ports: [{ port: 8000 }]
-    vm: { os: debian-12, provision: [setup.sh] }
+    vm: { os: debian@12, provision: [setup.sh] }
     command: [python3, -m, http.server, '8000']
     working_dir: /srv/site
     before: [flag.sh]
     healthcheck: { http: { port: 8000, path: /health }, interval: 2s, retries: 30, start_period: 0s }
   win:
     networks: { lan: 11 }
-    vm: { os: windows-server-2022, provision: [setup.ps1] }
+    vm: { os: windows-server@2022, provision: [setup.ps1] }
     command: 'python -m http.server 80'
     before: [flag.ps1]
     healthcheck: { test: [python, check.py] }

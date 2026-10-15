@@ -349,10 +349,10 @@ More DNS names the machine answers to besides its own (a fully qualified name an
 
 ### `machines.*.os`
 
-The machine's OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default version (`debian` is `debian@12`). The older names (`debian-12`) are read too. `vm.os` defaults to it, and a machine with neither `docker:` nor `vm:` runs as a VM of this OS (`vm: { os }`).
+The machine's OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default version (`debian` is `debian@12`). `vm.os` defaults to it, and a machine with neither `docker:` nor `vm:` runs as a VM of this OS (`vm: { os }`).
 
 - **Type:** string
-- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`, `debian-11`, `debian-12`, `debian-13`, `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `ubuntu-20.04`, `ubuntu-22.04`, `ubuntu-24.04`, `rocky-9`, `almalinux-9`, `alpine-3.19`, `fedora-42`, `centos-7`, `windows-10`, `windows-11`, `windows-server-2008r2`, `windows-server-2012r2`, `windows-server-2016`, `windows-server-2019`, `windows-server-2022`, `windows-server-2025`
+- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
 
 ### `machines.*.arch`
 
@@ -542,7 +542,7 @@ The ceiling a process may raise its soft limit to.
 
 ### `machines.*.ports`
 
-The ports the machine answers on, each with its protocol, an HTTP probe and whether it is published or dormant: what is published, opened by `reach`, waited for and checked. Named `services` before 1.0, a key still read, with a warning, for at least one release.
+The ports the machine answers on, each with its protocol, an HTTP probe and whether it is published or dormant: what is published, opened by `reach`, waited for and checked.
 
 - **Type:** list of mappings
 
@@ -900,7 +900,7 @@ The image is a network appliance Isoloom knows how to wire (a router or switch O
   - `cisco-iol`: Cisco IOL (IOS on Linux, from Cisco Modeling Labs) as vrnetlab packages it (`vrnetlab/cisco_iol:<version>`): a router.
   - `cisco-iol-l2`: Cisco IOL-L2 (`vrnetlab/cisco_iol:L2-<version>`): a switch.
   - `cisco-vios`: Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router.
-  - `cisco-vios-l2`: Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch. `cisco-viosl2`, as the image is named, is read too.
+  - `cisco-vios-l2`: Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch.
   - `cisco-csr1000v`: Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm).
   - `cisco-c8000v`: Cisco Catalyst 8000v (IOS XE) in QEMU (`vrnetlab/cisco_c8000v:<version>`, needs /dev/kvm).
   - `cisco-dynamips`: A classic Cisco 7200 router emulated by Dynamips, booting the IOS `.bin` in `firmware`.
@@ -933,10 +933,10 @@ How a VM produces this machine (services installed natively, no Docker inside).
 
 ### `machines.*.vm.os`
 
-The OS, as `<family>@<version>` (`debian@12`), a family alone for its pinned default, or an older name (`debian-12`); each target maps it to an image. Defaults to the machine's `os`, which it must agree with when both are set. May come from `common:` or a group (`vm: {}` in the machine).
+The OS, as `<family>@<version>` (`debian@12`) or a family alone for its pinned default; each target maps it to an image. Once parsed, it holds the image table's name for the OS (`KNOWN_OS`, see `crate::os::canonical`). Defaults to the machine's `os`, which it must agree with when both are set. May come from `common:` or a group (`vm: {}` in the machine).
 
 - **Type:** string
-- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`, `debian-11`, `debian-12`, `debian-13`, `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `ubuntu-20.04`, `ubuntu-22.04`, `ubuntu-24.04`, `rocky-9`, `almalinux-9`, `alpine-3.19`, `fedora-42`, `centos-7`, `windows-10`, `windows-11`, `windows-server-2008r2`, `windows-server-2012r2`, `windows-server-2016`, `windows-server-2019`, `windows-server-2022`, `windows-server-2025`
+- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
 
 ### `machines.*.vm.provision`
 

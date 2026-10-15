@@ -114,7 +114,7 @@ mod tests {
             "docker: { image: postgres }, command: [docker-entrypoint.sh, postgres], working_dir: /srv, before: [flag.sh], healthcheck: { test: pg_isready, interval: 2s, retries: 30, start_period: 1m }",
         );
         assert!(ok.is_empty(), "{ok:?}");
-        let vm = problems("vm: { os: debian-12 }, command: 'python3 -m http.server 80', healthcheck: { http: { port: 80 } }");
+        let vm = problems("vm: { os: debian@12 }, command: 'python3 -m http.server 80', healthcheck: { http: { port: 80 } }");
         assert!(vm.is_empty(), "{vm:?}");
     }
 
@@ -134,7 +134,7 @@ mod tests {
         );
         let p = problems("docker: { image: alpine, idle: true }, command: [sleep, '1']");
         assert!(p.iter().any(|m| m.contains("an `idle` machine")), "{p:?}");
-        let p = problems("vm: { os: windows-server-2022 }, command: x, before: [set.sh]");
+        let p = problems("vm: { os: windows-server@2022 }, command: x, before: [set.sh]");
         assert!(p.iter().any(|m| m.contains("PowerShell scripts (.ps1)")), "{p:?}");
     }
 }

@@ -3,12 +3,12 @@
 //!
 //! ```yaml
 //! common:
-//!   vm: { os: debian-12 }
+//!   vm: { os: debian@12 }
 //!   resources: { cpus: 2, memory_mb: 2048 }
 //! groups:
 //!   servers:
 //!     members: [dc01, dc02, srv02]        # machine names, globs (ws*), other groups
-//!     vm: { os: windows-server-2019 }
+//!     vm: { os: windows-server@2019 }
 //! ```
 //!
 //! Any field a group may share deep-merges into its members: a machine's own value wins over

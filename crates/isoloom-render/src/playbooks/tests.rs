@@ -337,7 +337,7 @@ fn a_failed_download_is_tried_again() {
 #[test]
 fn the_script_runs_each_playbook_through_run_play_with_retry_files_on() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lab: 10 }\n    vm: { os: debian-12 }\nprovision:\n  - ansible: ansible/site.yml\n    vars: { greeting: hi there }\n",
+        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lab: 10 }\n    vm: { os: debian@12 }\nprovision:\n  - ansible: ansible/site.yml\n    vars: { greeting: hi there }\n",
     )
     .unwrap();
     let s = script(&spec, &["web".into()]);

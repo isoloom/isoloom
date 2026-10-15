@@ -69,7 +69,7 @@ machines:
   a:
     networks: { lan: 10 }
     docker: { image: nginx }
-    vm: { os: debian-12, provision: [setup.sh] }
+    vm: { os: debian@12, provision: [setup.sh] }
     external: { address: 192.0.2.10 }
     files:
       - { path: /etc/a.ini, content: x }

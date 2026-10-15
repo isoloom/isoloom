@@ -68,7 +68,7 @@ fn sets_override_the_spec_before_it_is_parsed() {
     let out = override_spec(
         &text,
         &[
-            "machines.web.vm.os=ubuntu-24.04".into(),
+            "machines.web.vm.os=ubuntu@24.04".into(),
             "networks.app.internet=true".into(),
             "defaults.cloud.aws.region=eu-west-1".into(),
         ],

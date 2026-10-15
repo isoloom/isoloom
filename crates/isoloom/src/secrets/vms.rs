@@ -368,7 +368,7 @@ mod tests {
         use super::Guest;
         use isoloom_spec::Target;
         let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  l: { networks: { lan: 10 }, vm: { os: debian-12 } }\n  w: { networks: { lan: 11 }, vm: { os: windows-server-2022 } }\n  s: { networks: { lan: 12 }, vm: { os: windows-server-2022, image: { winssh: true } } }\n  t: { networks: { lan: 13 }, vm: { os: windows-server-2022, image: { winrm: ssl } } }\n",
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  l: { networks: { lan: 10 }, vm: { os: debian@12 } }\n  w: { networks: { lan: 11 }, vm: { os: windows-server@2022 } }\n  s: { networks: { lan: 12 }, vm: { os: windows-server@2022, image: { winssh: true } } }\n  t: { networks: { lan: 13 }, vm: { os: windows-server@2022, image: { winrm: ssl } } }\n",
         )
         .unwrap();
         let env = isoloom_plan::Environment::build(&spec, Target::Vagrant, None);

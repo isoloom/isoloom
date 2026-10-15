@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn machines_json_fills_the_ssh_defaults() {
-        let env = env("  a: { networks: { lab: 5 }, vm: { os: debian-12 }, external: { address: h.example, port: 2200 } }\n");
+        let env = env("  a: { networks: { lab: 5 }, vm: { os: debian@12 }, external: { address: h.example, port: 2200 } }\n");
         let files = render(&env).expect("renders");
         let json = &files.iter().find(|f| f.path.ends_with("machines.json")).expect("machines.json").contents;
         assert_eq!(

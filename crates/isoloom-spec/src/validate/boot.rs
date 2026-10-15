@@ -197,7 +197,7 @@ mod tests {
 
     fn problems(machine: &str) -> Vec<String> {
         let spec = parse(&format!(
-            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, vm: {machine} }}\n  b: {{ networks: {{ lan: 11 }}, vm: {{ os: debian-12, boot: {{ order: [network], network: {{ file: other.0 }} }} }} }}\n"
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, vm: {machine} }}\n  b: {{ networks: {{ lan: 11 }}, vm: {{ os: debian@12, boot: {{ order: [network], network: {{ file: other.0 }} }} }} }}\n"
         ))
         .unwrap();
         validate(&spec).into_iter().map(|p| p.to_string()).collect()
@@ -205,29 +205,29 @@ mod tests {
 
     #[test]
     fn a_box_url_needs_the_box_name_and_a_url_or_a_project_file() {
-        let p = problems("{ os: debian-12, image: { box_url: /tmp/x.box, box_server_url: ftp://x } }");
+        let p = problems("{ os: debian@12, image: { box_url: /tmp/x.box, box_server_url: ftp://x } }");
         assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.vagrant: name the box")), "{p:?}");
         assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.box_url:")), "{p:?}");
         assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.box_server_url:")), "{p:?}");
-        let ok = problems("{ os: debian-12, image: { vagrant: my/box, box_url: boxes/my.box } }");
+        let ok = problems("{ os: debian@12, image: { vagrant: my/box, box_url: boxes/my.box } }");
         assert!(!ok.iter().any(|p| p.starts_with("machines.a.vm.image")), "{ok:?}");
     }
 
     #[test]
     fn each_cloud_image_is_in_its_clouds_form() {
-        let p = problems("{ os: debian-12, image: { proxmox: '42', aws: ubuntu, azure: x, gcp: debian, oci: y, linode: 'a b' } }");
+        let p = problems("{ os: debian@12, image: { proxmox: '42', aws: ubuntu, azure: x, gcp: debian, oci: y, linode: 'a b' } }");
         for field in ["proxmox", "aws", "azure", "gcp", "oci", "linode"] {
             assert!(p.iter().any(|p| p.starts_with(&format!("machines.a.vm.image.{field}:"))), "{field}: {p:?}");
         }
         let ok = problems(
-            "{ os: debian-12, image: { proxmox: '9000', aws: ami-1, azure: /subscriptions/s, gcp: projects/p/global/images/i, oci: ocid1.image.oc1..x, linode: private/1, digitalocean: '123' } }",
+            "{ os: debian@12, image: { proxmox: '9000', aws: ami-1, azure: /subscriptions/s, gcp: projects/p/global/images/i, oci: ocid1.image.oc1..x, linode: private/1, digitalocean: '123' } }",
         );
         assert!(!ok.iter().any(|p| p.starts_with("machines.a.vm.image")), "{ok:?}");
     }
 
     #[test]
     fn a_boots_parts_hang_on_what_they_need() {
-        let p = problems("{ os: debian-12, boot: { initrd: /i, cmdline: x, dtb: d, nvram: /n, order: [hd, hd], network: { tftp_root: t, server: x } } }");
+        let p = problems("{ os: debian@12, boot: { initrd: /i, cmdline: x, dtb: d, nvram: /n, order: [hd, hd], network: { tftp_root: t, server: x } } }");
         for want in [
             "boot.initrd: `initrd` goes with a `kernel`",
             "boot.dtb: `d` must be an absolute path",
@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn the_controller_image_is_a_box() {
-        let spec = parse("version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lan: 10 }, vm: { os: debian-12 } } }\ncontroller: { image: { vagrant: x/y, aws: ami-1 } }\n").unwrap();
+        let spec = parse("version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lan: 10 }, vm: { os: debian@12 } } }\ncontroller: { image: { vagrant: x/y, aws: ami-1 } }\n").unwrap();
         let p: Vec<String> = validate(&spec).into_iter().map(|p| p.to_string()).collect();
         assert!(p.iter().any(|p| p.starts_with("controller.image.aws:")), "{p:?}");
     }

@@ -45,7 +45,7 @@ mod tests {
         let sizes = [(8192, "small"), (16384, "large")];
         let env = |extra: &str| {
             let spec = isoloom_spec::parse(&format!(
-                "version: 1\nname: n\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, vm: {{ os: debian-12, provision: [a.sh] }}, {extra} }}\n"
+                "version: 1\nname: n\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, vm: {{ os: debian@12, provision: [a.sh] }}, {extra} }}\n"
             ))
             .unwrap();
             Environment::build(&spec, isoloom_spec::model::Target::CloudVm, None)

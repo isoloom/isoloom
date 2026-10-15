@@ -16,11 +16,11 @@ groups:
 machines:
   web:
     networks: { back: 10, lab: 10 }
-    vm: { os: debian-12 }
+    vm: { os: debian@12 }
     external: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id }
   dc:
     networks: { lab: 20 }
-    vm: { os: windows-server-2022, image: { vagrant: some/box, winrm: ssl } }
+    vm: { os: windows-server@2022, image: { vagrant: some/box, winrm: ssl } }
     external: { address: 192.168.1.20 }
   box:
     networks: { lab: 30 }
@@ -92,7 +92,7 @@ fn windows_hosts_get_their_winrm_and_the_windows_vars() {
 
 #[test]
 fn no_windows_vars_without_a_windows_host() {
-    let linux_only = "version: 1\nname: l\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian-12 }\n";
+    let linux_only = "version: 1\nname: l\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian@12 }\n";
     let inv = render(&env(linux_only, Target::Vagrant), &Access::vagrant());
     assert_eq!(
         inv,

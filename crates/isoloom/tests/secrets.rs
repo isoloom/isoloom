@@ -38,11 +38,11 @@ machines:
     networks: { lan: 10 }
     ports: [{ port: 80 }]
     docker: { image: nginx:alpine }
-    vm: { os: debian-12, provision: [db.sh] }
+    vm: { os: debian@12, provision: [db.sh] }
     secrets: [db-password, { source: api-key, target: /etc/app/api.key, mode: 0400 }]
   db:
     networks: { lan: 20 }
-    vm: { os: debian-12, provision: [db.sh] }
+    vm: { os: debian@12, provision: [db.sh] }
     secrets: [{ source: db-password, uid: 999, mode: 0400 }]
 ";
 
@@ -58,7 +58,7 @@ machines:
   win:
     networks: { lan: 10 }
     ports: [{ port: 80 }]
-    vm: { os: windows-server-2022, provision: [setup.ps1] }
+    vm: { os: windows-server@2022, provision: [setup.ps1] }
     secrets: [db-password, { source: api-key, target: 'C:\\app\\api.key' }]
     command: [app.exe]
 ";

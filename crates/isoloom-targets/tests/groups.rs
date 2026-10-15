@@ -13,7 +13,7 @@ const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }
 #[test]
 fn shared_fields_fold_into_machines_with_the_right_precedence() {
     let spec = parse(&format!(
-        "{BASE}common:\n  resources: {{ cpus: 1, memory_mb: 512 }}\n  vm: {{ os: debian-12, provision: [base.sh] }}\ngroups:\n  servers:\n    members: [srv*, db]\n    resources: {{ memory_mb: 4096 }}\n  big:\n    members: [servers]\n    resources: {{ cpus: 8 }}\n  pinned:\n    members: [db]\n    vm: {{ os: ubuntu-24.04 }}\nmachines:\n  srv1: {{ networks: {{ lab: 11 }}, vm: {{}} }}\n  db: {{ networks: {{ lab: 12 }}, resources: {{ memory_mb: 8192 }}, vm: {{ provision: [p.sh] }} }}\n  user: {{ access: true, networks: {{ lab: 20 }} }}\n"
+        "{BASE}common:\n  resources: {{ cpus: 1, memory_mb: 512 }}\n  vm: {{ os: debian@12, provision: [base.sh] }}\ngroups:\n  servers:\n    members: [srv*, db]\n    resources: {{ memory_mb: 4096 }}\n  big:\n    members: [servers]\n    resources: {{ cpus: 8 }}\n  pinned:\n    members: [db]\n    vm: {{ os: ubuntu@24.04 }}\nmachines:\n  srv1: {{ networks: {{ lab: 11 }}, vm: {{}} }}\n  db: {{ networks: {{ lab: 12 }}, resources: {{ memory_mb: 8192 }}, vm: {{ provision: [p.sh] }} }}\n  user: {{ access: true, networks: {{ lab: 20 }} }}\n"
     ))
     .unwrap();
     assert_eq!(validate(&spec), vec![]);

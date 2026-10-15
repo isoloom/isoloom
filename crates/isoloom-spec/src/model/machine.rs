@@ -65,9 +65,9 @@ pub struct Machine {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
     /// The machine's OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the
-    /// family alone for its pinned default version (`debian` is `debian@12`). The older names
-    /// (`debian-12`) are read too. `vm.os` defaults to it, and a machine with neither `docker:`
-    /// nor `vm:` runs as a VM of this OS (`vm: { os }`).
+    /// family alone for its pinned default version (`debian` is `debian@12`). `vm.os` defaults
+    /// to it, and a machine with neither `docker:` nor `vm:` runs as a VM of this OS
+    /// (`vm: { os }`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub os: Option<String>,
     /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
@@ -137,7 +137,6 @@ pub struct Machine {
     pub ulimits: IndexMap<String, Ulimit>,
     /// The ports the machine answers on, each with its protocol, an HTTP probe and whether it
     /// is published or dormant: what is published, opened by `reach`, waited for and checked.
-    /// Named `services` before 1.0, a key still read, with a warning, for at least one release.
     #[serde(default)]
     pub ports: Vec<Port>,
     /// The spec's `inputs` this machine receives, by name: only these reach it.

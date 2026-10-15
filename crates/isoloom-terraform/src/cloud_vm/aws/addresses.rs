@@ -124,7 +124,7 @@ mod tests {
 
     fn plan(octets: &str) -> MachinePlan {
         let spec = isoloom_spec::parse(&format!(
-            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: {octets} }}, vm: {{ os: debian-12, provision: [s.sh] }} }}\n"
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: {octets} }}, vm: {{ os: debian@12, provision: [s.sh] }} }}\n"
         ))
         .unwrap();
         isoloom_plan::Environment::build(&spec, Target::CloudVm, None).machines["web"].clone()

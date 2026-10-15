@@ -18,7 +18,7 @@ machines:
     networks: { app: 10 }
     ports: [{ port: 80 }]
     docker: { image: nginx }
-    vm: { os: debian-12 }
+    vm: { os: debian@12 }
 ";
 
 /// A project holding SPEC and the given profiles.

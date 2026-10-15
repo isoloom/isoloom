@@ -81,15 +81,7 @@ pub fn fill(text: &str, snapshot: &Value) -> Result<String, String> {
             return Err("message: a `{{` without its `}}`".into());
         };
         let path = after[..end].trim();
-        let value = lookup(snapshot, path).ok_or_else(|| {
-            // A machine's `services` is `ports` since 1.0, in the snapshot too.
-            let renamed = if path.contains(".services.") {
-                "; a machine's `services` is now `ports`"
-            } else {
-                ""
-            };
-            format!("message: `{{{{ {path} }}}}` points at nothing in the snapshot (see `isoloom inspect`){renamed}")
-        })?;
+        let value = lookup(snapshot, path).ok_or_else(|| format!("message: `{{{{ {path} }}}}` points at nothing in the snapshot (see `isoloom inspect`)"))?;
         match value {
             Value::String(s) => out.push_str(s),
             Value::Null => {}

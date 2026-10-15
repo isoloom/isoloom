@@ -17,7 +17,6 @@ pub mod os;
 pub mod probe;
 pub mod profile;
 pub mod reference;
-pub mod renamed;
 pub mod schema;
 pub mod shell;
 pub mod targets;
@@ -32,7 +31,7 @@ pub use model::{
     Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Port, Reach, Resources, Shape, Spec, Target, Tc, Vlan,
 };
 pub use targets::{derive, effective};
-pub use validate::{Problem, validate, validate_files, warnings};
+pub use validate::{Problem, validate, validate_files};
 
 /// The spec file names, at the root of a project: `isoloom.yml` (canonical) or `isoloom.yaml`.
 pub const SPEC_FILES: &[&str] = &["isoloom.yml", "isoloom.yaml"];
@@ -42,9 +41,8 @@ pub const SPEC_FILES: &[&str] = &["isoloom.yml", "isoloom.yaml"];
 /// rest of Isoloom only deals in networks.
 pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
     let mut doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml)?;
-    // Keys renamed before 1.0 move to their new names, and a machine's `os` reaches its `vm:`,
-    // before clones copy the machine and before a shared `vm:` could fill its OS.
-    let warnings = renamed::machine_keys(&mut doc).map_err(LoadError::at(Stage::Renamed))?;
+    // A machine's `os` reaches its `vm:` before clones copy the machine and before a shared
+    // `vm:` could fill its OS.
     os::fill_vm(&mut doc);
     // `count:` clones, then `common:` and `groups:` fold into the machines, so every reader sees
     // finished ones.
@@ -53,8 +51,7 @@ pub fn parse(yaml: &str) -> Result<Spec, LoadError> {
     addresses::split(&mut doc).map_err(LoadError::at(Stage::Addresses))?;
     let mut spec: Spec = serde_yaml_ng::from_value(doc)?;
     spec.clones = clones;
-    spec.warnings = warnings;
-    os::canonical(&mut spec);
+    os::canonical(&mut spec).map_err(LoadError::at(Stage::Os))?;
     vlans::flatten(spec).map_err(LoadError::at(Stage::Vlans))
 }
 

@@ -107,10 +107,10 @@ machines:
     networks: { lan: 10, office: 10, home: 0, corp: 5 }
     secrets: [db-password]
     disks: { data: { size_gb: 20, mount: /data }, scratch: { size_gb: 5, fs: raw } }
-    vm: { os: debian-12, provision: [s.sh], boot: { firmware: uefi } }
+    vm: { os: debian@12, provision: [s.sh], boot: { firmware: uefi } }
   db:
     networks: { lan: 20 }
-    vm: { os: ubuntu-24.04, provision: [db.sh], boot: { firmware: bios } }
+    vm: { os: ubuntu@24.04, provision: [db.sh], boot: { firmware: bios } }
 ";
 
 fn lab(text: &str) -> Environment {

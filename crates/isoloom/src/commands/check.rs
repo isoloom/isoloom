@@ -12,7 +12,7 @@ pub struct Args {
     /// The image table the files were generated with (see `generate --images`).
     #[arg(long, value_name = "FILE")]
     images: Option<PathBuf>,
-    /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+    /// Override a value for this command: `-s machines.web.vm.os=ubuntu@24.04` on the spec,
     /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     sets: Vec<String>,

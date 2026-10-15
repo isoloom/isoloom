@@ -62,14 +62,14 @@ const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }
 #[test]
 fn asking_for_an_impossible_target_names_the_machines() {
     let p = problems(&format!(
-        "{BASE}targets: [docker]\nmachines:\n  dc: {{ networks: {{ lab: 5 }}, ports: [{{ port: 389 }}], vm: {{ os: windows-server-2022, provision: [p.ps1] }} }}\n"
+        "{BASE}targets: [docker]\nmachines:\n  dc: {{ networks: {{ lab: 5 }}, ports: [{{ port: 389 }}], vm: {{ os: windows-server@2022, provision: [p.ps1] }} }}\n"
     ));
     assert_eq!(p, ["targets[0]: `docker` needs a `docker:` implementation on every machine; missing on: dc"]);
 }
 
 #[test]
 fn narrowing_targets_keeps_only_those() {
-    let r = parse(&format!("{BASE}targets: [docker, vagrant]\nmachines:\n  a: {{ networks: {{ lab: 5 }}, docker: {{ image: nginx }}, vm: {{ os: debian-12, provision: [p.sh] }} }}\n")).unwrap();
+    let r = parse(&format!("{BASE}targets: [docker, vagrant]\nmachines:\n  a: {{ networks: {{ lab: 5 }}, docker: {{ image: nginx }}, vm: {{ os: debian@12, provision: [p.sh] }} }}\n")).unwrap();
     assert_eq!(ids(effective(&r)), ["docker", "vagrant"]);
 }
 
@@ -235,7 +235,7 @@ fn the_size_floor_is_a_vms() {
         )
     };
     assert_eq!(problems(&spec("    docker: { image: nginx }\n")), [] as [std::string::String; 0]);
-    let both = problems(&spec("    docker: { image: nginx }\n    vm: { os: debian-12, provision: [x.sh] }\n"));
+    let both = problems(&spec("    docker: { image: nginx }\n    vm: { os: debian@12, provision: [x.sh] }\n"));
     assert!(both.iter().any(|p| p.contains("too small for a VM")), "{both:?}");
     let tiny = problems(&spec("    docker: { image: nginx }\n").replace("memory_mb: 64", "memory_mb: 8"));
     assert!(tiny.iter().any(|p| p.contains("at least 1 cpu and 16 MB")), "{tiny:?}");

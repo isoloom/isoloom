@@ -77,7 +77,7 @@ fn the_registry_renders_vagrant_from_the_plan() {
 #[test]
 fn appliances_are_refused_from_the_capabilities() {
     let spec = isoloom_spec::parse(
-        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  sw:\n    networks: { lab: 10 }\n    docker: { image: x, appliance: cisco-iol }\n    vm: { os: debian-12 }\n",
+        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  sw:\n    networks: { lab: 10 }\n    docker: { image: x, appliance: cisco-iol }\n    vm: { os: debian@12 }\n",
     )
     .expect("parses");
     let env = Environment::build(&spec, Target::Vagrant, None);
@@ -88,10 +88,12 @@ fn appliances_are_refused_from_the_capabilities() {
 
 #[test]
 fn a_machine_without_a_box_is_refused_without_rendering() {
-    let spec = isoloom_spec::parse(
-        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  m:\n    networks: { lab: 10 }\n    vm: { os: plan9 }\n",
+    let mut spec = isoloom_spec::parse(
+        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  m:\n    networks: { lab: 10 }\n    vm: { os: debian@12 }\n",
     )
     .expect("parses");
+    // Parsing refuses an OS it doesn't know; a spec built in code can still name one.
+    spec.machines["m"].vm.as_mut().expect("a VM").os = "plan9".into();
     let env = Environment::build(&spec, Target::Vagrant, None);
     let why = VagrantBackend.refusal(&env).expect("refused");
     assert!(why.contains("no Vagrant box for `plan9`"), "{why}");

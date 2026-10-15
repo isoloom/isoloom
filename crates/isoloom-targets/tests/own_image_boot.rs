@@ -22,7 +22,7 @@ fn spec(vm: &str) -> isoloom_spec::Spec {
 
 /// `web` and a second VM on its network: QEMU links VMs in pairs.
 fn pair(vm: &str) -> isoloom_spec::Spec {
-    build(vm, "  db: { networks: { lan: 11 }, vm: { os: debian-12, provision: [s.sh] } }\n")
+    build(vm, "  db: { networks: { lan: 11 }, vm: { os: debian@12, provision: [s.sh] } }\n")
 }
 
 fn file(s: &isoloom_spec::Spec, target: Target, path: &str) -> String {
@@ -30,7 +30,7 @@ fn file(s: &isoloom_spec::Spec, target: Target, path: &str) -> String {
     files.into_iter().find(|f| f.path == path).unwrap_or_else(|| panic!("no {path}")).contents
 }
 
-const IMAGES: &str = "{ os: debian-12, provision: [s.sh], image: { vagrant: lab/debian, box_url: 'https://boxes.example/d.box', box_server_url: 'https://boxes.example', proxmox: 'https://images.example/d.qcow2', aws: ami-0abc, azure: /subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/images/d, gcp: projects/p/global/images/d, digitalocean: '4242', linode: private/42, oci: ocid1.image.oc1..d } }";
+const IMAGES: &str = "{ os: debian@12, provision: [s.sh], image: { vagrant: lab/debian, box_url: 'https://boxes.example/d.box', box_server_url: 'https://boxes.example', proxmox: 'https://images.example/d.qcow2', aws: ami-0abc, azure: /subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/images/d, gcp: projects/p/global/images/d, digitalocean: '4242', linode: private/42, oci: ocid1.image.oc1..d } }";
 
 #[test]
 fn every_target_boots_the_machines_own_image() {
@@ -70,7 +70,7 @@ fn a_proxmox_template_is_cloned_and_an_own_image_stands_in_for_the_os() {
     assert_eq!(refusal(&s, Target::CloudVm), None);
 }
 
-const BOOT: &str = "{ os: debian-12, provision: [s.sh], boot: { kernel: /srv/vmlinuz, initrd: /srv/initrd, cmdline: console=ttyS0, loader: /usr/share/OVMF/OVMF_CODE.fd, nvram: /srv/web_VARS.fd, firmware_format: qcow2, order: [network, hd], network: { tftp_root: /srv/tftp, file: pxelinux.0, server: 10.30.0.1 } } }";
+const BOOT: &str = "{ os: debian@12, provision: [s.sh], boot: { kernel: /srv/vmlinuz, initrd: /srv/initrd, cmdline: console=ttyS0, loader: /usr/share/OVMF/OVMF_CODE.fd, nvram: /srv/web_VARS.fd, firmware_format: qcow2, order: [network, hd], network: { tftp_root: /srv/tftp, file: pxelinux.0, server: 10.30.0.1 } } }";
 
 #[test]
 fn libvirt_boots_the_machines_own_way() {
@@ -99,7 +99,7 @@ fn a_target_or_provider_that_boots_the_image_as_it_is_refuses_and_says_why() {
     assert!(qemu.contains("`vm.boot.kernel`, `vm.boot.initrd`"), "{qemu}");
     assert_eq!(
         refusal_on(
-            &pair("{ os: debian-12, provision: [s.sh], boot: { firmware_format: raw } }"),
+            &pair("{ os: debian@12, provision: [s.sh], boot: { firmware_format: raw } }"),
             Target::Vagrant,
             Some("qemu")
         ),
@@ -112,13 +112,13 @@ fn a_target_or_provider_that_boots_the_image_as_it_is_refuses_and_says_why() {
         proxmox.contains("machine `web` sets `vm.boot.kernel`: Proxmox boots the VM's disk"),
         "{proxmox}"
     );
-    let cdrom = refusal(&spec("{ os: debian-12, provision: [s.sh], boot: { order: [cdrom] } }"), Target::Proxmox).unwrap();
+    let cdrom = refusal(&spec("{ os: debian@12, provision: [s.sh], boot: { order: [cdrom] } }"), Target::Proxmox).unwrap();
     assert!(cdrom.contains("no CD-ROM drive"), "{cdrom}");
 }
 
 #[test]
 fn proxmox_boots_uefi_in_the_machines_order() {
-    let s = spec("{ os: debian-12, provision: [s.sh], boot: { firmware: uefi, firmware_format: qcow2, order: [network, hd] } }");
+    let s = spec("{ os: debian@12, provision: [s.sh], boot: { firmware: uefi, firmware_format: qcow2, order: [network, hd] } }");
     let proxmox = file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf");
     for line in [
         "= \"ovmf\"",
@@ -129,7 +129,7 @@ fn proxmox_boots_uefi_in_the_machines_order() {
         assert!(proxmox.contains(line), "{line}\n{proxmox}");
     }
     let bios = file(
-        &spec("{ os: debian-12, provision: [s.sh], boot: { firmware: bios } }"),
+        &spec("{ os: debian@12, provision: [s.sh], boot: { firmware: bios } }"),
         Target::Proxmox,
         ".isoloom/proxmox/main.tf",
     );

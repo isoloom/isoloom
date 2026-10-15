@@ -3,15 +3,16 @@
 //! then what a spec gives itself (`vm.image`).
 
 use indexmap::IndexMap;
-use serde::Deserialize;
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer};
 
 use crate::model::{DockerImpl, Spec, VmImage, VmImpl};
 
 /// The runner's own image table, between the built-in one and the spec's `vm.image`:
 ///
 /// ```yaml
-/// os:                     # an OS name's image, instead of the built-in one
-///   debian-12: { vagrant: my-org/debian-12, vagrant_version: "1.2.0" }
+/// os:                     # an OS's image, instead of the built-in one
+///   debian@12: { vagrant: my-org/debian-12, vagrant_version: "1.2.0" }
 /// access:                 # the access machine, when the spec leaves it to the runner
 ///   docker: kalilinux/kali-rolling
 ///   vm: kali
@@ -19,8 +20,9 @@ use crate::model::{DockerImpl, Spec, VmImage, VmImpl};
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Table {
-    /// An OS name's image per target, instead of the built-in one.
-    #[serde(default)]
+    /// An OS's image per target, instead of the built-in one. Written as a spec writes the OS
+    /// (`debian@12`, `debian`), held by the image table's name for it (`debian-12`).
+    #[serde(default, deserialize_with = "os_keys")]
     pub os: IndexMap<String, VmImage>,
     /// The access machine, when the spec leaves it to the runner.
     #[serde(default)]
@@ -34,21 +36,37 @@ pub struct Access {
     /// A container image (kept running idle) for container targets.
     #[serde(default)]
     pub docker: Option<String>,
-    /// An OS name (from this table or the built-in one) for VM targets.
-    #[serde(default)]
+    /// An OS for VM targets, written as a spec writes it (`kali`, `debian@12`), held by the
+    /// image table's name for it (its image from this table or the built-in one).
+    #[serde(default, deserialize_with = "access_os")]
     pub vm: Option<String>,
 }
 
-impl Table {
-    /// The table's image for an OS by its image-table name (`debian-12`), whichever of the
-    /// OS's spellings the table's key is written in (`debian@12`, `debian`).
-    fn image_of(&self, os: &str) -> Option<&VmImage> {
-        self.os.get(os).or_else(|| {
-            self.os
-                .iter()
-                .find(|(k, _)| crate::os::resolve(k).is_ok_and(|o| o.name == os))
-                .map(|(_, image)| image)
+/// The table's `os:` keys, each resolved to the image table's name for its OS.
+fn os_keys<'de, D: Deserializer<'de>>(d: D) -> Result<IndexMap<String, VmImage>, D::Error> {
+    IndexMap::<String, VmImage>::deserialize(d)?
+        .into_iter()
+        .map(|(key, image)| match crate::os::resolve(&key) {
+            Ok(os) => Ok((os.name.to_string(), image)),
+            Err(e) => Err(D::Error::custom(format!("os.{key}: {e}"))),
         })
+        .collect()
+}
+
+/// The access machine's OS, resolved to the image table's name for it.
+fn access_os<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    Option::<String>::deserialize(d)?
+        .map(|text| match crate::os::resolve(&text) {
+            Ok(os) => Ok(os.name.to_string()),
+            Err(e) => Err(D::Error::custom(e)),
+        })
+        .transpose()
+}
+
+impl Table {
+    /// The table's image for an OS by its image-table name (`debian-12`).
+    fn image_of(&self, os: &str) -> Option<&VmImage> {
+        self.os.get(os)
     }
 
     /// Reads a table from YAML. Unknown fields are errors.
@@ -90,10 +108,9 @@ impl Table {
             if m.vm.is_none()
                 && let Some(os) = &access.vm
             {
-                let os = crate::os::resolve(os).map_or_else(|_| os.clone(), |o| o.name.to_string());
                 m.vm = Some(VmImpl {
-                    image: self.image_of(&os).cloned(),
-                    os,
+                    image: self.image_of(os).cloned(),
+                    os: os.clone(),
                     provision: Vec::new(),
                     tpm: None,
                     boot: None,

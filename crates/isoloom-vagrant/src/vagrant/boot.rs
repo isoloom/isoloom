@@ -110,7 +110,7 @@ mod tests {
 
     fn env(boot: &str) -> Environment {
         let spec = isoloom_spec::parse(&format!(
-            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, vm: {{ os: debian-12, provision: [s.sh], boot: {boot} }} }}\n"
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, vm: {{ os: debian@12, provision: [s.sh], boot: {boot} }} }}\n"
         ))
         .unwrap();
         Environment::build(&spec, Target::Vagrant, None)

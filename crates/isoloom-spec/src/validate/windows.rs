@@ -36,17 +36,17 @@ mod tests {
 
     #[test]
     fn winssh_is_for_a_windows_box_that_answers_no_winrm() {
-        assert_eq!(problems("{ os: windows-server-2022, provision: [a.ps1], image: { winssh: true } }"), vec![]);
-        let linux = problems("{ os: debian-12, provision: [a.sh], image: { winssh: true } }");
+        assert_eq!(problems("{ os: windows-server@2022, provision: [a.ps1], image: { winssh: true } }"), vec![]);
+        let linux = problems("{ os: debian@12, provision: [a.sh], image: { winssh: true } }");
         assert_eq!(linux.len(), 1, "{linux:?}");
         assert_eq!(linux[0].0, "machines.a.vm.image.winssh");
-        let both = problems("{ os: windows-server-2022, provision: [a.ps1], image: { winssh: true, winrm: ssl } }");
+        let both = problems("{ os: windows-server@2022, provision: [a.ps1], image: { winssh: true, winrm: ssl } }");
         assert_eq!(both[0].1, "a box answers WinRM or OpenSSH: drop `winrm` or `winssh`");
     }
 
     #[test]
     fn any_vm_may_ask_for_a_tpm_or_none() {
-        assert_eq!(problems("{ os: debian-12, provision: [a.sh], tpm: true }"), vec![]);
-        assert_eq!(problems("{ os: windows-11, provision: [a.ps1], tpm: false }"), vec![]);
+        assert_eq!(problems("{ os: debian@12, provision: [a.sh], tpm: true }"), vec![]);
+        assert_eq!(problems("{ os: windows@11, provision: [a.ps1], tpm: false }"), vec![]);
     }
 }

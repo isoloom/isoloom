@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn a_windows_secret_takes_a_drive_path_and_no_owner() {
-        let win = "    vm: { os: windows-server-2022, provision: [s.ps1] }\n";
+        let win = "    vm: { os: windows-server@2022, provision: [s.ps1] }\n";
         let ok = problems(&format!("{win}    secrets: [db, {{ source: db, target: 'C:\\app\\db' }}]\n"));
         assert!(ok.is_empty(), "{ok:?}");
         let owned = problems(&format!("{win}    secrets: [{{ source: db, mode: 0400 }}]\n"));
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn a_linux_secret_keeps_the_mount_rules() {
-        let linux = "    vm: { os: debian-12, provision: [s.sh] }\n";
+        let linux = "    vm: { os: debian@12, provision: [s.sh] }\n";
         let drive = problems(&format!("{linux}    secrets: [{{ source: db, target: 'C:\\app\\db' }}]\n"));
         assert!(drive.iter().any(|p| p.contains("isn't a safe file path")), "{drive:?}");
         let owned = problems(&format!("{linux}    secrets: [{{ source: db, mode: 0400, uid: 1000 }}]\n"));

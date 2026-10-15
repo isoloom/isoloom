@@ -23,10 +23,10 @@ machines:
   web:
     networks: { front: 10, back: 10 }
     ports: [{ port: 80, publish: 8080 }]
-    vm: { os: ubuntu-24.04, provision: [web.sh] }
+    vm: { os: ubuntu@24.04, provision: [web.sh] }
   db:
     networks: { back: 20 }
-    vm: { os: debian-12, provision: [db.sh] }
+    vm: { os: debian@12, provision: [db.sh] }
 ";
 
 fn module(spec: &str) -> String {
@@ -60,19 +60,19 @@ fn a_vm_per_machine_set_up_through_the_router() {
 
 #[test]
 fn windows_and_ipv6_are_hosted_within_limits() {
-    let windows = PAIR.replace("os: debian-12, provision: [db.sh]", "os: windows-server-2022, provision: [db.ps1]");
+    let windows = PAIR.replace("os: debian@12, provision: [db.sh]", "os: windows-server@2022, provision: [db.ps1]");
     assert_eq!(EsxiBackend.refusal(&env(&windows)), None);
     let tf = module(&windows);
     assert!(tf.contains("guestos        = \"windows2019srvnext-64\""), "{tf}");
     assert!(tf.contains("resource \"random_password\" \"windows\""));
     assert!(!tf.contains("resource \"terraform_data\" \"db\""), "cloudbase-init sets it up");
-    let shell = PAIR.replace("os: debian-12", "os: windows-server-2022");
+    let shell = PAIR.replace("os: debian@12", "os: windows-server@2022");
     let why = EsxiBackend.refusal(&env(&shell)).unwrap();
     assert!(why.contains("PowerShell scripts"), "{why}");
     let v6 = PAIR.replace("back: { cidr: 10.20.2.0/24 }", "back: { cidr: 10.20.2.0/24, ipv6: { cidr: \"fd00:20::/64\" } }");
     assert_eq!(EsxiBackend.refusal(&env(&v6)), None);
     assert!(module(&v6).contains("\"10.20.2.254/24\", \"fd00:20::254/64\""), "the router's IPv6 address");
-    let kali = PAIR.replace("os: debian-12", "os: kali");
+    let kali = PAIR.replace("os: debian@12", "os: kali");
     let why = EsxiBackend.refusal(&env(&kali)).unwrap();
     assert!(why.contains("no ESXi image for `kali`"), "{why}");
     assert_eq!(EsxiBackend.refusal(&env(PAIR)), None);

@@ -125,7 +125,7 @@ mod tests {
         Environment::build(&spec, isoloom_spec::model::Target::CloudVm, None)
     }
 
-    const EDGE: &str = "version: 1\nname: e\nnetworks:\n  out: { cidr: 10.70.0.0/24 }\n  dmz: { cidr: 10.70.10.0/24, gateway: fw }\nmachines:\n  fw: { networks: { out: 5, dmz: 1 }, vm: { os: debian-12, provision: [fw.sh] } }\n  web: { networks: { dmz: 10 }, vm: { os: debian-12, provision: [web.sh] } }\n";
+    const EDGE: &str = "version: 1\nname: e\nnetworks:\n  out: { cidr: 10.70.0.0/24 }\n  dmz: { cidr: 10.70.10.0/24, gateway: fw }\nmachines:\n  fw: { networks: { out: 5, dmz: 1 }, vm: { os: debian@12, provision: [fw.sh] } }\n  web: { networks: { dmz: 10 }, vm: { os: debian@12, provision: [web.sh] } }\n";
 
     #[test]
     fn the_gateway_moves_to_the_router_address_everywhere() {

@@ -396,17 +396,14 @@ fn vm_without_os() {
 
 #[test]
 fn vm_unknown_os() {
-    assert_problem(
-        &with_machine("{ networks: { lab: 5 }, vm: { os: plan9, provision: [p.sh] } }"),
-        "machines.m.vm.os",
-        "unknown OS `plan9`",
-    );
+    let e = parse(&with_machine("{ networks: { lab: 5 }, vm: { os: plan9, provision: [p.sh] } }")).unwrap_err();
+    assert!(e.to_string().starts_with("machines.m.vm.os: unknown OS `plan9`"), "{e}");
 }
 
 #[test]
 fn vm_without_provisioning() {
     assert_problem(
-        &with_machine("{ networks: { lab: 5 }, vm: { os: debian-12 } }"),
+        &with_machine("{ networks: { lab: 5 }, vm: { os: debian@12 } }"),
         "machines.m.vm.provision",
         "list the steps",
     );
@@ -414,7 +411,7 @@ fn vm_without_provisioning() {
 
 // Environment provisioning.
 
-const VM: &str = "{ networks: { lab: 5 }, vm: { os: debian-12 } }";
+const VM: &str = "{ networks: { lab: 5 }, vm: { os: debian@12 } }";
 
 #[test]
 fn provision_not_a_playbook() {
@@ -536,8 +533,8 @@ fn check_from_windows() {
     let yaml = format!(
         "{}checks:\n  - {{ from: win, tcp: 'web:80' }}\n",
         with_machines(&[
-            "web: { networks: { lab: 5 }, vm: { os: debian-12, provision: [p.sh] } }",
-            "win: { networks: { lab: 6 }, vm: { os: windows-server-2022, provision: [p.ps1] } }",
+            "web: { networks: { lab: 5 }, vm: { os: debian@12, provision: [p.sh] } }",
+            "win: { networks: { lab: 6 }, vm: { os: windows-server@2022, provision: [p.ps1] } }",
         ])
     );
     assert_problem(&yaml, "checks[0].from", "runs Windows");

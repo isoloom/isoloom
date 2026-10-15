@@ -26,7 +26,7 @@ machines:
   web:
     networks: { lab: 10 }
     ports: [{ port: 80, http: true, publish: 8080 }]
-    vm: { os: debian-12, provision: [p.sh] }
+    vm: { os: debian@12, provision: [p.sh] }
 ",
     );
     let tf = &files.iter().find(|f| f.path == DO).expect("a digitalocean file (refusal is None)").contents;
@@ -57,10 +57,10 @@ machines:
   web:
     networks: { a: 10 }
     ports: [{ port: 80, http: true }]
-    vm: { os: debian-12 }
+    vm: { os: debian@12 }
   box:
     networks: { b: 10 }
-    vm: { os: debian-12 }
+    vm: { os: debian@12 }
 ",
     );
     assert!(files.iter().any(|f| f.path == ".isoloom/cloud-vm/aws/main.tf"), "AWS still generates");

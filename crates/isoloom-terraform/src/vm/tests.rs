@@ -21,11 +21,11 @@ machines:
     networks: { lab: 10 }
     ports: [{ port: 80 }]
     inputs: [TOKEN]
-    vm: { os: debian-12, provision: [one.sh, reboot, two.sh] }
+    vm: { os: debian@12, provision: [one.sh, reboot, two.sh] }
   b:
     networks: { lab: 11 }
     depends_on: [a]
-    vm: { os: debian-12, provision: [b.sh] }
+    vm: { os: debian@12, provision: [b.sh] }
 ";
 
 fn env() -> Environment {

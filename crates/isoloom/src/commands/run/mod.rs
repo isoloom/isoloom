@@ -38,7 +38,7 @@ pub struct Args {
     /// ports, files under .isoloom-N/. For several copies on one host.
     #[arg(long, value_name = "N")]
     instance: Option<u8>,
-    /// Override a value for this command: `-s machines.web.vm.os=ubuntu-24.04` on the spec,
+    /// Override a value for this command: `-s machines.web.vm.os=ubuntu@24.04` on the spec,
     /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     sets: Vec<String>,

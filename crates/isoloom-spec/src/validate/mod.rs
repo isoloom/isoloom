@@ -50,12 +50,6 @@ pub use cidr6::{Cidr6, PREFIX as IPV6_PREFIX};
 pub use files::validate_files;
 pub use settings::CONTAINER_SYSCTLS;
 
-/// What the spec still writes the way it did before 1.0 (a machine's `services`, now `ports`):
-/// warnings, not problems, so the spec stays valid while its author renames them.
-pub fn warnings(spec: &Spec) -> &[Problem] {
-    &spec.warnings
-}
-
 /// One thing wrong with a spec: the field's path and what to do about it.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{at}: {message}")]

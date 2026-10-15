@@ -268,11 +268,6 @@ fn vm(s: &Subject, v: &VmImpl, p: &mut Problems) {
             format!("{at}.vm.os"),
             "name the machine's OS with `os: <family>@<version>` (`debian@12`), here or on the machine (or share one through `common:` or a group)",
         );
-    } else if s.m.os.as_deref() != Some(v.os.as_str())
-        && let Err(e) = crate::os::resolve(&v.os)
-    {
-        // An `os` copied from the machine's own is reported there, once.
-        p.add(format!("{at}.vm.os"), e.to_string());
     }
     // `reboot` is a Linux step. A Windows machine restarts from the environment's playbooks
     // (`ansible.windows.win_reboot`), which run from the controller and wait for it to come

@@ -145,7 +145,7 @@ mod tests {
         assert!(vagrant_uses_libvirt(&dir));
         std::fs::remove_dir_all(&dir).ok();
         let spec = isoloom_spec::parse(
-            "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53, publish: 1053 }], vm: { os: debian-12 } }\n",
+            "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  dns: { networks: { lab: 5 }, ports: [{ port: 53, protocol: udp, publish: 10053 }, { port: 53, publish: 1053 }], vm: { os: debian@12 } }\n",
         )
         .unwrap();
         let plan = isoloom_plan::Environment::build(&spec, isoloom_spec::Target::Vagrant, None);

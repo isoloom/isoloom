@@ -80,7 +80,7 @@ fn rendering_twice_gives_the_same_files() {
 /// A container `web` and a VM `db` on one network, with `extra` appended.
 fn mixed(extra: &str) -> Environment {
     let text = format!(
-        "version: 1\nname: m\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    ports: [{{ port: 80 }}]\n    docker: {{ image: nginx }}\n  db:\n    networks: {{ lab: 20 }}\n    ports: [{{ port: 5432 }}]\n    vm: {{ os: debian-12 }}\n{extra}"
+        "version: 1\nname: m\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    ports: [{{ port: 80 }}]\n    docker: {{ image: nginx }}\n  db:\n    networks: {{ lab: 20 }}\n    ports: [{{ port: 5432 }}]\n    vm: {{ os: debian@12 }}\n{extra}"
     );
     let spec = isoloom_spec::parse(&text).expect("parses");
     Environment::build(&spec, Target::Hybrid, None)
@@ -113,7 +113,7 @@ fn hybrid_refuses_a_volume_shared_by_containers_and_vms() {
 
 #[test]
 fn hybrid_refuses_gateways_and_docker_vm_takes_them() {
-    let gateway = "version: 1\nname: g\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { wan: 2, lan: 1 }\n    docker: { image: alpine }\n    vm: { os: debian-12 }\n  pc:\n    networks: { lan: 10 }\n    vm: { os: debian-12 }\n";
+    let gateway = "version: 1\nname: g\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { wan: 2, lan: 1 }\n    docker: { image: alpine }\n    vm: { os: debian@12 }\n  pc:\n    networks: { lan: 10 }\n    vm: { os: debian@12 }\n";
     let spec = isoloom_spec::parse(gateway).expect("parses");
     let why = HybridBackend.refusal(&Environment::build(&spec, Target::Hybrid, None));
     assert_eq!(why.as_deref(), Some("networks with a `gateway` machine in hybrid environments come later"));

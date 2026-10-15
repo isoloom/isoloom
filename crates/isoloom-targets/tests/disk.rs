@@ -15,7 +15,7 @@ machines:
   box:
     networks: {{ lab: 10 }}
     resources: {{ cpus: 1, memory_mb: 1024{disk} }}
-    vm: {{ os: debian-12, provision: [setup.sh] }}
+    vm: {{ os: debian@12, provision: [setup.sh] }}
 "
     ))
     .unwrap();

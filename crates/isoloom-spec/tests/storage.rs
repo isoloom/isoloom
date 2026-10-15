@@ -10,7 +10,7 @@ use isoloom_spec::{parse, validate};
 /// `app` completed by their own fields.
 fn spec(extra: &str, web: &str, app: &str) -> String {
     format!(
-        "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\n{extra}machines:\n  web: {{ networks: {{ lab: 5 }}, docker: {{ image: nginx }}{web} }}\n  app: {{ networks: {{ lab: 6 }}, docker: {{ image: alpine }}, vm: {{ os: debian-12, provision: [setup.sh] }}{app} }}\n"
+        "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\n{extra}machines:\n  web: {{ networks: {{ lab: 5 }}, docker: {{ image: nginx }}{web} }}\n  app: {{ networks: {{ lab: 6 }}, docker: {{ image: alpine }}, vm: {{ os: debian@12, provision: [setup.sh] }}{app} }}\n"
     )
 }
 
@@ -99,7 +99,7 @@ fn a_disk_has_a_size_a_filesystem_for_its_os_and_its_own_mount() {
 
 #[test]
 fn a_windows_disk_mounts_at_a_drive_letter() {
-    let yaml = "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  dc: { networks: { lab: 5 }, vm: { os: windows-server-2022 }, disks: { logs: { size_gb: 1, mount: /logs }, sys: { size_gb: 1, mount: 'C:' }, ok: { size_gb: 1, mount: 'E:' }, x: { size_gb: 1, fs: xfs, mount: 'F:' } } }\n";
+    let yaml = "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  dc: { networks: { lab: 5 }, vm: { os: windows-server@2022 }, disks: { logs: { size_gb: 1, mount: /logs }, sys: { size_gb: 1, mount: 'C:' }, ok: { size_gb: 1, mount: 'E:' }, x: { size_gb: 1, fs: xfs, mount: 'F:' } } }\n";
     assert_problem(yaml, "machines.dc.disks.logs.mount", "drive letter");
     assert_problem(yaml, "machines.dc.disks.sys.mount", "drive letter");
     assert_problem(yaml, "machines.dc.disks.x.fs", "formats NTFS");

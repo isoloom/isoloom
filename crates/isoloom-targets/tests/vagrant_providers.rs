@@ -7,7 +7,7 @@ use isoloom_spec::{Target, parse};
 use isoloom_targets::{generate, refusal, refusal_on};
 
 /// Three Debian VMs on one network, the first sized.
-const THREE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    resources: { disk_gb: 40 }\n    vm: { os: debian-12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian-12, provision: [p.sh] }\n  c:\n    networks: { lab: 12 }\n    vm: { os: debian-12, provision: [p.sh] }\n";
+const THREE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    resources: { disk_gb: 40 }\n    vm: { os: debian@12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian@12, provision: [p.sh] }\n  c:\n    networks: { lab: 12 }\n    vm: { os: debian@12, provision: [p.sh] }\n";
 
 fn vagrantfile(spec: &str) -> String {
     generate(&parse(spec).unwrap(), Target::Vagrant).unwrap().remove(0).contents
@@ -67,22 +67,18 @@ fn qemu_links_three_vms_through_a_hub() {
 
 #[test]
 fn qemu_keeps_the_pair_for_two_vms_and_refuses_a_vm_on_two_networks() {
-    let two = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian-12, provision: [p.sh] }\n";
+    let two = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\n  b:\n    networks: { lab: 11 }\n    vm: { os: debian@12, provision: [p.sh] }\n";
     let vf = vagrantfile(two);
     assert!(provider_block(&vf, "a", "qemu").contains("v.socket_opts = \"listen=127.0.0.1:"));
     assert!(!vf.contains("IsoloomQemu"), "no hub, no disk size: no helper");
 
-    let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10, dmz: 10 }\n    vm: { os: debian-12, provision: [p.sh] }\n";
+    let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10, dmz: 10 }\n    vm: { os: debian@12, provision: [p.sh] }\n";
     let spec = parse(routed).unwrap();
     let why = refusal_on(&spec, Target::Vagrant, Some("qemu")).expect("a VM on two networks");
     assert!(why.contains("`a` is on 2 networks, and QEMU gives a VM one"), "{why}");
     // Only QEMU: Vagrant on another provider, or whatever the provider, runs it.
     assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
     assert_eq!(refusal(&spec, Target::Vagrant), None);
-    // The deprecated question still answers the same, for the tools that ask it.
-    #[allow(deprecated)]
-    let old = isoloom_targets::qemu_refusal(&spec);
-    assert_eq!(old.as_deref(), Some(why.as_str()));
     // Still generated (for every other provider); the QEMU block says why it has no network.
     let vf = vagrantfile(routed);
     assert!(provider_block(&vf, "a", "qemu").contains("# No private network on QEMU: `a` is on 2 networks"));
@@ -110,7 +106,7 @@ fn utm_refuses_vms_on_a_network() {
 
 #[test]
 fn vmware_runs_a_machine_with_nested_virtualization() {
-    let spec = "version: 1\nname: t\nmachines:\n  a:\n    nested_virtualization: true\n    vm: { os: debian-12, provision: [p.sh] }\n  b:\n    vm: { os: debian-12, provision: [p.sh] }\n";
+    let spec = "version: 1\nname: t\nmachines:\n  a:\n    nested_virtualization: true\n    vm: { os: debian@12, provision: [p.sh] }\n  b:\n    vm: { os: debian@12, provision: [p.sh] }\n";
     let vf = vagrantfile(spec);
     assert!(provider_block(&vf, "a", "vmware_desktop").contains("v.vmx[\"vhv.enable\"] = \"TRUE\""));
     assert!(!provider_block(&vf, "b", "vmware_desktop").contains("vhv.enable"));

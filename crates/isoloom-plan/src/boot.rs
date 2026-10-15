@@ -53,7 +53,7 @@ version: 1
 name: t
 networks: { lan: { cidr: 10.0.0.0/24 } }
 machines:
-  web: { networks: { lan: 10 }, docker: { image: nginx }, vm: { os: debian-12, provision: [s.sh], boot: { order: [network, hd], network: { file: pxelinux.0 } } } }
+  web: { networks: { lan: 10 }, docker: { image: nginx }, vm: { os: debian@12, provision: [s.sh], boot: { order: [network, hd], network: { file: pxelinux.0 } } } }
 ";
 
     #[test]

@@ -32,10 +32,10 @@ networks:
 machines:
   fw:
     networks: { out: 5, dmz: 1 }
-    vm: { os: debian-12, provision: [fw.sh] }
+    vm: { os: debian@12, provision: [fw.sh] }
   web:
     networks: { dmz: 10 }
-    vm: { os: debian-12, provision: [web.sh] }
+    vm: { os: debian@12, provision: [web.sh] }
 ";
 
 #[test]
@@ -120,7 +120,7 @@ fn google_cloud_routes_a_network_through_its_gateway_in_a_vpc_of_its_own() {
 #[test]
 fn google_cloud_peers_the_networks_and_routes_a_routed_one_through_a_peer() {
     // `far` has no interface of fw's: it reaches dmz through out's route, over their peering.
-    let spec = format!("{EDGE}  x:\n    networks: {{ far: 10 }}\n    vm: {{ os: debian-12, provision: [x.sh] }}\n").replace(
+    let spec = format!("{EDGE}  x:\n    networks: {{ far: 10 }}\n    vm: {{ os: debian@12, provision: [x.sh] }}\n").replace(
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }",
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }",
     );
@@ -145,7 +145,7 @@ fn google_cloud_refuses_more_interfaces_than_a_vm_takes() {
     let nets = (0..9).map(|i| format!("  n{i}: {{ cidr: 10.9{i}.0.0/24 }}\n")).collect::<Vec<_>>().concat();
     let on: Vec<String> = (0..9).map(|i| format!("n{i}: 10")).collect();
     let spec = format!(
-        "version: 1\nname: wide\nnetworks:\n{nets}machines:\n  x:\n    networks: {{ {} }}\n    vm: {{ os: debian-12, provision: [x.sh] }}\n",
+        "version: 1\nname: wide\nnetworks:\n{nets}machines:\n  x:\n    networks: {{ {} }}\n    vm: {{ os: debian@12, provision: [x.sh] }}\n",
         on.join(", ")
     );
     let why = GcpBackend.refusal(&env(&spec)).unwrap();
@@ -173,7 +173,7 @@ networks:
 machines:
   x:
     networks: { a: 10 }
-    vm: { os: debian-12, provision: [x.sh] }
+    vm: { os: debian@12, provision: [x.sh] }
 ";
 
 #[test]
