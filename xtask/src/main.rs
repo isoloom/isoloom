@@ -8,12 +8,15 @@
 //! - `dev-link`: the consumers built against this checkout, without touching their pins;
 //! - `host-setup`: a test host's tools, installed once.
 //!
-//! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts.
+//! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts. `deps`
+//! is the test that keeps the workspace's dependencies one way.
 
 // The tasks report on the terminal: printing is their interface, not stray debugging output.
 #![allow(clippy::print_stdout)]
 
 mod check_all;
+#[cfg(test)]
+mod deps;
 mod dev_link;
 mod generate_all;
 mod host_setup;

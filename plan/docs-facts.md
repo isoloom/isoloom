@@ -65,6 +65,7 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
   - `cargo xtask host-setup [--check]`: the Linux host's tools in Rust (Rust itself first, by hand, from rustup.rs); on Windows it runs `xtask/host-setup/windows.ps1`, which can also run directly on a fresh host.
   - The linux-docker image is built from `xtask/check-all/linux.Dockerfile` and now carries the Windows MSVC target that `rust-toolchain.toml` asks for.
   - **`scripts/real-targets/` is gone:** `record.sh` read the `--json` events of `isoloom run|test|down`, which no longer exist, and the cloud reaper belongs to the runner. The disabled workflows `real-cloud.yml` and `real-proxmox.yml` still name them.
+- **The dependency rule is a test** (`cargo test -p xtask`, module `deps`, on `cargo metadata`): spec → plan → render → backends → targets → cli, each crate depending only on crates below it; no backend on another backend; the tools (`isoloom-import`) on the core only; `isoloom-manifest` on no workspace crate and on serde, serde_json, serde_path_to_error, schemars and thiserror only; nothing on the xtask. A new core crate has to be placed in the core order (spec and manifest, catalogue, plan, render), and a crate outside `crates/{core,backends,tools,targets,cli}/` fails.
 
 ## Phase 2: the spec front end
 - **`checks[].wait` takes a duration** as well as seconds: `90`, `90s`, `3m`, `1m30s` (held in seconds; the run manifest's timeouts read it).
