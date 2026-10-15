@@ -154,4 +154,30 @@ mod tests {
         let p = problems("vm: { os: windows-server@2022 }, command: x, before: [set.sh]");
         assert!(p.iter().any(|m| m.contains("PowerShell scripts (.ps1)")), "{p:?}");
     }
+
+    #[test]
+    fn an_appliance_runs_no_process_of_its_own() {
+        assert_eq!(
+            problems("docker: { image: x, appliance: cisco-iol }, working_dir: /srv"),
+            ["machines.a: a network appliance runs its own OS: no `command`, `working_dir` or `before`"]
+        );
+    }
+
+    #[test]
+    fn a_healthcheck_test_is_a_command() {
+        assert_eq!(
+            problems("docker: { image: nginx }, healthcheck: { test: '' }"),
+            ["machines.a.healthcheck.test: give the command to run"]
+        );
+    }
+
+    #[test]
+    fn a_healthchecks_pace_has_a_floor() {
+        let floor = "docker: { image: nginx }, healthcheck: { test: x, interval: 1s, timeout: 1s, start_period: 0s }";
+        assert_eq!(problems(floor), Vec::<String>::new());
+        assert_eq!(
+            problems("docker: { image: nginx }, healthcheck: { test: x, interval: 0s }"),
+            ["machines.a.healthcheck.interval: `0s` isn't a duration of at least 1s, like 5s, 1m or 1m30s"]
+        );
+    }
 }

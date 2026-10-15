@@ -56,3 +56,47 @@ fn host_vars(spec: &Spec, i: usize, step: &Provision, p: &mut Problems) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::testing::{lab, problems};
+
+    /// The problems of VMs `web` and `db` with `rest` (a `controller`, `provision`).
+    fn with(rest: &str) -> Vec<String> {
+        problems(&lab(&format!(
+            "machines:\n  web: {{ networks: {{ lan: 10 }}, vm: {{ os: debian@12 }} }}\n  db: {{ networks: {{ lan: 11 }}, vm: {{ os: debian@12 }} }}\n{rest}\n"
+        )))
+    }
+
+    #[test]
+    fn a_sound_controller_and_steps_pass() {
+        let ok = "controller: { resources: { memory_mb: 256, cpus: 1 } }\nprovision: [{ ansible: site.yaml, groups: { front: [web] }, host_vars: { db: { db_port: 5432, _x1: y } } }]";
+        assert_eq!(with(ok), Vec::<String>::new());
+    }
+
+    #[test]
+    fn the_controller_has_the_room_ansible_needs() {
+        assert_eq!(
+            with("controller: { resources: { memory_mb: 255, cpus: 0 } }"),
+            [
+                "controller.resources.memory_mb: at least 256 MB (Ansible and Python)",
+                "controller.resources.cpus: at least 1"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_step_runs_a_playbook_on_the_specs_machines() {
+        let step = "provision: [{ ansible: site.sh, groups: { linux: [web], front: [web, cache] }, host_vars: { cache: { 1x: y } } }]";
+        assert_eq!(
+            with(step),
+            [
+                "provision[0].ansible: an Ansible playbook: a .yml or .yaml file",
+                "provision[0].groups.linux: Isoloom fills this group itself",
+                "provision[0].groups.front[1]: no machine named `cache`",
+                "provision[0].host_vars.cache: no machine named `cache`",
+                "provision[0].host_vars.cache.1x: a variable name: letters, digits and `_`, not starting with a digit",
+            ]
+        );
+    }
+}

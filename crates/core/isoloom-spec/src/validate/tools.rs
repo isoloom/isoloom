@@ -67,3 +67,70 @@ pub(super) fn each(spec: &Spec, p: &mut Problems) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::testing::{lab, problems};
+
+    /// The problems of machine `web` (its port 80 published on 8080), group `front` and `tools`.
+    fn with(tools: &str) -> Vec<String> {
+        problems(&lab(&format!(
+            "machines:\n  web: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }}, ports: [{{ port: 80, name: site, publish: 8080 }}] }}\ngroups: {{ front: {{ members: [web] }} }}\ntools: {tools}\n"
+        )))
+    }
+
+    #[test]
+    fn sound_tools_pass() {
+        let three = "{ shell: {}, ui: { image: x, port: 3000, publish: 3000 }, dns: { image: y, port: 53 } }";
+        assert_eq!(with(three), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_tools_address_is_left_free() {
+        let found = problems(&lab(
+            "machines:\n  web: { networks: { lan: 252 }, docker: { image: nginx } }\n  db: { networks: { lan: 251 }, docker: { image: x } }\ntools: { shell: {} }\n",
+        ));
+        assert_eq!(
+            found,
+            ["machines.web.networks.lan: .252 is reserved for the tools (the 1 addresses below .253) when `tools:` is set"]
+        );
+    }
+
+    #[test]
+    fn a_tool_is_named_apart_from_the_machines_and_groups() {
+        assert_eq!(with("{ 1ui: { image: x } }"), ["tools.1ui: tool names are kebab-case and start with a letter"]);
+        for taken in ["web", "front"] {
+            let why = format!("tools.{taken}: `{taken}` is already a machine's or a group's name");
+            assert_eq!(with(&format!("{{ {taken}: {{ image: x }} }}")), [why], "{taken}");
+        }
+    }
+
+    #[test]
+    fn a_tool_is_a_recipe_or_an_image() {
+        assert_eq!(with("{ ui: {} }"), ["tools.ui.image: give a container image, or use a recipe: shell"]);
+        assert_eq!(
+            with("{ shell: { image: x } }"),
+            ["tools.shell.image: `shell` is a recipe with its own image; leave `image` out or choose another name"]
+        );
+    }
+
+    #[test]
+    fn a_published_tool_serves_a_port_no_machine_publishes() {
+        assert_eq!(
+            with("{ ui: { image: x, publish: 3000 } }"),
+            ["tools.ui.publish: say which `port` the tool serves"]
+        );
+        assert_eq!(
+            with("{ ui: { image: x, port: 3000, publish: 8080 } }"),
+            ["tools.ui.publish: host port 8080 is already published by a machine"]
+        );
+    }
+
+    #[test]
+    fn three_tools_at_most() {
+        assert_eq!(
+            with("{ shell: {}, a: { image: x }, b: { image: x }, c: { image: x } }"),
+            ["tools: at most 3 tools (each takes one of the addresses Isoloom reserves on every network)"]
+        );
+    }
+}

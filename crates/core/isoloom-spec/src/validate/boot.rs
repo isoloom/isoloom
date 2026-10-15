@@ -204,6 +204,67 @@ mod tests {
         validate(&spec).into_iter().map(|p| p.to_string()).collect()
     }
 
+    /// The problems of machine `a`, alone on `lan`, with `vm` as its `vm:`.
+    fn alone(vm: &str) -> Vec<String> {
+        crate::testing::problems(&crate::testing::lab(&format!("machines:\n  a: {{ networks: {{ lan: 10 }}, vm: {vm} }}\n")))
+    }
+
+    #[test]
+    fn sound_images_and_boots_pass() {
+        for vm in [
+            "{ os: debian@12, image: { vagrant: my/box, box_url: 'https://boxes.corp/v1/../my.box', box_server_url: 'http://boxes.corp' } }",
+            "{ os: debian@12, image: { vagrant: my/box, box_server_url: 'https://boxes.corp' } }",
+            "{ os: debian@12, boot: { firmware: uefi, loader: /usr/share/OVMF/OVMF_CODE.fd, nvram: /var/lib/vars.fd } }",
+            "{ os: debian@12, boot: { firmware: bios } }",
+            "{ os: debian@12, boot: { kernel: /k, initrd: /i, cmdline: 'console=ttyS0', dtb: /d } }",
+            "{ os: debian@12, boot: { order: [network, hd], network: { tftp_root: /srv/tftp } } }",
+            "{ os: debian@12, boot: { order: [network], network: { server: 10.0.0.1, file: pxelinux.0 } } }",
+        ] {
+            assert_eq!(alone(vm), Vec::<String>::new(), "{vm}");
+        }
+    }
+
+    #[test]
+    fn a_downloaded_box_is_named_in_vagrant() {
+        let why = "machines.a.vm.image.vagrant: name the box in `vagrant` too: Vagrant keeps the box it downloads from `box_url` (or finds on `box_server_url`) under that name";
+        assert_eq!(alone("{ os: debian@12, image: { box_url: boxes/my.box } }"), [why]);
+    }
+
+    #[test]
+    fn a_box_url_without_a_scheme_stays_in_the_project() {
+        for bad in ["'://boxes/../my.box'", "/srv/my.box"] {
+            assert_eq!(
+                alone(&format!("{{ os: debian@12, image: {{ vagrant: my/box, box_url: {bad} }} }}")),
+                ["machines.a.vm.image.box_url: a URL (https://, file://) or a .box file inside the project folder"],
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_bios_takes_no_uefi_loader() {
+        assert_eq!(
+            alone("{ os: debian@12, boot: { firmware: bios, loader: /usr/share/OVMF/OVMF_CODE.fd } }"),
+            ["machines.a.vm.boot.firmware: `loader` and `firmware_format` are a UEFI firmware's: `firmware: uefi`, or leave them out"]
+        );
+    }
+
+    #[test]
+    fn a_boot_server_serves_a_file() {
+        assert_eq!(
+            alone("{ os: debian@12, boot: { order: [network], network: { tftp_root: /srv/tftp, server: 10.0.0.1 } } }"),
+            ["machines.a.vm.boot.network.server: the server holds the boot `file`: give the file too"]
+        );
+    }
+
+    #[test]
+    fn machines_on_one_network_may_share_one_network_boot() {
+        assert_eq!(
+            problems("{ os: debian@12, boot: { order: [network], network: { file: other.0 } } }"),
+            Vec::<String>::new()
+        );
+    }
+
     #[test]
     fn a_box_url_needs_the_box_name_and_a_url_or_a_project_file() {
         let p = problems("{ os: debian@12, image: { box_url: /tmp/x.box, box_server_url: ftp://x } }");

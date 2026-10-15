@@ -109,6 +109,26 @@ mod tests {
     }
 
     #[test]
+    fn a_driver_is_a_lowercase_word_of_letters_digits_and_separators() {
+        assert_eq!(problems("vm: { os: debian@12 }, gpus: { driver: nvidia-535.104_x }"), Vec::<String>::new());
+        assert_eq!(
+            problems("vm: { os: debian@12 }, gpus: { driver: 'nvidia 535' }"),
+            ["machines.a.gpus.driver: a driver's name, e.g. nvidia, amd or intel"]
+        );
+    }
+
+    #[test]
+    fn a_gpu_id_is_one_word() {
+        for bad in ["''", "'0 1'"] {
+            assert_eq!(
+                problems(&format!("vm: {{ os: debian@12 }}, gpus: {{ ids: [{bad}] }}")),
+                ["machines.a.gpus.ids[0]: a GPU's id on the host: an index (`0`), a UUID, or a PCI address (`0000:01:00.0`)"],
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
     fn each_mistake_says_where_and_how_to_fix_it() {
         let found = problems(
             "docker: { image: x }, nested_virtualization: true, gpus: { count: 0, ids: ['1', '1', ' '], driver: NV, capabilities: ['Comp'], options: { ' ': x } }, \

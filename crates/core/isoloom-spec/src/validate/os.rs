@@ -24,3 +24,26 @@ pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::testing::{lab, problems};
+
+    /// The problems of a VM whose `os` is `os` and `vm.os` is `vm_os`.
+    fn of(os: &str, vm_os: &str) -> Vec<String> {
+        problems(&lab(&format!(
+            "machines:\n  a: {{ networks: {{ lan: 10 }}, os: {os}, vm: {{ os: {vm_os} }} }}\n"
+        )))
+    }
+
+    #[test]
+    fn a_machines_os_and_its_vm_os_agree() {
+        assert_eq!(of("debian@12", "debian@12"), Vec::<String>::new());
+        assert_eq!(
+            of("debian@12", "ubuntu@24.04"),
+            [
+                "machines.a.vm.os: `vm.os` is ubuntu@24.04 but the machine's `os` is debian@12: they must agree; leave `vm.os` out (it defaults to `os`) or write the same OS in both"
+            ]
+        );
+    }
+}

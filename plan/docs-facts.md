@@ -210,6 +210,7 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **Spec problems, `service:`:** a `service:` that is neither a name nor a list says "expected a catalogue service, `name[@version]`, or a list of them".
 - **The spec's JSON Schema is committed** at `schemas/spec-v1.schema.json`, exactly as `isoloom schema` prints it; a test keeps it current (`cargo test -p isoloom-spec --test schema -- --ignored write_the_committed_schema` rewrites it).
 - **Run manifest, port names:** a port's name follows the spec's rule (`[a-z][a-z0-9-]{0,30}`), so a `${published.<machine>.<port>}` placeholder names its port by that rule; a UDP port marked `http` or `tls` is refused (`port_protocol`). The JSON fields are unchanged.
+- **`constraints.proxy`:** an `http://` URL with a one-character host (`http://p:3128`) is accepted; it was refused because its length was compared with `https://`'s.
 
 ## Test hosts: the pinned commits
 - **`cargo xtask check-all`, SSH hosts:** before a run that copies Isothrum or the launcher, each SSH host (`linux`, `windows`) gets a bare mirror of this machine's Isoloom and Isothrum `main` in its home (`~/isoloom-mirrors/<repo>.git`, fetched from a git bundle each run), its global git config rewrites `https://github.com/isoloom/<repo>` to it (`url.file://<mirror>.insteadOf`, any other rewrite of that URL removed), and its legs run Cargo with `CARGO_NET_GIT_FETCH_WITH_CLI=true`. The host log says which `main` each mirror got. It replaces `~/.isoloom-lab/windows-vm/sync-mirrors.sh` (and its `C:/isoloom-mirrors`).

@@ -92,3 +92,103 @@ fn scripts(c: &CloudServices, p: &mut Problems) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::testing::problems;
+
+    /// The problems of a cloud-services environment written as `cloud`, its input `PLAYER_IP`
+    /// declared.
+    fn of(cloud: &str) -> Vec<String> {
+        problems(&format!("version: 1\nname: t\ninputs: [PLAYER_IP]\ncloud: {cloud}\n"))
+    }
+
+    /// The problems of `cloud.<field>` added to a sound module.
+    fn with(field: &str) -> Vec<String> {
+        of(&format!("{{ provider: aws, terraform: infra, {field} }}"))
+    }
+
+    #[test]
+    fn sound_cloud_services_pass() {
+        let ok = with(
+            "vars: { region: eu, ip-list_2: ['{{ inputs.PLAYER_IP }}/32'] }, outputs: { site: site_url, api-2_x: api }, hourly_usd: 0, env: { REGION: x, _TOKEN: y, A_1: z }, apply_retries: 5, requires: [jq]",
+        );
+        assert_eq!(ok, Vec::<String>::new());
+        assert_eq!(with("hourly_usd: 1000"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn cloud_services_have_no_machines_and_a_module() {
+        let both = problems(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines: { web: { networks: { lan: 10 }, docker: { image: nginx } } }\ncloud: { provider: aws, terraform: infra }\n",
+        );
+        assert_eq!(
+            both,
+            ["cloud: an environment is cloud services or machines, not both (yet): leave `machines` out"]
+        );
+        assert_eq!(
+            of("{ provider: aws, terraform: ' ' }"),
+            ["cloud.terraform: the Terraform module's folder, in the project"]
+        );
+    }
+
+    #[test]
+    fn variables_and_outputs_are_terraform_names() {
+        for bad in ["1region", "re.gion", "re gion"] {
+            assert_eq!(
+                with(&format!("vars: {{ '{bad}': x }}")),
+                [format!("cloud.vars.{bad}: `{bad}` isn't a Terraform variable name")],
+                "{bad}"
+            );
+        }
+        assert_eq!(with("vars: { '': x }"), ["cloud.vars.: `` isn't a Terraform variable name"]);
+        assert_eq!(
+            with("outputs: { 1site: site_url }"),
+            ["cloud.outputs.1site: `1site: site_url`: a name, then the module output it reads"]
+        );
+        assert_eq!(
+            with("outputs: { site: site.url }"),
+            ["cloud.outputs.site: `site: site.url`: a name, then the module output it reads"]
+        );
+    }
+
+    #[test]
+    fn a_variables_inputs_are_declared() {
+        assert_eq!(
+            with("vars: { ip: '{{ inputs.NOPE }}' }"),
+            ["cloud.vars.ip: `NOPE` isn't declared in the spec's `inputs`"]
+        );
+    }
+
+    #[test]
+    fn the_hourly_cost_is_0_to_1000_dollars() {
+        for bad in ["-1", "1000.5"] {
+            assert_eq!(
+                with(&format!("hourly_usd: {bad}")),
+                ["cloud.hourly_usd: a cost per hour in US dollars (0 to 1000)"],
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_scripts_environment_is_well_named_and_their_own_is_left_alone() {
+        for bad in ["1A", "A-B"] {
+            let why = format!("cloud.env.{bad}: `{bad}` isn't an environment variable name (letters, digits, `_`)");
+            assert_eq!(with(&format!("env: {{ {bad}: x }}")), [why], "{bad}");
+        }
+        for taken in ["PATH", "tries", "ISOLOOM_PROJECT"] {
+            let why = format!("cloud.env.{taken}: `{taken}` is the scripts' own (or the shell's): pick another name");
+            assert_eq!(with(&format!("env: {{ {taken}: x }}")), [why], "{taken}");
+        }
+    }
+
+    #[test]
+    fn retries_and_requirements_are_bounded_and_named() {
+        assert_eq!(with("apply_retries: 6"), ["cloud.apply_retries: at most 5 more applies"]);
+        assert_eq!(
+            with("requires: [jq, ' ']"),
+            ["cloud.requires[1]: a command name, or a shell command that must succeed"]
+        );
+    }
+}

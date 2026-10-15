@@ -95,3 +95,113 @@ fn under_volume(name: &str, m: &Machine, p: &mut Problems) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::testing::{lab, problems};
+
+    /// A Linux machine.
+    const LINUX: &str = "docker: { image: nginx }";
+
+    /// A Windows machine.
+    const WINDOWS: &str = "vm: { os: windows-server@2022 }";
+
+    /// The problems of machine `a`, implemented as `machine`, with `files`.
+    fn of(machine: &str, files: &str) -> Vec<String> {
+        problems(&lab(&format!("machines:\n  a: {{ networks: {{ lan: 10 }}, {machine}, files: {files} }}\n")))
+    }
+
+    #[test]
+    fn sound_files_pass() {
+        let linux = "[{ path: /etc/app/app.ini, source: config/app-1_x.ini, uid: 1000, gid: 1000, mode: '0640' }, { path: /a, content: x, mode: '755' }, { path: /etc/a..b/x.conf, content: y }]";
+        assert_eq!(of(LINUX, linux), Vec::<String>::new());
+        let windows = "[{ path: 'C:\\app\\app.ini', content: x }, { path: 'D:/data/x.txt', source: data/x.txt }]";
+        assert_eq!(of(WINDOWS, windows), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_path_is_absolute_on_the_machines_os() {
+        for bad in ["etc/app.ini", "/", "''"] {
+            let path = bad.trim_matches('\'');
+            let why = format!("machines.a.files[0].path: `{path}` must be an absolute path on the machine, like `/etc/app/app.ini`");
+            assert_eq!(of(LINUX, &format!("[{{ path: {bad}, content: x }}]")), [why], "{bad}");
+        }
+        assert_eq!(
+            of(WINDOWS, "[{ path: /etc/app.ini, content: x }]"),
+            ["machines.a.files[0].path: `/etc/app.ini` must be an absolute path on the machine, like `C:\\app\\app.ini`"]
+        );
+    }
+
+    #[test]
+    fn a_path_names_a_file() {
+        for bad in ["/etc/app/", "/etc/../app.ini", "/etc/./app.ini"] {
+            let why = format!("machines.a.files[0].path: `{bad}` must name a file: no trailing `/`, `.` or `..`");
+            assert_eq!(of(LINUX, &format!("[{{ path: {bad}, content: x }}]")), [why], "{bad}");
+        }
+        assert_eq!(
+            of(WINDOWS, "[{ path: 'C:\\app\\', content: x }]"),
+            ["machines.a.files[0].path: `C:\\app\\` must name a file: no trailing `/`, `.` or `..`"]
+        );
+    }
+
+    #[test]
+    fn a_path_is_placed_once() {
+        assert_eq!(
+            of(LINUX, "[{ path: /etc/a.ini, content: x }, { path: /etc/a.ini, content: y }]"),
+            ["machines.a.files[1].path: `/etc/a.ini` is placed twice: keep one entry per path"]
+        );
+    }
+
+    #[test]
+    fn a_file_has_either_a_source_or_a_content() {
+        assert_eq!(
+            of(LINUX, "[{ path: /etc/a.ini, source: a.ini, content: x }]"),
+            ["machines.a.files[0]: give `source` (a file of the project) or `content` (the text), not both"]
+        );
+        assert_eq!(
+            of(LINUX, "[{ path: /etc/a.ini }]"),
+            ["machines.a.files[0]: give `source` (a file of the project) or `content` (the text)"]
+        );
+    }
+
+    #[test]
+    fn a_source_is_a_plain_project_path() {
+        assert_eq!(
+            of(LINUX, "[{ path: /etc/a.ini, source: 'my app.ini' }]"),
+            ["machines.a.files[0].source: `my app.ini`: a project path of letters, digits, `.`, `_`, `-` and `/` (rename the file)"]
+        );
+    }
+
+    #[test]
+    fn a_windows_file_has_no_owner_or_mode() {
+        assert_eq!(
+            of(WINDOWS, "[{ path: 'C:\\app.ini', content: x, mode: '0644' }]"),
+            ["machines.a.files[0]: a Windows machine's files have no `uid`, `gid` or `mode`: remove them"]
+        );
+    }
+
+    #[test]
+    fn a_mode_is_three_or_four_octal_digits() {
+        for bad in ["0999", "12", "01234"] {
+            let why = format!("machines.a.files[0].mode: `{bad}` isn't a mode: three or four octal digits, like `0644`");
+            assert_eq!(of(LINUX, &format!("[{{ path: /etc/a.ini, content: x, mode: '{bad}' }}]")), [why], "{bad}");
+        }
+    }
+
+    #[test]
+    fn an_appliance_takes_no_files() {
+        assert_eq!(
+            of("docker: { image: x, appliance: cisco-iol }", "[{ path: etc/x, content: x }]"),
+            ["machines.a.files: a network appliance takes its configuration from `app.config`, not `files`"]
+        );
+    }
+
+    #[test]
+    fn a_file_goes_outside_the_machines_volumes() {
+        let files = "[{ path: /srv/data/x.ini, content: x }, { path: /srv/database.ini, content: y }]";
+        assert_eq!(
+            of(&format!("{LINUX}, volumes: {{ data: /srv/data }}"), files),
+            ["machines.a.files[0].path: `/srv/data/x.ini` is inside volume `data` (/srv/data): a volume keeps its own data, place the file outside it"]
+        );
+    }
+}

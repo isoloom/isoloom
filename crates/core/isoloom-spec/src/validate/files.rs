@@ -114,3 +114,135 @@ fn cloud_module(spec: &Spec, lab_dir: &Path) -> Option<Problem> {
         )
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+    use std::fs;
+
+    use super::validate_files;
+    use crate::testing::{lab, model};
+
+    /// A test's outcome: a failed step is its report.
+    type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+
+    /// Every file a spec of machines can name, in its project.
+    const MACHINES: &str = "machines:
+  web: { networks: { lan: 10 }, docker: { build: app, dockerfile: app/Dockerfile, init: [init.sh] }, files: [{ path: /etc/a.ini, source: conf/a.ini }], before: [before.sh] }
+  r1: { networks: { lan: 20 }, docker: { image: x, appliance: cisco-iol, config: r1.cfg, firmware: fw.bin } }
+  vm1: { networks: { lan: 30 }, vm: { os: debian@12, provision: [setup.sh, reboot], image: { vagrant: my/box, box_url: boxes/my.box } } }
+  vm2: { networks: { lan: 40 }, vm: { os: debian@12, image: { vagrant: my/box, box_url: 'https://boxes.corp/my.box' } } }
+provision: [{ ansible: site.yml, inventory: [inv.ini], requirements: req.yml }]
+checks: [check.sh, { script: v1..2/probe.sh, from: web }]
+";
+
+    /// The files `MACHINES` names.
+    const MACHINES_FILES: &[&str] = &[
+        "app/Dockerfile",
+        "init.sh",
+        "conf/a.ini",
+        "before.sh",
+        "r1.cfg",
+        "fw.bin",
+        "setup.sh",
+        "boxes/my.box",
+        "site.yml",
+        "inv.ini",
+        "req.yml",
+        "check.sh",
+        "v1..2/probe.sh",
+    ];
+
+    /// A cloud-services spec with its module in `infra` and a `before` script.
+    const CLOUD: &str = "version: 1\nname: t\ncloud: { provider: aws, terraform: infra, before: [prep.sh] }\n";
+
+    /// What `validate_files` finds for the lowered spec `yaml` in a fresh project folder (named
+    /// after `test`) holding `files`, each written empty; a name ending in `/` is a folder.
+    fn found(test: &str, files: &[&str], yaml: &str) -> Outcome<Vec<String>> {
+        let dir = std::env::temp_dir().join(format!("isoloom-spec-files-{}-{test}", std::process::id()));
+        if dir.exists() {
+            fs::remove_dir_all(&dir)?;
+        }
+        fs::create_dir_all(&dir)?;
+        for f in files {
+            let path = dir.join(f);
+            if f.ends_with('/') {
+                fs::create_dir_all(&path)?;
+            } else {
+                fs::create_dir_all(path.parent().unwrap_or(&dir))?;
+                fs::write(&path, "")?;
+            }
+        }
+        let spec = model(yaml)?;
+        let problems = validate_files(&spec, &dir).iter().map(ToString::to_string).collect();
+        fs::remove_dir_all(&dir)?;
+        Ok(problems)
+    }
+
+    #[test]
+    fn every_path_present_in_the_project_passes() -> Outcome {
+        assert_eq!(found("present", MACHINES_FILES, &lab(MACHINES))?, Vec::<String>::new());
+        assert_eq!(found("present-cloud", &["infra/main.tf", "prep.sh"], CLOUD)?, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn every_missing_path_is_named_where_the_spec_mentions_it() -> Outcome {
+        let missing = |at: &str, path: &str| format!("{at}: `{path}` doesn't exist in the project folder");
+        let expect = [
+            missing("machines.web.docker.build", "app"),
+            missing("machines.web.docker.dockerfile", "app/Dockerfile"),
+            missing("machines.web.docker.init[0]", "init.sh"),
+            missing("machines.web.files[0].source", "conf/a.ini"),
+            missing("machines.web.before[0]", "before.sh"),
+            missing("machines.r1.docker.config", "r1.cfg"),
+            missing("machines.r1.docker.firmware", "fw.bin"),
+            missing("machines.vm1.vm.provision[0]", "setup.sh"),
+            missing("machines.vm1.vm.image.box_url", "boxes/my.box"),
+            missing("provision[0].ansible", "site.yml"),
+            missing("provision[0].inventory[0]", "inv.ini"),
+            missing("provision[0].requirements", "req.yml"),
+            missing("checks[0]", "check.sh"),
+            missing("checks[1].script", "v1..2/probe.sh"),
+        ];
+        assert_eq!(found("missing", &[], &lab(MACHINES))?, expect);
+        Ok(())
+    }
+
+    #[test]
+    fn a_path_leaving_the_project_is_refused() -> Outcome {
+        let checks = "machines: { web: { networks: { lan: 10 }, docker: { image: nginx } } }\nchecks: [/etc/hosts, ../x.sh, a/../../x.sh]\n";
+        let outside = |i: usize, path: &str| format!("checks[{i}]: `{path}` must be a path inside the project folder");
+        assert_eq!(
+            found("outside", &["a/"], &lab(checks))?,
+            [outside(0, "/etc/hosts"), outside(1, "../x.sh"), outside(2, "a/../../x.sh")]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_files_source_is_a_file_not_a_folder() -> Outcome {
+        let machine = "machines: { web: { networks: { lan: 10 }, docker: { image: nginx }, files: [{ path: /etc/a, source: conf }] } }\n";
+        assert_eq!(
+            found("folder", &["conf/"], &lab(machine))?,
+            ["machines.web.files[0].source: `conf` is a folder: name a file"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_cloud_module_is_a_folder_holding_terraform_files() -> Outcome {
+        assert_eq!(
+            found("cloud-missing", &[], CLOUD)?,
+            [
+                "cloud.terraform: `infra` doesn't exist in the project folder",
+                "cloud.before[0]: `prep.sh` doesn't exist in the project folder"
+            ]
+        );
+        assert_eq!(
+            found("cloud-no-tf", &["infra/README.md", "prep.sh"], CLOUD)?,
+            ["cloud.terraform: `infra` holds no .tf file: it must be a Terraform root module"]
+        );
+        Ok(())
+    }
+}

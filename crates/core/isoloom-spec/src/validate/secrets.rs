@@ -146,4 +146,76 @@ mod tests {
         let owned = problems(&format!("{linux}    secrets: [{{ source: db, mode: 0400, uid: 1000 }}]\n"));
         assert!(owned.is_empty(), "{owned:?}");
     }
+
+    /// The problems of secret `s`, kept in `store`, placed on a container.
+    fn stored(store: &str) -> Vec<String> {
+        crate::testing::problems(&crate::testing::lab(&format!(
+            "secrets: {{ s: {store} }}\nmachines:\n  m: {{ networks: {{ lan: 10 }}, docker: {{ image: x }}, secrets: [s] }}\n"
+        )))
+    }
+
+    #[test]
+    fn each_store_takes_its_kind_of_reference() {
+        for ok in [
+            "{ env: DB_PASSWORD }",
+            "{ file: ~/db }",
+            "{ vault: 'secret/app#db_password' }",
+            "{ sops: 'secrets.enc.yaml#db.password' }",
+        ] {
+            assert_eq!(stored(ok), Vec::<String>::new(), "{ok}");
+        }
+        assert_eq!(
+            stored("{ env: 1DB }"),
+            ["secrets.s.env: `1DB` isn't an environment variable name (letters, digits and `_`, not starting with a digit)"]
+        );
+        assert_eq!(
+            stored("{ file: ' ' }"),
+            ["secrets.s.file: the file's path: absolute, `~/...`, or relative to the project"]
+        );
+    }
+
+    #[test]
+    fn a_vault_or_sops_reference_is_a_place_then_a_key() {
+        for bad in ["secret/app", "'#db_password'", "'secret/app#'", "'secret/app# '"] {
+            let r = bad.trim_matches('\'');
+            let why = format!("secrets.s.vault: `{r}` isn't `<path>#<key>`, like secret/app#db_password");
+            assert_eq!(stored(&format!("{{ vault: {bad} }}")), [why], "{bad}");
+        }
+        assert_eq!(
+            stored("{ sops: secrets.enc.yaml }"),
+            ["secrets.s.sops: `secrets.enc.yaml` isn't `<file>#<key>`, like secrets.enc.yaml#db.password"]
+        );
+    }
+
+    #[test]
+    fn a_machines_secret_is_declared() {
+        assert_eq!(
+            problems("    docker: { image: x }\n    secrets: [db, other, { source: more, target: /run/more }]\n"),
+            [
+                "machines.m.secrets[1]: `other` isn't declared in `secrets` (db)",
+                "machines.m.secrets[2].source: `more` isn't declared in `secrets` (db)",
+            ]
+        );
+        let undeclared = crate::testing::problems(&crate::testing::lab(
+            "machines:\n  m: { networks: { lan: 10 }, docker: { image: x }, secrets: [db] }\n",
+        ));
+        assert_eq!(
+            undeclared,
+            ["machines.m.secrets[0]: `db` isn't declared: add it under the top-level `secrets` with its store (`{ env: VAR }`, `{ file: path }`...)"]
+        );
+    }
+
+    #[test]
+    fn a_windows_secret_path_has_no_colon_past_the_drive_nor_a_trailing_separator() {
+        let win = "    vm: { os: windows-server@2022, provision: [s.ps1] }\n";
+        for bad in ["C:\\app\\db:x", "C:\\app\\"] {
+            let why =
+                format!("machines.m.secrets[0].target: `{bad}` isn't a file path on the machine (no ':' past the drive, no '..'), like C:\\app\\db-password");
+            assert_eq!(problems(&format!("{win}    secrets: [{{ source: db, target: '{bad}' }}]\n")), [why], "{bad}");
+        }
+        assert_eq!(
+            problems(&format!("{win}    secrets: [{{ source: db, uid: 1000 }}]\n")),
+            ["machines.m.secrets[0]: a Windows machine's secret has no `uid`, `gid` or `mode`: its file is readable by SYSTEM and Administrators only"]
+        );
+    }
 }
