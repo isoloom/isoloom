@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ proxmox
@@ -9,6 +8,7 @@ assertion_line: 219
 ✓ .isoloom/proxmox/main.tf
 ✓ .isoloom/proxmox/checks/user.sh
 ✓ .isoloom/proxmox/checks/web01.sh
+✓ .isoloom/proxmox/run.json
 ✓ .isoloom/resolved.json
 
 ## .isoloom/proxmox/checks/user.sh
@@ -272,8 +272,12 @@ variable "proxmox_ssh_address" {
 }
 
 variable "node" {
-  type    = string
-  default = "pve"
+  type        = string
+  description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
+  validation {
+    condition     = var.node != ""
+    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+  }
 }
 
 variable "datastore" {
@@ -364,10 +368,14 @@ resource "proxmox_virtual_environment_pool" "env" {
   comment = "Isoloom: corp-ad-basics"
 }
 
+# Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.
+resource "proxmox_sdn_applier" "finalizer" {}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
-  id    = local.zone
-  nodes = [var.node]
+  id         = local.zone
+  nodes      = [var.node]
+  depends_on = [proxmox_sdn_applier.finalizer]
 }
 
 # The controller's own key: it runs the playbooks over SSH on every machine.
@@ -402,7 +410,11 @@ resource "proxmox_sdn_vnet" "access" {
   zone = proxmox_sdn_zone_simple.env.id
 }
 
+# Applies the SDN objects once created, and again whenever one of them is replaced.
 resource "proxmox_sdn_applier" "env" {
+  lifecycle {
+    replace_triggered_by = [proxmox_sdn_zone_simple.env, proxmox_sdn_vnet.dmz, proxmox_sdn_vnet.corp, proxmox_sdn_vnet.access]
+  }
   depends_on = [proxmox_sdn_vnet.dmz, proxmox_sdn_vnet.corp, proxmox_sdn_vnet.access]
 }
 
@@ -519,6 +531,17 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   on_boot   = false
   agent {
     enabled = true
+    timeout = "8m"
+    wait_for_ip {
+      ipv4 = true
+    }
+  }
+  stop_on_destroy = true
+  lifecycle {
+    postcondition {
+      condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], a)]) > 0
+      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+    }
   }
   cpu {
     cores = 1
@@ -856,10 +879,11 @@ resource "proxmox_virtual_environment_file" "web01" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.40.99.10 user'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'ip route replace 10.40.99.0/24 via 10.40.10.254'",
-        "sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\ncd /opt/isoloom && sh -c '\\''ansible-playbook -c local -i web01, provision/web01.yml'\\'''",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.40.99.10 user'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: routes' > /var/lib/isoloom/ready && sh -c 'ip route replace 10.40.99.0/24 via 10.40.10.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/web01.yml' > /var/lib/isoloom/ready && sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\ncd /opt/isoloom && sh -c '\\''ansible-playbook -c local -i web01, provision/web01.yml'\\''' || { echo 'failed: provision/web01.yml' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -981,14 +1005,15 @@ resource "proxmox_virtual_environment_file" "controller" {
         }
       ])
       runcmd = [
-        "sh -c 'printf '\\''%s\\n'\\'' '\\''10.40.20.5 dc01'\\'' '\\''10.40.20.21 ws-01'\\'' '\\''10.40.20.22 ws-02'\\'' '\\''10.40.10.10 web01'\\'' '\\''10.40.99.10 user'\\'' >> /etc/hosts'",
-        "sh -c '[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q '\\''ansible-core>=2.15,<2.17'\\'' pywinrm; }'",
-        "sh -c 'i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.40.10.10 test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && { echo '\\''web01 not ready'\\''; exit 1; }; sleep 5; done'",
-        "sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini dc01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''dc01 not ready'\\''; exit 1; }; sleep 10; done'",
-        "sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-01 not ready'\\''; exit 1; }; sleep 10; done'",
-        "sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-02 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-02 not ready'\\''; exit 1; }; sleep 10; done'",
-        "sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\nmkdir -p /tmp/isoloom-retry\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\n_isoloom_attempts=4\n_isoloom_transient='\\''send_input failed|the pipe has been ended|winrmtransporterror|winrmoperationtimeouterror|read timeout|bad http response returned from server|(kerberos|ntlm|credssp).*500|remote end closed connection|connection reset by peer|connection refused|connection aborted|broken pipe|timed out|failed to connect to the host via ssh|shared connection to .* closed'\\''\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nplay_hosts() {\n  awk -v transient=\"$_isoloom_transient\" '\\''\n    function commit() {\n      if (pending != \"\") { if (pending_real) real[pending] = 1; else cut[pending] = 1 }\n      pending = \"\"\n    }\n    { gsub(/\\033\\[[0-9;]*m/, \"\") }\n    /^\\.\\.\\.ignoring/ { pending = \"\"; next }\n    { commit() }\n    /^(fatal|failed): \\[/ && !/UNREACHABLE!/ {\n      pending = $0\n      sub(/^(fatal|failed): \\[/, \"\", pending)\n      sub(/\\].*/, \"\", pending)\n      sub(/ -> .*/, \"\", pending)\n      pending_real = (tolower($0) !~ transient)\n      next\n    }\n    /^PLAY RECAP/ { recap = 1; next }\n    recap && / : ok=/ {\n      for (i = 2; i <= NF; i++) {\n        split($i, kv, \"=\")\n        if (kv[1] == \"failed\" && kv[2] > 0) failed[$1] = 1\n        if (kv[1] == \"unreachable\" && kv[2] > 0) unreachable[$1] = 1\n      }\n    }\n    END {\n      commit()\n      for (h in failed) print ((h in real || !(h in cut)) ? \"real \" : \"cut \") h\n      for (h in unreachable) if (!(h in failed)) print \"unreachable \" h\n    }\n  '\\'' \"$1\" | sort\n}\n_isoloom_kind() {\n  echo \"$1\" | awk -v k=\"$2\" '\\''$1 == k { printf \"%s%s\", s, $2; s = \" \" }'\\''\n}\nrun_play() {\n  # The playbook is the last argument; Ansible names its retry file after it.\n  for _isoloom_book; do :; done\n  _isoloom_name=$(basename \"$_isoloom_book\")\n  _isoloom_retry=$${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/$${_isoloom_name%.*}.retry\n  _isoloom_limit=\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  _isoloom_n=1\n  rm -f \"$_isoloom_retry\"\n  while :; do\n    { \"$@\" $_isoloom_limit && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    [ \"$_isoloom_rc\" -ne 0 ] || break\n    _isoloom_hosts=$(play_hosts \"$_isoloom_log\")\n    _isoloom_real=$(_isoloom_kind \"$_isoloom_hosts\" real)\n    _isoloom_gone=$(_isoloom_kind \"$_isoloom_hosts\" unreachable)\n    _isoloom_cut=$(_isoloom_kind \"$_isoloom_hosts\" cut)\n    _isoloom_again=$(echo $_isoloom_gone $_isoloom_cut)\n    if [ -n \"$_isoloom_real\" ]; then\n      echo \"isoloom: $_isoloom_name: a task failed on $_isoloom_real: not retried\"\n      break\n    fi\n    if [ -z \"$_isoloom_again\" ]; then\n      echo \"isoloom: $_isoloom_name failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried\"\n      break\n    fi\n    if [ \"$_isoloom_n\" -ge \"$_isoloom_attempts\" ]; then\n      echo \"isoloom: $_isoloom_name: still unreachable after $_isoloom_n runs: $_isoloom_again; giving up\"\n      break\n    fi\n    printf '\\''%s\\n'\\'' $_isoloom_again > \"$_isoloom_retry\"\n    _isoloom_limit=\"--limit @$_isoloom_retry\"\n    _isoloom_n=$((_isoloom_n + 1))\n    if [ -n \"$_isoloom_gone\" ]; then\n      _isoloom_wait=$((4 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: unreachable: $_isoloom_again; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    else\n      _isoloom_wait=$((2 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: the play was cut by a dropped connection on $_isoloom_cut; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    fi\n    sleep \"$_isoloom_wait\"\n  done\n  rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n  [ \"$_isoloom_rc\" -ne 0 ] || rm -f \"$_isoloom_retry\"\n  return \"$_isoloom_rc\"\n}\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-domain.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-join.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ws.yml'",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'printf '\\''%s\\n'\\'' '\\''10.40.20.5 dc01'\\'' '\\''10.40.20.21 ws-01'\\'' '\\''10.40.20.22 ws-02'\\'' '\\''10.40.10.10 web01'\\'' '\\''10.40.99.10 user'\\'' >> /etc/hosts' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: installing Ansible' > /var/lib/isoloom/ready && sh -c '[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q '\\''ansible-core>=2.15,<2.17'\\'' pywinrm; }' || { echo 'failed: installing Ansible' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for web01' > /var/lib/isoloom/ready && sh -c 'i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.40.10.10 head -n 1 /var/lib/isoloom/ready 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"web01: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && { echo '\\''web01 not ready'\\''; exit 1; }; sleep 5; done' || { echo 'failed: waiting for web01' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for the Windows machines' > /var/lib/isoloom/ready && sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini dc01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''dc01 not ready'\\''; exit 1; }; sleep 10; done' || { echo 'failed: waiting for the Windows machines' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for the Windows machines' > /var/lib/isoloom/ready && sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-01 not ready'\\''; exit 1; }; sleep 10; done' || { echo 'failed: waiting for the Windows machines' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for the Windows machines' > /var/lib/isoloom/ready && sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-02 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-02 not ready'\\''; exit 1; }; sleep 10; done' || { echo 'failed: waiting for the Windows machines' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: the playbooks' > /var/lib/isoloom/ready && sh -c 'set -e\nmkdir -p /tmp/isoloom-facts\nexport PATH=/opt/ansible/bin:$PATH ANSIBLE_HOST_KEY_CHECKING=False ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200\nmkdir -p /tmp/isoloom-retry\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry\n_isoloom_pause=$${ISOLOOM_RETRY_PAUSE:-15}\n_isoloom_attempts=4\n_isoloom_transient='\\''send_input failed|the pipe has been ended|winrmtransporterror|winrmoperationtimeouterror|read timeout|bad http response returned from server|(kerberos|ntlm|credssp).*500|remote end closed connection|connection reset by peer|connection refused|connection aborted|broken pipe|timed out|failed to connect to the host via ssh|shared connection to .* closed'\\''\nretry_download() {\n  _isoloom_n=1\n  until \"$@\"; do\n    [ \"$_isoloom_n\" -lt 5 ] || return 1\n    echo \"isoloom: download failed; trying again in $((_isoloom_n * _isoloom_pause)) s ($((_isoloom_n + 1))/5)\"\n    sleep $((_isoloom_n * _isoloom_pause))\n    _isoloom_n=$((_isoloom_n + 1))\n  done\n}\nplay_hosts() {\n  awk -v transient=\"$_isoloom_transient\" '\\''\n    function commit() {\n      if (pending != \"\") { if (pending_real) real[pending] = 1; else cut[pending] = 1 }\n      pending = \"\"\n    }\n    { gsub(/\\033\\[[0-9;]*m/, \"\") }\n    /^\\.\\.\\.ignoring/ { pending = \"\"; next }\n    { commit() }\n    /^(fatal|failed): \\[/ && !/UNREACHABLE!/ {\n      pending = $0\n      sub(/^(fatal|failed): \\[/, \"\", pending)\n      sub(/\\].*/, \"\", pending)\n      sub(/ -> .*/, \"\", pending)\n      pending_real = (tolower($0) !~ transient)\n      next\n    }\n    /^PLAY RECAP/ { recap = 1; next }\n    recap && / : ok=/ {\n      for (i = 2; i <= NF; i++) {\n        split($i, kv, \"=\")\n        if (kv[1] == \"failed\" && kv[2] > 0) failed[$1] = 1\n        if (kv[1] == \"unreachable\" && kv[2] > 0) unreachable[$1] = 1\n      }\n    }\n    END {\n      commit()\n      for (h in failed) print ((h in real || !(h in cut)) ? \"real \" : \"cut \") h\n      for (h in unreachable) if (!(h in failed)) print \"unreachable \" h\n    }\n  '\\'' \"$1\" | sort\n}\n_isoloom_kind() {\n  echo \"$1\" | awk -v k=\"$2\" '\\''$1 == k { printf \"%s%s\", s, $2; s = \" \" }'\\''\n}\nrun_play() {\n  # The playbook is the last argument; Ansible names its retry file after it.\n  for _isoloom_book; do :; done\n  _isoloom_name=$(basename \"$_isoloom_book\")\n  _isoloom_retry=$${ANSIBLE_RETRY_FILES_SAVE_PATH:-/tmp/isoloom-retry}/$${_isoloom_name%.*}.retry\n  _isoloom_limit=\n  _isoloom_log=$(mktemp)\n  _isoloom_rcf=$(mktemp)\n  _isoloom_n=1\n  rm -f \"$_isoloom_retry\"\n  while :; do\n    { \"$@\" $_isoloom_limit && echo 0 > \"$_isoloom_rcf\" || echo $? > \"$_isoloom_rcf\"; } 2>&1 | tee \"$_isoloom_log\"\n    _isoloom_rc=$(cat \"$_isoloom_rcf\")\n    [ \"$_isoloom_rc\" -ne 0 ] || break\n    _isoloom_hosts=$(play_hosts \"$_isoloom_log\")\n    _isoloom_real=$(_isoloom_kind \"$_isoloom_hosts\" real)\n    _isoloom_gone=$(_isoloom_kind \"$_isoloom_hosts\" unreachable)\n    _isoloom_cut=$(_isoloom_kind \"$_isoloom_hosts\" cut)\n    _isoloom_again=$(echo $_isoloom_gone $_isoloom_cut)\n    if [ -n \"$_isoloom_real\" ]; then\n      echo \"isoloom: $_isoloom_name: a task failed on $_isoloom_real: not retried\"\n      break\n    fi\n    if [ -z \"$_isoloom_again\" ]; then\n      echo \"isoloom: $_isoloom_name failed (exit $_isoloom_rc) with no unreachable host or dropped connection: not retried\"\n      break\n    fi\n    if [ \"$_isoloom_n\" -ge \"$_isoloom_attempts\" ]; then\n      echo \"isoloom: $_isoloom_name: still unreachable after $_isoloom_n runs: $_isoloom_again; giving up\"\n      break\n    fi\n    printf '\\''%s\\n'\\'' $_isoloom_again > \"$_isoloom_retry\"\n    _isoloom_limit=\"--limit @$_isoloom_retry\"\n    _isoloom_n=$((_isoloom_n + 1))\n    if [ -n \"$_isoloom_gone\" ]; then\n      _isoloom_wait=$((4 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: unreachable: $_isoloom_again; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    else\n      _isoloom_wait=$((2 * _isoloom_pause))\n      echo \"isoloom: $_isoloom_name: the play was cut by a dropped connection on $_isoloom_cut; waiting $_isoloom_wait s, then running it again on them ($_isoloom_n/$_isoloom_attempts)\"\n    fi\n    sleep \"$_isoloom_wait\"\n  done\n  rm -f \"$_isoloom_log\" \"$_isoloom_rcf\"\n  [ \"$_isoloom_rc\" -ne 0 ] || rm -f \"$_isoloom_retry\"\n  return \"$_isoloom_rc\"\n}\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-domain.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ad-join.yml\ncd /opt/isoloom/provision\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini ws.yml' || { echo 'failed: the playbooks' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -1066,14 +1091,20 @@ resource "proxmox_virtual_environment_vm" "isoloom_controller" {
 }
 
 locals {
-  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], a)][0]
+  router_address = try([for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], a)][0], "")
 }
 
-output "address" {
+# The router's uplink address: the lab's way in.
+output "ip" {
   value = local.router_address
 }
 
-# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+# Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).
+output "ready_file" {
+  value = "/var/lib/isoloom/ready"
+}
+
+# The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
   value = { dc01 = "10.40.20.5", ws-01 = "10.40.20.21", ws-02 = "10.40.20.22", web01 = "10.40.10.10" }
 }
@@ -1082,7 +1113,7 @@ output "ssh_user" {
   value = "isoloom"
 }
 
-# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+# The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).
 output "checks" {
   value = [
     {
@@ -1121,6 +1152,644 @@ locals {
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
   project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
+}
+
+## .isoloom/proxmox/run.json
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "corp-ad-basics",
+    "instance": null,
+    "message": null
+  },
+  "target": "proxmox",
+  "driver": "terraform",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "terraform",
+      "probe": [
+        "terraform",
+        "version"
+      ],
+      "min_version": "1.6.0",
+      "container": "hashicorp/terraform:1.9.8@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd",
+      "container_hosts": [
+        "macos"
+      ]
+    },
+    {
+      "name": "ssh",
+      "probe": [
+        "ssh",
+        "-V"
+      ]
+    }
+  ],
+  "identity": {
+    "terraform": {
+      "module": ".",
+      "state": "runner"
+    }
+  },
+  "params": [
+    {
+      "name": "proxmox_endpoint",
+      "description": "https://<server>:8006/.",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_endpoint"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_username",
+      "description": "The module's `proxmox_username`.",
+      "default": "root@pam",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_username"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_insecure",
+      "description": "Accept the server's self-signed certificate.",
+      "default": "true",
+      "values": [
+        "true",
+        "false"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_insecure"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_ssh_username",
+      "description": "Uploading cloud-init snippets goes over SSH to the node.",
+      "default": "root",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_ssh_username"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_ssh_address",
+      "description": "The node's SSH address, when the API reports one this machine can't reach.",
+      "default": "",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_ssh_address"
+        }
+      ]
+    },
+    {
+      "name": "node",
+      "description": "The Proxmox node the VMs go on (`pvesh get /nodes` lists them).",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "node"
+        }
+      ]
+    },
+    {
+      "name": "datastore",
+      "description": "Where VM disks go.",
+      "default": "local-lvm",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "datastore"
+        }
+      ]
+    },
+    {
+      "name": "image_datastore",
+      "description": "A datastore with 'iso' content, for cloud images.",
+      "default": "local",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "image_datastore"
+        }
+      ]
+    },
+    {
+      "name": "snippets_datastore",
+      "description": "A datastore with 'snippets' content, for cloud-init.",
+      "default": "local",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "snippets_datastore"
+        }
+      ]
+    },
+    {
+      "name": "uplink_bridge",
+      "description": "The bridge the router reaches the internet through.",
+      "default": "vmbr0",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "uplink_bridge"
+        }
+      ]
+    },
+    {
+      "name": "template_windows_11",
+      "description": "The VM id of a `windows-11` template: cloudbase-init and the VirtIO drivers installed, UEFI on Q35, its disk on virtio0, sysprepped.",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "template_windows_11"
+        }
+      ]
+    },
+    {
+      "name": "template_windows_server_2022",
+      "description": "The VM id of a `windows-server-2022` template: cloudbase-init and the VirtIO drivers installed, UEFI on Q35, its disk on virtio0, sysprepped.",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "template_windows_server_2022"
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-user",
+            "check-web01"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "name": "proxmox_api_token",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_api_token"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_password",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_password"
+        }
+      ]
+    }
+  ],
+  "networks": [
+    {
+      "name": "dmz",
+      "cidr": "10.40.10.0/24",
+      "internet": true,
+      "native": "i${run.slot}n0"
+    },
+    {
+      "name": "corp",
+      "cidr": "10.40.20.0/24",
+      "internet": true,
+      "native": "i${run.slot}n1"
+    },
+    {
+      "name": "access",
+      "cidr": "10.40.99.0/24",
+      "internet": true,
+      "native": "i${run.slot}n2"
+    }
+  ],
+  "machines": [
+    {
+      "name": "dc01",
+      "role": "target",
+      "os": "windows-server-2022",
+      "windows": true,
+      "arch": "amd64",
+      "addresses": {
+        "corp": "10.40.20.5"
+      },
+      "ports": [
+        {
+          "name": "dns",
+          "port": 53,
+          "protocol": "tcp",
+          "http": false
+        },
+        {
+          "name": "kerberos",
+          "port": 88,
+          "protocol": "tcp",
+          "http": false
+        },
+        {
+          "name": "ldap",
+          "port": 389,
+          "protocol": "tcp",
+          "http": false
+        },
+        {
+          "name": "smb",
+          "port": 445,
+          "protocol": "tcp",
+          "http": false
+        }
+      ]
+    },
+    {
+      "name": "ws-01",
+      "role": "target",
+      "os": "windows-11",
+      "windows": true,
+      "arch": "amd64",
+      "addresses": {
+        "corp": "10.40.20.21"
+      }
+    },
+    {
+      "name": "ws-02",
+      "role": "target",
+      "os": "windows-11",
+      "windows": true,
+      "arch": "amd64",
+      "addresses": {
+        "corp": "10.40.20.22"
+      }
+    },
+    {
+      "name": "web01",
+      "role": "target",
+      "os": "debian-12",
+      "arch": "amd64",
+      "addresses": {
+        "corp": "10.40.20.10",
+        "dmz": "10.40.10.10"
+      },
+      "ports": [
+        {
+          "name": "web",
+          "port": 80,
+          "protocol": "tcp",
+          "http": false
+        }
+      ]
+    },
+    {
+      "name": "user",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "access": "10.40.99.10"
+      }
+    },
+    {
+      "name": "isoloom-router",
+      "role": "infra",
+      "addresses": {
+        "access": "10.40.99.254",
+        "corp": "10.40.20.254",
+        "dmz": "10.40.10.254"
+      }
+    },
+    {
+      "name": "isoloom-controller",
+      "role": "infra",
+      "addresses": {
+        "access": "10.40.99.253",
+        "corp": "10.40.20.253",
+        "dmz": "10.40.10.253"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 600
+      },
+      {
+        "id": "apply",
+        "note": "Creating the lab's VMs on the server…",
+        "argv": [
+          "terraform",
+          "apply",
+          "-auto-approve",
+          "-input=false",
+          "-no-color"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 3600
+      }
+    ],
+    "down": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 600
+      },
+      {
+        "id": "destroy",
+        "note": "Removing the lab from the server…",
+        "argv": [
+          "terraform",
+          "destroy",
+          "-auto-approve",
+          "-input=false",
+          "-no-color",
+          "-refresh=false"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 1800
+      }
+    ],
+    "status": {
+      "id": "state",
+      "action": "terraform.read_state"
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "apply",
+      "means": "the VMs exist and booted; each sets itself up from its cloud-init"
+    },
+    {
+      "kind": "ready_file",
+      "host": "10.40.10.10",
+      "user": "isoloom",
+      "path": "${outputs.ready_file}",
+      "log": "/var/log/cloud-init-output.log",
+      "grammar": "isoloom-ready/1",
+      "via": "isoloom@${outputs.ip}",
+      "timeout_s": 2400,
+      "unreachable_timeout_s": 600,
+      "interval_s": 10
+    },
+    {
+      "kind": "ready_file",
+      "host": "10.40.10.253",
+      "user": "isoloom",
+      "path": "${outputs.ready_file}",
+      "log": "/var/log/cloud-init-output.log",
+      "grammar": "isoloom-ready/1",
+      "via": "isoloom@${outputs.ip}",
+      "timeout_s": 7200,
+      "unreachable_timeout_s": 600,
+      "interval_s": 10
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ip",
+      "description": "The router's uplink address: the published ports answer there, and SSH reaches the machines through it.",
+      "role": "address",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ip"
+      }
+    },
+    {
+      "name": "ssh_user",
+      "description": "The user every Linux VM and the router let in with the runner's key.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user"
+      }
+    },
+    {
+      "name": "ready_file",
+      "description": "Where each Linux machine's set-up says how far it got (isoloom-ready/1).",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ready_file"
+      }
+    }
+  ],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "user",
+        "from": "from controller",
+        "checks": [
+          {
+            "name": "checks/domain-up.sh",
+            "kind": "script",
+            "wait_s": 0,
+            "derived": false
+          },
+          {
+            "name": "checks/web01-reaches-dc01.sh",
+            "kind": "script",
+            "wait_s": 0,
+            "derived": false
+          },
+          {
+            "name": "dc01:53 blocked from user",
+            "kind": "tcp",
+            "wait_s": 0,
+            "derived": true
+          },
+          {
+            "name": "dc01:88 blocked from user",
+            "kind": "tcp",
+            "wait_s": 0,
+            "derived": true
+          },
+          {
+            "name": "dc01:389 blocked from user",
+            "kind": "tcp",
+            "wait_s": 0,
+            "derived": true
+          },
+          {
+            "name": "dc01:445 blocked from user",
+            "kind": "tcp",
+            "wait_s": 0,
+            "derived": true
+          },
+          {
+            "name": "web01:80 on dmz from user",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-user",
+          "action": "ssh.run",
+          "with": {
+            "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
+            "host": "10.40.10.253",
+            "user": "isoloom",
+            "via": "isoloom@${outputs.ip}"
+          },
+          "stdin": "checks/user.sh",
+          "timeout_s": 195
+        }
+      },
+      {
+        "id": "web01",
+        "from": "from web01",
+        "checks": [
+          {
+            "name": "dc01:53 from web01",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "dc01:88 from web01",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "dc01:389 from web01",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "dc01:445 from web01",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-web01",
+          "action": "ssh.run",
+          "with": {
+            "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
+            "host": "10.40.10.10",
+            "user": "isoloom",
+            "via": "isoloom@${outputs.ip}"
+          },
+          "stdin": "checks/web01.sh",
+          "timeout_s": 240
+        }
+      }
+    ],
+    "teardown": []
+  }
 }
 
 ## .isoloom/resolved.json: identical in the `hybrid` snapshot

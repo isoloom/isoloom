@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ esxi
@@ -438,6 +437,12 @@ resource "esxi_guest" "isoloom_router" {
     })))
     "userdata.encoding" = "base64"
   }
+  lifecycle {
+    postcondition {
+      condition     = self.ip_address != "" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], self.ip_address)
+      error_message = "The router got no address on its uplink port group `${var.uplink_port_group}`: it has no DHCP (VMware Tools then reports a lab address). Give it an uplink with DHCP and internet (`uplink_port_group`; on a nested ESXi, promiscuous mode on)."
+    }
+  }
   depends_on = [esxi_portgroup.dmz, esxi_portgroup.corp, esxi_portgroup.access]
 }
 
@@ -751,11 +756,17 @@ locals {
   router_address = esxi_guest.isoloom_router.ip_address
 }
 
-output "address" {
+# The router's uplink address: the lab's way in.
+output "ip" {
   value = local.router_address
 }
 
-# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+# Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).
+output "ready_file" {
+  value = "/var/lib/isoloom/ready"
+}
+
+# The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
   value = { dc01 = "10.40.20.5", ws-01 = "10.40.20.21", ws-02 = "10.40.20.22", web01 = "10.40.10.10" }
 }
@@ -764,7 +775,7 @@ output "ssh_user" {
   value = "isoloom"
 }
 
-# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test esxi`.
+# The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).
 output "checks" {
   value = [
     {

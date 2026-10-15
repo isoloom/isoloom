@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ proxmox
@@ -9,6 +8,7 @@ assertion_line: 219
 ✓ .isoloom/proxmox/main.tf
 ✓ .isoloom/proxmox/checks/web.sh
 ✓ .isoloom/proxmox/checks/cache.sh
+✓ .isoloom/proxmox/run.json
 ✓ .isoloom/resolved.json
 
 ## .isoloom/proxmox/checks/cache.sh
@@ -415,7 +415,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   on_boot   = false
   agent {
     enabled = true
-    timeout = "5m"
+    timeout = "8m"
     wait_for_ip {
       ipv4 = true
     }
@@ -424,7 +424,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   lifecycle {
     postcondition {
       condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["192.168.1.254"], a)]) > 0
-      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 5m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
     }
   }
   cpu {
@@ -656,7 +656,7 @@ resource "proxmox_virtual_environment_firewall_rules" "cache" {
 }
 
 locals {
-  router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["192.168.1.254"], a)][0]
+  router_address = try([for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["192.168.1.254"], a)][0], "")
 }
 
 # The router's uplink address: the lab's way in.
@@ -717,6 +717,501 @@ locals {
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
   project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
+}
+
+## .isoloom/proxmox/run.json
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "existing-hosts",
+    "instance": null,
+    "message": null
+  },
+  "target": "proxmox",
+  "driver": "terraform",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "terraform",
+      "probe": [
+        "terraform",
+        "version"
+      ],
+      "min_version": "1.6.0",
+      "container": "hashicorp/terraform:1.9.8@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd",
+      "container_hosts": [
+        "macos"
+      ]
+    },
+    {
+      "name": "ssh",
+      "probe": [
+        "ssh",
+        "-V"
+      ]
+    }
+  ],
+  "identity": {
+    "terraform": {
+      "module": ".",
+      "state": "runner"
+    }
+  },
+  "params": [
+    {
+      "name": "proxmox_endpoint",
+      "description": "https://<server>:8006/.",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_endpoint"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_username",
+      "description": "The module's `proxmox_username`.",
+      "default": "root@pam",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_username"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_insecure",
+      "description": "Accept the server's self-signed certificate.",
+      "default": "true",
+      "values": [
+        "true",
+        "false"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_insecure"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_ssh_username",
+      "description": "Uploading cloud-init snippets goes over SSH to the node.",
+      "default": "root",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_ssh_username"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_ssh_address",
+      "description": "The node's SSH address, when the API reports one this machine can't reach.",
+      "default": "",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_ssh_address"
+        }
+      ]
+    },
+    {
+      "name": "node",
+      "description": "The Proxmox node the VMs go on (`pvesh get /nodes` lists them).",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "node"
+        }
+      ]
+    },
+    {
+      "name": "datastore",
+      "description": "Where VM disks go.",
+      "default": "local-lvm",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "datastore"
+        }
+      ]
+    },
+    {
+      "name": "image_datastore",
+      "description": "A datastore with 'iso' content, for cloud images.",
+      "default": "local",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "image_datastore"
+        }
+      ]
+    },
+    {
+      "name": "snippets_datastore",
+      "description": "A datastore with 'snippets' content, for cloud-init.",
+      "default": "local",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "snippets_datastore"
+        }
+      ]
+    },
+    {
+      "name": "uplink_bridge",
+      "description": "The bridge the router reaches the internet through.",
+      "default": "vmbr0",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "uplink_bridge"
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-web",
+            "check-cache"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "name": "proxmox_api_token",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_api_token"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_password",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_password"
+        }
+      ]
+    }
+  ],
+  "networks": [
+    {
+      "name": "lab",
+      "cidr": "192.168.1.0/24",
+      "internet": true,
+      "native": "i${run.slot}n0"
+    }
+  ],
+  "machines": [
+    {
+      "name": "web",
+      "role": "target",
+      "os": "debian-12",
+      "arch": "amd64",
+      "addresses": {
+        "lab": "192.168.1.20"
+      },
+      "ports": [
+        {
+          "name": "web",
+          "port": 80,
+          "protocol": "tcp",
+          "http": true
+        }
+      ]
+    },
+    {
+      "name": "cache",
+      "role": "target",
+      "os": "debian-12",
+      "arch": "amd64",
+      "addresses": {
+        "lab": "192.168.1.21"
+      },
+      "ports": [
+        {
+          "name": "redis",
+          "port": 6379,
+          "protocol": "tcp",
+          "http": false
+        }
+      ]
+    },
+    {
+      "name": "isoloom-router",
+      "role": "infra",
+      "addresses": {
+        "lab": "192.168.1.254"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 600
+      },
+      {
+        "id": "apply",
+        "note": "Creating the lab's VMs on the server…",
+        "argv": [
+          "terraform",
+          "apply",
+          "-auto-approve",
+          "-input=false",
+          "-no-color"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 3600
+      }
+    ],
+    "down": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 600
+      },
+      {
+        "id": "destroy",
+        "note": "Removing the lab from the server…",
+        "argv": [
+          "terraform",
+          "destroy",
+          "-auto-approve",
+          "-input=false",
+          "-no-color",
+          "-refresh=false"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 1800
+      }
+    ],
+    "status": {
+      "id": "state",
+      "action": "terraform.read_state"
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "apply",
+      "means": "the VMs exist and booted; each sets itself up from its cloud-init"
+    },
+    {
+      "kind": "ready_file",
+      "host": "192.168.1.20",
+      "user": "isoloom",
+      "path": "${outputs.ready_file}",
+      "log": "/var/log/cloud-init-output.log",
+      "grammar": "isoloom-ready/1",
+      "via": "isoloom@${outputs.ip}",
+      "timeout_s": 2400,
+      "unreachable_timeout_s": 600,
+      "interval_s": 10
+    },
+    {
+      "kind": "ready_file",
+      "host": "192.168.1.21",
+      "user": "isoloom",
+      "path": "${outputs.ready_file}",
+      "log": "/var/log/cloud-init-output.log",
+      "grammar": "isoloom-ready/1",
+      "via": "isoloom@${outputs.ip}",
+      "timeout_s": 2400,
+      "unreachable_timeout_s": 600,
+      "interval_s": 10
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ip",
+      "description": "The router's uplink address: the published ports answer there, and SSH reaches the machines through it.",
+      "role": "address",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ip"
+      }
+    },
+    {
+      "name": "ssh_user",
+      "description": "The user every Linux VM and the router let in with the runner's key.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user"
+      }
+    },
+    {
+      "name": "ready_file",
+      "description": "Where each Linux machine's set-up says how far it got (isoloom-ready/1).",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ready_file"
+      }
+    }
+  ],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "web",
+        "from": "from web",
+        "checks": [
+          {
+            "name": "cache:6379 from web",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-web",
+          "action": "ssh.run",
+          "with": {
+            "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
+            "host": "192.168.1.20",
+            "user": "isoloom",
+            "via": "isoloom@${outputs.ip}"
+          },
+          "stdin": "checks/web.sh",
+          "timeout_s": 105
+        }
+      },
+      {
+        "id": "cache",
+        "from": "from cache",
+        "checks": [
+          {
+            "name": "the cache came back with transparent hugepages off",
+            "kind": "exec",
+            "wait_s": 0,
+            "derived": false
+          },
+          {
+            "name": "web:80 from cache",
+            "kind": "http",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-cache",
+          "action": "ssh.run",
+          "with": {
+            "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
+            "host": "192.168.1.21",
+            "user": "isoloom",
+            "via": "isoloom@${outputs.ip}"
+          },
+          "stdin": "checks/cache.sh",
+          "timeout_s": 120
+        }
+      }
+    ],
+    "teardown": []
+  }
 }
 
 ## .isoloom/resolved.json: identical in the `vagrant` snapshot
