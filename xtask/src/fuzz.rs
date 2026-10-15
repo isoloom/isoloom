@@ -10,6 +10,9 @@
 //! `--check` builds nothing with nightly: it checks the fuzz crate's format and lints on the
 //! pinned toolchain instead, so a change to the APIs it calls shows in `check-all`.
 //!
+//! A target's dictionary, `fuzz/dictionaries/<target>.dict` when there is one, gives libFuzzer
+//! the format's words to mutate toward (the spec parser's: every field and step kind).
+//!
 //! Needs `cargo install --locked cargo-fuzz` and `rustup toolchain install nightly --profile
 //! minimal`. The builds go to `<target dir>/fuzz`.
 
@@ -80,7 +83,17 @@ fn fuzz_one(root: &Path, t: &Target, secs: u32) -> Res<bool> {
     cmd.arg(&t.name).arg(&corpus);
     cmd.args(t.seeds.iter().map(|s| root.join("fuzz").join(s)));
     cmd.args(["--", &format!("-max_total_time={secs}"), "-timeout=10", "-print_final_stats=1"]);
+    // The target's dictionary, when it has one: the format's words to mutate toward.
+    let words = dictionary(root, &t.name);
+    if words.is_file() {
+        cmd.arg(format!("-dict={}", words.display()));
+    }
     process::passed(&mut cmd).map_err(|e| format!("{e} (cargo install --locked cargo-fuzz; rustup toolchain install nightly)").into())
+}
+
+/// Where target `name`'s dictionary is: `fuzz/dictionaries/<name>.dict`.
+fn dictionary(root: &Path, name: &str) -> std::path::PathBuf {
+    root.join("fuzz").join("dictionaries").join(format!("{name}.dict"))
 }
 
 /// Checks the fuzz crate's format and lints on the pinned toolchain.
@@ -154,6 +167,30 @@ mod tests {
             for seed in &t.seeds {
                 assert!(fuzz.join(seed).is_dir(), "{}: seed folder {seed} is missing", t.name);
             }
+        }
+    }
+
+    #[test]
+    fn the_spec_parsers_dictionary_holds_every_step_kind_in_libfuzzers_format() {
+        let text = std::fs::read_to_string(dictionary(&repo::root(), "spec_syntax")).unwrap_or_default();
+        let entries: Vec<&str> = text.lines().filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
+        assert!(entries.iter().all(|e| e.starts_with('"') && e.ends_with('"')), "one quoted entry per line");
+        for kind in [
+            "run:",
+            "copy:",
+            "packages:",
+            "playbook:",
+            "repository:",
+            "file:",
+            "template:",
+            "user:",
+            "group:",
+            "service:",
+            "command:",
+            "firewall:",
+            "reboot",
+        ] {
+            assert!(entries.contains(&format!("\"{kind}\"").as_str()), "{kind}");
         }
     }
 }
