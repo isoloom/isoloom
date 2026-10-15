@@ -169,6 +169,15 @@ fn a_closed_set_nested_past_the_walks_depth_is_not_listed() {
 }
 
 #[test]
+fn alternatives_of_alternatives_of_constants_are_one_closed_set() {
+    let tiers = json!({ "properties": { "tier": { "anyOf": [{ "anyOf": [{ "const": "a" }, { "const": "b" }] }, { "const": "c" }] } } });
+    let all = fields(&tiers);
+    assert_eq!(all[0].kind, "string");
+    let values: Vec<&str> = all[0].allowed.iter().map(|(v, _)| v.as_str()).collect();
+    assert_eq!(values, ["a", "b", "c"]);
+}
+
+#[test]
 fn a_closed_set_of_fractions_is_numbers() {
     let numbers = json!({ "properties": { "loss": { "enum": [0.5, 1.5] }, "level": { "enum": [1, 2] } } });
     let kinds: Vec<String> = fields(&numbers).into_iter().map(|f| f.kind).collect();
