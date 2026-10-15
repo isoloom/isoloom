@@ -58,16 +58,25 @@ pub fn step(spec: &Spec, m: &Machine) -> Option<Step> {
     (!addresses.is_empty()).then_some(Step::MoreAddresses { addresses })
 }
 
-/// What they ask of the backend: the first machine with several addresses on a network, as the
-/// target produces it.
-pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Option<Requirement> {
-    let (name, m) = spec.machines.iter().find(|(_, m)| m.more_addresses.values().any(|o| !o.is_empty()))?;
-    let network = m.more_addresses.iter().find(|(_, o)| !o.is_empty()).map(|(n, _)| n.clone())?;
-    Some(Requirement::MoreAddresses {
-        machine: name.clone(),
-        network,
-        shape: shape(name)?,
-    })
+/// What they ask of the backend: for each shape the target gives such machines, the first
+/// machine with several addresses on a network. A VM's and a container's ask for different
+/// things, so a target running both (`hybrid`) is asked about each.
+pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+    let mut out: Vec<Requirement> = Vec::new();
+    for (name, m) in &spec.machines {
+        let network = m.more_addresses.iter().find(|(_, o)| !o.is_empty()).map(|(n, _)| n.clone());
+        let (Some(network), Some(shape)) = (network, shape(name)) else {
+            continue;
+        };
+        if !out.iter().any(|r| matches!(r, Requirement::MoreAddresses { shape: s, .. } if *s == shape)) {
+            out.push(Requirement::MoreAddresses {
+                machine: name.clone(),
+                network,
+                shape,
+            });
+        }
+    }
+    out
 }
 
 /// Why a target refuses a machine's several addresses on `network`.
@@ -120,5 +129,24 @@ machines:
         assert!(matches!(vm, Requirement::MoreAddresses { shape: MachineShape::Vm, .. }));
         let container = need(Target::Docker).unwrap();
         assert!(container.to_string().contains("a container has one address per network"), "{container}");
+    }
+
+    /// The `several-addresses` example's shape on `hybrid`: a VM with several addresses first,
+    /// then a container. Only the VM's used to be asked about, so the container's reached the
+    /// renderer before it was refused.
+    #[test]
+    fn a_target_running_vms_and_containers_is_asked_about_the_first_of_each() {
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: [10, 11] }, ports: { web: 80 }, app: { steps: [{ run: w.sh }] } }\n  decoy: { os: debian@12, networks: { lan: [40, 41] }, app: { steps: [{ run: d.sh }] } }\n  more: { os: debian@12, networks: { lan: [50, 51] }, app: { steps: [{ run: m.sh }] } }\n",
+        );
+        let asked: Vec<(String, MachineShape)> = testing::planned(&lab, Target::Hybrid)
+            .requirements
+            .into_iter()
+            .filter_map(|r| match r {
+                Requirement::MoreAddresses { machine, shape, .. } => Some((machine, shape)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(asked, [("web".to_owned(), MachineShape::Vm), ("decoy".to_owned(), MachineShape::Container)]);
     }
 }

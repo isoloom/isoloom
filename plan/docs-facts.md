@@ -278,3 +278,6 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **The runner's fixtures** are in `crates/isothrum-runner/tests/fixtures/` (was `tests/data/`).
 - **Isothrum's fuzz targets:** `placeholders` (the runner's placeholder filling on any template and values) and `plan` (every step of any manifest planned on every host and provider), beside `drawing`; they build the runner with its `fuzzing` feature, which only `fuzz/` turns on. `cargo run -p xtask -- mutants` mutates the runner's executor and its drivers' readers (Compose's config and ps, Vagrant's status, Terraform's state).
 - **Isothrum's lints:** every workspace lint is at deny, every crate at zero (`quality-baseline.json` holds only the xtask's one `#[expect]`).
+
+## Phase 6b: the tiers and the capability matrix
+- **`hybrid`, several addresses on one network:** the capability check now asks about the first such VM and the first such container (it asked about the first machine only), so a container with several addresses after a VM with several is refused by the plan's check, with the same reason the renderer gave (`several-addresses`).

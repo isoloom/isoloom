@@ -525,5 +525,6 @@ pub(crate) fn container_checks(spec: &Spec) -> Option<Requirement> {
         .map(|c| Requirement::ExecWithoutContainer { check: c.name })
 }
 
+mod feature;
 #[cfg(test)]
 mod tests;
