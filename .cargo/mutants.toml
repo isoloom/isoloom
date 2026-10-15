@@ -7,6 +7,9 @@ exclude_re = [
     # A machine's address is its block's network part with the octet in the last byte, which the
     # mask leaves zero: `|` and `^` give the same address for every block and octet.
     'isoloom-plan/src/addressing\.rs:\d+:\d+: replace \| with \^ in address$',
+    # A non-empty list's schema is inlined (`inline_schema` is true), so its name is never written
+    # into the schema: any name gives the same schema.
+    'isoloom-manifest/src/list\.rs:\d+:\d+: replace <impl JsonSchema for NonEmpty<T>>::schema_name ',
 ]
 
 # Lints capped while mutants build: the workspace denies `unused`, so a mutant that replaces a

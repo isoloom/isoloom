@@ -345,17 +345,15 @@ mod tests {
 
     #[test]
     fn a_placeholder_is_written_from_its_root() {
-        for text in [
-            "${run.known_hosts}",
-            "${params.REGION}",
-            "${outputs.web_site}",
-            "${published.web.site}",
-            "${machine}",
-            "${value}",
+        for (text, root) in [
+            ("${run.known_hosts}", "run"),
+            ("${params.REGION}", "params"),
+            ("${outputs.web_site}", "outputs"),
+            ("${published.web.site}", "published"),
+            ("${machine}", "machine"),
+            ("${value}", "value"),
         ] {
-            let t = round_trip(text);
-            let p = t.placeholders().next().unwrap();
-            assert!(text.starts_with(&format!("${{{}", p.root())), "{text}: {}", p.root());
+            assert_eq!(round_trip(text).placeholders().next().map(Placeholder::root), Some(root), "{text}");
         }
         assert_eq!(RunVar::SshKey.key(), "ssh_key");
     }
@@ -365,6 +363,7 @@ mod tests {
         assert_eq!(Template::text("a $ b").to_string(), "a $$ b");
         assert_eq!(Template::from(Placeholder::Machine).to_string(), "${machine}");
         assert_eq!(Template::from(Placeholder::Run(RunVar::Dir)).parts().len(), 1);
+        assert_eq!("${machine}/x".parse::<Template>(), Template::parse("${machine}/x"));
     }
 
     #[test]

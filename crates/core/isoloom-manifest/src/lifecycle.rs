@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn a_retry_count_is_0_to_3() {
         assert_eq!(Retries::new(3).map(Retries::get), Ok(3));
-        assert_eq!(Retries::try_from(1).map(u8::from), Ok(1));
+        assert_eq!(Retries::try_from(2).map(u8::from), Ok(2));
         assert_eq!(Retries::default().get(), 0);
         assert_eq!(Retries::new(4).unwrap_err().code(), "out_of_range");
         assert!(serde_json::from_str::<Retries>("4").is_err());

@@ -143,7 +143,8 @@ impl Manifest {
                     Placeholder::Output(name) if !self.outputs.iter().any(|x| &x.name == name) => {
                         return Err(Error::UnknownOutput { at, name: name.to_string() });
                     }
-                    Placeholder::Value if !(at.starts_with("outputs[") && at.ends_with("].format")) => {
+                    // An output's only template is its `format`.
+                    Placeholder::Value if !at.starts_with("outputs[") => {
                         return Err(out_of_place(at, "value", "an output's `format`"));
                     }
                     Placeholder::Machine if !at.starts_with("lifecycle.provision.machine[") => {
