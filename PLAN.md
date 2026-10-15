@@ -287,12 +287,12 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
 **Rules:**
 - **A push to `main` deploys production** (Vercel): both sites are live. So they follow the same local-`main` workflow, and nothing is pushed until a release, with the maintainer's OK at that moment.
 - **The engineering standard (3b) applies in full:** lint levels, the ratchet to zero, `knip` and `jscpd`, components ≤ 200 lines, typed boundaries.
-- **The two sites duplicate most of their scaffolding** (`components/ui`, `components/markdown`, `components/seo`, `lib/oembed`, `assets/fonts`, the blog config). DRY across repositories is recommended: one private monorepo, `isoloom/websites`, with `apps/isoloom`, `apps/isothrum` and `packages/site-kit`. Merging keeps each domain's Vercel project, and is the maintainer's call. Without the merge, a private `site-kit` package does the same job.
+- **The two sites stay in separate repositories** (maintainer, 2026-10-15). Their shared scaffolding is not merged; each repository meets 3b on its own.
 
 **When:**
 - **Phase 0.7, the engineering standard in both sites:** measure, then lint configs, the ratchet, the folder layout, and driving to zero. It can run alongside other phases, because the sites don't block the converter.
 - **Phase 2:** the Isothrum compiler (`isothrum-core`, soon `isothrum-compiler`) and the website editor **write the new spec syntax**. With no old-format support, a drawn lab would otherwise break. They test against Isoloom's spec examples and schema.
-- **Until Phase 7:** isoloom.com still describes the old 0.x tool, and some claims are wrong (see the facts kept for the docs rewrite). Recommended: a short "1.0 in progress" banner now, so visitors aren't misled. It needs one push, so it needs the maintainer's OK.
+- **Until Phase 7:** isoloom.com carries a "1.0 is being rebuilt" banner (live since 2026-10-15, commit `60098c4`), because its pages still describe the 0.x preview. The banner is removed in Phase 7.
 - **Phase 7, release:** isoloom.com's docs are regenerated from the repository's new docs, and its pages rewritten (features, targets, comparisons) from the 1.0 facts. On isothrum.com: the editor on the 1.0 spec, the WASM from the published npm package instead of the committed `public/wasm/`, and the release announcement. Both are pushed with the 1.0 release.
 - **1.x:** `desktop-editor/` and the editor components move into `isothrum-ui`, shared with the desktop app. Accounts (Better Auth, ex-isothrum #30) and the project store follow.
 
