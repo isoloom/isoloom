@@ -136,6 +136,7 @@ name = "isoloom-fuzz"
 version = "0.0.0"
 dependencies = [
  "isoloom-manifest",
+ "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
  "libfuzzer-sys",
