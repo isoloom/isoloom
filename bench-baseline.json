@@ -2,14 +2,14 @@
   "host": "macos-x86_64",
   "unit": "ns",
   "medians": {
-    "lower/corp-ad-basics": 1527074,
-    "lower/hello-stack": 912830,
-    "lower/segmented": 1124078,
-    "parse/corp-ad-basics": 509476,
-    "parse/hello-stack": 359778,
-    "parse/segmented": 380460,
-    "render/corp-ad-basics": 1025150,
-    "render/hello-stack": 19479128,
-    "render/segmented": 23298834
+    "lower/corp-ad-basics": 609358.0,
+    "lower/hello-stack": 439123.0,
+    "lower/segmented": 1378786.0,
+    "parse/corp-ad-basics": 397422.0,
+    "parse/hello-stack": 182948.0,
+    "parse/segmented": 246301.0,
+    "render/corp-ad-basics": 632919.0,
+    "render/hello-stack": 11829070.0,
+    "render/segmented": 19225616.0
   }
 }
