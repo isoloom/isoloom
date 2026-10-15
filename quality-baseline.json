@@ -26,18 +26,17 @@
       "isoloom-vagrant": 1
     },
     "clippy/doc_markdown": {
-      "isoloom": 2,
-      "isoloom-ansible": 1,
-      "isoloom-compose": 7,
-      "isoloom-import": 3,
-      "isoloom-kubernetes": 48,
-      "isoloom-manifest": 16,
-      "isoloom-plan": 6,
-      "isoloom-render": 25,
-      "isoloom-spec": 41,
-      "isoloom-targets": 5,
-      "isoloom-terraform": 105,
-      "isoloom-vagrant": 40
+      "isoloom": 1,
+      "isoloom-compose": 6,
+      "isoloom-import": 2,
+      "isoloom-kubernetes": 47,
+      "isoloom-manifest": 10,
+      "isoloom-plan": 2,
+      "isoloom-render": 3,
+      "isoloom-spec": 19,
+      "isoloom-targets": 3,
+      "isoloom-terraform": 40,
+      "isoloom-vagrant": 10
     },
     "clippy/indexing_slicing": {
       "isoloom-compose": 28,
@@ -63,7 +62,6 @@
       "isoloom-vagrant": 5
     },
     "clippy/missing_errors_doc": {
-      "isoloom-ansible": 1,
       "isoloom-compose": 6,
       "isoloom-import": 3,
       "isoloom-kubernetes": 3,
@@ -110,7 +108,6 @@
     },
     "clippy/str_to_string": {
       "isoloom": 13,
-      "isoloom-ansible": 1,
       "isoloom-compose": 46,
       "isoloom-import": 38,
       "isoloom-kubernetes": 44,

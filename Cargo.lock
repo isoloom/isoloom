@@ -505,6 +505,7 @@ dependencies = [
  "isoloom-render",
  "isoloom-spec",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

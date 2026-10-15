@@ -10,3 +10,7 @@ allow-panic-in-tests = true
 allow-print-in-tests = true
 allow-dbg-in-tests = false
 allow-indexing-slicing-in-tests = true
+
+# Product names written as their makers write them, not code (`doc_markdown` would want them in
+# backticks); `..` keeps clippy's own list.
+doc-valid-idents = ["ESXi", "IOSv", "NetworkManager", "OpenRC", "OrbStack", "VirtualBox", "VMware", "WinRM", ".."]
