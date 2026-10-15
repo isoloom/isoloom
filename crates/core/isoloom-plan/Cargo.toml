@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-plan"
-description = "The target-neutral plan of an environment: its checks."
+description = "The target-neutral plan of a lab: the spec lowered per target, the environment a backend renders, its checks and requirements."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,6 +15,7 @@ serde_json.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+proptest.workspace = true
 
 [lints]
 workspace = true

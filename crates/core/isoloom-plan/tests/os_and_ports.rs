@@ -3,22 +3,14 @@
 
 use std::num::NonZeroU16;
 
-use isoloom_plan::Lab;
-use isoloom_spec::syntax::{self, Code, Kind, Problem, Problems};
+use isoloom_spec::syntax::{Code, Kind, Problem};
+use testing::{lab, refused};
+
+pub mod testing;
 
 /// A spec with one network and these lines under `machines:`.
 fn spec(machines: &str) -> String {
     format!("version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n{machines}")
-}
-
-/// The lab of `yaml`, or the problems that stop it from being read.
-fn lab(yaml: &str) -> Result<Lab, Problems> {
-    Lab::parse(yaml)
-}
-
-/// The problems the parser refuses `yaml` with.
-fn refused(yaml: &str) -> Vec<Problem> {
-    syntax::parse(yaml).err().unwrap_or_default()
 }
 
 /// The one problem the parser refuses `yaml` with, on one line.

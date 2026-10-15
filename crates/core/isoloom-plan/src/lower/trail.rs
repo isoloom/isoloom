@@ -52,6 +52,7 @@ impl Trail {
     }
 
     /// The written path of lowered path `path`.
+    #[must_use]
     pub fn path(&self, path: &str) -> FieldPath {
         let within = |prefix: &str| path == prefix || path.strip_prefix(prefix).is_some_and(|r| r.starts_with(['.', '[']));
         let best = self
@@ -73,7 +74,7 @@ fn rename_inside(rest: &str) -> String {
         ".fixed" => ".publish".into(),
         ".target" => ".path".into(),
         ".source" => String::new(),
-        other => other.to_string(),
+        other => other.to_owned(),
     }
 }
 
@@ -86,12 +87,12 @@ fn rename(path: &str) -> String {
             ("docker", "") => format!("overrides.docker.networks.{n}"),
             ("docker", inner) => format!("overrides.docker.networks.{n}.{inner}"),
             ("external", _) => format!("overrides.docker.networks.{n}.external"),
-            _ => path.to_string(),
+            _ => path.to_owned(),
         },
         ["volumes", v, "external"] => format!("overrides.docker.volumes.{v}.external"),
         ["volumes", v, rest] if rest.starts_with("virtiofs") => format!("overrides.proxmox.volumes.{v}.{rest}"),
         ["controller", "image", ..] => "overrides.vagrant.controller".into(),
-        _ => path.to_string(),
+        _ => path.to_owned(),
     }
 }
 
@@ -144,7 +145,43 @@ fn machine_field(m: &str, rest: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
+
+    /// A machine's name, as the spec allows them.
+    fn machine() -> impl Strategy<Value = String> {
+        "[a-z][a-z0-9-]{0,10}"
+    }
+
+    proptest! {
+        #[test]
+        fn a_recorded_file_points_at_its_written_index_and_field(
+            m in machine(),
+            (lowered, written) in (0usize..20, 0usize..20),
+            (inside, renamed) in prop::sample::select(vec![("", ""), (".uid", ".uid"), (".mode", ".mode"), (".target", ".path"), (".source", "")]),
+        ) {
+            let mut t = Trail::default();
+            t.file(&m, "secrets", lowered, written);
+            let path = t.path(&format!("machines.{m}.secrets[{lowered}]{inside}"));
+            prop_assert_eq!(path.to_string(), format!("machines.{m}.files[{written}]{renamed}"));
+        }
+
+        #[test]
+        fn the_longest_recorded_prefix_wins(m in machine(), i in 1usize..9) {
+            let mut t = Trail::default();
+            t.record(format!("machines.{m}.ports[{i}]"), format!("machines.{m}.ports.short"));
+            t.record(format!("machines.{m}.ports[{i}0]"), format!("machines.{m}.ports.long"));
+            prop_assert_eq!(t.path(&format!("machines.{m}.ports[{i}0].fixed")).to_string(), format!("machines.{m}.ports.long.publish"));
+            prop_assert_eq!(t.path(&format!("machines.{m}.ports[{i}].fixed")).to_string(), format!("machines.{m}.ports.short.publish"));
+        }
+
+        #[test]
+        fn a_path_nothing_renames_is_kept(head in prop::sample::select(vec!["checks", "reach", "message", "targets", "groups"]), rest in "(\\[[0-9]{1,2}\\])?(\\.[a-z_]{1,8}){0,3}") {
+            let path = format!("{head}{rest}");
+            prop_assert_eq!(Trail::default().path(&path).to_string(), path);
+        }
+    }
 
     #[test]
     fn renamed_fields_point_at_what_the_author_wrote() {

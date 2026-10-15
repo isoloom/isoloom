@@ -1,12 +1,13 @@
 //! The plan built from a spec: addresses, shared volumes, start order, refusals.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
-
 use std::net::Ipv4Addr;
 
 use isoloom_plan::lifecycle::SharedRole;
-use isoloom_plan::{Capabilities, Environment, Feature, Lab, MachineShape, Requirement, Step, VolumeKind, refusal};
+use isoloom_plan::{Capabilities, Environment, Feature, MachineShape, Requirement, Step, VolumeKind, refusal};
 use isoloom_spec::model::Target;
+use testing::{Outcome, plan, plan_anyway};
+
+pub mod testing;
 
 const SPEC: &str = r"
 version: 1
@@ -35,27 +36,13 @@ machines:
     app: { image: postgres, steps: [{ run: setup.sh }] }
 ";
 
-/// The plan of `yaml` (the authored format) for `target`, the spec valid.
-fn plan(yaml: &str, target: Target) -> Environment {
-    let lab = Lab::new(isoloom_spec::parse(yaml).expect("parses"));
-    assert_eq!(lab.problems(), [], "valid");
-    Environment::build(&lab.for_target(target), target, None)
-}
-
-/// The plan of `yaml` for `target` even when validation would refuse it: what the plan asks of a
-/// backend, whatever else is wrong.
-fn plan_anyway(yaml: &str, target: Target) -> Environment {
-    let lab = Lab::new(isoloom_spec::parse(yaml).expect("parses"));
-    Environment::build(&lab.for_target(target), target, None)
-}
-
-fn env(target: Target) -> Environment {
+fn env(target: Target) -> Outcome<Environment> {
     plan(SPEC, target)
 }
 
 #[test]
-fn machines_have_their_addresses_names_and_ports() {
-    let env = env(Target::Vagrant);
+fn machines_have_their_addresses_names_and_ports() -> Outcome {
+    let env = env(Target::Vagrant)?;
     let web = &env.machines["web"];
     assert_eq!(web.addresses["front"], Ipv4Addr::new(10, 30, 0, 10));
     assert_eq!(web.names, ["web", "www"]);
@@ -67,21 +54,23 @@ fn machines_have_their_addresses_names_and_ports() {
     assert_eq!(web.routes[0].cidr, "10.31.0.0/24");
     assert_eq!(env.router.as_ref().map(|r| r["front"]), Some(web.routes[0].via));
     assert_eq!(env.address_for("web", "db"), Ipv4Addr::new(10, 30, 0, 20));
+    Ok(())
 }
 
 #[test]
-fn docker_targets_lay_networks_on_their_docker_blocks() {
-    let env = env(Target::Docker);
+fn docker_targets_lay_networks_on_their_docker_blocks() -> Outcome {
+    let env = env(Target::Docker)?;
     assert_eq!(env.machines["web"].shape, MachineShape::Container);
     for n in env.networks.values() {
         assert_eq!(n.cidr.rsplit('/').next(), n.declared_cidr.rsplit('/').next());
     }
     assert!(env.machines["web"].lifecycle.is_empty(), "containers have no VM steps");
+    Ok(())
 }
 
 #[test]
-fn shared_volumes_name_their_owner_and_users() {
-    let env = env(Target::Vagrant);
+fn shared_volumes_name_their_owner_and_users() -> Outcome {
+    let env = env(Target::Vagrant)?;
     let db = &env.machines["db"];
     let shared = db.volumes.iter().find(|v| v.name == "shared").expect("shared");
     assert_eq!(
@@ -106,11 +95,12 @@ fn shared_volumes_name_their_owner_and_users() {
         .find(|s| matches!(s, Step::SharedVolume { .. }))
         .expect("a mount step");
     assert!(matches!(mount, Step::SharedVolume { role: SharedRole::Mount { source, .. }, .. } if source == "10.30.0.20:/var/data"));
+    Ok(())
 }
 
 #[test]
-fn machines_start_after_what_they_wait_for() {
-    let env = env(Target::Vagrant);
+fn machines_start_after_what_they_wait_for() -> Outcome {
+    let env = env(Target::Vagrant)?;
     assert_eq!(env.start_order, ["db", "web"]);
     let steps = &env.machines["web"].lifecycle;
     assert_eq!(steps.first(), Some(&Step::Prelude));
@@ -119,35 +109,38 @@ fn machines_start_after_what_they_wait_for() {
         machine: "db".into(),
         ports: vec![5432]
     }));
+    Ok(())
 }
 
 #[test]
-fn a_backend_refuses_what_it_lacks_the_capability_for() {
-    let env = plan(&format!("{SPEC}provision:\n  - ansible: site.yml\n"), Target::Docker);
+fn a_backend_refuses_what_it_lacks_the_capability_for() -> Outcome {
+    let env = plan(&format!("{SPEC}provision:\n  - ansible: site.yml\n"), Target::Docker)?;
     assert_eq!(env.requirements, [Requirement::EnvironmentProvisioning, Requirement::MachineAliases]);
     let none = Capabilities::default();
     let why = refusal(&env.requirements, &none).expect("refused");
     assert_eq!(why.to_string(), "environment-level provisioning (`provision:`) runs on VM targets for now");
     let provisioning = Capabilities::of([Feature::EnvironmentProvisioning]);
-    let why = refusal(&env.requirements, &provisioning).expect("refused");
-    assert_eq!(why.to_string(), "machine `aliases` (dotted DNS names) aren't Kubernetes Service names");
+    let next = refusal(&env.requirements, &provisioning).expect("refused");
+    assert_eq!(next.to_string(), "machine `aliases` (dotted DNS names) aren't Kubernetes Service names");
     let both = Capabilities::of([Feature::EnvironmentProvisioning, Feature::MachineAliases]);
     assert!(refusal(&env.requirements, &both).is_none());
+    Ok(())
 }
 
 #[test]
-fn what_is_required_and_nothing_more_is_refused() {
-    let env = env(Target::Docker);
+fn what_is_required_and_nothing_more_is_refused() -> Outcome {
+    let env = env(Target::Docker)?;
     assert_eq!(env.requirements, [Requirement::MachineAliases]);
     assert!(refusal(&env.requirements, &Capabilities::of([Feature::MachineAliases])).is_none());
+    Ok(())
 }
 
 #[test]
-fn gateways_ulimits_and_tc_are_required_in_that_order() {
+fn gateways_ulimits_and_tc_are_required_in_that_order() -> Outcome {
     let env = plan_anyway(
         "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: gw, tc: { delay: 50ms } }\nmachines:\n  gw:\n    networks: { lan: 1 }\n    app: { image: alpine }\n  web:\n    networks: { lan: 10 }\n    ulimits: { nofile: 1024 }\n    app: { image: nginx }\n",
         Target::Kubernetes,
-    );
+    )?;
     assert_eq!(
         env.requirements,
         [
@@ -158,14 +151,15 @@ fn gateways_ulimits_and_tc_are_required_in_that_order() {
     );
     let why = refusal(&env.requirements, &Capabilities::of([Feature::Gateways])).expect("refused");
     assert_eq!(why.to_string(), "machine `web` sets `ulimits`: Kubernetes has no per-container process limits");
+    Ok(())
 }
 
 #[test]
-fn a_machine_process_is_required_and_planned_as_steps() {
+fn a_machine_process_is_required_and_planned_as_steps() -> Outcome {
     let env = plan(
         "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: web.sh }] }\n    command: [serve]\n    setup: [seed.sh]\n    healthcheck: { test: 'true', interval: 1m }\n",
         Target::Vagrant,
-    );
+    )?;
     assert_eq!(env.requirements, [Requirement::MachineProcess { machine: "web".into() }]);
     let why = refusal(&env.requirements, &Capabilities::default()).expect("refused");
     assert!(why.to_string().contains("an existing host runs what it already runs"), "{why}");
@@ -175,14 +169,15 @@ fn a_machine_process_is_required_and_planned_as_steps() {
         "{steps:?}"
     );
     assert_eq!(env.machines["web"].process.health.as_ref().map(|h| h.interval), Some(60));
+    Ok(())
 }
 
 #[test]
-fn secrets_come_before_what_reads_them_on_linux_and_windows() {
+fn secrets_come_before_what_reads_them_on_linux_and_windows() -> Outcome {
     let env = plan(
         "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nsecrets:\n  db: { env: DB }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: web.sh }] }\n    files: [{ path: /etc/a, content: x }, { path: /run/secrets/db, secret: db }]\n    command: [serve]\n  win:\n    os: windows-server@2022\n    networks: { lan: 11 }\n    files: [{ path: 'C:\\\\secrets\\\\db', secret: db }]\n",
         Target::Vagrant,
-    );
+    )?;
     let steps = &env.machines["web"].lifecycle;
     let at = |want: fn(&Step) -> bool| steps.iter().position(want).expect("planned");
     let secrets = at(|s| *s == Step::Secrets);
@@ -192,4 +187,5 @@ fn secrets_come_before_what_reads_them_on_linux_and_windows() {
     // A Windows machine gets its secrets like any VM: nothing beyond `Secrets` is asked.
     assert!(env.machines["win"].lifecycle.contains(&Step::Secrets));
     assert!(refusal(&env.requirements, &Capabilities::of([Feature::Secrets, Feature::MachineProcess])).is_none());
+    Ok(())
 }

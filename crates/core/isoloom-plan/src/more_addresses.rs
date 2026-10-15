@@ -31,6 +31,7 @@ pub struct MoreAddresses {
 }
 
 /// Machine `m`'s addresses after its primary one, by network (in its networks' order).
+#[must_use]
 pub fn of(spec: &Spec, m: &Machine) -> IndexMap<String, Vec<Ipv4Addr>> {
     m.networks
         .keys()
@@ -42,13 +43,16 @@ pub fn of(spec: &Spec, m: &Machine) -> IndexMap<String, Vec<Ipv4Addr>> {
 }
 
 /// The set-up step that adds them, when the machine has any.
+#[must_use]
 pub fn step(spec: &Spec, m: &Machine) -> Option<Step> {
     let addresses: Vec<MoreAddresses> = of(spec, m)
         .into_iter()
-        .map(|(n, more)| MoreAddresses {
-            primary: address(spec, &n, m.networks[&n]),
-            prefix: cidr(spec, &n).len,
-            more,
+        .filter_map(|(n, more)| {
+            Some(MoreAddresses {
+                primary: address(spec, &n, *m.networks.get(&n)?),
+                prefix: cidr(spec, &n).len,
+                more,
+            })
         })
         .collect();
     (!addresses.is_empty()).then_some(Step::MoreAddresses { addresses })
@@ -86,7 +90,7 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::*;
-    use crate::{Environment, Lab};
+    use crate::testing;
 
     const SPEC: &str = "
 version: 1
@@ -98,8 +102,8 @@ machines:
 
     #[test]
     fn a_vm_adds_them_on_the_interface_of_its_primary_address() {
-        let lab = Lab::new(isoloom_spec::parse(SPEC).unwrap());
-        let build = |t| Environment::build(&lab.for_target(t), t, None);
+        let lab = testing::lab(SPEC);
+        let build = |t| testing::planned(&lab, t);
         let env = build(Target::Vagrant);
         let web = &env.machines["web"];
         assert_eq!(

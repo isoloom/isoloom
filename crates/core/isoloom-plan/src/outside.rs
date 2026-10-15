@@ -5,6 +5,7 @@
 //! interface after its own networks. A target renders them, or refuses them through its
 //! capabilities ([`requirements`]).
 
+use std::fmt;
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
@@ -41,6 +42,7 @@ pub enum OutsideAddress {
 }
 
 /// The spec's outside networks, in spec order.
+#[must_use]
 pub fn networks(spec: &Spec) -> IndexMap<String, OutsideNetwork> {
     spec.networks
         .iter()
@@ -56,6 +58,7 @@ pub fn networks(spec: &Spec) -> IndexMap<String, OutsideNetwork> {
 }
 
 /// Machine `m`'s addresses on the outside networks it joins, in its order.
+#[must_use]
 pub fn addresses(spec: &Spec, m: &Machine) -> IndexMap<String, OutsideAddress> {
     m.networks
         .iter()
@@ -73,6 +76,7 @@ pub fn addresses(spec: &Spec, m: &Machine) -> IndexMap<String, OutsideAddress> {
 
 /// The spec without its outside networks, as the rest of the plan and the backends read it:
 /// the networks gone, and gone from each machine's list.
+#[must_use]
 pub fn without(spec: &Spec) -> Spec {
     let mut s = spec.clone();
     s.networks.retain(|_, n| !n.is_outside());
@@ -84,6 +88,7 @@ pub fn without(spec: &Spec) -> Spec {
 
 /// What the outside networks ask of a backend: joining an existing network, bridging a host
 /// interface. At most one of each, the first network that asks.
+#[must_use]
 pub fn requirements(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
     if let Some((network, n)) = spec.networks.iter().find(|(_, n)| n.external.is_some()) {
@@ -98,11 +103,28 @@ pub fn requirements(spec: &Spec) -> Vec<Requirement> {
     out
 }
 
+/// Why a target that makes every network it uses refuses existing network `network` (`name`).
+pub(crate) fn no_existing_network(f: &mut fmt::Formatter<'_>, network: &str, name: &str) -> fmt::Result {
+    write!(
+        f,
+        "network `{network}` is an existing network (`external: {name}`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones)"
+    )
+}
+
+/// Why a target that bridges nothing refuses bridged network `network`.
+pub(crate) fn no_bridge(f: &mut fmt::Formatter<'_>, network: &str) -> fmt::Result {
+    write!(
+        f,
+        "network `{network}` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)"
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{Environment, Feature, Lab};
     use isoloom_spec::model::Target;
+
+    use super::*;
+    use crate::{Feature, testing};
 
     const SPEC: &str = "
 version: 1
@@ -119,9 +141,7 @@ overrides:
 
     #[test]
     fn outside_networks_stay_apart_from_the_environment_s_own() {
-        let lab = Lab::new(isoloom_spec::parse(SPEC).unwrap());
-        assert_eq!(lab.problems(), vec![]);
-        let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None);
+        let env = testing::planned(&testing::valid(SPEC), Target::Docker);
         assert_eq!(env.networks.keys().collect::<Vec<_>>(), ["lan"]);
         assert_eq!(env.spec().networks.len(), 1);
         assert_eq!(env.outside["corp"].join, Join::Existing("corp-net".into()));

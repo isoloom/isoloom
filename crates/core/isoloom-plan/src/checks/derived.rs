@@ -2,10 +2,11 @@
 //! `reach` lets through and not from the others, and offline networks don't reach the internet.
 
 use super::{Host, HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect, Url, can_run_checks};
-use crate::model::{Machine, Port, Spec};
+use isoloom_spec::model::{Machine, Port, Spec};
 
 /// Whether `from` may open connections to `to`'s address on `network`, port `port`: they share
 /// the network, or a `reach` rule from one of `from`'s networks opens it.
+#[must_use]
 pub fn allowed(spec: &Spec, from: &Machine, network: &str, port: u16) -> bool {
     from.networks.contains_key(network)
         || spec
@@ -98,8 +99,8 @@ fn service_from(spec: &Spec, position: &Position, (a, ma): (&str, &Machine), (b,
 /// there, then each of its further addresses (`lan: [10, 11]`) as written.
 fn hosts(spec: &Spec, b: &str, mb: &Machine, n: &str) -> Vec<(Host, String)> {
     let primary = Host::Machine {
-        name: b.to_string(),
-        network: n.to_string(),
+        name: b.to_owned(),
+        network: n.to_owned(),
     };
     let more = crate::more_addresses::of(spec, mb).swap_remove(n).unwrap_or_default();
     std::iter::once((primary, on_network(mb, n)))
@@ -129,6 +130,7 @@ fn derived_check(name: String, position: Position, probe: Probe, wait: u32) -> R
 /// Nothing stands where `reach` blocks a service or where a network is offline, so those aren't
 /// asserted. A target where the machines that could run them don't (the containers of a hybrid
 /// environment) uses it too.
+#[must_use]
 pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     let mut out = Vec::new();
     for (b, mb) in &spec.machines {

@@ -1,26 +1,27 @@
 //! One machine, lowered: its settings copied over, its ports named, its files split by source
 //! (configuration as files, run-time values as secret files), and its forms as `docker:` and
-//! `vm:` blocks, each built from the recipe that gives it.
-
-use std::net::Ipv4Addr;
+//! `vm:` blocks, each built from the recipe that gives it ([`super::forms`]).
 
 use indexmap::IndexMap;
 use isoloom_spec::model::{self, DockerImpl, Generated, HttpCheck, MachineFile, MachineSecret, Protocol, SecretMount, VmImpl};
-use isoloom_spec::syntax::{self, EnvValue, FileSource, Form, Octets, PortProtocol, PortRef, Publish, Recipe, Step, Tpm};
+use isoloom_spec::syntax::{self, Code, EnvValue, FieldPath, FileSource, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm};
 
 use super::Scope;
+use super::forms::{self, Container, Vm};
 use super::overrides;
 use super::trail::Trail;
 
-/// A lowered machine, and the inputs its files read (the secret each becomes → the input).
+/// A lowered machine, the inputs its files read (the secret each becomes → the input), and what
+/// couldn't be lowered, at the field the author wrote.
 pub(super) struct LoweredMachine {
     pub machine: model::Machine,
     pub inputs: Vec<(String, String)>,
+    pub problems: Vec<Problem>,
 }
 
 /// The secret an input's file becomes: `input-<name>`, kebab-case (`CTF_FLAG` is
 /// `input-ctf-flag`).
-pub fn input_secret(input: &str) -> String {
+pub(super) fn input_secret(input: &str) -> String {
     format!("input-{}", input.to_ascii_lowercase().replace('_', "-"))
 }
 
@@ -29,6 +30,11 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
     let (networks, more_addresses) = addresses(&m.networks);
     let (files, secrets, inputs) = files(name, m, trail);
     trail.machine(name, m);
+    let at = FieldPath::new("machines").key(name);
+    let (ports, mut problems) = ports(&at, m);
+    let (healthcheck, unknown_port) = m.healthcheck.as_ref().map(|h| healthcheck(&at, m, h)).unzip();
+    problems.extend(unknown_port.flatten());
+    let healthcheck = healthcheck.flatten();
     let mut out = model::Machine {
         networks,
         more_addresses,
@@ -48,7 +54,7 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         environment: environment(m),
         sysctls: m.sysctls.clone(),
         ulimits: m.ulimits.clone(),
-        ports: ports(m),
+        ports,
         inputs: m
             .environment
             .values()
@@ -62,7 +68,7 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         command: m.command.as_ref().map(|c| c.run.clone()),
         working_dir: m.command.as_ref().and_then(|c| c.cwd.clone()),
         before: Vec::new(),
-        healthcheck: m.healthcheck.as_ref().map(|h| healthcheck(m, h)),
+        healthcheck,
         depends_on: m.depends_on.clone(),
         volumes: m.volumes.clone(),
         files,
@@ -77,7 +83,11 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
         out.vm = None;
     }
-    LoweredMachine { machine: out, inputs }
+    LoweredMachine {
+        machine: out,
+        inputs,
+        problems,
+    }
 }
 
 /// Each network's first address, and the further ones where a list gives several.
@@ -113,12 +123,25 @@ fn environment(m: &syntax::Machine) -> IndexMap<String, String> {
         .collect()
 }
 
-/// The ports, each named after its key.
-fn ports(m: &syntax::Machine) -> Vec<model::Port> {
-    m.ports
+/// The ports, each named after its key (`at`: the machine's path). A port without its number
+/// is a problem at its `port`, and stays out; on a catalogue service's machine the number is the
+/// entry's, so it stays out without one (the machine is refused at its `service` until the
+/// catalogue has the entry).
+fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>) {
+    let service = matches!(m.kind, Kind::Service(_));
+    let mut problems = Vec::new();
+    let ports = m
+        .ports
         .iter()
         .filter_map(|(name, p)| {
-            let port = p.port?.get();
+            let Some(number) = p.port else {
+                if !service {
+                    let path = at.key("ports").key(name.as_str()).key("port");
+                    problems.push(Problem::new(Code::MissingField, path, "a port says its number"));
+                }
+                return None;
+            };
+            let port = number.get();
             let (publish, fixed) = match p.publish {
                 None => (None, false),
                 Some(Publish::Free) => (Some(port), false),
@@ -136,25 +159,42 @@ fn ports(m: &syntax::Machine) -> Vec<model::Port> {
                 protocol: if p.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp },
             })
         })
-        .collect()
+        .collect();
+    (ports, problems)
 }
 
-/// The healthcheck, its page's port by number.
-fn healthcheck(m: &syntax::Machine, h: &syntax::Healthcheck) -> model::Healthcheck {
-    model::Healthcheck {
+/// The healthcheck, its page's port by number (`at`: the machine's path). A page on a port the
+/// machine doesn't name is a problem at its `port`, and the page stays out; so does one on a
+/// catalogue service's port, whose number is the entry's. With nothing left to try, the
+/// healthcheck stays out (the spec's own checks report one that says nothing to try).
+fn healthcheck(at: &FieldPath, m: &syntax::Machine, h: &syntax::Healthcheck) -> (Option<model::Healthcheck>, Option<Problem>) {
+    let mut unknown = None;
+    let http = h.http.as_ref().and_then(|page| {
+        let port = match &page.port {
+            PortRef::Number(n) => Some(n.get()),
+            PortRef::Name(n) => {
+                let Some(p) = m.ports.get(n) else {
+                    let path = at.key("healthcheck").key("http").key("port");
+                    unknown = Some(Problem::new(Code::UnknownReference, path, format!("the machine has no port named `{n}`")));
+                    return None;
+                };
+                p.port.map(std::num::NonZeroU16::get)
+            }
+        };
+        port.map(|port| HttpCheck { port, path: page.path.clone() })
+    });
+    if h.test.is_none() && http.is_none() {
+        return (None, unknown);
+    }
+    let lowered = model::Healthcheck {
         test: h.test.clone(),
-        http: h.http.as_ref().map(|page| HttpCheck {
-            port: match &page.port {
-                PortRef::Number(n) => n.get(),
-                PortRef::Name(n) => m.ports.get(n).and_then(|p| p.port).map_or(0, std::num::NonZeroU16::get),
-            },
-            path: page.path.clone(),
-        }),
+        http,
         interval: h.interval.clone(),
         timeout: h.timeout.clone(),
         retries: h.retries,
         start_period: h.start_period.clone(),
-    }
+    };
+    (Some(lowered), unknown)
 }
 
 /// The machine's files split by source: configuration as files, values as secret files (an
@@ -186,7 +226,7 @@ fn files(name: &str, m: &syntax::Machine, trail: &mut Trail) -> (Vec<MachineFile
             content,
             uid: f.uid,
             gid: f.gid,
-            mode: f.mode.map(|m| m.to_string()),
+            mode: f.mode.map(|mode| mode.to_string()),
         });
     }
     (files, secrets, inputs)
@@ -196,7 +236,7 @@ fn files(name: &str, m: &syntax::Machine, trail: &mut Trail) -> (Vec<MachineFile
 /// Windows).
 fn value_file(secret: &str, f: &syntax::File, windows: bool) -> MachineSecret {
     MachineSecret::Mount(SecretMount {
-        source: secret.to_string(),
+        source: secret.to_owned(),
         target: Some(f.path.clone()),
         uid: f.uid,
         gid: f.gid,
@@ -221,32 +261,33 @@ fn docker(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope) 
         lxc: overrides::lxc(source, name, scope),
         generated: None,
     };
-    match syntax::container_form(m).ok()? {
-        Form::Supplied | Form::Service => return None,
-        Form::Recipe(Recipe::Image(i)) => d.image = Some(i.clone()),
-        Form::Recipe(Recipe::Build(b)) => {
+    // No container form: the target refuses the machine there (`refusals`), or the lab lowers
+    // it with the forms it has.
+    match forms::container(m).ok()? {
+        Container::Supplied => return None,
+        Container::Recipe(Recipe::Image(i)) => d.image = Some(i.clone()),
+        Container::Recipe(Recipe::Build(b)) => {
             d.build = Some(b.context.clone());
             d.dockerfile.clone_from(&b.dockerfile);
             d.target.clone_from(&b.target);
             d.args.clone_from(&b.args);
         }
-        Form::Recipe(Recipe::Appliance(a)) => {
+        Container::Recipe(Recipe::Appliance(a)) => {
             d.image.clone_from(&a.image);
             d.appliance = Some(a.kind);
             d.config.clone_from(&a.config);
             d.firmware.clone_from(&a.firmware);
         }
-        Form::Steps => {
-            let os = m.os?.name();
+        Container::Steps { os, base } => {
             d.generated = Some(Generated {
-                os: os.to_string(),
-                base: isoloom_spec::os::container_image(os)?.to_string(),
+                os: os.name().to_owned(),
+                base: base.to_owned(),
                 steps: m.app().map(|a| a.steps.clone()).unwrap_or_default(),
             });
             d.idle = idle;
         }
-        Form::Os => {
-            d.image = Some(isoloom_spec::os::container_image(m.os?.name())?.to_string());
+        Container::Os { image } => {
+            d.image = Some(image.to_owned());
             d.idle = idle;
         }
     }
@@ -255,9 +296,9 @@ fn docker(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope) 
 
 /// The VM form, as a `vm:` block: a fresh VM of the OS, set up by the steps a VM runs.
 fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine) -> Option<VmImpl> {
-    if !matches!(syntax::vm_form(m).ok()?, Form::Os | Form::Steps) {
-        return None;
-    }
+    // No VM form: the target refuses the machine there (`refusals`), or the lab lowers it with
+    // the forms it has; a supplied machine has no VM to describe.
+    let Ok(Vm::Os(os)) = forms::vm(m) else { return None };
     let provision = m
         .app()
         .map(|a| {
@@ -265,16 +306,17 @@ fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine) -> Option<VmImpl> 
                 .iter()
                 .filter_map(|s| match s {
                     Step::Run { script, .. } => Some(script.clone()),
-                    Step::Reboot => Some(model::REBOOT_STEP.to_string()),
+                    Step::Reboot => Some(model::REBOOT_STEP.to_owned()),
                     Step::Playbook(p) => Some(p.clone()),
-                    // Configuration steps on a VM come in Phase 4: refused there.
+                    // Configuration steps (`copy`, `packages`) on a VM come in Phase 4: refused
+                    // there (`refusals`).
                     _ => None,
                 })
                 .collect()
         })
         .unwrap_or_default();
     Some(VmImpl {
-        os: m.os?.name().to_string(),
+        os: os.name().to_owned(),
         provision,
         image: overrides::vm_image(source, name),
         tpm: match m.hardware.tpm {
@@ -308,8 +350,10 @@ pub(super) fn resolve_dns(spec: &mut model::Spec, scope: Scope) {
 }
 
 /// `server`'s address on the first network it shares with `machine`.
-fn address_on_shared(spec: &model::Spec, machine: &str, server: &str) -> Option<Ipv4Addr> {
+fn address_on_shared(spec: &model::Spec, machine: &str, server: &str) -> Option<std::net::Ipv4Addr> {
     let (m, s) = (spec.machines.get(machine)?, spec.machines.get(server)?);
-    let net = m.networks.keys().find(|n| s.networks.contains_key(*n) && spec.networks.contains_key(*n))?;
-    Some(crate::addressing::address(spec, net, s.networks[net]))
+    m.networks.keys().find_map(|n| {
+        let octet = s.networks.get(n).filter(|_| spec.networks.contains_key(n))?;
+        Some(crate::addressing::address(spec, n, *octet))
+    })
 }

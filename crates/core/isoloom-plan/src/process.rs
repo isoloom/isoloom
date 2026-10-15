@@ -38,6 +38,7 @@ impl Process {
     }
 
     /// Whether the spec sets any of it.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.command.is_none() && self.working_dir.is_none() && self.before.is_empty() && self.health.is_none()
     }
@@ -74,6 +75,7 @@ pub enum HealthTest {
 
 impl Health {
     /// The plan of a validated healthcheck; `None` when it says nothing to try.
+    #[must_use]
     pub fn of(h: &Healthcheck) -> Option<Health> {
         let test = match (&h.test, &h.http) {
             (Some(t), _) => HealthTest::Command(t.clone()),
@@ -96,6 +98,7 @@ impl Health {
     /// The test as one line of shell, run inside the machine: the command as written, or the
     /// page fetched with `wget` (busybox has it, as Isoloom's probe does on the containers).
     /// `wget`'s own failure on a 4xx or 5xx status is the unhealthy answer.
+    #[must_use]
     pub fn shell_test(&self, wget: &str) -> String {
         match &self.test {
             HealthTest::Command(c) => c.shell_line(),

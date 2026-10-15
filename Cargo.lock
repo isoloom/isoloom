@@ -668,6 +668,7 @@ dependencies = [
  "indexmap",
  "insta",
  "isoloom-spec",
+ "proptest",
  "serde_json",
 ]
 

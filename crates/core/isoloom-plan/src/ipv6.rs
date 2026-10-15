@@ -2,6 +2,7 @@
 //! left to the target), the router's IPv6 addresses and the IPv6 routes through it. Pure
 //! functions of a validated spec, beside their IPv4 counterparts in `addressing` and `routing`.
 
+use std::fmt;
 use std::net::Ipv6Addr;
 
 use indexmap::IndexMap;
@@ -35,11 +36,13 @@ pub struct Route6 {
 }
 
 /// A network's IPv6 block, when it has one that parses.
+#[must_use]
 pub fn block(spec: &Spec, network: &str) -> Option<Cidr6> {
     spec.networks.get(network)?.ipv6.as_ref().and_then(|v| Cidr6::parse(&v.cidr))
 }
 
 /// A network's IPv6 side, when it has one.
+#[must_use]
 pub fn network(spec: &Spec, network: &str) -> Option<Ipv6Plan> {
     let v6 = spec.networks.get(network)?.ipv6.as_ref()?;
     let c = Cidr6::parse(&v6.cidr)?;
@@ -52,12 +55,14 @@ pub fn network(spec: &Spec, network: &str) -> Option<Ipv6Plan> {
 }
 
 /// Whether the network carries no IPv4.
+#[must_use]
 pub fn only(spec: &Spec, network: &str) -> bool {
     spec.networks.get(network).and_then(|n| n.ipv6.as_ref()).is_some_and(|v| v.only)
 }
 
 /// The IPv6 address a machine at `octet` has on a network, when the network is IPv6 and its
 /// addresses are derived (with `auto`, the target picks it).
+#[must_use]
 pub fn address(spec: &Spec, network: &str, octet: u8) -> Option<Ipv6Addr> {
     let v6 = spec.networks.get(network)?.ipv6.as_ref()?;
     if v6.addresses != Ipv6Addresses::Static {
@@ -67,18 +72,21 @@ pub fn address(spec: &Spec, network: &str, octet: u8) -> Option<Ipv6Addr> {
 }
 
 /// A machine's derived IPv6 addresses, by network, in its order.
+#[must_use]
 pub fn addresses(spec: &Spec, m: &Machine) -> IndexMap<String, Ipv6Addr> {
     m.networks.iter().filter_map(|(n, o)| Some((n.clone(), address(spec, n, *o)?))).collect()
 }
 
 /// The router's IPv6 address on a network it routes: the one its IPv4 octet gives (`::254` in
 /// a /24), fixed whatever the network's `addresses`.
+#[must_use]
 pub fn router_address(spec: &Spec, network: &str) -> Option<Ipv6Addr> {
     let octet = cidr(spec, network).router().octets()[3];
     block(spec, network).map(|c| c.host(octet))
 }
 
 /// The router's IPv6 addresses, on each IPv6 network it routes (empty without a router).
+#[must_use]
 pub fn router(spec: &Spec) -> IndexMap<String, Ipv6Addr> {
     if !routing::needed(spec) {
         return IndexMap::new();
@@ -89,6 +97,7 @@ pub fn router(spec: &Spec) -> IndexMap<String, Ipv6Addr> {
 /// A machine's IPv6 routes: each IPv6 block it isn't on, through the router's IPv6 address on
 /// its first IPv6 network the router is on. Gateway networks carry no IPv6 (validated), so the
 /// router is the only next hop.
+#[must_use]
 pub fn routes(spec: &Spec, m: &Machine) -> Vec<Route6> {
     let router = router(spec);
     let Some(via) = m.networks.keys().find_map(|n| router.get(n)) else {
@@ -116,8 +125,25 @@ pub fn cloud_routes(steps: &mut [crate::lifecycle::Step]) {
     }
 }
 
+/// Why a target without IPv6-only networks refuses network `network`.
+pub(crate) fn no_ipv6_only(f: &mut fmt::Formatter<'_>, network: &str) -> fmt::Result {
+    write!(
+        f,
+        "network `{network}` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport)"
+    )
+}
+
+/// Why a target that hands out no IPv6 addresses refuses network `network`'s `auto` ones.
+pub(crate) fn no_auto_addresses(f: &mut fmt::Formatter<'_>, network: &str) -> fmt::Result {
+    write!(
+        f,
+        "network `{network}` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`"
+    )
+}
+
 /// What the IPv6 networks ask of a backend: IPv6 at all, IPv6-only networks, addresses the
 /// target hands out. At most one of each kind, naming the first network that asks.
+#[must_use]
 pub fn requirements(spec: &Spec) -> Vec<Requirement> {
     let first = |pick: fn(&isoloom_spec::model::Ipv6) -> bool| {
         spec.networks
@@ -143,7 +169,7 @@ mod tests {
     use super::*;
 
     fn spec() -> Spec {
-        let source = isoloom_spec::parse(
+        crate::testing::spec(
             "version: 1
 name: v6
 networks:
@@ -156,8 +182,6 @@ machines:
   y: { networks: { b: 20, c: 5 }, app: { image: alpine } }
 ",
         )
-        .unwrap();
-        crate::Lab::new(source).spec()
     }
 
     #[test]

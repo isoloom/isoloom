@@ -23,7 +23,7 @@ mod runner;
 pub use derived::{allowed, derived, from_networks};
 pub use runner::{Line, Render, parse_line, script};
 
-use crate::model::{Check, Declared, Expect, Spec};
+use isoloom_spec::model::{Check, Declared, Expect, Spec};
 
 /// Where a check runs from.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -36,6 +36,7 @@ pub enum Position {
 
 impl Position {
     /// A file-safe id: the machine's name, or `networks`.
+    #[must_use]
     pub fn id(&self) -> &str {
         match self {
             Position::Machine(m) => m,
@@ -44,10 +45,11 @@ impl Position {
     }
 
     /// How results name the position.
+    #[must_use]
     pub fn label(&self) -> String {
         match self {
             Position::Machine(m) => format!("from {m}"),
-            Position::Networks => "from the environment's networks".to_string(),
+            Position::Networks => "from the environment's networks".to_owned(),
         }
     }
 }
@@ -168,6 +170,7 @@ pub struct Resolved {
 }
 
 /// The position a check without `from` runs from: the access machine, else the networks.
+#[must_use]
 pub fn default_position(spec: &Spec) -> Position {
     match spec.machines.iter().find(|(_, m)| m.access) {
         Some((name, _)) => Position::Machine(name.clone()),
@@ -177,6 +180,7 @@ pub fn default_position(spec: &Spec) -> Position {
 
 /// Every check of the spec, resolved: the author's in order, then the derived ones.
 /// Validated specs only (a declared check that validation rejects isn't resolved).
+#[must_use]
 pub fn plan(spec: &Spec) -> Vec<Resolved> {
     let default = default_position(spec);
     let mut out: Vec<Resolved> = spec
@@ -254,14 +258,14 @@ fn declared_http(d: &Declared, u: &str) -> Option<DeclaredProbe> {
     let what = match (&expect, &request.method) {
         (HttpExpect::Blocked, _) => format!("{u} blocked"),
         (_, Some(m)) => format!("{} {u}", m.to_uppercase()),
-        _ => u.to_string(),
+        _ => u.to_owned(),
     };
     Some((Probe::Http { url, expect, request }, wait, what))
 }
 
-/// A declared `tcp` check (to `host:port` `t`).
-fn declared_tcp(d: &Declared, t: &str) -> Option<DeclaredProbe> {
-    let (host, port) = t.rsplit_once(':')?;
+/// A declared `tcp` check (to `host:port` `target`).
+fn declared_tcp(d: &Declared, target: &str) -> Option<DeclaredProbe> {
+    let (host, port) = target.rsplit_once(':')?;
     let port: u16 = port.parse().ok().filter(|p| *p > 0)?;
     let expect = match d.expect.as_ref() {
         None => TcpExpect::Open,
@@ -271,15 +275,15 @@ fn declared_tcp(d: &Declared, t: &str) -> Option<DeclaredProbe> {
     };
     let wait = if expect == TcpExpect::Blocked { 0 } else { 30 };
     let what = match expect {
-        TcpExpect::Blocked => format!("{t} blocked"),
-        TcpExpect::Open => t.to_string(),
+        TcpExpect::Blocked => format!("{target} blocked"),
+        TcpExpect::Open => target.to_owned(),
     };
     let exchange = TcpExchange {
         send: d.send.clone(),
         contains: d.contains.clone(),
     };
     let probe = Probe::Tcp {
-        host: Host::Literal(host.to_string()),
+        host: Host::Literal(host.to_owned()),
         port,
         expect,
         exchange,
@@ -288,6 +292,7 @@ fn declared_tcp(d: &Declared, t: &str) -> Option<DeclaredProbe> {
 }
 
 /// The checks grouped by position: the default position first, then machines in spec order.
+#[must_use]
 pub fn by_position<'a>(spec: &Spec, checks: &'a [Resolved]) -> Vec<(Position, Vec<&'a Resolved>)> {
     let mut order: Vec<Position> = vec![default_position(spec)];
     for m in spec.machines.keys() {

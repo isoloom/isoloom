@@ -5,32 +5,15 @@ use std::path::{Path, PathBuf};
 
 use isoloom_plan::Lab;
 use isoloom_spec::syntax::{self, Problem};
+use testing::{assert_problem, problems};
+
+pub mod testing;
 
 /// A spec with one network, `lab` (10.9.0.0/24), and nothing else.
 const NET: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n";
 
 /// A valid machine on `lab`.
 const WEB: &str = "{ networks: { lab: 5 }, app: { image: nginx } }";
-
-/// What an author sees: the parser's problems, or the lab's once the spec parses.
-fn found(yaml: &str) -> Vec<Problem> {
-    isoloom_plan::problems_in(yaml)
-}
-
-fn problems(yaml: &str) -> Vec<String> {
-    found(yaml).iter().map(Problem::line).collect()
-}
-
-/// Some problem is at `at` and its reason contains `fragment`.
-#[track_caller]
-fn assert_problem(yaml: &str, at: &str, fragment: &str) {
-    let found = problems(yaml);
-    let prefix = format!("{at}: ");
-    assert!(
-        found.iter().any(|p| p.starts_with(&prefix) && p.contains(fragment)),
-        "expected `{at}: …{fragment}…`, got {found:#?}\nspec:\n{yaml}"
-    );
-}
 
 /// `NET` with these lines under `machines:` (each `  name: { … }`).
 fn with_machines(lines: &[&str]) -> String {

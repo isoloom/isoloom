@@ -12,7 +12,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_spec::images;
-use isoloom_spec::model::{Arch, Boot, Constraints, External, Machine, MachineFile, Protocol, Spec, Target, Tc, Ulimit, VmImage, Winrm};
+use isoloom_spec::model::{Arch, Boot, Constraints, External, Machine, MachineFile, Network, Protocol, Spec, Target, Tc, Ulimit, VmImage, Winrm};
 use isoloom_spec::validate::docker_cidrs;
 use isoloom_spec::windows::{self, Tpm};
 
@@ -261,6 +261,7 @@ pub struct Settings {
 
 impl Settings {
     /// Whether there is nothing to set.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.environment.is_empty() && self.sysctls.is_empty() && self.ulimits.is_empty()
     }
@@ -316,77 +317,71 @@ impl Controller {
 
 impl Environment {
     /// Plans a validated `spec` for `target` (`instance`: the copy it is, when several run).
+    #[must_use]
     pub fn build(spec: &Spec, target: Target, instance: Option<u8>) -> Environment {
-        let original = spec;
         // Laid out with the outside networks (so a moved block avoids them), then without them.
         let laid_out = outside::without(&lay_out(spec, target));
-        let spec = &laid_out;
-        let router = routing::needed(spec).then(|| routing::networks(spec).map(|n| (n.clone(), routing::address(spec, n))).collect());
-        let machines: IndexMap<String, MachinePlan> = spec
-            .machines
+        let machines = machines(spec, &laid_out, target);
+        let requirements = all_requirements(spec, &laid_out, &machines);
+        let networks = laid_out
+            .networks
             .iter()
-            .map(|(n, m)| {
-                let mut mp = machine(spec, target, n, m);
-                mp.outside = original.machines.get(n).map(|m| outside::addresses(original, m)).unwrap_or_default();
-                (n.clone(), mp)
+            .map(|(name, n)| {
+                let declared = spec.networks.get(name).map_or(&n.cidr, |o| &o.cidr);
+                (name.clone(), network(&laid_out, name, n, declared))
             })
             .collect();
-        let mut requirements = requirements::of(spec);
-        requirements.extend(outside::requirements(original));
-        requirements.extend(requirements::mixed_shapes(spec, |n| machines.get(n).map(|m| m.shape)));
-        requirements.extend(crate::machine_files::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
-        requirements.extend(requirements::tpm(&machines));
-        requirements.extend(crate::boot::requirements(&machines));
-        requirements.extend(hardware::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
-        requirements.extend(crate::more_addresses::requirements(spec, |n| machines.get(n).map(|m| m.shape)));
         Environment {
-            name: spec.name.clone(),
+            name: laid_out.name.clone(),
             target,
             instance,
-            networks: spec
-                .networks
-                .keys()
-                .map(|n| (n.clone(), network(spec, &original.networks[n].cidr, n)))
-                .collect(),
-            outside: outside::networks(original),
-            router,
-            router6: ipv6::router(spec),
+            networks,
+            outside: outside::networks(spec),
+            router: routing::needed(&laid_out).then(|| routing::networks(&laid_out).map(|n| (n.clone(), routing::address(&laid_out, n))).collect()),
+            router6: ipv6::router(&laid_out),
             machines,
-            start_order: start_order(spec).into_iter().map(String::from).collect(),
-            checks: checks::plan(spec),
-            controller: Controller::needed(spec).then(|| Controller::of(spec)),
-            constraints: spec.constraints.clone(),
+            start_order: start_order(&laid_out).into_iter().map(String::from).collect(),
+            checks: checks::plan(&laid_out),
+            controller: Controller::needed(&laid_out).then(|| Controller::of(&laid_out)),
+            constraints: laid_out.constraints.clone(),
             requirements,
-            images: Images::of(spec),
-            inventory_groups: ansible::groups(spec),
+            images: Images::of(&laid_out),
+            inventory_groups: ansible::groups(&laid_out),
             private_dns: crate::private_dns::plan(&laid_out),
-            spec: laid_out.clone(),
+            spec: laid_out,
         }
     }
 
     /// The spec as laid out for the target, for what the plan doesn't model yet.
+    #[must_use]
     pub fn spec(&self) -> &Spec {
         &self.spec
     }
 
     /// The address `from` reaches `to` at: on a network they share, else `to`'s first.
+    #[must_use]
     pub fn address_for(&self, from: &str, to: &str) -> Ipv4Addr {
         address_for(&self.spec, from, to)
     }
 
     /// Where a probe reaches machine `name` on `network`: its IPv4 address, or on an IPv6-only
-    /// network its IPv6 one (its name, which the target's DNS resolves, when the target hands
-    /// addresses out).
+    /// network its IPv6 one. Its name, which the target's DNS resolves, when it has no address
+    /// there: on an IPv6-only network that leaves addresses to the target (or a machine or a
+    /// network the plan doesn't hold, which no check of the plan names).
+    #[must_use]
     pub fn probe_address(&self, name: &str, network: &str) -> String {
-        let m = &self.machines[name];
-        if !ipv6::only(&self.spec, network) {
-            return m.addresses[network].to_string();
-        }
-        m.addresses6.get(network).map_or_else(|| name.to_string(), ToString::to_string)
+        let m = self.machines.get(name);
+        let address = if ipv6::only(&self.spec, network) {
+            m.and_then(|m| m.addresses6.get(network)).map(ToString::to_string)
+        } else {
+            m.and_then(|m| m.addresses.get(network)).map(ToString::to_string)
+        };
+        address.unwrap_or_else(|| name.to_owned())
     }
 }
 
 /// Whether the target runs the environment on Docker's networks (their Docker blocks).
+#[must_use]
 pub fn on_docker(target: Target) -> bool {
     matches!(target, Target::Docker | Target::Hosted)
 }
@@ -404,11 +399,11 @@ pub(crate) fn lay_out(spec: &Spec, target: Target) -> Spec {
     s
 }
 
-fn network(spec: &Spec, declared: &str, name: &str) -> NetworkPlan {
-    let n = &spec.networks[name];
+/// Network `name` (`n`) as laid out in `spec`, its block as the author wrote it `declared`.
+fn network(spec: &Spec, name: &str, n: &Network, declared: &str) -> NetworkPlan {
     NetworkPlan {
         cidr: n.cidr.clone(),
-        declared_cidr: declared.to_string(),
+        declared_cidr: declared.to_owned(),
         host: host_address(spec, name),
         gateway: n.gateway.clone(),
         internet: n.internet,
@@ -419,6 +414,9 @@ fn network(spec: &Spec, declared: &str, name: &str) -> NetworkPlan {
     }
 }
 
+/// How the target produces machine `m`. Lowering keeps only the forms the target runs and
+/// refuses a machine without one, so a machine with neither form here is the access machine the
+/// runner supplies.
 fn shape(target: Target, m: &Machine) -> MachineShape {
     if target == Target::External {
         return MachineShape::External;
@@ -437,6 +435,35 @@ fn shape(target: Target, m: &Machine) -> MachineShape {
     }
 }
 
+/// The machines of `laid_out`, each with its place on the outside networks of `spec`.
+fn machines(spec: &Spec, laid_out: &Spec, target: Target) -> IndexMap<String, MachinePlan> {
+    laid_out
+        .machines
+        .iter()
+        .map(|(name, m)| {
+            let mut mp = machine(laid_out, target, name, m);
+            mp.outside = spec.machines.get(name).map(|om| outside::addresses(spec, om)).unwrap_or_default();
+            (name.clone(), mp)
+        })
+        .collect()
+}
+
+/// Everything the environment requires, most fundamental first: the spec's own requirements,
+/// the outside networks', then those that depend on each machine's shape.
+fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, MachinePlan>) -> Vec<Requirement> {
+    let shape = |n: &str| machines.get(n).map(|m| m.shape);
+    let mut out = requirements::of(laid_out);
+    out.extend(outside::requirements(spec));
+    out.extend(requirements::mixed_shapes(laid_out, shape));
+    out.extend(crate::machine_files::requirements(laid_out, shape));
+    out.extend(requirements::tpm(machines));
+    out.extend(crate::boot::requirements(machines));
+    out.extend(hardware::requirements(laid_out, shape));
+    out.extend(crate::more_addresses::requirements(laid_out, shape));
+    out
+}
+
+/// Machine `name` (`m`), planned for `target`.
 fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan {
     let shape = shape(target, m);
     MachinePlan {
@@ -519,13 +546,13 @@ fn volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Volume> {
         .iter()
         .map(|(v, mount)| Volume {
             name: v.clone(),
-            path: mount.path().to_string(),
+            path: mount.path().to_owned(),
             subpath: mount.subpath().map(String::from),
             key: spec.volume_key(name, v),
             lifetime: storage::lifetime(spec, v),
             kind: match spec.volume_owner(v) {
                 Some(owner) if spec.volumes.contains_key(v) => VolumeKind::Shared {
-                    owner: owner.to_string(),
+                    owner: owner.to_owned(),
                     users: spec.volume_users(v).into_iter().map(String::from).collect(),
                 },
                 _ => VolumeKind::Own,
@@ -539,13 +566,12 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::{Controller, Environment};
-    use crate::Lab;
+    use crate::testing;
 
     const NEEDS_ONE: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nprovision: [{ ansible: site.yml }]\n";
 
     fn controller(extra: &str) -> Option<Controller> {
-        let lab = Lab::parse(&format!("{NEEDS_ONE}{extra}")).expect("the test's spec parses");
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).controller
+        testing::environment(&format!("{NEEDS_ONE}{extra}"), Target::Vagrant).controller
     }
 
     #[test]
@@ -570,12 +596,14 @@ mod tests {
 
     #[test]
     fn only_playbooks_need_a_controller() {
-        let lab = Lab::parse("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.sh]\n")
-            .expect("the test's spec parses");
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.sh]\n",
+        );
         let spec = lab.for_target(Target::Vagrant);
         assert!(!Controller::needed(&spec) && Environment::build(&spec, Target::Vagrant, None).controller.is_none());
-        let playbook = Lab::parse("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.yml]\n")
-            .expect("the test's spec parses");
+        let playbook = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.yml]\n",
+        );
         assert!(Controller::needed(&playbook.for_target(Target::Vagrant)));
         assert_eq!(Controller::of(&spec).memory_mb, Controller::MEMORY_MB);
     }

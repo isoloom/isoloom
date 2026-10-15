@@ -13,6 +13,7 @@ use crate::requirements::Requirement;
 
 /// The zone, as every target serves it.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct PrivateDns {
     /// The zone's domain (`lab.internal`).
     pub domain: String,
@@ -22,6 +23,7 @@ pub struct PrivateDns {
 
 /// One name of the zone.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Record {
     /// The full name (`web.lab.internal`).
     pub name: String,
@@ -34,6 +36,7 @@ pub struct Record {
 }
 
 /// The zone of `spec`, when `dns.private` is on.
+#[must_use]
 pub fn plan(spec: &Spec) -> Option<PrivateDns> {
     let domain = spec.private_domain()?;
     let mut records = Vec::new();
@@ -54,6 +57,7 @@ pub fn plan(spec: &Spec) -> Option<PrivateDns> {
 
 /// `names` (a machine's own and its aliases), then each of them under the private zone's domain
 /// when `dns.private` is on.
+#[must_use]
 pub fn with_domain(spec: &Spec, names: Vec<String>) -> Vec<String> {
     match spec.private_domain() {
         Some(domain) => {
@@ -65,6 +69,7 @@ pub fn with_domain(spec: &Spec, names: Vec<String>) -> Vec<String> {
 }
 
 /// What the zone asks of a backend: names it serves itself, by its DNS or each VM's hosts file.
+#[must_use]
 pub fn requirements(spec: &Spec) -> Option<Requirement> {
     spec.private_domain().map(|domain| Requirement::PrivateDns { domain })
 }
@@ -74,11 +79,9 @@ mod tests {
     use super::*;
 
     fn spec(dns: &str) -> Spec {
-        let source = isoloom_spec::parse(&format!(
+        crate::testing::spec(&format!(
             "version: 1\nname: lab\n{dns}\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, aliases: [www], app: {{ image: nginx }} }}\n  db: {{ networks: {{ lan: 20 }}, app: {{ image: postgres }} }}\n  box: {{ app: {{ image: alpine }} }}\n"
         ))
-        .unwrap();
-        crate::Lab::new(source).spec()
     }
 
     #[test]
@@ -89,9 +92,9 @@ mod tests {
         assert_eq!(
             records,
             [
-                ("web.corp.lab", "web", "10.0.0.10".to_string()),
-                ("www.corp.lab", "www", "10.0.0.10".to_string()),
-                ("db.corp.lab", "db", "10.0.0.20".to_string()),
+                ("web.corp.lab", "web", "10.0.0.10".to_owned()),
+                ("www.corp.lab", "www", "10.0.0.10".to_owned()),
+                ("db.corp.lab", "db", "10.0.0.20".to_owned()),
             ]
         );
         assert_eq!(

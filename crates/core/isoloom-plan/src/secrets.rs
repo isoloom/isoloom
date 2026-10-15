@@ -2,6 +2,8 @@
 //! The plan never holds a value: `isoloom run` reads each from its store and hands it to the
 //! target's own mechanism (Compose secrets, a Kubernetes Secret).
 
+use std::fmt;
+
 use isoloom_spec::model::{MachineSecret, SecretSource, Spec};
 
 /// Where a value file's contents come from.
@@ -46,6 +48,7 @@ pub const VM_DEFAULT_MODE: u32 = 0o400;
 
 impl SecretFile {
     /// The file a machine's `secrets` entry places.
+    #[must_use]
     pub fn of(spec: &Spec, s: &MachineSecret) -> SecretFile {
         let m = s.mount();
         let source = match spec.secrets.get(&m.source) {
@@ -61,4 +64,20 @@ impl SecretFile {
             mode: m.mode,
         }
     }
+}
+
+/// Why a target with no machine to deliver to refuses machine `machine`'s secrets.
+pub(crate) fn no_delivery(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
+    write!(
+        f,
+        "machine `{machine}` gets `secrets`, and this target has no machine `isoloom run` can hand them to"
+    )
+}
+
+/// Why a target that places a secret's file as root's refuses one with its own owner.
+pub(crate) fn no_owner(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
+    write!(
+        f,
+        "a secret of machine `{machine}` sets `uid` or `gid`, and this target places a secret's file as root's"
+    )
 }

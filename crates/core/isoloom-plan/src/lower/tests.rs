@@ -138,14 +138,11 @@ fn the_design_examples_validate_but_for_what_waits_on_later_phases() {
     assert_eq!(problems("help-desk"), []);
     assert_eq!(problems("legacy-intranet"), []);
     // `windows` is a group name Isoloom fills itself (the inventory's).
-    assert_eq!(problems("forest-mini"), [(Code::InvalidValue, "groups.windows".to_string())]);
+    assert_eq!(problems("forest-mini"), [(Code::InvalidValue, "groups.windows".to_owned())]);
     // The catalogue arrives in Phase 4.
-    assert_eq!(problems("branch-office"), [(Code::UnknownReference, "machines.db.service".to_string())]);
+    assert_eq!(problems("branch-office"), [(Code::UnknownReference, "machines.db.service".to_owned())]);
     let bookshelf = problems("bookshelf");
-    assert!(
-        bookshelf.contains(&(Code::UnknownReference, "machines.db.service".to_string())),
-        "{bookshelf:?}"
-    );
+    assert!(bookshelf.contains(&(Code::UnknownReference, "machines.db.service".to_owned())), "{bookshelf:?}");
     assert!(bookshelf.iter().all(|(c, _)| *c == Code::UnknownReference), "{bookshelf:?}");
 }
 
@@ -160,4 +157,55 @@ fn a_lab_lists_the_targets_its_machines_have_forms_for() {
     assert_eq!((refused.path.as_str(), refused.span.map(|s| s.line)), ("machines.web.app.build", Some(21)));
     let forest = crate::Lab::new(example("forest-mini"));
     assert_eq!(forest.possible(), [Target::Vagrant, Target::Proxmox, Target::Esxi, Target::CloudVm]);
+}
+
+#[test]
+fn a_catalogue_service_is_refused_at_its_service_until_its_entry_exists() {
+    for target in [Target::Docker, Target::Vagrant, Target::Hybrid] {
+        let l = on("branch-office", target);
+        let db: Vec<&str> = l
+            .refusals
+            .iter()
+            .filter(|r| r.path.as_str().starts_with("machines.db"))
+            .map(|r| r.path.as_str())
+            .collect();
+        assert_eq!(db, ["machines.db.service"], "{target:?}");
+        let machine = &l.spec.machines["db"];
+        assert!(machine.docker.is_none() && machine.vm.is_none(), "{target:?}");
+    }
+    assert_eq!(crate::Lab::new(example("branch-office")).possible(), []);
+}
+
+#[test]
+fn what_lowering_cant_lower_is_a_problem_at_the_authored_field() {
+    let lab = crate::testing::lab(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n    ports: { site: { protocol: http }, admin: 8080 }\n    healthcheck: { http: { port: status, path: /health } }\n",
+    );
+    let l = lower(lab.source(), Scope::Lab);
+    let found: Vec<(Code, &str)> = l.problems.iter().map(|p| (p.code, p.path.as_str())).collect();
+    assert_eq!(
+        found,
+        [
+            (Code::MissingField, "machines.web.ports.site.port"),
+            (Code::UnknownReference, "machines.web.healthcheck.http.port")
+        ]
+    );
+    let web = &l.spec.machines["web"];
+    let ports: Vec<u16> = web.ports.iter().map(|p| p.port).collect();
+    assert_eq!(ports, [8080]);
+    assert!(web.healthcheck.is_none());
+    // The spec's own checks say the same, once each.
+    let problems: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
+    assert_eq!(problems, ["machines.web.ports.site.port", "machines.web.healthcheck.http.port"]);
+}
+
+#[test]
+fn a_healthcheck_page_on_a_named_port_takes_its_number() {
+    let lab = crate::testing::lab(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n    ports: { site: 8000 }\n    healthcheck: { http: { port: site, path: /health } }\n",
+    );
+    let l = lower(lab.source(), Scope::Lab);
+    assert_eq!(l.problems, []);
+    let page = l.spec.machines["web"].healthcheck.as_ref().and_then(|h| h.http.clone()).expect("a page");
+    assert_eq!((page.port, page.path.as_str()), (8000, "/health"));
 }

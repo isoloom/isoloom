@@ -3,8 +3,9 @@
 //! no existing host on `external`. Each is a `refused` problem; the spec itself stays valid.
 
 use isoloom_spec::model::{Shape, Target};
-use isoloom_spec::syntax::{self, Code, FieldPath, Form, NoForm, Problem, Step};
+use isoloom_spec::syntax::{self, Code, FieldPath, NoForm, Problem, Step};
 
+use super::forms::{self, Vm};
 use super::overrides;
 
 /// The machines `target` has no form for, in machine order.
@@ -37,8 +38,8 @@ fn refused(name: &str, no: &NoForm) -> Problem {
 
 /// The form `target` needs that the machine lacks, if it lacks it.
 fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) -> Option<Problem> {
-    let container = syntax::container_form(m);
-    let vm = syntax::vm_form(m);
+    let container = forms::container(m);
+    let vm = forms::vm(m);
     match target.needs() {
         Shape::Docker => container.err().map(|no| refused(name, &no)),
         Shape::Vm => vm.err().map(|no| refused(name, &no)),
@@ -64,11 +65,11 @@ fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) 
 
 /// Whether `target` runs machine `name` as a VM.
 fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) -> bool {
-    let vm = matches!(syntax::vm_form(m), Ok(Form::Os | Form::Steps));
+    let vm = matches!(forms::vm(m), Ok(Vm::Os(_)));
     match target.needs() {
         Shape::Vm | Shape::External => vm,
         Shape::VmOrLxc => vm && !overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
-        Shape::Either => vm && syntax::container_form(m).is_err(),
+        Shape::Either => vm && forms::container(m).is_err(),
         Shape::Docker | Shape::Cloud => false,
     }
 }

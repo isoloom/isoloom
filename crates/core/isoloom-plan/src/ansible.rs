@@ -11,6 +11,7 @@ use isoloom_spec::model::Spec;
 /// the spec's `groups:` with their resolved members. A name in both lists its members once.
 /// Members are machine names in the order first given; which of them a target can reach is
 /// the renderer's filter.
+#[must_use]
 pub fn groups(spec: &Spec) -> IndexMap<String, Vec<String>> {
     let mut out: IndexMap<String, Vec<String>> = IndexMap::new();
     let declared = spec.provision.iter().flat_map(|s| s.groups.iter().map(|(g, m)| (g.clone(), m.clone())));
@@ -28,6 +29,7 @@ pub fn groups(spec: &Spec) -> IndexMap<String, Vec<String>> {
 
 /// The variables of `machine` from every `provision[].host_vars`, in step order (a later step
 /// overrides an earlier one's value and keeps its place).
+#[must_use]
 pub fn host_vars(spec: &Spec, machine: &str) -> IndexMap<String, serde_json::Value> {
     spec.provision
         .iter()
@@ -39,8 +41,6 @@ pub fn host_vars(spec: &Spec, machine: &str) -> IndexMap<String, serde_json::Val
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)] // tests: a failing test is the report.
-
     use super::*;
 
     const SPEC: &str = r"
@@ -65,7 +65,7 @@ provision:
 ";
 
     fn spec() -> Spec {
-        crate::Lab::new(isoloom_spec::parse(SPEC).expect("parses")).spec()
+        crate::testing::spec(SPEC)
     }
 
     #[test]

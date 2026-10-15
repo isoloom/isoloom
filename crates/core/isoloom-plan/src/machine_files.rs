@@ -1,7 +1,9 @@
 //! A machine's `files` in the plan: the VM set-up step that places them, and what they ask of a
-//! backend. A container gets them from its runtime (a Compose config, a ConfigMap copied into
+//! backend. A container gets them from its runtime (a Compose config, a `ConfigMap` copied into
 //! place on Kubernetes), a VM from its [`Step::Files`] step, after the project is unpacked (a
 //! file's `source` is read from there).
+
+use std::fmt;
 
 use isoloom_spec::model::{Machine, Spec};
 
@@ -10,6 +12,7 @@ use crate::lifecycle::Step;
 use crate::requirements::Requirement;
 
 /// The step placing `m`'s files, when it has any.
+#[must_use]
 pub fn step(m: &Machine) -> Option<Step> {
     (!m.files.is_empty()).then(|| Step::Files { files: m.files.clone() })
 }
@@ -17,6 +20,7 @@ pub fn step(m: &Machine) -> Option<Step> {
 /// Whether a VM's steps read the project: it runs scripts of its own (or `before` ones), or
 /// copies a file from it.
 /// A target that ships the project only when it is read asks this.
+#[must_use]
 pub fn reads_project(lifecycle: &[Step]) -> bool {
     lifecycle.iter().any(|s| match s {
         Step::Run { .. } | Step::Before { .. } | Step::Setup { .. } => true,
@@ -52,14 +56,31 @@ pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -
     out
 }
 
+/// Why a target that places a container's project file as it is refuses one with an owner or a
+/// mode.
+pub(crate) fn no_owned_project_file(f: &mut fmt::Formatter<'_>, machine: &str, path: &str) -> fmt::Result {
+    write!(
+        f,
+        "machine `{machine}`'s file `{path}` comes from the project with a `uid`, `gid` or `mode`, and this target places a container's project file as it is: write it as `content` instead"
+    )
+}
+
+/// Why the `external` target refuses an existing host's files.
+pub(crate) fn no_existing_host_files(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
+    write!(
+        f,
+        "machine `{machine}` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use isoloom_spec::model::Target;
 
-    use crate::Lab;
     use crate::environment::Environment;
     use crate::lifecycle::Step;
     use crate::requirements::Requirement;
+    use crate::testing;
 
     const SPEC: &str = "
 version: 1
@@ -79,9 +100,7 @@ overrides:
 ";
 
     fn env(target: Target) -> Environment {
-        let lab = Lab::new(isoloom_spec::parse(SPEC).expect("parses"));
-        assert!(lab.problems().is_empty(), "{:?}", lab.problems());
-        Environment::build(&lab.for_target(target), target, None)
+        testing::planned(&testing::valid(SPEC), target)
     }
 
     #[test]

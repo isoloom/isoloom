@@ -80,7 +80,8 @@ fn refusal_of_an_undeclared_network_does_not_panic() {
 
 #[test]
 fn checks_plan_of_an_undeclared_network_does_not_panic() {
-    let _ = isoloom_plan::checks::plan(&lab(UNDECLARED_NETWORK).spec());
+    let checks = isoloom_plan::checks::plan(&lab(UNDECLARED_NETWORK).spec());
+    assert!(checks.iter().all(|c| !c.name.is_empty()), "{checks:?}");
 }
 
 #[test]

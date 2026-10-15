@@ -15,6 +15,7 @@ use crate::hardware::Need;
 
 /// A capability a backend may have: the kind of a [`Requirement`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Feature {
     /// Environment-level provisioning (`provision:`), run by a controller.
     EnvironmentProvisioning,
@@ -98,6 +99,7 @@ pub enum Feature {
 /// One thing the environment needs from the backend that renders it, with what in the spec
 /// asks for it.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Requirement {
     /// The spec has `provision:` steps.
     EnvironmentProvisioning,
@@ -263,6 +265,7 @@ pub enum Requirement {
 
 impl Requirement {
     /// The capability this requirement needs.
+    #[must_use]
     pub fn feature(&self) -> Feature {
         match self {
             Requirement::EnvironmentProvisioning => Feature::EnvironmentProvisioning,
@@ -335,31 +338,14 @@ impl fmt::Display for Requirement {
             Requirement::Ulimits { machine } => write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits"),
             Requirement::TrafficControl => f.write_str("link impairment (`tc`) needs a router in the path; Kubernetes has none"),
             Requirement::Ipv6 { network } => write!(f, "network `{network}` is IPv6 (`ipv6`), which this target's networks don't carry yet"),
-            Requirement::Ipv6Only { network } => write!(
-                f,
-                "network `{network}` is IPv6-only (`ipv6.only`): this target needs IPv4 on every network (its router, its set-up, its transport)"
-            ),
-            Requirement::Ipv6Auto { network } => write!(
-                f,
-                "network `{network}` leaves IPv6 addresses to the target (`ipv6.addresses: auto`), and nothing on this target hands them out: use `static`"
-            ),
-            Requirement::Secrets { .. } | Requirement::SecretOwner { .. } => refused_secrets(self, f),
-            Requirement::ExternalNetwork { network, name } => write!(
-                f,
-                "network `{network}` is an existing network (`external: {name}`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones)"
-            ),
-            Requirement::BridgedNetwork { network } => write!(
-                f,
-                "network `{network}` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)"
-            ),
-            Requirement::OwnedProjectFile { machine, path } => write!(
-                f,
-                "machine `{machine}`'s file `{path}` comes from the project with a `uid`, `gid` or `mode`, and this target places a container's project file as it is: write it as `content` instead"
-            ),
-            Requirement::ExistingHostFiles { machine } => write!(
-                f,
-                "machine `{machine}` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook"
-            ),
+            Requirement::Ipv6Only { network } => crate::ipv6::no_ipv6_only(f, network),
+            Requirement::Ipv6Auto { network } => crate::ipv6::no_auto_addresses(f, network),
+            Requirement::Secrets { machine } => crate::secrets::no_delivery(f, machine),
+            Requirement::SecretOwner { machine } => crate::secrets::no_owner(f, machine),
+            Requirement::ExternalNetwork { network, name } => crate::outside::no_existing_network(f, network, name),
+            Requirement::BridgedNetwork { network } => crate::outside::no_bridge(f, network),
+            Requirement::OwnedProjectFile { machine, path } => crate::machine_files::no_owned_project_file(f, machine, path),
+            Requirement::ExistingHostFiles { machine } => crate::machine_files::no_existing_host_files(f, machine),
             Requirement::Tpm { machine } => no_tpm(f, machine),
             Requirement::MachineProcess { machine } => write!(f, "machine `{machine}` {OWN_PROCESS}"),
             Requirement::OwnBoot { machine } => crate::boot::no_own_boot(f, machine),
@@ -373,23 +359,12 @@ impl fmt::Display for Requirement {
                 "the names are served under a private zone (`dns.private`, `{domain}`), and this target has no DNS or hosts file Isoloom sets: a cluster names Services under its own domain, an existing host keeps its own resolver"
             ),
             Requirement::MoreAddresses { machine, network, shape } => crate::more_addresses::refused(f, machine, network, *shape),
-            storage => crate::storage::why(storage, f),
+            Requirement::PersistentVolume { volume } => crate::storage::no_persistent_volume(f, volume),
+            Requirement::ExternalVolume { volume } => crate::storage::no_existing_volume(f, volume),
+            Requirement::DataDisks { machine } => crate::storage::no_data_disks(f, machine),
+            Requirement::RawDisks { machine } => crate::storage::no_raw_disks(f, machine),
+            Requirement::TmpfsModes { machine } => crate::storage::no_tmpfs_modes(f, machine),
         }
-    }
-}
-
-/// Why a target refuses a machine's secrets.
-fn refused_secrets(r: &Requirement, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match r {
-        Requirement::Secrets { machine } => write!(
-            f,
-            "machine `{machine}` gets `secrets`, and this target has no machine `isoloom run` can hand them to"
-        ),
-        Requirement::SecretOwner { machine } => write!(
-            f,
-            "a secret of machine `{machine}` sets `uid` or `gid`, and this target places a secret's file as root's"
-        ),
-        _ => Ok(()),
     }
 }
 
@@ -416,6 +391,7 @@ impl Capabilities {
     }
 
     /// Whether the backend has `feature`.
+    #[must_use]
     pub fn has(&self, feature: Feature) -> bool {
         self.features.contains(&feature)
     }
@@ -435,11 +411,13 @@ impl fmt::Display for Refusal {
 }
 
 /// The first of `requirements` that `caps` can't meet, in the order the plan lists them.
+#[must_use]
 pub fn refusal(requirements: &[Requirement], caps: &Capabilities) -> Option<Refusal> {
     requirements.iter().find(|r| !caps.has(r.feature())).map(|r| Refusal { requirement: r.clone() })
 }
 
 /// Everything `spec` requires, most fundamental first.
+#[must_use]
 pub fn of(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
     if !spec.provision.is_empty() {
@@ -523,6 +501,7 @@ pub fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -
 
 /// The first VM that requires a TPM (`vm.tpm: true`); one Windows 11 merely expects is given
 /// where the target can, so it requires nothing.
+#[must_use]
 pub fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
     machines
         .iter()
@@ -545,4 +524,162 @@ pub fn container_checks(spec: &Spec) -> Option<Requirement> {
             Position::Networks => true,
         })
         .map(|c| Requirement::ExecWithoutContainer { check: c.name })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn web() -> String {
+        "web".to_owned()
+    }
+
+    fn lan() -> String {
+        "lan".to_owned()
+    }
+
+    /// One requirement of every kind, and what its message must say: the field that asks, and
+    /// whom it is about.
+    fn every() -> Vec<(Requirement, &'static str)> {
+        [environment_wide(), about_networks(), about_machines(), about_storage()].concat()
+    }
+
+    fn environment_wide() -> Vec<(Requirement, &'static str)> {
+        vec![
+            (Requirement::EnvironmentProvisioning, "`provision:`"),
+            (Requirement::PlaybookChecks, "Ansible checks (.yml)"),
+            (Requirement::ExecWithoutContainer { check: "c1".into() }, "`exec` check \"c1\" needs `from:`"),
+            (Requirement::MachineAliases, "machine `aliases`"),
+            (Requirement::TrafficControl, "(`tc`)"),
+            (Requirement::PrivateDns { domain: "lab.internal".into() }, "(`dns.private`, `lab.internal`)"),
+            (
+                Requirement::VmDependsOnContainer {
+                    vm: web(),
+                    container: "db".into(),
+                },
+                "VM `web` depends on container `db`",
+            ),
+        ]
+    }
+
+    fn about_networks() -> Vec<(Requirement, &'static str)> {
+        vec![
+            (Requirement::Gateway { network: lan() }, "a `gateway` machine"),
+            (Requirement::Ipv6 { network: lan() }, "network `lan` is IPv6 (`ipv6`)"),
+            (Requirement::Ipv6Only { network: lan() }, "network `lan` is IPv6-only (`ipv6.only`)"),
+            (
+                Requirement::Ipv6Auto { network: lan() },
+                "network `lan` leaves IPv6 addresses to the target (`ipv6.addresses: auto`)",
+            ),
+            (
+                Requirement::ExternalNetwork {
+                    network: lan(),
+                    name: "corp".into(),
+                },
+                "network `lan` is an existing network (`external: corp`)",
+            ),
+            (
+                Requirement::BridgedNetwork { network: lan() },
+                "network `lan` is bridged to a host interface (`bridged`)",
+            ),
+            (Requirement::NetworkMtu { network: lan() }, "network `lan` sets its `mtu`"),
+        ]
+    }
+
+    fn about_machines() -> Vec<(Requirement, &'static str)> {
+        let more = |shape| Requirement::MoreAddresses {
+            machine: web(),
+            network: lan(),
+            shape,
+        };
+        vec![
+            (
+                Requirement::NetworkAppliance { machine: web() },
+                "machine `web` is a network appliance (`app.appliance`)",
+            ),
+            (Requirement::Ulimits { machine: web() }, "machine `web` sets `ulimits`"),
+            (Requirement::Secrets { machine: web() }, "machine `web` gets `secrets`"),
+            (Requirement::SecretOwner { machine: web() }, "machine `web` sets `uid` or `gid`"),
+            (
+                Requirement::Tpm { machine: web() },
+                "machine `web` asks for a virtual TPM (`hardware.tpm: required`)",
+            ),
+            (Requirement::MachineProcess { machine: web() }, "machine `web` sets its own process"),
+            (Requirement::OwnBoot { machine: web() }, "machine `web` boots its own way (`hardware.boot`)"),
+            (
+                Requirement::Hardware {
+                    machine: web(),
+                    need: Need::VmGpus,
+                },
+                "machine `web` asks for GPUs (`gpus`)",
+            ),
+            (Requirement::RateLimit { machine: web() }, "machine `web` sets a `rate_limit`"),
+            (more(MachineShape::Vm), "which this target doesn't give a VM yet"),
+            (more(MachineShape::Container), "a container has one address per network"),
+            (more(MachineShape::External), "an existing host keeps the addresses it has"),
+        ]
+    }
+
+    fn about_storage() -> Vec<(Requirement, &'static str)> {
+        vec![
+            (
+                Requirement::VolumeAcrossShapes { volume: "data".into() },
+                "volume `data` is shared by containers and VMs",
+            ),
+            (
+                Requirement::OwnedProjectFile {
+                    machine: web(),
+                    path: "/etc/a".into(),
+                },
+                "machine `web`'s file `/etc/a` comes from the project with a `uid`, `gid` or `mode`",
+            ),
+            (Requirement::ExistingHostFiles { machine: web() }, "machine `web` has `files`"),
+            (Requirement::PersistentVolume { volume: "data".into() }, "volume `data` is persistent"),
+            (
+                Requirement::ExternalVolume { volume: "data".into() },
+                "volume `data` is an existing one (`external`)",
+            ),
+            (Requirement::DataDisks { machine: web() }, "machine `web` has data disks (`disks`)"),
+            (Requirement::RawDisks { machine: web() }, "machine `web` has a raw disk (`fs: raw`)"),
+            (Requirement::TmpfsModes { machine: web() }, "machine `web` sets a tmpfs `mode`"),
+        ]
+    }
+
+    #[test]
+    fn every_requirement_says_why_naming_the_field_that_asks_and_whom() {
+        for (r, says) in every() {
+            let why = r.to_string();
+            assert!(why.contains(says), "{r:?}: {why}");
+            assert_eq!(Refusal { requirement: r }.to_string(), why);
+        }
+    }
+
+    #[test]
+    fn a_backend_refuses_the_first_requirement_it_lacks_the_feature_for() {
+        let requirements: Vec<Requirement> = every().into_iter().map(|(r, _)| r).collect();
+        let all = Capabilities::of(requirements.iter().map(Requirement::feature));
+        assert_eq!(refusal(&requirements, &all), None);
+        for (i, r) in requirements.iter().enumerate() {
+            let without = Capabilities::of(requirements.iter().map(Requirement::feature).filter(|f| *f != r.feature()));
+            let first = requirements.iter().position(|o| o.feature() == r.feature());
+            assert_eq!(
+                refusal(&requirements, &without).map(|x| x.requirement),
+                first.map(|p| requirements[p].clone()),
+                "{i}"
+            );
+            assert!(!without.has(r.feature()) && all.has(r.feature()));
+        }
+    }
+
+    #[test]
+    fn several_addresses_need_the_feature_of_the_machines_shape() {
+        let more = |shape| Requirement::MoreAddresses {
+            machine: "web".into(),
+            network: "lan".into(),
+            shape,
+        };
+        assert_eq!(more(MachineShape::Vm).feature(), Feature::VmMoreAddresses);
+        assert_eq!(more(MachineShape::Container).feature(), Feature::ContainerMoreAddresses);
+        assert_eq!(more(MachineShape::External).feature(), Feature::ContainerMoreAddresses);
+    }
 }

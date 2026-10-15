@@ -23,6 +23,7 @@ pub enum Lifetime {
 
 /// The lifetime of the storage behind machine volume `volume`: a top-level volume's own, else
 /// the environment's.
+#[must_use]
 pub fn lifetime(spec: &Spec, volume: &str) -> Lifetime {
     let Some(v) = spec.volumes.get(volume) else {
         return Lifetime::Environment;
@@ -51,17 +52,20 @@ pub struct DataDisk {
 
 impl DataDisk {
     /// Whether it is a block device left unformatted.
+    #[must_use]
     pub fn is_raw(&self) -> bool {
         self.fs == Filesystem::Raw
     }
 
     /// Its size in bytes, as the OS sees it (GiB: what every platform's GB is).
+    #[must_use]
     pub fn bytes(&self) -> u64 {
         u64::from(self.size_gb) << 30
     }
 }
 
 /// Machine `name`'s data disks, in spec order.
+#[must_use]
 pub fn disks(name: &str, m: &Machine) -> Vec<DataDisk> {
     let windows = m.vm.as_ref().is_some_and(|vm| images::is_windows(&vm.os));
     let default = if windows { Filesystem::Ntfs } else { Filesystem::Ext4 };
@@ -79,6 +83,7 @@ pub fn disks(name: &str, m: &Machine) -> Vec<DataDisk> {
 
 /// What the spec's storage asks of a backend: volumes kept past `down` or existing already,
 /// data disks (raw ones apart), tmpfs modes. At most one of each kind: the first that asks.
+#[must_use]
 pub fn requirements(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
     if let Some((v, _)) = spec.volumes.iter().find(|(_, v)| v.persistent) {
@@ -100,27 +105,38 @@ pub fn requirements(spec: &Spec) -> Vec<Requirement> {
     out
 }
 
-/// Why a backend without the capability refuses a storage requirement, in the user's terms.
-pub(crate) fn why(r: &Requirement, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match r {
-        Requirement::PersistentVolume { volume } => write!(
-            f,
-            "volume `{volume}` is persistent: it outlives `down` on Docker and Kubernetes, while this target's storage goes with its machines"
-        ),
-        Requirement::ExternalVolume { volume } => write!(
-            f,
-            "volume `{volume}` is an existing one (`external`): Docker and Kubernetes mount one by name, this target has none to mount"
-        ),
-        Requirement::DataDisks { machine } => write!(f, "machine `{machine}` has data disks (`disks`), which this target can't attach"),
-        Requirement::RawDisks { machine } => write!(
-            f,
-            "machine `{machine}` has a raw disk (`fs: raw`): a block device, which this target's containers don't get"
-        ),
-        Requirement::TmpfsModes { machine } => {
-            write!(f, "machine `{machine}` sets a tmpfs `mode`: Kubernetes' memory volumes have none")
-        }
-        other => write!(f, "{other:?}"),
-    }
+/// Why a target whose storage goes with its machines refuses persistent volume `volume`.
+pub(crate) fn no_persistent_volume(f: &mut std::fmt::Formatter<'_>, volume: &str) -> std::fmt::Result {
+    write!(
+        f,
+        "volume `{volume}` is persistent: it outlives `down` on Docker and Kubernetes, while this target's storage goes with its machines"
+    )
+}
+
+/// Why a target with nothing to mount by name refuses existing volume `volume`.
+pub(crate) fn no_existing_volume(f: &mut std::fmt::Formatter<'_>, volume: &str) -> std::fmt::Result {
+    write!(
+        f,
+        "volume `{volume}` is an existing one (`external`): Docker and Kubernetes mount one by name, this target has none to mount"
+    )
+}
+
+/// Why a target that attaches no disk refuses machine `machine`'s.
+pub(crate) fn no_data_disks(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
+    write!(f, "machine `{machine}` has data disks (`disks`), which this target can't attach")
+}
+
+/// Why a target whose containers get no block device refuses machine `machine`'s raw disk.
+pub(crate) fn no_raw_disks(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
+    write!(
+        f,
+        "machine `{machine}` has a raw disk (`fs: raw`): a block device, which this target's containers don't get"
+    )
+}
+
+/// Why Kubernetes refuses machine `machine`'s tmpfs mode.
+pub(crate) fn no_tmpfs_modes(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
+    write!(f, "machine `{machine}` sets a tmpfs `mode`: Kubernetes' memory volumes have none")
 }
 
 #[cfg(test)]
@@ -129,13 +145,9 @@ mod tests {
 
     #[test]
     fn a_disk_takes_its_os_default_filesystem_and_a_key_of_its_machine() {
-        let lab = crate::Lab::new(
-            isoloom_spec::parse(
-                "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { networks: { lan: 10 }, os: debian@12, disks: { data: { size_gb: 5, mount: /data }, blk: { size_gb: 1, fs: raw } } }\n  win: { networks: { lan: 11 }, os: windows-server@2022, disks: { logs: { size_gb: 2, mount: 'E:' } } }\n",
-            )
-            .unwrap(),
+        let spec = crate::testing::spec(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { networks: { lan: 10 }, os: debian@12, disks: { data: { size_gb: 5, mount: /data }, blk: { size_gb: 1, fs: raw } } }\n  win: { networks: { lan: 11 }, os: windows-server@2022, disks: { logs: { size_gb: 2, mount: 'E:' } } }\n",
         );
-        let spec = lab.spec();
         let db = disks("db", &spec.machines["db"]);
         assert_eq!((db[0].key.as_str(), db[0].fs, db[0].bytes()), ("db-data", Filesystem::Ext4, 5 << 30));
         assert!(db[1].is_raw());

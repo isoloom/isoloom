@@ -166,6 +166,7 @@ pub enum RunKind {
 }
 
 /// The set-up steps of VM `name`.
+#[must_use]
 pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     let mut steps = vec![Step::Prelude];
     if m.resources.and_then(|r| r.disk_gb).is_some() {
@@ -191,7 +192,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
         .volumes
         .iter()
         .filter(|(v, _)| !spec.volumes.contains_key(*v))
-        .map(|(_, p)| p.path().to_string())
+        .map(|(_, p)| p.path().to_owned())
         .collect();
     if !own.is_empty() {
         steps.push(Step::Volumes { paths: own });
@@ -201,7 +202,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
         steps.push(Step::Secrets);
     }
     steps.extend(m.depends_on.iter().filter_map(|dep| {
-        let ports = spec.machines[dep].ready_ports();
+        let ports = spec.machines.get(dep)?.ready_ports();
         (!ports.is_empty()).then(|| Step::WaitFor { machine: dep.clone(), ports })
     }));
     steps.extend(runs(m));
@@ -217,7 +218,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     if routing::offline(spec, name, m) {
         steps.push(Step::Egress);
     }
-    if m.networks.keys().any(|n| spec.networks[n].tc.is_some()) {
+    if m.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.tc.is_some())) {
         steps.push(Step::Tc);
     }
     steps.push(Step::Ready);
@@ -268,7 +269,10 @@ fn more_addresses(spec: &Spec, name: &str, linux: bool) -> Vec<(Ipv4Addr, Vec<St
         .collect()
 }
 
+/// The machine's part in each shared volume it mounts: its owner serves it, the others mount
+/// the owner's export (validated: the owner mounts the volume too).
 fn shared_volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Step> {
+    let mount_of = |machine: &str, v: &str| spec.machines.get(machine).and_then(|om| om.volumes.get(v));
     m.volumes
         .iter()
         .filter(|(v, _)| spec.volumes.contains_key(*v))
@@ -276,23 +280,23 @@ fn shared_volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Step> {
             let owner = spec.volume_owner(v)?;
             let role = if owner == name {
                 let others: Vec<&str> = spec.volume_users(v).into_iter().filter(|u| *u != name).collect();
-                let mut folders: Vec<String> = others.iter().filter_map(|u| spec.machines[*u].volumes[v].subpath().map(String::from)).collect();
+                let mut folders: Vec<String> = others.iter().filter_map(|u| mount_of(u, v)?.subpath().map(String::from)).collect();
                 folders.dedup();
                 SharedRole::Serve {
                     clients: others.iter().map(|u| address_for(spec, name, u)).collect(),
                     folders,
                 }
             } else {
-                let at = spec.machines[owner].volumes[v].path().trim_end_matches('/');
+                let at = mount_of(owner, v)?.path().trim_end_matches('/');
                 let folder = mount.subpath().map(|f| format!("/{f}")).unwrap_or_default();
                 SharedRole::Mount {
                     source: format!("{}:{at}{folder}", address_for(spec, name, owner)),
-                    owner: owner.to_string(),
+                    owner: owner.to_owned(),
                 }
             };
             Some(Step::SharedVolume {
                 volume: v.clone(),
-                path: mount.path().to_string(),
+                path: mount.path().to_owned(),
                 role,
             })
         })
@@ -327,6 +331,7 @@ fn runs(m: &Machine) -> Vec<Step> {
 
 /// Whether a provisioning step's file has this extension, in any case (`setup.SH` is a shell
 /// script): how the plan and the backends tell a step's kind.
+#[must_use]
 pub fn has_extension(path: &str, extension: &str) -> bool {
     std::path::Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(extension))
 }

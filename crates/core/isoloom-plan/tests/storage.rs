@@ -3,7 +3,9 @@
 
 use isoloom_plan::Lab;
 use isoloom_spec::model::{Filesystem, Mount, Tmpfs};
-use isoloom_spec::syntax::{Problem, Problems};
+use testing::{assert_problem, problems};
+
+pub mod testing;
 
 /// One network and two machines, `web` and `app`, with `extra` top-level lines and `web` and
 /// `app` completed by their own fields.
@@ -11,20 +13,6 @@ fn spec(extra: &str, web: &str, app: &str) -> String {
     format!(
         "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\n{extra}machines:\n  web: {{ networks: {{ lab: 5 }}, app: {{ image: nginx }}{web} }}\n  app: {{ networks: {{ lab: 6 }}, os: debian@12, app: {{ image: alpine, steps: [{{ run: setup.sh }}] }}{app} }}\n"
     )
-}
-
-/// What an author sees for `yaml`, one line per problem.
-fn problems(yaml: &str) -> Vec<String> {
-    let found: Problems = isoloom_plan::problems_in(yaml);
-    found.iter().map(Problem::line).collect()
-}
-
-#[track_caller]
-fn assert_problem(yaml: &str, at: &str, fragment: &str) {
-    let prefix = format!("{at}: ");
-    let found = problems(yaml);
-    let hit = found.iter().find(|p| p.starts_with(&prefix) && p.contains(fragment));
-    assert!(hit.is_some(), "no `{at}: …{fragment}…` among {found:#?}");
 }
 
 #[test]

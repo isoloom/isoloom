@@ -1,8 +1,10 @@
 //! `machines.*.files` through parsing and the lab's checks: one mistake per spec, each problem at
 //! its field with what to do.
 
-use isoloom_plan::Lab;
-use isoloom_spec::syntax::{FileSource, Problem, Problems};
+use isoloom_spec::syntax::{FileSource, Problem};
+use testing::{assert_problem, lab, problems};
+
+pub mod testing;
 
 /// A spec with one machine whose body is `body`.
 fn spec(body: &str) -> String {
@@ -14,25 +16,6 @@ fn container(files: &str) -> String {
     spec(&format!(
         "{{ networks: {{ lab: 5 }}, app: {{ image: nginx }}, volumes: {{ data: /srv/data }}, files: {files} }}"
     ))
-}
-
-/// The lab of `yaml`, or the problems that stop it from being read.
-fn lab(yaml: &str) -> Result<Lab, Problems> {
-    Lab::parse(yaml)
-}
-
-/// What an author sees: the parser's problems, or the lab's once the spec parses.
-fn problems(yaml: &str) -> Vec<String> {
-    isoloom_plan::problems_in(yaml).iter().map(Problem::line).collect()
-}
-
-#[track_caller]
-fn assert_problem(yaml: &str, at: &str, fragment: &str) {
-    let found = problems(yaml);
-    assert!(
-        found.iter().any(|p| p.starts_with(&format!("{at}: ")) && p.contains(fragment)),
-        "expected `{at}: …{fragment}…`, got {found:#?}"
-    );
 }
 
 #[test]

@@ -5,13 +5,14 @@
 use isoloom_spec::model::{Constraints, Spec};
 
 /// `image` pulled through the mirror of its registry, when there is one.
+#[must_use]
 pub fn rewrite_image(c: &Constraints, image: &str) -> String {
     if c.registries.is_empty() {
-        return image.to_string();
+        return image.to_owned();
     }
     let (first, rest) = match image.split_once('/') {
-        Some((f, r)) if f.contains('.') || f.contains(':') || f == "localhost" => (f, r.to_string()),
-        _ => ("docker.io", if image.contains('/') { image.to_string() } else { format!("library/{image}") }),
+        Some((f, r)) if f.contains('.') || f.contains(':') || f == "localhost" => (f, r.to_owned()),
+        _ => ("docker.io", if image.contains('/') { image.to_owned() } else { format!("library/{image}") }),
     };
     let registry = match first {
         "index.docker.io" | "registry-1.docker.io" => "docker.io",
@@ -19,14 +20,14 @@ pub fn rewrite_image(c: &Constraints, image: &str) -> String {
     };
     match c.registries.get(registry) {
         Some(mirror) => format!("{}/{rest}", mirror.trim_end_matches('/')),
-        None => image.to_string(),
+        None => image.to_owned(),
     }
 }
 
 /// The tag a machine's container image goes by: the published one, or the name its build is
 /// tagged with (so its `init:` jobs can reuse it).
 pub fn tag_of(spec: &Spec, name: &str, image: Option<&str>) -> String {
-    image.map_or_else(|| format!("isoloom/{}-{name}", spec.name), str::to_string)
+    image.map_or_else(|| format!("isoloom/{}-{name}", spec.name), str::to_owned)
 }
 
 /// Resolves the image references of one environment: pulls through the mirrors, except the
@@ -39,6 +40,7 @@ pub struct Images {
 
 impl Images {
     /// The resolver of `spec`'s images.
+    #[must_use]
     pub fn of(spec: &Spec) -> Images {
         let built = spec
             .machines
@@ -53,10 +55,62 @@ impl Images {
     }
 
     /// The reference to write for `image`.
+    #[must_use]
     pub fn pull(&self, image: &str) -> String {
         match &self.constraints {
             Some(c) if !self.built.iter().any(|b| b == image) => rewrite_image(c, image),
-            _ => image.to_string(),
+            _ => image.to_owned(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+    use isoloom_spec::model::Constraints;
+    use proptest::prelude::*;
+
+    use super::rewrite_image;
+
+    fn mirrors(registries: &[(&str, &str)]) -> Constraints {
+        Constraints {
+            registries: registries.iter().map(|(r, m)| ((*r).to_owned(), (*m).to_owned())).collect::<IndexMap<_, _>>(),
+            ..Constraints::default()
+        }
+    }
+
+    /// An image name on Docker Hub, with a tag or not: `redis`, `bitnami/redis:7`.
+    fn hub_image() -> impl Strategy<Value = String> {
+        ("([a-z0-9]{1,8}/)?[a-z0-9]{1,8}", "(:[a-z0-9.]{1,6})?").prop_map(|(n, t)| format!("{n}{t}"))
+    }
+
+    proptest! {
+        #[test]
+        fn without_mirrors_an_image_is_pulled_as_written(image in "[ -~]{0,30}") {
+            prop_assert_eq!(rewrite_image(&Constraints::default(), &image), image);
+        }
+
+        #[test]
+        fn a_docker_hub_image_goes_through_its_mirror_under_library(image in hub_image()) {
+            let rewritten = rewrite_image(&mirrors(&[("docker.io", "registry.corp/hub/")]), &image);
+            let official = if image.contains('/') { image.clone() } else { format!("library/{image}") };
+            prop_assert_eq!(rewritten, format!("registry.corp/hub/{official}"));
+        }
+
+        #[test]
+        fn another_registrys_image_goes_through_its_own_mirror_only(path in "[a-z0-9]{1,8}(/[a-z0-9]{1,8})?(:[0-9]{1,3})?") {
+            let image = format!("ghcr.io/{path}");
+            prop_assert_eq!(rewrite_image(&mirrors(&[("ghcr.io", "mirror.corp/ghcr")]), &image), format!("mirror.corp/ghcr/{path}"));
+            prop_assert_eq!(rewrite_image(&mirrors(&[("docker.io", "mirror.corp/hub")]), &image), image);
+        }
+    }
+
+    #[test]
+    fn docker_hubs_other_names_and_a_registry_with_a_port_are_registries() {
+        let c = mirrors(&[("docker.io", "m/hub"), ("localhost:5000", "m/local")]);
+        assert_eq!(rewrite_image(&c, "index.docker.io/library/redis"), "m/hub/library/redis");
+        assert_eq!(rewrite_image(&c, "registry-1.docker.io/x/y"), "m/hub/x/y");
+        assert_eq!(rewrite_image(&c, "localhost:5000/app"), "m/local/app");
+        assert_eq!(rewrite_image(&c, "localhost/app"), "localhost/app");
     }
 }

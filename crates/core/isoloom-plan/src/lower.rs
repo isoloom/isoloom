@@ -7,6 +7,7 @@
 //! Lowered for the lab as a whole ([`Scope::Lab`]), no target's own facts apply: that is the
 //! spec validation, the snapshot and the derived targets read.
 
+mod forms;
 mod machine;
 mod overrides;
 mod refusals;
@@ -29,6 +30,7 @@ pub enum Scope {
 
 impl Scope {
     /// The target, when lowering for one.
+    #[must_use]
     pub fn target(self) -> Option<Target> {
         match self {
             Scope::Lab => None,
@@ -40,6 +42,7 @@ impl Scope {
 /// A spec lowered: the model the plan builds from, what the target refuses, and where each
 /// lowered field came from.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Lowered {
     /// The spec in the form the backends read.
     pub spec: model::Spec,
@@ -48,7 +51,9 @@ pub struct Lowered {
     pub refusals: Vec<Problem>,
     /// Lowered field paths back to the written ones.
     pub trail: Trail,
-    /// What only lowering finds wrong (VLANs that don't fit their LAN), as spec problems.
+    /// What lowering couldn't lower, at the field the author wrote: VLANs that don't fit their
+    /// LAN, a port without its number, a healthcheck on a port the machine doesn't name. The
+    /// spec's own checks report the last two as well; on a valid spec, only the first can come.
     pub problems: Vec<Problem>,
 }
 
@@ -58,11 +63,13 @@ pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
     let mut trail = Trail::default();
     let mut secrets = source.secrets.clone();
     let mut machines = IndexMap::new();
+    let mut problems = Vec::new();
     for (name, m) in &source.machines {
         let lowered = machine::lower(source, name, m, scope, &mut trail);
         for (secret, input) in lowered.inputs {
             secrets.insert(secret, SecretSource::Input { input });
         }
+        problems.extend(lowered.problems);
         machines.insert(name.clone(), lowered.machine);
     }
     let mut spec = model::Spec {
@@ -92,9 +99,12 @@ pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
     let refusals = scope.target().map(|t| refusals::of(source, t)).unwrap_or_default();
     trail.inputs(source);
     // VLANs written under their LAN become networks of their own, as the backends expect.
-    let (spec, problems) = match isoloom_spec::vlans::flatten(spec.clone()) {
-        Ok(flat) => (flat, Vec::new()),
-        Err(why) => (spec, vec![stage_problem(&why)]),
+    let spec = match isoloom_spec::vlans::flatten(spec.clone()) {
+        Ok(flat) => flat,
+        Err(why) => {
+            problems.push(stage_problem(&why));
+            spec
+        }
     };
     Lowered {
         spec,

@@ -12,6 +12,7 @@ use crate::requirements::{Feature, Requirement};
 
 /// A machine's hardware, as the spec asks for it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Hardware {
     /// Its GPUs, if it asks for any.
     pub gpus: Option<Gpus>,
@@ -23,6 +24,7 @@ pub struct Hardware {
 
 impl Hardware {
     /// What machine `m` asks for.
+    #[must_use]
     pub fn of(m: &Machine) -> Hardware {
         Hardware {
             gpus: m.gpus.clone(),
@@ -34,6 +36,7 @@ impl Hardware {
 
 /// One hardware need of a machine, in its shape on the target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Need {
     /// A container asks for GPUs.
     ContainerGpus,
@@ -51,6 +54,7 @@ pub enum Need {
 
 impl Need {
     /// The capability a backend needs to meet it.
+    #[must_use]
     pub fn feature(self) -> Feature {
         match self {
             Need::ContainerGpus => Feature::ContainerGpus,
@@ -64,7 +68,7 @@ impl Need {
 
     /// Why a backend without the capability refuses it, for machine `machine`. Each message names
     /// the targets that lack it, since only those ever show it.
-    pub fn reason(self, machine: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub(crate) fn reason(self, machine: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Need::ContainerGpus => write!(
                 f,
@@ -122,13 +126,11 @@ mod tests {
     use super::*;
 
     fn spec() -> Spec {
-        let source = isoloom_spec::parse(
+        crate::testing::spec(
             "version: 1\nname: hw\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  \
              a: { networks: { lan: 10 }, hardware: { gpus: 1, devices: [/dev/fuse] }, os: debian@12, app: { image: x, steps: [{ run: a.sh }] } }\n  \
              b: { networks: { lan: 11 }, hardware: { nested_virtualization: true }, os: debian@12, app: { steps: [{ run: a.sh }] } }\n",
         )
-        .unwrap();
-        crate::Lab::new(source).spec()
     }
 
     fn needs(shape: MachineShape) -> Vec<(String, Need)> {
@@ -143,7 +145,7 @@ mod tests {
 
     #[test]
     fn each_need_follows_the_machine_shape() {
-        let n = |m: &str, need| (m.to_string(), need);
+        let n = |m: &str, need| (m.to_owned(), need);
         assert_eq!(
             needs(MachineShape::Container),
             [n("a", Need::ContainerGpus), n("a", Need::ContainerDevices), n("b", Need::ContainerNested)]

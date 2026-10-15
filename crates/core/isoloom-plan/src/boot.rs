@@ -11,6 +11,7 @@ use crate::requirements::Requirement;
 
 /// What the machines' own boots ask of the backend: the first VM that sets `vm.boot`. A
 /// container or an existing host boots its own way whatever the spec says, so only VMs count.
+#[must_use]
 pub fn requirements(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
     machines
         .iter()
@@ -28,6 +29,7 @@ pub(crate) fn no_own_boot(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Res
 
 /// The network boot each network serves: a VM's `boot.network` on its first network (the
 /// validator keeps the machines of one network in agreement).
+#[must_use]
 pub fn network_boots(machines: &IndexMap<String, MachinePlan>) -> IndexMap<String, NetworkBoot> {
     let mut out = IndexMap::new();
     for mp in machines.values().filter(|mp| mp.shape == MachineShape::Vm) {
@@ -46,7 +48,7 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::*;
-    use crate::{Environment, Lab};
+    use crate::testing;
 
     const SPEC: &str = "
 version: 1
@@ -58,8 +60,8 @@ machines:
 
     #[test]
     fn only_a_vm_requires_its_own_boot() {
-        let lab = Lab::new(isoloom_spec::parse(SPEC).unwrap());
-        let vm = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+        let lab = testing::lab(SPEC);
+        let vm = testing::planned(&lab, Target::Vagrant);
         assert!(vm.requirements.contains(&Requirement::OwnBoot { machine: "web".into() }));
         assert_eq!(network_boots(&vm.machines)["lan"].file.as_deref(), Some("pxelinux.0"));
         // A boot is VM-only hardware: the machine has no container form, so a container target

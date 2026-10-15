@@ -1,27 +1,11 @@
 //! A lab's problems and the targets its machines' forms allow (the examples are checked in the
 //! `examples` test).
 
-use isoloom_plan::Lab;
-use isoloom_spec::syntax::{self, Code, Problem, Problems};
-use isoloom_spec::{LoadError, Target};
+use isoloom_spec::LoadError;
+use isoloom_spec::syntax::Code;
+use testing::{ids, lab, problems, refused};
 
-fn ids(targets: Vec<Target>) -> Vec<&'static str> {
-    targets.into_iter().map(Target::id).collect()
-}
-
-/// The lab of `yaml`, or the problems that stop it from being read.
-fn lab(yaml: &str) -> Result<Lab, Problems> {
-    Lab::parse(yaml)
-}
-
-fn problems(yaml: &str) -> Vec<String> {
-    isoloom_plan::problems_in(yaml).iter().map(Problem::line).collect()
-}
-
-/// The problems the parser refuses `yaml` with.
-fn refused(yaml: &str) -> Vec<Problem> {
-    syntax::parse(yaml).err().unwrap_or_default()
-}
+pub mod testing;
 
 const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n";
 

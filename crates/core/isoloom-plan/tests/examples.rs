@@ -6,7 +6,9 @@
 use std::path::{Path, PathBuf};
 
 use isoloom_plan::Lab;
-use isoloom_spec::Target;
+use testing::ids;
+
+pub mod testing;
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
@@ -29,10 +31,6 @@ fn names() -> std::io::Result<Vec<String>> {
 
 fn example(name: &str) -> Result<Lab, String> {
     isoloom_spec::load(&root().join(name)).map(Lab::new).map_err(|e| format!("{name}: {e}"))
-}
-
-fn ids(targets: Vec<Target>) -> Vec<&'static str> {
-    targets.into_iter().map(Target::id).collect()
 }
 
 const ALL: [&str; 9] = [
