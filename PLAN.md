@@ -463,9 +463,9 @@ Kubernetes, Helm, Kustomize, hybrid, hosted, external and Terraform ESXi, onto t
    - **One source:** isoloom.com's docs come from the repository through `sync:isoloom`; nothing is edited only on the site.
    - **Exit:** an audit checklist covering every doc file, each item closed.
 3. **Squash each repository's history,** with the maintainer's confirmation at that moment, and re-enable CI.
-3. **Publish to crates.io:** the Isoloom crates, then the Isothrum runner.
-4. **Rewrite every CTF lab file in the new syntax** (by hand, with each lab's real run as proof).
-5. **Switch the launcher from path dependencies to the published versions,** and release the launcher.
+4. **Publish to crates.io:** the Isoloom crates, then the Isothrum runner.
+5. **Rewrite every CTF lab file in the new syntax** (by hand, with each lab's real run as proof).
+6. **Switch the launcher from path dependencies to the published versions,** and release the launcher.
 
 **Exit:** the launcher runs its full catalogue in local, server and cloud mode on published Isoloom 1.0 and the runner.
 
