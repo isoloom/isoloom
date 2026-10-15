@@ -14,7 +14,16 @@ Working document for the local rebuild. It is squashed away with the history at 
 | **Track C: Proxmox 9.2** | Proven: a real apply, serve, check and destroy. |
 | **Track C: ESXi 8.0U3e** | VMs are created and destroyed through `josenk/esxi` and `vagrant-vmware-esxi` (SSH + ovftool). The free licence refuses every vSphere API write. Guest networking waits on Fusion's promiscuous mode (a maintainer step). |
 | **Launcher standard (0.6)** | Ratchet, lints, reorg and repository-root grouping landed (`0560c78`). 1,724 violations remain outside `runtime/`, fixed by area in parallel. |
+| **Test hosts** | jarvis (Linux) and karen (Windows) are offline until the end of 2026-10-15. Meanwhile Linux uses `check-all --hosts linux-docker`, and Windows uses clippy on `x86_64-pc-windows-msvc`. The real Windows and Linux legs are queued below and run as soon as the hosts are back. |
 | **Websites** | Kept separate. The isoloom.com rebuild banner is live. Standard (0.7): next. |
+
+**Queued for when jarvis and karen are back:**
+- `check-all --hosts linux,windows` on every repository;
+- the Linux host setup script (Rust user-level tools, Terraform, kind, Helm, Ansible, pwsh) and the Windows host setup script (Vagrant, Terraform, pwsh);
+- the launcher's `pnpm quality --update` on both, for the Windows and Linux baselines;
+- the flag-file proof on Linux and Windows Docker (owner, mode, no flag in `env`);
+- the runner's real run on jarvis;
+- the Windows leg of Phase 1b's final run.
 
 ## 0. Three products
 
