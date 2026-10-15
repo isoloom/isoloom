@@ -102,6 +102,51 @@ fn docker_examples() -> Vec<(String, Lab)> {
     out
 }
 
+/// Compose refuses `up` and `start` while a secret's variable is unset, and an input's file is
+/// such a secret: the manifest never leaves the runner a slot it may skip. A slot it delivers
+/// through the environment is required, or says what to deliver when it has no value.
+#[test]
+fn every_env_delivered_slot_has_a_value_or_a_default() {
+    let mut manifests = vec![(
+        "flag-portal".to_owned(),
+        run_json(&generate(&lab(FLAG_PORTAL), Target::Docker).unwrap(), ".isoloom/docker/run.json"),
+    )];
+    for (name, spec) in docker_examples() {
+        manifests.push((name, run_json(&generate(&spec, Target::Docker).unwrap(), ".isoloom/docker/run.json")));
+    }
+    for (name, m) in manifests {
+        for slot in &m.secrets {
+            let by_env = slot.deliver.iter().any(|d| matches!(d, isoloom_manifest::Delivery::Env { .. }));
+            assert!(
+                !by_env || slot.required || slot.default.is_some(),
+                "{name}: slot {} may be left unset",
+                slot.name
+            );
+        }
+    }
+    let flag = lab(FLAG_PORTAL);
+    let m = run_json(&generate(&flag, Target::Docker).unwrap(), ".isoloom/docker/run.json");
+    let slot = m.secrets.iter().find(|s| s.name.to_string() == "CTF_FLAG_MAIN").unwrap();
+    assert_eq!(
+        (slot.required, slot.default.as_deref()),
+        (false, Some("")),
+        "an input left out is delivered empty"
+    );
+}
+
+/// An input's own `sensitive` reaches its slot: one the spec marks `false` is shown, one it says
+/// nothing of is masked.
+#[test]
+fn an_input_keeps_the_sensitivity_the_spec_gives_it() {
+    let spec = lab(
+        "version: 1\nname: s\nnetworks:\n  lab: { cidr: 10.30.0.0/24 }\ninputs: { API_URL: { sensitive: false }, FLAG: {} }\nmachines:\n  web:\n    networks: { lab: 10 }\n    environment: { API_URL: { input: API_URL } }\n    files: [{ path: /srv/flag, input: FLAG }]\n    app: { image: nginx }\n",
+    );
+    let m = run_json(&generate(&spec, Target::Docker).unwrap(), ".isoloom/docker/run.json");
+    let sensitive = |name: &str| m.secrets.iter().find(|s| s.name.to_string() == name).map(|s| s.sensitive);
+    assert_eq!(sensitive("API_URL"), Some(false));
+    assert_eq!(sensitive("FLAG"), Some(true));
+}
+
 #[test]
 fn every_examples_manifest_parses_and_matches_the_schema() {
     let schema = jsonschema::validator_for(&isoloom_manifest::schema()).unwrap();

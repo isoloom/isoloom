@@ -1118,6 +1118,13 @@
           ],
           "description": "Where the runner reads it when the embedder passes none."
         },
+        "default": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What the runner delivers when it has no value (neither the embedder nor `source` gives one): a slot that isn't `required` still reaches its steps, so a tool that refuses an unset variable (Compose, for a secret read from the environment) gets this instead."
+        },
         "deliver": {
           "type": "array",
           "minItems": 1,

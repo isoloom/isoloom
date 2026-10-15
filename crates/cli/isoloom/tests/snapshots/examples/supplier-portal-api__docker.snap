@@ -561,11 +561,12 @@ secrets:
       "name": "API_URL",
       "kind": "input",
       "required": false,
-      "sensitive": true,
+      "sensitive": false,
       "machines": [
         "database",
         "database-init-1"
       ],
+      "default": "",
       "deliver": [
         {
           "via": "env",
@@ -586,6 +587,7 @@ secrets:
         "database",
         "database-init-1"
       ],
+      "default": "",
       "deliver": [
         {
           "via": "env",

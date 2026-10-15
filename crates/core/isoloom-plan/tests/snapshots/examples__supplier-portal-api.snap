@@ -1,7 +1,7 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 44
-expression: example(&name).spec()
+assertion_line: 62
+expression: example(&name).unwrap().spec()
 ---
 version: 1
 name: supplier-portal-api
@@ -15,6 +15,8 @@ reach: []
 inputs:
   - API_URL
   - LAUNCH_TOKEN
+plain_inputs:
+  - API_URL
 secrets:
   input-launch-token:
     input: LAUNCH_TOKEN

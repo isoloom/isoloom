@@ -122,6 +122,7 @@ fn a_docker_host_reads_each_kept_value_into_its_variable() {
         reach: Vec::new(),
         dns: None,
         inputs: Vec::new(),
+        plain_inputs: Vec::new(),
         secrets: indexmap::IndexMap::new(),
         machines: indexmap::IndexMap::new(),
         cloud: None,

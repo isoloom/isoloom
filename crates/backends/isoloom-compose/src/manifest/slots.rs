@@ -91,7 +91,14 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan) -> 
             .map(|(n, _)| n.as_str())
             .collect();
         if !readers.is_empty() {
-            out.push(slot(input, SlotKind::Input, None, input, reach(&readers, members, plan)?)?);
+            let mut s = slot(input, SlotKind::Input, None, input, reach(&readers, members, plan)?)?;
+            // The spec's own word on it; an input it says nothing of is masked.
+            s.sensitive = !env.spec().plain_inputs.contains(input);
+            // An input may be left out, but Compose won't create or start a container whose
+            // secret's variable is unset: the runner delivers it empty instead (Compose keeps the
+            // file, empty).
+            s.default = Some(String::new());
+            out.push(s);
         }
     }
     for (name, source) in &env.spec().secrets {
@@ -154,8 +161,8 @@ fn reach(machines: &[&str], members: &[Member], plan: &StartPlan) -> Result<Reac
     })
 }
 
-/// A sensitive slot named `name`, delivered as the variable `var`; an input may be left unset,
-/// a secret or a project file may not.
+/// A sensitive slot named `name`, delivered as the variable `var`; an input isn't required (its
+/// slot says what to deliver without a value), a secret or a project file is.
 fn slot(name: &str, kind: SlotKind, source: Option<SecretSource>, var: &str, reach: Reach) -> Result<SecretSlot> {
     Ok(SecretSlot {
         name: Identifier::parse(name)?,
@@ -165,6 +172,7 @@ fn slot(name: &str, kind: SlotKind, source: Option<SecretSource>, var: &str, rea
         machines: reach.machines,
         providers: BTreeSet::new(),
         source,
+        default: None,
         deliver: env(var, reach.steps)?,
     })
 }

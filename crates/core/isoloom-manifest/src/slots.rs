@@ -189,6 +189,11 @@ pub struct SecretSlot {
     /// Where the runner reads it when the embedder passes none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<SecretSource>,
+    /// What the runner delivers when it has no value (neither the embedder nor `source` gives
+    /// one): a slot that isn't `required` still reaches its steps, so a tool that refuses an
+    /// unset variable (Compose, for a secret read from the environment) gets this instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
     /// Where it goes.
     pub deliver: NonEmpty<Delivery>,
 }

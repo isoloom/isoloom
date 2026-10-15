@@ -113,6 +113,7 @@
         "web",
         "web-init-1"
       ],
+      "default": "",
       "deliver": [
         {
           "via": "env",

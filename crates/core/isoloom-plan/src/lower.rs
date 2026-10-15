@@ -72,6 +72,7 @@ pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
         reach: source.reach.clone(),
         dns: source.dns.clone(),
         inputs: source.inputs.0.keys().map(ToString::to_string).collect(),
+        plain_inputs: source.inputs.0.iter().filter(|(_, i)| !i.sensitive).map(|(name, _)| name.to_string()).collect(),
         secrets,
         machines,
         cloud: source.cloud.clone(),

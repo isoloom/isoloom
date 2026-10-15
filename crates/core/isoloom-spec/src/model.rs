@@ -71,6 +71,11 @@ pub struct Spec {
     /// `inputs` lists. Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
+    /// The inputs the authored spec marks `sensitive: false` (an URL, a mode): shown in a runner's
+    /// events and logs. Every other input is masked. Set by lowering only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(skip)]
+    pub plain_inputs: Vec<String>,
     /// Secrets, by kebab-case name: where `isoloom run` reads each value on the runner (`env`,
     /// `file`, `vault`, `sops`). A machine lists the ones it gets in its own `secrets`, as
     /// files. Values never reach a generated file, the resolved snapshot or a log.
