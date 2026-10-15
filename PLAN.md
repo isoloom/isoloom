@@ -539,6 +539,7 @@ Its §12 open questions take the design's recommendations.
 - **Launcher `unsafe`** follows the runner's rule: one audited `sys` module.
 - **ESXi** server mode is supported only through SSH + ovftool (Vagrant `vmware_esxi`, Terraform `josenk/esxi`); no vSphere API on the free edition. The launcher uses Vagrant for ESXi.
 - **ESXi finding:** the Terraform output reports the router's lab-side address when its uplink gets no DHCP. Fix it in Phase 3.
+- **`tuned-web` keeps its TPM** (`hardware.tpm: required`), so it is VM-only: the example exists to show hardware tuning.
 - **ESXi finding:** ESXi 8 refuses ed25519 keys in FIPS mode. The launcher's guidance must say so, or use RSA.
 
 ### Phase 3: The launcher's modes, wide (L, parallel per target)
