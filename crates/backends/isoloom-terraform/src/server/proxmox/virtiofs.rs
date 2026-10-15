@@ -103,15 +103,14 @@ fn creates(env: &Environment) -> bool {
 }
 
 /// The folder the created mappings point under, when the module creates any.
-pub(super) fn variables(env: &Environment) -> Vec<Block> {
+pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     if !creates(env) {
         return Vec::new();
     }
     vec![
         Variable::new("virtiofs_root", "string")
             .default(string("/srv/isoloom"))
-            .describe("On the node, the folder holding each virtiofs volume's own: <root>/<environment>/<volume>, made before apply")
-            .block(),
+            .describe("On the node, the folder holding each virtiofs volume's own: <root>/<environment>/<volume>, made before apply"),
     ]
 }
 

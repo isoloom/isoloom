@@ -63,7 +63,10 @@ pub(crate) fn is_default_gateway(env: &Environment, mp: &MachinePlan) -> bool {
 /// machines through it, the checks.
 pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
     let dir = target.id();
-    m.commented("The router's uplink address: the lab's way in.", output("ip", reference("local.router_address")));
+    m.commented(
+        "The router's uplink address: the lab's way in.",
+        output("ip", reference("local.router_address")),
+    );
     m.commented(
         "Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).",
         output("ready_file", string(crate::machine::cloud_init::READY_FILE)),
@@ -109,22 +112,26 @@ fn first_address(env: &Environment, name: &str) -> Option<String> {
     env.machines.get(name)?.addresses.values().next().map(ToString::to_string)
 }
 
-/// Where a position's checks run: on its machine when it is a VM, else from the controller,
-/// else from the first machine.
-fn runner(env: &Environment, p: &Position) -> Option<Runner> {
-    let at = |machine: &str, host: String| Runner {
-        machine: machine.to_owned(),
-        host: string(host),
-        user: string("isoloom"),
-    };
+/// Where a position's checks run, as the machine's name and address: on its machine when it is a
+/// VM, else from the controller, else from the first machine.
+pub(crate) fn check_host(env: &Environment, p: &Position) -> Option<(String, String)> {
     if let Position::Machine(m) = p
         && env.spec().machines.get(m).is_some_and(|x| x.vm.is_some())
     {
-        return first_address(env, m).map(|a| at(m, a));
+        return first_address(env, m).map(|a| (m.clone(), a));
     }
     if controller::needed(env) {
         let first = env.networks.values().next().and_then(|n| Cidr::parse(&n.cidr))?;
-        return Some(at("controller", first.controller().to_string()));
+        return Some(("controller".to_owned(), first.controller().to_string()));
     }
-    vms(env).find_map(|(n, _)| first_address(env, n).map(|a| at(n, a)))
+    vms(env).find_map(|(n, _)| first_address(env, n).map(|a| (n.to_owned(), a)))
+}
+
+/// [`check_host`], as the `checks` output's runner (the `isoloom` user).
+fn runner(env: &Environment, p: &Position) -> Option<Runner> {
+    check_host(env, p).map(|(machine, host)| Runner {
+        machine,
+        host: string(host),
+        user: string("isoloom"),
+    })
 }

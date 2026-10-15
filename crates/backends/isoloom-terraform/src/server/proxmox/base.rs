@@ -19,13 +19,7 @@ pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
 
 /// Everything before the router.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let variables = [
-        variables(),
-        super::windows::variables(env),
-        super::lxc::variables(env),
-        super::virtiofs::variables(env),
-    ]
-    .concat();
+    let variables = variables(env).into_iter().map(Variable::block).collect();
     server::head(env, m, &[providers::PROXMOX, providers::TLS], variables, provider());
     m.commented(
         "The project, written to /opt/isoloom in each machine that has steps; the `isoloom` user on every VM.",
@@ -52,7 +46,10 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     m.commented("The environment's networks: an SDN simple zone, a VNet per network.", zone.build());
     credentials(env, m);
     let vnets = super::links::vnets(env, m);
-    m.commented("Applies the SDN objects once created, and again whenever one of them is replaced.", applier(vnets));
+    m.commented(
+        "Applies the SDN objects once created, and again whenever one of them is replaced.",
+        applier(vnets),
+    );
     images(env, m);
     super::image::downloads(env, m);
     super::firewall::ipsets(env, m);
@@ -73,68 +70,71 @@ fn applier(vnets: Vec<Expression>) -> Block {
         .build()
 }
 
-fn variables() -> Vec<Block> {
+/// The module's variables, the run manifest's params and slots among them.
+pub(super) fn variables(env: &Environment) -> Vec<Variable> {
+    [
+        own_variables(),
+        super::windows::variables(env),
+        super::lxc::variables(env),
+        super::virtiofs::variables(env),
+    ]
+    .concat()
+}
+
+fn own_variables() -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
     let mut v = connection("Uploading cloud-init snippets goes over SSH to the node");
     v.extend([
         node(),
-        s("datastore").default(string("local-lvm")).describe("Where VM disks go").block(),
+        s("datastore").default(string("local-lvm")).describe("Where VM disks go"),
         s("image_datastore")
             .default(string("local"))
-            .describe("A datastore with 'iso' content, for cloud images")
-            .block(),
+            .describe("A datastore with 'iso' content, for cloud images"),
         s("snippets_datastore")
             .default(string("local"))
-            .describe("A datastore with 'snippets' content, for cloud-init")
-            .block(),
+            .describe("A datastore with 'snippets' content, for cloud-init"),
         s("uplink_bridge")
             .default(string("vmbr0"))
-            .describe("The bridge the router reaches the internet through")
-            .block(),
+            .describe("The bridge the router reaches the internet through"),
         Variable::new("slot", "number")
             .default(number(1))
-            .describe("1 to 99, unique per environment on this server (SDN ids are short)")
-            .block(),
-        s("ssh_public_key")
-            .default(string(""))
-            .describe("Installed for the user `isoloom` on every VM")
-            .block(),
+            .describe("1 to 99, unique per environment on this server (SDN ids are short)"),
+        s("ssh_public_key").default(string("")).describe("Installed for the user `isoloom` on every VM"),
     ]);
     v
 }
 
 /// The node the VMs go on: no default, since a server's first node can be named anything (the
 /// launcher finds it when the server is added); an empty name is refused before anything is made.
-pub(super) fn node() -> Block {
+pub(super) fn node() -> Variable {
     Variable::new("node", "string")
         .describe("The Proxmox node the VMs go on (`pvesh get /nodes` lists them)")
-        .validated(is_set("node"), "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them).")
-        .block()
+        .validated(
+            is_set("node"),
+            "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them).",
+        )
 }
 
 /// The variables of the connection to the server: its API (a token, or a user and password),
 /// and SSH to the node, which uploads the snippets (`snippets` says how many).
-pub(super) fn connection(snippets: &str) -> Vec<Block> {
+pub(super) fn connection(snippets: &str) -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
     vec![
-        s("proxmox_endpoint").describe("https://<server>:8006/").block(),
+        s("proxmox_endpoint").describe("https://<server>:8006/"),
         s("proxmox_api_token")
             .default(string(""))
             .sensitive()
-            .describe("user@realm!name=secret; or use proxmox_username and proxmox_password")
-            .block(),
-        s("proxmox_username").default(string("root@pam")).block(),
-        s("proxmox_password").default(string("")).sensitive().block(),
+            .describe("user@realm!name=secret; or use proxmox_username and proxmox_password"),
+        s("proxmox_username").default(string("root@pam")),
+        s("proxmox_password").default(string("")).sensitive(),
         Variable::new("proxmox_insecure", "bool")
             .default(boolean(true))
-            .describe("Accept the server's self-signed certificate")
-            .block(),
-        s("proxmox_ssh_username").default(string("root")).describe(snippets).block(),
-        s("proxmox_ssh_private_key_file").default(string("")).block(),
+            .describe("Accept the server's self-signed certificate"),
+        s("proxmox_ssh_username").default(string("root")).describe(snippets),
+        s("proxmox_ssh_private_key_file").default(string("")),
         s("proxmox_ssh_address")
             .default(string(""))
-            .describe("The node's SSH address, when the API reports one this machine can't reach")
-            .block(),
+            .describe("The node's SSH address, when the API reports one this machine can't reach"),
     ]
 }
 

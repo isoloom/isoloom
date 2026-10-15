@@ -34,6 +34,7 @@ mod image;
 mod links;
 mod lxc;
 mod machine;
+mod manifest;
 mod outside;
 mod router;
 mod uplink;
@@ -131,6 +132,14 @@ impl Backend for ProxmoxBackend {
 
     fn refusal(&self, env: &Environment) -> Option<String> {
         PARTS.refusal(&self.capabilities(), env)
+    }
+
+    /// The run manifest (`.isoloom/proxmox/run.json`): Terraform applies the infrastructure, the
+    /// runner reads each machine's ready file and runs the checks over SSH through the router.
+    fn run_manifest(&self, env: &Environment) -> std::result::Result<Option<isoloom_manifest::Manifest>, RenderError> {
+        let checked = lxc::checked(env);
+        let mounted = virtiofs::mounted(&checked);
+        Ok(Some(manifest::manifest(&mounted)?))
     }
 }
 

@@ -6,7 +6,6 @@
 //! configuration drive (`crate::machine::cloudbase_init`).
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::Block;
 use isoloom_spec::images::is_windows;
 
 use super::machine::Boot;
@@ -20,17 +19,15 @@ fn template_variable(os: &str) -> String {
 }
 
 /// One variable per Windows OS the machines use: its template's VM id.
-pub(crate) fn variables(env: &Environment) -> Vec<Block> {
+pub(crate) fn variables(env: &Environment) -> Vec<Variable> {
     let mut oses: Vec<&str> = vms(env).filter_map(|(_, mp)| mp.os.as_deref()).filter(|o| is_windows(o)).collect();
     oses.sort_unstable();
     oses.dedup();
     oses.into_iter()
         .map(|o| {
-            Variable::new(&template_variable(o), "number")
-                .describe(&format!(
-                    "The VM id of a `{o}` template: cloudbase-init and the VirtIO drivers installed, UEFI on Q35, its disk on virtio0, sysprepped"
-                ))
-                .block()
+            Variable::new(&template_variable(o), "number").describe(&format!(
+                "The VM id of a `{o}` template: cloudbase-init and the VirtIO drivers installed, UEFI on Q35, its disk on virtio0, sysprepped"
+            ))
         })
         .collect()
 }

@@ -234,7 +234,9 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
             Step::Disks { disks } => config.disks.clone_from(disks),
             Step::Reboot => parts.push(again.clone()),
             _ => {
-                let Some(c) = Shell::Root.step(env, machine, step).map(|c| tracked(&label(step), &c)) else { continue };
+                let Some(c) = Shell::Root.step(env, machine, step).map(|c| tracked(&label(step), &c)) else {
+                    continue;
+                };
                 if at_every_boot(step) {
                     again.push(c.clone());
                 }

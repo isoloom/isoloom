@@ -107,15 +107,14 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
 }
 
 /// The OCI templates' datastore, when there are containers.
-pub(super) fn variables(env: &Environment) -> Vec<Block> {
+pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     if !needed(env) {
         return Vec::new();
     }
     vec![
         Variable::new("template_datastore", "string")
             .default(string("local"))
-            .describe("A datastore with 'vztmpl' content, for the containers' OCI images")
-            .block(),
+            .describe("A datastore with 'vztmpl' content, for the containers' OCI images"),
     ]
 }
 

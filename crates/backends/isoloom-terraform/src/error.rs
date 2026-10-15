@@ -29,6 +29,15 @@ pub enum Error {
         #[source]
         source: hcl_builder::Error,
     },
+    /// The run manifest breaks its contract (a bug: the plan checked what it is made of).
+    #[error("{}: the run manifest: {source}", target.id())]
+    Manifest {
+        /// The target whose manifest it is.
+        target: Target,
+        /// What the manifest's types refused.
+        #[source]
+        source: isoloom_manifest::ManifestError,
+    },
 }
 
 /// A result whose error is this crate's [`Error`].
@@ -41,6 +50,7 @@ impl From<Error> for RenderError {
         let (target, what) = match e {
             Error::Refused { target, reason } => (target, reason),
             Error::Module { target, folder, source } => (target, format!("the {folder} module couldn't be written: {source}")),
+            Error::Manifest { target, source } => (target, format!("the run manifest: {source}")),
         };
         RenderError::Unsupported { target, what }
     }

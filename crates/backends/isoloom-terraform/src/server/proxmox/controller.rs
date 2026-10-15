@@ -28,7 +28,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         ),
         file("/etc/isoloom/inventory.ini", Some("0644"), inventory),
     ];
-    for hosts in controller::hosts(env) {
+    if let Some(hosts) = controller::hosts(env) {
         config.track("hosts file", &Shell::Root.command(&hosts));
     }
     config.track("installing Ansible", &Shell::Root.command(controller::ANSIBLE));
@@ -39,7 +39,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         config.track("waiting for the Windows machines", &Shell::Root.command(&wait));
     }
     config.track("the playbooks", &Shell::Root.command(&controller::playbooks(env)));
-    for ready in steps::linux(env, "", &Step::Ready) {
+    if let Some(ready) = steps::linux(env, "", &Step::Ready) {
         config.track("health check", &Shell::Root.command(&ready));
     }
     m.commented(

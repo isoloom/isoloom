@@ -8,8 +8,7 @@ use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
 use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, index, list, null, number, reference,
-    string,
+    BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, index, list, null, number, reference, string,
 };
 use isoloom_spec::model::Target;
 
@@ -61,13 +60,16 @@ const DEBIAN: &str = "https://cloud.debian.org/images/cloud/bookworm/latest/debi
 
 fn variables() -> Vec<Block> {
     let s = |name: &str| Variable::new(name, "string");
-    let mut v = connection("Uploading the cloud-init snippet goes over SSH to the node");
+    let mut v: Vec<Block> = connection("Uploading the cloud-init snippet goes over SSH to the node")
+        .into_iter()
+        .map(Variable::block)
+        .collect();
     v.extend([
         Variable::new("ssh_via_node", "bool")
             .default(boolean(false))
             .describe("Reach the lab VM over SSH through the node (its bridge isn't routable from here)")
             .block(),
-        super::base::node(),
+        super::base::node().block(),
         s("datastore").default(string("local-lvm")).describe("Where the VM's disk goes").block(),
         s("image_datastore")
             .default(string("local"))
