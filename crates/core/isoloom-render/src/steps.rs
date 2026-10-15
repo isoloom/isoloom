@@ -64,6 +64,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Tc => tc(env, machine),
         Step::Before { paths } => process::before(env, machine, paths),
         Step::Command => process::command(env, machine),
+        Step::Setup { paths } => process::setup(env, machine, paths),
         Step::Ready => Some(format!(
             "{}mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\n",
             process::healthy(env, machine).unwrap_or_default()
@@ -112,6 +113,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         )),
         Step::Before { paths } => process::windows_before(env, machine, paths),
         Step::Command => process::windows_command(env, machine),
+        Step::Setup { paths } => Some(process::windows_setup(paths)),
         Step::Ready => Some(format!(
             "{}New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready",
             process::windows_healthy(env, machine).unwrap_or_default()

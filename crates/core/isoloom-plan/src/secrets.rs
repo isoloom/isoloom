@@ -2,13 +2,25 @@
 //! The plan never holds a value: `isoloom run` reads each from its store and hands it to the
 //! target's own mechanism (Compose secrets, a Kubernetes Secret).
 
-use isoloom_spec::model::MachineSecret;
+use isoloom_spec::model::{MachineSecret, SecretSource, Spec};
+
+/// Where a value file's contents come from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValueSource {
+    /// A secret, read from its store at each start.
+    Secret(String),
+    /// An input, given at each start (`files: [{ path, input }]`).
+    Input(String),
+}
 
 /// One secret file of a machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecretFile {
-    /// The secret, as the top-level `secrets` names it.
+    /// The secret, as the top-level `secrets` names it (an input's file is the secret
+    /// `input-<name>` lowering makes of it).
     pub name: String,
+    /// Where the value comes from.
+    pub source: ValueSource,
     /// The file's absolute path in the machine.
     pub path: String,
     /// Its owner's user id, when the spec sets one (root otherwise).
@@ -34,9 +46,14 @@ pub const VM_DEFAULT_MODE: u32 = 0o400;
 
 impl SecretFile {
     /// The file a machine's `secrets` entry places.
-    pub fn of(s: &MachineSecret) -> SecretFile {
+    pub fn of(spec: &Spec, s: &MachineSecret) -> SecretFile {
         let m = s.mount();
+        let source = match spec.secrets.get(&m.source) {
+            Some(SecretSource::Input { input }) => ValueSource::Input(input.clone()),
+            _ => ValueSource::Secret(m.source.clone()),
+        };
         SecretFile {
+            source,
             name: m.source,
             path: s.path(),
             uid: m.uid,

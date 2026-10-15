@@ -87,18 +87,28 @@ impl<'a> Machine<'a> {
 
     /// How the project builds its image, as the comment of the manifests says to run it.
     pub fn build_command(&self) -> Option<String> {
-        let b = self.build?;
         let mut cmd = format!("docker build -t {}", self.reference);
-        if let Some(f) = &b.dockerfile {
-            let _ = write!(cmd, " -f {f}");
+        match self.build? {
+            Build::Own {
+                context,
+                dockerfile,
+                target,
+                args,
+            } => {
+                if let Some(f) = dockerfile {
+                    let _ = write!(cmd, " -f {f}");
+                }
+                if let Some(t) = target {
+                    let _ = write!(cmd, " --target {t}");
+                }
+                for (k, v) in args {
+                    let _ = write!(cmd, " --build-arg {}", shell::quote(&format!("{k}={v}")));
+                }
+                Some(format!("{cmd} {context}"))
+            }
+            // Isoloom's own Dockerfile, with the project folder as its context.
+            Build::Generated { dockerfile, .. } => Some(format!("{cmd} -f {dockerfile} .")),
         }
-        if let Some(t) = &b.target {
-            let _ = write!(cmd, " --target {t}");
-        }
-        for (k, v) in &b.args {
-            let _ = write!(cmd, " --build-arg {}", shell::quote(&format!("{k}={v}")));
-        }
-        Some(format!("{cmd} {}", b.context))
     }
 }
 

@@ -60,6 +60,38 @@ pub(super) fn command(env: &Environment, machine: &str) -> Option<String> {
     Some(boot::service("command", "The machine's own command", &script, Kind::Daemon, &after))
 }
 
+/// Marks a machine's `setup` scripts as run: they run once, not at every provisioning.
+const SETUP_DONE: &str = "/var/lib/isoloom/setup.done";
+
+/// The `setup` scripts, run once in order with the machine's service up (a failure fails the
+/// set-up), as root, with its inputs and environment.
+pub(super) fn setup(env: &Environment, machine: &str, paths: &[String]) -> Option<String> {
+    let mp = env.machines.get(machine)?;
+    let mut script = format!("[ -f {SETUP_DONE} ] || (\nset -e\n{}", prelude(env, machine, mp));
+    for p in paths {
+        let _ = writeln!(script, "sh {}", quote(&format!("{PROJECT_DIR}/{p}")));
+    }
+    let _ = writeln!(script, "mkdir -p /var/lib/isoloom && touch {SETUP_DONE}\n)");
+    Some(script)
+}
+
+/// The `setup` scripts on Windows: each run once in order, from the project folder.
+pub(super) fn windows_setup(paths: &[String]) -> String {
+    let runs: Vec<String> = paths
+        .iter()
+        .map(|p| {
+            format!(
+                "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
+                ps(p)
+            )
+        })
+        .collect();
+    format!(
+        "if (-not (Test-Path '{WINDOWS_DIR}\\setup.done')) {{ Set-Location {WINDOWS_DIR}; {}; Set-Content '{WINDOWS_DIR}\\setup.done' done }}",
+        runs.join("; ")
+    )
+}
+
 /// At boot, a machine's secrets are back in place before its `before` steps and command run.
 fn secrets_first(mp: &MachinePlan) -> Vec<&'static str> {
     if mp.secrets.is_empty() {

@@ -166,6 +166,7 @@ pub fn compose_file(target: Target, env: &Environment) -> Result<Rendered, Rende
     file.networks.extend(crate::outside::networks(env));
     let mut files = runners;
     files.extend(out.files);
+    files.extend(isoloom_render::dockerfile::files(env));
     Ok(Rendered { file, files })
 }
 

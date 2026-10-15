@@ -10,6 +10,11 @@ use super::spans::Spans;
 use super::{Spec, old_keys};
 
 /// Reads a spec from its YAML text: the spec, or its problems in file order.
+///
+/// # Errors
+///
+/// Every problem found, coded and placed: YAML that doesn't parse, the earlier format's keys,
+/// unknown and missing fields, values of the wrong type or shape.
 pub fn parse(yaml: &str) -> Result<Spec, Problems> {
     let spans = Spans::of(yaml);
     let mut doc: Value = serde_yaml_ng::from_str(yaml).map_err(|e| vec![yaml_problem(&e)])?;

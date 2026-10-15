@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -357,6 +358,7 @@ services:
     restart: unless-stopped
   writer-init-1:
     image: alpine:3.20
+    user: root
     entrypoint:
     - /bin/sh
     - /isoloom/init/write.sh

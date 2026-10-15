@@ -102,6 +102,7 @@ impl Table {
                     config: None,
                     firmware: None,
                     lxc: false,
+                    generated: None,
                 });
                 m.supplied = true;
             }
@@ -114,6 +115,7 @@ impl Table {
                     provision: Vec::new(),
                     tpm: None,
                     boot: None,
+                    setup: Vec::new(),
                 });
                 m.supplied = true;
             }

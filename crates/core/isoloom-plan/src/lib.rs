@@ -10,8 +10,10 @@ pub mod environment;
 pub mod hardware;
 pub mod images;
 pub mod ipv6;
+pub mod lab;
 pub mod lifecycle;
 pub mod links;
+pub mod lower;
 pub mod machine_files;
 pub mod more_addresses;
 pub mod outside;
@@ -22,13 +24,14 @@ pub mod routing;
 pub mod secrets;
 pub mod storage;
 
-pub use environment::{Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind};
+pub use environment::{Build, Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind};
+pub use lab::Lab;
 pub use lifecycle::{MachineLifecycle, Step};
 pub use outside::{Join, OutsideAddress, OutsideNetwork};
 pub use private_dns::PrivateDns;
 pub use process::{Health, HealthTest, Process};
 pub use requirements::{Capabilities, Feature, Refusal, Requirement, refusal};
-pub use secrets::SecretFile;
+pub use secrets::{SecretFile, ValueSource};
 pub use storage::{DataDisk, Lifetime};
 
 use isoloom_spec::{model, shell};

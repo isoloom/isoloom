@@ -126,3 +126,32 @@ fn dns_servers_are_addresses_or_machines_on_a_shared_network() {
     );
     assert_eq!(found.len(), 2, "{found:?}");
 }
+
+/// A spec with machine `web` on `lab`, its port named `port` (HTTP), and `message`.
+fn with_message(port: &str, message: &str) -> crate::syntax::Spec {
+    let yaml = format!(
+        "version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.1.0.0/24 }}\nmachines:\n  web: {{ os: debian@12, networks: {{ lab: 10 }}, ports: {{ {port}: {{ port: 80, protocol: http, publish: 8080 }} }} }}\n"
+    );
+    let mut spec = parse(&yaml).unwrap();
+    spec.message = Some(message.to_string());
+    spec
+}
+
+proptest::proptest! {
+    #[test]
+    fn any_message_is_checked_without_panicking(message in "\\PC{0,80}") {
+        let _ = check(&with_message("web", &message));
+    }
+
+    #[test]
+    fn a_named_ports_paths_resolve(port in "[a-z][a-z0-9-]{0,30}", field in proptest::sample::select(vec!["port", "published", "url"])) {
+        let spec = with_message(&port, &format!("at {{{{ machines.web.ports.{port}.{field} }}}} and {{{{ machines.web.addresses.lab }}}}"));
+        proptest::prop_assert_eq!(check(&spec), []);
+    }
+
+    #[test]
+    fn a_numbered_port_path_never_resolves(i in 0..10_u8, field in proptest::sample::select(vec!["port", "publish", "published"])) {
+        let spec = with_message("web", &format!("{{{{ machines.web.ports.{i}.{field} }}}}"));
+        proptest::prop_assert!(check(&spec).iter().any(|p| p.code == Code::UnknownReference && p.path.as_str() == "message"));
+    }
+}

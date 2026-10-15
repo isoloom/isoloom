@@ -119,6 +119,7 @@ fn label(step: &Step) -> String {
         Step::Reboot => "reboot".into(),
         Step::Before { .. } => "before".into(),
         Step::Command => "command".into(),
+        Step::Setup { .. } => "setup".into(),
         Step::Egress => "no internet".into(),
         Step::Tc => "tc".into(),
         Step::Ready => "ready".into(),

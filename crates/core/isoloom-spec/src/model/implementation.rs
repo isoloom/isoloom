@@ -55,6 +55,22 @@ pub struct DockerImpl {
     /// volumes), so the author says the image runs as one. Ignored by every other target.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub lxc: bool,
+    /// The image Isoloom builds from the machine's portable steps (`app.steps`): a Dockerfile it
+    /// generates, `FROM` the OS's official image. Set by lowering, never written in a spec.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub generated: Option<Generated>,
+}
+
+/// A container image Isoloom builds from a machine's portable steps.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Generated {
+    /// The OS's image-table name (`debian-12`): its package installer.
+    pub os: String,
+    /// The OS's official image, pinned by digest: the `FROM`.
+    pub base: String,
+    /// The steps, in order.
+    pub steps: Vec<crate::syntax::Step>,
 }
 
 /// A network appliance image (see [`DockerImpl::appliance`]). The images aren't Isoloom's to
@@ -108,6 +124,11 @@ pub struct VmImpl {
     /// network boot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub boot: Option<super::Boot>,
+    /// Project scripts run once the machine is up, after its command started (`setup:`). Set by
+    /// lowering, never written in a spec.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub setup: Vec<String>,
 }
 
 /// The `vm.provision` step that restarts a Linux machine; the steps after it run once the

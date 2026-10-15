@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -421,6 +422,7 @@ services:
     restart: unless-stopped
   cache-init-1:
     image: redis:7-alpine
+    user: root
     entrypoint:
     - /bin/sh
     - /isoloom/init/seed.sh

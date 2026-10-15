@@ -5,11 +5,13 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::str::FromStr;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
 
+use super::invalid::Invalid;
 use super::names::InputName;
 
 /// Where a file's contents come from.
@@ -43,7 +45,7 @@ impl FileSource {
 }
 
 /// A file's permissions, octal, at most `0777`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Mode(u32);
 
 impl Mode {
@@ -53,17 +55,26 @@ impl Mode {
     pub const VALUE: Mode = Mode(0o400);
 
     /// The mode as a number (`0o444`).
+    #[must_use]
     pub fn bits(self) -> u32 {
         self.0
     }
+}
+
+impl FromStr for Mode {
+    type Err = Invalid;
 
     /// The mode `digits` (`"0444"`, or YAML's number `444`) names.
-    pub fn parse(digits: &str) -> Result<Mode, String> {
+    ///
+    /// # Errors
+    ///
+    /// [`Invalid::Mode`] when they aren't octal digits up to `0777`.
+    fn from_str(digits: &str) -> Result<Mode, Invalid> {
         u32::from_str_radix(digits, 8)
             .ok()
             .filter(|m| *m <= 0o777)
             .map(Mode)
-            .ok_or_else(|| format!("`{digits}` isn't a file mode: octal digits up to 0777, like \"0444\""))
+            .ok_or_else(|| Invalid::Mode(digits.to_string()))
     }
 }
 
@@ -82,10 +93,10 @@ impl<'de> Deserialize<'de> for Mode {
                 f.write_str("octal digits, like \"0444\"")
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Mode, E> {
-                Mode::parse(v).map_err(E::custom)
+                v.parse().map_err(E::custom)
             }
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<Mode, E> {
-                Mode::parse(&v.to_string()).map_err(E::custom)
+                v.to_string().parse().map_err(E::custom)
             }
         }
         d.deserialize_any(V)

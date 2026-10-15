@@ -5,6 +5,7 @@ use isoloom_plan::SecretFile;
 
 fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFile {
     SecretFile {
+        source: isoloom_plan::ValueSource::Secret(name.to_string()),
         name: name.into(),
         path: path.into(),
         uid,

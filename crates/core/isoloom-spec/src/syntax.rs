@@ -10,6 +10,7 @@ mod files;
 mod forms;
 mod hardware;
 mod inputs;
+mod invalid;
 mod machine;
 mod names;
 mod old_keys;
@@ -28,8 +29,9 @@ pub use files::{File, FileSource, Mode};
 pub use forms::{Form, NoForm, container as container_form, reboots, vm as vm_form};
 pub use hardware::{Hardware, Tpm};
 pub use inputs::{Input, Inputs};
+pub use invalid::Invalid;
 pub use machine::{Kind, Machine, Octets, Services};
-pub use names::{InputName, PortName, ServiceRef, Version, is_variable};
+pub use names::{InputName, PortName, ServiceRef, Version};
 pub use os::OsRef;
 pub use overrides::{
     CloudMachine, CloudOverrides, DockerNetwork, DockerOverrides, EsxiOverrides, ExternalMachine, ExternalNetwork, ExternalOverrides, ExternalVolume,
@@ -39,7 +41,7 @@ pub use parse::parse;
 pub use ports::{Port, PortProtocol, Publish};
 pub use problem::{Code, FieldPath, Problem, Problems, Span};
 pub use process::{Command, EnvValue, HealthPage, Healthcheck, PortRef};
-pub use shared::{Group, OWN_FIELDS, SHARED_FIELDS, Shared};
+pub use shared::{Group, Shared};
 pub use spans::Spans;
 
 use indexmap::IndexMap;

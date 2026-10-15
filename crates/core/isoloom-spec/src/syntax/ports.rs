@@ -12,6 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 /// What a port speaks: TCP or UDP, and for TCP whether probes and checks speak HTTP or TLS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum PortProtocol {
     /// TCP, the default: probed by connecting.
     #[default]
@@ -28,16 +29,19 @@ pub enum PortProtocol {
 
 impl PortProtocol {
     /// Whether it runs over TCP (everything but UDP).
+    #[must_use]
     pub fn is_tcp(self) -> bool {
         self != PortProtocol::Udp
     }
 
     /// Whether it speaks HTTP (`http`, `https`).
+    #[must_use]
     pub fn is_http(self) -> bool {
         matches!(self, PortProtocol::Http | PortProtocol::Https)
     }
 
     /// Whether it speaks TLS (`https`, `tls`).
+    #[must_use]
     pub fn is_tls(self) -> bool {
         matches!(self, PortProtocol::Https | PortProtocol::Tls)
     }
@@ -58,7 +62,7 @@ pub enum Publish {
 /// `publish:` as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only: `Publish` reads the values.
+#[expect(dead_code, reason = "the schema's shape only: `Publish` reads the values.")]
 enum PublishInput {
     /// `true`: a free host port, preferably the port's own number.
     Free(bool),
@@ -115,7 +119,7 @@ struct PortFull {
 /// A port as written: its number (TCP), or in full.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only.
+#[expect(dead_code, reason = "the schema's shape only.")]
 enum PortInput {
     /// The port's number: TCP, not published.
     Number(NonZeroU16),
@@ -217,7 +221,7 @@ mod tests {
     #[test]
     fn a_port_is_a_number_or_written_in_full() {
         let p = ports("{ ssh: 22, site: { port: 8000, protocol: http, publish: 8080 }, shell: { port: 4444, dormant: true } }").unwrap();
-        let get = |n: &str| &p[&PortName::parse(n).unwrap()];
+        let get = |n: &str| &p[&n.parse::<PortName>().unwrap()];
         assert_eq!((get("ssh").port.map(NonZeroU16::get), get("ssh").protocol), (Some(22), PortProtocol::Tcp));
         assert_eq!(get("site").publish, Some(Publish::Preferred(NonZeroU16::new(8080).unwrap())));
         assert!(get("shell").dormant && get("site").protocol.is_http() && !get("site").protocol.is_tls());

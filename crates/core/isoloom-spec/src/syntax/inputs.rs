@@ -82,7 +82,7 @@ impl<'de> Deserialize<'de> for Inputs {
 /// `inputs:` as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only: `Inputs` reads the values.
+#[expect(dead_code, reason = "the schema's shape only: `Inputs` reads the values.")]
 enum InputsInput {
     /// Input names, each sensitive.
     Names(Vec<InputName>),

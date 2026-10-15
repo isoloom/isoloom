@@ -45,8 +45,7 @@ impl Images {
             .iter()
             .filter_map(|(name, m)| {
                 let d = m.docker.as_ref()?;
-                d.build.as_ref()?;
-                Some(tag_of(spec, name, d.image.as_deref()))
+                (d.build.is_some() || d.generated.is_some()).then(|| tag_of(spec, name, d.image.as_deref()))
             })
             .collect();
         let constraints = spec.constraints.clone().filter(|c| !c.registries.is_empty());

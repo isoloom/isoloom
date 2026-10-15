@@ -35,6 +35,14 @@ pub enum SecretSource {
         /// `<file>#<key>`, dotted keys for nesting, e.g. `secrets.enc.yaml#db.password`.
         sops: String,
     },
+    /// An input's value, given at each start: the secret lowering makes of a file whose source
+    /// is an input (`files: [{ path, input }]`). Never written in a spec.
+    #[serde(skip_deserializing)]
+    #[schemars(skip)]
+    Input {
+        /// The input's name (`CTF_FLAG_MAIN`): the runner's variable holding the value.
+        input: String,
+    },
 }
 
 impl SecretSource {
@@ -45,13 +53,18 @@ impl SecretSource {
             SecretSource::File { .. } => "file",
             SecretSource::Vault { .. } => "vault",
             SecretSource::Sops { .. } => "sops",
+            SecretSource::Input { .. } => "input",
         }
     }
 
     /// What the store is asked for: a variable, a path, a `<path>#<field>` reference.
     pub fn reference(&self) -> &str {
         match self {
-            SecretSource::Env { env: r } | SecretSource::File { file: r } | SecretSource::Vault { vault: r } | SecretSource::Sops { sops: r } => r,
+            SecretSource::Env { env: r }
+            | SecretSource::File { file: r }
+            | SecretSource::Vault { vault: r }
+            | SecretSource::Sops { sops: r }
+            | SecretSource::Input { input: r } => r,
         }
     }
 }

@@ -27,7 +27,7 @@ pub use checks::{Check, Declared, Expect};
 pub use cloud::{CloudProvider, CloudServices};
 pub use constraints::{Constraints, Mirrors, Proxy};
 pub use hardware::{DEFAULT_GPU_DRIVER, Device, DeviceFull, DeviceInput, GpuCount, Gpus, GpusFull, GpusInput};
-pub use implementation::{Appliance, Controller, Dns, DockerImpl, KNOWN_OS, Provision, REBOOT_STEP, VmImage, VmImpl, Winrm, is_reboot};
+pub use implementation::{Appliance, Controller, Dns, DockerImpl, Generated, KNOWN_OS, Provision, REBOOT_STEP, VmImage, VmImpl, Winrm, is_reboot};
 pub use ipv6::{Ipv6, Ipv6Addresses};
 pub(crate) use machine::scalars;
 pub use machine::{Arch, Machine, Octets, Port, Protocol, Resources, ScalarSchema};

@@ -17,7 +17,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
             p.add(format!("{at}.{}", source.store()), why);
         }
         if !spec.machines.values().any(|m| m.secrets.iter().any(|s| s.source() == name)) {
-            p.add(at, "no machine gets it: list it in a machine's `secrets`");
+            p.add(at, "no machine gets it: place it as a file, `files: [{ path, secret: <name> }]`");
         }
     }
     for (machine, m) in &spec.machines {

@@ -112,6 +112,11 @@ pub enum Step {
     },
     /// Its own command, run as a service from now on (see [`crate::Process`]).
     Command,
+    /// Its `setup` scripts, run once with its service up, as root from the project folder.
+    Setup {
+        /// The scripts, from the project folder.
+        paths: Vec<String>,
+    },
     /// Offline: no new connection leaves the environment.
     Egress,
     /// Link impairment on its own interfaces.
@@ -205,6 +210,9 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
     }
     if m.command.is_some() {
         steps.push(Step::Command);
+    }
+    if let Some(vm) = m.vm.as_ref().filter(|vm| !vm.setup.is_empty()) {
+        steps.push(Step::Setup { paths: vm.setup.clone() });
     }
     if routing::offline(spec, name, m) {
         steps.push(Step::Egress);

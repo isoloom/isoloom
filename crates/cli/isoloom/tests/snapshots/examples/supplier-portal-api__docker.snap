@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -304,6 +305,7 @@ services:
     restart: unless-stopped
   database-init-1:
     image: mysql:8.0
+    user: root
     entrypoint:
     - /bin/sh
     - /isoloom/init/seed.sh

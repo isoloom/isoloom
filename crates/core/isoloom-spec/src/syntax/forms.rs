@@ -43,6 +43,7 @@ impl NoForm {
     }
 
     /// The field's full path for machine `name`.
+    #[must_use]
     pub fn path(&self, name: &str) -> FieldPath {
         let machine = FieldPath::new("machines").key(name);
         match self.field.split_once('[') {
@@ -53,6 +54,10 @@ impl NoForm {
 }
 
 /// The machine's container form, or why it has none.
+///
+/// # Errors
+///
+/// [`NoForm`]: the field that rules the form out, why, and the fix.
 pub fn container(m: &Machine) -> Result<Form<'_>, NoForm> {
     if m.access && m.os.is_none() && matches!(m.kind, Kind::Bare) {
         return Ok(Form::Supplied);
@@ -92,6 +97,10 @@ pub fn container(m: &Machine) -> Result<Form<'_>, NoForm> {
 }
 
 /// The machine's VM form, or why it has none.
+///
+/// # Errors
+///
+/// [`NoForm`]: the field that rules the form out, why, and the fix.
 pub fn vm(m: &Machine) -> Result<Form<'_>, NoForm> {
     if m.access && m.os.is_none() && matches!(m.kind, Kind::Bare) {
         return Ok(Form::Supplied);
@@ -123,6 +132,7 @@ pub fn vm(m: &Machine) -> Result<Form<'_>, NoForm> {
 }
 
 /// Whether one of the machine's steps restarts it (its inputs must outlive the boot).
+#[must_use]
 pub fn reboots(m: &Machine) -> bool {
     m.app().is_some_and(|a| a.steps.contains(&Step::Reboot))
 }

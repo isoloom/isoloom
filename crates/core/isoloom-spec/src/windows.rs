@@ -45,6 +45,7 @@ mod tests {
             image: None,
             tpm: tpm_field,
             boot: None,
+            setup: Vec::new(),
         }
     }
 

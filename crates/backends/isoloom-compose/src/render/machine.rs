@@ -41,7 +41,7 @@ fn base(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, ts: &[trun
         networks: sidecars::attachments(env, name, mp),
         extra_hosts: sidecars::extra_hosts(env, name),
         environment: environment(env, mp),
-        ports: mp.ports.iter().copied().map(port).collect(),
+        ports: mp.ports.iter().map(port).collect(),
         volumes: crate::storage::volume_mounts(mp).into_iter().chain(crate::storage::tmpfs(m).1).collect(),
         secrets: super::secrets::of_machine(mp),
         configs: super::files::mounts(name, mp),
@@ -94,7 +94,7 @@ fn ulimit(soft: u64, hard: u64) -> Ulimit {
 /// A published port: on the host's loopback, on an ephemeral host port by default (no
 /// collisions); ISOLOOM_PUBLISH_FIXED pins it to `publish` inside the docker-vm/cloud VMs that
 /// forward it. `<port>/udp` for a UDP service (Compose's default is TCP).
-pub(super) fn port(p: PublishedPort) -> String {
+pub(super) fn port(p: &PublishedPort) -> String {
     let proto = if p.protocol.is_tcp() { "" } else { "/udp" };
     let (publish, port) = (p.publish, p.port);
     if p.fixed {
@@ -106,18 +106,32 @@ pub(super) fn port(p: PublishedPort) -> String {
 
 /// A machine's Compose `build`: its context, and the Dockerfile (Compose reads it relative to
 /// the context) and build arguments when the spec gives them; the spec's own arguments win over
-/// the constraints'. `$$`: a literal value, not Compose's interpolation.
-fn build_of(env: &Environment, b: &isoloom_plan::environment::Build) -> Build {
+/// the constraints'. `$$`: a literal value, not Compose's interpolation. A generated Dockerfile
+/// builds with the project folder as its context.
+fn build_of(env: &Environment, b: &isoloom_plan::Build) -> Build {
     let constraints = constraints::build_args(env.spec());
-    let own = b.args.iter().map(|(k, v)| (k.clone(), v.clone()));
+    let (context, dockerfile, target, own) = match b {
+        isoloom_plan::Build::Own {
+            context,
+            dockerfile,
+            target,
+            args,
+        } => (
+            format!("{ROOT}/{context}"),
+            dockerfile.as_ref().map(|f| relative_to(context, f)),
+            target.clone(),
+            args.clone(),
+        ),
+        isoloom_plan::Build::Generated { dockerfile, .. } => (ROOT.to_string(), Some(dockerfile.clone()), None, IndexMap::new()),
+    };
     Build {
-        context: format!("{ROOT}/{}", b.context),
-        dockerfile: b.dockerfile.as_ref().map(|f| relative_to(&b.context, f)),
-        target: b.target.clone(),
+        context,
+        dockerfile,
+        target,
         args: constraints
             .into_iter()
-            .filter(|(k, _)| !b.args.contains_key(k))
-            .chain(own)
+            .filter(|(k, _)| !own.contains_key(k))
+            .chain(own.clone())
             .map(|(k, v)| (k, v.replace('$', "$$")))
             .collect(),
         labels: IndexMap::new(),
@@ -274,12 +288,18 @@ fn init_jobs(env: &Environment, name: &str, mp: &MachinePlan, m: &Machine, servi
     let mut previous: Option<String> = None;
     for (job, script) in init_names(name, m).into_iter().zip(&d.init) {
         let mounted = format!("/isoloom/init/{}", file_name(script));
+        // A setup job runs as root with what the machine has: its network, volumes, files (value
+        // files included) and privileges.
         let mut j = Service {
             image: image.clone(),
+            user: Some("root".into()),
+            privileged: m.privileged,
+            cap_add: if mp.is_gateway { vec!["NET_ADMIN".into()] } else { Vec::new() },
             entrypoint: vec!["/bin/sh".into(), mounted.clone()],
             network_mode: Some(format!("service:{name}")),
             environment: environment(env, mp),
             secrets: super::secrets::of_machine(mp),
+            configs: super::files::mounts(name, mp),
             restart: Some("no".into()),
             ..Service::default()
         };

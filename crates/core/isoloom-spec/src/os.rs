@@ -101,7 +101,7 @@ pub const FAMILIES: &[Family] = &[
 ];
 
 /// An OS resolved: its family, its version (the default filled in) and its image-table name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Os {
     /// The family (`debian`).
     pub family: &'static str,
@@ -234,6 +234,10 @@ pub fn canonical(spec: &mut Spec) -> Result<(), String> {
     }
     Ok(())
 }
+
+mod containers;
+
+pub use containers::container_image;
 
 #[cfg(test)]
 mod tests;

@@ -4,6 +4,7 @@ use super::{BOOTSTRAP, DELIVERED, KEPT_DIR, PLACE_SCRIPT, command_line, input, p
 
 fn file(name: &str, path: &str) -> SecretFile {
     SecretFile {
+        source: isoloom_plan::ValueSource::Secret(name.to_string()),
         name: name.into(),
         path: path.into(),
         uid: None,

@@ -14,6 +14,7 @@ use serde::Serialize;
 /// The kind of problem: a stable, kebab-case code that tools and editors can key on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum Code {
     /// A key the spec doesn't have (a typo, or a field in the wrong place).
     UnknownField,
@@ -36,6 +37,7 @@ pub enum Code {
 
 impl Code {
     /// The code as written in a problem: `removed-field`.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             Code::UnknownField => "unknown-field",
@@ -66,6 +68,7 @@ pub struct FieldPath(String);
 
 impl FieldPath {
     /// The path as written.
+    #[must_use]
     pub fn new(path: impl Into<String>) -> FieldPath {
         FieldPath(path.into())
     }
@@ -87,17 +90,20 @@ impl FieldPath {
     }
 
     /// The path as text.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// The enclosing field's path (`machines.web` for `machines.web.app`), when there is one.
+    #[must_use]
     pub fn parent(&self) -> Option<FieldPath> {
         let cut = self.0.rfind(['.', '['])?;
         Some(FieldPath(self.0[..cut].to_string()))
     }
 
     /// Whether this path is `other` or a field inside it.
+    #[must_use]
     pub fn within(&self, other: &FieldPath) -> bool {
         self.0 == other.0 || self.0.strip_prefix(other.0.as_str()).is_some_and(|rest| rest.starts_with(['.', '[']))
     }
@@ -129,6 +135,7 @@ pub struct Problem {
 
 impl Problem {
     /// A problem with no fix to offer and no place yet (see [`crate::syntax::Spans::place`]).
+    #[must_use]
     pub fn new(code: Code, path: FieldPath, reason: impl Into<String>) -> Problem {
         Problem {
             code,
@@ -147,6 +154,7 @@ impl Problem {
     }
 
     /// The three lines an author reads, naming `file` (`isoloom.yml`) on the first.
+    #[must_use]
     pub fn render(&self, file: &str) -> String {
         let place = self.span.map(|s| format!("  ({file}:{}:{})", s.line, s.column)).unwrap_or_default();
         let mut out = format!("error[{}] {}{place}\n  {}", self.code.id(), self.path, self.reason);
@@ -158,6 +166,7 @@ impl Problem {
     }
 
     /// The top-level section the problem is in: `machines` for `machines.web.app`.
+    #[must_use]
     pub fn section(&self) -> &str {
         let p = self.path.as_str();
         &p[..p.find(['.', '[']).unwrap_or(p.len())]

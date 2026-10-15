@@ -401,12 +401,10 @@ fn vm_unknown_os() {
 }
 
 #[test]
-fn vm_without_provisioning() {
-    assert_problem(
-        &with_machine("{ networks: { lab: 5 }, vm: { os: debian@12 } }"),
-        "machines.m.vm.provision",
-        "list the steps",
-    );
+fn a_bare_vm_is_a_machine_of_its_own() {
+    // An OS alone is a machine (a fresh VM, or the OS's image kept running idle): no steps needed.
+    let spec = isoloom_spec::parse(&with_machine("{ networks: { lab: 5 }, vm: { os: debian@12 } }")).unwrap();
+    assert_eq!(isoloom_spec::validate(&spec), vec![]);
 }
 
 // Environment provisioning.

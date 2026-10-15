@@ -16,11 +16,15 @@ use isoloom_spec::model::{Arch, Boot, Constraints, External, Machine, MachineFil
 use isoloom_spec::validate::docker_cidrs;
 use isoloom_spec::windows::{self, Tpm};
 
+mod image;
+
+pub use image::{Build, Image, generated_dockerfile};
+
 use crate::addressing::{address, address_for, host_address, start_order};
 use crate::ansible;
 use crate::checks::{self, Resolved};
 use crate::hardware::{self, Hardware};
-use crate::images::{Images, tag_of};
+use crate::images::Images;
 use crate::ipv6::{self, Ipv6Plan, Route6};
 use crate::lifecycle::{self, MachineLifecycle};
 use crate::outside::{self, OutsideAddress, OutsideNetwork};
@@ -199,8 +203,10 @@ pub struct Route {
 }
 
 /// A port published on the host.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublishedPort {
+    /// The port's name: how labels, outputs and the message refer to it.
+    pub name: String,
     /// The machine's port.
     pub port: u16,
     /// The host port asked for.
@@ -269,36 +275,6 @@ pub struct Size {
     pub memory_mb: Option<u32>,
     /// Disk, in GB.
     pub disk_gb: Option<u32>,
-}
-
-/// What a machine runs from.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Image {
-    /// A container image.
-    Container {
-        /// The reference to run (pulled through a mirror when one is set; a built image's tag).
-        reference: String,
-        /// How the project builds it, if it does.
-        build: Option<Build>,
-    },
-    /// A VM's operating system.
-    Vm {
-        /// The OS id (`ubuntu-24.04`, `windows-2022`...).
-        os: String,
-    },
-}
-
-/// A container image the project builds.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Build {
-    /// The build context, from the project folder.
-    pub context: String,
-    /// The Dockerfile, from the project folder, when not the context's own.
-    pub dockerfile: Option<String>,
-    /// The Dockerfile's stage to build, when not its last.
-    pub target: Option<String>,
-    /// The spec's build arguments.
-    pub args: IndexMap<String, String>,
 }
 
 /// The controller VM, which runs the environment's playbooks and Ansible checks.
@@ -386,7 +362,7 @@ pub fn on_docker(target: Target) -> bool {
 }
 
 /// The spec as `target` lays it out: on the Docker targets, every network on its Docker block.
-fn lay_out(spec: &Spec, target: Target) -> Spec {
+pub(crate) fn lay_out(spec: &Spec, target: Target) -> Spec {
     let mut s = spec.clone();
     if on_docker(target) {
         for (name, c) in docker_cidrs(spec) {
@@ -457,7 +433,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
             ulimits: m.ulimits.clone(),
         },
         inputs: m.inputs.clone(),
-        secrets: m.secrets.iter().map(SecretFile::of).collect(),
+        secrets: m.secrets.iter().map(|s| SecretFile::of(spec, s)).collect(),
         size: m
             .resources
             .map(|r| Size {
@@ -468,7 +444,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
             .unwrap_or_default(),
         arch: m.arch,
         rate_limit: m.rate_limit.clone(),
-        image: image(spec, shape, name, m),
+        image: image::of(spec, shape, name, m),
         vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
         boot: m.vm.as_ref().and_then(|v| v.boot.clone()),
         depends_on: m.depends_on.clone(),
@@ -498,6 +474,7 @@ fn published(m: &Machine) -> Vec<PublishedPort> {
         .iter()
         .filter_map(|s| {
             s.publish.map(|publish| PublishedPort {
+                name: m.port_label(s),
                 port: s.port,
                 publish,
                 protocol: s.protocol,
@@ -525,26 +502,6 @@ fn volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Volume> {
             },
         })
         .collect()
-}
-
-fn image(spec: &Spec, shape: MachineShape, name: &str, m: &Machine) -> Option<Image> {
-    match shape {
-        MachineShape::Container => {
-            let d = m.docker.as_ref()?;
-            let tag = tag_of(spec, name, d.image.as_deref());
-            Some(Image::Container {
-                reference: Images::of(spec).pull(&tag),
-                build: d.build.as_ref().map(|context| Build {
-                    context: context.clone(),
-                    dockerfile: d.dockerfile.clone(),
-                    target: d.target.clone(),
-                    args: d.args.clone(),
-                }),
-            })
-        }
-        MachineShape::Vm => m.vm.as_ref().map(|vm| Image::Vm { os: vm.os.clone() }),
-        MachineShape::Supplied | MachineShape::External => None,
-    }
 }
 
 fn controller(spec: &Spec) -> Option<Controller> {

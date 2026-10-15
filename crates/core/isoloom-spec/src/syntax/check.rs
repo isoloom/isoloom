@@ -15,6 +15,7 @@ use super::problem::{Code, FieldPath, Problem, Problems};
 use super::process::PortRef;
 
 /// The spec's problems, placed, in file order.
+#[must_use]
 pub fn check(spec: &Spec) -> Problems {
     let mut out = Problems::new();
     for (name, m) in &spec.machines {

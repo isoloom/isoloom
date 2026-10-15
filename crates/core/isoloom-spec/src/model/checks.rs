@@ -111,10 +111,40 @@ pub struct Declared {
     /// kind's field says its default.
     #[serde(default)]
     pub expect: Option<Expect>,
-    /// Seconds to keep retrying until the check passes: default 30 for `http` and `tcp`
-    /// (except `blocked`, tried once), 0 for `exec` and `script`.
-    #[serde(default)]
+    /// How long to keep retrying until the check passes, as seconds (`90`) or a duration (`90s`,
+    /// `3m`, `1m30s`): default 30 seconds for `http` and `tcp` (except `blocked`, tried once), 0
+    /// for `exec` and `script`. Held in seconds.
+    #[serde(default, deserialize_with = "duration")]
+    #[schemars(with = "Option<WaitSchema>")]
     pub wait: Option<u32>,
+}
+
+/// A wait as written, for the schema.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[expect(dead_code, reason = "the schema's shape only: `duration` reads the values")]
+enum WaitSchema {
+    /// Seconds.
+    Seconds(u32),
+    /// A duration: `90s`, `3m`, `1m30s`.
+    Duration(String),
+}
+
+/// A wait written as seconds (`90`) or a duration (`90s`, `3m`, `1m30s`), in seconds.
+fn duration<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<u32>, D::Error> {
+    let raw: Option<serde_json::Value> = Deserialize::deserialize(d)?;
+    match raw {
+        None => Ok(None),
+        Some(serde_json::Value::Number(n)) => n
+            .as_u64()
+            .and_then(|n| u32::try_from(n).ok())
+            .map(Some)
+            .ok_or_else(|| serde::de::Error::custom("a wait is a number of seconds or a duration (`90s`, `3m`)")),
+        Some(serde_json::Value::String(s)) => super::seconds(&s)
+            .map(Some)
+            .ok_or_else(|| serde::de::Error::custom(format!("`{s}` isn't a duration: write `90s`, `3m` or `1m30s`"))),
+        Some(_) => Err(serde::de::Error::custom("a wait is a number of seconds or a duration (`90s`, `3m`)")),
+    }
 }
 
 /// What a declared check expects: an HTTP status code, or a word (`any`, `blocked`, `open`),

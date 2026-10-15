@@ -239,7 +239,8 @@ fn docker(at: &str, d: &DockerImpl, p: &mut Problems) {
         );
     }
     match (&d.image, &d.build) {
-        _ if emulated => {}
+        // A Dynamips router's container, and the image Isoloom generates from steps, are Isoloom's.
+        _ if emulated || d.generated.is_some() => {}
         (Some(_), Some(_)) => p.add(format!("{at}.docker"), "use `image` or `build`, not both"),
         (None, None) => p.add(format!("{at}.docker"), "set `image` (a published image) or `build` (a folder in the project)"),
         _ => {}
@@ -281,12 +282,6 @@ fn vm(s: &Subject, v: &VmImpl, p: &mut Problems) {
                 );
             }
         }
-    }
-    if v.provision.is_empty() && s.m.command.is_none() && !s.m.access && s.spec.provision.is_empty() {
-        p.add(
-            format!("{at}.vm.provision"),
-            "list the steps that install the machine's services (or provision the environment with `provision:`)",
-        );
     }
 }
 

@@ -1648,9 +1648,9 @@ What counts as passing, in the check's own terms: a status code, `any` or `block
 
 ### `checks[].wait`
 
-Seconds to keep retrying until the check passes: default 30 for `http` and `tcp` (except `blocked`, tried once), 0 for `exec` and `script`.
+How long to keep retrying until the check passes, as seconds (`90`) or a duration (`90s`, `3m`, `1m30s`): default 30 seconds for `http` and `tcp` (except `blocked`, tried once), 0 for `exec` and `script`. Held in seconds.
 
-- **Type:** integer
+- **Type:** integer or string
 
 ## `tools`
 

@@ -22,6 +22,7 @@ enum Frame {
 impl Spans {
     /// The places of every key and list item in `yaml`. A document the parser refuses gives the
     /// places read before the refusal (the YAML error itself carries its own).
+    #[must_use]
     pub fn of(yaml: &str) -> Spans {
         let mut spans = Spans::default();
         let mut stack: Vec<Frame> = Vec::new();
@@ -77,6 +78,7 @@ impl Spans {
 
     /// The place of `path`: its own, else its nearest written parent's (a field a group gives a
     /// machine is placed at the machine).
+    #[must_use]
     pub fn find(&self, path: &FieldPath) -> Option<Span> {
         let mut at = Some(path.clone());
         while let Some(p) = at {
@@ -89,6 +91,7 @@ impl Spans {
     }
 
     /// `problem`, placed (unless it already is).
+    #[must_use]
     pub fn place(&self, mut problem: Problem) -> Problem {
         if problem.span.is_none() {
             problem.span = self.find(&problem.path);

@@ -95,7 +95,7 @@ struct AppInput {
 /// `build:` as written: a folder, or in full.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only.
+#[expect(dead_code, reason = "the schema's shape only.")]
 enum BuildInput {
     /// A folder of the project holding a `Dockerfile`.
     Folder(String),
@@ -162,7 +162,8 @@ fn appliance(kind: Appliance, image: Option<String>, config: Option<String>, fir
 /// One step of the portable recipe. Steps install and configure: they run as root from the
 /// project copy at `/opt/isoloom`, with no network to the other machines and no inputs or
 /// secrets (on containers they run at image build time). What needs those goes in `setup`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Step {
     /// A project script (`.sh`, or `.ps1` on Windows), skipped when `creates` exists.
     Run {
@@ -183,6 +184,7 @@ pub enum Step {
 
 impl Step {
     /// Why the step has no container form, when it has none.
+    #[must_use]
     pub fn container_refusal(&self) -> Option<&'static str> {
         match self {
             Step::Reboot => Some("a reboot needs a machine with its own kernel and boot: a container has neither"),
@@ -199,7 +201,7 @@ pub(crate) fn has_extension(path: &str, extension: &str) -> bool {
 }
 
 /// A `copy` step.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Copy {
     /// A file or folder of the project (a folder ends with `/`).
@@ -238,7 +240,7 @@ struct StepInput {
 /// A step as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only.
+#[expect(dead_code, reason = "the schema's shape only.")]
 enum StepSchema {
     /// `reboot`: the machine restarts, and the next step runs once it is back.
     Reboot(RebootWord),
@@ -248,7 +250,7 @@ enum StepSchema {
 
 /// The word `reboot`.
 #[derive(JsonSchema)]
-#[allow(dead_code)] // the schema's shape only.
+#[expect(dead_code, reason = "the schema's shape only.")]
 enum RebootWord {
     /// Restarts the machine.
     #[serde(rename = "reboot")]

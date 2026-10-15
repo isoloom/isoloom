@@ -37,7 +37,7 @@ struct CommandFull {
 /// A command as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only.
+#[expect(dead_code, reason = "the schema's shape only.")]
 enum CommandInput {
     /// A text run by the machine's shell (`/bin/sh -c`; PowerShell on Windows).
     Shell(String),
@@ -165,7 +165,7 @@ struct EnvReference {
 /// An environment value as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only.
+#[expect(dead_code, reason = "the schema's shape only.")]
 enum EnvInput {
     /// A fixed text.
     Text(String),
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn a_healthcheck_names_its_port() {
         let h: Healthcheck = serde_yaml_ng::from_str("{ http: { port: site, path: /health } }").unwrap();
-        assert_eq!(h.http.unwrap().port, PortRef::Name(PortName::parse("site").unwrap()));
+        assert_eq!(h.http.unwrap().port, PortRef::Name("site".parse().unwrap()));
         let h: Healthcheck = serde_yaml_ng::from_str("{ http: { port: 8000 } }").unwrap();
         assert!(matches!(h.http.unwrap().port, PortRef::Number(_)));
     }

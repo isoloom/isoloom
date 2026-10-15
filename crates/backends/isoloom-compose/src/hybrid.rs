@@ -85,6 +85,7 @@ fn ports_of(env: &Environment, name: &str) -> Vec<PublishedPort> {
     let tool = name.strip_prefix("isoloom-tool-").and_then(|t| env.spec().tools.get(t));
     match tool.map(|t| (t.port, t.publish)) {
         Some((Some(port), Some(publish))) => vec![PublishedPort {
+            name: "web".into(),
             port,
             publish,
             protocol: Protocol::Tcp,

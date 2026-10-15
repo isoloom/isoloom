@@ -7,6 +7,7 @@ pub mod boot;
 pub mod constraints;
 pub mod container;
 pub mod disks;
+pub mod dockerfile;
 pub mod hcl_builder;
 pub mod ignore;
 pub mod inventory;

@@ -103,7 +103,6 @@ pub struct Machine {
 /// A machine as written.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-#[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch an author writes.
 pub(crate) struct MachineInput {
     /// The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone
     /// for its pinned default. Required, except for a machine whose only recipe is `app.image`,
@@ -132,7 +131,7 @@ pub(crate) struct MachineInput {
     /// How many of this machine (2 to 99): clones `<name>-01`, `<name>-02`, ..., each one address
     /// further along on every network. Where the spec names this machine, it means every clone.
     #[serde(default)]
-    #[allow(dead_code)] // expanded into clones before the machines are read.
+    #[expect(dead_code, reason = "expanded into clones before the machines are read.")]
     count: Option<u8>,
     /// The machine the user lands on (at most one). Without `os`, the runner supplies it.
     #[serde(default)]
@@ -211,7 +210,7 @@ pub(crate) struct MachineInput {
 /// `service:` as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[allow(dead_code)] // the schema's shape only.
+#[expect(dead_code, reason = "the schema's shape only.")]
 enum ServicesInput {
     /// One service.
     One(ServiceRef),

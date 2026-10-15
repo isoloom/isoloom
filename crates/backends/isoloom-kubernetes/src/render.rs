@@ -53,6 +53,7 @@ pub fn render(env: &Environment) -> Result<Files, RenderError> {
     ];
     files.extend(checks::files(&r.checks, &r.namespace)?);
     files.extend(chart::files(env, &r)?);
+    files.extend(isoloom_render::dockerfile::files(env));
     Ok(files)
 }
 
