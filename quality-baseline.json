@@ -6,7 +6,6 @@
     "clippy/allow_attributes_without_reason": {
       "isoloom": 5,
       "isoloom-manifest": 3,
-      "isoloom-plan": 2,
       "isoloom-spec": 10,
       "isoloom-targets": 35
     },
@@ -17,31 +16,26 @@
     "clippy/doc_markdown": {
       "isoloom": 1,
       "isoloom-manifest": 9,
-      "isoloom-plan": 1,
       "isoloom-spec": 14,
       "isoloom-targets": 2
     },
     "clippy/indexing_slicing": {
       "isoloom-manifest": 4,
-      "isoloom-plan": 19,
       "isoloom-spec": 32,
       "isoloom-targets": 12
     },
     "clippy/let_underscore_must_use": {
       "isoloom": 10,
-      "isoloom-plan": 5,
       "isoloom-spec": 14,
       "isoloom-targets": 32
     },
     "clippy/missing_errors_doc": {
       "isoloom-manifest": 13,
-      "isoloom-plan": 1,
       "isoloom-spec": 20,
       "isoloom-targets": 2
     },
     "clippy/must_use_candidate": {
       "isoloom-manifest": 24,
-      "isoloom-plan": 78,
       "isoloom-spec": 121,
       "isoloom-targets": 4
     },
@@ -51,32 +45,27 @@
     "clippy/shadow_unrelated": {
       "isoloom": 7,
       "isoloom-manifest": 5,
-      "isoloom-plan": 6,
       "isoloom-spec": 38,
       "isoloom-targets": 32
     },
     "clippy/similar_names": {
-      "isoloom-plan": 2,
       "isoloom-targets": 2
     },
     "clippy/str_to_string": {
       "isoloom": 11,
       "isoloom-manifest": 24,
-      "isoloom-plan": 39,
       "isoloom-spec": 108,
       "isoloom-targets": 38
     },
     "clippy/string_slice": {
       "isoloom": 2,
       "isoloom-manifest": 4,
-      "isoloom-plan": 1,
       "isoloom-spec": 28,
       "isoloom-targets": 51
     },
     "dup/clone": {
       "isoloom": 5,
       "isoloom-manifest": 2,
-      "isoloom-plan": 1,
       "isoloom-spec": 3,
       "isoloom-targets": 14
     },
@@ -88,8 +77,7 @@
       "isoloom-targets": 1
     },
     "rustc/unreachable_pub": {
-      "isoloom": 66,
-      "isoloom-plan": 1
+      "isoloom": 66
     }
   }
 }

@@ -50,17 +50,12 @@ mod tests {
     use super::*;
     use crate::testing;
 
-    const SPEC: &str = "
-version: 1
-name: t
-networks: { lan: { cidr: 10.0.0.0/24 } }
-machines:
-  web: { networks: { lan: 10 }, os: debian@12, hardware: { boot: { order: [network, hd], network: { file: pxelinux.0 } } }, app: { image: nginx, steps: [{ run: s.sh }] } }
-";
+    /// A machine that boots from the network first, with both forms.
+    const PXE: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, hardware: { boot: { order: [network, hd], network: { file: pxelinux.0 } } }, app: { image: nginx, steps: [{ run: s.sh }] } }\n";
 
     #[test]
     fn only_a_vm_requires_its_own_boot() {
-        let lab = testing::lab(SPEC);
+        let lab = testing::lab(PXE);
         let vm = testing::planned(&lab, Target::Vagrant);
         assert!(vm.requirements.contains(&Requirement::OwnBoot { machine: "web".into() }));
         assert_eq!(network_boots(&vm.machines)["lan"].file.as_deref(), Some("pxelinux.0"));
