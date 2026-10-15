@@ -47,7 +47,7 @@ pub struct Note {
 /// What became of something the source said, from what needs checking to what needs nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NoteKind {
-    /// Changed on the way in (renamed, re-addressed): check it.
+    /// Changed on the way in (renamed, re-addressed) or left out: check it.
     Changed,
     /// Belongs in the machine's image or provisioning.
     InImage,

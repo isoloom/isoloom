@@ -48,12 +48,17 @@ fn have(tool: &str) -> bool {
     Command::new(tool).arg("--version").output().is_ok_and(|o| o.status.success())
 }
 
+/// Vagrant runs a Vagrantfile on its own embedded Ruby (3.x). The `ruby` standing in for it here
+/// can be older: macOS ships 2.6, from before `Enumerable#filter_map` (2.7), so the script gets
+/// it first when it's missing.
+const FILTER_MAP_FOR_OLD_RUBY: &str = "Enumerable.module_eval { def filter_map; each_with_object([]) { |x, out| v = yield(x); out << v if v }; end } unless Enumerable.method_defined?(:filter_map); ";
+
 /// Archives `root` with the Ruby of a generated Vagrantfile and lists the archive (`tar -tv`).
 fn archive(dir: &Path, root: &Path, generated: bool, out: &str) -> String {
     let rb = dir.join("project.rb");
     std::fs::write(&rb, file(&example("hello-stack"), Target::Vagrant, "vagrant/Vagrantfile")).unwrap();
     let script = format!(
-        "eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, generated: {generated}, extra: [\".isoloom/hybrid/compose.yml\"]) }}"
+        "{FILTER_MAP_FOR_OLD_RUBY}eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, generated: {generated}, extra: [\".isoloom/hybrid/compose.yml\"]) }}"
     );
     let st = Command::new("ruby")
         .arg("-e")

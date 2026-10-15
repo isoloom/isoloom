@@ -15,10 +15,10 @@ pub enum Stage {
     Groups,
     /// A machine's several addresses on one network (`lan: [10, 11]`), split from its first.
     Addresses,
-    /// VLANs written under their LAN, made networks of their own.
-    Vlans,
     /// Each machine's `os` and `vm.os`, resolved to a known OS.
     Os,
+    /// VLANs written under their LAN, made networks of their own.
+    Vlans,
 }
 
 /// Why a spec couldn't be loaded.

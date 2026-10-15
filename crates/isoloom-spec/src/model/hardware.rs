@@ -93,7 +93,7 @@ pub enum GpusInput {
 pub struct GpusFull {
     /// How many GPUs (a number, or `all`). Default: one, unless `ids` names them.
     #[serde(default)]
-    #[schemars(with = "Option<CountSchema>")]
+    #[schemars(schema_with = "count_schema")]
     count: Option<serde_json::Value>,
     /// Which GPUs, by the host's ids (a device index or UUID; a PCI address or a resource
     /// mapping on Proxmox). Not with `count`.
@@ -110,24 +110,14 @@ pub struct GpusFull {
     options: IndexMap<String, String>,
 }
 
-/// A count of GPUs as the schema shows it: a number, or `all`.
-#[derive(JsonSchema)]
-#[serde(untagged)]
-#[allow(dead_code)] // only describes the schema.
-enum CountSchema {
-    /// That many.
-    Count(u32),
-    /// Every GPU of the host.
-    All(AllWord),
-}
-
-/// The word `all`.
-#[derive(JsonSchema)]
-#[allow(dead_code)] // only describes the schema.
-enum AllWord {
-    /// Every GPU of the host.
-    #[serde(rename = "all")]
-    All,
+/// The schema of `gpus.count`, read as JSON to give a precise error: a number, or `all`.
+fn count_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "anyOf": [
+            { "type": "integer", "format": "uint32", "minimum": 0, "description": "That many." },
+            { "type": "string", "const": GpuCount::ALL, "description": "Every GPU of the host." }
+        ]
+    })
 }
 
 fn count(value: &serde_json::Value) -> Result<GpuCount, String> {
