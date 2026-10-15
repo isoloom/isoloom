@@ -111,3 +111,6 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **Attack box with the switch on:** the runner's hooks rejoin it to the lab's networks after a start or a resume, stop it before a park, and remove it before a stop.
 - **Lab page with the switch on:** machines, addresses, ports, roles and networks come from the manifest; Isoloom's own containers (jobs, probes, route keepers, the access stand-in) are hidden; the Open URL is the manifest's `entry` output (with its trailing `/`); the image column is empty.
 - **Real runs (2026-10-15, Docker Desktop 29.8.1 on macOS):** Isoloom's `hello-stack` and `segmented` examples ran through both launcher paths: up, status, the attack box reaching the target, the checks (12/12 and 8/8), and, on the runner path, park, resume on the same host port with the attack box back on the lab's networks, and down with nothing left. Linux and Windows: pending, hosts offline.
+
+## Launcher standard 0.6: machine, servers, cloud and onboarding (launcher repository)
+- **Copy buttons:** the Proxmox setup's "Copy" of the launcher's public key now says so in a toast when the clipboard refuses (it stayed silent); every copy button in the launcher behaves the same way.
