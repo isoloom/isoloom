@@ -230,3 +230,6 @@ pub(super) fn docker_overlaps(spec: &Spec, p: &mut Problems) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

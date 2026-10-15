@@ -157,3 +157,99 @@ fn moved_block(block: Cidr, taken: &[Cidr]) -> Cidr {
         .find(|cand| DOCKER_BLOCK.contains(*cand) && !taken.iter().any(|t| t.overlaps(*cand)))
         .unwrap_or(Cidr { base: first, len: block.len })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn block(text: &str) -> Cidr {
+        Cidr::parse(text).unwrap()
+    }
+
+    fn ip(text: &str) -> Ipv4Addr {
+        text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_24_reserves_its_first_and_last_addresses() {
+        let lan = block("10.9.0.0/24");
+        assert_eq!((lan.gateway(), lan.gateway_octet()), (ip("10.9.0.1"), 1));
+        assert_eq!((lan.controller(), lan.router()), (ip("10.9.0.253"), ip("10.9.0.254")));
+        assert_eq!((lan.tool(0), lan.tool(2)), (ip("10.9.0.252"), ip("10.9.0.250")));
+        assert_eq!(
+            (lan.host(2), lan.host(100), lan.host(252)),
+            (Some(ip("10.9.0.2")), Some(ip("10.9.0.100")), Some(ip("10.9.0.252")))
+        );
+        for reserved in [0, 1, 253, 254, 255] {
+            assert_eq!(lan.host(reserved), None, "{reserved}");
+        }
+    }
+
+    #[test]
+    fn a_29_inside_a_24_counts_from_its_own_base() {
+        let small = block("10.0.0.8/29");
+        assert_eq!((small.gateway(), small.gateway_octet()), (ip("10.0.0.9"), 9));
+        assert_eq!(
+            (small.controller(), small.router(), small.tool(0)),
+            (ip("10.0.0.13"), ip("10.0.0.14"), ip("10.0.0.12"))
+        );
+        assert_eq!((small.host(10), small.host(12)), (Some(ip("10.0.0.10")), Some(ip("10.0.0.12"))));
+        for outside in [8, 9, 13, 14, 15, 16, 7] {
+            assert_eq!(small.host(outside), None, "{outside}");
+        }
+    }
+
+    #[test]
+    fn a_tool_below_the_block_saturates_at_its_base() {
+        assert_eq!(block("10.0.0.8/29").tool(usize::MAX), ip("0.0.0.0"));
+    }
+
+    #[test]
+    fn only_a_24_to_a_29_has_host_addresses() {
+        for size in ["10.0.0.0/23", "10.0.0.0/16", "10.0.0.0/30", "10.0.0.0/32"] {
+            assert_eq!(block(size).host(2), None, "{size}");
+        }
+        assert_eq!(block("10.0.0.0/25").host(2), Some(ip("10.0.0.2")));
+    }
+
+    /// The Docker blocks of the networks `networks` (YAML) describes.
+    fn docker(networks: &str) -> Vec<(String, String)> {
+        let spec = crate::testing::model(&format!("version: 1\nname: t\nnetworks:\n{networks}")).unwrap();
+        docker_cidrs(&spec)
+            .into_iter()
+            .map(|(n, c)| (n, format!("{}/{}", Ipv4Addr::from(c.base), c.len)))
+            .collect()
+    }
+
+    fn pairs(list: &[(&str, &str)]) -> Vec<(String, String)> {
+        list.iter().map(|(a, b)| ((*a).to_owned(), (*b).to_owned())).collect()
+    }
+
+    #[test]
+    fn a_block_outside_10_moves_into_it_keeping_its_octets() {
+        assert_eq!(
+            docker("  home: { cidr: 192.168.5.0/24 }\n  dmz: { cidr: 172.20.3.0/24 }\n  lab: { cidr: 10.7.0.0/24 }\n"),
+            pairs(&[("home", "10.192.5.0/24"), ("dmz", "10.20.3.0/24"), ("lab", "10.7.0.0/24")])
+        );
+    }
+
+    #[test]
+    fn a_networks_own_docker_block_and_an_outside_network_stay_as_written() {
+        assert_eq!(
+            docker("  home: { cidr: 192.168.5.0/24, docker: { cidr: 10.50.0.0/24 } }\n  corp: { cidr: 192.168.50.0/24, external: corp-net }\n"),
+            pairs(&[("home", "10.50.0.0/24"), ("corp", "192.168.50.0/24")])
+        );
+    }
+
+    #[test]
+    fn a_taken_block_moves_to_the_next_free_one_from_10_240() {
+        assert_eq!(
+            docker("  lab: { cidr: 10.192.5.0/24 }\n  home: { cidr: 192.168.5.0/24 }\n  also: { cidr: 192.168.5.0/24 }\n"),
+            pairs(&[("lab", "10.192.5.0/24"), ("home", "10.240.0.0/24"), ("also", "10.240.1.0/24")])
+        );
+        assert_eq!(
+            docker("  lab: { cidr: 10.240.0.0/23 }\n  dmz: { cidr: 172.240.0.0/24 }\n"),
+            pairs(&[("lab", "10.240.0.0/23"), ("dmz", "10.240.2.0/24")])
+        );
+    }
+}

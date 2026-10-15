@@ -160,3 +160,6 @@ fn name_problem(machine: &str, v: &str) -> Option<&'static str> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests;

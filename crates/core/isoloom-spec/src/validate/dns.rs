@@ -90,6 +90,20 @@ mod tests {
     }
 
     #[test]
+    fn a_machines_options_are_resolver_options_set_once() {
+        let yaml = crate::testing::lab(
+            "machines:\n  web: { networks: { lan: 10 }, docker: { image: nginx }, dns: { options: ['ndots:2', 'no such', 'ndots:3', rotate] } }\n",
+        );
+        assert_eq!(
+            crate::testing::problems(&yaml),
+            [
+                "machines.web.dns.options[1]: `no such` isn't a resolver option: write `name` or `name:value`, as resolv.conf's `options` line (ndots:2, timeout:1, rotate)",
+                "machines.web.dns.options[2]: `ndots` is set twice: keep one",
+            ]
+        );
+    }
+
+    #[test]
     fn options_are_names_or_name_value_pairs() {
         for ok in ["ndots:2", "timeout:1", "attempts:3", "rotate", "edns0", "single-request-reopen", "trust-ad"] {
             assert!(option(ok), "{ok}");

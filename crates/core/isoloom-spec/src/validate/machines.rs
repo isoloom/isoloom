@@ -308,3 +308,6 @@ pub(super) fn external(spec: &Spec, p: &mut Problems) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

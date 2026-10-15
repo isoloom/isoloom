@@ -170,4 +170,17 @@ mod tests {
             "{got:#?}"
         );
     }
+
+    #[test]
+    fn a_bridged_networks_vlan_tag_is_1_to_4094() {
+        let tag = |vlan: u16| {
+            problems(&format!(
+                "{BASE}  home: {{ cidr: 10.0.0.0/24, bridged: {{ vlan: {vlan} }} }}\nmachines:\n  a: {{ networks: {{ lan: 10, home: 10 }}, docker: {{ image: nginx }} }}\n"
+            ))
+        };
+        assert_eq!(tag(1), Vec::<String>::new());
+        assert_eq!(tag(4094), Vec::<String>::new());
+        assert_eq!(tag(0), ["networks.home.bridged.vlan: a VLAN tag is 1 to 4094"]);
+        assert_eq!(tag(4095), ["networks.home.bridged.vlan: a VLAN tag is 1 to 4094"]);
+    }
 }

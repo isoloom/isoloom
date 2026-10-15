@@ -77,6 +77,13 @@ mod tests {
     }
 
     #[test]
+    fn two_64s_overlap_only_when_they_are_the_same_block() {
+        let a = Cidr6::parse("fd00:20::/64").unwrap();
+        let b = Cidr6::parse("fd00:21::/64").unwrap();
+        assert!(a.overlaps(a) && !a.overlaps(b) && !b.overlaps(a));
+    }
+
+    #[test]
     fn only_unicast_network_addresses_of_a_64() {
         assert!(Cidr6::parse("2001:db8:1:2::/64").is_some());
         for bad in [
