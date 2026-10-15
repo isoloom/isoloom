@@ -550,7 +550,7 @@ provider "proxmox" {
 # The VM's address on the uplink, from the guest agent (not the loopback).
 locals {
   root = abspath("${path.module}/../../..")
-  ip   = [for a in flatten(proxmox_virtual_environment_vm.env.ipv4_addresses) : a if a != "127.0.0.1"][0]
+  ip   = try([for a in flatten(proxmox_virtual_environment_vm.env.ipv4_addresses) : a if a != "127.0.0.1"][0], "")
 }
 
 resource "proxmox_download_file" "debian" {
@@ -592,7 +592,7 @@ resource "proxmox_virtual_environment_vm" "env" {
   on_boot   = false
   agent {
     enabled = true
-    timeout = "5m"
+    timeout = "8m"
     wait_for_ip {
       ipv4 = true
     }
@@ -630,7 +630,7 @@ resource "proxmox_virtual_environment_vm" "env" {
   lifecycle {
     postcondition {
       condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1"]) > 0
-      error_message = "The Docker host got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 5m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+      error_message = "The Docker host got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
     }
   }
 }

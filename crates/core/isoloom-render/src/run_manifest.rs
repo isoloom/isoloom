@@ -242,9 +242,11 @@ fn output(m: &Machine, p: &Port, host: &Template) -> Result<Output, ManifestErro
         role,
         sensitive: false,
         format: Some(Template::from_parts(
-            std::iter::once(Part::Text(scheme.into()))
-                .chain(host.parts().iter().cloned())
-                .chain([Part::Text(":".into()), Part::Placeholder(Placeholder::Value), Part::Text(after.into())]),
+            std::iter::once(Part::Text(scheme.into())).chain(host.parts().iter().cloned()).chain([
+                Part::Text(":".into()),
+                Part::Placeholder(Placeholder::Value),
+                Part::Text(after.into()),
+            ]),
         )),
         from: OutputSource::PublishedPort {
             machine: m.name.clone(),

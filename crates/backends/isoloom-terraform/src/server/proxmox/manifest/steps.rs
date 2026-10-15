@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, CheckRunner, Condition, EnvName, HostArgv, Lifecycle, ManifestError, Name, NonEmpty, Part, Placeholder, Program,
-    ReadyGrammar, RelPath, Run, RunVar, SnakeName, Step, StepId, Template,
+    Action, Argv, CheckRunner, Condition, EnvName, HostArgv, Lifecycle, ManifestError, Name, NonEmpty, Part, Placeholder, Program, ReadyGrammar, RelPath, Run,
+    RunVar, SnakeName, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_plan::checks::by_position;
@@ -191,4 +191,3 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
     }
     Ok(out)
 }
-

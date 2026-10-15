@@ -48,7 +48,9 @@ pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError>
     let at = Template::from(Placeholder::Output(SnakeName::parse(IP)?));
     let mut out = Vec::new();
     for name in &env.start_order {
-        let (Some(mp), Some(spec)) = (env.machines.get(name), env.spec().machines.get(name)) else { continue };
+        let (Some(mp), Some(spec)) = (env.machines.get(name), env.spec().machines.get(name)) else {
+            continue;
+        };
         let mut m = machine(name, Role::Target, addresses(mp)?)?;
         m.os = mp.os.as_deref().map(OsName::parse).transpose()?;
         m.windows = mp.is_windows();
@@ -113,9 +115,21 @@ pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError
         })
     };
     let mut out = vec![
-        state(IP, OutputRole::Address, "The router's uplink address: the published ports answer there, and SSH reaches the machines through it.")?,
-        state("ssh_user", OutputRole::Info, "The user every Linux VM and the router let in with the runner's key.")?,
-        state("ready_file", OutputRole::Info, "Where each Linux machine's set-up says how far it got (isoloom-ready/1).")?,
+        state(
+            IP,
+            OutputRole::Address,
+            "The router's uplink address: the published ports answer there, and SSH reaches the machines through it.",
+        )?,
+        state(
+            "ssh_user",
+            OutputRole::Info,
+            "The user every Linux VM and the router let in with the runner's key.",
+        )?,
+        state(
+            "ready_file",
+            OutputRole::Info,
+            "Where each Linux machine's set-up says how far it got (isoloom-ready/1).",
+        )?,
     ];
     out.extend(outputs_at(machines, &Template::from(Placeholder::Output(SnakeName::parse(IP)?)))?);
     Ok(out)

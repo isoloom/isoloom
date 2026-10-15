@@ -76,7 +76,9 @@ fn a_router_that_never_reported_an_address_can_still_be_destroyed() {
     // index" (the router's address list is empty in the state), leaving the lab behind.
     let tf = proxmox("hello-stack").unwrap();
     assert!(tf.contains("router_address = try(["), "{tf}");
-    let lab = testing::spec("version: 1\nname: d\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n").unwrap();
+    let lab =
+        testing::spec("version: 1\nname: d\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n")
+            .unwrap();
     let env = planned(&lab, Target::DockerVm);
     let host = isoloom_terraform::docker_vm_module(&env).unwrap().contents;
     assert!(host.contains("ip   = try(["), "{host}");

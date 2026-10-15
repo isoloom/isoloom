@@ -99,10 +99,7 @@ fn locals() -> Block {
         "abspath",
         [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
     );
-    Block::builder("locals")
-        .add_attribute(("root", root))
-        .add_attribute(("ip", address))
-        .build()
+    Block::builder("locals").add_attribute(("root", root)).add_attribute(("ip", address)).build()
 }
 
 /// The cloud-init document: the `isoloom` user with the operator's key, the guest agent (it
