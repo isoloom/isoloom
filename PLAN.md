@@ -299,6 +299,55 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
     - Group the packaging assets (`store/`, MSIX) under `packaging/`, and the attack-box image under `images/attack-box/`.
   - **Phase 2–3:** `runtime/` moves into `isothrum-runner`, and the launcher keeps only CTF-specific code.
 
+## 3d. Rust best practices (Isoloom, Isothrum, the launcher's `src-tauri`)
+
+These go beyond lints. Each one names the tool or review that enforces it.
+
+**Workspace hygiene**
+- **Workspace settings:** edition 2024 and resolver 3. Every crate inherits `[workspace.package]`, `[workspace.dependencies]` (one version per dependency, declared once) and `[workspace.lints]` (`lints.workspace = true`). Checked by an `xtask` test over `cargo metadata`.
+- **Pinned and declared versions:** `rust-toolchain.toml` pins the toolchain, `rust-version` declares the MSRV, and `cargo msrv verify` (or `cargo hack --rust-version check`) proves it.
+- **Features:** additive only, never mutually exclusive. `cargo hack check --feature-powerset` proves every combination builds.
+- **Supply chain:** `Cargo.lock` is committed. `cargo deny check` covers advisories, licences (an allow-list compatible with Apache-2.0), duplicate versions (`bans`) and sources (crates.io only, no git dependencies at release). `cargo machete` catches unused dependencies.
+
+**API design** (the Rust API Guidelines checklist, reviewed per public item)
+- **Common traits:** public types implement the traits a user expects (`Debug` always; `Clone`, `PartialEq`/`Eq`, `Hash`, `Default`, `Display` where they make sense; `Send`/`Sync` asserted in tests for types that cross threads).
+- **Conversions:** through `From`/`TryFrom`/`AsRef`/`FromStr`, not ad-hoc `to_x()`/`from_x()` functions. Constructors are `new` or a builder for more than about three optional fields.
+- **Types carry meaning:** newtypes for every identifier and quantity; enums instead of `bool` and stringly modes; `#[non_exhaustive]` on public enums and structs that may grow; sealed traits for traits not meant to be implemented outside the crate.
+- **Ownership:** borrow in arguments (`&str`, `&Path`, `impl AsRef<Path>` where it helps), return owned values, and `Cow` only where it measurably saves copies. No `clone()` to satisfy the borrow checker without a reason; clippy `redundant_clone` and review catch it.
+- **`#[must_use]`** on pure functions and builders (clippy `must_use_candidate`). Iterators over index loops. No `Rc<RefCell<…>>` in library APIs.
+- **Visibility:** `pub(crate)` by default (`unreachable_pub`). Every `pub` item is deliberate, documented and covered by `cargo semver-checks` once the crate is published.
+
+**Errors**
+- **Library errors:** one `thiserror` enum per crate, with a `pub type Result<T> = std::result::Result<T, Error>`. Variants carry their `#[source]`, so the cause chain is never lost. No `Box<dyn Error>`, `anyhow` or `String` errors in libraries; `anyhow` is allowed only in binaries and `xtask`.
+- **Messages:** lowercase, no trailing period (API guideline C-GOOD-ERR). User-facing text with the field path, reason and fix lives in one rendering layer, not scattered.
+- **No panics in library code paths,** enforced by lints. A truly impossible state is an `#[expect]` with its reason, or better, a type that makes it unrepresentable.
+
+**Concurrency and I/O** (the runner especially)
+- **Sync or async, chosen once per crate and documented.** In async code: no blocking calls (`spawn_blocking` for processes and files), cancellation-safe steps, timeouts on every external call.
+- **Observability:** structured `tracing` spans and fields per run, step and driver in the runner. No `println!` or `eprintln!` outside binaries. The pure core logs nothing.
+- **Processes** are spawned only through the `ProcessRunner` port, with argv vectors only, never a shell string.
+
+**Documentation**
+- **Crate and item docs:** every crate has crate-level docs (what it is, where it sits, a runnable example). Every public item is documented, with `# Errors` and `# Panics` sections (clippy `missing_errors_doc` and `missing_panics_doc`).
+- **Docs build clean:** doctests run and pass; `RUSTDOCFLAGS=-Dwarnings cargo doc` with `broken_intra_doc_links`, `private_intra_doc_links` and `missing_crate_level_docs` at deny.
+
+**Testing depth**
+- **`cargo nextest`** is the test runner: each test runs in its own process, with slow-test reporting and retries off, so flaky tests fail loudly.
+- **Naming:** tests are named for the behaviour (`refuses_a_service_on_a_container_target_when…`). One concept per test, no `#[should_panic]`, no sleeps, and a fake clock where time matters.
+- **Property tests** (`proptest`) for every parser and every quoting or escaping function. **Fuzzing** (`cargo fuzz`) for the spec parser, the manifest parser and the HCL/Ruby/shell/PowerShell quoting: each target runs in `check-all --deep`, and every crash it finds becomes a regression test.
+- **Mutation testing** (`cargo mutants`) on the core crates (spec, plan, render, manifest) and the runner's executor. Every surviving mutant is either killed by a new test or listed in `mutants.toml` with its reason (an equivalent mutant). That proves the tests check behaviour, not just run code.
+- **Snapshots** (`insta`) only for whole generated files. Never snapshot something a precise assertion should check.
+- **`unsafe`:** the single `sys` module (runner and launcher) runs under Miri where the platform allows, and every `unsafe` block carries a `// SAFETY:` comment (clippy `undocumented_unsafe_blocks`).
+
+**Performance budgets**
+- Generating every example on every target stays under a fixed time budget, checked by a test, so regressions show.
+- Hot paths (spec parsing, lowering, rendering) get `criterion` benchmarks run by `cargo xtask bench`, compared against a stored baseline.
+
+**Where it applies**
+- **Isoloom:** Phase 1c (the tools are wired in by the 1c tooling unit, and every crate meets it at 1c's exit).
+- **Isothrum:** from its first line (the runner skeleton follows it now).
+- **The launcher's `src-tauri`:** as its code is cleaned (non-runtime now, runtime as it moves).
+
 ## 3c. The two websites
 
 | | isoloom.com (`isoloom/isoloom-website`) | isothrum.com (`isoloom/isothrum-website`) |
@@ -402,10 +451,11 @@ Phase 1 is done only when every Isoloom crate is deeply organized and has **zero
    - **Tests:** unit tests next to the code (`#[cfg(test)] mod tests` in the same file, or `foo/tests.rs`), integration tests in `tests/`, fixtures in `tests/fixtures/`, snapshots beside their test, and shared test helpers in one `testing` module (`#[cfg(test)]` or a dev-only crate).
    - **Names:** the 3b vocabulary everywhere; no stutter (`isoloom_spec::spec::SpecSpec`); the same word for the same concept in every crate.
    - **Dependencies:** each crate lists only what it uses (machete); the dependency-direction test passes.
-3. **Ratchet every count to zero, crate by crate,** with real refactors only. This runs in parallel by crate group: backends, then targets, tools and cli, then core, once the spec front end has landed in core.
-4. **A principles review per crate,** using the 3b table as a checklist: SRP, DRY, KISS/YAGNI, CQS, Demeter, boundaries, F.I.R.S.T. tests and names. The review notes every finding with its fix, and the phase closes when every finding is fixed.
+3. **The 3d tooling,** wired into `cargo xtask` and `check-all`: nextest, cargo-hack feature powerset, msrv verification, cargo-deny bans and sources, doc lints at deny, fuzz targets, cargo-mutants on core, criterion benchmarks with a stored baseline, and the generation-time budget test.
+4. **Ratchet every count to zero, crate by crate,** with real refactors only. This runs in parallel by crate group: backends, then targets, tools and cli, then core, once the spec front end has landed in core.
+5. **A principles and 3d review per crate,** using the 3b table and the 3d API, errors, docs and testing items as a checklist: SRP, DRY, KISS/YAGNI, CQS, Demeter, boundaries, F.I.R.S.T. tests and names. The review notes every finding with its fix, and the phase closes when every finding is fixed.
 
-**Exit:** green net (snapshots byte-identical, `verify` with no new failures); `quality-baseline.json` at zero for every crate; every `#[expect]` carries a reason; each crate's review checklist closed; all of it on three hosts (`check-all`).
+**Exit:** green net (snapshots byte-identical, `verify` with no new failures); `quality-baseline.json` at zero for every crate; every surviving mutant in core killed or listed with its reason; fuzz targets clean; every `#[expect]` carries a reason; each crate's review checklist closed; all of it on three hosts (`check-all`).
 
 ### Phase 2: The walking skeleton (M–L)
 
