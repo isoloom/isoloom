@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What nginx does the same as a container and as a VM (plan/phase4/design.md §4.6).
+# `cargo xtask catalogue check nginx` builds one small lab per case: this machine (`web`), the
+# case's helper machines, and an access machine (`probe`) running the checks. It runs the lab on
+# `docker` and on `vagrant` through the Isothrum CLI. A case passes when every check passes in
+# both forms and every fact reads the same in both.
+cases:
+  default: {}
+  site:
+    with: { root: site/ }
+    project:
+      site/index.html: "parity-ok\n"
+  config:
+    with: { config: nginx/site.conf, port: 8081 }
+    project:
+      nginx/site.conf: |
+        server {
+            listen 8081;
+            location / { return 200 "own-config\n"; }
+        }
+  php:
+    with: { root: site/, php_fpm: "fpm:9000" }
+    machines:
+      fpm: { service: php-fpm, with: { root: site/, clients: [web] } }
+    project:
+      site/index.php: "<?php echo 6 * 7;\n"
+
+checks:
+  - name: the port answers
+    http: "http://{{ machine }}:{{ with.port }}/"
+    expect: any
+    wait: 2m
+  - name: nginx reports the release asked for
+    exec: nginx -v 2>&1
+    expect: "nginx/{{ version }}"
+  - name: the root's index is what is served
+    case: site
+    http: "http://{{ machine }}:{{ with.port }}/"
+    contains: parity-ok
+  - name: an own server block replaces the entry's
+    case: config
+    http: "http://{{ machine }}:8081/"
+    contains: own-config
+  - name: PHP runs on the php-fpm machine
+    case: php
+    http: "http://{{ machine }}:{{ with.port }}/index.php"
+    contains: "42"
+
+# Equal in both forms, or the case fails: the claim behind `os:` and the build behind the version.
+facts:
+  - name: the OS
+    exec: . /etc/os-release && echo "$ID $VERSION_ID"
+  - name: nginx's build
+    exec: nginx -V 2>&1 | head -n 1

@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The nginx entry in full, in the format plan/phase4/design.md §4 designs. It is written by hand;
+# lock.yml beside it is written only by `cargo xtask catalogue refresh`. The recipe below is
+# rendered for every form and CM tool:
+# - the official image's thin build (only `configure`);
+# - a Dockerfile from the OS image (`install`, then `configure`);
+# - a VM's set-up, in shell, cloud-init or Ansible (`install`, then `configure`).
+name: nginx
+description: >-
+  The nginx web server, from nginx.org's own packages and images: it serves a folder of the
+  project, and can pass PHP to a php-fpm machine.
+upstream: https://nginx.org/
+licence:
+  software: BSD-2-Clause
+  notes: The official images bundle their base distribution's packages, under those packages' licences.
+
+# nginx.org's two channels: stable (an even minor version) and mainline (an odd one). Their
+# repositories differ only by a path segment, which `vars.branch` carries into the recipe.
+releases:
+  - version: 1.30.6
+    channel: stable
+    source: vendor
+    os: [debian@12, debian@13, ubuntu@24.04, rocky@9, alpine@3.24]
+    vars: { branch: "" }
+  - version: 1.31.7
+    channel: mainline
+    source: vendor
+    os: [debian@12, debian@13, ubuntu@24.04, rocky@9, alpine@3.24]
+    vars: { branch: "mainline/" }
+default: 1.30.6
+
+# Official images, used only where the image's OS is the machine's. nginx's Debian images moved to
+# Debian 13 with 1.29.2, so debian@12 builds from Debian 12's own image with nginx.org's
+# packages, as its VM gets them, and so do Ubuntu and Rocky.
+images:
+  debian@13: docker.io/library/nginx:{{ version }}-trixie
+  alpine@3.24: docker.io/library/nginx:{{ version }}-alpine3.24
+
+settings:
+  port:
+    type: port
+    default: 80
+    description: The port nginx listens on, and the number of the machine's `http` port.
+  root:
+    type: folder
+    description: >-
+      A folder of the project served at `/` (`site/`), holding an `index.html`. It replaces what
+      is at /usr/share/nginx/html, as a container's mount of it would. Without it, nginx's own
+      welcome page.
+  config:
+    type: file
+    description: >-
+      A file of the project holding nginx's `server { … }` block, in place of the one the entry
+      writes from `port` and `root`. It should listen on `port`.
+  php_fpm:
+    type: endpoint
+    description: >-
+      A php-fpm machine and its port (`app:9000`) that runs the `.php` files under `root`, from
+      its own copy at /var/www/html (the php-fpm entry's `root`).
+
+ports:
+  http: { setting: port, protocol: http }
+
+# The daemon table's nginx: the same unit on every family, its foreground form for containers,
+# and the log files a container sends to its output.
+daemons:
+  nginx:
+    unit: nginx
+    foreground: [nginx, -g, "daemon off;"]
+    logs:
+      /var/log/nginx/access.log: stdout
+      /var/log/nginx/error.log: stderr
+
+recipe:
+  # Skipped on the official image's form: the image is this phase.
+  install:
+    - repository:
+        name: nginx
+        url: "https://nginx.org/packages/{{ vars.branch }}{{ os.family }}"
+        components: [nginx]
+        # A GPG key: the refresh checks its fingerprint (nginx.org's own documentation lists it)
+        # and writes the file's SHA-256 into lock.yml, which every renderer then checks.
+        key: { url: "https://nginx.org/keys/nginx_signing.key", fingerprint: 573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62 }
+        priority: 900          # nginx.org's package wins over the distribution's
+      when: { family: [debian, ubuntu] }
+    - repository:
+        name: nginx
+        url: "https://nginx.org/packages/{{ vars.branch }}centos/{{ os.version }}/$basearch/"
+        key: { url: "https://nginx.org/keys/nginx_signing.key", fingerprint: 573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62 }
+        priority: 1
+      when: { family: [rocky] }
+    - repository:
+        name: nginx
+        url: "https://nginx.org/packages/{{ vars.branch }}alpine/v{{ os.version }}/main"
+        # An apk key isn't a GPG key: it is pinned by its file's SHA-256 directly.
+        key: { url: "https://nginx.org/keys/nginx_signing.rsa.pub", sha256: ff7cf138acc09f2a5029300ab713fe6a1440605fca72e2bab76a4da9206fec87 }
+      when: { family: [alpine] }
+    # lock.yml gives the exact package string per OS (1.30.6-1~bookworm, 1.30.6-r1, …).
+    - packages: [{ name: nginx, version: "{{ version }}" }]
+
+  # Every form, the official image's included (as a thin build on top of it).
+  configure:
+    - template: { from: files/default.conf, to: /etc/nginx/conf.d/default.conf, mode: "0644" }
+      when: { unset: config }
+    - copy: { from: "{{ with.config }}", to: /etc/nginx/conf.d/default.conf, mode: "0644" }
+      when: { set: config }
+    - file: { path: /etc/nginx/isoloom.d, state: directory, mode: "0755" }
+    - template: { from: files/php.conf, to: /etc/nginx/isoloom.d/php.conf, mode: "0644" }
+      when: { set: php_fpm }
+    # A folder replaces what is at its path, as a container's mount of it does.
+    - file: { path: /usr/share/nginx/html, state: absent }
+      when: { set: root }
+    - copy: { from: "{{ with.root }}/", to: /usr/share/nginx/html/ }
+      when: { set: root }
+    # Rocky's firewalld would otherwise block the port on a VM. Nothing to do in a container.
+    - firewall: { allow: [http] }
+    # On VMs: enabled and started, restarted when a step above changed something. In a built
+    # container: the runner's one foreground process. On the official image: the image's own.
+    - service: nginx
+
+  # Nothing to prepare at start: nginx needs no secret and no first-start initialisation.
+  start: []
