@@ -89,6 +89,9 @@ pub(crate) struct Guest<'a> {
     pub(crate) tpm: Option<Tpm>,
     /// The guest OS ESXi registers it as, when its box's own isn't enough (Windows).
     pub(crate) esxi_guestos: Option<&'static str>,
+    /// The box ESXi boots instead of the main one, if any: the controller's Alpine box reports no
+    /// address through its VMware Tools there, so `vagrant up` would wait for one forever.
+    pub(crate) esxi_box: Option<&'a str>,
     /// Whether it runs VMs of its own (`nested_virtualization`).
     pub(crate) nested: bool,
     /// Its data disks, `(name, GB)`, in order.
@@ -131,7 +134,8 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
     if let Link::Hub(h) = g.qemu.link {
         hub_triggers(r, h);
     }
-    r.block(provider(Provider::VmwareEsxi), "v", |r| esxi(r, g));
+    let params = if g.esxi_box.is_some() { "v, o" } else { "v" };
+    r.block(provider(Provider::VmwareEsxi), params, |r| esxi(r, g));
     libvirt(r, g);
     hyperv::block(r, &g.vm_name, g.size, &g.hyperv);
     if g.nested {
@@ -188,6 +192,10 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::Libvirt), params, |r| {
         if let Some(b) = g.libvirt_box {
             r.assign("o.vm.box", Value::str(b));
+            // A roboxes box, with a build for each architecture and each one's metadata: the
+            // machine's own, else (Isoloom's own VMs) the host's.
+            let arch = g.qemu.arch.map_or_else(|| Value::sym("auto"), |a| Value::str(a.id()));
+            r.assign("o.vm.box_architecture", arch);
         }
         r.assign("v.cpus", g.size.cpus);
         r.assign("v.memory", g.size.mem);
@@ -310,6 +318,9 @@ fn windows_lab_address(ip: Ipv4Addr, len: u8) -> String {
 
 /// The vagrant-vmware-esxi provider: the host from the ESXI_* variables, a port group per NIC.
 fn esxi(r: &mut Ruby, g: &Guest) {
+    if let Some(b) = g.esxi_box {
+        r.assign("o.vm.box", Value::str(b));
+    }
     let nets = Value::array(g.nets.iter().map(|n| Value::str(n)));
     vagrantfile::esxi_host(r);
     r.assign("v.esxi_virtual_network", Value::raw(format!("esxi_networks({nets})")));

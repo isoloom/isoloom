@@ -62,8 +62,8 @@ fn every_machine(env: &Environment) -> Step {
 /// there.
 fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ipv4Addr)>, link: &'a Link) -> Guest<'a> {
     Guest {
-        label: format!("{} · {what}", env.name),
-        vm_name: format!("{}-{}", env.name, what.replace(' ', "-")),
+        label: super::label(env, what),
+        vm_name: super::vm_name(env, what),
         size,
         nets: at.iter().map(|(net, _)| *net).collect(),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
@@ -72,6 +72,7 @@ fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ip
         hyperv: HyperV::helper(env, at),
         tpm: None,
         esxi_guestos: None,
+        esxi_box: None,
         nested: false,
         disks: Vec::new(),
     }
@@ -191,6 +192,8 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     guest.libvirt_box = (bx == CONTROLLER_BOX).then_some(CONTROLLER_BOX);
     // Its box (Alpine's, or the spec's own) boots on Hyper-V as it is.
     guest.hyperv.boxed = HyperVBox::Main;
+    // On ESXi, the default box's VMware Tools never report an address: Debian's instead.
+    guest.esxi_box = (bx == CONTROLLER_BOX).then_some(HELPER_BOX);
     let mut steps = vec![Step::Prelude];
     steps.extend(size.disk.map(|_| Step::DiskGrow));
     steps.extend([every_machine(env), Step::Project]);

@@ -39,6 +39,7 @@ mod backend;
 pub mod docker_vm;
 mod error;
 pub mod hybrid;
+mod manifest;
 mod ruby;
 mod stable_hash;
 #[cfg(test)]

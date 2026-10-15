@@ -189,12 +189,18 @@ pub struct VagrantProvider {
     pub refusal: Option<String>,
 }
 
-/// The Vagrant providers of a run.
+/// The Vagrant providers of a run, and where Vagrant keeps its record of the run's machines.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VagrantIdentity {
     /// The providers the Vagrantfile supports.
     pub providers: Vec<VagrantProvider>,
+    /// The folder Vagrant keeps its machines' state in (`VAGRANT_DOTFILE_PATH`, which the runner
+    /// sets for every Vagrant command of the run, its actions' included), in the run's state
+    /// folder (`${run.state_dir}/vagrant`): a reinstalled or replaced lab folder never loses
+    /// track of its VMs. Absent: Vagrant's own `.vagrant` next to the Vagrantfile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dotfile: Option<PathTemplate>,
 }
 
 /// Who keeps a Terraform state.

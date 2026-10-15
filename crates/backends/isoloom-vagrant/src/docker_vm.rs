@@ -49,7 +49,7 @@ pub fn vagrantfile(env: &Environment) -> GeneratedFile {
     r.blank();
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.text(&crate::vms::project_rb());
-    vagrantfile::inputs(&mut r, &env.spec().inputs);
+    vagrantfile::inputs(&mut r, &env.spec().inputs, false);
     r.blank();
     r.block("Vagrant.configure(\"2\")", "config", |r| configure(r, env));
     GeneratedFile {

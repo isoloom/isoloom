@@ -1,30 +1,171 @@
 {
   "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
   "manifest_version": 0,
-  "generator": { "name": "isoloom", "version": "0.10.1" },
-  "lab": { "name": "mini-ad", "instance": null, "message": null },
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "mini-ad",
+    "instance": null,
+    "message": null
+  },
   "target": "vagrant",
   "driver": "vagrant",
-  "hosts": ["linux", "macos", "windows"],
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
   "tools": [
-    { "name": "vagrant", "probe": ["vagrant", "--version"] },
-    { "name": "virtualbox", "probe": ["VBoxManage", "--version"], "providers": ["virtualbox"] },
-    { "name": "vmware", "probe": ["vmrun", "list"], "providers": ["vmware_desktop"] },
-    { "name": "parallels", "probe": ["prlctl", "--version"], "providers": ["parallels"], "hosts": ["macos"] },
-    { "name": "libvirt", "probe": ["virsh", "--version"], "providers": ["libvirt"], "hosts": ["linux"] }
+    {
+      "name": "vagrant",
+      "probe": [
+        "vagrant",
+        "--version"
+      ],
+      "min_version": "2.4.0"
+    },
+    {
+      "name": "virtualbox",
+      "probe": [
+        "VBoxManage",
+        "--version"
+      ],
+      "providers": [
+        "virtualbox"
+      ]
+    },
+    {
+      "name": "vmware",
+      "probe": [
+        "vmrun",
+        "list"
+      ],
+      "providers": [
+        "vmware_desktop"
+      ]
+    },
+    {
+      "name": "parallels",
+      "probe": [
+        "prlctl",
+        "--version"
+      ],
+      "hosts": [
+        "macos"
+      ],
+      "providers": [
+        "parallels"
+      ]
+    },
+    {
+      "name": "libvirt",
+      "probe": [
+        "virsh",
+        "--version"
+      ],
+      "hosts": [
+        "linux"
+      ],
+      "providers": [
+        "libvirt"
+      ]
+    },
+    {
+      "name": "qemu",
+      "probe": [
+        "qemu-img",
+        "--version"
+      ],
+      "providers": [
+        "qemu"
+      ]
+    }
   ],
   "identity": {
     "vagrant": {
       "providers": [
-        { "id": "virtualbox", "hosts": ["linux", "macos", "windows"], "elevation": "none", "refusal": null },
-        { "id": "vmware_desktop", "hosts": ["linux", "macos", "windows"], "plugin": "vagrant-vmware-desktop", "elevation": "none", "refusal": null },
-        { "id": "hyperv", "hosts": ["windows"], "elevation": "hyperv", "refusal": null },
-        { "id": "parallels", "hosts": ["macos"], "plugin": "vagrant-parallels", "elevation": "none", "refusal": null },
-        { "id": "libvirt", "hosts": ["linux"], "plugin": "vagrant-libvirt", "elevation": "none", "refusal": null },
-        { "id": "qemu", "hosts": ["linux", "macos"], "plugin": "vagrant-qemu", "elevation": "none", "refusal": null },
-        { "id": "utm", "hosts": ["macos"], "plugin": "vagrant_utm", "elevation": "none", "refusal": null },
-        { "id": "vmware_esxi", "hosts": ["linux", "macos", "windows"], "plugin": "vagrant-vmware-esxi", "elevation": "none", "remote": true, "refusal": null }
-      ]
+        {
+          "id": "virtualbox",
+          "hosts": [
+            "linux",
+            "macos",
+            "windows"
+          ],
+          "elevation": "none",
+          "refusal": null
+        },
+        {
+          "id": "vmware_desktop",
+          "hosts": [
+            "linux",
+            "macos",
+            "windows"
+          ],
+          "plugin": "vagrant-vmware-desktop",
+          "elevation": "none",
+          "refusal": null
+        },
+        {
+          "id": "hyperv",
+          "hosts": [
+            "windows"
+          ],
+          "elevation": "hyperv",
+          "refusal": null
+        },
+        {
+          "id": "parallels",
+          "hosts": [
+            "macos"
+          ],
+          "plugin": "vagrant-parallels",
+          "elevation": "none",
+          "refusal": null
+        },
+        {
+          "id": "libvirt",
+          "hosts": [
+            "linux"
+          ],
+          "plugin": "vagrant-libvirt",
+          "elevation": "none",
+          "refusal": null
+        },
+        {
+          "id": "qemu",
+          "hosts": [
+            "linux",
+            "macos"
+          ],
+          "plugin": "vagrant-qemu",
+          "elevation": "none",
+          "refusal": null
+        },
+        {
+          "id": "utm",
+          "hosts": [
+            "macos"
+          ],
+          "plugin": "vagrant_utm",
+          "elevation": "none",
+          "refusal": "`dc01` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
+        },
+        {
+          "id": "vmware_esxi",
+          "hosts": [
+            "linux",
+            "macos",
+            "windows"
+          ],
+          "plugin": "vagrant-vmware-esxi",
+          "elevation": "none",
+          "remote": true,
+          "refusal": null
+        }
+      ],
+      "dotfile": "${run.state_dir}/vagrant"
     }
   },
   "params": [
@@ -32,32 +173,148 @@
       "name": "ISOLOOM_HYPERV_SWITCH",
       "description": "The Hyper-V virtual switch each VM's first adapter (Vagrant's connection, and the internet) goes on.",
       "default": "Default Switch",
-      "hosts": ["windows"],
-      "providers": ["hyperv"],
+      "hosts": [
+        "windows"
+      ],
+      "providers": [
+        "hyperv"
+      ],
       "set_by": "embedder",
-      "deliver": [{ "via": "env", "var": "ISOLOOM_HYPERV_SWITCH", "steps": ["*"] }]
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_HYPERV_SWITCH",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
     },
     {
       "name": "ISOLOOM_SSH_PROXY_COMMAND",
       "description": "The command Vagrant's SSH to the VMs goes through when this host can't reach them directly (an ESXi host through the runner's relay on macOS).",
-      "default": null,
-      "providers": ["vmware_esxi"],
+      "providers": [
+        "vmware_esxi"
+      ],
       "set_by": "runner",
-      "deliver": [{ "via": "env", "var": "ISOLOOM_SSH_PROXY_COMMAND", "steps": ["*"] }]
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_SSH_PROXY_COMMAND",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ESXI_HOSTNAME",
+      "description": "The ESXi host.",
+      "required": true,
+      "providers": [
+        "vmware_esxi"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ESXI_HOSTNAME",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ESXI_HOSTPORT",
+      "description": "Its SSH port.",
+      "default": "22",
+      "providers": [
+        "vmware_esxi"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ESXI_HOSTPORT",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ESXI_USERNAME",
+      "description": "The ESXi user.",
+      "default": "root",
+      "providers": [
+        "vmware_esxi"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ESXI_USERNAME",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ESXI_DATASTORE",
+      "description": "The datastore the VMs' disks go on (default: ESXi's first).",
+      "providers": [
+        "vmware_esxi"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ESXI_DATASTORE",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ESXI_VIRTUAL_NETWORK",
+      "description": "Port groups, comma-separated: the management network, then one per lab network.",
+      "default": "VM Network",
+      "providers": [
+        "vmware_esxi"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ESXI_VIRTUAL_NETWORK",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
     },
     {
       "name": "ISOLOOM_DERIVED",
-      "description": "0: the checks derived from the spec are skipped.",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
       "default": "1",
-      "values": ["0", "1"],
+      "values": [
+        "0",
+        "1"
+      ],
       "set_by": "embedder",
-      "deliver": [{ "via": "env", "var": "ISOLOOM_DERIVED", "steps": ["check-controller"] }]
-    },
-    { "name": "ESXI_HOSTNAME", "description": "The ESXi host.", "required": true, "providers": ["vmware_esxi"], "set_by": "embedder", "deliver": [{ "via": "env", "var": "ESXI_HOSTNAME", "steps": ["*"] }] },
-    { "name": "ESXI_HOSTPORT", "description": "Its SSH port.", "default": "22", "providers": ["vmware_esxi"], "set_by": "embedder", "deliver": [{ "via": "env", "var": "ESXI_HOSTPORT", "steps": ["*"] }] },
-    { "name": "ESXI_USERNAME", "description": "The ESXi user.", "default": "root", "providers": ["vmware_esxi"], "set_by": "embedder", "deliver": [{ "via": "env", "var": "ESXI_USERNAME", "steps": ["*"] }] },
-    { "name": "ESXI_DATASTORE", "description": "The datastore the VMs' disks go on.", "default": null, "providers": ["vmware_esxi"], "set_by": "embedder", "deliver": [{ "via": "env", "var": "ESXI_DATASTORE", "steps": ["*"] }] },
-    { "name": "ESXI_VIRTUAL_NETWORK", "description": "Port groups, comma-separated: the management network, then one per lab network (lab).", "default": "VM Network", "providers": ["vmware_esxi"], "set_by": "embedder", "deliver": [{ "via": "env", "var": "ESXI_VIRTUAL_NETWORK", "steps": ["*"] }] }
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-controller"
+          ]
+        }
+      ]
+    }
   ],
   "secrets": [
     {
@@ -65,20 +322,48 @@
       "kind": "input",
       "required": false,
       "sensitive": true,
-      "machines": ["dc01"],
-      "deliver": [{ "via": "env", "var": "CTF_FLAG_MAIN", "steps": ["up", "provision-machine"] }]
+      "machines": [
+        "dc01"
+      ],
+      "default": "",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "CTF_FLAG_MAIN",
+          "steps": [
+            "up",
+            "provision",
+            "provision-machine"
+          ]
+        }
+      ]
     },
     {
       "name": "ESXI_PASSWORD",
       "kind": "connection",
       "required": true,
       "sensitive": true,
-      "providers": ["vmware_esxi"],
-      "deliver": [{ "via": "env", "var": "ESXI_PASSWORD", "steps": ["*"] }]
+      "providers": [
+        "vmware_esxi"
+      ],
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ESXI_PASSWORD",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
     }
   ],
   "networks": [
-    { "name": "lab", "cidr": "10.50.0.0/24", "internet": true, "native": "isoloom-mini-ad-lab" }
+    {
+      "name": "lab",
+      "cidr": "10.50.0.0/24",
+      "internet": true,
+      "native": "isoloom-mini-ad-lab"
+    }
   ],
   "machines": [
     {
@@ -87,22 +372,38 @@
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
-      "resources": { "cpus": 2, "memory_mb": 4096 },
-      "addresses": { "lab": "10.50.0.10" },
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 4096
+      },
+      "addresses": {
+        "lab": "10.50.0.10"
+      },
       "native": {
         "vagrant": "dc01",
         "vm_names": {
           "virtualbox": "mini-ad · dc01",
           "vmware_desktop": "mini-ad · dc01",
-          "parallels": "mini-ad · dc01",
-          "utm": "mini-ad · dc01",
           "hyperv": "mini-ad-dc01",
+          "parallels": "mini-ad · dc01",
+          "libvirt": "mini-ad_dc01",
+          "utm": "mini-ad · dc01",
           "vmware_esxi": "mini-ad-dc01"
         }
       },
       "ports": [
-        { "name": "ldap", "port": 389, "protocol": "tcp", "http": false },
-        { "name": "smb", "port": 445, "protocol": "tcp", "http": false }
+        {
+          "name": "ldap",
+          "port": 389,
+          "protocol": "tcp",
+          "http": false
+        },
+        {
+          "name": "smb",
+          "port": 445,
+          "protocol": "tcp",
+          "http": false
+        }
       ]
     },
     {
@@ -111,37 +412,45 @@
       "os": "windows-10",
       "windows": true,
       "arch": "amd64",
-      "resources": { "cpus": 2, "memory_mb": 4096 },
-      "addresses": { "lab": "10.50.0.20" },
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 4096
+      },
+      "addresses": {
+        "lab": "10.50.0.20"
+      },
       "native": {
         "vagrant": "ws01",
         "vm_names": {
           "virtualbox": "mini-ad · ws01",
           "vmware_desktop": "mini-ad · ws01",
-          "parallels": "mini-ad · ws01",
-          "utm": "mini-ad · ws01",
           "hyperv": "mini-ad-ws01",
+          "parallels": "mini-ad · ws01",
+          "libvirt": "mini-ad_ws01",
+          "utm": "mini-ad · ws01",
           "vmware_esxi": "mini-ad-ws01"
         }
-      },
-      "ports": []
+      }
     },
     {
       "name": "isoloom-controller",
       "role": "infra",
-      "os": "alpine-3.19",
-      "windows": false,
-      "resources": { "cpus": 1, "memory_mb": 512 },
-      "addresses": { "lab": "10.50.0.253" },
-      "keep_running": false,
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
+      "addresses": {
+        "lab": "10.50.0.253"
+      },
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
           "virtualbox": "mini-ad · controller",
           "vmware_desktop": "mini-ad · controller",
-          "parallels": "mini-ad · controller",
-          "utm": "mini-ad · controller",
           "hyperv": "mini-ad-controller",
+          "parallels": "mini-ad · controller",
+          "libvirt": "mini-ad_isoloom-controller",
+          "utm": "mini-ad · controller",
           "vmware_esxi": "mini-ad-controller"
         }
       }
@@ -149,110 +458,398 @@
   ],
   "lifecycle": {
     "up": [
-      { "id": "reconcile", "action": "vagrant.reconcile_provider", "note": "Clearing the state of a run on another provider, if any…" },
-      { "id": "discard-saved", "action": "vagrant.discard_aborted_saved", "providers": ["virtualbox"], "failure": "tolerate" },
+      {
+        "id": "reconcile",
+        "note": "Clearing the state of a run on another provider, if any…",
+        "action": "vagrant.reconcile_provider"
+      },
+      {
+        "id": "discard-saved",
+        "action": "vagrant.discard_aborted_saved",
+        "failure": "tolerate",
+        "providers": [
+          "virtualbox"
+        ]
+      },
       {
         "id": "up",
         "note": "Building the lab's VMs (Windows machines take a while)…",
-        "argv": ["vagrant", "up", "--provider", "${run.provider}"],
+        "argv": [
+          "vagrant",
+          "up",
+          "--provider",
+          "${run.provider}"
+        ],
         "timeout_s": 21600,
         "verdict": "fatal: \\[[^\\]]+\\]: (UNREACHABLE|FAILED)!.*"
       },
       {
         "id": "park-controller",
         "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
-        "argv": ["vagrant", "halt", "isoloom-controller"],
-        "providers": ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "utm", "vmware_esxi"],
+        "argv": [
+          "vagrant",
+          "halt",
+          "isoloom-controller"
+        ],
+        "timeout_s": 300,
         "failure": "tolerate",
-        "timeout_s": 300
+        "providers": [
+          "virtualbox",
+          "vmware_desktop",
+          "hyperv",
+          "parallels",
+          "libvirt",
+          "utm",
+          "vmware_esxi"
+        ]
       }
     ],
     "down": [
-      { "id": "destroy", "argv": ["vagrant", "destroy", "--force"], "when": "always", "timeout_s": 1800 },
-      { "id": "orphans", "action": "vagrant.remove_orphans", "providers": ["virtualbox", "parallels"], "when": "always", "failure": "tolerate" }
+      {
+        "id": "destroy",
+        "argv": [
+          "vagrant",
+          "destroy",
+          "--force"
+        ],
+        "timeout_s": 1800,
+        "when": "always"
+      },
+      {
+        "id": "orphans",
+        "action": "vagrant.remove_orphans",
+        "when": "always",
+        "failure": "tolerate",
+        "providers": [
+          "virtualbox",
+          "parallels"
+        ]
+      },
+      {
+        "id": "reset",
+        "action": "vagrant.reset_state"
+      }
     ],
     "park": {
-      "pause": [{ "id": "suspend", "argv": ["vagrant", "suspend"], "timeout_s": 1800 }],
-      "shutdown": [{ "id": "halt", "argv": ["vagrant", "halt"], "timeout_s": 1800 }]
+      "pause": [
+        {
+          "id": "suspend",
+          "argv": [
+            "vagrant",
+            "suspend"
+          ],
+          "timeout_s": 1800
+        }
+      ],
+      "shutdown": [
+        {
+          "id": "halt",
+          "argv": [
+            "vagrant",
+            "halt"
+          ],
+          "timeout_s": 1800
+        }
+      ]
     },
     "resume": [
-      { "id": "discard-saved", "action": "vagrant.discard_aborted_saved", "providers": ["virtualbox"], "failure": "tolerate" },
-      { "id": "up", "argv": ["vagrant", "up", "--no-provision", "--provider", "${run.provider}"], "timeout_s": 3600 },
       {
-        "id": "park-controller",
-        "argv": ["vagrant", "halt", "isoloom-controller"],
-        "providers": ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "utm", "vmware_esxi"],
+        "id": "discard-saved",
+        "action": "vagrant.discard_aborted_saved",
         "failure": "tolerate",
-        "timeout_s": 300
+        "providers": [
+          "virtualbox"
+        ]
+      },
+      {
+        "id": "resume",
+        "argv": [
+          "vagrant",
+          "up",
+          "--no-provision",
+          "--provider",
+          "${run.provider}",
+          "dc01",
+          "ws01"
+        ],
+        "timeout_s": 3600,
+        "failure": "tolerate"
+      },
+      {
+        "id": "discard-cut-off",
+        "action": "vagrant.discard_aborted_saved",
+        "failure": "tolerate",
+        "providers": [
+          "virtualbox"
+        ]
+      },
+      {
+        "id": "boot",
+        "argv": [
+          "vagrant",
+          "up",
+          "--no-provision",
+          "--provider",
+          "${run.provider}",
+          "dc01",
+          "ws01"
+        ],
+        "timeout_s": 3600
       }
     ],
     "provision": {
       "all": [
-        { "id": "wake-controller", "argv": ["vagrant", "up", "isoloom-controller", "--no-provision"], "note": "Booting the setup machine…", "timeout_s": 1800 },
+        {
+          "id": "wake-controller",
+          "note": "Booting the setup machine…",
+          "argv": [
+            "vagrant",
+            "up",
+            "isoloom-controller",
+            "--no-provision"
+          ],
+          "timeout_s": 1800
+        },
+        {
+          "id": "provision",
+          "argv": [
+            "vagrant",
+            "provision",
+            "dc01",
+            "ws01"
+          ],
+          "timeout_s": 7200
+        },
         {
           "id": "play",
-          "argv": ["vagrant", "provision", "isoloom-controller", "--provision-with", "ansible"],
           "note": "Running the lab's setup play…",
+          "argv": [
+            "vagrant",
+            "provision",
+            "isoloom-controller",
+            "--provision-with",
+            "ansible"
+          ],
           "timeout_s": 14400,
           "verdict": "fatal: \\[[^\\]]+\\]: (UNREACHABLE|FAILED)!.*"
         },
-        { "id": "park-controller", "argv": ["vagrant", "halt", "isoloom-controller"], "when": "always", "failure": "tolerate", "timeout_s": 300 }
+        {
+          "id": "park-controller",
+          "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
+          "argv": [
+            "vagrant",
+            "halt",
+            "isoloom-controller"
+          ],
+          "timeout_s": 300,
+          "when": "always",
+          "failure": "tolerate",
+          "providers": [
+            "virtualbox",
+            "vmware_desktop",
+            "hyperv",
+            "parallels",
+            "libvirt",
+            "utm",
+            "vmware_esxi"
+          ]
+        }
       ],
       "machine": [
-        { "id": "wake-controller", "argv": ["vagrant", "up", "isoloom-controller", "--no-provision"], "note": "Booting the setup machine…", "timeout_s": 1800 },
-        { "id": "provision-machine", "argv": ["vagrant", "provision", "${machine}"], "timeout_s": 7200 },
+        {
+          "id": "wake-controller",
+          "note": "Booting the setup machine…",
+          "argv": [
+            "vagrant",
+            "up",
+            "isoloom-controller",
+            "--no-provision"
+          ],
+          "timeout_s": 1800
+        },
+        {
+          "id": "provision-machine",
+          "argv": [
+            "vagrant",
+            "provision",
+            "${machine}"
+          ],
+          "timeout_s": 7200
+        },
         {
           "id": "play",
-          "argv": ["vagrant", "provision", "isoloom-controller", "--provision-with", "ansible"],
           "note": "Running the lab's setup play…",
+          "argv": [
+            "vagrant",
+            "provision",
+            "isoloom-controller",
+            "--provision-with",
+            "ansible"
+          ],
           "timeout_s": 14400,
           "verdict": "fatal: \\[[^\\]]+\\]: (UNREACHABLE|FAILED)!.*"
         },
-        { "id": "park-controller", "argv": ["vagrant", "halt", "isoloom-controller"], "when": "always", "failure": "tolerate", "timeout_s": 300 }
+        {
+          "id": "park-controller",
+          "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
+          "argv": [
+            "vagrant",
+            "halt",
+            "isoloom-controller"
+          ],
+          "timeout_s": 300,
+          "when": "always",
+          "failure": "tolerate",
+          "providers": [
+            "virtualbox",
+            "vmware_desktop",
+            "hyperv",
+            "parallels",
+            "libvirt",
+            "utm",
+            "vmware_esxi"
+          ]
+        }
       ]
     },
-    "status": { "id": "status", "argv": ["vagrant", "status", "--machine-readable"], "timeout_s": 25 }
+    "status": {
+      "id": "status",
+      "argv": [
+        "vagrant",
+        "status",
+        "--machine-readable"
+      ],
+      "timeout_s": 25
+    }
   },
   "ready": [
-    { "kind": "step_ok", "step": "up", "means": "every VM booted and ran its provisioners, the controller's Ansible play included" },
-    { "kind": "machines_running", "machines": ["dc01", "ws01"] }
+    {
+      "kind": "step_ok",
+      "step": "up",
+      "means": "every VM booted and ran its provisioners, the controller's playbooks included"
+    },
+    {
+      "kind": "machines_running",
+      "machines": [
+        "dc01",
+        "ws01"
+      ]
+    }
   ],
-  "outputs": [
-    { "name": "dc01", "description": "dc01's address on lab.", "role": "address", "sensitive": false, "from": { "kind": "static", "value": "10.50.0.10" } },
-    { "name": "ws01", "description": "ws01's address on lab.", "role": "address", "sensitive": false, "from": { "kind": "static", "value": "10.50.0.20" } }
-  ],
+  "outputs": [],
   "checks": {
     "protocol": "isoloom-check/1",
     "setup": [
-      { "id": "wake-controller", "action": "vagrant.wake_controller", "note": "Booting the setup machine for the checks…", "timeout_s": 1800 }
+      {
+        "id": "wake-controller",
+        "note": "Booting the setup machine for the checks…",
+        "action": "vagrant.wake_controller",
+        "timeout_s": 1800
+      }
     ],
     "runners": [
       {
-        "id": "isoloom-check",
+        "id": "isoloom-controller",
         "from": "from the environment's networks",
         "checks": [
-          { "name": "dc01:389", "kind": "tcp", "wait_s": 300, "derived": false },
-          { "name": "checks/kerberoast.sh", "kind": "script", "wait_s": 600, "derived": false },
-          { "name": "dc01:389 from the networks", "kind": "tcp", "wait_s": 30, "derived": true },
-          { "name": "dc01:445 from the networks", "kind": "tcp", "wait_s": 30, "derived": true }
+          {
+            "name": "dc01:389",
+            "kind": "tcp",
+            "wait_s": 300,
+            "derived": false
+          },
+          {
+            "name": "checks/kerberoast.sh",
+            "kind": "script",
+            "wait_s": 600,
+            "derived": false
+          },
+          {
+            "name": "dc01:389 from the networks",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "dc01:445 from the networks",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          }
         ],
         "step": {
           "id": "check-controller",
-          "argv": ["vagrant", "provision", "isoloom-controller", "--provision-with", "checks"],
-          "timeout_s": 1200
+          "argv": [
+            "vagrant",
+            "provision",
+            "isoloom-controller",
+            "--provision-with",
+            "checks"
+          ],
+          "timeout_s": 1080
         }
       }
     ],
     "teardown": [
-      { "id": "park-controller", "argv": ["vagrant", "halt", "isoloom-controller"], "when": "always", "failure": "tolerate", "timeout_s": 300 }
+      {
+        "id": "park-controller",
+        "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
+        "argv": [
+          "vagrant",
+          "halt",
+          "isoloom-controller"
+        ],
+        "timeout_s": 300,
+        "when": "always",
+        "failure": "tolerate",
+        "providers": [
+          "virtualbox",
+          "vmware_desktop",
+          "hyperv",
+          "parallels",
+          "libvirt",
+          "utm",
+          "vmware_esxi"
+        ]
+      }
     ]
   },
   "recovery": {
-    "stale_markers": ["verr_already_exists", "could not rename", "is locked", "different provider", "single provider at a time"],
+    "stale_markers": [
+      "verr_already_exists",
+      "could not rename",
+      "is locked",
+      "different provider",
+      "single provider at a time"
+    ],
     "steps": [
-      { "id": "destroy", "argv": ["vagrant", "destroy", "--force"], "timeout_s": 180, "when": "always", "failure": "tolerate" },
-      { "id": "orphans", "action": "vagrant.remove_orphans", "providers": ["virtualbox", "parallels"], "when": "always", "failure": "tolerate" },
-      { "id": "reset", "action": "vagrant.reset_state", "when": "always" }
+      {
+        "id": "destroy",
+        "note": "Clearing what an earlier run left, then starting again…",
+        "argv": [
+          "vagrant",
+          "destroy",
+          "--force"
+        ],
+        "timeout_s": 180,
+        "when": "always",
+        "failure": "tolerate"
+      },
+      {
+        "id": "orphans",
+        "action": "vagrant.remove_orphans",
+        "when": "always",
+        "failure": "tolerate",
+        "providers": [
+          "virtualbox",
+          "parallels"
+        ]
+      },
+      {
+        "id": "reset",
+        "action": "vagrant.reset_state",
+        "when": "always"
+      }
     ],
     "retries": 1
   }

@@ -1,7 +1,7 @@
 //! The run manifest the `docker` target writes (`.isoloom/docker/run.json`): the design's
-//! flag-portal spec writes the shared fixture the runner tests against, every example's manifest
-//! parses and matches the schema, check runners get the time their waits need, and only `docker`
-//! writes one.
+//! flag-portal spec writes the shared fixture the runner tests against, check runners get the
+//! time their waits need, and only `docker` and `vagrant` write one. Every example's manifest, on
+//! both, parses and matches the schema, and leaves the runner no slot it may skip.
 
 use std::path::{Path, PathBuf};
 
@@ -88,8 +88,15 @@ fn the_message_leaves_published_ports_to_the_runner() -> Outcome {
     Ok(())
 }
 
-/// Every example the docker target generates.
-fn docker_examples() -> Outcome<Vec<(String, Lab)>> {
+/// The targets that write a run manifest, where they write it, and how many examples each
+/// generates at least.
+const WRITERS: [(Target, &str, usize); 2] = [
+    (Target::Docker, ".isoloom/docker/run.json", 15),
+    (Target::Vagrant, ".isoloom/vagrant/run.json", 10),
+];
+
+/// Every example `target` generates.
+fn examples(target: Target) -> Outcome<Vec<(String, Lab)>> {
     let mut out: Vec<(String, Lab)> = Vec::new();
     for entry in std::fs::read_dir(crate::testing::examples())? {
         let path = entry?.path();
@@ -97,7 +104,7 @@ fn docker_examples() -> Outcome<Vec<(String, Lab)>> {
             continue;
         }
         let lab = Lab::new(load(&path)?);
-        if generate(&lab, Target::Docker).is_ok() {
+        if generate(&lab, target).is_ok() {
             out.push((path.file_name().ok_or("an example with no name")?.to_string_lossy().into_owned(), lab));
         }
     }
@@ -106,7 +113,8 @@ fn docker_examples() -> Outcome<Vec<(String, Lab)>> {
 }
 
 /// Compose refuses `up` and `start` while a secret's variable is unset, and an input's file is
-/// such a secret: the manifest never leaves the runner a slot it may skip. A slot it delivers
+/// such a secret; the runner delivers a VM lab's slot without a value only when the manifest says
+/// what to deliver: the manifest never leaves the runner a slot it may skip. A slot it delivers
 /// through the environment is required, or says what to deliver when it has no value.
 #[test]
 fn every_env_delivered_slot_has_a_value_or_a_default() -> Outcome {
@@ -114,8 +122,10 @@ fn every_env_delivered_slot_has_a_value_or_a_default() -> Outcome {
         "flag-portal".to_owned(),
         run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?,
     )];
-    for (name, spec) in docker_examples()? {
-        manifests.push((name, run_json(&generate(&spec, Target::Docker).unwrap(), ".isoloom/docker/run.json")?));
+    for (target, path, _) in WRITERS {
+        for (name, spec) in examples(target)? {
+            manifests.push((format!("{name} ({target:?})"), run_json(&generate(&spec, target).unwrap(), path)?));
+        }
     }
     for (name, m) in manifests {
         for slot in &m.secrets {
@@ -155,26 +165,25 @@ fn an_input_keeps_the_sensitivity_the_spec_gives_it() -> Outcome {
 #[test]
 fn every_examples_manifest_parses_and_matches_the_schema() -> Outcome {
     let schema = jsonschema::validator_for(&isoloom_manifest::schema()).unwrap();
-    let examples = docker_examples()?;
-    assert!(examples.len() >= 15, "{}", examples.len());
-    for (name, spec) in examples {
-        let files = generate(&spec, Target::Docker).unwrap();
-        let file = files
-            .iter()
-            .find(|f| f.path == ".isoloom/docker/run.json")
-            .unwrap_or_else(|| panic!("{name}: no run.json"));
-        isoloom_manifest::parse(&file.contents).unwrap_or_else(|e| panic!("{name}: {e}"));
-        let doc: serde_json::Value = serde_json::from_str(&file.contents).unwrap();
-        let errors: Vec<String> = schema.iter_errors(&doc).map(|e| format!("{e} at {}", e.instance_path())).collect();
-        assert!(errors.is_empty(), "{name}: {errors:#?}");
+    for (target, path, at_least) in WRITERS {
+        let examples = examples(target)?;
+        assert!(examples.len() >= at_least, "{target:?}: {}", examples.len());
+        for (name, spec) in examples {
+            let files = generate(&spec, target).unwrap();
+            let file = files.iter().find(|f| f.path == path).unwrap_or_else(|| panic!("{name}: no {path}"));
+            isoloom_manifest::parse(&file.contents).unwrap_or_else(|e| panic!("{name} ({target:?}): {e}"));
+            let doc: serde_json::Value = serde_json::from_str(&file.contents).unwrap();
+            let errors: Vec<String> = schema.iter_errors(&doc).map(|e| format!("{e} at {}", e.instance_path())).collect();
+            assert!(errors.is_empty(), "{name} ({target:?}): {errors:#?}");
+        }
     }
     Ok(())
 }
 
 #[test]
-fn only_docker_writes_a_run_manifest_for_now() -> Outcome {
+fn only_docker_and_vagrant_write_a_run_manifest_for_now() -> Outcome {
     let spec = lab(FLAG_PORTAL)?;
-    for target in [Target::Hosted, Target::DockerVm, Target::Kubernetes, Target::Vagrant] {
+    for target in [Target::Hosted, Target::DockerVm, Target::Kubernetes] {
         let files = generate(&spec, target).unwrap_or_default();
         assert!(!files.iter().any(|f| f.path.ends_with("run.json")), "{}", target.id());
     }

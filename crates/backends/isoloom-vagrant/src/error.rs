@@ -1,5 +1,6 @@
 //! Why a Vagrantfile isn't rendered, and how a backend reports it.
 
+use isoloom_manifest::ManifestError;
 use isoloom_plan::Refusal;
 use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
@@ -25,6 +26,20 @@ pub enum Error {
         /// Why, as the refusal reads.
         reason: String,
     },
+    /// A value of the run manifest was refused by the manifest's own types: a bug of this
+    /// backend, which builds every one of them.
+    #[error("{}: the run manifest refused a value of this backend", Target::Vagrant.id())]
+    Manifest {
+        /// What the manifest's types refused.
+        #[source]
+        source: ManifestError,
+    },
+}
+
+impl From<ManifestError> for Error {
+    fn from(source: ManifestError) -> Error {
+        Error::Manifest { source }
+    }
 }
 
 /// A result whose error is this crate's [`Error`].
@@ -36,6 +51,7 @@ impl Error {
         match self {
             Error::Refused { refusal, .. } => Error::Refused { target, refusal },
             Error::Unsupported { reason, .. } => Error::Unsupported { target, reason },
+            other @ Error::Manifest { .. } => other,
         }
     }
 }
@@ -47,6 +63,10 @@ impl From<Error> for RenderError {
         match e {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
             Error::Unsupported { target, reason } => RenderError::Unsupported { target, what: reason },
+            Error::Manifest { source } => RenderError::Unsupported {
+                target: Target::Vagrant,
+                what: format!("the run manifest: {source}"),
+            },
         }
     }
 }

@@ -670,12 +670,23 @@
             "$ref": "#/$defs/VagrantProvider"
           },
           "description": "The providers the Vagrantfile supports."
+        },
+        "dotfile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PathTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The folder Vagrant keeps its machines' state in (`VAGRANT_DOTFILE_PATH`, which the runner sets for every Vagrant command of the run, its actions' included), in the run's state folder (`${run.state_dir}/vagrant`): a reinstalled or replaced lab folder never loses track of its VMs. Absent: Vagrant's own `.vagrant` next to the Vagrantfile."
         }
       },
       "required": [
         "providers"
       ],
-      "description": "The Vagrant providers of a run."
+      "description": "The Vagrant providers of a run, and where Vagrant keeps its record of the run's machines."
     },
     "VagrantProvider": {
       "type": "object",

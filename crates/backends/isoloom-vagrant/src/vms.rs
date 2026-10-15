@@ -35,9 +35,10 @@ mod machine;
 mod nested;
 mod own;
 pub(crate) mod provider;
-mod providers;
+pub(crate) mod providers;
 mod qemu;
 mod transport;
+mod values;
 mod windows;
 
 /// The name of a network on the host, `isoloom-<environment>-<network>`: its VirtualBox
@@ -48,9 +49,10 @@ pub fn network_name(environment: &str, network: &str) -> String {
 }
 
 use indexmap::IndexMap;
+use isoloom_plan::checks::{Position, Resolved};
 use isoloom_plan::{Controller, Environment, MachineShape};
 use isoloom_render::backend::Files;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, powershell};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, powershell, router};
 use isoloom_spec::model::{Spec, Target};
 
 use crate::backend::capabilities;
@@ -61,7 +63,7 @@ use crate::vagrantfile;
 /// The folder of the target's files, under [`OUTPUT_DIR`].
 const DIR: &str = "vagrant";
 /// The define names of Isoloom's own VMs (the router's is `router::NAME`).
-const CONTROLLER: &str = "isoloom-controller";
+pub(crate) const CONTROLLER: &str = "isoloom-controller";
 const TOOL_SHELL: &str = "isoloom-tool-shell";
 /// Whether the host is an ARM one, in Ruby.
 const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
@@ -179,7 +181,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(&project_rb());
     r.text(hyperv::HYPERV_RB);
     r.blank();
-    vagrantfile::inputs(r, &env.spec().inputs);
+    vagrantfile::inputs(r, &env.spec().inputs, values::any(env));
     esxi(r, env);
     r.blank();
 }
@@ -236,6 +238,109 @@ fn settings(r: &mut Ruby, env: &Environment) {
 /// Whether the Vagrantfile has a controller: to run the environment's playbooks, or checks.
 fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
     env.controller.is_some() || !checks.controller.is_empty()
+}
+
+/// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> · <what>`.
+pub(crate) fn label(env: &Environment, what: &str) -> String {
+    format!("{} · {what}", env.name)
+}
+
+/// A VM's name on ESXi and Hyper-V, which allow no `·`: `<env>-<what>`, spaces as dashes.
+pub(crate) fn vm_name(env: &Environment, what: &str) -> String {
+    format!("{}-{}", env.name, what.replace(' ', "-"))
+}
+
+/// What one `config.vm.define` of the Vagrantfile is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Kind {
+    /// The router Isoloom adds for `reach` rules.
+    Router,
+    /// A machine of the lab.
+    Lab,
+    /// The `shell` tool's VM.
+    ToolShell,
+    /// The controller.
+    Controller,
+}
+
+/// One `config.vm.define` of the Vagrantfile, in its order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Define {
+    /// Its define name (`vagrant up <name>`).
+    pub(crate) name: String,
+    /// What it is.
+    pub(crate) kind: Kind,
+    /// What its VM names say after the environment's (`web`, `controller`).
+    pub(crate) what: String,
+}
+
+/// The checks one VM's `checks` provisioner runs: the VM, where they stand, and the checks.
+#[derive(Debug, Clone)]
+pub(crate) struct Runner {
+    /// The VM that runs them (`vagrant provision <vm> --provision-with checks`).
+    pub(crate) vm: String,
+    /// Where they stand.
+    pub(crate) position: Position,
+    /// The checks, in the order the runner reports them.
+    pub(crate) checks: Vec<Resolved>,
+}
+
+/// What the Vagrantfile of `env` holds, as a run manifest describes it: its VMs in order, and
+/// the checks each runs.
+#[derive(Debug, Clone)]
+pub(crate) struct Shape {
+    /// Every VM, in the Vagrantfile's order.
+    pub(crate) defines: Vec<Define>,
+    /// The check runners, the lab's VMs first, then the controller's.
+    pub(crate) runners: Vec<Runner>,
+}
+
+impl Shape {
+    /// The shape of `env`'s Vagrantfile, decided as [`render`] decides it.
+    pub(crate) fn of(env: &Environment) -> Shape {
+        let in_their_place = checks::in_their_place(env);
+        let checks = checks::Checks::of(env, &in_their_place);
+        let mut defines = Vec::new();
+        let mut runners = Vec::new();
+        let define = |name: &str, kind, what: &str| Define {
+            name: name.to_owned(),
+            kind,
+            what: what.to_owned(),
+        };
+        if env.router.is_some() {
+            defines.push(define(router::NAME, Kind::Router, "router"));
+        }
+        for name in env.start_order.iter().filter(|n| machine::has_vm(env, n)) {
+            defines.push(define(name, Kind::Lab, name));
+            let linux = env.machines.get(name).is_some_and(|mp| transport::Os::of(mp) == transport::Os::Linux);
+            if let Some(group) = checks.of_machine(name).filter(|_| linux) {
+                runners.push(Runner {
+                    vm: name.clone(),
+                    position: Position::Machine(name.clone()),
+                    checks: group.iter().map(|c| (*c).clone()).collect(),
+                });
+            }
+        }
+        if env.spec().tools.contains_key("shell") {
+            defines.push(define(TOOL_SHELL, Kind::ToolShell, "tool shell"));
+        }
+        if with_controller(env, &checks) {
+            defines.push(define(CONTROLLER, Kind::Controller, "controller"));
+            if !checks.controller.is_empty() {
+                runners.push(Runner {
+                    vm: CONTROLLER.to_owned(),
+                    position: Position::Networks,
+                    checks: checks.controller.iter().map(|c| (*c).clone()).collect(),
+                });
+            }
+        }
+        Shape { defines, runners }
+    }
+
+    /// The controller, when the Vagrantfile has one.
+    pub(crate) fn controller(&self) -> Option<&Define> {
+        self.defines.iter().find(|d| d.kind == Kind::Controller)
+    }
 }
 
 /// Each VM's link under QEMU, the controller included when the environment has one.

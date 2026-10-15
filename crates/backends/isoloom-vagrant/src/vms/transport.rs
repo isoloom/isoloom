@@ -19,6 +19,7 @@ use isoloom_plan::{Environment, MachinePlan, Route};
 use isoloom_render::boot::{self, Trigger};
 use isoloom_render::steps;
 
+use super::values;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
@@ -71,7 +72,9 @@ pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, 
             r.call(Call::new("m.vm.provision").arg(Value::str("isoloom_project")).kw("name", Value::str("project")));
         }
         (Os::Linux, Step::Prelude) => vagrantfile::prelude(r, env, "m"),
-        (Os::Linux, Step::Inputs { .. }) => inputs(r, env, machine, step),
+        (Os::Linux, Step::Inputs { .. }) => values::linux_inputs(r, env, machine, step),
+        (Os::Windows, Step::Inputs { .. }) => values::windows_inputs(r, env, machine),
+        (_, Step::Secrets) => values::secret_files(r, env, machine, os),
         (Os::Linux, Step::Reboot) => reboot(r),
         (Os::Linux, Step::Routes { routes, .. }) => {
             let early = Step::Routes {
@@ -82,10 +85,10 @@ pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, 
         }
         (Os::Linux, Step::Trunks | Step::Tc | Step::Ipv6 { .. } | Step::MoreAddresses { .. }) => persisted(r, env, machine, step),
         (Os::Linux, Step::WaitFor { machine: dep, ports }) => wait_for(r, env, machine, dep, ports),
-        (Os::Windows, Step::Run { path, .. }) => {
+        (Os::Windows, Step::Run { .. } | Step::Setup { .. }) => {
             if let Some(script) = steps::windows(env, machine, step) {
-                let call = vagrantfile::shell("m", path).kw_opt("env", inputs_env(env, machine));
-                r.script(call, "inline", &script);
+                let call = vagrantfile::shell("m", &label(step)).kw_opt("env", values::inputs_env(env, machine));
+                r.script(call, "inline", &format!("{}{script}", values::windows_decode(env, machine)));
             }
         }
         _ => {
@@ -136,27 +139,6 @@ fn label(step: &Step) -> String {
 /// `m.vm.provision "shell", name: ..., inline: ...`.
 pub(crate) fn shell(r: &mut Ruby, name: &str, script: &str) {
     r.script(vagrantfile::shell("m", name), "inline", script);
-}
-
-/// The machine's inputs from the host's environment (`INPUTS`), when it reads some.
-fn inputs_env(env: &Environment, machine: &str) -> Option<Value> {
-    let names = &env.machines.get(machine)?.inputs;
-    let list = names.iter().map(|n| Value::str(n).to_string()).collect::<Vec<_>>().join(", ");
-    (!names.is_empty()).then(|| Value::raw(format!("INPUTS.slice({list})")))
-}
-
-/// The inputs, from the host's environment, written as `KEY='value'` lines (readable by root
-/// alone) to the file the steps read; then the step itself (kept on disk when a reboot comes).
-fn inputs(r: &mut Ruby, env: &Environment, machine: &str, step: &Step) {
-    let Some(mp) = env.machines.get(machine) else { return };
-    let file = steps::INPUTS_FILE;
-    let mut script = format!(
-        "umask 077\n: > {file}\nfor k in {}; do printf \"%s='%s'\\n\" \"$k\" \"$(printenv \"$k\" | sed \"s/'/'\\\\\\\\''/g\")\" >> {file}; done\n",
-        mp.inputs.join(" ")
-    );
-    script.push_str(&steps::linux(env, machine, step).unwrap_or_default());
-    let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
-    r.script(call, "inline", &script);
 }
 
 /// Vagrant restarts the machine and waits until it answers; the boot is recorded before and

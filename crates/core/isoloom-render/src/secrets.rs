@@ -88,8 +88,35 @@ pub fn wait(who: &str) -> String {
 /// A VM's `Secrets` step: the wait, then its files put in place now and at every boot.
 #[must_use]
 pub fn step(machine: &str, files: &[SecretFile]) -> String {
-    let service = boot::at_boot(PLACE_SERVICE, "The machine's secrets, put in place", &place(files), boot::Trigger::Boot, &[]);
-    format!("set -e\n{}{service}", wait(machine))
+    format!("set -e\n{}{}", wait(machine), placed(files))
+}
+
+/// The files put in place now and at every boot.
+fn placed(files: &[SecretFile]) -> String {
+    boot::at_boot(PLACE_SERVICE, "The machine's secrets, put in place", &place(files), boot::Trigger::Boot, &[])
+}
+
+/// A VM's `Secrets` step when the tool that runs it hands the values over itself (Vagrant's
+/// provisioner environment, filled from the host's when Vagrant runs): each of `values`, a
+/// secret's name and the variable holding its value in base64 (so a `$`, a quote or a line break
+/// in it is never read by the shell that sets the variable), kept as delivery keeps it and the
+/// delivery marked; then the files put in place now and at every boot. Nothing waits: the
+/// values are there. An empty or unset variable writes an empty value the first time, and keeps
+/// the value already kept after (a re-provision given no value again).
+#[must_use]
+pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> String {
+    let kept = values
+        .iter()
+        .map(|(name, var)| {
+            let kept = format!("{KEPT_DIR}/{name}");
+            format!("v=\"$(printenv {var} || true)\"; if [ -n \"$v\" ] || [ ! -e {kept} ]; then printf '%s' \"$v\" | base64 -d > {kept}.new; mv -f {kept}.new {kept}; fi\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    format!(
+        "set -e\numask 077\nmkdir -p {KEPT_DIR}\nchmod 700 {KEPT_DIR}\n{kept}touch {DELIVERED}\n{}",
+        placed(files)
+    )
 }
 
 /// The variable the Compose file reads secret `name` from: an input's file, the input's own

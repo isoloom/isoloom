@@ -103,14 +103,44 @@ pub fn wait(who: &str) -> String {
 /// startup task (as SYSTEM) and run now.
 #[must_use]
 pub fn step(machine: &str, files: &[SecretFile]) -> String {
+    format!("{}{}", wait(machine), placed(files))
+}
+
+/// The placing script written, registered as a startup task (as SYSTEM) and run now.
+fn placed(files: &[SecretFile]) -> String {
     format!(
-        "{}Set-Content -Path {script} -Value {body}\n\
+        "Set-Content -Path {script} -Value {body}\n\
          $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {PLACE_SCRIPT}'; \
          Register-ScheduledTask -TaskName '{PLACE_TASK}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null\n\
          & powershell -NoProfile -ExecutionPolicy Bypass -File {script}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}\n",
-        wait(machine),
         script = powershell::quote(PLACE_SCRIPT),
         body = powershell::quote(&place(files)),
+    )
+}
+
+/// A Windows VM's `Secrets` step when the tool that runs it hands the values over itself
+/// (Vagrant's provisioner environment over WinRM): each of `values`, a secret's name and the
+/// variable holding its value in base64 (PowerShell never expands anything in it), kept in the
+/// SYSTEM- and Administrators-only folder and the delivery marked; then the placing script
+/// written, registered and run, as [`step`] does. Nothing waits. An empty or unset variable
+/// writes an empty value the first time, and keeps the value already kept after.
+#[must_use]
+pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> String {
+    let pairs = values
+        .iter()
+        .map(|(name, var)| format!("{} = {}", powershell::quote(name), powershell::quote(var)))
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!(
+        "$ErrorActionPreference = 'Stop'\n{PROTECT}\n$k = {k}\nNew-Item -ItemType Directory -Force $k | Out-Null\nProtect-IsoloomPath $k\n\
+         foreach ($e in @{{ {pairs} }}.GetEnumerator()) {{ $v = [Environment]::GetEnvironmentVariable($e.Value); \
+         if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) {{ continue }}; \
+         $b = if ($v) {{ [Convert]::FromBase64String($v) }} else {{ [byte[]]@() }}; \
+         [IO.File]::WriteAllBytes(\"$k\\$($e.Key).new\", $b); Move-Item -Force \"$k\\$($e.Key).new\" \"$k\\$($e.Key)\" }}\n\
+         Set-Content -Path {} -Value ''\n{}",
+        powershell::quote(DELIVERED),
+        placed(files),
+        k = powershell::quote(KEPT_DIR),
     )
 }
 

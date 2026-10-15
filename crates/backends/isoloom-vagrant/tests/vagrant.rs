@@ -122,3 +122,22 @@ fn a_machine_without_a_box_is_refused_without_rendering() -> Outcome {
     assert_eq!(refused.to_string(), format!("vagrant: {why}"));
     Ok(())
 }
+
+/// Vagrant 2.4 picks one build of a multi-architecture box by `box_architecture` (an older one
+/// takes any: a ppc64le Debian on an amd64 host). libvirt's roboxes boxes are such boxes: a
+/// machine's gets its own architecture, Isoloom's own VMs the host's.
+#[test]
+fn libvirts_own_boxes_are_pinned_to_an_architecture() -> Outcome {
+    let file = vagrantfile("ansible-pair")?;
+    let libvirt_blocks: Vec<&str> = file.split("provider \"libvirt\" do |v, o|").skip(1).collect();
+    assert!(!libvirt_blocks.is_empty(), "no libvirt box of its own");
+    for block in libvirt_blocks {
+        let body = block.split("\n    end").next().unwrap_or_default();
+        assert!(
+            body.contains("o.vm.box_architecture = \"amd64\"") || body.contains("o.vm.box_architecture = :auto"),
+            "{body}"
+        );
+    }
+    assert!(file.contains("o.vm.box_architecture = :auto"), "the controller takes the host's");
+    Ok(())
+}

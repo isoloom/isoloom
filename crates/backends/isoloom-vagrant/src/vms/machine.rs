@@ -19,6 +19,13 @@ use super::{Ctx, boot, checks, windows};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
+/// Whether lab machine `name` is a VM with a Vagrant box: one the Vagrantfile defines.
+pub(crate) fn has_vm(env: &Environment, name: &str) -> bool {
+    let vm = env.machines.get(name).filter(|mp| mp.shape == isoloom_plan::MachineShape::Vm);
+    let spec = env.spec().machines.get(name).and_then(|m| m.vm.as_ref());
+    vm.is_some() && spec.and_then(images::vagrant).is_some()
+}
+
 /// Lab machine `name`'s VM, and the check runner it uploads, if it has checks. Nothing when it
 /// has no Vagrant box (refused before rendering).
 pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
@@ -116,8 +123,8 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         tpm: mp.tpm,
     };
     Guest {
-        label: format!("{} · {name}", env.name),
-        vm_name: format!("{}-{name}", env.name),
+        label: super::label(env, name),
+        vm_name: super::vm_name(env, name),
         size: Size::of(mp.size, isoloom_spec::DEFAULT_CPUS, isoloom_spec::DEFAULT_MEMORY_MB),
         nets: mp.addresses.keys().map(String::as_str).collect(),
         libvirt_box: image.libvirt.as_deref(),
@@ -132,6 +139,7 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         hyperv,
         tpm: mp.tpm,
         esxi_guestos: mp.os.as_deref().and_then(windows::esxi_guestos),
+        esxi_box: None,
         nested: mp.hardware.nested_virtualization,
         disks: mp.disks.iter().map(|d| (d.name.as_str(), d.size_gb)).collect(),
     }

@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
+isoloom-manifest.workspace = true
 isoloom-render.workspace = true
 indexmap.workspace = true
 thiserror.workspace = true

@@ -52,6 +52,9 @@ impl Manifest {
             let pinned = c.pinned_ports_file.iter().map(|f| ("identity.compose.pinned_ports_file".to_owned(), f));
             out.extend(files.chain(pinned).map(|(at, f)| (at, PathTemplate::template(f))));
         }
+        if let crate::Identity::Vagrant(v) = &self.identity {
+            out.extend(v.dotfile.iter().map(|f| ("identity.vagrant.dotfile".to_owned(), f.template())));
+        }
         for (i, t) in self.tools.iter().enumerate() {
             host_argv(&format!("tools[{i}].probe"), &t.probe, &mut out);
         }

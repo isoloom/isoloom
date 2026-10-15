@@ -111,7 +111,7 @@ fn inputs_come_from_the_hosts_environment_into_the_file_the_steps_read() {
         .map(|(_, rest)| format!("name: \"inputs\"{rest}"))
         .expect("an inputs step");
     assert!(
-        inputs.starts_with("name: \"inputs\", env: INPUTS.slice(\"TOKEN\"), inline: <<~'SH'\n"),
+        inputs.starts_with("name: \"inputs\", env: { \"TOKEN\" => isoloom_b64(INPUTS[\"TOKEN\"]) }, inline: <<~'SH'\n"),
         "{inputs}"
     );
     assert!(
@@ -134,12 +134,12 @@ fn the_inputs_file_quotes_every_value() {
     let dir = std::env::temp_dir().join(format!("isoloom-inputs-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("a temporary folder");
     let out = dir.join("inputs.env");
-    let tricky = "it's $(not run) \"quoted\"";
+    let tricky = "it's $(not run) \"quoted\" `nor this`";
     let status = std::process::Command::new("sh")
         .arg("-c")
         .arg(format!("{script}set -a; . \"$OUT\"; set +a; printf %s \"$TOKEN\" > \"$OUT.read\""))
         .env("OUT", &out)
-        .env("TOKEN", tricky)
+        .env("TOKEN", isoloom_spec::shell::base64(tricky.as_bytes()))
         .status()
         .expect("sh runs");
     let read = std::fs::read_to_string(dir.join("inputs.env.read")).unwrap_or_default();
@@ -157,9 +157,11 @@ fn a_linux_machine_waits_for_a_windows_one_by_address() {
 #[test]
 fn windows_runs_powershell_with_its_inputs() {
     let s = text(|r| provisioners(r, &env(), "dc", Os::Windows));
-    assert_eq!(names(&s), ["project", "hosts", "routes", "dc.ps1", "ready"], "{s}");
+    assert_eq!(names(&s), ["project", "hosts", "routes", "inputs", "dc.ps1", "ready"], "{s}");
     assert!(s.contains("route -p add 10.85.0.0 MASK 255.255.255.0 10.84.0.2"), "through the gateway: {s}");
-    assert!(s.contains("-File 'dc.ps1'") && s.contains("env: INPUTS.slice(\"TOKEN\")"), "{s}");
+    let run = s.lines().find(|l| l.contains("-File 'dc.ps1'")).unwrap_or_default();
+    assert!(run.contains("env: { \"TOKEN\" => isoloom_b64(INPUTS[\"TOKEN\"]) }"), "{run}");
+    assert!(run.contains("FromBase64String"), "decoded before the script reads it: {run}");
     assert!(!s.contains("/etc/"), "no Linux step on Windows: {s}");
 }
 

@@ -541,6 +541,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
+      o.vm.box_architecture = :auto
       v.cpus = 1
       v.memory = 512
     end
@@ -701,6 +702,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
+      o.vm.box_architecture = "amd64"
       v.cpus = 1
       v.memory = 1024
       v.machine_arch = "x86_64"
@@ -935,6 +937,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
+      o.vm.box_architecture = "amd64"
       v.cpus = 1
       v.memory = 1024
       v.machine_arch = "x86_64"
@@ -1112,6 +1115,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/debian12"
+      o.vm.box_architecture = "amd64"
       v.cpus = 1
       v.memory = 1024
       v.machine_arch = "x86_64"

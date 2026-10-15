@@ -15,14 +15,19 @@ pub(crate) fn shell(var: &str, name: &str) -> Call {
 }
 
 /// The values given at launch, read from the host's environment (empty when unset), as the
-/// `INPUTS` hash provisioners pass on. Nothing when the environment has none.
-pub(crate) fn inputs(r: &mut Ruby, inputs: &[String]) {
-    if inputs.is_empty() {
-        return;
+/// `INPUTS` hash provisioners pass on; with `encoded`, the `isoloom_b64` they pass them through
+/// (a provisioner's environment is written into a double-quoted shell string, which would read
+/// a `$` in a value). Nothing when there is neither.
+pub(crate) fn inputs(r: &mut Ruby, inputs: &[String], encoded: bool) {
+    if !inputs.is_empty() {
+        r.comment("Values provided at launch (empty when unset).");
+        let fetch = |i: &String| Value::raw(format!("ENV.fetch({}, \"\")", Value::str(i)));
+        r.hash("INPUTS", inputs.iter().map(|i| (Value::str(i), fetch(i))));
     }
-    r.comment("Values provided at launch (empty when unset).");
-    let fetch = |i: &String| Value::raw(format!("ENV.fetch({}, \"\")", Value::str(i)));
-    r.hash("INPUTS", inputs.iter().map(|i| (Value::str(i), fetch(i))));
+    if encoded {
+        r.comment("A value as a provisioner's environment carries it: in base64, which no shell reads anything into.");
+        r.text("def isoloom_b64(value)\n  [value.to_s].pack(\"m0\")\nend\n");
+    }
 }
 
 /// A tool that can't reach the machines itself (macOS keeps third-party tools off the local
@@ -102,9 +107,9 @@ mod tests {
     #[test]
     fn inputs_are_read_from_the_host() {
         let mut r = Ruby::new();
-        inputs(&mut r, &[]);
+        inputs(&mut r, &[], false);
         ssh_proxy(&mut r, "config");
-        inputs(&mut r, &["TOKEN".into()]);
+        inputs(&mut r, &["TOKEN".into()], false);
         assert_eq!(
             r.finish(),
             "config.ssh.proxy_command = ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"] if ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"]\n# Values provided at launch (empty when unset).\nINPUTS = {\n  \"TOKEN\" => ENV.fetch(\"TOKEN\", \"\"),\n}\n"
