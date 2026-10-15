@@ -10,7 +10,7 @@ Working document for the local rebuild. It is squashed away with the history at 
 | **Phase 1a: subtract** | **Done** (`58ae8e6b`). About 195k lines and 943 files removed: coverage, committed outputs, compatibility, hand-written docs, the CHANGELOG. Tests are green on macOS. |
 | **Phase 1b: runtime out, layout, xtask, ratchet** | Layout (`b6c218c9`, the last commit with the runtime), runtime out (`4ed14e1e`), backends independent (`e8a850ea`), `cargo xtask` replacing `scripts/` (`1b2f7c55`). The ratchet with the 1c lint set is running. |
 | **Phase 1c: deep organization, zero violations** | Next, after 1b. Phase 1 isn't done until 1c's exit. |
-| **Phase 2: manifest** | `isoloom-manifest` crate and docker `run.json` landed (`defe7a65`). |
+| **Phase 2: manifest and runner** | `isoloom-manifest` and the docker `run.json` (`defe7a65`). The Isothrum runner skeleton (`isothrum@5d7f59b`): the manifest executor, the Compose driver, the run store with a lock that fails closed, the event stream, hooks and the `isothrum` CLI. A real Docker run passes on the Mac (12/12 checks, park and resume on the same port, the flag kept out of every event and log). The jarvis run is pending. Risks R2, R3, R5, R9 and R11 are fixed with tests. |
 | **Phase 2: syntax** | **Approved by the maintainer** (`plan/phase2/spec.md`, including the flag via `files:` with `input:`). Implementation is next. |
 | **Track C: Proxmox 9.2** | Proven: a real apply, serve, check and destroy. |
 | **Track C: ESXi 8.0U3e** | Proven with promiscuous mode on: nested DHCP works, the launcher's Vagrant self-test passes, and Isoloom's `esxi` Terraform module serves and passes its check (finishing from a container). Two fixes are queued for Phase 3 (the controller box on ESXi; guest SSH moving to the runner). |
@@ -503,6 +503,13 @@ The full design is in `plan/phase2/`: `run-manifest-v0.md`, its JSON Schema, `ru
 - **Homes:** separate for the launcher (its app data) and the CLI (`~/.isothrum`); the CLI can attach with `--home`.
 - **Events:** the event stream has its own version.
 - **The launcher's switch:** a hidden developer flag in Phase 2, then a visible setting once Vagrant lands.
+
+**Runner follow-ups (decided 2026-10-15):**
+- **Check grammar:** the `isoloom-check/1` parser moves into `isoloom-manifest`, so there's one source; the runner drops its copy.
+- **Compiler lints:** the compiler and WASM crates take the workspace lints in the compiler-on-new-syntax unit.
+- **State files:** the runner is synchronous, so small state files are read and written inline. Documented in the crate docs; that is 3d's "chosen once per crate".
+- **Isothrum's 3d tools** (cargo-deny, cargo-hack, msrv, semver-checks, fuzz, mutants) are wired in Isothrum's own 1c-equivalent pass.
+- **`cargo xtask dev-link relock`:** updates a consumer's lockfile from the local Isoloom without GitHub, because the pinned revisions aren't pushed.
 
 **Bugs found in today's code**, fixed by the manifest and runner work (`runner-extraction.md` §6):
 - Launcher and Isoloom names have drifted: the port labels, `address` vs `ip`, the ready file.
