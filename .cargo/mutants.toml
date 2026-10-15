@@ -3,7 +3,11 @@
 # Every mutant that survives is killed by a new test, unless no test can tell it apart from the
 # original (an equivalent mutant): then it is listed here, matched by the name `cargo mutants
 # --list` shows, with the reason it is equivalent. Nothing else goes here.
-exclude_re = []
+exclude_re = [
+    # A machine's address is its block's network part with the octet in the last byte, which the
+    # mask leaves zero: `|` and `^` give the same address for every block and octet.
+    'isoloom-plan/src/addressing\.rs:\d+:\d+: replace \| with \^ in address$',
+]
 
 # Lints capped while mutants build: the workspace denies `unused`, so a mutant that replaces a
 # function's body (its arguments then unused) wouldn't compile and would count as unviable, never
@@ -11,8 +15,9 @@ exclude_re = []
 cap_lints = true
 
 # A test run slower than this is a timeout (a loop the mutant made endless), however fast the
-# unmutated run was: a busy machine doesn't turn a slow run into a false timeout.
-minimum_test_timeout = 120
+# unmutated run was: a busy machine (each mutant recompiles its doctests) doesn't turn a slow
+# run into a false timeout.
+minimum_test_timeout = 300
 
 # The copies each mutant is built in leave out what git ignores: build folders, and the fuzz
 # corpora a running `cargo xtask fuzz` is still writing.
