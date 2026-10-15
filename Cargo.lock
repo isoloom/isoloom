@@ -518,8 +518,10 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
+ "proptest",
  "serde",
  "serde_yaml_ng",
+ "thiserror",
 ]
 
 [[package]]

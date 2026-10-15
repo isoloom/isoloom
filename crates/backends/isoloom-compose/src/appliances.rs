@@ -25,20 +25,24 @@
 //! as Isoloom's Linux switch had), then a trunk port on each trunk machine's link (see
 //! `trunks`). Its configuration declares the VLANs (VTP transparent) and sets each port's mode.
 
-use std::fmt::Write;
+use std::fmt;
 use std::net::Ipv4Addr;
 
-use super::trunks;
-use crate::model::{Appliance, Machine, Spec};
-use crate::validate::Cidr;
-use crate::vlans;
-pub use isoloom_spec::appliance::{MGMT_CIDR, is_switch};
+use isoloom_render::trunks;
+pub(crate) use isoloom_spec::appliance::MGMT_CIDR;
+use isoloom_spec::appliance::is_switch;
+use isoloom_spec::model::{Appliance, Machine, Spec};
+use isoloom_spec::validate::Cidr;
+use isoloom_spec::vlans;
 
 /// Isoloom's management network for appliances, outside the environment (no `reach`, no checks).
-pub const MGMT_NETWORK: &str = "isoloom-mgmt";
+pub(crate) const MGMT_NETWORK: &str = "isoloom-mgmt";
+
+/// The Dockerfile of the Dynamips container Isoloom builds.
+const DYNAMIPS_DOCKERFILE: &str = "# Dynamips, the Cisco 7200 emulator (Ubuntu's package, in its default sources); the IOS\n# image is the user's.\nFROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends dynamips iproute2 && rm -rf /var/lib/apt/lists/*\n";
 
 /// The appliance machines, in spec order.
-pub fn appliances(spec: &Spec) -> Vec<(&String, &Machine, Appliance)> {
+pub(crate) fn appliances(spec: &Spec) -> Vec<(&String, &Machine, Appliance)> {
     spec.machines.iter().filter_map(|(n, m)| Some((n, m, m.docker.as_ref()?.appliance?))).collect()
 }
 
@@ -48,23 +52,23 @@ const MGMT: Cidr = Cidr {
     len: 24,
 };
 
-/// An appliance's management address: .10 and up on the management network.
-pub fn mgmt_address(spec: &Spec, name: &str) -> Ipv4Addr {
-    let i = appliances(spec).iter().position(|(n, _, _)| n.as_str() == name).unwrap_or(0);
-    Ipv4Addr::from(MGMT.base + 10 + u32::try_from(i).unwrap_or(0))
+/// An appliance's position among the environment's appliances (0 for a machine that isn't one).
+fn position(spec: &Spec, name: &str) -> usize {
+    appliances(spec).iter().position(|(n, _, _)| n.as_str() == name).unwrap_or(0)
 }
 
-fn mgmt_gateway() -> Ipv4Addr {
-    MGMT.gateway()
+/// An appliance's management address: .10 and up on the management network.
+pub(crate) fn mgmt_address(spec: &Spec, name: &str) -> Ipv4Addr {
+    Ipv4Addr::from(MGMT.base + 10 + u32::try_from(position(spec, name)).unwrap_or(0))
 }
 
 /// IOL's instance number: unique in the environment (1, 2...).
-pub fn iol_pid(spec: &Spec, name: &str) -> usize {
-    appliances(spec).iter().position(|(n, _, _)| n.as_str() == name).unwrap_or(0) + 1
+fn iol_pid(spec: &Spec, name: &str) -> usize {
+    position(spec, name) + 1
 }
 
 /// The OS's name for the `k`th data interface (from 1, `eth<k>` in the container).
-pub fn interface(kind: Appliance, k: usize) -> String {
+fn interface(kind: Appliance, k: usize) -> String {
     match kind {
         Appliance::CiscoIol | Appliance::CiscoIolL2 => format!("Ethernet{}/{}", k / 4, k % 4),
         Appliance::CiscoVios | Appliance::CiscoViosL2 => format!("GigabitEthernet0/{k}"),
@@ -81,22 +85,23 @@ fn dynamips_port(k: usize) -> (usize, usize) {
     if k == 1 { (0, 0) } else { (k / 2, k % 2) }
 }
 
+/// The netmask of a prefix length.
 fn mask(len: u8) -> Ipv4Addr {
-    Ipv4Addr::from(if len == 0 { 0 } else { u32::MAX << (32 - len) })
+    Ipv4Addr::from(u32::MAX.checked_shl(32 - u32::from(len.min(32))).unwrap_or(0))
 }
 
 /// One data interface of an appliance: `eth1`, `eth2`... in order.
-pub struct Port {
+pub(crate) struct Port {
     /// The Compose network it is on.
-    pub network: String,
+    pub(crate) network: String,
     /// The container's address there (none on a trunk's link, which has no addresses).
-    pub address: Option<Ipv4Addr>,
+    pub(crate) address: Option<Ipv4Addr>,
     /// What the port carries: the network itself, one VLAN, or a trunk.
-    pub role: Role,
+    role: Role,
 }
 
 /// What a data interface is for.
-pub enum Role {
+enum Role {
     /// One of the machine's own networks (a router's interface takes its address).
     Network,
     /// A LAN switch's access port in a VLAN.
@@ -107,7 +112,7 @@ pub enum Role {
 
 /// The data interfaces of appliance `name`, in order: its networks; for a LAN's `switch`, an
 /// access port per VLAN of the LAN, then a trunk port per machine on several of them.
-pub fn ports(spec: &Spec, name: &str, m: &Machine, address: &impl Fn(&str, u8) -> Ipv4Addr) -> Vec<Port> {
+pub(crate) fn ports(spec: &Spec, name: &str, m: &Machine, address: &impl Fn(&str, u8) -> Ipv4Addr) -> Vec<Port> {
     let Some(lan) = vlans::switched_by(spec, name) else {
         return m
             .networks
@@ -136,89 +141,140 @@ pub fn ports(spec: &Spec, name: &str, m: &Machine, address: &impl Fn(&str, u8) -
     out
 }
 
-/// How an appliance's container is set up.
-pub struct Wiring {
-    /// Its data interfaces, in order (`eth1`, `eth2`...).
-    pub ports: Vec<Port>,
-    /// Files to mount: (name in its folder, path inside, contents).
-    pub files: Vec<(String, String, String)>,
-    /// Where the machine's own `config` is mounted (read when the container starts).
-    pub own_config: &'static str,
-    /// Where the `firmware` file is mounted, for kinds that boot one.
-    pub firmware: Option<&'static str>,
-    /// The container's environment variables, in order.
-    pub environment: Vec<(String, String)>,
-    /// What the container runs: joins the startup configuration, then starts the OS.
-    pub entrypoint: Vec<String>,
-    /// QEMU needs /dev/kvm (and the image sets up its own taps).
-    pub privileged: bool,
-    /// The container Isoloom builds for the kind (its Dockerfile), if any.
-    pub build: Option<String>,
+/// A file Isoloom writes for an appliance, mounted into its container.
+pub(crate) struct File {
+    /// Its name in the appliance's folder, next to the Compose file.
+    pub(crate) name: &'static str,
+    /// Its path inside the container.
+    pub(crate) inside: &'static str,
+    /// What it holds.
+    pub(crate) contents: String,
 }
 
-/// The startup configuration Isoloom writes: hostname, credentials, each interface's address.
-fn base_config(spec: &Spec, name: &str, kind: Appliance, ports: &[Port]) -> String {
-    let mut cfg = format!("hostname {name}\n!\nno ip domain lookup\nip domain name lab\n!\nusername admin privilege 15 secret admin\n!\n");
-    if matches!(kind, Appliance::CiscoIol | Appliance::CiscoIolL2) {
-        let mgmt = MGMT;
-        let _ = write!(
-            cfg,
+/// How an appliance's container is set up.
+pub(crate) struct Wiring {
+    /// Its data interfaces, in order (`eth1`, `eth2`...).
+    pub(crate) ports: Vec<Port>,
+    /// The files to mount.
+    pub(crate) files: Vec<File>,
+    /// Where the machine's own `config` is mounted (read when the container starts).
+    pub(crate) own_config: &'static str,
+    /// Where the `firmware` file is mounted, for kinds that boot one.
+    pub(crate) firmware: Option<&'static str>,
+    /// The container's environment variables, in order.
+    pub(crate) environment: Vec<(String, String)>,
+    /// What the container runs: joins the startup configuration, then starts the OS.
+    pub(crate) entrypoint: Vec<String>,
+    /// QEMU needs /dev/kvm (and the image sets up its own taps).
+    pub(crate) privileged: bool,
+    /// The Dockerfile of the container Isoloom builds for the kind, if it builds one.
+    pub(crate) build: Option<&'static str>,
+}
+
+/// The startup configuration Isoloom writes for an appliance: hostname, credentials, IOL's
+/// management interface, a switch's VLANs, each interface (a router's with its address), the
+/// management route, remote access.
+struct StartupConfig<'a> {
+    spec: &'a Spec,
+    name: &'a str,
+    kind: Appliance,
+    ports: &'a [Port],
+}
+
+impl StartupConfig<'_> {
+    /// Whether the kind is IOL, whose management port lives in a VRF of its own.
+    fn iol(&self) -> bool {
+        matches!(self.kind, Appliance::CiscoIol | Appliance::CiscoIolL2)
+    }
+
+    /// IOL's management interface, `Ethernet0/0`, in the `isoloom-mgmt` VRF.
+    fn management(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "no aaa new-model\nip cef\n!\nvrf definition isoloom-mgmt\n description Isoloom management\n address-family ipv4\n exit-address-family\n!\ninterface Ethernet0/0\n{}vrf forwarding isoloom-mgmt\n description Isoloom management\n ip address {} {}\n no shutdown\n!\n",
-            if is_switch(kind) { " no switchport\n " } else { " " },
-            mgmt_address(spec, name),
-            mask(mgmt.len),
-        );
+            if is_switch(self.kind) { " no switchport\n " } else { " " },
+            mgmt_address(self.spec, self.name),
+            mask(MGMT.len),
+        )
     }
-    // A LAN's switch: its VLANs, kept in the configuration (VTP transparent).
-    let access: Vec<(&str, u16)> = ports
-        .iter()
-        .filter_map(|p| match p.role {
-            Role::Access(id) => Some((p.network.as_str(), id)),
-            _ => None,
-        })
-        .collect();
-    if !access.is_empty() {
-        cfg.push_str("vtp mode transparent\n!\n");
-        for (net, id) in &access {
-            // IOS takes VLAN names of up to 32 characters.
-            let _ = write!(cfg, "vlan {id}\n name {}\n!\n", net.chars().take(32).collect::<String>());
+
+    /// A LAN's switch: its VLANs, kept in the configuration (VTP transparent).
+    fn vlans(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let access: Vec<(&str, u16)> = self
+            .ports
+            .iter()
+            .filter_map(|p| match p.role {
+                Role::Access(id) => Some((p.network.as_str(), id)),
+                Role::Network | Role::Trunk(..) => None,
+            })
+            .collect();
+        if access.is_empty() {
+            return Ok(());
         }
+        f.write_str("vtp mode transparent\n!\n")?;
+        for (net, id) in access {
+            // IOS takes VLAN names of up to 32 characters.
+            write!(f, "vlan {id}\n name {}\n!\n", net.chars().take(32).collect::<String>())?;
+        }
+        Ok(())
     }
-    for (k, port) in ports.iter().enumerate() {
-        let _ = writeln!(cfg, "interface {}", interface(kind, k + 1));
+
+    /// The `k`th data interface (from 1), as its port's role sets it up.
+    fn interface(&self, f: &mut fmt::Formatter<'_>, k: usize, port: &Port) -> fmt::Result {
+        writeln!(f, "interface {}", interface(self.kind, k))?;
         match &port.role {
             Role::Network => {
-                let _ = writeln!(cfg, " description {}", port.network);
+                writeln!(f, " description {}", port.network)?;
                 // The spec is validated: its blocks parse.
-                let block = Cidr::parse(&spec.networks[&port.network].cidr);
-                if let (false, Some(addr), Some(block)) = (is_switch(kind), port.address, block) {
-                    let _ = writeln!(cfg, " ip address {addr} {}", mask(block.len));
+                let block = self.spec.networks.get(&port.network).and_then(|n| Cidr::parse(&n.cidr));
+                if let (false, Some(addr), Some(block)) = (is_switch(self.kind), port.address, block) {
+                    writeln!(f, " ip address {addr} {}", mask(block.len))?;
                 }
             }
-            Role::Access(id) => {
-                let _ = write!(cfg, " description {}\n switchport mode access\n switchport access vlan {id}\n", port.network);
-            }
+            Role::Access(id) => write!(f, " description {}\n switchport mode access\n switchport access vlan {id}\n", port.network)?,
             Role::Trunk(machine, ids) => {
                 let ids = ids.iter().map(u16::to_string).collect::<Vec<_>>().join(",");
-                let _ = write!(
-                    cfg,
+                write!(
+                    f,
                     " description trunk to {machine}\n switchport trunk encapsulation dot1q\n switchport mode trunk\n switchport trunk allowed vlan {ids}\n"
-                );
+                )?;
             }
         }
-        cfg.push_str(" no shutdown\n!\n");
+        f.write_str(" no shutdown\n!\n")
     }
-    if matches!(kind, Appliance::CiscoIol | Appliance::CiscoIolL2) {
-        let _ = write!(cfg, "ip route vrf isoloom-mgmt 0.0.0.0 0.0.0.0 Ethernet0/0 {}\n!\n", mgmt_gateway());
+}
+
+impl fmt::Display for StartupConfig<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "hostname {}\n!\nno ip domain lookup\nip domain name lab\n!\nusername admin privilege 15 secret admin\n!\n",
+            self.name
+        )?;
+        if self.iol() {
+            self.management(f)?;
+        }
+        self.vlans(f)?;
+        for (k, port) in self.ports.iter().enumerate() {
+            self.interface(f, k + 1, port)?;
+        }
+        if self.iol() {
+            write!(f, "ip route vrf isoloom-mgmt 0.0.0.0 0.0.0.0 Ethernet0/0 {}\n!\n", MGMT.gateway())?;
+        }
+        f.write_str("ip ssh version 2\n!\nline vty 0 4\n login local\n transport input ssh telnet\n!\n")
     }
-    cfg.push_str("ip ssh version 2\n!\nline vty 0 4\n login local\n transport input ssh telnet\n!\n");
-    cfg
 }
 
 /// How the container of appliance `name` is wired.
-pub fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: impl Fn(&str, u8) -> Ipv4Addr) -> Wiring {
+pub(crate) fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: impl Fn(&str, u8) -> Ipv4Addr) -> Wiring {
     let ports = ports(spec, name, m, &address);
-    let cfg = base_config(spec, name, kind, &ports);
+    let cfg = StartupConfig {
+        spec,
+        name,
+        kind,
+        ports: &ports,
+    }
+    .to_string();
     match kind {
         Appliance::CiscoIol | Appliance::CiscoIolL2 => iol_wiring(iol_pid(spec, name), ports, cfg),
         Appliance::CiscoVios | Appliance::CiscoViosL2 | Appliance::CiscoCsr1000v | Appliance::CiscoC8000v => vrnetlab_wiring(name, kind, ports, cfg),
@@ -228,19 +284,30 @@ pub fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: im
 
 /// IOL: the interfaces mapped by `/iol/NETMAP` and `/iol/iouyap.ini`, the instance in `IOL_PID`.
 fn iol_wiring(pid: usize, ports: Vec<Port>, cfg: String) -> Wiring {
-    let mut iouyap = "[default]\nbase_port = 49000\nnetmap = /iol/NETMAP\n[513:0/0]\neth_dev = eth0\n".to_string();
-    let mut netmap = format!("{pid}:0/0 513:0/0\n");
-    for k in 1..=ports.len() {
-        let (slot, port) = (k / 4, k % 4);
-        let _ = write!(iouyap, "[513:{slot}/{port}]\neth_dev = eth{k}\n");
-        let _ = writeln!(netmap, "{pid}:{slot}/{port} 513:{slot}/{port}");
-    }
+    let slots: Vec<(usize, usize, usize)> = (1..=ports.len()).map(|k| (k, k / 4, k % 4)).collect();
+    let iouyap: Vec<String> = slots.iter().map(|(k, slot, port)| format!("[513:{slot}/{port}]\neth_dev = eth{k}\n")).collect();
+    let netmap: Vec<String> = slots.iter().map(|(_, slot, port)| format!("{pid}:{slot}/{port} 513:{slot}/{port}\n")).collect();
     Wiring {
         ports,
         files: vec![
-            ("base.txt".into(), "/iol/base.txt".into(), cfg),
-            ("NETMAP".into(), "/iol/NETMAP".into(), netmap),
-            ("iouyap.ini".into(), "/iol/iouyap.ini".into(), iouyap),
+            File {
+                name: "base.txt",
+                inside: "/iol/base.txt",
+                contents: cfg,
+            },
+            File {
+                name: "NETMAP",
+                inside: "/iol/NETMAP",
+                contents: format!("{pid}:0/0 513:0/0\n{}", netmap.concat()),
+            },
+            File {
+                name: "iouyap.ini",
+                inside: "/iol/iouyap.ini",
+                contents: format!(
+                    "[default]\nbase_port = 49000\nnetmap = /iol/NETMAP\n[513:0/0]\neth_dev = eth0\n{}",
+                    iouyap.concat()
+                ),
+            },
         ],
         own_config: "/iol/own.txt",
         firmware: None,
@@ -259,7 +326,7 @@ fn vrnetlab_wiring(name: &str, kind: Appliance, ports: Vec<Port>, cfg: String) -
     }
     Wiring {
         ports,
-        files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
+        files: vec![base_cfg(cfg)],
         own_config: "/config/own.cfg",
         firmware: None,
         environment,
@@ -276,37 +343,46 @@ fn dynamips_wiring(ports: Vec<Port>, cfg: String) -> Wiring {
     let n = ports.len();
     // PA-2FE-TX adapters in the slots the data interfaces reach past the I/O card's port.
     let slots = (2..=n).map(|k| dynamips_port(k).0).max().unwrap_or(0);
-    let mut args = String::from("-P 7200 -r 512 -T 2000 -C /config/startup-config.cfg");
-    for slot in 1..=slots {
-        let _ = write!(args, " -p {slot}:PA-2FE-TX");
-    }
-    for k in 1..=n {
+    let adapters = (1..=slots).map(|slot| format!(" -p {slot}:PA-2FE-TX"));
+    let bindings = (1..=n).map(|k| {
         let (slot, port) = dynamips_port(k);
-        let _ = write!(args, " -s {slot}:{port}:linux_eth:eth{k}");
-    }
+        format!(" -s {slot}:{port}:linux_eth:eth{k}")
+    });
+    let args: Vec<String> = std::iter::once("-P 7200 -r 512 -T 2000 -C /config/startup-config.cfg".to_owned())
+        .chain(adapters)
+        .chain(bindings)
+        .collect();
     Wiring {
         ports,
-        files: vec![("base.cfg".into(), "/config/base.cfg".into(), cfg)],
+        files: vec![base_cfg(cfg)],
         own_config: "/config/own.cfg",
         firmware: Some("/firmware/ios.bin"),
-        environment: vec![("DYNAMIPS_ARGS".into(), args)],
+        environment: vec![("DYNAMIPS_ARGS".into(), args.concat())],
         entrypoint: shell(
             "cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $DYNAMIPS_ARGS /firmware/ios.bin",
         ),
         privileged: false,
-        build: Some(
-            "# Dynamips, the Cisco 7200 emulator (Ubuntu's package, in its default sources); the IOS\n# image is the user's.\nFROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends dynamips iproute2 && rm -rf /var/lib/apt/lists/*\n".into(),
-        ),
+        build: Some(DYNAMIPS_DOCKERFILE),
     }
 }
 
+/// Isoloom's startup configuration, as `/config/base.cfg` (vrnetlab's and Dynamips' place).
+fn base_cfg(cfg: String) -> File {
+    File {
+        name: "base.cfg",
+        inside: "/config/base.cfg",
+        contents: cfg,
+    }
+}
+
+/// `script`, run by `sh -c`.
 fn shell(script: &str) -> Vec<String> {
     vec!["/bin/sh".into(), "-c".into(), script.into()]
 }
 
 /// What the network sidecar runs: the container lets go of the data addresses on its `ports`
 /// data interfaces (IOS owns them).
-pub fn sidecar_commands(ports: usize) -> Vec<String> {
+pub(crate) fn sidecar_commands(ports: usize) -> Vec<String> {
     (1..=ports).map(|k| format!("ip addr flush dev eth{k}")).collect()
 }
 
@@ -317,5 +393,21 @@ mod tests {
     #[test]
     fn the_management_block_is_the_shared_constant() {
         assert_eq!(Cidr::parse(MGMT_CIDR), Some(MGMT));
+    }
+
+    #[test]
+    fn a_mask_has_its_prefix_length_in_ones() {
+        assert_eq!(mask(24), Ipv4Addr::new(255, 255, 255, 0));
+        assert_eq!(mask(0), Ipv4Addr::UNSPECIFIED);
+        assert_eq!(mask(32), Ipv4Addr::BROADCAST);
+    }
+
+    #[test]
+    fn interfaces_are_named_as_each_os_names_them() {
+        assert_eq!(interface(Appliance::CiscoIol, 5), "Ethernet1/1");
+        assert_eq!(interface(Appliance::CiscoVios, 2), "GigabitEthernet0/2");
+        assert_eq!(interface(Appliance::CiscoC8000v, 1), "GigabitEthernet2");
+        assert_eq!(interface(Appliance::CiscoDynamips, 1), "FastEthernet0/0");
+        assert_eq!(interface(Appliance::CiscoDynamips, 3), "FastEthernet1/1");
     }
 }

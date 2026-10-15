@@ -11,23 +11,22 @@ pub use backends::{BACKENDS, backend};
 pub use isoloom_plan::Environment;
 pub use isoloom_render::backend::{Backend, Files, RenderError};
 
-pub use isoloom_compose::render::files::project_variables as compose_project_variables;
-pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, exec_runner, leaf_jobs, removable_volumes, start_commands, start_plan};
+pub use isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL, StartPlan, start_plan};
 pub use isoloom_kubernetes::{project_copies, secrets::SECRETS as KUBERNETES_SECRETS};
+pub use isoloom_render::container::{exec_runner, leaf_jobs, project_variables as compose_project_variables, start_commands};
 pub use isoloom_render::{GenerateError, GeneratedFile, OUTPUT_DIR, constraints, machine_setup, provision_script, router_name};
 pub use isoloom_spec::validate::docker_cidrs;
 
-use isoloom_compose::appliances;
 use isoloom_plan::checks;
 use isoloom_render::{address, router, start_order};
 use isoloom_spec::{groups, images, instance, model, targets, validate};
 use isoloom_vagrant::vagrant;
 
 /// The network appliances' management network (see `docker.appliance`).
-pub const APPLIANCE_MGMT_CIDR: &str = appliances::MGMT_CIDR;
+pub const APPLIANCE_MGMT_CIDR: &str = isoloom_spec::appliance::MGMT_CIDR;
 /// Whether an appliance kind is a switch (it can be a LAN's `switch`).
 pub fn is_switch_appliance(kind: crate::model::Appliance) -> bool {
-    appliances::is_switch(kind)
+    isoloom_spec::appliance::is_switch(kind)
 }
 
 use std::net::Ipv4Addr;

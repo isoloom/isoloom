@@ -9,14 +9,14 @@ use isoloom_manifest::{
     Delivery, EnvName, Identifier, Machine, Name, NonEmpty, Param, PublishMode, Role, SecretSlot, SecretSource, SetBy, SlotKind, StepId, StepSelection, Store,
 };
 use isoloom_plan::{Environment, MachineShape, ValueSource};
-use isoloom_render::backend::RenderError;
 use isoloom_spec::model::{SecretSource as SpecSource, secret_variable};
 
-use super::bug;
+use isoloom_render::container::project_variables;
+
 use super::lifecycle::{job_step, owner};
 use super::machines::Member;
-use crate::docker::StartPlan;
-use crate::render::files::project_variables;
+use crate::error::Result;
+use crate::start::StartPlan;
 
 /// The host address published ports listen on.
 pub(super) const PUBLISH_ADDRESS: &str = "ISOLOOM_PUBLISH_ADDRESS";
@@ -25,21 +25,21 @@ const PUBLISH_FIXED: &str = "ISOLOOM_PUBLISH_FIXED";
 /// `0`: the checks derived from the spec are skipped.
 const DERIVED: &str = "ISOLOOM_DERIVED";
 
-fn env_name(name: &str) -> Result<EnvName, RenderError> {
-    EnvName::parse(name).map_err(bug)
+fn env_name(name: &str) -> Result<EnvName> {
+    Ok(EnvName::parse(name)?)
 }
 
 /// An environment variable of `steps`.
-fn env(var: &str, steps: StepSelection) -> Result<NonEmpty<Delivery>, RenderError> {
+fn env(var: &str, steps: StepSelection) -> Result<NonEmpty<Delivery>> {
     Ok(NonEmpty::one(Delivery::Env { var: env_name(var)?, steps }))
 }
 
-fn param(name: &str, description: &str, default: Option<&str>, values: &[&str], steps: StepSelection) -> Result<Param, RenderError> {
+fn param(name: &str, description: &str, default: Option<&str>, values: &[&str], steps: StepSelection) -> Result<Param> {
     Ok(Param {
         name: env_name(name)?,
         description: description.into(),
         default: default.map(String::from),
-        values: values.iter().map(|v| (*v).to_string()).collect(),
+        values: values.iter().map(|v| (*v).to_owned()).collect(),
         required: false,
         hosts: BTreeSet::new(),
         providers: BTreeSet::new(),
@@ -50,7 +50,7 @@ fn param(name: &str, description: &str, default: Option<&str>, values: &[&str], 
 
 /// The params the Compose file reads: the publish address and the fixed host ports when a port
 /// is published, the derived checks' switch when a runner reads it.
-pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Param>, RenderError> {
+pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Param>> {
     let published: Vec<PublishMode> = machines
         .iter()
         .flat_map(|m| &m.ports)
@@ -79,7 +79,7 @@ pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Par
 
 /// The slots: each input a container reads, each secret a container gets, each project file
 /// Compose takes from its environment.
-pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan) -> Result<Vec<SecretSlot>, RenderError> {
+pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan) -> Result<Vec<SecretSlot>> {
     let containers: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container).collect();
     let mut out = Vec::new();
     for input in &env.spec().inputs {
@@ -128,7 +128,7 @@ fn spec_source(s: &SpecSource) -> Option<SecretSource> {
     };
     Some(SecretSource {
         store,
-        reference: s.reference().to_string(),
+        reference: s.reference().to_owned(),
     })
 }
 
@@ -139,24 +139,24 @@ struct Reach {
     steps: StepSelection,
 }
 
-fn reach(machines: &[&str], members: &[Member], plan: &StartPlan) -> Result<Reach, RenderError> {
+fn reach(machines: &[&str], members: &[Member], plan: &StartPlan) -> Result<Reach> {
     let jobs = members
         .iter()
         .filter(|m| m.role == Role::Job && m.of.as_deref().is_some_and(|o| machines.contains(&o)));
     let names = machines.iter().copied().chain(jobs.map(|j| j.name.as_str()));
     let leaf_jobs = plan.jobs.iter().filter(|j| machines.contains(&owner(members, j))).map(|j| job_step(j));
-    let steps = std::iter::once("up".to_string()).chain(leaf_jobs);
+    let steps = std::iter::once("up".to_owned()).chain(leaf_jobs);
     Ok(Reach {
-        machines: names.map(Name::parse).collect::<Result<_, _>>().map_err(bug)?,
-        steps: StepSelection::Only(NonEmpty::new(steps.map(|s| StepId::parse(&s)).collect::<Result<_, _>>().map_err(bug)?, "the steps").map_err(bug)?),
+        machines: names.map(Name::parse).collect::<Result<_, _>>()?,
+        steps: StepSelection::Only(NonEmpty::new(steps.map(|s| StepId::parse(&s)).collect::<Result<_, _>>()?, "the steps")?),
     })
 }
 
 /// A sensitive slot named `name`, delivered as the variable `var`; an input may be left unset,
 /// a secret or a project file may not.
-fn slot(name: &str, kind: SlotKind, source: Option<SecretSource>, var: &str, reach: Reach) -> Result<SecretSlot, RenderError> {
+fn slot(name: &str, kind: SlotKind, source: Option<SecretSource>, var: &str, reach: Reach) -> Result<SecretSlot> {
     Ok(SecretSlot {
-        name: Identifier::parse(name).map_err(bug)?,
+        name: Identifier::parse(name)?,
         kind,
         required: kind != SlotKind::Input,
         sensitive: true,

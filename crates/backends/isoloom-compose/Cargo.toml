@@ -16,9 +16,11 @@ isoloom-manifest.workspace = true
 serde_yaml_ng.workspace = true
 serde.workspace = true
 indexmap.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+proptest.workspace = true
 
 [lints]
 workspace = true

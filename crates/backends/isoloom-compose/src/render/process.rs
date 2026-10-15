@@ -3,18 +3,15 @@
 
 use isoloom_plan::process::{DEFAULT_INTERVAL, DEFAULT_RETRIES, DEFAULT_START_PERIOD, DEFAULT_TIMEOUT};
 use isoloom_plan::{Health, MachinePlan};
+use isoloom_render::container::{PROBE_DIR, ready_test};
 use isoloom_spec::model::Machine;
 
-use crate::docker::{PROBE_DIR, ROOT, file_name, ready_test};
-use crate::file::{Healthcheck, Service};
+use crate::file::{Healthcheck, Seconds, Service};
+use crate::interpolation::literal;
+use crate::layout::{ROOT, file_name};
 
 /// Where a machine sees its `before` scripts.
-pub const BEFORE_DIR: &str = "/isoloom/before";
-
-/// `$$`: a literal `$`, not Compose's interpolation.
-fn literal(s: &str) -> String {
-    s.replace('$', "$$")
-}
+const BEFORE_DIR: &str = "/isoloom/before";
 
 /// The command (the image's entrypoint runs it), the working directory, and the `before`
 /// scripts: a shell entrypoint runs them in order, then hands over to the command (`exec`), so
@@ -47,13 +44,12 @@ pub(super) fn healthcheck(m: &Machine, mp: &MachinePlan) -> Option<Healthcheck> 
     if test.is_empty() {
         return None;
     }
-    let secs = |s: u32| format!("{s}s");
     let pace = |f: fn(&Health) -> u32, default: u32| health.map_or(default, f);
     Some(Healthcheck {
         test: vec!["CMD".into(), format!("{PROBE_DIR}/busybox"), "sh".into(), "-c".into(), literal(&test)],
-        interval: secs(pace(|h| h.interval, DEFAULT_INTERVAL)),
-        timeout: secs(pace(|h| h.timeout, DEFAULT_TIMEOUT)),
+        interval: Seconds(pace(|h| h.interval, DEFAULT_INTERVAL)),
+        timeout: Seconds(pace(|h| h.timeout, DEFAULT_TIMEOUT)),
         retries: pace(|h| h.retries, DEFAULT_RETRIES),
-        start_period: Some(secs(pace(|h| h.start_period, DEFAULT_START_PERIOD))),
+        start_period: Some(Seconds(pace(|h| h.start_period, DEFAULT_START_PERIOD))),
     })
 }

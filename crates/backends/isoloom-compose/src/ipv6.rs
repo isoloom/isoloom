@@ -7,11 +7,11 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
 
-use crate::file::{Attachment, Network, Subnet};
+use crate::file::{Attachment, Block, Network};
 
 /// A network's Compose definition: `v4` its IPv4 block and Docker's address there, then its
 /// IPv6 block when it has one (Docker at `::1`); an IPv6-only network keeps only that one.
-pub(crate) fn network(n: &NetworkPlan, v4: Subnet, internal: bool) -> Network {
+pub(crate) fn network(n: &NetworkPlan, v4: Block, internal: bool) -> Network {
     let mut subnets = vec![v4];
     let mut net = Network {
         internal,
@@ -23,7 +23,7 @@ pub(crate) fn network(n: &NetworkPlan, v4: Subnet, internal: bool) -> Network {
             net.enable_ipv4 = Some(false);
             subnets.clear();
         }
-        subnets.push(Subnet {
+        subnets.push(Block {
             subnet: v6.cidr.clone(),
             gateway: Some(v6.gateway.to_string()),
             ip_range: Some(dynamic_range(v6.gateway)),
@@ -71,7 +71,7 @@ pub(crate) fn router_attachment(env: &Environment, net: &str, v4: Ipv4Addr) -> A
 
 /// The router's sysctls: IPv4 forwarding, and IPv6 forwarding when it routes IPv6.
 pub(crate) fn forwarding(env: &Environment) -> IndexMap<String, String> {
-    let mut out = IndexMap::from([("net.ipv4.ip_forward".to_string(), "1".to_string())]);
+    let mut out = IndexMap::from([("net.ipv4.ip_forward".to_owned(), "1".to_owned())]);
     if !env.router6.is_empty() {
         out.insert("net.ipv6.conf.all.forwarding".into(), "1".into());
     }
@@ -85,9 +85,8 @@ pub(crate) fn route_commands(mp: &MachinePlan) -> impl Iterator<Item = String> +
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::model::Target;
-
     use super::*;
+    use crate::testing::environment;
 
     const SPEC: &str = "version: 1
 name: v6
@@ -100,8 +99,8 @@ machines:
 
     #[test]
     fn dual_stack_keeps_both_blocks_and_ipv6_only_drops_ipv4() {
-        let env = Environment::build(&isoloom_spec::parse(SPEC).unwrap(), Target::Docker, None);
-        let v4 = |n: &str| Subnet {
+        let env = environment(SPEC);
+        let v4 = |n: &str| Block {
             subnet: env.networks[n].cidr.clone(),
             gateway: None,
             ip_range: None,

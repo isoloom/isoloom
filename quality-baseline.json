@@ -1,13 +1,11 @@
 {
   "rules": {
     "clippy/allow_attributes": {
-      "isoloom-compose": 3,
       "isoloom-import": 3,
       "isoloom-spec": 6
     },
     "clippy/allow_attributes_without_reason": {
       "isoloom": 5,
-      "isoloom-compose": 5,
       "isoloom-import": 4,
       "isoloom-kubernetes": 1,
       "isoloom-manifest": 3,
@@ -27,7 +25,6 @@
     },
     "clippy/doc_markdown": {
       "isoloom": 1,
-      "isoloom-compose": 6,
       "isoloom-import": 2,
       "isoloom-kubernetes": 47,
       "isoloom-manifest": 10,
@@ -39,7 +36,6 @@
       "isoloom-vagrant": 10
     },
     "clippy/indexing_slicing": {
-      "isoloom-compose": 28,
       "isoloom-import": 13,
       "isoloom-manifest": 4,
       "isoloom-plan": 19,
@@ -51,7 +47,6 @@
     },
     "clippy/let_underscore_must_use": {
       "isoloom": 10,
-      "isoloom-compose": 13,
       "isoloom-import": 1,
       "isoloom-kubernetes": 8,
       "isoloom-plan": 5,
@@ -62,7 +57,6 @@
       "isoloom-vagrant": 5
     },
     "clippy/missing_errors_doc": {
-      "isoloom-compose": 6,
       "isoloom-import": 3,
       "isoloom-kubernetes": 3,
       "isoloom-manifest": 13,
@@ -73,7 +67,6 @@
       "isoloom-vagrant": 4
     },
     "clippy/must_use_candidate": {
-      "isoloom-compose": 17,
       "isoloom-import": 2,
       "isoloom-kubernetes": 24,
       "isoloom-manifest": 24,
@@ -88,7 +81,6 @@
     },
     "clippy/shadow_unrelated": {
       "isoloom": 7,
-      "isoloom-compose": 5,
       "isoloom-import": 9,
       "isoloom-kubernetes": 5,
       "isoloom-manifest": 5,
@@ -106,7 +98,6 @@
     },
     "clippy/str_to_string": {
       "isoloom": 13,
-      "isoloom-compose": 46,
       "isoloom-import": 38,
       "isoloom-kubernetes": 44,
       "isoloom-manifest": 24,
@@ -119,7 +110,6 @@
     },
     "clippy/string_slice": {
       "isoloom": 2,
-      "isoloom-compose": 1,
       "isoloom-import": 6,
       "isoloom-kubernetes": 3,
       "isoloom-manifest": 4,
@@ -131,7 +121,6 @@
     },
     "dup/clone": {
       "isoloom": 7,
-      "isoloom-compose": 2,
       "isoloom-import": 1,
       "isoloom-kubernetes": 3,
       "isoloom-manifest": 2,
@@ -153,7 +142,6 @@
     },
     "rustc/unreachable_pub": {
       "isoloom": 66,
-      "isoloom-compose": 1,
       "isoloom-import": 14,
       "isoloom-kubernetes": 9,
       "isoloom-plan": 1,

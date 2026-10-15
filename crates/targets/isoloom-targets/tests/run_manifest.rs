@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use isoloom_manifest::{Manifest, Part, Placeholder, Version};
 use isoloom_spec::{Target, load, parse};
-use isoloom_targets::{Environment, GeneratedFile, generate, generate_instance};
+use isoloom_targets::{GeneratedFile, generate, generate_instance};
 
 /// The worked example of the design (run-manifest v0, §9): an init job filling a volume with an
 /// input, a published HTTP port, checks with waits, a message pointing at the published port.
@@ -118,20 +118,6 @@ fn every_examples_manifest_parses_and_matches_the_schema() {
         let doc: serde_json::Value = serde_json::from_str(&file.contents).unwrap();
         let errors: Vec<String> = schema.iter_errors(&doc).map(|e| format!("{e} at {}", e.instance_path())).collect();
         assert!(errors.is_empty(), "{name}: {errors:#?}");
-    }
-}
-
-#[test]
-fn the_start_plan_is_computed_as_embedders_read_it_from_the_file() {
-    for (name, spec) in docker_examples() {
-        let env = Environment::build(&spec, Target::Docker, None);
-        let rendered = isoloom_compose::compose_file(Target::Docker, &env).unwrap();
-        let yaml = isoloom_compose::to_yaml(Target::Docker, &rendered.file).unwrap();
-        assert_eq!(
-            isoloom_compose::StartPlan::of(&rendered.file),
-            isoloom_compose::start_plan(&yaml).unwrap(),
-            "{name}"
-        );
     }
 }
 

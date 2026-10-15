@@ -4,54 +4,48 @@
 //! past `down` or existing already.
 
 use indexmap::IndexMap;
-use isoloom_plan::{Environment, Lifetime, MachinePlan, MachineShape};
+use isoloom_plan::{Environment, Lifetime, MachinePlan, MachineShape, VolumeKind};
+use isoloom_render::container::UTILITY_IMAGE;
 use isoloom_spec::model::Machine;
+use isoloom_spec::shell;
 
-use crate::docker::UTILITY_IMAGE;
-use crate::file::{LongMount, Mount, Service, TmpfsOptions, Volume, VolumeOptions};
-
-/// The label of a volume `isoloom down` keeps (`down --volumes` removes it too).
-pub const PERSISTENT_LABEL: &str = "isoloom.persistent";
+use crate::file::{Condition, LongMount, Mount, NetworkMode, Restart, Service, TmpfsOptions, Volume, VolumeOptions};
+use crate::labels::PERSISTENT_LABEL;
 
 /// The one-shot service creating the folders machines take of shared volumes.
-pub const FOLDERS_JOB: &str = "isoloom-volume-folders";
+pub(crate) const FOLDERS_JOB: &str = "isoloom-volume-folders";
 
 /// A machine's volumes and data disks, as its service mounts them.
-pub fn volume_mounts(mp: &MachinePlan) -> Vec<Mount> {
-    let volumes = mp.volumes.iter().map(|v| match &v.subpath {
-        Some(sub) => Mount::Long(LongMount {
-            kind: "volume",
-            source: Some(v.key.clone()),
+pub(crate) fn volume_mounts(plan: &MachinePlan) -> Vec<Mount> {
+    let volumes = plan.volumes.iter().map(|v| match &v.subpath {
+        Some(sub) => Mount::Long(LongMount::Volume {
+            source: v.key.clone(),
             target: v.path.clone(),
-            volume: Some(VolumeOptions { subpath: sub.clone() }),
-            tmpfs: None,
+            volume: VolumeOptions { subpath: sub.clone() },
         }),
         None => Mount::Short(format!("{}:{}", v.key, v.path)),
     });
-    let disks = mp.disks.iter().filter_map(|d| Some(Mount::Short(format!("{}:{}", d.key, d.mount.as_ref()?))));
+    let disks = plan.disks.iter().filter_map(|d| Some(Mount::Short(format!("{}:{}", d.key, d.mount.as_ref()?))));
     volumes.chain(disks).collect()
 }
 
 /// A machine's tmpfs mounts: the plain ones (Compose's `tmpfs:`), and the ones with a size or a
 /// mode (long-form mounts).
-pub fn tmpfs(m: &Machine) -> (Vec<String>, Vec<Mount>) {
+pub(crate) fn tmpfs(machine: &Machine) -> (Vec<String>, Vec<Mount>) {
     let mut plain = Vec::new();
     let mut long = Vec::new();
-    for t in &m.tmpfs {
+    for t in &machine.tmpfs {
         if t.size().is_none() && t.mode().is_none() {
-            plain.push(t.path().to_string());
+            plain.push(t.path().to_owned());
             continue;
         }
-        long.push(Mount::Long(LongMount {
-            kind: "tmpfs",
-            source: None,
-            target: t.path().to_string(),
-            volume: None,
-            tmpfs: Some(TmpfsOptions {
+        long.push(Mount::Long(LongMount::Tmpfs {
+            target: t.path().to_owned(),
+            tmpfs: TmpfsOptions {
                 size: t.size().map(String::from),
                 // Validated: three or four octal digits.
-                mode: t.mode().and_then(|m| u32::from_str_radix(m, 8).ok()),
-            }),
+                mode: t.mode().and_then(|mode| u32::from_str_radix(mode, 8).ok()),
+            },
         }));
     }
     (plain, long)
@@ -59,14 +53,14 @@ pub fn tmpfs(m: &Machine) -> (Vec<String>, Vec<Mount>) {
 
 /// The named volumes of the containers: each machine's (shared ones once), then its disks'. A
 /// persistent one is labelled for `down` to keep; an existing one is only named.
-pub fn declared(env: &Environment) -> IndexMap<String, Volume> {
+pub(crate) fn declared(env: &Environment) -> IndexMap<String, Volume> {
     let mut out = IndexMap::new();
     for m in env.machines.values().filter(|m| m.shape == MachineShape::Container) {
         for v in &m.volumes {
             let vol = match &v.lifetime {
                 Lifetime::Environment => Volume::default(),
                 Lifetime::Persistent => Volume {
-                    labels: IndexMap::from([(PERSISTENT_LABEL.to_string(), "true".to_string())]),
+                    labels: IndexMap::from([(PERSISTENT_LABEL.to_owned(), "true".to_owned())]),
                     ..Volume::default()
                 },
                 Lifetime::External { name } => Volume {
@@ -85,23 +79,23 @@ pub fn declared(env: &Environment) -> IndexMap<String, Volume> {
 /// The one-shot job creating, in each shared volume, the folders machines take of it: started
 /// once the volume's owner is (Docker seeds an empty volume from the owner's image first), and
 /// waited for by the machines taking a folder (Docker mounts only a folder that exists).
-pub fn folders(env: &Environment, services: &mut IndexMap<String, Service>) {
+pub(crate) fn folders(env: &Environment, services: &mut IndexMap<String, Service>) {
     let mut cmds = Vec::new();
-    let mut mounts = Vec::new();
+    let mut mounts: Vec<String> = Vec::new();
     let mut owners = Vec::new();
     for (name, m) in env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container) {
         for v in &m.volumes {
-            let (Some(sub), isoloom_plan::VolumeKind::Shared { owner, .. }) = (&v.subpath, &v.kind) else {
+            let (Some(sub), VolumeKind::Shared { owner, .. }) = (&v.subpath, &v.kind) else {
                 continue;
             };
             let at = format!("/volumes/{}", v.key);
-            if !mounts.iter().any(|x: &String| x.ends_with(&format!(":{at}"))) {
+            if !mounts.iter().any(|x| x.ends_with(&format!(":{at}"))) {
                 mounts.push(format!("{}:{at}", v.key));
             }
-            cmds.push(format!("mkdir -p {}", isoloom_spec::shell::quote(&format!("{at}/{sub}"))));
+            cmds.push(format!("mkdir -p {}", shell::quote(&format!("{at}/{sub}"))));
             owners.push(owner.clone());
             if let Some(svc) = services.get_mut(name) {
-                svc.after(FOLDERS_JOB, "service_completed_successfully");
+                svc.after(FOLDERS_JOB, Condition::CompletedSuccessfully);
             }
         }
     }
@@ -112,50 +106,43 @@ pub fn folders(env: &Environment, services: &mut IndexMap<String, Service>) {
         image: Some(env.images.pull(UTILITY_IMAGE)),
         entrypoint: vec!["sh".into(), "-c".into(), cmds.join(" && ")],
         volumes: mounts.into_iter().map(Mount::Short).collect(),
-        network_mode: Some("none".into()),
-        restart: Some("no".into()),
+        network_mode: Some(NetworkMode::None),
+        restart: Some(Restart::No),
         ..Service::default()
     };
     for o in owners.into_iter().filter(|o| services.contains_key(o)) {
-        job.after(o, "service_started");
+        job.after(o, Condition::Started);
     }
-    services.insert(FOLDERS_JOB.to_string(), job);
-}
-
-/// What `isoloom down` removes of a Compose file's named volumes when some are kept: the Docker
-/// names of the others (`<project>_<key>`, or their `name`), the existing ones left out. `None`
-/// when no volume is kept: `down -v` then removes them all. `project` is the project the file
-/// runs under, when not its own `name`.
-pub fn removable_volumes(compose_yaml: &str, project: Option<&str>) -> Option<Vec<String>> {
-    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(compose_yaml).ok()?;
-    let volumes = doc.get("volumes")?.as_mapping()?;
-    let kept = |v: &serde_yaml_ng::Value| v.get("labels").and_then(|l| l.get(PERSISTENT_LABEL)).is_some();
-    if !volumes.values().any(kept) {
-        return None;
-    }
-    let project = project.or_else(|| doc.get("name")?.as_str())?;
-    let external = |v: &serde_yaml_ng::Value| v.get("external").and_then(serde_yaml_ng::Value::as_bool) == Some(true);
-    let names = volumes
-        .iter()
-        .filter(|(_, v)| !kept(v) && !external(v))
-        .filter_map(|(k, v)| match v.get("name").and_then(serde_yaml_ng::Value::as_str) {
-            Some(n) => Some(n.to_string()),
-            None => Some(format!("{project}_{}", k.as_str()?)),
-        })
-        .collect();
-    Some(names)
+    services.insert(FOLDERS_JOB.to_owned(), job);
 }
 
 #[cfg(test)]
 mod tests {
-    use super::removable_volumes;
+    use crate::labels::PERSISTENT_LABEL;
+    use crate::testing::environment;
+
+    const SPEC: &str = "version: 1
+name: store
+networks: { lan: { cidr: 10.9.0.0/24 } }
+volumes: { data: { persistent: true } }
+machines:
+  db: { networks: { lan: 10 }, docker: { image: postgres }, volumes: { data: /var/lib/postgresql/data } }
+  web: { networks: { lan: 11 }, docker: { image: nginx }, tmpfs: [/run, { path: /cache, size: 64m, mode: '1777' }] }
+";
 
     #[test]
-    fn down_removes_every_volume_but_the_kept_and_the_existing_ones() {
-        let yaml =
-            "name: lab\nvolumes:\n  db-data:\n    labels: { isoloom.persistent: 'true' }\n  web-cache: {}\n  shared:\n    external: true\n    name: theirs\n";
-        assert_eq!(removable_volumes(yaml, None), Some(vec!["lab_web-cache".to_string()]));
-        assert_eq!(removable_volumes(yaml, Some("mine")), Some(vec!["mine_web-cache".to_string()]));
-        assert_eq!(removable_volumes("name: lab\nvolumes: { a: {} }\n", None), None);
+    fn a_kept_volume_is_labelled_for_down_to_keep() {
+        let volumes = super::declared(&environment(SPEC));
+        assert_eq!(volumes.len(), 1);
+        assert!(volumes.values().all(|v| v.labels.get(PERSISTENT_LABEL).is_some_and(|l| l == "true")));
+    }
+
+    #[test]
+    fn a_tmpfs_with_a_size_or_a_mode_is_a_long_mount() {
+        let env = environment(SPEC);
+        let (plain, long) = super::tmpfs(&env.spec().machines["web"]);
+        assert_eq!(plain, ["/run"]);
+        let yaml = serde_yaml_ng::to_string(&long).expect("serializes");
+        assert_eq!(yaml, "- type: tmpfs\n  target: /cache\n  tmpfs:\n    size: 64m\n    mode: 1023\n");
     }
 }

@@ -17,7 +17,7 @@ use isoloom_vagrant::{docker_vm, hybrid};
 /// The `docker` target's files for `env`: what a Docker host runs.
 fn docker_files(env: &Environment) -> Result<Files, RenderError> {
     let on_docker = Environment::build(env.spec(), Target::Docker, env.instance);
-    isoloom_compose::render(Target::Docker, &on_docker)
+    Ok(isoloom_compose::render(Target::Docker, &on_docker)?)
 }
 
 /// The `cloud-docker` backend: Compose on one cloud VM per cloud, built by Terraform.
@@ -33,7 +33,7 @@ impl Backend for CloudDockerBackend {
     /// Compose can, with the secrets `isoloom run` delivers to the VM; the Docker host is a
     /// fresh VM with no existing network to join.
     fn capabilities(&self) -> Capabilities {
-        isoloom_compose::render::capabilities_on_a_vm()
+        isoloom_compose::capabilities_on_a_vm()
     }
 
     /// The `docker` target's Compose file (and the files it mounts), then a module per cloud.
@@ -64,7 +64,7 @@ impl Backend for DockerVmBackend {
 
     /// Compose's but existing networks, as for `cloud-docker`: the VM runs the Compose file.
     fn capabilities(&self) -> Capabilities {
-        isoloom_compose::render::capabilities_on_a_vm()
+        isoloom_compose::capabilities_on_a_vm()
     }
 
     /// The `docker` target's Compose file (and the files it mounts), the Vagrantfile, and the

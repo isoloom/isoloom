@@ -20,10 +20,10 @@ pub(super) fn machine(hw: &Hardware, svc: &mut Service) {
         .iter()
         .map(|d| ServiceDevice {
             source: d.host.clone(),
-            target: d.guest().to_string(),
+            target: d.guest().to_owned(),
             // Always written: Docker's runtime refuses a long-form device with none (it has no
             // default there, unlike the short form's `rwm`).
-            permissions: d.permissions.clone().unwrap_or_else(|| ALL_ACCESS.to_string()),
+            permissions: d.permissions.clone().unwrap_or_else(|| ALL_ACCESS.to_owned()),
         })
         .collect();
     if let Some(g) = &hw.gpus {
@@ -34,7 +34,7 @@ pub(super) fn machine(hw: &Hardware, svc: &mut Service) {
 
 /// The GPU request: `gpu` and the spec's capabilities, its driver, then a count or the ids.
 fn request(g: &Gpus) -> DeviceRequest {
-    let mut capabilities = vec![GPU.to_string()];
+    let mut capabilities = vec![GPU.to_owned()];
     capabilities.extend(g.capabilities.iter().filter(|c| c.as_str() != GPU).cloned());
     let count = match g.count {
         Some(GpuCount::All) => Some(serde_yaml_ng::Value::from("all")),
@@ -44,7 +44,7 @@ fn request(g: &Gpus) -> DeviceRequest {
     };
     DeviceRequest {
         capabilities,
-        driver: g.driver().to_string(),
+        driver: g.driver().to_owned(),
         count,
         device_ids: g.ids.clone(),
         options: g.options.clone(),
@@ -85,6 +85,10 @@ mod tests {
             yaml(&svc),
             "deploy:\n  resources:\n    reservations:\n      devices:\n      - capabilities:\n        - gpu\n        - compute\n        driver: nvidia\n        count: all\n        options:\n          virtualization: 'false'\n"
         );
+    }
+
+    #[test]
+    fn gpus_by_id_name_them_and_their_driver() {
         let mut svc = Service::default();
         machine(&hardware("gpus: { ids: ['0', GPU-1], driver: cdi }"), &mut svc);
         assert!(
@@ -92,6 +96,10 @@ mod tests {
             "{}",
             yaml(&svc)
         );
+    }
+
+    #[test]
+    fn gpus_without_a_count_or_ids_are_one() {
         let mut svc = Service::default();
         machine(&hardware("gpus: {}"), &mut svc);
         assert!(yaml(&svc).contains("count: 1\n"));

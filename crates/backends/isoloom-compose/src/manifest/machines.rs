@@ -12,28 +12,30 @@ use isoloom_manifest::{
 };
 use isoloom_plan::checks::{self, Position};
 use isoloom_plan::{Environment, Lifetime, MachinePlan, PublishedPort};
-use isoloom_render::backend::RenderError;
 use isoloom_render::{router, trunks};
 use isoloom_spec::model;
 
-use super::{bug, in_project};
-use crate::docker::{STAND_IN, check_runner_service, init_names, probe_service, tool_service};
+use isoloom_render::container::init_names;
+
+use super::in_project;
+use crate::error::{Error, Result};
 use crate::file::ComposeFile;
+use crate::names::{STAND_IN, check_runner_service, probe_service, routes_service, tool_service};
 use crate::storage::FOLDERS_JOB;
 
 /// A service of the Compose file, told apart.
 pub(super) struct Member {
     /// The service.
-    pub name: String,
+    pub(super) name: String,
     /// What it is to the run.
-    pub role: Role,
+    pub(super) role: Role,
     /// The machine it belongs to.
-    pub of: Option<String>,
+    pub(super) of: Option<String>,
 }
 
 /// Every service of `file`, in its order, with its role; a service this backend doesn't know it
 /// added is refused.
-pub(super) fn classify(env: &Environment, file: &ComposeFile) -> Result<Vec<Member>, RenderError> {
+pub(super) fn classify(env: &Environment, file: &ComposeFile) -> Result<Vec<Member>> {
     file.services
         .keys()
         .map(|name| {
@@ -43,8 +45,9 @@ pub(super) fn classify(env: &Environment, file: &ComposeFile) -> Result<Vec<Memb
         .collect()
 }
 
-fn bug_unknown(name: &str) -> RenderError {
-    bug(ManifestError::UnknownMachine {
+/// A service this backend doesn't know it added: a bug, which the manifest's types name.
+fn bug_unknown(name: &str) -> Error {
+    Error::from(ManifestError::UnknownMachine {
         at: "the Compose file".into(),
         machine: name.into(),
     })
@@ -59,7 +62,7 @@ fn role_of(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, O
         if init_names(m, machine).iter().any(|j| j == name) {
             Some((Role::Job, Some(m.clone())))
         } else {
-            (name == format!("{m}-routes")).then(|| (Role::Infra, Some(m.clone())))
+            (name == routes_service(m)).then(|| (Role::Infra, Some(m.clone())))
         }
     });
     owned.or_else(|| isoloom_own(env, name)).or_else(|| runner(env, file, name))
@@ -72,7 +75,7 @@ fn isoloom_own(env: &Environment, name: &str) -> Option<(Role, Option<String>)> 
     if name == STAND_IN {
         return Some((Role::Access, None));
     }
-    if name == format!("{STAND_IN}-routes") {
+    if name == routes_service(STAND_IN) {
         return Some((Role::Infra, Some(STAND_IN.into())));
     }
     if spec.tools.keys().any(|t| tool_service(t) == name) {
@@ -92,7 +95,7 @@ fn runner(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, Op
         .find(|(pos, _)| check_runner_service(pos, &default) == name)?;
     let of = match pos {
         Position::Machine(m) if file.services.contains_key(&m) => Some(m),
-        Position::Machine(_) => Some(STAND_IN.to_string()),
+        Position::Machine(_) => Some(STAND_IN.to_owned()),
         Position::Networks => None,
     };
     Some((Role::Check, of))
@@ -100,16 +103,16 @@ fn runner(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, Op
 
 /// Each member as a machine: the lab's own with their architecture, size, addresses, volumes
 /// and ports; Isoloom's with what they have of those.
-pub(super) fn machines(env: &Environment, file: &ComposeFile, members: &[Member]) -> Result<Vec<Machine>, RenderError> {
+pub(super) fn machines(env: &Environment, file: &ComposeFile, members: &[Member]) -> Result<Vec<Machine>> {
     members.iter().map(|m| machine(env, file, m)).collect()
 }
 
-fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Machine, RenderError> {
-    let name = Name::parse(&member.name).map_err(bug)?;
+fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Machine> {
+    let name = Name::parse(&member.name)?;
     let mut out = Machine {
         name: name.clone(),
         role: member.role,
-        of: member.of.as_deref().map(Name::parse).transpose().map_err(bug)?,
+        of: member.of.as_deref().map(Name::parse).transpose()?,
         os: None,
         windows: false,
         arch: None,
@@ -137,8 +140,8 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Mac
             out.addresses = addresses(mp)?;
         }
     } else if member.name == router::NAME {
-        let router = env.router.iter().flatten().map(|(n, a)| Ok((Name::parse(n).map_err(bug)?, IpAddr::V4(*a))));
-        out.addresses = router.collect::<Result<_, RenderError>>()?;
+        let router = env.router.iter().flatten().map(|(n, a)| Ok((Name::parse(n)?, IpAddr::V4(*a))));
+        out.addresses = router.collect::<Result<_>>()?;
     } else if let Some(tool) = spec.tools.iter().find(|(t, _)| tool_service(t) == member.name).map(|(_, t)| t) {
         out.ports = tool_port(tool)?.into_iter().collect();
     }
@@ -157,18 +160,18 @@ fn protocol(p: model::Protocol) -> Protocol {
 }
 
 /// Its address on each network: IPv4 where it has one, else IPv6.
-fn addresses(mp: &MachinePlan) -> Result<BTreeMap<Name, IpAddr>, RenderError> {
+fn addresses(mp: &MachinePlan) -> Result<BTreeMap<Name, IpAddr>> {
     let v4 = mp.addresses.iter().map(|(n, a)| (n, IpAddr::V4(*a)));
     let v6 = mp
         .addresses6
         .iter()
         .filter(|(n, _)| !mp.addresses.contains_key(*n))
         .map(|(n, a)| (n, IpAddr::V6(*a)));
-    v4.chain(v6).map(|(n, a)| Ok((Name::parse(n).map_err(bug)?, a))).collect()
+    v4.chain(v6).map(|(n, a)| Ok((Name::parse(n)?, a))).collect()
 }
 
 /// Its named volumes and data disks, by their names in the spec.
-fn volumes(mp: &MachinePlan) -> Result<Vec<Volume>, RenderError> {
+fn volumes(mp: &MachinePlan) -> Result<Vec<Volume>> {
     let named = mp.volumes.iter().map(|v| {
         let native = match &v.lifetime {
             Lifetime::External { name } => Template::text(name),
@@ -181,26 +184,26 @@ fn volumes(mp: &MachinePlan) -> Result<Vec<Volume>, RenderError> {
         .chain(disks)
         .map(|(name, path, native)| {
             Ok(Volume {
-                name: Name::parse(name).map_err(bug)?,
-                path: GuestPath::parse(path).map_err(bug)?,
+                name: Name::parse(name)?,
+                path: GuestPath::parse(path)?,
                 native: Some(native),
             })
         })
         .collect()
 }
 
-/// Where a published port listens: ISOLOOM_PUBLISH_ADDRESS.
-fn publish_address() -> Result<Template, RenderError> {
-    let name = isoloom_manifest::EnvName::parse(super::slots::PUBLISH_ADDRESS).map_err(bug)?;
+/// Where a published port listens: `ISOLOOM_PUBLISH_ADDRESS`.
+fn publish_address() -> Result<Template> {
+    let name = isoloom_manifest::EnvName::parse(super::slots::PUBLISH_ADDRESS)?;
     Ok(Template::from(Placeholder::Param(name)))
 }
 
-fn port(p: &model::Port, published: &[PublishedPort]) -> Result<Port, RenderError> {
+fn port(p: &model::Port, published: &[PublishedPort]) -> Result<Port> {
     let publish = published
         .iter()
         .find(|x| x.port == p.port && x.protocol == p.protocol)
         .map(|x| {
-            Ok::<_, RenderError>(Publish {
+            Ok::<_, Error>(Publish {
                 mode: if x.fixed { PublishMode::Fixed } else { PublishMode::Ephemeral },
                 preferred: NonZeroU16::new(x.publish),
                 address: Some(publish_address()?),
@@ -208,9 +211,9 @@ fn port(p: &model::Port, published: &[PublishedPort]) -> Result<Port, RenderErro
         })
         .transpose()?;
     Ok(Port {
-        name: p.name.as_deref().map(Name::parse).transpose().map_err(bug)?,
+        name: p.name.as_deref().map(Name::parse).transpose()?,
         port: NonZeroU16::new(p.port).ok_or_else(|| {
-            bug(ManifestError::OutOfRange {
+            Error::from(ManifestError::OutOfRange {
                 what: "a port",
                 value: 0,
                 min: 1,
@@ -225,7 +228,7 @@ fn port(p: &model::Port, published: &[PublishedPort]) -> Result<Port, RenderErro
 }
 
 /// A tool's port, always published on its own `publish` number.
-fn tool_port(tool: &model::Tool) -> Result<Option<Port>, RenderError> {
+fn tool_port(tool: &model::Tool) -> Result<Option<Port>> {
     let (Some(port), Some(publish)) = (tool.port.and_then(NonZeroU16::new), tool.publish) else {
         return Ok(None);
     };
@@ -245,7 +248,7 @@ fn tool_port(tool: &model::Tool) -> Result<Option<Port>, RenderError> {
 
 /// An output per published port of the lab's machines and tools: an HTTP port is an entry (the
 /// Open button), the others information; each shown at the host's loopback.
-pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>, RenderError> {
+pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>> {
     let shown = machines.iter().filter(|m| matches!(m.role, Role::Target | Role::Access | Role::Tool));
     shown
         .flat_map(|m| m.ports.iter().filter(|p| p.publish.is_some()).map(move |p| (m, p)))
@@ -253,7 +256,7 @@ pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>, RenderError> 
         .collect()
 }
 
-fn output(m: &Machine, p: &Port) -> Result<Output, RenderError> {
+fn output(m: &Machine, p: &Port) -> Result<Output> {
     let label = p.name.as_ref().map_or_else(|| p.port.to_string(), ToString::to_string);
     let udp = if p.protocol == Protocol::Udp { "_udp" } else { "" };
     let snake: String = format!("{}_{label}{udp}", m.name)
@@ -271,7 +274,7 @@ fn output(m: &Machine, p: &Port) -> Result<Output, RenderError> {
         None => format!("{}'s port {port}", m.name),
     };
     Ok(Output {
-        name: SnakeName::parse(&snake).map_err(bug)?,
+        name: SnakeName::parse(&snake)?,
         description: Some(format!("{what}.")),
         role,
         sensitive: false,
@@ -290,19 +293,25 @@ fn output(m: &Machine, p: &Port) -> Result<Output, RenderError> {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_plan::Environment;
+    use isoloom_manifest::ManifestError;
     use isoloom_spec::model::Target;
 
+    use crate::error::Error;
     use crate::file::Service;
+    use crate::testing::environment;
 
     #[test]
     fn a_service_this_backend_did_not_add_is_refused() {
-        let yaml = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n";
-        let env = Environment::build(&isoloom_spec::parse(yaml).unwrap(), Target::Docker, None);
-        let mut file = crate::compose_file(Target::Docker, &env).unwrap().file;
+        let env = environment(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n",
+        );
+        let mut file = crate::render::compose_file(Target::Docker, &env).expect("renders").file;
         assert!(super::classify(&env, &file).is_ok());
         file.services.insert("mystery".into(), Service::default());
-        let err = super::classify(&env, &file).err().unwrap();
-        assert!(err.to_string().contains("no machine `mystery`"), "{err}");
+        let err = super::classify(&env, &file).err();
+        assert!(
+            matches!(&err, Some(Error::Manifest { source: ManifestError::UnknownMachine { machine, .. } }) if machine == "mystery"),
+            "{err:?}"
+        );
     }
 }

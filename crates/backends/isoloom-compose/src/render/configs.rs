@@ -8,12 +8,13 @@
 //! generated file never holds the project's contents, and an edit takes effect at the next run.
 
 use indexmap::IndexMap;
-use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_render::container::copied_from_project;
-pub use isoloom_render::container::{host_environment, project_variables, variable};
+use isoloom_plan::{Environment, MachinePlan};
+use isoloom_render::container::{copied_from_project, project_variables, variable};
 
-use crate::docker::ROOT;
 use crate::file::{Config, ConfigMount};
+use crate::interpolation::literal;
+use crate::layout::ROOT;
+use crate::machine::Machine;
 
 /// The name of machine `machine`'s `n`th file's config.
 fn name(machine: &str, n: usize) -> String {
@@ -35,12 +36,10 @@ pub(super) fn usage(env: &Environment) -> String {
 }
 
 /// Every container machine's files, as top-level configs.
-pub(super) fn configs(env: &Environment) -> IndexMap<String, Config> {
-    env.machines
-        .iter()
-        .filter(|(_, mp)| mp.shape == MachineShape::Container)
-        .flat_map(|(machine, mp)| {
-            mp.files.iter().enumerate().map(move |(n, f)| {
+pub(super) fn declared(env: &Environment) -> IndexMap<String, Config> {
+    Machine::containers(env)
+        .flat_map(|Machine { name: machine, plan, .. }| {
+            plan.files.iter().enumerate().map(move |(n, f)| {
                 let config = match (&f.source, &f.content) {
                     (Some(_), _) if copied_from_project(f) => Config {
                         environment: Some(variable(machine, n)),
@@ -51,7 +50,7 @@ pub(super) fn configs(env: &Environment) -> IndexMap<String, Config> {
                         ..Config::default()
                     },
                     (None, content) => Config {
-                        content: Some(content.as_deref().unwrap_or_default().replace('$', "$$")),
+                        content: Some(literal(content.as_deref().unwrap_or_default())),
                         ..Config::default()
                     },
                 };
@@ -75,7 +74,7 @@ pub(super) fn mounts(machine: &str, mp: &MachinePlan) -> Vec<ConfigMount> {
                 target: f.path.clone(),
                 uid: f.uid.filter(|_| text).map(|u| u.to_string()),
                 gid: f.gid.filter(|_| text).map(|g| g.to_string()),
-                mode: text.then(|| f.mode_or_default().to_string()),
+                mode: text.then(|| f.mode_or_default().to_owned()),
             }
         })
         .collect()
@@ -83,8 +82,9 @@ pub(super) fn mounts(machine: &str, mp: &MachinePlan) -> Vec<ConfigMount> {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_plan::Environment;
-    use isoloom_spec::model::Target;
+    use isoloom_render::container::{project_variables, variable};
+
+    use crate::testing::environment;
 
     const SPEC: &str = "
 version: 1
@@ -103,9 +103,8 @@ machines:
 
     #[test]
     fn text_is_copied_with_its_owner_and_a_project_file_mounted() {
-        let spec = isoloom_spec::parse(SPEC).expect("parses");
-        let env = Environment::build(&spec, Target::Docker, None);
-        let configs = super::configs(&env);
+        let env = environment(SPEC);
+        let configs = super::declared(&env);
         assert_eq!(configs["web-file-0"].content.as_deref(), Some("home=$$HOME\n"));
         assert_eq!(configs["web-file-1"].file.as_deref(), Some("../../conf/site.conf"));
         let mounts = super::mounts("web", &env.machines["web"]);
@@ -118,9 +117,8 @@ machines:
 
     #[test]
     fn an_owned_project_file_is_copied_in_from_compose_s_environment() {
-        let spec = isoloom_spec::parse(SPEC).expect("parses");
-        let env = Environment::build(&spec, Target::Docker, None);
-        let configs = super::configs(&env);
+        let env = environment(SPEC);
+        let configs = super::declared(&env);
         assert_eq!(configs["web-file-2"].environment.as_deref(), Some("ISOLOOM_FILE_WEB_2"));
         assert_eq!((configs["web-file-2"].file.as_ref(), configs["web-file-2"].content.as_ref()), (None, None));
         let mounts = super::mounts("web", &env.machines["web"]);
@@ -128,10 +126,10 @@ machines:
             (mounts[2].uid.as_deref(), mounts[2].gid.as_deref(), mounts[2].mode.as_deref()),
             (Some("101"), None, Some("0400"))
         );
-        assert_eq!(super::project_variables(&env), [("ISOLOOM_FILE_WEB_2".to_string(), "conf/key.pem".to_string())]);
-        assert_eq!(super::variable("db-main", 0), "ISOLOOM_FILE_DB_MAIN_0");
+        assert_eq!(project_variables(&env), [("ISOLOOM_FILE_WEB_2".to_owned(), "conf/key.pem".to_owned())]);
+        assert_eq!(variable("db-main", 0), "ISOLOOM_FILE_DB_MAIN_0");
         assert_eq!(
-            super::host_environment(&env),
+            isoloom_render::container::host_environment(&env),
             "ISOLOOM_FILE_WEB_2=\"$(cat 'conf/key.pem'; printf x)\" && ISOLOOM_FILE_WEB_2=\"${ISOLOOM_FILE_WEB_2%x}\" && export ISOLOOM_FILE_WEB_2 && "
         );
         assert!(
