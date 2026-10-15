@@ -211,6 +211,12 @@
           "host": "mac",
           "date": "2026-10-15",
           "result": "pass"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "the full cycle through the launcher's runner path (real_vm_labs), VirtualBox 7.2.20"
         }
       ]
     },
@@ -236,6 +242,12 @@
           "date": "2026-10-15",
           "result": "partial",
           "note": "up, status and checks; park, resume and down pending"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "the full cycle through the runner (up, checks, pause and shutdown with their resumes, provision, down), Vagrant 2.4.9 on Windows 11"
         }
       ]
     },
