@@ -56,3 +56,28 @@ fn recipes_that_cannot_go_together_are_refused() {
         assert!(e.contains(why), "{yaml}: {e}");
     }
 }
+
+#[test]
+fn a_build_or_a_step_of_the_wrong_shape_says_what_is_expected() {
+    let build = app("{ build: [a] }").unwrap_err();
+    assert!(build.contains("a project folder, or `{ context, dockerfile, target, args }`"), "{build}");
+    let step = app("{ steps: [[a]] }").unwrap_err();
+    assert!(
+        step.contains("`reboot`, or one of `{ run }`, `{ copy }`, `{ packages }` and `{ playbook }`"),
+        "{step}"
+    );
+    let nothing = app("{ steps: [{}] }").unwrap_err();
+    assert!(nothing.contains("a step needs one of `run`, `copy`, `packages` and `playbook`"), "{nothing}");
+}
+
+#[test]
+fn a_step_without_a_container_form_says_why() {
+    let refusal = |yaml: &str| app(yaml).unwrap().steps[0].container_refusal();
+    assert_eq!(refusal("{ steps: [{ playbook: p.yml }] }"), Some("a playbook step runs in a VM only in 1.0"));
+    assert_eq!(
+        refusal("{ steps: [{ run: iis.PS1 }] }"),
+        Some("a PowerShell script means Windows, which has no container form in 1.0")
+    );
+    assert_eq!(refusal("{ steps: [{ run: web.sh }] }"), None);
+    assert_eq!(refusal("{ steps: [{ copy: { from: a, to: /a } }] }"), None);
+}

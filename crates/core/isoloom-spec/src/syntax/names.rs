@@ -210,6 +210,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_number_as_a_name_is_refused_against_the_naming_rule() {
+        let ports = |yaml: &str| serde_yaml_ng::from_str::<indexmap::IndexMap<PortName, u16>>(yaml).unwrap_err().to_string();
+        assert!(ports("{ 80: 80 }").contains("`80` isn't a valid port name"), "{}", ports("{ 80: 80 }"));
+        assert!(ports("{ -5: 80 }").contains("`-5` isn't a valid port name"), "{}", ports("{ -5: 80 }"));
+        let wrong = ports("{ [a]: 80 }");
+        assert!(wrong.contains("expected a name"), "{wrong}");
+    }
+
+    #[test]
     fn a_name_that_breaks_its_rule_is_refused_with_the_rule() {
         assert!("dns-udp".parse::<PortName>().is_ok() && "80".parse::<PortName>().is_err() && "Web".parse::<PortName>().is_err());
         assert!("a".repeat(31).parse::<PortName>().is_ok() && "a".repeat(32).parse::<PortName>().is_err());

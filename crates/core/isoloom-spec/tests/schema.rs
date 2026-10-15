@@ -1,5 +1,6 @@
 //! The JSON Schema editors use agrees with the parser: every example is valid, typos are
-//! caught, and the examples point editors to it.
+//! caught, the examples point editors to it, and the committed copy
+//! (`schemas/spec-v1.schema.json`) is the one the types generate.
 
 use std::error::Error;
 use std::path::Path;
@@ -8,6 +9,33 @@ use isoloom_spec::schema::{MODELINE, schema};
 
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+
+const WRITE: &str = "cargo test -p isoloom-spec --test schema -- --ignored write_the_committed_schema";
+
+/// The committed copy of the schema.
+fn committed() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/spec-v1.schema.json")
+}
+
+/// The schema the types generate, as the committed file holds it.
+fn generated() -> serde_json::Result<String> {
+    serde_json::to_string_pretty(&schema()).map(|text| text + "\n")
+}
+
+#[test]
+fn the_committed_schema_is_current() -> Outcome {
+    let on_disk = std::fs::read_to_string(committed()).unwrap_or_default();
+    assert!(on_disk == generated()?, "schemas/spec-v1.schema.json is out of date: run `{WRITE}`");
+    Ok(())
+}
+
+/// Writes the schema the types generate to `schemas/spec-v1.schema.json`.
+#[test]
+#[ignore = "writes the committed schema; run it after changing the types"]
+fn write_the_committed_schema() -> Outcome {
+    std::fs::write(committed(), generated()?)?;
+    Ok(())
+}
 
 /// Every example of the project: its folder's name and its spec's text.
 fn examples() -> Outcome<Vec<(String, String)>> {

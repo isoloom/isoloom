@@ -61,3 +61,35 @@ fn moved_keys_name_their_new_place() {
 fn a_spec_in_the_new_form_has_none() {
     assert_eq!(scanned("machines:\n  web: { os: debian@12, app: { image: nginx }, ports: { web: 80 } }\n"), []);
 }
+
+#[test]
+fn a_docker_build_with_its_dockerfile_keeps_it_in_full() {
+    for extra in ["dockerfile: web.Dockerfile", "args: { A: b }", "target: prod"] {
+        let p = scanned(&format!("machines:\n  web:\n    docker: {{ build: build/web, {extra} }}\n"));
+        let fix = p[0].fix.as_deref().unwrap();
+        assert!(
+            fix.contains("`app: { build: { context: build/web, dockerfile, target, args } }`"),
+            "{extra}: {fix}"
+        );
+    }
+    let lxc = scanned("machines:\n  web:\n    docker: { image: nginx, lxc: true }\n");
+    assert!(
+        lxc[0]
+            .fix
+            .as_deref()
+            .unwrap()
+            .contains("`overrides: { proxmox: { machines: { web: { lxc: true } } } }`")
+    );
+    let idle_off = scanned("machines:\n  web:\n    docker: { image: nginx, idle: false }\n");
+    assert_eq!(idle_off[0].fix.as_deref(), Some("`app: { image: nginx }`"));
+}
+
+#[test]
+fn listed_ports_keep_their_protocol_in_the_map() {
+    let fix = |port: &str| scanned(&format!("machines:\n  web:\n    ports: [{port}]\n"))[0].fix.clone().unwrap();
+    assert_eq!(fix("{ port: 53, protocol: udp, http: true }"), "`ports: { p53: { port: 53, protocol: udp } }`");
+    assert_eq!(fix("{ port: 443, http: true, tls: true }"), "`ports: { p443: { port: 443, protocol: https } }`");
+    assert_eq!(fix("{ port: 80, http: true }"), "`ports: { p80: { port: 80, protocol: http } }`");
+    assert_eq!(fix("{ port: 636, tls: true }"), "`ports: { p636: { port: 636, protocol: tls } }`");
+    assert_eq!(fix("{ port: 22 }"), "`ports: { p22: { port: 22 } }`");
+}

@@ -118,6 +118,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn an_input_is_sensitive_unless_it_says_otherwise() {
+        let map: Inputs = serde_yaml_ng::from_str("{ FLAG: { description: the flag } }").unwrap();
+        assert!(map.0.values().all(|i| i.sensitive));
+        let none: Inputs = serde_yaml_ng::from_str("~").unwrap();
+        assert_eq!(none, Inputs::default());
+        let wrong = serde_yaml_ng::from_str::<Inputs>("5").unwrap_err().to_string();
+        assert!(
+            wrong.contains("a list of input names, or a map of name to `{ sensitive, description }`"),
+            "{wrong}"
+        );
+    }
+
+    #[test]
     fn inputs_are_a_list_or_a_map() {
         let list: Inputs = serde_yaml_ng::from_str("[FLAG, API_URL]").unwrap();
         assert!(list.0.values().all(|i| i.sensitive));

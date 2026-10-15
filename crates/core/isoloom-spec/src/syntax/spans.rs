@@ -105,6 +105,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn an_alias_takes_its_place_in_a_list() {
+        let spans = Spans::of(
+            "base: &b { a: 1 }
+list:
+  - *b
+  - two
+",
+        );
+        let at = |p: &str| spans.find(&FieldPath::new(p)).map(|s| (s.line, s.column));
+        assert_eq!((at("list[0]"), at("list[1]")), (Some((3, 5)), Some((4, 5))));
+    }
+
+    #[test]
     fn keys_and_items_are_placed_in_block_and_flow_style() {
         let yaml = "version: 1\nmachines:\n  web:\n    networks: { lab: 10 }\n    files:\n      - { path: /a, input: FLAG }\n      - path: /b\n";
         let spans = Spans::of(yaml);

@@ -307,6 +307,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_command_or_an_environment_value_of_the_wrong_shape_says_what_is_expected() {
+        let command = serde_yaml_ng::from_str::<Command>("5").unwrap_err().to_string();
+        assert!(command.contains("a text, a list of arguments, or `{ run, cwd }`"), "{command}");
+        let value = serde_yaml_ng::from_str::<EnvValue>("[1]").unwrap_err().to_string();
+        assert!(value.contains("a text, a number, a boolean, or `{ input: NAME }`"), "{value}");
+        let both = serde_yaml_ng::from_str::<EnvValue>("{ input: A, secret: b }").unwrap_err().to_string();
+        assert!(both.contains("write one of `{ input: NAME }`"), "{both}");
+        assert_eq!(serde_yaml_ng::from_str::<EnvValue>("1.5").ok(), Some(EnvValue::Text("1.5".into())));
+        assert_eq!(serde_yaml_ng::from_str::<EnvValue>("-3").ok(), Some(EnvValue::Text("-3".into())));
+    }
+
+    #[test]
     fn a_command_is_a_text_a_list_or_with_its_directory() {
         let text: Command = serde_yaml_ng::from_str("python3 app.py").unwrap();
         assert_eq!(text.run, CommandLine::Shell("python3 app.py".into()));

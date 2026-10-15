@@ -246,6 +246,26 @@ mod tests {
     }
 
     #[test]
+    fn a_protocol_says_what_it_runs_over_and_speaks() {
+        let all = [PortProtocol::Tcp, PortProtocol::Udp, PortProtocol::Http, PortProtocol::Https, PortProtocol::Tls];
+        let tcp: Vec<bool> = all.iter().map(|p| p.is_tcp()).collect();
+        let http: Vec<bool> = all.iter().map(|p| p.is_http()).collect();
+        let tls: Vec<bool> = all.iter().map(|p| p.is_tls()).collect();
+        assert_eq!(tcp, [true, false, true, true, true]);
+        assert_eq!(http, [false, false, true, true, false]);
+        assert_eq!(tls, [false, false, false, true, true]);
+    }
+
+    #[test]
+    fn a_port_or_a_publish_of_the_wrong_shape_says_what_is_expected() {
+        let port = ports("{ a: [1] }").unwrap_err();
+        assert!(port.contains("a port number, or `{ port, protocol, publish, dormant }`"), "{port}");
+        let publish = ports("{ a: { port: 1, publish: [1] } }").unwrap_err();
+        assert!(publish.contains("`true`, a host port, or `{ host, fixed: true }`"), "{publish}");
+        assert!(ports("{ a: { port: 1, publish: 0 } }").unwrap_err().contains("a host port is 1 to 65535"));
+    }
+
+    #[test]
     fn a_port_is_a_number_or_written_in_full() {
         let p = ports("{ ssh: 22, site: { port: 8000, protocol: http, publish: 8080 }, shell: { port: 4444, dormant: true } }").unwrap();
         let get = |n: &str| &p[&n.parse::<PortName>().unwrap()];

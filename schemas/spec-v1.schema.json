@@ -1,0 +1,2924 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "The version of the `isoloom.yml` format the file is written in: `1`.",
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "description": "The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs,\nnetworks and cloud resources.",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "networks": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Network"
+      },
+      "description": "The environment's networks, by name: each an address block the machines on it share.",
+      "default": {},
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+      }
+    },
+    "reach": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Reach"
+      },
+      "description": "Allowed traffic between networks; everything else between networks is blocked.",
+      "default": []
+    },
+    "dns": {
+      "description": "The environment's names in a private DNS zone: off unless `private: true`.",
+      "$ref": "#/$defs/EnvironmentDns"
+    },
+    "inputs": {
+      "$ref": "#/$defs/Inputs",
+      "description": "Values given at each start (a flag, a launch token): a list of names, or a map of name to\n`{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a\nmachine as a file (`files: [{ path, input }]`), never as an environment variable.",
+      "default": {}
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/SecretSource"
+      },
+      "description": "Secrets, by kebab-case name: the store each value is read from at each start (`env`,\n`file`, `vault`, `sops`). A machine gets one as a file (`files: [{ path, secret }]`).",
+      "default": {}
+    },
+    "volumes": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/SharedVolume"
+      },
+      "description": "Volumes shared between machines, by name: `{ owner, persistent }`.",
+      "default": {}
+    },
+    "machines": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Machine"
+      },
+      "description": "The environment's machines, by name, started in the order written (after their\n`depends_on`).",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+      }
+    },
+    "common": {
+      "description": "Machine fields every machine shares (a machine's own value wins).",
+      "$ref": "#/$defs/Shared"
+    },
+    "groups": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Group"
+      },
+      "description": "Named sets of machines sharing fields, also Ansible inventory groups and `overrides` keys."
+    },
+    "provision": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Provision"
+      },
+      "description": "The environment's own Ansible, run from Isoloom's Linux controller once every machine is\nup.",
+      "default": []
+    },
+    "controller": {
+      "description": "The controller added for `provision:` and playbook checks: `{ resources, keep_running }`.",
+      "$ref": "#/$defs/Controller"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Check"
+      },
+      "description": "Black-box checks that prove the behaviour on every target.",
+      "default": []
+    },
+    "message": {
+      "type": "string",
+      "description": "Shown once the environment is up, in Markdown, with `{{ path }}` placeholders:\n`machines.<m>.ports.<name>.port`, `.published`, `.url`, `machines.<m>.addresses.<network>`\nand `cloud.outputs.<name>`, each checked at validation."
+    },
+    "overrides": {
+      "$ref": "#/$defs/Overrides",
+      "description": "Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `proxmox`,\n`aws`, ...)."
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Tool"
+      },
+      "description": "Observers beside the environment, on every network: a toolbox (`shell`), or any container\nimage.",
+      "default": {}
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Target"
+      },
+      "description": "Narrows the targets the machines' forms allow."
+    },
+    "constraints": {
+      "description": "What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time\nservers.",
+      "$ref": "#/$defs/Constraints"
+    },
+    "cloud": {
+      "description": "An environment of cloud services rather than machines: a Terraform module applied into\nthe user's own cloud account.",
+      "$ref": "#/$defs/CloudServices"
+    }
+  },
+  "required": [
+    "version",
+    "name"
+  ],
+  "description": "An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec-reference",
+  "title": "isoloom.yml",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cidr": {
+          "type": "string",
+          "description": "The network's private IPv4 block (inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16),\na /24 to a /29, e.g. `10.20.0.0/24`. A LAN split into `vlans` may be larger, from /8.",
+          "pattern": "^(10\\.\\d{1,3}|172\\.(1[6-9]|2\\d|3[01])|192\\.168)\\.\\d{1,3}\\.\\d{1,3}/([89]|1\\d|2[0-9])$"
+        },
+        "internet": {
+          "type": "boolean",
+          "description": "Whether machines on it may reach the internet (default true).",
+          "default": true
+        },
+        "gateway": {
+          "type": "string",
+          "description": "A machine of the environment that routes this network (an edge firewall): it takes the\ngateway address, and its own configuration decides what crosses it. Isoloom adds no\nrouter of its own here, so `reach` and `internet` on this network become expected\nbehavior for the checks to verify."
+        },
+        "vlans": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^\\d+$": {
+              "$ref": "#/$defs/Vlan"
+            }
+          },
+          "description": "The VLANs this LAN is split into, by id (1-4094), each with its own block inside the\nLAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming\nthe LAN covers all of its VLANs. Each VLAN becomes a network of its own,\n`<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.",
+          "propertyNames": {
+            "pattern": "^[1-9][0-9]{0,3}$"
+          }
+        },
+        "switch": {
+          "type": "string",
+          "description": "On a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance:\ncisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.\nIts ports are derived, so the machine lists no `networks`: an access port per VLAN, then\na trunk per machine on several of the LAN's VLANs. Docker targets only."
+        },
+        "tc": {
+          "description": "Link impairment on traffic entering this network through Isoloom's router (a slow or\nlossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule\ntouching it, no `gateway` machine).",
+          "$ref": "#/$defs/Tc"
+        },
+        "ipv6": {
+          "description": "The network's IPv6 block: dual-stack beside `cidr`, or IPv6-only (`only: true`).\nMachines get an IPv6 address on it (derived from their octet, or handed out by the\ntarget) and routes to the other IPv6 blocks the `reach` rules open.",
+          "$ref": "#/$defs/Ipv6"
+        },
+        "bridged": {
+          "description": "Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed\naddresses in `cidr`, or DHCP from the LAN).",
+          "$ref": "#/$defs/Bridged"
+        },
+        "mtu": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "The largest packet the network carries, in bytes (576 to 9216): smaller to mimic a\ntunnel or a VPN link, jumbo frames (9000) for a storage network. A LAN's VLANs carry\nthe LAN's. Default: the target's own (1500 on most)."
+        }
+      },
+      "required": [
+        "cidr"
+      ],
+      "description": "A network: an address block, whether it reaches the internet, and what routes it.",
+      "if": {
+        "not": {
+          "required": [
+            "vlans"
+          ]
+        }
+      },
+      "then": {
+        "properties": {
+          "cidr": {
+            "pattern": "^(10\\.\\d{1,3}|172\\.(1[6-9]|2\\d|3[01])|192\\.168)\\.\\d{1,3}\\.\\d{1,3}/(2[4-9])$"
+          }
+        }
+      }
+    },
+    "Vlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cidr": {
+          "type": "string",
+          "description": "Its IPv4 block, inside the LAN's (e.g. 10.10.10.0/24 in 10.10.0.0/16).",
+          "pattern": "^(10\\.\\d{1,3}|172\\.(1[6-9]|2\\d|3[01])|192\\.168)\\.\\d{1,3}\\.\\d{1,3}/(2[4-9])$"
+        },
+        "internet": {
+          "type": "boolean",
+          "description": "Whether machines on it may reach the internet (default: as the LAN)."
+        }
+      },
+      "required": [
+        "cidr"
+      ],
+      "description": "A VLAN of a LAN (see [`Network::vlans`])."
+    },
+    "Tc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "delay": {
+          "type": "string",
+          "description": "The one-way delay added to every packet entering the network, e.g. `50ms`, `1s`."
+        },
+        "jitter": {
+          "type": "string",
+          "description": "Random variation of the delay, e.g. `5ms` (needs `delay`)."
+        },
+        "loss": {
+          "type": "number",
+          "format": "double",
+          "description": "The share of packets entering the network that are dropped at random, in percent\n(`0.5` = 0.5%)."
+        },
+        "rate": {
+          "type": "string",
+          "description": "The bandwidth cap on traffic entering the network, as `tc` writes a rate, e.g. `10mbit`,\n`512kbit`."
+        }
+      },
+      "description": "Link impairment (Linux netem on the router's interface into the network)."
+    },
+    "Ipv6": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cidr": {
+          "type": "string",
+          "description": "An IPv6 /64 block, unique local (`fd00:20::/64`) or global. A machine at octet 10 of\nthe IPv4 block gets `<block>::10`: the octet's digits, read as the address's last group,\nso both addresses read alike."
+        },
+        "addresses": {
+          "$ref": "#/$defs/Ipv6Addresses",
+          "description": "How machines get their IPv6 address: `static` (default), the one derived from their\noctet, or `auto`, the one the target hands out (Docker's address management, the\ncluster's, Oracle Cloud's). Isoloom's own addresses stay fixed either way."
+        },
+        "only": {
+          "type": "boolean",
+          "description": "IPv6 only: the network carries no IPv4. Its `cidr` still numbers the machines (their\noctet), but no target puts it on the wire. Such a network has no `reach`, `gateway`,\n`tc` or internet: those go through Isoloom's IPv4 router or NAT."
+        }
+      },
+      "required": [
+        "cidr"
+      ],
+      "description": "A network's IPv6 side (see [`super::Network::ipv6`])."
+    },
+    "Ipv6Addresses": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "static",
+          "description": "Derived from the machine's octet, the same on every target."
+        },
+        {
+          "type": "string",
+          "const": "auto",
+          "description": "Handed out by the target."
+        }
+      ],
+      "description": "How machines get their IPv6 address on a network."
+    },
+    "Bridged": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "interface": {
+          "type": "string",
+          "description": "The host interface, as the target names it (VirtualBox: `en0: Wi-Fi`; Proxmox: a bridge\nlike `vmbr0`; ESXi: a physical NIC like `vmnic1` that no vSwitch holds, which gets a\nvSwitch of its own). Without it, Vagrant asks when several interfaces could do, Proxmox\nuses its uplink bridge, and ESXi its LAN vSwitch (`uplink_vswitch`)."
+        },
+        "dhcp": {
+          "type": "boolean",
+          "description": "The machines take their address from the LAN's DHCP server instead of a fixed one in\n`cidr`; each machine lists the network with `0` (`networks: { home: 0 }`)."
+        },
+        "default_route": {
+          "type": "boolean",
+          "description": "With `dhcp`: the machines' default route goes through the LAN's own router (the one its\nDHCP server gives) instead of the environment's."
+        },
+        "vlan": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 4094,
+          "description": "The VLAN tag on the bridge (1-4094), where the target tags a VM's interface (Proxmox; on\nESXi, the port group's)."
+        }
+      },
+      "description": "How a network is bridged to the host (see [`super::Network::bridged`])."
+    },
+    "Reach": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "The network the connections start from: its machines may open them."
+        },
+        "to": {
+          "type": "string",
+          "description": "The network those connections may reach: its machines accept them, on `ports`."
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "description": "The destination ports allowed. Empty (the default): every port.",
+          "default": []
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "description": "Traffic allowed from one network to another (one way: answers come back), on some ports or\nall of them."
+    },
+    "EnvironmentDns": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "private": {
+          "type": "boolean",
+          "description": "Serve every machine's name and `aliases` under `domain` (`web.<domain>`) from the\nplatform's own private DNS: a Route 53 private hosted zone on AWS, an Azure private DNS\nzone, a Cloud DNS private zone on Google Cloud, a private view on Oracle Cloud, Docker's\nDNS on the Docker targets. Where the platform has none (Vagrant, Proxmox, DigitalOcean,\nLinode), the hosts file every VM gets carries the same names. Off by default: a cloud\nzone is billed, and the short names already resolve through the hosts file everywhere."
+        },
+        "domain": {
+          "type": "string",
+          "description": "The private zone's domain (`lab.internal`). By default `<name>.internal`, after the\nenvironment's name. Needs `private: true`."
+        }
+      },
+      "description": "The environment's names in a private DNS zone (see [`super::Spec::dns`])."
+    },
+    "Inputs": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(?!ISOLOOM_)[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "description": "Input names, each sensitive."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(?!ISOLOOM_)[A-Za-z_][A-Za-z0-9_]*$": {
+              "$ref": "#/$defs/Input"
+            }
+          },
+          "description": "Inputs by name, each with whether it is sensitive and what it is."
+        }
+      ],
+      "description": "`inputs:` as written, for the schema."
+    },
+    "Input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sensitive": {
+          "type": "boolean",
+          "description": "Whether the value must stay hidden (default `true`): a sensitive input may be a file's\n`input` or a `with:` value, never an `environment` value, which `docker inspect` shows.",
+          "default": true
+        },
+        "description": {
+          "type": "string",
+          "description": "What the value is, shown when a runner asks for it."
+        }
+      },
+      "description": "One input."
+    },
+    "SecretSource": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "env": {
+              "type": "string",
+              "description": "The name of the runner's environment variable holding the value, e.g. `DB_PASSWORD`."
+            }
+          },
+          "required": [
+            "env"
+          ],
+          "description": "An environment variable of the runner (or the profile's `inputs`)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "Its path: absolute, `~/...`, or relative to the project folder."
+            }
+          },
+          "required": [
+            "file"
+          ],
+          "description": "A file on the runner. Keep it out of version control."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vault": {
+              "type": "string",
+              "description": "The secret's path in Vault and the field holding the value, as `<path>#<field>`,\ne.g. `secret/app#db_password`."
+            }
+          },
+          "required": [
+            "vault"
+          ],
+          "description": "A HashiCorp Vault key/value secret, read with the `vault` command and its usual\nsettings (`VAULT_ADDR`, `VAULT_TOKEN`)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sops": {
+              "type": "string",
+              "description": "`<file>#<key>`, dotted keys for nesting, e.g. `secrets.enc.yaml#db.password`."
+            }
+          },
+          "required": [
+            "sops"
+          ],
+          "description": "A value in a SOPS-encrypted file, decrypted with the `sops` command."
+        }
+      ],
+      "description": "Where the runner (`isoloom run`) reads a secret's value: one store, written as a map with\none key (`{ env: DB_PASSWORD }`). Another store is a new variant here and a reader of its\nown in the runtime."
+    },
+    "SharedVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "The machine that holds the data (serves it over NFS on the VM targets). Default: the\nfirst machine that mounts it."
+        },
+        "persistent": {
+          "type": "boolean",
+          "description": "Keep its data when the environment is torn down: `isoloom down` leaves it, and the next\n`run` finds it again; `isoloom down --volumes` removes it. Docker and Kubernetes; a VM's\nstorage goes with the VM."
+        }
+      },
+      "description": "A volume of the environment, mounted by one machine or several (see [`Spec::volumes`]): one\nnamed volume on Docker, one claim on Kubernetes (its users on its owner's node), and on VMs\nthe owner's directory served over NFS to the others, mounted at their own paths. Declared\nhere, a volume can also outlive the environment (`persistent`) or be one that exists already\n(`external`)."
+    },
+    "Machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "$ref": "#/$defs/Os",
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form in 1.0."
+        },
+        "service": {
+          "$ref": "#/$defs/ServicesInput",
+          "description": "A catalogue service, `name[@version]` (`postgres@16`), or a list of them. Not with `app`."
+        },
+        "with": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The service's settings, from its entry's settings schema. Only with `service`.",
+          "default": {}
+        },
+        "app": {
+          "description": "A custom app: its own image, its own Dockerfile, a network appliance, or portable steps.\nNot with `service`.",
+          "$ref": "#/$defs/App"
+        },
+        "networks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Octets"
+          },
+          "description": "Network name → the last octet of the machine's address on it, or a list of them (the\nfirst is its primary address). Every machine has one, but a LAN's `switch`."
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "More DNS names it answers to besides its own (`api.example.com`), on every network.",
+          "default": []
+        },
+        "count": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "How many of this machine (2 to 99): clones `<name>-01`, `<name>-02`, ..., each one address\nfurther along on every network. Where the spec names this machine, it means every clone."
+        },
+        "access": {
+          "type": "boolean",
+          "description": "The machine the user lands on (at most one). Without `os`, the runner supplies it.",
+          "default": false
+        },
+        "ports": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9-]{0,30}$": {
+              "$ref": "#/$defs/Port"
+            }
+          },
+          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant }`. Messages and checks reach them as `machines.<m>.ports.<name>.published`."
+        },
+        "command": {
+          "description": "Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:\nthe image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.",
+          "$ref": "#/$defs/Command"
+        },
+        "setup": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Project scripts run once, in order, once the machine is up (as root, with its network,\nvolumes, files and privileges): `.sh`, or `.ps1` on Windows. A machine is ready once they\nhave run.",
+          "default": []
+        },
+        "healthcheck": {
+          "description": "When it counts as healthy beyond its ports answering: `{ test }` or `{ http: { port,\npath } }` (a port's name or number), with `interval`, `timeout`, `retries` and\n`start_period`.",
+          "$ref": "#/$defs/Healthcheck"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Machines that must be ready (ports answering, healthcheck passed, setup run) first.",
+          "default": []
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/EnvValue"
+          },
+          "description": "Environment variables: a text, a number or a boolean, or `{ input: NAME }` for a\nnon-sensitive input. Secrets and sensitive inputs reach a machine as `files`."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/File"
+          },
+          "description": "Files placed on the machine, each from a project `source`, inline `content`, an `input` or a\n`secret`, with its owner and mode."
+        },
+        "volumes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Mount"
+          },
+          "description": "Data kept until the environment is destroyed: a name → an absolute path, or `{ path,\nsubpath }` for one folder of a shared volume.",
+          "default": {}
+        },
+        "disks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Disk"
+          },
+          "description": "Data disks beside its own, by name: `{ size_gb, fs, mount }`.",
+          "default": {}
+        },
+        "tmpfs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tmpfs"
+          },
+          "description": "Memory-backed mounts: a path, or `{ path, size, mode }`.",
+          "default": []
+        },
+        "resources": {
+          "$ref": "#/$defs/Resources",
+          "description": "CPUs, memory and disk (default 1, 1024 MB, 20 GB)."
+        },
+        "hardware": {
+          "$ref": "#/$defs/Hardware",
+          "description": "What it asks of the hardware: `arch`, `tpm`, `gpus`, `devices`, `nested_virtualization`,\n`boot`."
+        },
+        "dns": {
+          "$ref": "#/$defs/Dns",
+          "description": "How it resolves names: `servers` (addresses, or machines sharing a network), `search`,\n`domain`, `options`."
+        },
+        "privileged": {
+          "type": "boolean",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "default": false
+        },
+        "read_only": {
+          "type": "boolean",
+          "description": "A read-only root filesystem (containers).",
+          "default": false
+        },
+        "shm_size": {
+          "type": "string",
+          "description": "The size of `/dev/shm` (`256m`, `1g`)."
+        },
+        "sysctls": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ScalarSchema"
+          },
+          "description": "Kernel parameters (`net.core.somaxconn: 4096`).",
+          "default": {}
+        },
+        "ulimits": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Ulimit"
+          },
+          "description": "Process limits by name: one value, or `{ soft, hard }`.",
+          "default": {}
+        },
+        "rate_limit": {
+          "type": "string",
+          "description": "A bandwidth cap on each of its links, as `tc` writes a rate (`10mbit`)."
+        }
+      },
+      "description": "A machine as written."
+    },
+    "Os": {
+      "description": "An OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default version (`debian` is `debian@12`).",
+      "type": "string",
+      "enum": [
+        "debian",
+        "debian@11",
+        "debian@12",
+        "debian@13",
+        "ubuntu",
+        "ubuntu@14.04",
+        "ubuntu@16.04",
+        "ubuntu@18.04",
+        "ubuntu@20.04",
+        "ubuntu@22.04",
+        "ubuntu@24.04",
+        "rocky",
+        "rocky@9",
+        "alma",
+        "alma@9",
+        "alpine",
+        "alpine@3.19",
+        "kali",
+        "kali@rolling",
+        "fedora",
+        "fedora@42",
+        "centos",
+        "centos@7",
+        "windows",
+        "windows@10",
+        "windows@11",
+        "windows-server",
+        "windows-server@2008r2",
+        "windows-server@2012r2",
+        "windows-server@2016",
+        "windows-server@2019",
+        "windows-server@2022",
+        "windows-server@2025"
+      ]
+    },
+    "ServicesInput": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(@[A-Za-z0-9.+-]+)?$",
+          "description": "One service."
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(@[A-Za-z0-9.+-]+)?$"
+          },
+          "description": "Several services on one machine (no container form: one process per container)."
+        }
+      ],
+      "description": "`service:` as written, for the schema."
+    },
+    "App": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "A published image, by tag or digest (`example/clamd:1.4`): the container form. Not with\n`build`."
+        },
+        "build": {
+          "description": "The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,\ntarget, args }`. The container form; translating it to a VM is never attempted, so add\n`os` and `steps` for a VM form.",
+          "$ref": "#/$defs/BuildInput"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "description": "Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's official\nimage on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe."
+        },
+        "appliance": {
+          "$ref": "#/$defs/Appliance",
+          "description": "A network appliance Isoloom wires (a router or switch OS in a container): with `image`, or\n`firmware` for `cisco-dynamips`."
+        },
+        "config": {
+          "type": "string",
+          "description": "An appliance's own configuration (a project file), added to the one Isoloom generates."
+        },
+        "firmware": {
+          "type": "string",
+          "description": "The firmware `cisco-dynamips` boots (the IOS `.bin`, a project file)."
+        }
+      },
+      "description": "`app:` as written."
+    },
+    "BuildInput": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A folder of the project holding a `Dockerfile`."
+        },
+        {
+          "$ref": "#/$defs/Build",
+          "description": "The folder, the Dockerfile, the stage and the arguments."
+        }
+      ],
+      "description": "`build:` as written: a folder, or in full."
+    },
+    "Build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "type": "string",
+          "description": "The build context: a folder of the project."
+        },
+        "dockerfile": {
+          "type": "string",
+          "description": "The Dockerfile, anywhere in the project (default `<context>/Dockerfile`)."
+        },
+        "target": {
+          "type": "string",
+          "description": "The stage of a multi-stage Dockerfile to build, when not its last."
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Build arguments (the Dockerfile's `ARG`s), fixed values.",
+          "default": {}
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "description": "The project's own Dockerfile: its folder, or the folder with the file, stage and arguments."
+    },
+    "Step": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RebootWord",
+          "description": "`reboot`: the machine restarts, and the next step runs once it is back."
+        },
+        {
+          "$ref": "#/$defs/StepInput",
+          "description": "A step that runs, copies or installs something."
+        }
+      ],
+      "description": "A step as written, for the schema."
+    },
+    "RebootWord": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "reboot",
+          "description": "Restarts the machine."
+        }
+      ],
+      "description": "The word `reboot`."
+    },
+    "StepInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "type": "string",
+          "description": "A project script (`.sh`; `.ps1` on Windows)."
+        },
+        "creates": {
+          "type": "string",
+          "description": "With `run`: a path whose existence means the step already ran."
+        },
+        "copy": {
+          "description": "A project file or folder copied into the machine.",
+          "$ref": "#/$defs/Copy"
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Packages to install with the OS's installer (`apt-get`, `apk`, `dnf`)."
+        },
+        "playbook": {
+          "type": "string",
+          "description": "An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`)."
+        }
+      },
+      "description": "A step as written: `reboot`, or a map with one of `run`, `copy`, `packages` and `playbook`."
+    },
+    "Copy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "A file or folder of the project (a folder ends with `/`)."
+        },
+        "to": {
+          "type": "string",
+          "description": "Where it goes in the machine (absolute)."
+        },
+        "owner": {
+          "type": "string",
+          "description": "The owner, a user name (default root)."
+        },
+        "mode": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ],
+          "pattern": "^0?[0-7]{1,3}$",
+          "description": "The mode, octal (default: as in the project)."
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "description": "A `copy` step."
+    },
+    "Appliance": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "cisco-iol",
+          "description": "Cisco IOL (IOS on Linux, from Cisco Modeling Labs) as vrnetlab packages it\n(`vrnetlab/cisco_iol:<version>`): a router."
+        },
+        {
+          "type": "string",
+          "const": "cisco-iol-l2",
+          "description": "Cisco IOL-L2 (`vrnetlab/cisco_iol:L2-<version>`): a switch."
+        },
+        {
+          "type": "string",
+          "const": "cisco-vios",
+          "description": "Cisco IOSv in QEMU (`vrnetlab/cisco_vios:<version>`, needs /dev/kvm): a router."
+        },
+        {
+          "type": "string",
+          "const": "cisco-vios-l2",
+          "description": "Cisco IOSvL2 in QEMU (`vrnetlab/cisco_viosl2:<version>`, needs /dev/kvm): a switch."
+        },
+        {
+          "type": "string",
+          "const": "cisco-csr1000v",
+          "description": "Cisco CSR1000v (IOS XE) in QEMU (`vrnetlab/cisco_csr1000v:<version>`, needs /dev/kvm)."
+        },
+        {
+          "type": "string",
+          "const": "cisco-c8000v",
+          "description": "Cisco Catalyst 8000v (IOS XE) in QEMU (`vrnetlab/cisco_c8000v:<version>`, needs /dev/kvm)."
+        },
+        {
+          "type": "string",
+          "const": "cisco-dynamips",
+          "description": "A classic Cisco 7200 router emulated by Dynamips, booting the IOS `.bin` in `firmware`."
+        }
+      ],
+      "description": "A network appliance image (see [`DockerImpl::appliance`]). The images aren't Isoloom's to\nship: the user builds them from software they are licensed for."
+    },
+    "Octets": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "The last octet of its address (0: an address from the LAN's DHCP server, on a bridged\nnetwork that hands them out)."
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "description": "Several addresses on the network, by last octet: the first is its primary address."
+        }
+      ],
+      "description": "A machine's address on a network: one last octet, or several (the first the primary one)."
+    },
+    "Port": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "The port's number: TCP, not published."
+        },
+        {
+          "$ref": "#/$defs/PortFull",
+          "description": "The port in full."
+        }
+      ],
+      "description": "A port as written: its number (TCP), or in full."
+    },
+    "PortFull": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "The port the machine listens on (1 to 65535). On a catalogue service's machine, its\nentry gives it (change it through `with.port`)."
+        },
+        "protocol": {
+          "$ref": "#/$defs/PortProtocol",
+          "description": "`tcp` (the default), `udp`, or TCP that speaks `http`, `https` or `tls`: probes and\nderived checks speak it.",
+          "default": "tcp"
+        },
+        "publish": {
+          "description": "Reachable from the user's machine (loopback only): `true` for a free host port\n(preferably the same number), a number for the preferred host port, or `{ host, fixed:\ntrue }` for that host port or nothing.",
+          "$ref": "#/$defs/PublishInput"
+        },
+        "dormant": {
+          "type": "boolean",
+          "description": "Only answers once something wakes it: nothing waits for it.",
+          "default": false
+        }
+      },
+      "description": "A port written in full."
+    },
+    "PortProtocol": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "tcp",
+          "description": "TCP, the default: probed by connecting."
+        },
+        {
+          "type": "string",
+          "const": "udp",
+          "description": "UDP (DNS, SNMP, TFTP): nothing waits for it and no derived check probes it."
+        },
+        {
+          "type": "string",
+          "const": "http",
+          "description": "HTTP over TCP: derived checks request a page."
+        },
+        {
+          "type": "string",
+          "const": "https",
+          "description": "HTTPS over TCP: derived checks request a page over TLS, certificates unchecked."
+        },
+        {
+          "type": "string",
+          "const": "tls",
+          "description": "TLS over TCP (not HTTP): probes speak TLS, certificates unchecked."
+        }
+      ],
+      "description": "What a port speaks: TCP or UDP, and for TCP whether probes and checks speak HTTP or TLS."
+    },
+    "PublishInput": {
+      "anyOf": [
+        {
+          "type": "boolean",
+          "description": "`true`: a free host port, preferably the port's own number."
+        },
+        {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "The preferred host port."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "The host port."
+            },
+            "fixed": {
+              "type": "boolean",
+              "description": "`true`: that port or nothing; `false` (the default): preferred.",
+              "default": false
+            }
+          },
+          "required": [
+            "host"
+          ],
+          "description": "A host port, and whether it is that one or nothing."
+        }
+      ],
+      "description": "`publish:` as written, for the schema."
+    },
+    "Command": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A text run by the machine's shell (`/bin/sh -c`; PowerShell on Windows)."
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments run as they are, the program first."
+        },
+        {
+          "$ref": "#/$defs/CommandFull",
+          "description": "The command and the directory it runs in."
+        }
+      ],
+      "description": "A command as written, for the schema."
+    },
+    "CommandFull": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/CommandLine",
+          "description": "A text run by the shell, or a list of arguments run as they are."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "The directory the command, the healthcheck and the `setup` scripts run in (absolute)."
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "description": "A command written with its directory."
+    },
+    "CommandLine": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A text run by the machine's shell (`/bin/sh -c`; PowerShell on a Windows VM), with its\nvariables, pipes and `&&`."
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments run as they are, the program first (no shell in between)."
+        }
+      ],
+      "description": "A command line: a text the shell runs, or a list of arguments run as they are."
+    },
+    "Healthcheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "test": {
+          "$ref": "#/$defs/CommandLine",
+          "description": "A command run inside the machine: healthy when it exits with 0 (exactly one of `test`\nand `http`)."
+        },
+        "http": {
+          "description": "A page the machine serves: healthy when it answers with a 2xx or 3xx status.",
+          "$ref": "#/$defs/HealthPage"
+        },
+        "interval": {
+          "type": "string",
+          "description": "The time between two tries (`5s`, `1m30s`). Default: 5s."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "How long one try may take. Default: 3s."
+        },
+        "retries": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Failed tries in a row before the machine counts as unhealthy. Default: 60."
+        },
+        "start_period": {
+          "type": "string",
+          "description": "A grace period after start before the first try counts (`30s`). Default: 10s."
+        }
+      },
+      "description": "When a machine counts as healthy, besides its ports answering: a command that succeeds, or\na page that answers."
+    },
+    "HealthPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/PortRef",
+          "description": "The port it is served on: a declared port's name or a number."
+        },
+        "path": {
+          "type": "string",
+          "description": "The page's path. Default: `/`.",
+          "default": "/"
+        }
+      },
+      "required": [
+        "port"
+      ],
+      "description": "A page a healthcheck requests on the machine itself."
+    },
+    "PortRef": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "A port number."
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,30}$",
+          "description": "One of the machine's ports, by name."
+        }
+      ],
+      "description": "A port a healthcheck names: one of the machine's ports by name, or a port number."
+    },
+    "EnvValue": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A fixed text."
+        },
+        {
+          "type": "number",
+          "format": "double",
+          "description": "A number, read as its text."
+        },
+        {
+          "type": "boolean",
+          "description": "A boolean, read as `true` or `false`."
+        },
+        {
+          "$ref": "#/$defs/EnvReference",
+          "description": "`{ input: NAME }`: a non-sensitive input's value."
+        }
+      ],
+      "description": "An environment value as written, for the schema."
+    },
+    "EnvReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input": {
+          "type": "string",
+          "pattern": "^(?!ISOLOOM_)[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "A non-sensitive input, by name."
+        },
+        "secret": {
+          "type": "string",
+          "description": "Not allowed: a secret reaches a machine as a file (`files: [{ path, secret }]`)."
+        }
+      },
+      "description": "An environment value written as a reference."
+    },
+    "File": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\\app\\flag.txt`)\non Windows. Its folders are created when missing."
+        },
+        "source": {
+          "type": "string",
+          "description": "A file of the project to copy (`config/app.ini`). Exactly one of `source`, `content`,\n`input` and `secret`."
+        },
+        "content": {
+          "type": "string",
+          "description": "The file's text, written in the spec."
+        },
+        "input": {
+          "type": "string",
+          "pattern": "^(?!ISOLOOM_)[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "An input's name: the file holds its value, given at each start, before the machine's\nprocess starts. Never in a generated file, an image or an environment variable."
+        },
+        "secret": {
+          "type": "string",
+          "description": "A secret's name: the file holds its value, read from its store at each start."
+        },
+        "uid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "The user id that owns the file (default 0, root). Not on Windows."
+        },
+        "gid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "The group id that owns the file (default 0, root). Not on Windows."
+        },
+        "mode": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ],
+          "pattern": "^0?[0-7]{1,3}$",
+          "description": "Its permissions in octal (`\"0444\"`): default `0644` for `source` and `content`, `0400`\nfor `input` and `secret` (only root reads it; widen it for an app's own user). Not on\nWindows, where a value file is readable by SYSTEM and Administrators."
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "description": "A file as written."
+    },
+    "Mount": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "The whole volume at this absolute path."
+        },
+        {
+          "$ref": "#/$defs/MountPart",
+          "description": "A mount with its options."
+        }
+      ],
+      "description": "Where a machine mounts one of its volumes: a path, or a path and the folder of a shared\nvolume it takes (`{ path: /srv/www, subpath: www }`)."
+    },
+    "MountPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The absolute path in the machine.",
+          "pattern": "^/"
+        },
+        "subpath": {
+          "type": "string",
+          "description": "One folder of a shared volume (`www`, `logs/app`), relative to the volume's root, instead\nof all of it. Created when missing. The volume's owner holds all of it."
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "description": "A mount with its options."
+    },
+    "Disk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "size_gb": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Its size in GB (1 to 16384)."
+        },
+        "fs": {
+          "description": "Its filesystem: `ext4` (the default on Linux), `xfs`, `ntfs` (the default on Windows), or\n`raw` for a block device left unformatted.",
+          "$ref": "#/$defs/Filesystem"
+        },
+        "mount": {
+          "type": "string",
+          "description": "Where it is mounted: an absolute path on Linux and in containers, a drive letter (`E:`)\non Windows. Required unless the disk is `raw`."
+        }
+      },
+      "required": [
+        "size_gb"
+      ],
+      "description": "A data disk a machine is given beside its own: on a VM, a disk of its own, formatted and\nmounted at boot (a raw one is left as it is); on the container targets, a volume at the\nmount (a claim of that size on Kubernetes). It goes with the machine."
+    },
+    "Filesystem": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "ext4",
+          "description": "Linux's usual filesystem."
+        },
+        {
+          "type": "string",
+          "const": "xfs",
+          "description": "XFS, for large files."
+        },
+        {
+          "type": "string",
+          "const": "ntfs",
+          "description": "Windows' filesystem."
+        },
+        {
+          "type": "string",
+          "const": "raw",
+          "description": "No filesystem: a block device the machine formats or uses itself."
+        }
+      ],
+      "description": "A data disk's filesystem."
+    },
+    "Tmpfs": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A mount at this absolute path, of the runtime's default size and mode."
+        },
+        {
+          "$ref": "#/$defs/TmpfsMount",
+          "description": "A mount with its options."
+        }
+      ],
+      "description": "A memory-backed mount: a path, or a path with a size and a mode\n(`{ path: /run, size: 64m, mode: \"1777\" }`)."
+    },
+    "TmpfsMount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The absolute path in the machine."
+        },
+        "size": {
+          "type": "string",
+          "description": "Its most memory: bytes, or a number with `k`, `m` or `g` (`64m`)."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Its permissions, in octal (`\"1777\"`, `\"0700\"`). Quote it: YAML reads `0700` unquoted as\na number."
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "description": "A memory-backed mount with its options."
+    },
+    "Resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpus": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "CPUs (default 1)."
+        },
+        "memory_mb": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Memory in MB (default 1024)."
+        },
+        "disk_gb": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Disk in GB, for a VM (default 20)."
+        }
+      },
+      "description": "What a machine is given to run on; each left out takes its default."
+    },
+    "Hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "$ref": "#/$defs/Arch",
+          "description": "The CPU architecture: `amd64` (the default) or `arm64`.",
+          "default": "amd64"
+        },
+        "tpm": {
+          "$ref": "#/$defs/Tpm",
+          "description": "A virtual TPM 2.0: `auto` (the default: Windows 11 gets one where the target can),\n`required` (a VM only) or `none`."
+        },
+        "gpus": {
+          "$ref": "#/$defs/GpusInput",
+          "description": "GPUs: a count (`1`), `all`, or `{ count, ids, driver, capabilities, options }`. A container\ngets the host's; a VM gets them passed through or sized with them."
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DeviceInput"
+          },
+          "description": "The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest,\npermissions }`). A container only.",
+          "default": []
+        },
+        "nested_virtualization": {
+          "type": "boolean",
+          "description": "The machine runs VMs of its own: its VM gets the CPU's virtualization extensions. A VM\nonly.",
+          "default": false
+        },
+        "boot": {
+          "$ref": "#/$defs/Boot",
+          "description": "How it boots, when not the way its image does: its own kernel, firmware, boot order or\nnetwork boot. A VM only."
+        }
+      },
+      "description": "The hardware a machine asks for."
+    },
+    "Arch": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "amd64",
+          "description": "x86-64 (amd64), the default."
+        },
+        {
+          "type": "string",
+          "const": "arm64",
+          "description": "64-bit ARM (aarch64)."
+        }
+      ],
+      "description": "A machine's CPU architecture. Every target has one: a container platform, a box\narchitecture, a cloud instance family. Defaults to x86-64."
+    },
+    "Tpm": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "auto",
+          "description": "Windows 11 gets one wherever the target can give one, and runs without where it can't;\nevery other OS gets none."
+        },
+        {
+          "type": "string",
+          "const": "required",
+          "description": "The machine needs one: a target that gives none refuses it. A VM only."
+        },
+        {
+          "type": "string",
+          "const": "none",
+          "description": "None, even on Windows 11."
+        }
+      ],
+      "description": "A virtual TPM 2.0 (BitLocker, Windows Hello, measured boot)."
+    },
+    "GpusInput": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "That many GPUs."
+        },
+        {
+          "type": "string",
+          "description": "`all`: every GPU of the host."
+        },
+        {
+          "$ref": "#/$defs/GpusFull",
+          "description": "The full form."
+        }
+      ],
+      "description": "`gpus` as written: a count, `all`, or the full form."
+    },
+    "GpusFull": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0,
+              "description": "That many."
+            },
+            {
+              "type": "string",
+              "const": "all",
+              "description": "Every GPU of the host."
+            }
+          ],
+          "description": "How many GPUs (a number, or `all`). Default: one, unless `ids` names them."
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Which GPUs, by the host's ids (a device index or UUID; a PCI address or a resource\nmapping on Proxmox). Not with `count`.",
+          "default": []
+        },
+        "driver": {
+          "type": "string",
+          "description": "The GPUs' vendor driver (`nvidia`, `amd`, `intel`). Default: `nvidia`."
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What the container may use the GPUs for (`compute`, `utility`, `video`, `graphics`).",
+          "default": []
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Options for the container runtime's GPU driver (Compose only).",
+          "default": {}
+        }
+      },
+      "description": "`gpus` in full, as written (`count` may be a number or `all`)."
+    },
+    "DeviceInput": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "`/dev/fuse`, `/dev/ttyUSB0:/dev/ttyS1`, `/dev/sda:/dev/xvda:r`."
+        },
+        {
+          "$ref": "#/$defs/DeviceFull",
+          "description": "The full form."
+        }
+      ],
+      "description": "A device as written: `host[:guest[:permissions]]`, or a mapping."
+    },
+    "DeviceFull": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "The device's path on the host."
+        },
+        "guest": {
+          "type": "string",
+          "description": "Its path inside the machine. Default: the host's path."
+        },
+        "permissions": {
+          "type": "string",
+          "description": "`r`, `w` and `m`, in any combination. Default: `rwm`."
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "description": "A device in full, as written."
+    },
+    "Boot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kernel": {
+          "type": "string",
+          "description": "A kernel to boot directly, instead of the image's boot loader."
+        },
+        "initrd": {
+          "type": "string",
+          "description": "The initial RAM disk booted with `kernel`."
+        },
+        "cmdline": {
+          "type": "string",
+          "description": "The command line passed to `kernel` (`console=ttyS0 root=/dev/vda1`)."
+        },
+        "dtb": {
+          "type": "string",
+          "description": "A device tree blob for `kernel` (ARM boards)."
+        },
+        "firmware": {
+          "description": "The firmware the VM boots through: `bios`, or `uefi` (on libvirt, with its file in\n`loader`; Proxmox and QEMU bring their own).",
+          "$ref": "#/$defs/Firmware"
+        },
+        "loader": {
+          "type": "string",
+          "description": "A UEFI firmware file the VM boots through (OVMF's `OVMF_CODE.fd`)."
+        },
+        "nvram": {
+          "type": "string",
+          "description": "The file that keeps the firmware's variables between boots (with `loader`)."
+        },
+        "firmware_format": {
+          "description": "The format of the UEFI firmware files the hypervisor loads: `raw` (QEMU's own, as\nHomebrew ships them) or `qcow2` (some distributions'). Vagrant's QEMU provider needs it\nto load them; libvirt reads the format from the file itself.",
+          "$ref": "#/$defs/FirmwareFormat"
+        },
+        "order": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BootDevice"
+          },
+          "description": "The devices to boot from, in order (`[network, hd]` tries a network boot first)."
+        },
+        "network": {
+          "description": "A network boot served on the machine's first network: its TFTP folder and the file\nDHCP hands out. `order` must list `network`.",
+          "$ref": "#/$defs/NetworkBoot"
+        }
+      },
+      "description": "How a VM boots, instead of the way its image does. Paths are on the hypervisor's host (the\nhypervisor reads them, not Isoloom), so they are absolute. Vagrant's libvirt provider boots\nevery field and its QEMU provider `firmware_format`; the other targets refuse a machine with\none."
+    },
+    "Firmware": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "bios",
+          "description": "A legacy BIOS (SeaBIOS)."
+        },
+        {
+          "type": "string",
+          "const": "uefi",
+          "description": "UEFI (OVMF)."
+        }
+      ],
+      "description": "The firmware a VM boots through."
+    },
+    "FirmwareFormat": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "raw",
+          "description": "A raw image (QEMU's `edk2-*-code.fd`)."
+        },
+        {
+          "type": "string",
+          "const": "qcow2",
+          "description": "A qcow2 image."
+        }
+      ],
+      "description": "The format of a UEFI firmware file."
+    },
+    "BootDevice": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "hd",
+          "description": "The machine's disk."
+        },
+        {
+          "type": "string",
+          "const": "network",
+          "description": "The network (PXE)."
+        },
+        {
+          "type": "string",
+          "const": "cdrom",
+          "description": "A CD-ROM drive."
+        }
+      ],
+      "description": "A device a VM boots from."
+    },
+    "NetworkBoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tftp_root": {
+          "type": "string",
+          "description": "The folder the network's TFTP server serves, on the hypervisor's host."
+        },
+        "file": {
+          "type": "string",
+          "description": "The boot file DHCP hands out (`pxelinux.0`), from the TFTP folder."
+        },
+        "server": {
+          "type": "string",
+          "description": "The address of the TFTP server holding `file`, when it isn't the host's own."
+        }
+      },
+      "description": "A network boot: what the network's DHCP and TFTP server hand a booting machine."
+    },
+    "Dns": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "DNS server addresses, in order (e.g. the lab's domain controller).",
+          "default": []
+        },
+        "search": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Search domains appended to bare names.",
+          "default": []
+        },
+        "domain": {
+          "type": "string",
+          "description": "The machine's own domain name."
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Resolver options, as resolv.conf's `options` line writes them: `name` or `name:value`\n(`ndots:2`, `timeout:1`, `attempts:3`, `rotate`). A container's `dns_opt`, a pod's\n`dnsConfig` options."
+        }
+      },
+      "description": "How a machine resolves names."
+    },
+    "ScalarSchema": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A text."
+        },
+        {
+          "type": "number",
+          "format": "double",
+          "description": "A number, read as its text."
+        },
+        {
+          "type": "boolean",
+          "description": "A boolean, read as `true` or `false`."
+        }
+      ],
+      "description": "A text, a number or a boolean, read as text (environment values, sysctl values)."
+    },
+    "Ulimit": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "One value for both the soft and the hard limit."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "soft": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0,
+              "description": "The limit a process starts with."
+            },
+            "hard": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0,
+              "description": "The ceiling a process may raise its soft limit to."
+            }
+          },
+          "required": [
+            "soft",
+            "hard"
+          ],
+          "description": "The soft limit (what a process gets) and the hard one (how far it may raise it)."
+        }
+      ],
+      "description": "A process limit (see [`Machine::ulimits`]): one value for the soft and hard limits, or both."
+    },
+    "Shared": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "$ref": "#/$defs/Os",
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form in 1.0."
+        },
+        "service": {
+          "$ref": "#/$defs/ServicesInput",
+          "description": "A catalogue service, `name[@version]` (`postgres@16`), or a list of them. Not with `app`."
+        },
+        "with": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The service's settings, from its entry's settings schema. Only with `service`.",
+          "default": {}
+        },
+        "app": {
+          "description": "A custom app: its own image, its own Dockerfile, a network appliance, or portable steps.\nNot with `service`.",
+          "$ref": "#/$defs/App"
+        },
+        "command": {
+          "description": "Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:\nthe image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.",
+          "$ref": "#/$defs/Command"
+        },
+        "setup": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Project scripts run once, in order, once the machine is up (as root, with its network,\nvolumes, files and privileges): `.sh`, or `.ps1` on Windows. A machine is ready once they\nhave run.",
+          "default": []
+        },
+        "healthcheck": {
+          "description": "When it counts as healthy beyond its ports answering: `{ test }` or `{ http: { port,\npath } }` (a port's name or number), with `interval`, `timeout`, `retries` and\n`start_period`.",
+          "$ref": "#/$defs/Healthcheck"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Machines that must be ready (ports answering, healthcheck passed, setup run) first.",
+          "default": []
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/EnvValue"
+          },
+          "description": "Environment variables: a text, a number or a boolean, or `{ input: NAME }` for a\nnon-sensitive input. Secrets and sensitive inputs reach a machine as `files`."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/File"
+          },
+          "description": "Files placed on the machine, each from a project `source`, inline `content`, an `input` or a\n`secret`, with its owner and mode."
+        },
+        "volumes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Mount"
+          },
+          "description": "Data kept until the environment is destroyed: a name → an absolute path, or `{ path,\nsubpath }` for one folder of a shared volume.",
+          "default": {}
+        },
+        "disks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Disk"
+          },
+          "description": "Data disks beside its own, by name: `{ size_gb, fs, mount }`.",
+          "default": {}
+        },
+        "tmpfs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tmpfs"
+          },
+          "description": "Memory-backed mounts: a path, or `{ path, size, mode }`.",
+          "default": []
+        },
+        "resources": {
+          "$ref": "#/$defs/Resources",
+          "description": "CPUs, memory and disk (default 1, 1024 MB, 20 GB)."
+        },
+        "hardware": {
+          "$ref": "#/$defs/Hardware",
+          "description": "What it asks of the hardware: `arch`, `tpm`, `gpus`, `devices`, `nested_virtualization`,\n`boot`."
+        },
+        "dns": {
+          "$ref": "#/$defs/Dns",
+          "description": "How it resolves names: `servers` (addresses, or machines sharing a network), `search`,\n`domain`, `options`."
+        },
+        "privileged": {
+          "type": "boolean",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "default": false
+        },
+        "read_only": {
+          "type": "boolean",
+          "description": "A read-only root filesystem (containers).",
+          "default": false
+        },
+        "shm_size": {
+          "type": "string",
+          "description": "The size of `/dev/shm` (`256m`, `1g`)."
+        },
+        "sysctls": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ScalarSchema"
+          },
+          "description": "Kernel parameters (`net.core.somaxconn: 4096`).",
+          "default": {}
+        },
+        "ulimits": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Ulimit"
+          },
+          "description": "Process limits by name: one value, or `{ soft, hard }`.",
+          "default": {}
+        },
+        "rate_limit": {
+          "type": "string",
+          "description": "A bandwidth cap on each of its links, as `tc` writes a rate (`10mbit`)."
+        }
+      },
+      "description": "Machine fields every machine shares (a machine's own value wins)."
+    },
+    "Group": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "$ref": "#/$defs/Os",
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form in 1.0."
+        },
+        "service": {
+          "$ref": "#/$defs/ServicesInput",
+          "description": "A catalogue service, `name[@version]` (`postgres@16`), or a list of them. Not with `app`."
+        },
+        "with": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The service's settings, from its entry's settings schema. Only with `service`.",
+          "default": {}
+        },
+        "app": {
+          "description": "A custom app: its own image, its own Dockerfile, a network appliance, or portable steps.\nNot with `service`.",
+          "$ref": "#/$defs/App"
+        },
+        "command": {
+          "description": "Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:\nthe image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.",
+          "$ref": "#/$defs/Command"
+        },
+        "setup": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Project scripts run once, in order, once the machine is up (as root, with its network,\nvolumes, files and privileges): `.sh`, or `.ps1` on Windows. A machine is ready once they\nhave run.",
+          "default": []
+        },
+        "healthcheck": {
+          "description": "When it counts as healthy beyond its ports answering: `{ test }` or `{ http: { port,\npath } }` (a port's name or number), with `interval`, `timeout`, `retries` and\n`start_period`.",
+          "$ref": "#/$defs/Healthcheck"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Machines that must be ready (ports answering, healthcheck passed, setup run) first.",
+          "default": []
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/EnvValue"
+          },
+          "description": "Environment variables: a text, a number or a boolean, or `{ input: NAME }` for a\nnon-sensitive input. Secrets and sensitive inputs reach a machine as `files`."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/File"
+          },
+          "description": "Files placed on the machine, each from a project `source`, inline `content`, an `input` or a\n`secret`, with its owner and mode."
+        },
+        "volumes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Mount"
+          },
+          "description": "Data kept until the environment is destroyed: a name → an absolute path, or `{ path,\nsubpath }` for one folder of a shared volume.",
+          "default": {}
+        },
+        "disks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Disk"
+          },
+          "description": "Data disks beside its own, by name: `{ size_gb, fs, mount }`.",
+          "default": {}
+        },
+        "tmpfs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tmpfs"
+          },
+          "description": "Memory-backed mounts: a path, or `{ path, size, mode }`.",
+          "default": []
+        },
+        "resources": {
+          "$ref": "#/$defs/Resources",
+          "description": "CPUs, memory and disk (default 1, 1024 MB, 20 GB)."
+        },
+        "hardware": {
+          "$ref": "#/$defs/Hardware",
+          "description": "What it asks of the hardware: `arch`, `tpm`, `gpus`, `devices`, `nested_virtualization`,\n`boot`."
+        },
+        "dns": {
+          "$ref": "#/$defs/Dns",
+          "description": "How it resolves names: `servers` (addresses, or machines sharing a network), `search`,\n`domain`, `options`."
+        },
+        "privileged": {
+          "type": "boolean",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "default": false
+        },
+        "read_only": {
+          "type": "boolean",
+          "description": "A read-only root filesystem (containers).",
+          "default": false
+        },
+        "shm_size": {
+          "type": "string",
+          "description": "The size of `/dev/shm` (`256m`, `1g`)."
+        },
+        "sysctls": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ScalarSchema"
+          },
+          "description": "Kernel parameters (`net.core.somaxconn: 4096`).",
+          "default": {}
+        },
+        "ulimits": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Ulimit"
+          },
+          "description": "Process limits by name: one value, or `{ soft, hard }`.",
+          "default": {}
+        },
+        "rate_limit": {
+          "type": "string",
+          "description": "A bandwidth cap on each of its links, as `tc` writes a rate (`10mbit`)."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Machine names, globs (`ws*`), or other groups."
+        }
+      },
+      "description": "A machine as written.",
+      "required": [
+        "members"
+      ]
+    },
+    "Provision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ansible": {
+          "type": "string",
+          "description": "An Ansible playbook in the project, run against the whole environment."
+        },
+        "inventory": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "More inventory files in the project (groups, variables), next to the one Isoloom writes\n(every machine's address and connection, in the `linux` or `windows` group).",
+          "default": []
+        },
+        "groups": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": "Inventory groups: a name -> the machines in it.",
+          "default": {}
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Extra variables for the playbook, of any YAML type (strings, numbers, booleans, lists,\nmaps): passed as JSON (`-e`), which keeps their types.",
+          "default": {}
+        },
+        "host_vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": "Variables per machine (a machine's name -> its variables), on its line of the inventory\nIsoloom writes: what a playbook keys on per host (its domain, a role flag).",
+          "default": {}
+        },
+        "requirements": {
+          "type": "string",
+          "description": "The Ansible Galaxy requirements to install first (collections, roles); by default\n`requirements.yml` next to the playbook, when there is one."
+        }
+      },
+      "required": [
+        "ansible"
+      ],
+      "description": "One environment-level provisioning step."
+    },
+    "Controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resources": {
+          "$ref": "#/$defs/Resources",
+          "description": "CPUs, memory (and disk on Proxmox), for many forks against a large environment."
+        },
+        "keep_running": {
+          "type": "boolean",
+          "description": "Keep it running once provisioning is done (to use it as a jump host). By default it\nhalts, keeping its disk: `isoloom test` and `isoloom provision` boot it when they need it.",
+          "default": false
+        }
+      },
+      "description": "The controller's settings (`controller:`), the fields a machine uses for the same things."
+    },
+    "Check": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A path in the project: a `.sh` script run with sh from where a user stands (exits 0\nwhen the behavior holds), or an Ansible playbook (`.yml`) run from the controller."
+        },
+        {
+          "$ref": "#/$defs/Declared",
+          "description": "A probe Isoloom runs itself, from a machine of the environment."
+        }
+      ],
+      "description": "One check: a script in the project (a string), or a declared probe (a map)."
+    },
+    "Declared": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Shown in results. Default: what the check does (`http://web/ from user`)."
+        },
+        "from": {
+          "type": "string",
+          "description": "The machine the check runs from (its networks, its routes, its view). Default: the\naccess machine when the spec has one, else the environment's networks at once."
+        },
+        "http": {
+          "type": "string",
+          "description": "An HTTP(S) request to this URL. `expect`: a status code (default 200), `any` (an answer\nof any status), or `blocked` (nothing answers)."
+        },
+        "method": {
+          "type": "string",
+          "description": "With `http`: the request method (default GET)."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "With `http`: request headers."
+        },
+        "body": {
+          "type": "string",
+          "description": "With `http`: the request body, sent as is."
+        },
+        "contains": {
+          "type": "string",
+          "description": "With `http`: text the response body must contain. With `tcp`: text the bytes read in\nthe first 5 seconds of the connection (after `send`) must contain, like a banner."
+        },
+        "follow": {
+          "type": "boolean",
+          "description": "With `http`: follow redirects (up to 5 hops) and compare the final answer's status, for a\npage that redirects (a login page, an app's index). Default: the first answer counts. A\nPOST followed by a 301, 302 or 303 goes on as a GET, as in a browser; other methods are\nsent again to each hop."
+        },
+        "send": {
+          "type": "string",
+          "description": "With `tcp` and `contains`: a line written once connected (followed by a newline; end it\nwith `\\r` for CRLF), before reading."
+        },
+        "tcp": {
+          "type": "string",
+          "description": "A TCP connection to `host:port`. `expect`: `open` (default) or `blocked`."
+        },
+        "exec": {
+          "type": "string",
+          "description": "A command run inside the `from` machine (`from` is required). `expect`: text its output\nmust contain (default: the command succeeds)."
+        },
+        "script": {
+          "type": "string",
+          "description": "A script in the project, run with sh from the `from` machine's position; it exits 0 when\nthe behavior holds."
+        },
+        "expect": {
+          "$ref": "#/$defs/Expect",
+          "description": "What counts as passing, in the check's own terms: a status code, `any` or `blocked`\nfor `http`; `open` or `blocked` for `tcp`; text the output contains for `exec`. Each\nkind's field says its default."
+        },
+        "wait": {
+          "$ref": "#/$defs/WaitSchema",
+          "description": "How long to keep retrying until the check passes, as seconds (`90`) or a duration (`90s`,\n`3m`, `1m30s`): default 30 seconds for `http` and `tcp` (except `blocked`, tried once), 0\nfor `exec` and `script`. Held in seconds."
+        }
+      },
+      "description": "A check Isoloom runs itself. Exactly one of `http`, `tcp`, `exec` and `script` says what to\ncheck; `from` says where from; `expect` what counts as passing."
+    },
+    "Expect": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "An HTTP status code (`200`, `404`)."
+        },
+        {
+          "type": "string",
+          "description": "A word (`any`, `blocked`, `open`), or the text an `exec` output must contain."
+        }
+      ],
+      "description": "What a declared check expects: an HTTP status code, or a word (`any`, `blocked`, `open`),\nor for `exec` the text the output must contain."
+    },
+    "WaitSchema": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Seconds."
+        },
+        {
+          "type": "string",
+          "description": "A duration: `90s`, `3m`, `1m30s`."
+        }
+      ],
+      "description": "A wait as written, for the schema."
+    },
+    "Overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "docker": {
+          "description": "Every target that runs the Compose file: `docker`, `hosted`, `docker-vm`, `cloud-docker`.",
+          "$ref": "#/$defs/DockerOverrides"
+        },
+        "kubernetes": {
+          "description": "The `kubernetes` target.",
+          "$ref": "#/$defs/KubernetesOverrides"
+        },
+        "vagrant": {
+          "description": "The `vagrant` target, and the VMs of `hybrid`.",
+          "$ref": "#/$defs/VagrantOverrides"
+        },
+        "proxmox": {
+          "description": "The `proxmox` target.",
+          "$ref": "#/$defs/ProxmoxOverrides"
+        },
+        "esxi": {
+          "description": "The `esxi` target.",
+          "$ref": "#/$defs/EsxiOverrides"
+        },
+        "aws": {
+          "description": "`cloud-vm` on AWS.",
+          "$ref": "#/$defs/CloudOverrides"
+        },
+        "azure": {
+          "description": "`cloud-vm` on Azure.",
+          "$ref": "#/$defs/CloudOverrides"
+        },
+        "gcp": {
+          "description": "`cloud-vm` on Google Cloud.",
+          "$ref": "#/$defs/CloudOverrides"
+        },
+        "digitalocean": {
+          "description": "`cloud-vm` on DigitalOcean.",
+          "$ref": "#/$defs/CloudOverrides"
+        },
+        "linode": {
+          "description": "`cloud-vm` on Linode.",
+          "$ref": "#/$defs/CloudOverrides"
+        },
+        "oci": {
+          "description": "`cloud-vm` on Oracle Cloud.",
+          "$ref": "#/$defs/CloudOverrides"
+        },
+        "external": {
+          "description": "The `external` target: machines that already exist.",
+          "$ref": "#/$defs/ExternalOverrides"
+        }
+      },
+      "description": "The overrides, by target."
+    },
+    "DockerOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "networks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/DockerNetwork"
+          },
+          "description": "Networks by name: their block on Docker, or an existing Docker network."
+        },
+        "volumes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ExternalVolume"
+          },
+          "description": "Volumes by name: an existing Docker volume."
+        }
+      },
+      "description": "On the targets that run the Compose file."
+    },
+    "DockerNetwork": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cidr": {
+          "type": "string",
+          "description": "The block to use on Docker instead of `cidr` (same size, inside 10.0.0.0/8). Without it,\na network outside 10.0.0.0/8 moves into it (Docker Desktop and home networks use\n172.16.0.0/12 and 192.168.0.0/16).",
+          "pattern": "^10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/(2[4-9])$"
+        },
+        "external": {
+          "type": "string",
+          "description": "An existing Docker network, by name: the machines join it, and Isoloom never creates or\nremoves it."
+        }
+      },
+      "description": "A network on Docker."
+    },
+    "ExternalVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "external": {
+          "type": "string",
+          "description": "Its name on the platform (a Docker volume, a Kubernetes claim in the environment's\nnamespace): mounted, never created or removed."
+        }
+      },
+      "required": [
+        "external"
+      ],
+      "description": "An existing volume on the platform, by its name there."
+    },
+    "KubernetesOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "volumes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ExternalVolume"
+          },
+          "description": "Volumes by name: an existing claim."
+        }
+      },
+      "description": "On Kubernetes."
+    },
+    "VagrantOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "machines": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/VagrantMachine"
+          },
+          "description": "Machines (or groups) by name: the box each boots."
+        },
+        "controller": {
+          "description": "The controller's box.",
+          "$ref": "#/$defs/VagrantBox"
+        }
+      },
+      "description": "On Vagrant."
+    },
+    "VagrantMachine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "box": {
+          "type": "string",
+          "description": "The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS."
+        },
+        "box_version": {
+          "type": "string",
+          "description": "The box version to pin."
+        },
+        "box_url": {
+          "type": "string",
+          "description": "Where Vagrant downloads the box from when it isn't on Vagrant Cloud: a URL, or a `.box`\nfile in the project."
+        },
+        "box_server_url": {
+          "type": "string",
+          "description": "The box server to look the box up on, instead of Vagrant Cloud."
+        },
+        "boxes": {
+          "description": "Other boxes for the providers the box has no build for.",
+          "$ref": "#/$defs/ProviderBoxes"
+        },
+        "winrm": {
+          "$ref": "#/$defs/Winrm",
+          "description": "How this Windows box answers WinRM: `plaintext` (HTTP on 5985, the default) or `ssl`\n(HTTPS on 5986)."
+        },
+        "winssh": {
+          "type": "boolean",
+          "description": "This Windows box answers OpenSSH instead of WinRM. Not with `winrm`.",
+          "default": false
+        }
+      },
+      "description": "A machine's box on Vagrant."
+    },
+    "ProviderBoxes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "qemu": {
+          "type": "string",
+          "description": "The box the QEMU provider boots (libvirt format)."
+        },
+        "hyperv": {
+          "type": "string",
+          "description": "The box the Hyper-V provider boots."
+        }
+      },
+      "description": "Boxes for the providers the machine's box has no build for."
+    },
+    "Winrm": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "plaintext",
+          "description": "HTTP on 5985, basic auth (the default for the common Windows boxes)."
+        },
+        {
+          "type": "string",
+          "const": "ssl",
+          "description": "HTTPS on 5986, NTLM (certificate not verified)."
+        }
+      ],
+      "description": "How a Windows box answers WinRM. Most boxes (StefanScherer, gusztavvargadr) use plain HTTP\non 5985 with basic auth; some (GOAD's Windows Server 2025 box) only listen on HTTPS 5986.\nIsoloom can't tell from the box name, so a non-default box declares it."
+    },
+    "VagrantBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "box": {
+          "type": "string",
+          "description": "The box, instead of Isoloom's (a specific Ansible version, a mirror)."
+        },
+        "box_version": {
+          "type": "string",
+          "description": "The box version to pin."
+        }
+      },
+      "description": "The controller's box on Vagrant."
+    },
+    "ProxmoxOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "machines": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ProxmoxMachine"
+          },
+          "description": "Machines (or groups) by name: their image, or an LXC container."
+        },
+        "volumes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ProxmoxVolume"
+          },
+          "description": "Volumes by name: a folder of the server shared into each VM (virtiofs)."
+        },
+        "networks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ExternalNetwork"
+          },
+          "description": "Networks by name: an existing bridge."
+        }
+      },
+      "description": "On Proxmox."
+    },
+    "ProxmoxMachine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "The image: a cloud image's URL, or a template VM's id on the node."
+        },
+        "lxc": {
+          "type": "boolean",
+          "description": "Run its container image as an LXC container (Proxmox VE 9.1 or later) instead of a VM:\nlighter, but no Docker runtime, healthcheck or named volumes.",
+          "default": false
+        }
+      },
+      "description": "A machine on Proxmox."
+    },
+    "ProxmoxVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "virtiofs": {
+          "$ref": "#/$defs/Virtiofs",
+          "description": "A folder of the server, shared into each VM that mounts the volume, instead of NFS from\nits owner: `virtiofs: {}` takes the defaults."
+        }
+      },
+      "required": [
+        "virtiofs"
+      ],
+      "description": "A volume on Proxmox."
+    },
+    "Virtiofs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mapping": {
+          "type": "string",
+          "description": "An existing directory mapping of the cluster, by its id (Datacenter, Resource Mappings,\nDirectory mappings). By default Isoloom creates one, `iso<slot>-<volume>`, for the folder\n`<virtiofs_root>/<environment>/<volume>` on the node."
+        },
+        "cache": {
+          "description": "How the guests cache the folder: `auto` (the default: metadata kept a short while, so\nanother VM's changes show within a second), `always`, `metadata` or `never` (every access\ngoes to the server: slowest, always current).",
+          "$ref": "#/$defs/VirtiofsCache"
+        },
+        "direct_io": {
+          "type": "boolean",
+          "description": "Reads and writes that bypass the guest's page cache when a program asks for it\n(`O_DIRECT`), for databases that manage their own cache. Off by default."
+        },
+        "xattr": {
+          "type": "boolean",
+          "description": "Pass extended attributes through (SELinux labels, file capabilities). Off by default."
+        },
+        "acl": {
+          "type": "boolean",
+          "description": "Pass POSIX ACLs through (`setfacl`), which implies `xattr`. Off by default."
+        }
+      },
+      "description": "On Proxmox, the volume as a folder of the server, shared into each VM that mounts it\n(virtiofs, Proxmox VE 8.4 or later) instead of over NFS from its owner. Opt-in, because the\nfolder lives on the server: Isoloom creates a directory mapping for it unless `mapping` names\none made on the cluster, and the folder itself must exist on the node. Linux VMs only; every\nother target shares the volume as it always does."
+    },
+    "VirtiofsCache": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "auto",
+          "description": "Metadata and lookups kept a short while, or until they change: Proxmox's default."
+        },
+        {
+          "type": "string",
+          "const": "always",
+          "description": "Everything kept: fastest, but another VM's changes may not show."
+        },
+        {
+          "type": "string",
+          "const": "metadata",
+          "description": "Metadata kept, data read each time."
+        },
+        {
+          "type": "string",
+          "const": "never",
+          "description": "Nothing kept: every access goes to the server."
+        }
+      ],
+      "description": "How a VM caches a virtiofs folder (see [`Virtiofs::cache`])."
+    },
+    "ExternalNetwork": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "external": {
+          "type": "string",
+          "description": "Its name on the target (a Proxmox bridge, an ESXi port group): the machines join it, and\nIsoloom never creates or removes it."
+        }
+      },
+      "required": [
+        "external"
+      ],
+      "description": "An existing network on the target, by its name there."
+    },
+    "EsxiOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "networks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ExternalNetwork"
+          },
+          "description": "Networks by name: an existing port group."
+        }
+      },
+      "description": "On ESXi."
+    },
+    "CloudOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "machines": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/CloudMachine"
+          },
+          "description": "Machines (or groups) by name: their image on this cloud."
+        }
+      },
+      "description": "On one cloud of `cloud-vm`."
+    },
+    "CloudMachine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "The image: an AMI id on AWS, a resource id on Azure, `projects/…/images/…` on Google\nCloud, a slug or id on DigitalOcean, `linode/…` on Linode, an OCID on Oracle Cloud."
+        }
+      },
+      "required": [
+        "image"
+      ],
+      "description": "A machine's image on a cloud."
+    },
+    "ExternalOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "machines": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ExternalMachine"
+          },
+          "description": "Machines by name: where each already exists."
+        }
+      },
+      "description": "On the `external` target."
+    },
+    "ExternalMachine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ssh": {
+          "$ref": "#/$defs/External",
+          "description": "Its SSH endpoint: `{ address, user, port, key }`."
+        }
+      },
+      "required": [
+        "ssh"
+      ],
+      "description": "An existing machine."
+    },
+    "External": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string",
+          "description": "An address or hostname reachable from where Isoloom runs."
+        },
+        "user": {
+          "type": "string",
+          "description": "The SSH user (default `root`)."
+        },
+        "port": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "The SSH port (default 22)."
+        },
+        "key": {
+          "type": "string",
+          "description": "A private key file (default: the SSH agent and config)."
+        }
+      },
+      "required": [
+        "address"
+      ],
+      "description": "An existing machine's SSH endpoint, for the `external` target."
+    },
+    "Tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "A container image (needed unless the name is a built-in recipe)."
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The command to run, when the image's own isn't right."
+        },
+        "port": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "A port the tool serves (its web UI), reachable from every network."
+        },
+        "publish": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "The port on the host's loopback (`127.0.0.1`) that forwards to the tool's `port`, so a\nbrowser on the host can open its web UI."
+        }
+      },
+      "description": "A tool attached beside the environment. The built-in recipe `shell` (an empty block) is a\ntoolbox on every network: tcpdump, nmap, curl, dig, netcat (a netshoot container on Docker, a\nDebian VM on local VMs). Any other name takes a container image (container targets)."
+    },
+    "Target": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "docker",
+          "description": "Containers on the user's Docker."
+        },
+        {
+          "type": "string",
+          "const": "hosted",
+          "description": "A hosting service runs the Docker shape for the user."
+        },
+        {
+          "type": "string",
+          "const": "docker-vm",
+          "description": "Docker on one VM: on this machine, an ESXi host or a Proxmox server."
+        },
+        {
+          "type": "string",
+          "const": "cloud-docker",
+          "description": "Docker on one cloud VM."
+        },
+        {
+          "type": "string",
+          "const": "kubernetes",
+          "description": "The containers on a Kubernetes cluster."
+        },
+        {
+          "type": "string",
+          "const": "hybrid",
+          "description": "Containers and VMs together on the same networks (local VMs): each machine as a\ncontainer when it can be one, else as a VM."
+        },
+        {
+          "type": "string",
+          "const": "vagrant",
+          "description": "One local VM per machine (Vagrant)."
+        },
+        {
+          "type": "string",
+          "const": "proxmox",
+          "description": "One VM per machine on the user's Proxmox."
+        },
+        {
+          "type": "string",
+          "const": "esxi",
+          "description": "One VM per machine on the user's standalone ESXi host (Terraform, no vCenter)."
+        },
+        {
+          "type": "string",
+          "const": "cloud-vm",
+          "description": "One cloud VM per machine."
+        },
+        {
+          "type": "string",
+          "const": "external",
+          "description": "Machines that already exist, reached over SSH at the addresses the spec gives\n(`machines.*.external`): nothing is created, everything else applies."
+        },
+        {
+          "type": "string",
+          "const": "cloud-services",
+          "description": "The spec's cloud services (`cloud:`): its Terraform module applied into the user's own\ncloud account."
+        }
+      ],
+      "description": "Where an environment can run."
+    },
+    "Constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "proxy": {
+          "description": "The HTTP proxy outbound traffic goes through: set for the machines' containers (and their\nbuilds) and on every Linux VM (shell, apt, dnf, Docker), never for Isoloom's own checks.",
+          "$ref": "#/$defs/Proxy"
+        },
+        "registries": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Registry mirrors, by the registry they stand for: `docker.io: registry.corp/dockerhub`\npulls `redis:7` as `registry.corp/dockerhub/library/redis:7`. Every image of the\nenvironment is rewritten, Isoloom's own included; images built from the project aren't\npulled, so they stay as they are (their `FROM` lines are the Dockerfile's business)."
+        },
+        "mirrors": {
+          "description": "Package mirrors the machines install from instead of the public archives: apt's for\nDebian and Ubuntu VMs, and a Python package index.",
+          "$ref": "#/$defs/Mirrors"
+        },
+        "ntp": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The time servers (names or addresses) the Linux VMs synchronise their clocks with,\nwhere the place forbids the public pools."
+        }
+      },
+      "description": "What the network an environment runs in imposes, applied on every target: images pulled\nthrough the customer's registry, packages through their mirrors, outbound HTTP through their\nproxy, time from their servers."
+    },
+    "Proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "http": {
+          "type": "string",
+          "description": "The proxy for `http://` URLs, e.g. `http://proxy.corp:3128`."
+        },
+        "https": {
+          "type": "string",
+          "description": "The proxy for `https://` URLs (default: `http`'s)."
+        },
+        "no_proxy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names, domains (`.corp`) and blocks reached directly. The environment's own machine\nnames and network blocks, and localhost, are always added."
+        }
+      },
+      "description": "An HTTP proxy (see [`Constraints::proxy`])."
+    },
+    "Mirrors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "debian": {
+          "type": "string",
+          "description": "Replaces `deb.debian.org/debian` in the Debian VMs' apt sources (`debian-security`, a\nseparate archive, is left as it is)."
+        },
+        "ubuntu": {
+          "type": "string",
+          "description": "Replaces `archive.ubuntu.com/ubuntu` (and its country and security hosts) in the Ubuntu\nVMs' apt sources."
+        },
+        "pypi": {
+          "type": "string",
+          "description": "A Python package index: `PIP_INDEX_URL` for the machines, `/etc/pip.conf` on the VMs."
+        },
+        "npm": {
+          "type": "string",
+          "description": "An npm registry: `NPM_CONFIG_REGISTRY` for the machines, `/etc/npmrc` on the VMs."
+        }
+      },
+      "description": "Package mirrors (see [`Constraints::mirrors`])."
+    },
+    "CloudServices": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/CloudProvider",
+          "description": "The cloud the module deploys into (its credentials come from the environment, as\nTerraform expects)."
+        },
+        "terraform": {
+          "type": "string",
+          "description": "A Terraform root module in the project (a folder holding `.tf` files), used as is."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The module's variables: any value (a string, number, boolean, list or map). A string\nholding `{{ inputs.NAME }}`, at any depth (`[\"{{ inputs.PLAYER_IP }}/32\"]`), takes the\nlaunch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:\nrequired at `run`, kept for `down`."
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "What the environment exposes, by name: a module output each. Checks and the message\nuse them as `{{ cloud.outputs.<name> }}`."
+        },
+        "hourly_usd": {
+          "type": "number",
+          "format": "double",
+          "description": "About what the environment costs per hour while it exists, in US dollars: the author's\nestimate, for whoever runs it. `isoloom run` says it before applying, and the resolved\nsnapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a\nbudget. Isoloom doesn't bill or stop anything by it."
+        },
+        "before": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Steps run on this machine before Terraform applies the module (a key pair the module\nreads, a build): scripts in the project, run in order from the module's copy, with the\nspec's inputs and `env` in their environment. They run at every `run`: make them\nidempotent."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`).\nNot for credentials: those come from the user's own environment."
+        },
+        "apply_retries": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "How many times to apply again when an apply fails (a module that only converges on a\nsecond apply), 0 to 5. 0 by default."
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)\nthat must be on the PATH, or a shell command that must succeed\n(`python3 -c 'import boto3'`). `isoloom doctor` and `isoloom run` check them."
+        }
+      },
+      "required": [
+        "provider",
+        "terraform"
+      ],
+      "description": "An environment of cloud services: a Terraform module applied into the user's account."
+    },
+    "CloudProvider": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "aws",
+          "description": "Amazon Web Services."
+        },
+        {
+          "type": "string",
+          "const": "azure",
+          "description": "Microsoft Azure."
+        },
+        {
+          "type": "string",
+          "const": "gcp",
+          "description": "Google Cloud."
+        }
+      ],
+      "description": "A cloud an environment of cloud services deploys into."
+    }
+  },
+  "$id": "https://www.isoloom.com/schema/v1.json"
+}

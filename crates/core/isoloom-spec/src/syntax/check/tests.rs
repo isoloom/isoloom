@@ -175,3 +175,43 @@ proptest::proptest! {
         proptest::prop_assert!(check(&spec).iter().any(|p| p.code == Code::UnknownReference && p.path.as_str() == "message"));
     }
 }
+
+#[test]
+fn steps_install_onto_a_known_os_with_files_of_its_kind() {
+    let bare = problems("machines:\n  web:\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.sh }] }\n");
+    assert!(has(&bare, Code::MissingField, "machines.web.os"), "{bare:?}");
+    let ok = problems(
+        "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.sh }, { playbook: p.yaml }, { copy: { from: a, to: /srv/a } }, { packages: [nginx] }, reboot] }\n",
+    );
+    assert_eq!(ok, []);
+    let wrong = problems(
+        "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ playbook: p.txt }, { copy: { from: a, to: srv/a } }, { packages: [] }] }\n",
+    );
+    for path in [
+        "machines.web.app.steps[0].playbook",
+        "machines.web.app.steps[1].copy.to",
+        "machines.web.app.steps[2].packages",
+    ] {
+        assert!(has(&wrong, Code::InvalidValue, path), "{path}: {wrong:?}");
+    }
+    assert_eq!(wrong.len(), 3, "{wrong:?}");
+}
+
+#[test]
+fn a_windows_machine_steps_with_powershell_and_restarts_itself() {
+    let found = problems(
+        "machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.ps1 }, { copy: { from: a, to: 'C:\\app\\a' } }, { packages: [x] }, reboot] }\n",
+    );
+    assert!(has(&found, Code::InvalidValue, "machines.dc.app.steps[2].packages"), "{found:?}");
+    assert!(has(&found, Code::InvalidValue, "machines.dc.app.steps[3]"), "{found:?}");
+    assert_eq!(found.len(), 2, "{found:?}");
+}
+
+#[test]
+fn an_appliance_has_no_steps() {
+    let found =
+        problems("machines:\n  r1:\n    networks: { lab: 10 }\n    app: { appliance: cisco-iol, image: vrnetlab/cisco_iol:17, steps: [{ run: a.sh }] }\n");
+    assert!(has(&found, Code::Conflict, "machines.r1.app.steps"), "{found:?}");
+    let alone = problems("machines:\n  r1:\n    networks: { lab: 10 }\n    app: { appliance: cisco-iol, image: vrnetlab/cisco_iol:17 }\n");
+    assert_eq!(alone, []);
+}

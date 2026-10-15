@@ -173,6 +173,41 @@ mod tests {
     }
 
     #[test]
+    fn services_and_bare_machines_take_the_forms_their_os_allows() {
+        let one = machine("{ os: debian@12, service: postgres@16 }");
+        assert_eq!((container(&one), vm(&one)), (Ok(Form::Service), Ok(Form::Service)));
+        let two = machine("{ os: debian@12, service: [nginx, php-fpm] }");
+        assert_eq!(container(&two).unwrap_err().field, "service");
+        assert_eq!(vm(&two), Ok(Form::Service));
+        let no_os = machine("{ networks: { lab: 10 } }");
+        assert_eq!(
+            (container(&no_os).unwrap_err().field, vm(&no_os).unwrap_err().field),
+            ("os".to_owned(), "os".to_owned())
+        );
+        let steps_no_os = machine("{ app: { steps: [{ run: a.sh }] } }");
+        assert_eq!(container(&steps_no_os).unwrap_err().field, "app.steps");
+        assert_eq!(vm(&steps_no_os).unwrap_err().field, "os");
+        assert_eq!(container(&machine("{ os: debian@12, app: { steps: [{ run: a.sh }] } }")), Ok(Form::Steps));
+    }
+
+    #[test]
+    fn only_a_reboot_step_reboots() {
+        assert!(!reboots(&machine("{ os: debian@12, app: { steps: [{ run: a.sh }] } }")));
+        assert!(!reboots(&machine("{ os: debian@12 }")));
+    }
+
+    #[test]
+    fn a_refusal_is_placed_at_its_field() {
+        let built = machine("{ app: { build: build/web } }");
+        let refusal = vm(&built).unwrap_err().refusal("web");
+        assert_eq!((refusal.code, refusal.path.as_str()), (Code::Refused, "machines.web.app.build"));
+        assert_eq!(
+            refusal.fix.as_deref(),
+            Some("add `os` and `app.steps`, or use `docker`, `docker-vm` or `cloud-docker`")
+        );
+    }
+
+    #[test]
     fn each_recipe_gives_its_forms() {
         let os_only = machine("{ os: debian@12 }");
         assert_eq!((container(&os_only), vm(&os_only)), (Ok(Form::Os), Ok(Form::Os)));

@@ -71,3 +71,14 @@ fn yaml_errors_have_their_line() {
     assert_eq!(p[0].code, Code::InvalidValue);
     assert!(p[0].span.is_some());
 }
+
+#[test]
+fn machines_are_a_map_or_left_out() {
+    let none = parse("version: 1\nname: t\nmachines:\n").unwrap();
+    assert!(none.machines.is_empty());
+    let wrong = problems("version: 1\nname: t\nmachines: 5\n");
+    assert_eq!(
+        (wrong[0].code, wrong[0].path.as_str(), wrong[0].reason.as_str()),
+        (Code::InvalidValue, "machines", "machines are a map of name to machine")
+    );
+}

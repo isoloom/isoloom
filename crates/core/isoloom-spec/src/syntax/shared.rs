@@ -151,6 +151,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn shared_fields_left_empty_share_nothing() {
+        assert_eq!(serde_yaml_ng::from_str::<Shared>("~").unwrap(), Shared::default());
+        let wrong = serde_yaml_ng::from_str::<Group>("[a]").unwrap_err().to_string();
+        assert!(wrong.contains("a map of machine fields"), "{wrong}");
+    }
+
+    #[test]
     fn the_shared_fields_are_a_machines_but_its_own() {
         let schema = MachineInput::json_schema(&mut SchemaGenerator::default());
         let mut fields: Vec<&str> = schema.get("properties").unwrap().as_object().unwrap().keys().map(String::as_str).collect();

@@ -285,6 +285,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn each_override_key_applies_to_its_targets() {
+        assert_eq!(
+            Overrides::targets_of("docker"),
+            [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker]
+        );
+        assert_eq!(Overrides::targets_of("kubernetes"), [Target::Kubernetes]);
+        assert_eq!(Overrides::targets_of("vagrant"), [Target::Vagrant, Target::Hybrid]);
+        assert_eq!(Overrides::targets_of("proxmox"), [Target::Proxmox]);
+        assert_eq!(Overrides::targets_of("esxi"), [Target::Esxi]);
+        assert_eq!(Overrides::targets_of("external"), [Target::External]);
+        for cloud in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
+            assert_eq!(Overrides::targets_of(cloud), [Target::CloudVm], "{cloud}");
+        }
+        assert_eq!(Overrides::targets_of("podman"), []);
+    }
+
+    #[test]
     fn each_target_has_its_own_fields() {
         let o: Overrides = serde_yaml_ng::from_str(
             "{ docker: { networks: { office: { cidr: 10.70.0.0/24 } } }, vagrant: { machines: { portal: { box: example/debian, box_version: '1' } } }, proxmox: { machines: { status: { lxc: true } }, volumes: { uploads: { virtiofs: {} } } }, aws: { machines: { portal: { image: ami-1 } } } }",

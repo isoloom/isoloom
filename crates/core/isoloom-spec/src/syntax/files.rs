@@ -226,6 +226,15 @@ mod tests {
     }
 
     #[test]
+    fn a_mode_is_octal_text_or_the_number_yaml_reads() {
+        assert_eq!(serde_yaml_ng::from_str::<Mode>("\"0444\"").map(Mode::bits).ok(), Some(0o444));
+        assert_eq!(serde_yaml_ng::from_str::<Mode>("640").map(Mode::bits).ok(), Some(0o640));
+        assert_eq!(serde_json::to_string(&Mode::VALUE).ok().as_deref(), Some("\"0400\""));
+        let wrong = serde_yaml_ng::from_str::<Mode>("[4]").unwrap_err().to_string();
+        assert!(wrong.contains("octal digits, like \"0444\""), "{wrong}");
+    }
+
+    #[test]
     fn a_file_with_two_sources_or_none_is_refused() {
         let two = serde_yaml_ng::from_str::<File>("{ path: /a, source: a, input: FLAG }").unwrap_err().to_string();
         assert!(two.contains("`source` and `input`"), "{two}");

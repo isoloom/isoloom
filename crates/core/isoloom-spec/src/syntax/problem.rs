@@ -221,6 +221,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_problem_reads_on_one_line_as_its_path_and_reason() {
+        let p = Problem::new(Code::Refused, FieldPath::new("machines.web.app.build"), "a Dockerfile builds a container only");
+        assert_eq!(p.line(), "machines.web.app.build: a Dockerfile builds a container only");
+        assert_eq!(p.to_string(), p.render("isoloom.yml"));
+        assert_eq!(p.to_string(), "error[refused] machines.web.app.build\n  a Dockerfile builds a container only");
+    }
+
+    #[test]
     fn a_problem_reads_as_three_lines() {
         let mut p = Problem::new(Code::RemovedField, FieldPath::new("machines.web.docker"), "`docker:` is gone").fix("`app: { image: <ref> }`");
         assert_eq!(
@@ -240,6 +248,9 @@ mod tests {
 
     #[test]
     fn a_typo_finds_the_name_it_meant() {
+        // A long name allows more edits: a quarter of its length.
+        assert_eq!(closest("nested-virtualisatio", &["nested_virtualization"]), Some("nested_virtualization"));
+        assert_eq!((distance("a", "b"), distance("on", "no"), distance("flaw", "lawn")), (1, 2, 2));
         assert_eq!(closest("netwrks", &["networks", "ports"]), Some("networks"));
         assert_eq!(closest("dc1", &["dc01", "ws01"]), Some("dc01"));
         assert_eq!(closest("zzz", &["networks"]), None);
