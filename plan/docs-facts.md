@@ -171,3 +171,4 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **`isoloom import vagrant`:** a Vagrantfile with no `define` is one machine, `default`, with its settings once (its networks and forwarded ports were listed twice); `reboot: true` after a shell script is a `reboot` step.
 - **`isoloom import terraform`:** an `oci_core_subnet`, `digitalocean_vpc` or `linode_vpc_subnet` read as a network is no longer also noted as left out; a third VM of one name is `vm-3` (was `vm-2-2`).
 - **`isoloom import compose`:** memory and CPUs are read as decimals (`1.5g`, `0.5`); a negative or exponent form (`-1`, `1e3`) isn't a size and is left out.
+- **`cargo xtask host-setup` on Windows:** the Rust step accepts any MSVC toolchain as rustup's default (stable, or the pinned `1.99.0-x86_64-pc-windows-msvc`) with rustfmt and clippy, and reports Rust missing instead of stopping when rustup isn't installed.

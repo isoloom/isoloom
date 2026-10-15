@@ -66,9 +66,12 @@ function Install-VcTools {
 }
 
 function Test-Rust {
+    # Without rustup, `& rustup` throws (the preference is Stop) instead of returning nothing.
+    if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) { return $null }
     $components = (& rustup component list --installed 2>$null) -join ' '
     $default = (& rustup default 2>$null) -join ' '
-    if ($default -like 'stable-x86_64-pc-windows-msvc*' -and $components -like '*rustfmt*' -and $components -like '*clippy*') {
+    # Any MSVC toolchain as the default: stable, or the one rust-toolchain.toml pins.
+    if ($default -like '*-x86_64-pc-windows-msvc*' -and $components -like '*rustfmt*' -and $components -like '*clippy*') {
         return Get-Version rustc @('--version')
     }
     return $null
