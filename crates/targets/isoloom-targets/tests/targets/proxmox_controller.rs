@@ -21,8 +21,10 @@ fn proxmox_runs_environment_playbooks_from_a_controller() -> Outcome {
     // The inventory names each machine as the isoloom user with the controller's key.
     assert!(tf.contains("ansible_user=isoloom"));
     assert!(tf.contains("ansible_ssh_private_key_file=/etc/isoloom/id_ed25519"));
-    // It waits for each machine's own set-up to finish, then runs the playbooks.
-    assert!(tf.contains("test -f /var/lib/isoloom/ready"));
+    // It waits for each machine's ready file to say `ready` (and stops on `failed:`), then runs
+    // the playbooks.
+    assert!(tf.contains("head -n 1 /var/lib/isoloom/ready"));
+    assert!(tf.contains("failed:*)"));
     assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini"));
     // It starts after every machine exists.
     let vm = from(tf, "resource \"proxmox_virtual_environment_vm\" \"isoloom_controller\"")?;

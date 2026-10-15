@@ -71,7 +71,7 @@ fn vm(env: &Environment, name: &str, mp: &MachinePlan, boot: Boot) -> Vm {
         tpm: mp.tpm.is_some(),
         own_boot: mp.boot.clone(),
         arm: super::arch::is_arm(mp),
-        agent: false,
+        agent: None,
         nics,
         pci: super::gpus::hostpci(mp.hardware.gpus.as_ref()),
         dns: Some(dns(env, name)),
@@ -210,8 +210,9 @@ pub(super) struct Vm {
     pub(super) own_boot: Option<isoloom_spec::model::Boot>,
     /// Whether it is an aarch64 VM, emulated (`arch: arm64`).
     pub(super) arm: bool,
-    /// Whether the guest agent reports its addresses.
-    pub(super) agent: bool,
+    /// When the guest agent reports its uplink address (the router): its lab addresses, which
+    /// don't count as one.
+    pub(super) agent: Option<Vec<String>>,
     /// Its network devices.
     pub(super) nics: Vec<Block>,
     /// The server's PCI devices passed through to it (its GPUs), on a q35 machine.
@@ -250,8 +251,12 @@ impl Vm {
             b = b.add_attribute(("machine", string("q35")));
         }
         b = super::boot::add(b, self.own_boot.as_ref());
-        if self.agent {
-            b = b.add_block(Block::builder("agent").add_attribute(("enabled", boolean(true))).build());
+        if let Some(own) = &self.agent {
+            // A missing agent must not hold a destroy either: the VM is stopped, not shut down.
+            b = b
+                .add_block(super::uplink::agent())
+                .add_attribute(("stop_on_destroy", boolean(true)))
+                .add_block(super::uplink::checked(&format!("VM `{}`", self.name), own));
         }
         b = b
             .add_block(super::arch::cpu(cores, self.arm))

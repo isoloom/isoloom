@@ -48,7 +48,8 @@ fn a_lan_is_one_vlan_aware_vnet_and_its_vlans_are_tags() -> Outcome {
 fn mtu_and_rate_limit_go_on_the_devices() -> Outcome {
     let tf = proxmox(TWO)?;
     // The zone carries the largest; each device its network's.
-    assert!(tf.contains("mtu   = 9000") || tf.contains("mtu = 9000"), "{tf}");
+    let zone_mtu = |l: &str| l.split_whitespace().collect::<Vec<_>>() == ["mtu", "=", "9000"];
+    assert!(tf.lines().any(zone_mtu), "{tf}");
     assert!(tf.contains("= 1400"), "{tf}");
     assert!(tf.contains("rate_limit = 1.25"), "{tf}");
     Ok(())

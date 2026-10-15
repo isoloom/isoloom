@@ -1,5 +1,6 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
 ---
 # isoloom targets
 ✓ proxmox
@@ -258,8 +259,12 @@ variable "proxmox_ssh_address" {
 }
 
 variable "node" {
-  type    = string
-  default = "pve"
+  type        = string
+  description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
+  validation {
+    condition     = var.node != ""
+    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+  }
 }
 
 variable "datastore" {
@@ -333,10 +338,14 @@ resource "proxmox_virtual_environment_pool" "env" {
   comment = "Isoloom: several-addresses"
 }
 
+# Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.
+resource "proxmox_sdn_applier" "finalizer" {}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
-  id    = local.zone
-  nodes = [var.node]
+  id         = local.zone
+  nodes      = [var.node]
+  depends_on = [proxmox_sdn_applier.finalizer]
 }
 
 # Network `office`: 10.86.0.0/24
@@ -345,7 +354,11 @@ resource "proxmox_sdn_vnet" "office" {
   zone = proxmox_sdn_zone_simple.env.id
 }
 
+# Applies the SDN objects once created, and again whenever one of them is replaced.
 resource "proxmox_sdn_applier" "env" {
+  lifecycle {
+    replace_triggered_by = [proxmox_sdn_zone_simple.env, proxmox_sdn_vnet.office]
+  }
   depends_on = [proxmox_sdn_vnet.office]
 }
 
@@ -422,6 +435,17 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   on_boot   = false
   agent {
     enabled = true
+    timeout = "5m"
+    wait_for_ip {
+      ipv4 = true
+    }
+  }
+  stop_on_destroy = true
+  lifecycle {
+    postcondition {
+      condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.86.0.254"], a)]) > 0
+      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 5m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+    }
   }
   cpu {
     cores = 1
@@ -473,10 +497,11 @@ resource "proxmox_virtual_environment_file" "web" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.11/24 dev \"$dev\"\nip addr replace 10.86.0.12/24 dev \"$dev\"'",
-        "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: more addresses' > /var/lib/isoloom/ready && sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.11/24 dev \"$dev\"\nip addr replace 10.86.0.12/24 dev \"$dev\"' || { echo 'failed: more addresses' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/web.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -558,10 +583,11 @@ resource "proxmox_virtual_environment_file" "decoy" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.40/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.48/24 dev \"$dev\"\nip addr replace 10.86.0.49/24 dev \"$dev\"\nip addr replace 10.86.0.50/24 dev \"$dev\"\nip addr replace 10.86.0.51/24 dev \"$dev\"\nip addr replace 10.86.0.52/24 dev \"$dev\"\nip addr replace 10.86.0.53/24 dev \"$dev\"\nip addr replace 10.86.0.54/24 dev \"$dev\"\nip addr replace 10.86.0.55/24 dev \"$dev\"\nip addr replace 10.86.0.56/24 dev \"$dev\"\nip addr replace 10.86.0.57/24 dev \"$dev\"\nip addr replace 10.86.0.58/24 dev \"$dev\"\nip addr replace 10.86.0.59/24 dev \"$dev\"\nip addr replace 10.86.0.60/24 dev \"$dev\"\nip addr replace 10.86.0.61/24 dev \"$dev\"\nip addr replace 10.86.0.62/24 dev \"$dev\"\nip addr replace 10.86.0.63/24 dev \"$dev\"'",
-        "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/decoy.sh'\\'''",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: more addresses' > /var/lib/isoloom/ready && sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.40/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.48/24 dev \"$dev\"\nip addr replace 10.86.0.49/24 dev \"$dev\"\nip addr replace 10.86.0.50/24 dev \"$dev\"\nip addr replace 10.86.0.51/24 dev \"$dev\"\nip addr replace 10.86.0.52/24 dev \"$dev\"\nip addr replace 10.86.0.53/24 dev \"$dev\"\nip addr replace 10.86.0.54/24 dev \"$dev\"\nip addr replace 10.86.0.55/24 dev \"$dev\"\nip addr replace 10.86.0.56/24 dev \"$dev\"\nip addr replace 10.86.0.57/24 dev \"$dev\"\nip addr replace 10.86.0.58/24 dev \"$dev\"\nip addr replace 10.86.0.59/24 dev \"$dev\"\nip addr replace 10.86.0.60/24 dev \"$dev\"\nip addr replace 10.86.0.61/24 dev \"$dev\"\nip addr replace 10.86.0.62/24 dev \"$dev\"\nip addr replace 10.86.0.63/24 dev \"$dev\"' || { echo 'failed: more addresses' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/decoy.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/decoy.sh'\\''' || { echo 'failed: provision/decoy.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -643,9 +669,10 @@ resource "proxmox_virtual_environment_file" "client" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/client.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\''' || { echo 'failed: provision/client.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -718,11 +745,17 @@ locals {
   router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.86.0.254"], a)][0]
 }
 
-output "address" {
+# The router's uplink address: the lab's way in.
+output "ip" {
   value = local.router_address
 }
 
-# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+# Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).
+output "ready_file" {
+  value = "/var/lib/isoloom/ready"
+}
+
+# The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
   value = { web = "10.86.0.10", decoy = "10.86.0.40", client = "10.86.0.20" }
 }
@@ -731,7 +764,7 @@ output "ssh_user" {
   value = "isoloom"
 }
 
-# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+# The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).
 output "checks" {
   value = [
     {

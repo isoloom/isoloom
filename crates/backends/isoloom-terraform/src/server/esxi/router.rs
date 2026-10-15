@@ -4,7 +4,7 @@
 //! are reached there, and Terraform reaches the machines through it.
 
 use isoloom_plan::{Environment, ipv6};
-use isoloom_render::hcl_builder::{Block, Module, reference, string};
+use isoloom_render::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, list, not, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
@@ -62,11 +62,32 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         guestos: None,
         disks: Vec::new(),
         windows: false,
+        lifecycle: Some(uplink_checked(env)),
     };
     m.commented(
         "The router: forwards between networks with the reach rules, and to the internet. VMware Tools reports its uplink address.",
         guest.block(&env.name),
     );
+}
+
+/// The `lifecycle` block failing the apply when the router reports no uplink address: with no
+/// DHCP on the uplink port group, VMware Tools reports one of its lab addresses instead.
+fn uplink_checked(env: &Environment) -> Block {
+    let own = list(env.networks.keys().map(|n| string(router::address(env.spec(), n).to_string())));
+    let ip = || reference("self.ip_address");
+    let condition = binary(
+        binary(ip(), BinaryOperator::NotEq, string("")),
+        BinaryOperator::And,
+        not(call("contains", [own, ip()])),
+    );
+    let message = Template::text("The router got no address on its uplink port group `")
+        .with_expr(reference("var.uplink_port_group"))
+        .with_text("`: it has no DHCP (VMware Tools then reports a lab address). Give it an uplink with DHCP and internet (`uplink_port_group`; on a nested ESXi, promiscuous mode on).");
+    let postcondition = Block::builder("postcondition")
+        .add_attribute(("condition", condition))
+        .add_attribute(("error_message", message.into_expression()))
+        .build();
+    Block::builder("lifecycle").add_block(postcondition).build()
 }
 
 /// The outputs: Proxmox's, from the router's uplink address.

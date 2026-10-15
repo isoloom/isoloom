@@ -341,8 +341,12 @@ variable "proxmox_ssh_address" {
 }
 
 variable "node" {
-  type    = string
-  default = "pve"
+  type        = string
+  description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
+  validation {
+    condition     = var.node != ""
+    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+  }
 }
 
 variable "datastore" {
@@ -416,10 +420,14 @@ resource "proxmox_virtual_environment_pool" "env" {
   comment = "Isoloom: hello-stack"
 }
 
+# Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.
+resource "proxmox_sdn_applier" "finalizer" {}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
-  id    = local.zone
-  nodes = [var.node]
+  id         = local.zone
+  nodes      = [var.node]
+  depends_on = [proxmox_sdn_applier.finalizer]
 }
 
 # Network `app`: 10.60.0.0/24
@@ -428,7 +436,11 @@ resource "proxmox_sdn_vnet" "app" {
   zone = proxmox_sdn_zone_simple.env.id
 }
 
+# Applies the SDN objects once created, and again whenever one of them is replaced.
 resource "proxmox_sdn_applier" "env" {
+  lifecycle {
+    replace_triggered_by = [proxmox_sdn_zone_simple.env, proxmox_sdn_vnet.app]
+  }
   depends_on = [proxmox_sdn_vnet.app]
 }
 
@@ -505,6 +517,17 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   on_boot   = false
   agent {
     enabled = true
+    timeout = "5m"
+    wait_for_ip {
+      ipv4 = true
+    }
+  }
+  stop_on_destroy = true
+  lifecycle {
+    postcondition {
+      condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.60.0.254"], a)]) > 0
+      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 5m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+    }
   }
   cpu {
     cores = 1
@@ -556,12 +579,13 @@ resource "proxmox_virtual_environment_file" "cache" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.60.0.10 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'mkdir -p '\\''/data'\\'''",
-        "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\'''",
-        "sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/cache/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
-        "sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.60.0.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.60.0.10 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: volume folders' > /var/lib/isoloom/ready && sh -c 'mkdir -p '\\''/data'\\''' || { echo 'failed: volume folders' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/cache.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\''' || { echo 'failed: provision/cache.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: setup scripts' > /var/lib/isoloom/ready && sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/cache/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)' || { echo 'failed: setup scripts' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: closing the internet' > /var/lib/isoloom/ready && sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.60.0.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi' || { echo 'failed: closing the internet' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -643,11 +667,12 @@ resource "proxmox_virtual_environment_file" "web" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.60.0.20 cache'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'i=0; until (bash -c '\\''</dev/tcp/cache/6379'\\'' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\"'",
-        "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
-        "sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.60.0.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.60.0.20 cache'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for cache' > /var/lib/isoloom/ready && sh -c 'i=0; until (bash -c '\\''</dev/tcp/cache/6379'\\'' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\"' || { echo 'failed: waiting for cache' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/web.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: closing the internet' > /var/lib/isoloom/ready && sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.60.0.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi' || { echo 'failed: closing the internet' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -727,8 +752,14 @@ locals {
   router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.60.0.254"], a)][0]
 }
 
-output "address" {
+# The router's uplink address: the lab's way in.
+output "ip" {
   value = local.router_address
+}
+
+# Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).
+output "ready_file" {
+  value = "/var/lib/isoloom/ready"
 }
 
 # Published services, from the router's uplink address.
@@ -736,7 +767,7 @@ output "published" {
   value = { "web/web" = "${local.router_address}:8080" }
 }
 
-# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+# The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
   value = { cache = "10.60.0.20", web = "10.60.0.10" }
 }
@@ -745,7 +776,7 @@ output "ssh_user" {
   value = "isoloom"
 }
 
-# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+# The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).
 output "checks" {
   value = [
     {

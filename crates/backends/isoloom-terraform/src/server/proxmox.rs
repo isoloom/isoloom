@@ -36,6 +36,7 @@ mod lxc;
 mod machine;
 mod outside;
 mod router;
+mod uplink;
 mod virtiofs;
 mod windows;
 

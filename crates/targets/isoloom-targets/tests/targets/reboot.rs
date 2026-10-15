@@ -77,7 +77,10 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() -> Outcome {
     let runcmd = from(tf, "runcmd = [")?;
     let runcmd = before(runcmd, "]\n      power_state = {")?;
     assert!(runcmd.contains("sh kernel.sh"));
-    assert!(!runcmd.contains("middle.sh") && !runcmd.contains("last.sh") && !runcmd.contains("/var/lib/isoloom/ready"));
+    assert!(!runcmd.contains("middle.sh") && !runcmd.contains("last.sh") && !runcmd.contains("echo ready > /var/lib/isoloom/ready"));
+    // Each step says it runs in the ready file, and a failing one ends the set-up there.
+    assert!(runcmd.contains("echo 'running: kernel.sh' > /var/lib/isoloom/ready && "), "{runcmd}");
+    assert!(runcmd.contains("|| { echo 'failed: kernel.sh' > /var/lib/isoloom/ready; exit 1; }"), "{runcmd}");
     assert!(runcmd.contains("echo 1 > /var/lib/isoloom/next-boot && systemctl enable isoloom-steps.service"));
     assert!(tf.contains("mode      = \"reboot\""), "{tf}");
     // The unit runs each part at the following boots: the first ends with the next reboot, the
@@ -94,9 +97,10 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() -> Outcome {
     let boot2 = before(boot2, "\n        }")?;
     assert!(boot2.contains("sh last.sh"), "{boot2}");
     assert!(
-        boot2.contains("echo ready > /var/lib/isoloom/ready'\\nsystemctl disable isoloom-steps.service"),
+        at(boot2, "echo ready > /var/lib/isoloom/ready") < at(boot2, "systemctl disable isoloom-steps.service"),
         "{boot2}"
     );
+    assert!(boot2.contains("failed: last.sh"), "{boot2}");
     // Inputs are kept out of /tmp (emptied at boot).
     assert!(boot2.contains(". /var/lib/isoloom/inputs.env"), "{boot2}");
     Ok(())

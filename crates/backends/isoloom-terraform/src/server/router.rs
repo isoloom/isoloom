@@ -59,10 +59,15 @@ pub(crate) fn is_default_gateway(env: &Environment, mp: &MachinePlan) -> bool {
 }
 
 /// The outputs of `target`'s module, once `local.router_address` holds the router's uplink
-/// address: the address, the published services there, the machines through it, the checks.
+/// address: the address (`ip`), the machines' ready file, the published services there, the
+/// machines through it, the checks.
 pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
     let dir = target.id();
-    m.block(output("address", reference("local.router_address")));
+    m.commented("The router's uplink address: the lab's way in.", output("ip", reference("local.router_address")));
+    m.commented(
+        "Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).",
+        output("ready_file", string(crate::machine::cloud_init::READY_FILE)),
+    );
     let published: Vec<(String, Expression)> = env
         .spec()
         .machines
@@ -87,13 +92,13 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
         .filter_map(|(n, _)| first_address(env, n).map(|a| (n.clone(), string(a))))
         .collect();
     m.commented(
-        "The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.",
+        "The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.",
         output("machines", object(machines)),
     );
     m.block(output("ssh_user", string("isoloom")));
     if let Some(checks) = output_block(env, dir, Invocation::Script, &|p| runner(env, p)) {
         m.commented(
-            &format!("The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test {dir}`."),
+            "The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).",
             checks,
         );
     }

@@ -152,8 +152,12 @@ variable "proxmox_ssh_address" {
 }
 
 variable "node" {
-  type    = string
-  default = "pve"
+  type        = string
+  description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
+  validation {
+    condition     = var.node != ""
+    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+  }
 }
 
 variable "datastore" {
@@ -227,10 +231,14 @@ resource "proxmox_virtual_environment_pool" "env" {
   comment = "Isoloom: arm-vm"
 }
 
+# Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.
+resource "proxmox_sdn_applier" "finalizer" {}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
-  id    = local.zone
-  nodes = [var.node]
+  id         = local.zone
+  nodes      = [var.node]
+  depends_on = [proxmox_sdn_applier.finalizer]
 }
 
 # Network `lab`: 10.70.0.0/24
@@ -239,7 +247,11 @@ resource "proxmox_sdn_vnet" "lab" {
   zone = proxmox_sdn_zone_simple.env.id
 }
 
+# Applies the SDN objects once created, and again whenever one of them is replaced.
 resource "proxmox_sdn_applier" "env" {
+  lifecycle {
+    replace_triggered_by = [proxmox_sdn_zone_simple.env, proxmox_sdn_vnet.lab]
+  }
   depends_on = [proxmox_sdn_vnet.lab]
 }
 
@@ -326,6 +338,17 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   on_boot   = false
   agent {
     enabled = true
+    timeout = "5m"
+    wait_for_ip {
+      ipv4 = true
+    }
+  }
+  stop_on_destroy = true
+  lifecycle {
+    postcondition {
+      condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.70.0.254"], a)]) > 0
+      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 5m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+    }
   }
   cpu {
     cores = 1
@@ -377,8 +400,9 @@ resource "proxmox_virtual_environment_file" "box" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/setup.sh'\\'''",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: provision/setup.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/setup.sh'\\''' || { echo 'failed: provision/setup.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -461,11 +485,17 @@ locals {
   router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.70.0.254"], a)][0]
 }
 
-output "address" {
+# The router's uplink address: the lab's way in.
+output "ip" {
   value = local.router_address
 }
 
-# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+# Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).
+output "ready_file" {
+  value = "/var/lib/isoloom/ready"
+}
+
+# The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
   value = { box = "10.70.0.10" }
 }
@@ -474,7 +504,7 @@ output "ssh_user" {
   value = "isoloom"
 }
 
-# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+# The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).
 output "checks" {
   value = [
     {

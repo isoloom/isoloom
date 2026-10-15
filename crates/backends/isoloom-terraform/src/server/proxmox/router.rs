@@ -4,7 +4,7 @@
 
 use isoloom_plan::Environment;
 use isoloom_plan::ipv6;
-use isoloom_render::hcl_builder::{BinaryOperator, Block, Expression, Module, Template, binary, call, for_list, index, list, not, number, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, Template, call, index, list, number, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
@@ -56,7 +56,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         tpm: false,
         own_boot: None,
         arm: false,
-        agent: true,
+        agent: Some(own_addresses(env)),
         nics,
         pci: Vec::new(),
         dns: None,
@@ -106,21 +106,15 @@ fn files(env: &Environment) -> Vec<Expression> {
     out
 }
 
+/// The router's own addresses on the environment's networks.
+fn own_addresses(env: &Environment) -> Vec<String> {
+    env.networks.keys().map(|n| router::address(env.spec(), n).to_string()).collect()
+}
+
 /// The outputs, from `local.router_address`: the router's address that is none of its
 /// environment addresses.
 pub(super) fn outputs(env: &Environment, m: &mut Module) {
-    let own = list(env.networks.keys().map(|n| string(router::address(env.spec(), n).to_string())));
-    let a = || reference("a");
-    let cond = binary(
-        binary(a(), BinaryOperator::NotEq, string("127.0.0.1")),
-        BinaryOperator::And,
-        not(call("contains", [own, a()])),
-    );
-    let all = call("flatten", [reference("proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses")]);
-    m.block(
-        Block::builder("locals")
-            .add_attribute(("router_address", index(for_list("a", all, a(), Some(cond)), 0)))
-            .build(),
-    );
+    let all = super::uplink::addresses("proxmox_virtual_environment_vm.isoloom_router", &own_addresses(env));
+    m.block(Block::builder("locals").add_attribute(("router_address", index(all, 0))).build());
     crate::server::router::outputs(env, Target::Proxmox, m);
 }

@@ -14,8 +14,6 @@ use crate::machine::linux::CLOUD_INIT_WAIT;
 use crate::machine::provisioner::{Connection, Provisioner, Upload};
 use crate::module::{inputs, output};
 
-/// Where the host writes that the environment is up (the plan's `Ready` step).
-const READY_FILE: &str = "/var/lib/isoloom/ready";
 /// The Compose command on the host: the `docker` target's file, ports published on every
 /// address of the VM (its firewall decides who reaches them).
 const COMPOSE: &str = "sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml";
@@ -154,7 +152,7 @@ pub(crate) fn outputs(access: &Access) -> Vec<Block> {
     vec![
         output("ip", access.host.clone()),
         output("ssh_user", string(access.user)),
-        output("ready_file", string(READY_FILE)),
+        output("ready_file", string(crate::machine::cloud_init::READY_FILE)),
     ]
 }
 

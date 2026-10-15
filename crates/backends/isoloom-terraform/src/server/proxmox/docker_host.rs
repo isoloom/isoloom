@@ -8,7 +8,7 @@ use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
 use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, for_list, index, list, null, number, reference,
+    BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, index, list, null, number, reference,
     string,
 };
 use isoloom_spec::model::Target;
@@ -67,7 +67,7 @@ fn variables() -> Vec<Block> {
             .default(boolean(false))
             .describe("Reach the lab VM over SSH through the node (its bridge isn't routable from here)")
             .block(),
-        s("node").default(string("pve")).block(),
+        super::base::node(),
         s("datastore").default(string("local-lvm")).describe("Where the VM's disk goes").block(),
         s("image_datastore")
             .default(string("local"))
@@ -92,15 +92,14 @@ fn variables() -> Vec<Block> {
 /// The project's root, and the VM's address on the uplink: the guest agent's that isn't the
 /// loopback.
 fn locals() -> Block {
-    let addresses = call("flatten", [reference("proxmox_virtual_environment_vm.env.ipv4_addresses")]);
-    let not_loopback = binary(reference("a"), BinaryOperator::NotEq, string("127.0.0.1"));
+    let addresses = super::uplink::addresses("proxmox_virtual_environment_vm.env", &[]);
     let root = call(
         "abspath",
         [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
     );
     Block::builder("locals")
         .add_attribute(("root", root))
-        .add_attribute(("ip", index(for_list("a", addresses, reference("a"), Some(not_loopback)), 0)))
+        .add_attribute(("ip", index(addresses, 0)))
         .build()
 }
 
@@ -129,7 +128,9 @@ fn vm(env: &Environment) -> Block {
         .add_attribute(("node_name", reference("var.node")))
         .add_attribute(("tags", list([string("isoloom"), string(env.name.as_str())])))
         .add_attribute(("on_boot", boolean(false)))
-        .add_block(settings("agent", vec![("enabled", boolean(true))]))
+        .add_block(super::uplink::agent())
+        // A missing agent must not hold a destroy: the VM is stopped, not shut down.
+        .add_attribute(("stop_on_destroy", boolean(true)))
         .add_block(settings("cpu", vec![("cores", number(size.cpus.into())), ("type", string("host"))]))
         .add_block(settings("memory", vec![("dedicated", number(size.memory_mb.into()))]))
         .add_block(settings(
@@ -151,6 +152,7 @@ fn vm(env: &Environment) -> Block {
         )
         .add_block(settings("operating_system", vec![("type", string("l26"))]))
         .add_block(Block::builder("serial_device").build())
+        .add_block(super::uplink::checked("The Docker host", &[]))
         .build()
 }
 

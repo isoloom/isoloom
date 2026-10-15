@@ -10,8 +10,15 @@ use isoloom_plan::{DataDisk, Environment, MachinePlan, Step};
 use isoloom_render::hcl_builder::{Expression, boolean, call, list, object, string};
 use isoloom_render::steps;
 
+use isoloom_spec::shell::quote;
+
 use super::{Shell, at_every_boot};
 use crate::module::inputs;
+
+/// Where a machine's set-up says how far it got, in the `isoloom-ready/1` grammar: `running:
+/// <step>` while a step runs, `failed: <step>` once one failed (nothing after it runs), `ready`
+/// once it is done. No file yet: still booting.
+pub(crate) const READY_FILE: &str = "/var/lib/isoloom/ready";
 
 /// Where a machine with `reboot` steps keeps its continuation: `next-boot` (the part to run at the
 /// next boot), `steps.sh` and `boot-<n>.sh`.
@@ -41,6 +48,8 @@ pub(crate) struct CloudConfig {
     pub(crate) restart: bool,
     /// The data disks it formats and mounts (raw ones are left as they are).
     pub(crate) disks: Vec<DataDisk>,
+    /// Whether a command says its progress in [`READY_FILE`] (its folder is made first).
+    tracked: bool,
 }
 
 impl CloudConfig {
@@ -57,6 +66,21 @@ impl CloudConfig {
             runcmd: Vec::new(),
             restart: false,
             disks: Vec::new(),
+            tracked: false,
+        }
+    }
+
+    /// Adds `command` to `runcmd` as the step `label` (see [`tracked`]).
+    pub(crate) fn track(&mut self, label: &str, command: &str) {
+        self.ready_dir();
+        self.runcmd.push(tracked(label, command));
+    }
+
+    /// Makes the ready file's folder first, once.
+    fn ready_dir(&mut self) {
+        if !self.tracked {
+            self.runcmd.push(format!("mkdir -p {READY_DIR}"));
+            self.tracked = true;
         }
     }
 
@@ -80,6 +104,46 @@ impl CloudConfig {
             items.push(("power_state", power));
         }
         call("format", [string("#cloud-config\n%s"), call("yamlencode", [object(items)])])
+    }
+}
+
+/// The ready file's folder.
+const READY_DIR: &str = "/var/lib/isoloom";
+
+/// `command` as the set-up step `label`: its name in [`READY_FILE`] first; when it fails,
+/// `failed: <label>` there and the end of the set-up (cloud-init runs `runcmd` as one script
+/// that otherwise goes on to the next command, and to `ready`).
+pub(crate) fn tracked(label: &str, command: &str) -> String {
+    let running = quote(&format!("running: {label}"));
+    let failed = quote(&format!("failed: {label}"));
+    format!("echo {running} > {READY_FILE} && {command} || {{ echo {failed} > {READY_FILE}; exit 1; }}")
+}
+
+/// What the ready file calls a step of `machine`'s set-up.
+fn label(step: &Step) -> String {
+    match step {
+        Step::Run { path, .. } => path.clone(),
+        Step::WaitFor { machine, .. } => format!("waiting for {machine}"),
+        Step::SharedVolume { volume, .. } => format!("shared volume {volume}"),
+        Step::DiskGrow => "growing the disk".into(),
+        Step::Disks { .. } => "data disks".into(),
+        Step::Hosts { .. } => "hosts file".into(),
+        Step::Settings => "system settings".into(),
+        Step::Trunks => "VLAN interfaces".into(),
+        Step::MoreAddresses { .. } => "more addresses".into(),
+        Step::Routes { .. } => "routes".into(),
+        Step::Ipv6 { .. } => "IPv6".into(),
+        Step::Volumes { .. } => "volume folders".into(),
+        Step::Files { .. } => "files".into(),
+        Step::Secrets => "waiting for its secrets".into(),
+        Step::Inputs { .. } => "inputs".into(),
+        Step::Before { .. } => "before scripts".into(),
+        Step::Command => "starting its command".into(),
+        Step::Setup { .. } => "setup scripts".into(),
+        Step::Egress => "closing the internet".into(),
+        Step::Tc => "link impairment".into(),
+        Step::Ready => "health check".into(),
+        _ => "set-up".into(),
     }
 }
 
@@ -160,7 +224,7 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
         // Written outside /tmp (emptied at boot, maybe after cloud-init writes its files), then
         // put where the steps read it once the boot is done.
         config.files.push(file(steps::KEPT_INPUTS_FILE, Some("0600"), inputs::file(&mp.inputs)));
-        config.runcmd.push(format!("install -m 600 {} {}", steps::KEPT_INPUTS_FILE, steps::INPUTS_FILE));
+        config.track("inputs", &format!("install -m 600 {} {}", steps::KEPT_INPUTS_FILE, steps::INPUTS_FILE));
     }
     let mut parts: Vec<Vec<String>> = vec![Vec::new()];
     let mut again: Vec<String> = Vec::new();
@@ -170,7 +234,7 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
             Step::Disks { disks } => config.disks.clone_from(disks),
             Step::Reboot => parts.push(again.clone()),
             _ => {
-                let Some(c) = Shell::Root.step(env, machine, step) else { continue };
+                let Some(c) = Shell::Root.step(env, machine, step).map(|c| tracked(&label(step), &c)) else { continue };
                 if at_every_boot(step) {
                     again.push(c.clone());
                 }
@@ -179,7 +243,11 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
         }
     }
     let mut parts = parts.into_iter();
-    config.runcmd.extend(parts.next().unwrap_or_default());
+    let first = parts.next().unwrap_or_default();
+    if !first.is_empty() {
+        config.ready_dir();
+    }
+    config.runcmd.extend(first);
     let later: Vec<Vec<String>> = parts.collect();
     if !later.is_empty() {
         config.runcmd.push(format!(

@@ -233,8 +233,12 @@ variable "proxmox_ssh_address" {
 }
 
 variable "node" {
-  type    = string
-  default = "pve"
+  type        = string
+  description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
+  validation {
+    condition     = var.node != ""
+    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+  }
 }
 
 variable "datastore" {
@@ -308,10 +312,14 @@ resource "proxmox_virtual_environment_pool" "env" {
   comment = "Isoloom: shared-files"
 }
 
+# Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.
+resource "proxmox_sdn_applier" "finalizer" {}
+
 # The environment's networks: an SDN simple zone, a VNet per network.
 resource "proxmox_sdn_zone_simple" "env" {
-  id    = local.zone
-  nodes = [var.node]
+  id         = local.zone
+  nodes      = [var.node]
+  depends_on = [proxmox_sdn_applier.finalizer]
 }
 
 # Network `app`: 10.84.0.0/24
@@ -320,7 +328,11 @@ resource "proxmox_sdn_vnet" "app" {
   zone = proxmox_sdn_zone_simple.env.id
 }
 
+# Applies the SDN objects once created, and again whenever one of them is replaced.
 resource "proxmox_sdn_applier" "env" {
+  lifecycle {
+    replace_triggered_by = [proxmox_sdn_zone_simple.env, proxmox_sdn_vnet.app]
+  }
   depends_on = [proxmox_sdn_vnet.app]
 }
 
@@ -397,6 +409,17 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   on_boot   = false
   agent {
     enabled = true
+    timeout = "5m"
+    wait_for_ip {
+      ipv4 = true
+    }
+  }
+  stop_on_destroy = true
+  lifecycle {
+    postcondition {
+      condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.84.0.254"], a)]) > 0
+      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 5m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+    }
   }
   cpu {
     cores = 1
@@ -452,10 +475,11 @@ resource "proxmox_virtual_environment_file" "writer" {
       mounts         = [["LABEL=data", "/srv/data", "ext4", "defaults,nofail", "0", "2"]]
       write_files    = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra'",
-        "sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/write.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.84.0.11 reader'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: shared volume shared' > /var/lib/isoloom/ready && sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/srv/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-kernel-server; else pkg nfs-utils; fi\ngrep -v -F '\\''# isoloom-volume-shared'\\'' /etc/exports > /etc/exports.isoloom 2>/dev/null || true\nprintf '\\''%s %s %s\\n'\\'' '\\''/srv/shared'\\'' '\\''10.84.0.11(rw,sync,no_subtree_check,no_root_squash)'\\'' '\\''# isoloom-volume-shared'\\'' >> /etc/exports.isoloom && mv /etc/exports.isoloom /etc/exports\nsystemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs-kernel-server\nexportfs -ra' || { echo 'failed: shared volume shared' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: setup scripts' > /var/lib/isoloom/ready && sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/write.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)' || { echo 'failed: setup scripts' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -544,10 +568,11 @@ resource "proxmox_virtual_environment_file" "reader" {
       packages    = ["nftables", "curl", "netcat-openbsd"]
       write_files = local.project_files
       runcmd = [
-        "sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-        "sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done'",
-        "sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/look.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
-        "sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.84.0.10 writer'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: shared volume shared' > /var/lib/isoloom/ready && sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\nmkdir -p '\\''/data/shared'\\''\nif command -v apt-get >/dev/null; then pkg nfs-common; else pkg nfs-utils; fi\ngrep -qF '\\''10.84.0.10:/srv/shared '\\'' /etc/fstab || printf '\\''%s\\n'\\'' '\\''10.84.0.10:/srv/shared /data/shared nfs defaults,_netdev 0 0'\\'' >> /etc/fstab\ni=0; until mountpoint -q '\\''/data/shared'\\'' || mount '\\''/data/shared'\\'' 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo '\\''volume shared: writer doesn'\\''\\'\\'''\\''t serve it (NFS)'\\'' >&2; exit 1; fi; sleep 5; done' || { echo 'failed: shared volume shared' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: setup scripts' > /var/lib/isoloom/ready && sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/steps/look.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)' || { echo 'failed: setup scripts' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -620,11 +645,17 @@ locals {
   router_address = [for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.84.0.254"], a)][0]
 }
 
-output "address" {
+# The router's uplink address: the lab's way in.
+output "ip" {
   value = local.router_address
 }
 
-# The machines, through the router: ssh -J isoloom@<address> isoloom@<machine>.
+# Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).
+output "ready_file" {
+  value = "/var/lib/isoloom/ready"
+}
+
+# The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
   value = { writer = "10.84.0.10", reader = "10.84.0.11" }
 }
@@ -633,7 +664,7 @@ output "ssh_user" {
   value = "isoloom"
 }
 
-# The checks: each runner piped to its machine (ssh -J isoloom@<address> isoloom@<host> sh -s < <script>), or `isoloom test proxmox`.
+# The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).
 output "checks" {
   value = [
     {

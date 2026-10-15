@@ -107,6 +107,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut 
         guestos: windows.then(|| super::windows::guestos(os)),
         disks: super::disks::blocks(name, &mp.disks, m),
         windows,
+        lifecycle: None,
     };
     let what = if windows { ": set up by cloudbase-init at its first boot" } else { "" };
     m.commented(&format!("Machine `{name}`{what}."), guest.block(&env.name));
@@ -162,6 +163,7 @@ fn controller(env: &Environment, m: &mut Module) {
         guestos: None,
         disks: Vec::new(),
         windows: false,
+        lifecycle: None,
     };
     m.commented(
         "The controller: runs the environment's playbooks once every machine is set up.",

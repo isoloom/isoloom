@@ -70,6 +70,8 @@ pub(super) struct Guest {
     pub(super) disks: Vec<Expression>,
     /// Whether it runs Windows: cloudbase-init reads its network configuration.
     pub(super) windows: bool,
+    /// Its `lifecycle` block, when the apply checks what it reports (the router's uplink).
+    pub(super) lifecycle: Option<Block>,
 }
 
 /// The SCSI slots a data disk can take: 0:1 to 0:15 but 0:7, the controller's own.
@@ -132,9 +134,11 @@ impl Guest {
                     .build(),
             );
         }
-        b.add_attribute(("guestinfo", guestinfo))
-            .add_attribute(("depends_on", list(self.depends_on)))
-            .build()
+        b = b.add_attribute(("guestinfo", guestinfo));
+        if let Some(lifecycle) = self.lifecycle {
+            b = b.add_block(lifecycle);
+        }
+        b.add_attribute(("depends_on", list(self.depends_on))).build()
     }
 
     /// The metadata: its instance id and host name, and its network configuration (version 2),

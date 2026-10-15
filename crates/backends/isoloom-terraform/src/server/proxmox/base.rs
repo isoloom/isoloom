@@ -38,27 +38,46 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("comment", string(format!("Isoloom: {}", env.name))))
             .build(),
     );
+    m.commented(
+        "Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.",
+        resource("proxmox_sdn_applier", FINALIZER).build(),
+    );
     let mut zone = resource("proxmox_sdn_zone_simple", "env")
         .add_attribute(("id", reference("local.zone")))
         .add_attribute(("nodes", list([reference("var.node")])));
     if let Some(mtu) = super::links::zone_mtu(env) {
         zone = zone.add_attribute(("mtu", number(mtu.into())));
     }
+    zone = zone.add_attribute(("depends_on", list([reference(&format!("proxmox_sdn_applier.{FINALIZER}"))])));
     m.commented("The environment's networks: an SDN simple zone, a VNet per network.", zone.build());
     credentials(env, m);
     let vnets = super::links::vnets(env, m);
-    m.block(resource("proxmox_sdn_applier", "env").add_attribute(("depends_on", list(vnets))).build());
+    m.commented("Applies the SDN objects once created, and again whenever one of them is replaced.", applier(vnets));
     images(env, m);
     super::image::downloads(env, m);
     super::firewall::ipsets(env, m);
     super::virtiofs::mappings(env, m);
 }
 
+/// The applier that runs last on destroy (`proxmox_sdn_applier.finalizer`): the provider's own
+/// pattern, so the zone and VNet deletions don't stay pending on the server.
+const FINALIZER: &str = "finalizer";
+
+/// The applier of the zone and `vnets`: after them, and replaced (so run again) when one is.
+fn applier(vnets: Vec<Expression>) -> Block {
+    let mut triggers = vec![reference("proxmox_sdn_zone_simple.env")];
+    triggers.extend(vnets.iter().cloned());
+    resource("proxmox_sdn_applier", "env")
+        .add_block(Block::builder("lifecycle").add_attribute(("replace_triggered_by", list(triggers))).build())
+        .add_attribute(("depends_on", list(vnets)))
+        .build()
+}
+
 fn variables() -> Vec<Block> {
     let s = |name: &str| Variable::new(name, "string");
     let mut v = connection("Uploading cloud-init snippets goes over SSH to the node");
     v.extend([
-        s("node").default(string("pve")).block(),
+        node(),
         s("datastore").default(string("local-lvm")).describe("Where VM disks go").block(),
         s("image_datastore")
             .default(string("local"))
@@ -82,6 +101,15 @@ fn variables() -> Vec<Block> {
             .block(),
     ]);
     v
+}
+
+/// The node the VMs go on: no default, since a server's first node can be named anything (the
+/// launcher finds it when the server is added); an empty name is refused before anything is made.
+pub(super) fn node() -> Block {
+    Variable::new("node", "string")
+        .describe("The Proxmox node the VMs go on (`pvesh get /nodes` lists them)")
+        .validated(is_set("node"), "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them).")
+        .block()
 }
 
 /// The variables of the connection to the server: its API (a token, or a user and password),

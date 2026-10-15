@@ -451,8 +451,12 @@ variable "ssh_via_node" {
 }
 
 variable "node" {
-  type    = string
-  default = "pve"
+  type        = string
+  description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
+  validation {
+    condition     = var.node != ""
+    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+  }
 }
 
 variable "datastore" {
@@ -572,7 +576,12 @@ resource "proxmox_virtual_environment_vm" "env" {
   on_boot   = false
   agent {
     enabled = true
+    timeout = "5m"
+    wait_for_ip {
+      ipv4 = true
+    }
   }
+  stop_on_destroy = true
   cpu {
     cores = 2
     type  = "host"
@@ -602,6 +611,12 @@ resource "proxmox_virtual_environment_vm" "env" {
     type = "l26"
   }
   serial_device {}
+  lifecycle {
+    postcondition {
+      condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1"]) > 0
+      error_message = "The Docker host got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 5m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+    }
+  }
 }
 
 # The environment, over SSH: the project, Docker, then the Compose file.

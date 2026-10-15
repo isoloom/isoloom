@@ -9,7 +9,7 @@ use isoloom_render::steps;
 use isoloom_spec::validate::Cidr;
 
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
-use crate::machine::cloud_init::{self, CloudConfig, file};
+use crate::machine::cloud_init::{self, CloudConfig, READY_FILE, file};
 use crate::machine::{Shell, controller, vms};
 use crate::module::ident;
 
@@ -28,12 +28,20 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         ),
         file("/etc/isoloom/inventory.ini", Some("0644"), inventory),
     ];
-    config.runcmd.extend(controller::hosts(env).map(|s| Shell::Root.command(&s)));
-    config.runcmd.push(Shell::Root.command(controller::ANSIBLE));
-    config.runcmd.extend(waits(env));
-    config.runcmd.extend(controller::windows_waits(env).iter().map(|w| Shell::Root.command(w)));
-    config.runcmd.push(Shell::Root.command(&controller::playbooks(env)));
-    config.runcmd.extend(steps::linux(env, "", &Step::Ready).map(|s| Shell::Root.command(&s)));
+    for hosts in controller::hosts(env) {
+        config.track("hosts file", &Shell::Root.command(&hosts));
+    }
+    config.track("installing Ansible", &Shell::Root.command(controller::ANSIBLE));
+    for (name, wait) in waits(env) {
+        config.track(&format!("waiting for {name}"), &wait);
+    }
+    for wait in controller::windows_waits(env) {
+        config.track("waiting for the Windows machines", &Shell::Root.command(&wait));
+    }
+    config.track("the playbooks", &Shell::Root.command(&controller::playbooks(env)));
+    for ready in steps::linux(env, "", &Step::Ready) {
+        config.track("health check", &Shell::Root.command(&ready));
+    }
     m.commented(
         "The controller: runs the environment's playbooks once every machine is up.",
         snippet("controller", "controller", config.document()),
@@ -58,7 +66,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         tpm: false,
         own_boot: None,
         arm: false,
-        agent: false,
+        agent: None,
         nics,
         pci: Vec::new(),
         dns: Some(Block::builder("dns").add_attribute(("servers", list([string("1.1.1.1")]))).build()),
@@ -70,17 +78,18 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     m.block(vm.block(env));
 }
 
-/// Each Linux machine's own set-up must be done (its ready marker) before the playbooks run.
-fn waits(env: &Environment) -> Vec<String> {
+/// Each Linux machine's own set-up must be done (its ready file says `ready`) before the playbooks
+/// run: its name, and the wait.
+fn waits(env: &Environment) -> Vec<(String, String)> {
     vms(env)
         .filter(|(_, mp)| !mp.is_windows())
         .filter_map(|(name, mp)| {
             let a = mp.addresses.values().next()?;
-            Some(Shell::Root.command(
-                &format!(
-                    "i=0; until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@{a} test -f /var/lib/isoloom/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
-                ),
-            ))
+            // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
+            let wait = format!(
+                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@{a} head -n 1 {READY_FILE} 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
+            );
+            Some((name.to_owned(), Shell::Root.command(&wait)))
         })
         .collect()
 }
