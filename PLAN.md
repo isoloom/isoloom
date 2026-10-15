@@ -19,7 +19,8 @@ Working document for the local rebuild. It is squashed away with the history at 
 | `isoloom/isothrum` | Apache-2.0 | Libraries only: the runner, the lab-model compiler (drawing to spec, today's `isothrum-core`) and its WASM build | desktop app, website (WASM), launcher (runner) |
 | `isoloom/isothrum-desktop` (new) | Apache-2.0 | The Tauri app: brings Isoloom, the runner, the compiler and the UI together, with dynamic specs | users |
 | `isoloom/isothrum-ui` (new, optional) | Apache-2.0 | Shared front-end components: editor canvas, lab view, machines, consoles | desktop app, website, possibly the launcher |
-| `isoloom/isothrum-website` | Proprietary, private | Site, accounts, project store, MCP; uses the UI package and the WASM engine | — |
+| `isoloom/isothrum-website` | Proprietary, private | isothrum.com: marketing site and blog, the in-browser lab editor (`desktop-editor/`, React Flow), accounts (Better Auth), the project store (`db/`), and the MCP server (`/api/mcp`). Uses the WASM engine (committed today under `public/wasm/`) and later `isothrum-ui` | visitors, Isothrum users |
+| `isoloom/isoloom-website` | Proprietary, private | www.isoloom.com: marketing site, blog and the docs, synced from the Isoloom repository by `scripts/sync-isoloom.mjs` | visitors, Isoloom users |
 | `Cyber-Courses/Cyber-CTF-Launcher` | Apache-2.0 | CTF UI with fixed specs; uses Isoloom and the runner | players |
 
 **Packages, not pinned git commits:**
@@ -273,6 +274,27 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
     - Group the packaging assets (`store/`, MSIX) under `packaging/`, and the attack-box image under `images/attack-box/`.
   - **Phase 2–3:** `runtime/` moves into `isothrum-runner`, and the launcher keeps only CTF-specific code.
 
+## 3c. The two websites
+
+| | isoloom.com (`isoloom/isoloom-website`) | isothrum.com (`isoloom/isothrum-website`) |
+|---|---|---|
+| **Stack** | Next.js 16, React 19, Tailwind 4, Base UI, next-md-blog; Vercel | The same, plus React Flow (the editor), Better Auth, `mcp-handler` and a SQL project store; Vercel |
+| **Size** | About 7.5k lines of TS/TSX, 43 Markdown pages (42 docs) | About 17k lines of TS/TSX, 50 Markdown pages (blog, glossary) |
+| **Depends on** | Isoloom's docs, via `sync:isoloom` | Isothrum's compiler and WASM build, and the Isoloom spec the editor writes |
+| **Licence** | Proprietary, private | Proprietary, private |
+
+**Rules:**
+- **A push to `main` deploys production** (Vercel): both sites are live. So they follow the same local-`main` workflow, and nothing is pushed until a release, with the maintainer's OK at that moment.
+- **The engineering standard (3b) applies in full:** lint levels, the ratchet to zero, `knip` and `jscpd`, components ≤ 200 lines, typed boundaries.
+- **The two sites duplicate most of their scaffolding** (`components/ui`, `components/markdown`, `components/seo`, `lib/oembed`, `assets/fonts`, the blog config). DRY across repositories is recommended: one private monorepo, `isoloom/websites`, with `apps/isoloom`, `apps/isothrum` and `packages/site-kit`. Merging keeps each domain's Vercel project, and is the maintainer's call. Without the merge, a private `site-kit` package does the same job.
+
+**When:**
+- **Phase 0.7, the engineering standard in both sites:** measure, then lint configs, the ratchet, the folder layout, and driving to zero. It can run alongside other phases, because the sites don't block the converter.
+- **Phase 2:** the Isothrum compiler (`isothrum-core`, soon `isothrum-compiler`) and the website editor **write the new spec syntax**. With no old-format support, a drawn lab would otherwise break. They test against Isoloom's spec examples and schema.
+- **Until Phase 7:** isoloom.com still describes the old 0.x tool, and some claims are wrong (see the facts kept for the docs rewrite). Recommended: a short "1.0 in progress" banner now, so visitors aren't misled. It needs one push, so it needs the maintainer's OK.
+- **Phase 7, release:** isoloom.com's docs are regenerated from the repository's new docs, and its pages rewritten (features, targets, comparisons) from the 1.0 facts. On isothrum.com: the editor on the 1.0 spec, the WASM from the published npm package instead of the committed `public/wasm/`, and the release announcement. Both are pushed with the 1.0 release.
+- **1.x:** `desktop-editor/` and the editor components move into `isothrum-ui`, shared with the desktop app. Accounts (Better Auth, ex-isothrum #30) and the project store follow.
+
 ## 4. Work, in order
 
 **Principles:**
@@ -432,7 +454,7 @@ Kubernetes, Helm, Kustomize, hybrid, hosted, external and Terraform ESXi, onto t
 
 ### Phase 7: Release 1.0, together (M)
 
-1. **Minimal docs** in each repository: getting started, the generated spec reference, targets, secrets.
+1. **Minimal docs** in each repository: getting started, the generated spec reference, targets, secrets. Then the two websites (3c): isoloom.com from the new docs, and isothrum.com on the 1.0 spec and the npm WASM.
 2. **Squash each repository's history,** with the maintainer's confirmation at that moment, and re-enable CI.
 3. **Publish to crates.io:** the Isoloom crates, then the Isothrum runner.
 4. **Rewrite every CTF lab file in the new syntax** (by hand, with each lab's real run as proof).
