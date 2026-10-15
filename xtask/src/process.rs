@@ -4,7 +4,7 @@
 use std::ffi::{OsStr, OsString};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, ExitCode, ExitStatus, Stdio};
 use std::sync::mpsc;
 
 use crate::Res;
@@ -29,6 +29,27 @@ pub(crate) fn without_run_env(cmd: &mut Command) -> &mut Command {
         }
     }
     cmd
+}
+
+/// `cargo`, the one running this xtask (`$CARGO`, so the same toolchain), in `dir`, without the
+/// variables `cargo run` set for the xtask.
+pub(crate) fn cargo(dir: &Path) -> Command {
+    let mut cmd = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+    without_run_env(&mut cmd);
+    cmd.current_dir(dir);
+    cmd
+}
+
+/// Runs a command attached to the terminal; whether it succeeded. An error only when it can't
+/// start.
+pub(crate) fn passed(cmd: &mut Command) -> Res<bool> {
+    let status = cmd.status().map_err(|e| format!("`{}` couldn't start: {e}", describe(cmd)))?;
+    Ok(status.success())
+}
+
+/// The exit code of a task whose steps all had to pass.
+pub(crate) fn exit_code(ok: bool) -> ExitCode {
+    if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }
 
 /// Runs a command attached to the terminal; an error names it when it fails.

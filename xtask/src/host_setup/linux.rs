@@ -12,6 +12,7 @@ use crate::check_all::TAURI_PACKAGES;
 use crate::{Res, process, repo};
 
 const CARGO_MACHETE: &str = "0.9.2";
+const CARGO_NEXTEST: &str = "0.9.148";
 const TERRAFORM: &str = "1.16.6";
 const KUBECTL: &str = "1.37.1";
 const KIND: &str = "0.33.0";
@@ -58,6 +59,12 @@ fn tools() -> Vec<Tool> {
             |c| c.found(&["cargo", "machete", "--version"]),
             CARGO_MACHETE.into(),
             install_machete,
+        ),
+        tool(
+            format!("cargo-nextest {CARGO_NEXTEST}"),
+            |c| c.found(&["cargo", "nextest", "--version"]),
+            CARGO_NEXTEST.into(),
+            install_nextest,
         ),
         tool(
             format!("Terraform {TERRAFORM}"),
@@ -170,6 +177,10 @@ fn install_rust_components(ctx: &Ctx) -> Res<()> {
 
 fn install_machete(ctx: &Ctx) -> Res<()> {
     process::run(ctx.cmd("cargo").args(["install", "--locked", &format!("cargo-machete@{CARGO_MACHETE}")]))
+}
+
+fn install_nextest(ctx: &Ctx) -> Res<()> {
+    process::run(ctx.cmd("cargo").args(["install", "--locked", &format!("cargo-nextest@{CARGO_NEXTEST}")]))
 }
 
 /// Downloads `url` into the work folder as `name` and checks it against the SHA-256 listed for

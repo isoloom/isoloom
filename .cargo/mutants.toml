@@ -1,0 +1,6 @@
+# cargo-mutants (`cargo xtask mutants`, PLAN 3d): mutation testing of the core crates.
+#
+# Every mutant that survives is killed by a new test, unless no test can tell it apart from the
+# original (an equivalent mutant): then it is listed here, matched by the name `cargo mutants
+# --list` shows, with the reason it is equivalent. Nothing else goes here.
+exclude_re = []

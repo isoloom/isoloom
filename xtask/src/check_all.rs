@@ -23,6 +23,9 @@
 //! `ISOLOOM_NODE_BIN` names its bin folder when the one on `PATH` is another version. A set
 //! `CARGO_TARGET_DIR` gets one subfolder per repository, so they never share one.
 //!
+//! `--deep` adds the slow gates to this Mac's part: every fuzz target for a minute (`cargo xtask
+//! fuzz`) and mutation testing of the core crates (`cargo xtask mutants`).
+//!
 //! `--clean` removes the hosts' build folders and copies (the remote folders, the Docker volumes
 //! and image).
 
@@ -106,10 +109,21 @@ impl Host {
 /// Which gates a host runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub(crate) enum Profile {
-    /// Every gate: format, lints, docs, the ratchet, the tests.
+    /// Every gate: format, lints, the supply chain, docs, the ratchet, the minimum Rust, the
+    /// features, the fuzz crate's build, the tests.
     Full,
+    /// Every gate, then fuzzing and mutation testing.
+    Deep,
     /// The gates whose result depends on the platform: the tests.
     Platform,
+}
+
+impl Profile {
+    /// Whether it runs the gates that read the sources (format, lints, docs...), not only the
+    /// tests.
+    pub(crate) fn statics(self) -> bool {
+        self != Profile::Platform
+    }
 }
 
 /// The arguments of `cargo xtask check-all`.
@@ -124,6 +138,9 @@ pub(crate) struct Args {
     /// Where the logs go (default: a new folder under the system's temporary folder).
     #[arg(long, value_name = "DIR")]
     logs: Option<PathBuf>,
+    /// Also run the slow gates on this Mac: fuzzing and mutation testing.
+    #[arg(long)]
+    deep: bool,
     /// Remove the hosts' build folders and copies instead.
     #[arg(long)]
     clean: bool,
@@ -175,6 +192,8 @@ pub(crate) struct Run {
     pub dirs: Dirs,
     /// Where each host's and gate's log goes.
     pub logs: PathBuf,
+    /// Whether this Mac also runs the slow gates.
+    pub deep: bool,
 }
 
 /// Runs the gates (or, with `--leg`, this host's part; with `--clean`, the clean-up).
@@ -206,6 +225,7 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
         repos: a.repos.clone(),
         dirs,
         logs,
+        deep: a.deep,
     };
     let names = |ids: Vec<&str>| ids.join(",");
     println!(

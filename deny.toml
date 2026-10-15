@@ -1,9 +1,16 @@
-# cargo-deny, run by CI's `deny` job (`cargo deny check`): advisories, licenses, bans, sources.
+# cargo-deny (`cargo deny check`, a gate of `cargo xtask check-all`): the supply chain of PLAN 3d.
+# Advisories, licences, bans (duplicate versions, wildcard requirements) and sources (crates.io
+# only).
 
 [graph]
 all-features = true
 
 [advisories]
+# A vulnerability always fails; so do an unmaintained or unsound crate anywhere in the graph. A
+# yanked version is reported (an update is due) without failing the build.
+unmaintained = "all"
+unsound = "all"
+yanked = "warn"
 ignore = [
   # unsafe-libyaml (under serde_yaml_ng) is archived upstream: an "unmaintained" notice, with no
   # known vulnerability. Drop this once the YAML parsing moves to a maintained crate.
@@ -11,7 +18,8 @@ ignore = [
 ]
 
 [licenses]
-# The licenses of the current dependencies; a new one is a decision, made by adding it here.
+# Licences compatible with Apache-2.0, the workspace's: a new one is a decision, made by adding it
+# here.
 allow = [
   "MIT",
   "Apache-2.0",
@@ -27,12 +35,23 @@ confidence-threshold = 0.9
 ignore = true
 
 [bans]
-# Two versions of one crate: reported, not refused (it is often a transitive lag).
+# Two versions of one crate are reported, not refused (it is often a transitive lag), the
+# development dependencies' included. The ones reviewed are skipped below, each with its reason,
+# so a new one stands out; a skip that no longer matches is reported too.
 multiple-versions = "warn"
+multiple-versions-include-dev = true
+# A `*` requirement is refused; the workspace's own path dependencies aren't requirements.
 wildcards = "deny"
 allow-wildcard-paths = true
+skip = [
+  { crate = "getrandom@0.3.4", reason = "ahash (under jsonschema, a dev-dependency) is still on 0.3; proptest and tempfile are on 0.4" },
+  { crate = "r-efi@5.3.0", reason = "getrandom 0.3's UEFI support; it goes with the getrandom skip" },
+  { crate = "syn@2.0.119", reason = "strum_macros (under jsonschema, a dev-dependency) is still on syn 2; the other derives are on 3" },
+]
 
 [sources]
+# crates.io only: no other registry, and no git dependency.
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

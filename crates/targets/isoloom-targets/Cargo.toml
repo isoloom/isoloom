@@ -27,10 +27,16 @@ isoloom-import.workspace = true
 insta.workspace = true
 serde_yaml_ng.workspace = true
 jsonschema.workspace = true
+criterion.workspace = true
 
 # Unused today; kept while this crate moves onto the plan IR (Wave 1, unit 6).
 [package.metadata.cargo-machete]
 ignored = ["indexmap"]
+
+# The hot paths of generation, measured by `cargo xtask bench` (criterion, its own main).
+[[bench]]
+name = "pipeline"
+harness = false
 
 [lints]
 workspace = true

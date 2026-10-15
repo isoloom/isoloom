@@ -15,3 +15,7 @@
 
 # Python bytecode (tools/verify/runner, when run outside its image).
 __pycache__/
+
+# A `cargo mutants` report written in the tree (`cargo xtask mutants` writes under target/).
+mutants.out/
+mutants.out.old/

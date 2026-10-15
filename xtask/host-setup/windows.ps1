@@ -1,9 +1,10 @@
 <#
 Prepares a Windows host for `cargo xtask check-all` (its windows host) and for the Windows host
 proof: git, the Visual Studio 2022 Build Tools with the C++ workload, Rust with the MSVC toolchain
-(rustfmt, clippy) and cargo-machete (the launcher's `pnpm quality` runs it), Node 24 and pnpm for
-the launcher, then Vagrant, Terraform and PowerShell 7 for the real-target runs, and long paths
-turned on. Everything comes from winget, except cargo-machete (cargo install).
+(rustfmt, clippy), cargo-nextest (Isoloom's `cargo xtask test`) and cargo-machete (the launcher's
+`pnpm quality` runs it), Node 24 and pnpm for the launcher, then Vagrant, Terraform and
+PowerShell 7 for the real-target runs, and long paths turned on. Everything comes from winget,
+except cargo-nextest and cargo-machete (cargo install).
 
 Run it once, as an administrator, in Windows PowerShell (`cargo xtask host-setup` runs it once
 Rust is there):
@@ -22,6 +23,7 @@ $ProgressPreference = 'SilentlyContinue'
 # The launcher's Node 24, from winget's OpenJS.NodeJS.LTS.
 $NodeVersion = '24.20.0'
 $CargoMacheteVersion = '0.9.2'
+$CargoNextestVersion = '0.9.148'
 $VsWhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $VcTools = 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
 
@@ -85,6 +87,12 @@ function Test-Machete {
     return $null
 }
 
+function Test-Nextest {
+    $version = Get-Version cargo @('nextest', '--version')
+    if ($version -like "cargo-nextest $CargoNextestVersion*") { return $version }
+    return $null
+}
+
 function Test-Node {
     $version = Get-Version node @('--version')
     if ($version -like 'v24.*') { return $version }
@@ -108,6 +116,7 @@ $steps = @(
     @{ Name = 'Visual Studio 2022 Build Tools, C++ workload'; Test = { Test-VcTools }; Install = { Install-VcTools } },
     @{ Name = 'Rust, MSVC toolchain, rustfmt and clippy'; Test = { Test-Rust }; Install = { Install-Rust } },
     @{ Name = "cargo-machete $CargoMacheteVersion"; Test = { Test-Machete }; Install = { & cargo install --locked "cargo-machete@$CargoMacheteVersion"; if ($LASTEXITCODE -ne 0) { throw 'cargo install failed' } } },
+    @{ Name = "cargo-nextest $CargoNextestVersion"; Test = { Test-Nextest }; Install = { & cargo install --locked "cargo-nextest@$CargoNextestVersion"; if ($LASTEXITCODE -ne 0) { throw 'cargo install failed' } } },
     @{ Name = "Node $NodeVersion"; Test = { Test-Node }; Install = { Install-Package 'OpenJS.NodeJS.LTS' @('--version', $NodeVersion) } },
     @{ Name = 'pnpm'; Test = { Get-Version pnpm @('--version') }; Install = { Install-Package 'pnpm.pnpm' } },
     @{ Name = 'Vagrant'; Test = { Get-Version vagrant @('--version') }; Install = { Install-Package 'Hashicorp.Vagrant' } },

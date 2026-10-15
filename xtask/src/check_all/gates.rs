@@ -30,15 +30,17 @@ fn gate(name: &'static str, argv: &[&'static str]) -> Gate {
     }
 }
 
-/// Isoloom's gates: every one on the full profile, the tests on the others. Clippy runs without
-/// `-D warnings`: a lint at deny fails it, and the lints still at warn are counted by the
-/// ratchet (`cargo xtask quality`), which fails when a count goes up.
+/// Isoloom's gates: every one on the full profile, the tests (`cargo xtask test`: nextest, then
+/// the doctests) on the others, and fuzzing and mutation testing after them on the deep one.
+/// Clippy runs without `-D warnings`: a lint at deny fails it, and the lints still at warn are
+/// counted by the ratchet (`cargo xtask quality`), which fails when a count goes up.
 pub(super) fn isoloom(profile: Profile) -> Vec<Gate> {
     let mut gates = Vec::new();
-    if profile == Profile::Full {
+    if profile.statics() {
         gates.push(gate("fmt", &["cargo", "fmt", "--all", "--check"]));
         gates.push(gate("typos", &["typos"]));
         gates.push(gate("machete", &["cargo", "machete"]));
+        gates.push(gate("deny", &["cargo", "deny", "check"]));
         let clippy = ["cargo", "clippy", "--workspace", "--all-targets"];
         gates.push(gate("clippy", &clippy));
         gates.push(gate("clippy-linux", &[&clippy[..], &["--target", "x86_64-unknown-linux-gnu"]].concat()));
@@ -47,15 +49,22 @@ pub(super) fn isoloom(profile: Profile) -> Vec<Gate> {
         doc.env.push(("RUSTDOCFLAGS", "-Dwarnings"));
         gates.push(doc);
         gates.push(gate("quality", &["cargo", "xtask", "quality"]));
+        gates.push(gate("msrv", &["cargo", "xtask", "msrv"]));
+        gates.push(gate("features", &["cargo", "xtask", "features"]));
+        gates.push(gate("fuzz-check", &["cargo", "xtask", "fuzz", "--check"]));
     }
-    gates.push(gate("test", &["cargo", "test", "--workspace", "--no-fail-fast"]));
+    gates.push(gate("test", &["cargo", "xtask", "test"]));
+    if profile == Profile::Deep {
+        gates.push(gate("fuzz", &["cargo", "xtask", "fuzz"]));
+        gates.push(gate("mutants", &["cargo", "xtask", "mutants"]));
+    }
     gates
 }
 
 /// Isothrum's libraries (its root workspace; the desktop app is its own and moves out).
 pub(super) fn isothrum(profile: Profile) -> Vec<Gate> {
     let mut gates = Vec::new();
-    if profile == Profile::Full {
+    if profile.statics() {
         gates.push(gate("fmt", &["cargo", "fmt", "--all", "--check"]));
         gates.push(gate("clippy", &["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]));
     }
@@ -239,10 +248,26 @@ mod tests {
         let full: Vec<&str> = isoloom(Profile::Full).iter().map(|g| g.name).collect();
         assert_eq!(
             full,
-            ["fmt", "typos", "machete", "clippy", "clippy-linux", "clippy-windows", "doc", "quality", "test"]
+            [
+                "fmt",
+                "typos",
+                "machete",
+                "deny",
+                "clippy",
+                "clippy-linux",
+                "clippy-windows",
+                "doc",
+                "quality",
+                "msrv",
+                "features",
+                "fuzz-check",
+                "test"
+            ]
         );
         let platform: Vec<&str> = isoloom(Profile::Platform).iter().map(|g| g.name).collect();
         assert_eq!(platform, ["test"]);
+        let deep: Vec<&str> = isoloom(Profile::Deep).iter().map(|g| g.name).skip(full.len()).collect();
+        assert_eq!(deep, ["fuzz", "mutants"]);
         assert_eq!(isothrum(Profile::Full).len(), 3);
     }
 

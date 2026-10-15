@@ -1,0 +1,15 @@
+{
+  "host": "macos-x86_64",
+  "unit": "ns",
+  "medians": {
+    "lower/corp-ad-basics": 1527074,
+    "lower/hello-stack": 912830,
+    "lower/segmented": 1124078,
+    "parse/corp-ad-basics": 509476,
+    "parse/hello-stack": 359778,
+    "parse/segmented": 380460,
+    "render/corp-ad-basics": 1025150,
+    "render/hello-stack": 19479128,
+    "render/segmented": 23298834
+  }
+}

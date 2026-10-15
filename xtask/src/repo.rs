@@ -24,6 +24,11 @@ pub(crate) fn code_dir(root: &Path) -> PathBuf {
     main.parent().map_or_else(|| main.to_path_buf(), Path::to_path_buf)
 }
 
+/// The build folder: `CARGO_TARGET_DIR`, else the workspace's `target`.
+pub(crate) fn target_dir(root: &Path) -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from)
+}
+
 /// A consumer's checkout: `$<var>` when set, else `<code dir>/<name>`.
 pub(crate) fn consumer(var: &str, code_dir: &Path, name: &str) -> PathBuf {
     std::env::var_os(var).map_or_else(|| code_dir.join(name), PathBuf::from)

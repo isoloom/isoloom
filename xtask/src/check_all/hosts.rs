@@ -27,7 +27,8 @@ fn mac(run: &Run, out: &mut Collector) {
     if std::env::consts::OS != "macos" {
         return out.host_failed(Status::Skip, "not a Mac");
     }
-    gates::leg(Host::Mac, Profile::Full, &run.dirs, None).run(&run.repos, out);
+    let profile = if run.deep { Profile::Deep } else { Profile::Full };
+    gates::leg(Host::Mac, profile, &run.dirs, None).run(&run.repos, out);
 }
 
 /// The repositories as a `--repos` value.
