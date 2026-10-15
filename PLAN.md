@@ -2,6 +2,20 @@
 
 Working document for the local rebuild. It is squashed away with the history at the first satisfying version.
 
+## Status (updated 2026-10-15)
+
+| Item | State |
+|---|---|
+| **Phase 0: safety net** | **Done.** 336 characterization snapshots (`d64255fb`). `verify` with the pinned validator image and 886 baseline failures (`115bb503`). `dev-link`, and `check-all` on macOS, Linux (`jarvis`) and Windows (`karen`) (`ac79b0c6`). |
+| **Phase 1a: subtract** | **Done** (`58ae8e6b`). About 195k lines and 943 files removed: coverage, committed outputs, compatibility, hand-written docs, the CHANGELOG. Tests are green on macOS. |
+| **Phase 1b: runtime out, layout, xtask, ratchet** | Next. |
+| **Phase 2: manifest** | `isoloom-manifest` crate and docker `run.json` landed (`defe7a65`). |
+| **Phase 2: syntax** | **Approved by the maintainer** (`plan/phase2/spec.md`, including the flag via `files:` with `input:`). Implementation is next. |
+| **Track C: Proxmox 9.2** | Proven: a real apply, serve, check and destroy. |
+| **Track C: ESXi 8.0U3e** | VMs are created and destroyed through `josenk/esxi` and `vagrant-vmware-esxi` (SSH + ovftool). The free licence refuses every vSphere API write. Guest networking waits on Fusion's promiscuous mode (a maintainer step). |
+| **Launcher standard (0.6)** | Ratchet, lints, reorg and repository-root grouping landed (`0560c78`). 1,724 violations remain outside `runtime/`, fixed by area in parallel. |
+| **Websites** | Kept separate. The isoloom.com rebuild banner is live. Standard (0.7): next. |
+
 ## 0. Three products
 
 | Product | Role | Contains |
@@ -412,7 +426,24 @@ The full design is in `plan/phase2/`: `run-manifest-v0.md`, its JSON Schema, `ru
 - There are panics outside tests.
 - The launcher pins `isoloom-core@50147b3`, which is reachable only on GitHub's object store, since the `dev` branch was deleted; its archive is in `~/code/github-archive/`. The path-dependency switch in Phase 2 removes the pin.
 
-**Still the maintainer's call:** the flag construct in the new syntax (see the syntax design).
+**Syntax: approved by the maintainer (2026-10-15),** exactly as designed in `plan/phase2/spec.md`:
+- `os` plus one of `service:` or `app:`, with `overrides:` keyed by target;
+- `app.steps` is portable, while `app.build` and `app.image` are container-only;
+- ports are a map keyed by name, with one `protocol` enum;
+- the flag is a value delivered through `files:` with `input:` or `secret:` as its source;
+- `setup:` replaces `docker.init`;
+- coded errors.
+
+Its §12 open questions take the design's recommendations.
+
+**More decisions (2026-10-15):**
+- **Vagrant check timeouts** use the same rule as docker (waits + 15 s per check + 60 s); the controller's boot is a ready condition, not check time.
+- **Launcher `config`** moves from `app/` to `platform/`, so domain code never imports the app shell.
+- **Launcher `tauri` imports in domain code** reach zero when `runtime/` moves to the runner (Phase 2–3).
+- **Launcher `unsafe`** follows the runner's rule: one audited `sys` module.
+- **ESXi** server mode is supported only through SSH + ovftool (Vagrant `vmware_esxi`, Terraform `josenk/esxi`); no vSphere API on the free edition. The launcher uses Vagrant for ESXi.
+- **ESXi finding:** the Terraform output reports the router's lab-side address when its uplink gets no DHCP. Fix it in Phase 3.
+- **ESXi finding:** ESXi 8 refuses ed25519 keys in FIPS mode. The launcher's guidance must say so, or use RSA.
 
 ### Phase 3: The launcher's modes, wide (L, parallel per target)
 
