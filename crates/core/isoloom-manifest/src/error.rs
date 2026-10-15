@@ -83,7 +83,7 @@ pub enum ManifestError {
     },
     /// A placeholder outside the grammar.
     #[error(
-        "`{template}`: `${{{placeholder}}}` isn't a placeholder; the roots are run.name, run.dir, run.state_dir, run.provider, run.ssh_key, run.known_hosts, params.<NAME>, outputs.<name>, published.<machine>.<port>, machine and value"
+        "`{template}`: `${{{placeholder}}}` isn't a placeholder; the roots are run.name, run.dir, run.state_dir, run.provider, run.ssh_key, run.known_hosts, run.ssh_public_key, run.slot, params.<NAME>, outputs.<name>, published.<machine>.<port>, machine and value"
     )]
     UnknownPlaceholder {
         /// The template as written.

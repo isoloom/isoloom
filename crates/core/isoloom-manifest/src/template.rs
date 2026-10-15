@@ -27,16 +27,23 @@ pub enum RunVar {
     SshKey,
     /// The run's own `known_hosts` (`${run.known_hosts}`).
     KnownHosts,
+    /// The public half of the runner's SSH key, one line (`${run.ssh_public_key}`).
+    SshPublicKey,
+    /// The run's slot on its server, 1 to 99 (`${run.slot}`): the lowest no other run on the same
+    /// place holds, kept for the run's life, so two runs on one server never share names.
+    Slot,
 }
 
 impl RunVar {
-    const ALL: [RunVar; 6] = [
+    const ALL: [RunVar; 8] = [
         RunVar::Name,
         RunVar::Dir,
         RunVar::StateDir,
         RunVar::Provider,
         RunVar::SshKey,
         RunVar::KnownHosts,
+        RunVar::SshPublicKey,
+        RunVar::Slot,
     ];
 
     /// The path after `run.`.
@@ -49,6 +56,8 @@ impl RunVar {
             RunVar::Provider => "provider",
             RunVar::SshKey => "ssh_key",
             RunVar::KnownHosts => "known_hosts",
+            RunVar::SshPublicKey => "ssh_public_key",
+            RunVar::Slot => "slot",
         }
     }
 }
@@ -271,7 +280,7 @@ impl<'de> Deserialize<'de> for Template {
 /// The template grammar as a regular expression: literal text, `$$`, and the known placeholders.
 pub(crate) fn grammar() -> String {
     let roots = [
-        "run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts)",
+        "run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts|ssh_public_key|slot)",
         "params\\.[A-Za-z_][A-Za-z0-9_]*",
         "outputs\\.[a-z][a-z0-9_]*",
         "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[A-Za-z0-9][A-Za-z0-9_-]*",
@@ -288,7 +297,7 @@ impl JsonSchema for Template {
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
-            "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
+            "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `run.ssh_public_key`, `run.slot` (the run's slot on its server, 1 to 99), `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
             "type": "string",
             "pattern": grammar(),
         })
