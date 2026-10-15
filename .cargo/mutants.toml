@@ -5,6 +5,15 @@
 # --list` shows, with the reason it is equivalent. Nothing else goes here.
 exclude_re = []
 
+# Lints capped while mutants build: the workspace denies `unused`, so a mutant that replaces a
+# function's body (its arguments then unused) wouldn't compile and would count as unviable, never
+# tested. Capped, it builds and its tests must catch it.
+cap_lints = true
+
+# A test run slower than this is a timeout (a loop the mutant made endless), however fast the
+# unmutated run was: a busy machine doesn't turn a slow run into a false timeout.
+minimum_test_timeout = 120
+
 # The copies each mutant is built in leave out what git ignores: build folders, and the fuzz
 # corpora a running `cargo xtask fuzz` is still writing.
 gitignore = true
