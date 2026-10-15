@@ -9,7 +9,7 @@ use std::sync::OnceLock;
 
 use isoloom_spec::images::Table;
 use isoloom_spec::model::{self, Target};
-use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems};
+use isoloom_spec::syntax::{self, FieldPath, Problem, Problems};
 
 use crate::lower::{Lowered, Scope, lower};
 
@@ -282,26 +282,7 @@ fn follows_from(found: &[Problem], p: &Problem, source: &syntax::Spec) -> bool {
 /// A lowered spec's problem, at the field the author wrote.
 fn translated(lowered: &Lowered, p: &isoloom_spec::Problem) -> Problem {
     let path = lowered.trail.path(&p.at);
-    Problem::new(code_of(&p.message), path, p.message.clone())
-}
-
-/// The code a lowered spec's problem has, from what it says.
-fn code_of(message: &str) -> Code {
-    const UNKNOWN: &[&str] = &[
-        "no network named",
-        "no machine named",
-        "names no machine",
-        "isn't a machine",
-        "isn't declared",
-        "no such",
-        "no secret named",
-        "no input named",
-    ];
-    if UNKNOWN.iter().any(|u| message.contains(u)) {
-        Code::UnknownReference
-    } else {
-        Code::InvalidValue
-    }
+    Problem::new(p.code, path, p.message.clone())
 }
 
 #[cfg(test)]

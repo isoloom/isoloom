@@ -70,7 +70,7 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         super::ports::of_machine(&s, &mut published, p);
         for (i, input) in m.inputs.iter().enumerate() {
             if !spec.inputs.contains(input) {
-                p.add(format!("{}.inputs[{i}]", s.at), format!("`{input}` isn't declared in the spec's `inputs`"));
+                p.unknown(format!("{}.inputs[{i}]", s.at), format!("`{input}` isn't declared in the spec's `inputs`"));
             }
         }
         super::ports::depends_on(&s, p);
@@ -111,7 +111,7 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
     for (net, octet) in &s.m.networks {
         let nat = format!("{}.networks.{net}", s.at);
         let Some(c) = block(blocks, net) else {
-            p.add(nat, format!("no network named `{net}`"));
+            p.unknown(nat, format!("no network named `{net}`"));
             continue;
         };
         if super::outside::dhcp_address(s.spec, net, *octet, &nat, p) {

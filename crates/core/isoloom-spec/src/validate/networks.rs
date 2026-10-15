@@ -61,7 +61,7 @@ pub(super) fn gateways(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         let Some(gw) = &net.gateway else { continue };
         let at = format!("networks.{name}.gateway");
         match spec.machines.get(gw) {
-            None => p.add(at, format!("no machine named `{gw}`")),
+            None => p.unknown(at, format!("no machine named `{gw}`")),
             Some(m) if !m.networks.contains_key(name) => {
                 let octet = block(blocks, name).map_or(1, Cidr::gateway_octet);
                 p.add(
@@ -103,7 +103,7 @@ pub(super) fn switches(spec: &Spec, p: &mut Problems) {
 fn switch(spec: &Spec, lan: &str, sw: &str, switched: &[(&str, &str)], p: &mut Problems) -> bool {
     let at = format!("networks.{lan}.switch");
     let Some(m) = spec.machines.get(sw) else {
-        p.add(at, format!("no machine named `{sw}`"));
+        p.unknown(at, format!("no machine named `{sw}`"));
         return false;
     };
     if !m.docker.as_ref().and_then(|d| d.appliance).is_some_and(crate::appliance::is_switch) {

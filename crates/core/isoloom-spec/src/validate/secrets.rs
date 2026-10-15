@@ -74,7 +74,7 @@ fn of_machine(spec: &Spec, at: &str, s: &MachineSecret, p: &mut Problems) {
         } else {
             format!("{at}.source")
         };
-        p.add(
+        p.unknown(
             field,
             if known.is_empty() {
                 format!("`{source}` isn't declared: add it under the top-level `secrets` with its store (`{{ env: VAR }}`, `{{ file: path }}`...)")

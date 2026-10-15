@@ -59,6 +59,23 @@ fn inputs_reach_only_machines_that_declare_them() {
 }
 
 #[test]
+fn a_lowered_problem_keeps_its_code() {
+    let found = lab(&format!(
+        "{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, depends_on: [ghost], dns: {{ options: ['no such'] }}, app: {{ image: x }} }}\n"
+    ))
+    .unwrap()
+    .problems();
+    let found: Vec<(Code, &str)> = found.iter().map(|p| (p.code, p.path.as_str())).collect();
+    assert_eq!(
+        found,
+        [
+            (Code::UnknownReference, "machines.a.depends_on[0]"),
+            (Code::InvalidValue, "machines.a.dns.options[0]")
+        ]
+    );
+}
+
+#[test]
 fn unknown_fields_are_rejected() {
     let found = refused(&format!("{BASE}machines:\n  a: {{ networks: {{ lab: 5 }}, flag: x, app: {{ image: x }} }}\n"));
     let found: Vec<(Code, &str)> = found.iter().map(|p| (p.code, p.path.as_str())).collect();

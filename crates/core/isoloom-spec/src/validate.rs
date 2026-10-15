@@ -44,6 +44,7 @@ mod tests;
 use std::collections::BTreeSet;
 
 use crate::model::{Machine, Spec};
+use crate::syntax::Code;
 
 pub use cidr::{Cidr, DOCKER_BLOCK, PRIVATE, docker_cidrs};
 pub use cidr6::{Cidr6, PREFIX as IPV6_PREFIX};
@@ -54,6 +55,9 @@ pub use settings::CONTAINER_SYSCTLS;
 /// places it at the field the author wrote, as a [`crate::syntax::Problem`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Problem {
+    /// What kind of problem: `unknown-reference` for a name that names nothing, else
+    /// `invalid-value`.
+    pub code: Code,
     /// Where in the file, e.g. `machines.web.depends_on`.
     pub at: String,
     /// The reason, and the fix when there is one.
@@ -61,9 +65,10 @@ pub struct Problem {
 }
 
 impl Problem {
-    /// A problem at the field path `at`.
-    pub fn new(at: impl Into<String>, message: impl Into<String>) -> Self {
+    /// A problem of kind `code` at the field path `at`.
+    pub fn new(code: Code, at: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
+            code,
             at: at.into(),
             message: message.into(),
         }
@@ -88,8 +93,14 @@ impl std::fmt::Display for Problem {
 struct Problems(Vec<Problem>);
 
 impl Problems {
+    /// A value that's wrong where it is.
     fn add(&mut self, at: impl Into<String>, message: impl Into<String>) {
-        self.0.push(Problem::new(at, message));
+        self.0.push(Problem::new(Code::InvalidValue, at, message));
+    }
+
+    /// A name that names nothing the spec declares.
+    fn unknown(&mut self, at: impl Into<String>, message: impl Into<String>) {
+        self.0.push(Problem::new(Code::UnknownReference, at, message));
     }
 
     fn is_empty(&self) -> bool {

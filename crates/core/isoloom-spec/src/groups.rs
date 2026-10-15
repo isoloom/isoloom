@@ -27,6 +27,7 @@ use serde_yaml_ng::{Mapping, Value};
 
 use crate::model::Spec;
 use crate::syntax::{Code, FieldPath, Problem};
+use crate::validate;
 
 /// Group names Isoloom fills itself in inventories.
 pub(crate) const RESERVED: &[&str] = &["all", "linux", "windows"];
@@ -231,29 +232,31 @@ fn merged(own: &Mapping, common: &Mapping, mine: &[&str], groups: &Groups) -> Va
 
 /// The groups' problems: a reserved or taken name, a member that names nothing, a cycle.
 #[must_use]
-pub fn problems(spec: &Spec) -> Vec<(String, String)> {
+pub fn problems(spec: &Spec) -> Vec<validate::Problem> {
     let membership = Membership::of_spec(spec);
+    let invalid = |at: String, message: String| validate::Problem::new(Code::InvalidValue, at, message);
     let mut out = Vec::new();
     for (name, g) in &spec.groups {
         let at = format!("groups.{name}");
         if RESERVED.contains(&name.as_str()) {
-            out.push((at.clone(), "Isoloom fills this group itself; choose another name".into()));
+            out.push(invalid(at.clone(), "Isoloom fills this group itself; choose another name".into()));
         }
         if spec.machines.contains_key(name) {
-            out.push((at.clone(), format!("`{name}` is already a machine's name")));
+            out.push(invalid(at.clone(), format!("`{name}` is already a machine's name")));
         }
         if g.members.is_empty() {
-            out.push((format!("{at}.members"), "name the machines in the group".into()));
+            out.push(invalid(format!("{at}.members"), "name the machines in the group".into()));
         }
         for (i, m) in g.members.iter().enumerate() {
             if m == name && !spec.machines.contains_key(m) {
-                out.push((format!("{at}.members[{i}]"), "a group can't be its own member".into()));
+                out.push(invalid(format!("{at}.members[{i}]"), "a group can't be its own member".into()));
             } else if !spec.groups.contains_key(m) && !spec.machines.keys().any(|n| matches(m, n)) {
-                out.push((format!("{at}.members[{i}]"), format!("`{m}` names no machine or group")));
+                let why = format!("`{m}` names no machine or group");
+                out.push(validate::Problem::new(Code::UnknownReference, format!("{at}.members[{i}]"), why));
             }
         }
         if membership.contains(name, name, &mut Vec::new()) {
-            out.push((format!("{at}.members"), "groups contain each other in a loop".into()));
+            out.push(invalid(format!("{at}.members"), "groups contain each other in a loop".into()));
         }
     }
     out
@@ -316,10 +319,13 @@ mod tests {
     #[test]
     fn group_loops_count_groups_not_machines_of_the_same_name() {
         let looped = crate::testing::model("version: 1\nname: t\ngroups:\n  a: { members: [b] }\n  b: { members: [a] }\nmachines:\n  m: {}\n").unwrap();
-        assert!(problems(&looped).iter().any(|(at, why)| at == "groups.a.members" && why.contains("loop")));
+        assert!(problems(&looped).iter().any(|p| p.at == "groups.a.members" && p.message.contains("loop")));
         let named = crate::testing::model("version: 1\nname: t\ngroups:\n  m: { members: [m] }\nmachines:\n  m: {}\n").unwrap();
         let found = problems(&named);
-        assert_eq!(found, [("groups.m".to_owned(), "`m` is already a machine's name".to_owned())]);
+        assert_eq!(
+            found,
+            [validate::Problem::new(Code::InvalidValue, "groups.m", "`m` is already a machine's name")]
+        );
     }
 
     #[test]
@@ -331,9 +337,9 @@ mod tests {
         assert_eq!(
             problems(&spec),
             [
-                ("groups.g.members[0]".to_owned(), "a group can't be its own member".to_owned()),
-                ("groups.g.members[1]".to_owned(), "`ghost` names no machine or group".to_owned()),
-                ("groups.g.members".to_owned(), "groups contain each other in a loop".to_owned()),
+                validate::Problem::new(Code::InvalidValue, "groups.g.members[0]", "a group can't be its own member"),
+                validate::Problem::new(Code::UnknownReference, "groups.g.members[1]", "`ghost` names no machine or group"),
+                validate::Problem::new(Code::InvalidValue, "groups.g.members", "groups contain each other in a loop"),
             ]
         );
     }

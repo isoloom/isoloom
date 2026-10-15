@@ -60,7 +60,7 @@ pub(super) fn depends_on(s: &Subject, p: &mut Problems) {
             p.add(at, "a machine can't depend on itself");
         } else {
             match spec.machines.get(dep) {
-                None => p.add(at, format!("no machine named `{dep}`")),
+                None => p.unknown(at, format!("no machine named `{dep}`")),
                 Some(waited) => waited_for(dep, waited, at, p),
             }
         }

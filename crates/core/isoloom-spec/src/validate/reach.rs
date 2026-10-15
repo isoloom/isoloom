@@ -8,7 +8,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
     for (i, r) in spec.reach.iter().enumerate() {
         for (field, net) in [("from", &r.from), ("to", &r.to)] {
             if !spec.networks.contains_key(net) {
-                p.add(format!("reach[{i}].{field}"), format!("no network named `{net}`"));
+                p.unknown(format!("reach[{i}].{field}"), format!("no network named `{net}`"));
             }
         }
         if r.from == r.to {

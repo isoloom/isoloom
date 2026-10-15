@@ -32,7 +32,7 @@ pub(super) fn steps(spec: &Spec, p: &mut Problems) {
             }
             for (j, member) in members.iter().enumerate() {
                 if !spec.machines.contains_key(member) {
-                    p.add(format!("provision[{i}].groups.{group}[{j}]"), format!("no machine named `{member}`"));
+                    p.unknown(format!("provision[{i}].groups.{group}[{j}]"), format!("no machine named `{member}`"));
                 }
             }
         }
@@ -44,7 +44,7 @@ pub(super) fn steps(spec: &Spec, p: &mut Problems) {
 fn host_vars(spec: &Spec, i: usize, step: &Provision, p: &mut Problems) {
     for (machine, vars) in &step.host_vars {
         if !spec.machines.contains_key(machine) {
-            p.add(format!("provision[{i}].host_vars.{machine}"), format!("no machine named `{machine}`"));
+            p.unknown(format!("provision[{i}].host_vars.{machine}"), format!("no machine named `{machine}`"));
         }
         for k in vars.keys() {
             if !variable_name(k) {

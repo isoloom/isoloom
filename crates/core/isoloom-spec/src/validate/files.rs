@@ -4,6 +4,7 @@ use std::path::Path;
 
 use super::Problem;
 use crate::model::{Check, Spec};
+use crate::syntax::Code;
 
 /// The problems with the project's paths, in the order the spec mentions them.
 struct Paths<'a> {
@@ -15,10 +16,14 @@ impl Paths<'_> {
     /// `path` must be relative, stay in the project and exist there.
     fn check(&mut self, at: String, path: &str) {
         if path.starts_with('/') || path.split('/').any(|s| s == "..") {
-            self.problems
-                .push(Problem::new(at, format!("`{path}` must be a path inside the project folder")));
+            self.problems.push(Problem::new(
+                Code::InvalidValue,
+                at,
+                format!("`{path}` must be a path inside the project folder"),
+            ));
         } else if !self.lab_dir.join(path).exists() {
-            self.problems.push(Problem::new(at, format!("`{path}` doesn't exist in the project folder")));
+            self.problems
+                .push(Problem::new(Code::InvalidValue, at, format!("`{path}` doesn't exist in the project folder")));
         }
     }
 }
@@ -81,6 +86,7 @@ fn machines(spec: &Spec, paths: &mut Paths) {
                 paths.check(format!("machines.{name}.files[{i}].source"), s);
                 if paths.lab_dir.join(s).is_dir() {
                     paths.problems.push(Problem::new(
+                        Code::InvalidValue,
                         format!("machines.{name}.files[{i}].source"),
                         format!("`{s}` is a folder: name a file"),
                     ));
@@ -109,6 +115,7 @@ fn cloud_module(spec: &Spec, lab_dir: &Path) -> Option<Problem> {
     let tf = std::fs::read_dir(&dir).is_ok_and(|d| d.flatten().any(|e| e.path().extension().is_some_and(|x| x == "tf")));
     (!tf && dir.is_dir()).then(|| {
         Problem::new(
+            Code::InvalidValue,
             "cloud.terraform",
             format!("`{}` holds no .tf file: it must be a Terraform root module", c.terraform),
         )

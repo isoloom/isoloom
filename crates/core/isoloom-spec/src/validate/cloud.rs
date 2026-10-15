@@ -58,7 +58,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
     for (k, v) in &c.vars {
         for i in CloudServices::inputs_in(v) {
             if !spec.inputs.contains(&i) {
-                p.add(format!("cloud.vars.{k}"), format!("`{i}` isn't declared in the spec's `inputs`"));
+                p.unknown(format!("cloud.vars.{k}"), format!("`{i}` isn't declared in the spec's `inputs`"));
             }
         }
     }

@@ -86,3 +86,7 @@ None of this reaches the launcher or Isothrum, which read `isoloom-targets` (its
 ## Phase 4.2, the floor renderers (the 4.2 unit)
 
 27. **The recipe travels on the plan:** lowering hands a machine's configuration to the plan as `model::Machine.configuration` (`model::Configuration { os, install, configure, start, files }`, steps still in the authored types); `Environment::build` resolves it once into `MachinePlan.recipe: Option<configure::Recipe>` (`Recipe::of`), which every CM renderer reads. `model::Generated` loses `steps`; `Build::Generated` is `{ dockerfile, base, process: ContainerProcess }` (`ContainerProcess::resolve` and `is_runner()`). `Recipe` gains `os` and `files` (template texts by their `from`).
+
+## Phase 1c, `isoloom-spec` follow-ups (the 1c-spec unit)
+
+28. **A lowered spec's problem has a code:** `isoloom_spec::Problem` (`validate::Problem`) carries `code: syntax::Code` (`UnknownReference` for a name that names nothing, else `InvalidValue`), and `Problem::new(code, at, message)` takes it first. `groups::problems` returns these problems instead of `(path, message)` pairs. The plan places them with their own code instead of reading their wording.
