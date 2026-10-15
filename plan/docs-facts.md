@@ -102,3 +102,6 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **Container labels:** the lab page's Open button and service list read Isoloom's `isoloom.port.<name>: "<http|tcp|udp>:<port>"` labels (was `isoloom.service.<name>`).
 - **Removed with Isoloom's runtime:** the Settings > Labs row "Isoloom's lab list" (the launcher records nothing in `~/.isoloom/status.yml` any more, and a lab's instance number only avoids the other installed labs' numbers); the Machine page's "Where labs can run (Isoloom)" list; the cloud-services pre-check of `cloud.requires` (a missing tool now fails in the Terraform run; the runner's tool probes take it over in Phase 3).
 - isoloom.com: `npm run sync:isoloom` still calls `isoloom coverage --json`, removed in Phase 1a. Phase 7 must give the docs sync a new source (the generated spec reference, targets matrix and catalogue from `cargo xtask`, or `isoloom` commands).
+- isothrum.com MCP `save_project`: delays in `us` and `s` are laid out (they were lost). A `tc` value the editor can't read is listed in `problems` with its path, and `ok` is false.
+- isothrum.com share links (`#lab=`) carry cable conditions (delay, jitter, loss, rate).
+- isothrum.com: a stored or saved draft with a malformed node or cable, or a name that isn't text, opens as nothing instead of throwing.

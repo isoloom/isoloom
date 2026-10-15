@@ -365,7 +365,7 @@ These go beyond lints. Each one names the tool or review that enforces it.
 
 **When:**
 - **Phase 0.7, the engineering standard in both sites:** measure, then lint configs, the ratchet, the folder layout, and driving to zero. It can run alongside other phases, because the sites don't block the converter.
-- **Phase 2:** the Isothrum compiler (`isothrum-core`, soon `isothrum-compiler`) and the website editor **write the new spec syntax**. With no old-format support, a drawn lab would otherwise break. They test against Isoloom's spec examples and schema.
+- **Phase 2:** the Isothrum compiler (`isothrum-core`, soon `isothrum-compiler`) and the website editor **write the new spec syntax**. The editor's model must accept exactly what Isoloom accepts. For example, a rate with no unit is reported, as Isoloom does; today the editor reads it as bits. With no old-format support, a drawn lab would otherwise break. They test against Isoloom's spec examples and schema.
 - **Until Phase 7:** isoloom.com carries a "1.0 is being rebuilt" banner (live since 2026-10-15, commit `60098c4`), because its pages still describe the 0.x preview. The banner is removed in Phase 7.
 - **Phase 7, release:** isoloom.com's docs are regenerated from the repository's new docs, and its pages rewritten (features, targets, comparisons) from the 1.0 facts. On isothrum.com: the editor on the 1.0 spec, the WASM from the published npm package instead of the committed `public/wasm/`, and the release announcement. Both are pushed with the 1.0 release.
 - **1.x:** `desktop-editor/` and the editor components move into `isothrum-ui`, shared with the desktop app. Accounts (Better Auth, ex-isothrum #30) and the project store follow.
