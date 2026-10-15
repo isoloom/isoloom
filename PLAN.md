@@ -8,7 +8,7 @@ Working document for the local rebuild. It is squashed away with the history at 
 |---|---|
 | **Phase 0: safety net** | **Done.** 336 characterization snapshots (`d64255fb`). `verify` with the pinned validator image and 886 baseline failures (`115bb503`). `dev-link`, and `check-all` on macOS, Linux (`jarvis`) and Windows (`karen`) (`ac79b0c6`). |
 | **Phase 1a: subtract** | **Done** (`58ae8e6b`). About 195k lines and 943 files removed: coverage, committed outputs, compatibility, hand-written docs, the CHANGELOG. Tests are green on macOS. |
-| **Phase 1b: runtime out, layout, xtask, ratchet** | Layout (`b6c218c9`) and runtime out (`4ed14e1e`) landed. `xtask`, the dependency test and the ratchet are running. |
+| **Phase 1b: runtime out, layout, xtask, ratchet** | Layout (`b6c218c9`, the last commit with the runtime), runtime out (`4ed14e1e`), backends independent (`e8a850ea`), `cargo xtask` replacing `scripts/` (`1b2f7c55`). The ratchet with the 1c lint set is running. |
 | **Phase 1c: deep organization, zero violations** | Next, after 1b. Phase 1 isn't done until 1c's exit. |
 | **Phase 2: manifest** | `isoloom-manifest` crate and docker `run.json` landed (`defe7a65`). |
 | **Phase 2: syntax** | **Approved by the maintainer** (`plan/phase2/spec.md`, including the flag via `files:` with `input:`). Implementation is next. |
