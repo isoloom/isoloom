@@ -121,11 +121,10 @@ fn members<'a>(spec: &'a Spec, key: &str) -> Vec<(&'a str, &'a Machine)> {
     spec.machines.iter().filter(|(n, _)| names.contains(n)).map(|(n, m)| (n.as_str(), m)).collect()
 }
 
-/// Whether a group's member pattern takes machine `m`: its name, a glob, a counted machine, or
-/// a nested group's member.
+/// Whether a group's member pattern takes machine `m`: its name, a glob, or a nested group's
+/// member. A counted machine is no pattern here: reading the spec put its clones in the members.
 fn member(spec: &Spec, pattern: &str, m: &str) -> bool {
     crate::groups::matches(pattern, m)
-        || spec.clones.get(pattern).is_some_and(|c| c.iter().any(|n| n == m))
         || spec
             .groups
             .get(pattern)
