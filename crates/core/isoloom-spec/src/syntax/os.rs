@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn a_family_alone_resolves_to_its_pinned_default() {
         let os: OsRef = "debian".parse().unwrap();
-        assert_eq!((os.to_string(), os.name()), ("debian@12".to_string(), "debian-12"));
+        assert_eq!((os.to_string(), os.name()), ("debian@12".to_owned(), "debian-12"));
         assert!("windows-server@2019".parse::<OsRef>().unwrap().is_windows());
     }
 

@@ -4,6 +4,8 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::placeholders::{self, Piece};
+
 /// An environment of cloud services: a Terraform module applied into the user's account.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -42,19 +44,13 @@ pub struct CloudServices {
     pub env: IndexMap<String, String>,
     /// How many times to apply again when an apply fails (a module that only converges on a
     /// second apply), 0 to 5. 0 by default.
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default, skip_serializing_if = "super::is_default")]
     pub apply_retries: u8,
     /// What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)
     /// that must be on the PATH, or a shell command that must succeed
     /// (`python3 -c 'import boto3'`). `isoloom doctor` and `isoloom run` check them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<String>,
-}
-
-/// Whether a count is zero (left out when serialized).
-#[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference.
-fn is_zero(n: &u8) -> bool {
-    *n == 0
 }
 
 /// A cloud an environment of cloud services deploys into.
@@ -80,10 +76,11 @@ impl CloudServices {
 
     /// The launch-time inputs a variable's value takes: every `{{ inputs.NAME }}` in its strings,
     /// at any depth, in order (repeats kept).
+    #[must_use]
     pub fn inputs_in(value: &serde_json::Value) -> Vec<String> {
         let mut found = Vec::new();
         Self::fill_inputs(value, &mut |name| {
-            found.push(name.to_string());
+            found.push(name.to_owned());
             Some(String::new())
         });
         found
@@ -106,24 +103,30 @@ impl CloudServices {
 /// input `input` gives nothing for, left as written.
 fn fill_string(s: &str, input: &mut dyn FnMut(&str) -> Option<String>) -> String {
     let mut out = String::new();
-    let mut rest = s;
-    while let Some(start) = rest.find("{{") {
-        let Some(len) = rest[start..].find("}}") else { break };
-        let whole = &rest[start..start + len + 2];
-        out.push_str(&rest[..start]);
-        let inner = whole[2..whole.len() - 2].trim();
-        match inner.strip_prefix("inputs.").map(str::trim).and_then(&mut *input) {
-            Some(v) => out.push_str(&v),
-            None => out.push_str(whole),
+    for piece in placeholders::pieces(s) {
+        match piece {
+            Piece::Text(text) => out.push_str(text),
+            Piece::Placeholder(inner) => {
+                if let Some(value) = inner.trim().strip_prefix("inputs.").map(str::trim).and_then(&mut *input) {
+                    out.push_str(&value);
+                } else {
+                    out.push_str("{{");
+                    out.push_str(inner);
+                    out.push_str("}}");
+                }
+            }
+            Piece::Unclosed(after) => {
+                out.push_str("{{");
+                out.push_str(after);
+            }
         }
-        rest = &rest[start + len + 2..];
     }
-    out.push_str(rest);
     out
 }
 
 impl CloudProvider {
     /// The name the spec writes it with (`aws`, `azure`, `gcp`).
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             CloudProvider::Aws => "aws",

@@ -43,7 +43,7 @@ pub(super) fn appliances(spec: &Spec, p: &mut Problems) {
             p.add(format!("{at}.docker"), "a network appliance runs its own OS: no `idle` or `init`");
         }
         if let Some(c) = &d.config
-            && (c.starts_with('/') || c.split('/').any(|p| p == ".."))
+            && (c.starts_with('/') || c.split('/').any(|segment| segment == ".."))
         {
             p.add(format!("{at}.docker.config"), "a path in the project");
         }
@@ -117,10 +117,11 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
         if super::outside::dhcp_address(s.spec, net, *octet, &nat, p) {
             continue;
         }
-        let is_gateway = s.spec.networks[net].gateway.as_deref() == Some(name);
+        let network = s.spec.networks.get(net);
+        let is_gateway = network.and_then(|n| n.gateway.as_deref()) == Some(name);
         if is_gateway {
             if *octet == c.gateway_octet() {
-                taken.insert((net.clone(), *octet), name.to_string());
+                taken.insert((net.clone(), *octet), name.to_owned());
             } else {
                 p.add(
                     nat,
@@ -128,17 +129,18 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
                 );
             }
         } else if c.host(*octet).is_none() {
-            p.add(
-                nat,
-                format!(
-                    "{octet} isn't a usable address in {} (reserved: .0, .1 for the gateway, the two last addresses for the controller and the router, and the broadcast address)",
-                    s.spec.networks[net].cidr
-                ),
-            );
-        } else if let Some(other) = taken.insert((net.clone(), *octet), name.to_string()) {
+            p.add(nat, unusable(*octet, network.map_or("", |n| n.cidr.as_str())));
+        } else if let Some(other) = taken.insert((net.clone(), *octet), name.to_owned()) {
             p.add(nat, format!("address .{octet} is already used by `{other}`"));
         }
     }
+}
+
+/// Why `octet` isn't a usable address in the block `cidr`.
+fn unusable(octet: u8, cidr: &str) -> String {
+    format!(
+        "{octet} isn't a usable address in {cidr} (reserved: .0, .1 for the gateway, the two last addresses for the controller and the router, and the broadcast address)"
+    )
 }
 
 /// The machine's further addresses on a network (`lan: [10, 11]`): each usable in the
@@ -160,14 +162,8 @@ fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8)
             if seen.contains(octet) {
                 p.add(&nat, format!("address .{octet} is written twice"));
             } else if c.host(*octet).is_none() {
-                p.add(
-                    &nat,
-                    format!(
-                        "{octet} isn't a usable address in {} (reserved: .0, .1 for the gateway, the two last addresses for the controller and the router, and the broadcast address)",
-                        s.spec.networks[net].cidr
-                    ),
-                );
-            } else if let Some(other) = taken.insert((net.clone(), *octet), s.name.to_string()) {
+                p.add(&nat, unusable(*octet, s.spec.networks.get(net).map_or("", |n| n.cidr.as_str())));
+            } else if let Some(other) = taken.insert((net.clone(), *octet), s.name.to_owned()) {
                 p.add(&nat, format!("address .{octet} is already used by `{other}`"));
             }
             seen.push(*octet);

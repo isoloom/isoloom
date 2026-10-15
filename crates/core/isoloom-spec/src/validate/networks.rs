@@ -83,7 +83,7 @@ pub(super) fn switches(spec: &Spec, p: &mut Problems) {
             let message = if crate::vlans::of_lan(spec, net).next().is_some() {
                 format!("machines join `{net}` directly (its untagged part), which the switch doesn't carry: put them on one of its VLANs")
             } else {
-                "only a LAN split into `vlans` has a switch".to_string()
+                "only a LAN split into `vlans` has a switch".to_owned()
             };
             p.add(format!("networks.{net}.switch"), message);
             continue;
@@ -167,7 +167,7 @@ pub(super) fn tc(spec: &Spec, p: &mut Problems) {
 /// A number followed by one of `units`, like `50ms` or `10mbit`.
 pub(super) fn measure(v: &str, units: &[&str]) -> bool {
     let digits = v.trim_end_matches(|c: char| c.is_ascii_alphabetic());
-    let unit = &v[digits.len()..];
+    let unit = v.strip_prefix(digits).unwrap_or_default();
     !digits.is_empty() && digits.parse::<f64>().is_ok() && units.contains(&unit)
 }
 

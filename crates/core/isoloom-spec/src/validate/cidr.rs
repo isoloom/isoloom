@@ -17,6 +17,7 @@ pub struct Cidr {
 impl Cidr {
     /// The block written `a.b.c.d/len`, when it is one: the address must be the network
     /// address itself.
+    #[must_use]
     pub fn parse(s: &str) -> Option<Cidr> {
         let (ip, len) = s.split_once('/')?;
         let ip: Ipv4Addr = ip.parse().ok()?;
@@ -35,17 +36,20 @@ impl Cidr {
     }
 
     /// Whether `other` lies inside this block.
+    #[must_use]
     pub fn contains(self, other: Cidr) -> bool {
         self.len <= other.len && other.base & Self::mask(self.len) == self.base
     }
 
     /// Whether the two blocks share an address.
+    #[must_use]
     pub fn overlaps(self, other: Cidr) -> bool {
         self.contains(other) || other.contains(self)
     }
 
     /// The address with this last octet, if it is a usable host address in the block.
     /// Reserved on every target: `.1` (gateway) and the two last usable addresses (controller, router).
+    #[must_use]
     pub fn host(self, last_octet: u8) -> Option<Ipv4Addr> {
         if self.len < 24 || self.len > 29 {
             return None;
@@ -59,29 +63,35 @@ impl Cidr {
     }
 
     /// The gateway's address: the first usable address of the block (e.g. .1 in a /24).
+    #[must_use]
     pub fn gateway(self) -> Ipv4Addr {
         Ipv4Addr::from(self.base + 1)
     }
 
     /// The gateway's last octet (1 in a /24, 9 in 10.0.0.8/29).
+    #[must_use]
     pub fn gateway_octet(self) -> u8 {
-        ((self.base + 1) & 0xff) as u8
+        let [.., last] = self.gateway().octets();
+        last
     }
 
     /// The controller's address: the second-to-last usable one (e.g. .253 in a /24), where
     /// environment-level provisioning runs from.
+    #[must_use]
     pub fn controller(self) -> Ipv4Addr {
         Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 3)
     }
 
     /// The address of the `i`th tool (0-based): just below the controller (.252, .251, .250 in
     /// a /24), reserved for tools when the spec has any.
+    #[must_use]
     pub fn tool(self, i: usize) -> Ipv4Addr {
         let below = u32::try_from(i).unwrap_or(u32::MAX);
         Ipv4Addr::from((self.base + (1u32 << (32 - self.len)) - 4).saturating_sub(below))
     }
 
     /// The router's address: the last usable address of the block (e.g. .254 in a /24).
+    #[must_use]
     pub fn router(self) -> Ipv4Addr {
         Ipv4Addr::from(self.base + (1u32 << (32 - self.len)) - 2)
     }
@@ -103,6 +113,7 @@ pub const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
 /// automatically, keeping its size (so each machine keeps its last octet): 192.168.X.0 -> 10.192.X.0, 172.N.X.0 -> 10.N.X.0, or the next free
 /// block when that one is taken. Validated specs only: a network whose block doesn't parse is
 /// left out (validation reports it).
+#[must_use]
 pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
     let mut fixed: Vec<(String, Cidr)> = Vec::new();
     let mut moved: Vec<(String, Cidr)> = Vec::new();

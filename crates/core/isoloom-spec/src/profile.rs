@@ -72,6 +72,7 @@ struct File {
 }
 
 /// A profile name: kebab-case, as a spec's name.
+#[must_use]
 pub fn valid_name(name: &str) -> bool {
     !name.is_empty() && !name.starts_with('-') && !name.ends_with('-') && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
@@ -102,6 +103,7 @@ pub fn path(project: &Path, name: &str) -> Result<PathBuf, String> {
 }
 
 /// The profiles of a project, by name, sorted.
+#[must_use]
 pub fn list(project: &Path) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(project.join(DIR)) else { return vec![] };
     let mut names: Vec<String> = entries
@@ -111,7 +113,7 @@ pub fn list(project: &Path) -> Vec<String> {
             if !p.is_file() || !["yml", "yaml"].contains(&ext) {
                 return None;
             }
-            let stem = p.file_stem()?.to_str()?.to_string();
+            let stem = p.file_stem()?.to_str()?.to_owned();
             valid_name(&stem).then_some(stem)
         })
         .collect();
@@ -142,16 +144,16 @@ pub fn parse(name: &str, path: PathBuf, text: &str) -> Result<Profile, String> {
     let defaults = mapping(file.defaults, "defaults")?;
     let mut inputs = IndexMap::new();
     for (k, v) in file.inputs {
-        let text = match v {
+        let value = match v {
             Value::String(s) => s,
             Value::Number(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
             _ => return Err(at(format!("input `{k}` takes a single value (text, a number or a boolean)"))),
         };
-        inputs.insert(k, text);
+        inputs.insert(k, value);
     }
     Ok(Profile {
-        name: name.to_string(),
+        name: name.to_owned(),
         path,
         description: file.description,
         target: file.target,
@@ -163,11 +165,13 @@ pub fn parse(name: &str, path: PathBuf, text: &str) -> Result<Profile, String> {
 
 impl Profile {
     /// Where it shows in `isoloom defaults` and in errors.
+    #[must_use]
     pub fn source(&self) -> String {
         format!("profile {} ({})", self.name, self.path.display())
     }
 
     /// Its layer of the defaults.
+    #[must_use]
     pub fn layer(&self) -> Layer {
         Layer {
             source: self.source(),
@@ -182,7 +186,7 @@ impl Profile {
         let names = |section: &str| -> Vec<String> {
             spec.get(section)
                 .and_then(Value::as_mapping)
-                .map(|m| m.keys().filter_map(|k| k.as_str().map(str::to_string)).collect())
+                .map(|m| m.keys().filter_map(|k| k.as_str().map(str::to_owned)).collect())
                 .unwrap_or_default()
         };
         for section in ["machines", "networks"] {
@@ -194,7 +198,7 @@ impl Profile {
                         problems.push(format!(
                             "profile `{}`: `spec.{section}.{k}`: the spec has no {} `{k}`",
                             self.name,
-                            &section[..section.len() - 1]
+                            section.strip_suffix('s').unwrap_or(section)
                         ));
                     }
                 }
@@ -203,7 +207,7 @@ impl Profile {
         let declared: Vec<String> = spec
             .get("inputs")
             .and_then(Value::as_sequence)
-            .map(|s| s.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+            .map(|s| s.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
             .unwrap_or_default();
         for k in self.inputs.keys() {
             if !declared.iter().any(|d| d == k) {
@@ -216,13 +220,13 @@ impl Profile {
     /// The target to use: the profile's when none is asked for; an error when another is.
     pub fn pin(&self, asked: Option<&str>) -> Result<Option<String>, String> {
         match (self.target, asked) {
-            (Some(t), None) => Ok(Some(t.id().to_string())),
+            (Some(t), None) => Ok(Some(t.id().to_owned())),
             (Some(t), Some(a)) if a != t.id() => Err(format!(
                 "profile `{}` runs on `{}`, not `{a}`: drop the target or choose another profile",
                 self.name,
                 t.id()
             )),
-            (_, a) => Ok(a.map(str::to_string)),
+            (_, a) => Ok(a.map(str::to_owned)),
         }
     }
 }

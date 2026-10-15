@@ -21,6 +21,7 @@ pub enum Arch {
 
 impl Arch {
     /// The container platform value (`linux/amd64`, `linux/arm64`).
+    #[must_use]
     pub fn docker_platform(self) -> &'static str {
         match self {
             Arch::Amd64 => "linux/amd64",
@@ -29,6 +30,7 @@ impl Arch {
     }
 
     /// The name Vagrant, Kubernetes and most tools use (`amd64`, `arm64`).
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             Arch::Amd64 => "amd64",
@@ -41,7 +43,10 @@ impl Arch {
 /// kind of target produces it (`docker:`, `vm:`, `external:`).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-#[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the lowered form keeps one independent switch per field the backends read (spec.md §7.1); it shrinks as they read the plan instead"
+)]
 pub struct Machine {
     /// Network name -> last octet of the machine's address on it. Every machine has one, but a
     /// LAN's `switch`, whose ports the LAN gives it. A list (`lan: [10, 11, 12]`) gives the
@@ -51,7 +56,7 @@ pub struct Machine {
     #[schemars(with = "IndexMap<String, super::Octets>")]
     pub networks: IndexMap<String, u8>,
     /// The addresses after the first of each network written as a list, split from `networks`
-    /// when the spec is parsed ([`crate::addresses`]): not a field a spec writes.
+    /// by lowering: not a field a spec writes.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[schemars(skip)]
     pub more_addresses: IndexMap<String, Vec<u8>>,
@@ -214,7 +219,10 @@ pub struct Machine {
 /// A port a machine answers on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-#[allow(clippy::struct_excessive_bools)] // the spec's own keys: each is a switch a user writes.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the lowered form keeps the backends' port switches one to one (spec.md §7.3 item 2 turns them into one `PortKind`)"
+)]
 pub struct Port {
     /// The port the machine listens on (what the other machines and the
     /// checks connect to).
@@ -265,6 +273,7 @@ pub enum Protocol {
 
 impl Protocol {
     /// `tcp` or `udp`, as Compose, Vagrant, nftables and Terraform providers write it.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             Protocol::Tcp => "tcp",
@@ -273,6 +282,7 @@ impl Protocol {
     }
 
     /// Whether this is TCP, the default (a port without `protocol`).
+    #[must_use]
     pub fn is_tcp(&self) -> bool {
         *self == Protocol::Tcp
     }
@@ -282,6 +292,7 @@ impl Machine {
     /// How outputs name one of its ports (published outputs, Compose labels): its `name`,
     /// else its port. A UDP port is `<port>-udp`, and `<name>-udp` when a TCP port of the
     /// machine has the same name (DNS's `dns` over both protocols), so the two never share a key.
+    #[must_use]
     pub fn port_label(&self, s: &Port) -> String {
         match &s.name {
             None if s.protocol.is_tcp() => s.port.to_string(),
@@ -296,12 +307,14 @@ impl Machine {
     /// The ports Isoloom waits for before the machine counts as ready: its TCP ports but the
     /// dormant ones (UDP has no handshake to probe). Empty: nothing to probe (no healthcheck, no
     /// readiness probe).
+    #[must_use]
     pub fn ready_ports(&self) -> Vec<u16> {
         self.ports.iter().filter(|s| !s.dormant && s.protocol.is_tcp()).map(|s| s.port).collect()
     }
 
     /// Whether anything says when the machine is ready: a port to probe or a healthcheck of its
     /// own. Without either, the machine is ready once started.
+    #[must_use]
     pub fn has_readiness(&self) -> bool {
         self.healthcheck.is_some() || !self.ready_ports().is_empty()
     }

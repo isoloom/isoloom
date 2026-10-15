@@ -59,10 +59,10 @@ pub enum Publish {
     Fixed(NonZeroU16),
 }
 
+// What the schema shows and the reader returns, before it means a `Publish`.
 /// `publish:` as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only: `Publish` reads the values.")]
 enum PublishInput {
     /// `true`: a free host port, preferably the port's own number.
     Free(bool),
@@ -78,8 +78,51 @@ enum PublishInput {
     },
 }
 
+impl PublishInput {
+    /// What it asks for: `false` is not published.
+    fn publish(self) -> Option<Publish> {
+        match self {
+            PublishInput::Free(free) => free.then_some(Publish::Free),
+            PublishInput::Preferred(host) | PublishInput::Host { host, fixed: false } => Some(Publish::Preferred(host)),
+            PublishInput::Host { host, fixed: true } => Some(Publish::Fixed(host)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PublishInput {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<PublishInput, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = PublishInput;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("`true`, a host port, or `{ host, fixed: true }`")
+            }
+            fn visit_bool<E: de::Error>(self, v: bool) -> Result<PublishInput, E> {
+                Ok(PublishInput::Free(v))
+            }
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<PublishInput, E> {
+                host_port(v).map(PublishInput::Preferred)
+            }
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<PublishInput, A::Error> {
+                /// `{ host, fixed }`, read.
+                #[derive(Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct HostFields {
+                    host: NonZeroU16,
+                    #[serde(default)]
+                    fixed: bool,
+                }
+                let h = HostFields::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(PublishInput::Host { host: h.host, fixed: h.fixed })
+            }
+        }
+        d.deserialize_any(V)
+    }
+}
+
 /// A port a machine answers on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(from = "PortInput")]
 pub struct Port {
     /// The port the machine listens on. Left out only on a catalogue service's machine, whose
     /// entry gives it.
@@ -116,10 +159,10 @@ struct PortFull {
     dormant: bool,
 }
 
+// What the schema shows and the reader returns.
 /// A port as written: its number (TCP), or in full.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only.")]
 enum PortInput {
     /// The port's number: TCP, not published.
     Number(NonZeroU16),
@@ -127,67 +170,51 @@ enum PortInput {
     Full(PortFull),
 }
 
-impl<'de> Deserialize<'de> for Port {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Port, D::Error> {
+impl<'de> Deserialize<'de> for PortInput {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<PortInput, D::Error> {
         struct V;
         impl<'de> Visitor<'de> for V {
-            type Value = Port;
+            type Value = PortInput;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.write_str("a port number, or `{ port, protocol, publish, dormant }`")
             }
-            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Port, E> {
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<PortInput, E> {
                 let port = u16::try_from(v)
                     .ok()
                     .and_then(NonZeroU16::new)
                     .ok_or_else(|| E::custom("a port is 1 to 65535"))?;
-                Ok(Port {
-                    port: Some(port),
-                    protocol: PortProtocol::Tcp,
-                    publish: None,
-                    dormant: false,
-                })
+                Ok(PortInput::Number(port))
             }
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Port, A::Error> {
-                let f = PortFull::deserialize(de::value::MapAccessDeserializer::new(map))?;
-                Ok(Port {
-                    port: f.port,
-                    protocol: f.protocol,
-                    publish: f.publish,
-                    dormant: f.dormant,
-                })
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<PortInput, A::Error> {
+                PortFull::deserialize(de::value::MapAccessDeserializer::new(map)).map(PortInput::Full)
             }
         }
         d.deserialize_any(V)
     }
 }
 
-/// `publish:`: `true`, a number, or `{ host, fixed }` (`false`: not published).
-fn publish<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Publish>, D::Error> {
-    struct V;
-    impl<'de> Visitor<'de> for V {
-        type Value = Option<Publish>;
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("`true`, a host port, or `{ host, fixed: true }`")
-        }
-        fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
-            Ok(v.then_some(Publish::Free))
-        }
-        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
-            host_port(v).map(|p| Some(Publish::Preferred(p)))
-        }
-        fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-            #[derive(Deserialize)]
-            #[serde(deny_unknown_fields)]
-            struct Host {
-                host: NonZeroU16,
-                #[serde(default)]
-                fixed: bool,
-            }
-            let h = Host::deserialize(de::value::MapAccessDeserializer::new(map))?;
-            Ok(Some(if h.fixed { Publish::Fixed(h.host) } else { Publish::Preferred(h.host) }))
+impl From<PortInput> for Port {
+    fn from(written: PortInput) -> Port {
+        match written {
+            PortInput::Number(port) => Port {
+                port: Some(port),
+                protocol: PortProtocol::Tcp,
+                publish: None,
+                dormant: false,
+            },
+            PortInput::Full(f) => Port {
+                port: f.port,
+                protocol: f.protocol,
+                publish: f.publish,
+                dormant: f.dormant,
+            },
         }
     }
-    d.deserialize_any(V)
+}
+
+/// `publish:`: `true`, a number, or `{ host, fixed }` (`false`: not published).
+fn publish<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Publish>, D::Error> {
+    PublishInput::deserialize(d).map(PublishInput::publish)
 }
 
 fn host_port<E: de::Error>(v: u64) -> Result<NonZeroU16, E> {

@@ -47,7 +47,7 @@ fn os_keys<'de, D: Deserializer<'de>>(d: D) -> Result<IndexMap<String, VmImage>,
     IndexMap::<String, VmImage>::deserialize(d)?
         .into_iter()
         .map(|(key, image)| match crate::os::resolve(&key) {
-            Ok(os) => Ok((os.name.to_string(), image)),
+            Ok(os) => Ok((os.name.to_owned(), image)),
             Err(e) => Err(D::Error::custom(format!("os.{key}: {e}"))),
         })
         .collect()
@@ -57,7 +57,7 @@ fn os_keys<'de, D: Deserializer<'de>>(d: D) -> Result<IndexMap<String, VmImage>,
 fn access_os<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     Option::<String>::deserialize(d)?
         .map(|text| match crate::os::resolve(&text) {
-            Ok(os) => Ok(os.name.to_string()),
+            Ok(os) => Ok(os.name.to_owned()),
             Err(e) => Err(D::Error::custom(e)),
         })
         .transpose()
@@ -77,6 +77,7 @@ impl Table {
     /// The spec with this table applied: each VM's image from `os:` (unless the spec gives its
     /// own `vm.image`), and the access machine's missing implementations from `access:`. The
     /// generators then treat a supplied machine like any other, on every target.
+    #[must_use]
     pub fn apply(&self, spec: &Spec) -> Spec {
         let mut out = spec.clone();
         for m in out.machines.values_mut() {
@@ -170,6 +171,7 @@ const ROBOXES: &str = "4.3.12";
 pub const QEMU_DEBIAN_12: &str = "cloud-image/debian-12";
 
 /// Whether an OS name is a Windows one (WinRM and PowerShell instead of SSH and sh).
+#[must_use]
 pub fn is_windows(os: &str) -> bool {
     os.starts_with("windows")
 }
@@ -275,12 +277,14 @@ fn builtin_windows(os: &str) -> Option<VagrantBox> {
 
 /// How a machine's Windows box answers WinRM: what its image declares, else plain HTTP (every
 /// built-in Windows box uses plain HTTP today).
+#[must_use]
 pub fn winrm(vm: &VmImpl) -> crate::model::Winrm {
     vm.image.as_ref().and_then(|i| i.winrm).unwrap_or_default()
 }
 
 /// The Vagrant box for a machine: the spec's `vm.image.vagrant` when set, else the built-in one;
 /// on Hyper-V, the spec's `vm.image.hyperv` when set (its latest version with a Hyper-V build).
+#[must_use]
 pub fn vagrant(vm: &VmImpl) -> Option<VagrantBox> {
     let image = vm.image.as_ref();
     let mut b = match image.and_then(|i| i.vagrant.clone()) {
@@ -317,7 +321,7 @@ mod tests {
             Some(HyperVBox::Other { name, version }) => Some((name, version)),
             _ => None,
         };
-        let pinned = |n: &str, v: &str| Some((n.to_string(), Some(v.to_string())));
+        let pinned = |n: &str, v: &str| Some((n.to_owned(), Some(v.to_owned())));
         assert_eq!(other("debian-12"), pinned("generic/debian12", "4.3.12"));
         assert_eq!(other("ubuntu-24.04"), pinned("gusztavvargadr/ubuntu-server-2404-lts", "2607.0.0"));
         assert_eq!(other("windows-server-2019"), pinned("StefanScherer/windows_2019", "2020.02.12"));

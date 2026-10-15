@@ -71,9 +71,9 @@ impl Problem {
 
     /// The top-level section of the spec the problem is in: `machines` for
     /// `machines.web.depends_on[0]`, `checks` for `checks[2].http`.
+    #[must_use]
     pub fn section(&self) -> &str {
-        let end = self.at.find(['.', '[']).unwrap_or(self.at.len());
-        &self.at[..end]
+        self.at.split(['.', '[']).next().unwrap_or_default()
     }
 }
 
@@ -100,6 +100,7 @@ fn block(blocks: &Blocks, name: &str) -> Option<Cidr> {
 }
 
 /// Checks the spec itself (no file system access). See [`validate_files`] for paths.
+#[must_use]
 pub fn validate(spec: &Spec) -> Vec<Problem> {
     let mut p = Problems::default();
     top::version_and_name(spec, &mut p);
@@ -194,8 +195,8 @@ pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a Machine) -> Vec<&'a s
 fn dependency_cycle(spec: &Spec) -> Option<Vec<String>> {
     fn visit<'a>(spec: &'a Spec, n: &'a str, stack: &mut Vec<&'a str>, done: &mut BTreeSet<&'a str>) -> Option<Vec<String>> {
         if let Some(pos) = stack.iter().position(|s| *s == n) {
-            let mut c: Vec<String> = stack[pos..].iter().map(std::string::ToString::to_string).collect();
-            c.push(n.to_string());
+            let mut c: Vec<String> = stack.iter().skip(pos).map(|s| (*s).to_owned()).collect();
+            c.push(n.to_owned());
             return Some(c);
         }
         if done.contains(n) {

@@ -51,6 +51,7 @@ pub struct Boot {
 impl Boot {
     /// The fields set besides `firmware_format` and `firmware: uefi`, by name: what Vagrant's
     /// QEMU provider can't boot (it boots the box's disk through its own UEFI firmware).
+    #[must_use]
     pub fn beyond_firmware_format(&self) -> Vec<&'static str> {
         let set = [
             ("firmware", self.firmware == Some(Firmware::Bios)),
@@ -89,6 +90,7 @@ pub enum FirmwareFormat {
 
 impl FirmwareFormat {
     /// The name the hypervisors use.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             FirmwareFormat::Raw => "raw",
@@ -111,6 +113,7 @@ pub enum BootDevice {
 
 impl BootDevice {
     /// The name libvirt gives it.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             BootDevice::Hd => "hd",

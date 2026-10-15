@@ -101,7 +101,7 @@ pub enum Appliance {
 pub struct VmImpl {
     /// The OS, as `<family>@<version>` (`debian@12`) or a family alone for its pinned default;
     /// each target maps it to an image. Once parsed, it holds the image table's name for the OS
-    /// ([`KNOWN_OS`], see [`crate::os::canonical`]). Defaults to the machine's
+    /// ([`KNOWN_OS`], see [`crate::os::Os::name`]), as lowering writes it. Defaults to the machine's
     /// `os`, which it must agree with when both are set. May come from `common:` or a group
     /// (`vm: {}` in the machine).
     #[serde(default)]
@@ -136,6 +136,7 @@ pub struct VmImpl {
 pub const REBOOT_STEP: &str = "reboot";
 
 /// Whether a `vm.provision` step is the [`REBOOT_STEP`] rather than a file.
+#[must_use]
 pub fn is_reboot(step: &str) -> bool {
     step == REBOOT_STEP
 }

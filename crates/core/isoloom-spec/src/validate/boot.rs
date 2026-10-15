@@ -118,7 +118,7 @@ fn boot(at: &str, b: &Boot, p: &mut Problems) {
         );
     }
     for (i, d) in b.order.iter().enumerate() {
-        if b.order[..i].contains(d) {
+        if b.order.iter().take(i).any(|earlier| earlier == d) {
             p.add(format!("{at}.order[{i}]"), format!("`{}` is listed twice", d.id()));
         }
     }
@@ -193,7 +193,7 @@ fn shared_networks(spec: &Spec, p: &mut Problems) {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::from_yaml as parse;
+    use crate::testing::model as parse;
     use crate::validate;
 
     fn problems(machine: &str) -> Vec<String> {
@@ -211,7 +211,7 @@ mod tests {
         assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.box_url:")), "{p:?}");
         assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.box_server_url:")), "{p:?}");
         let ok = problems("{ os: debian@12, image: { vagrant: my/box, box_url: boxes/my.box } }");
-        assert!(!ok.iter().any(|p| p.starts_with("machines.a.vm.image")), "{ok:?}");
+        assert!(!ok.iter().any(|problem| problem.starts_with("machines.a.vm.image")), "{ok:?}");
     }
 
     #[test]
@@ -223,7 +223,7 @@ mod tests {
         let ok = problems(
             "{ os: debian@12, image: { proxmox: '9000', aws: ami-1, azure: /subscriptions/s, gcp: projects/p/global/images/i, oci: ocid1.image.oc1..x, linode: private/1, digitalocean: '123' } }",
         );
-        assert!(!ok.iter().any(|p| p.starts_with("machines.a.vm.image")), "{ok:?}");
+        assert!(!ok.iter().any(|problem| problem.starts_with("machines.a.vm.image")), "{ok:?}");
     }
 
     #[test]

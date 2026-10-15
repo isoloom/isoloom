@@ -19,12 +19,12 @@ pub fn parse(yaml: &str) -> Result<Spec, Problems> {
     let spans = Spans::of(yaml);
     let mut doc: Value = serde_yaml_ng::from_str(yaml).map_err(|e| vec![yaml_problem(&e)])?;
     let mut problems = old_keys::scan(&doc);
-    let clones = crate::clones::expand(&mut doc).unwrap_or_else(|e| {
-        problems.push(stage_problem(&e));
+    let clones = crate::clones::expand(&mut doc).unwrap_or_else(|refused| {
+        problems.push(refused);
         indexmap::IndexMap::new()
     });
-    if let Err(e) = crate::groups::expand_shared(&mut doc) {
-        problems.push(stage_problem(&e));
+    if let Err(refused) = crate::groups::expand(&mut doc) {
+        problems.push(refused);
     }
     let Value::Mapping(top) = doc else {
         return Err(vec![Problem::new(
@@ -61,14 +61,6 @@ fn yaml_problem(e: &serde_yaml_ng::Error) -> Problem {
         column: l.column(),
     });
     p
-}
-
-/// A normalization step's refusal (`machines.ws.count: 2 to 99`), at the field it names.
-fn stage_problem(e: &str) -> Problem {
-    match e.split_once(": ") {
-        Some((path, reason)) if !path.contains(' ') => Problem::new(Code::InvalidValue, FieldPath::new(path), reason),
-        _ => Problem::new(Code::InvalidValue, FieldPath::default(), e),
-    }
 }
 
 /// Reads typed values out of the document, keeping every problem.
@@ -161,7 +153,7 @@ impl Reader {
             return;
         };
         for (name, m) in machines {
-            let Some(name) = name.as_str().map(str::to_string) else {
+            let Some(name) = name.as_str().map(str::to_owned) else {
                 self.problems.push(Problem::new(Code::InvalidValue, at.clone(), "a machine's name is a text"));
                 continue;
             };

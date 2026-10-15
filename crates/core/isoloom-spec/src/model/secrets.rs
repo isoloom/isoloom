@@ -47,6 +47,7 @@ pub enum SecretSource {
 
 impl SecretSource {
     /// The store's name, as the spec writes it (`env`, `file`, `vault`, `sops`).
+    #[must_use]
     pub fn store(&self) -> &'static str {
         match self {
             SecretSource::Env { .. } => "env",
@@ -58,6 +59,7 @@ impl SecretSource {
     }
 
     /// What the store is asked for: a variable, a path, a `<path>#<field>` reference.
+    #[must_use]
     pub fn reference(&self) -> &str {
         match self {
             SecretSource::Env { env: r }
@@ -107,9 +109,17 @@ pub struct SecretMount {
 }
 
 /// Whether `p` is an absolute Windows path on a drive (`C:\app\db`, `C:/app/db`).
+#[must_use]
 pub fn is_drive_path(p: &str) -> bool {
-    let b = p.as_bytes();
-    b.len() > 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/')
+    after_drive(p).is_some()
+}
+
+/// The path after its drive (`\app\db` of `C:\app\db`), when `p` is an absolute Windows path
+/// on a drive.
+#[must_use]
+pub fn after_drive(p: &str) -> Option<&str> {
+    let rest = p.strip_prefix(|c: char| c.is_ascii_alphabetic())?.strip_prefix(':')?;
+    (rest.len() > 1 && rest.starts_with(['\\', '/'])).then_some(rest)
 }
 
 /// Where secrets go when a machine names no path.
@@ -117,6 +127,7 @@ pub const SECRETS_DIR: &str = "/run/secrets";
 
 impl MachineSecret {
     /// The secret it places.
+    #[must_use]
     pub fn source(&self) -> &str {
         match self {
             MachineSecret::Name(n) => n,
@@ -125,6 +136,7 @@ impl MachineSecret {
     }
 
     /// The file's absolute path in the machine.
+    #[must_use]
     pub fn path(&self) -> String {
         match self {
             MachineSecret::Mount(SecretMount { target: Some(t), .. }) if t.starts_with('/') || is_drive_path(t) => t.clone(),
@@ -134,6 +146,7 @@ impl MachineSecret {
     }
 
     /// Its long form (every field but the source unset for a name alone).
+    #[must_use]
     pub fn mount(&self) -> SecretMount {
         match self {
             MachineSecret::Name(n) => SecretMount {
@@ -151,6 +164,7 @@ impl MachineSecret {
 /// The environment variable a secret's value is handed over in, to the tool that delivers it
 /// (`ISOLOOM_SECRET_DB_PASSWORD` for `db-password`). Secret names are kebab-case, so two
 /// secrets never share one.
+#[must_use]
 pub fn secret_variable(name: &str) -> String {
     format!("ISOLOOM_SECRET_{}", name.to_ascii_uppercase().replace('-', "_"))
 }
@@ -172,7 +186,11 @@ fn octal<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<u32>, D::Error
 }
 
 /// A mode as the spec writes it, `"0440"`, so the resolved spec reads back the same.
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)] // serde's `serialize_with` passes a reference.
+#[expect(
+    clippy::ref_option,
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's `serialize_with` calls this with a reference to the field, an `Option<u32>`"
+)]
 fn write_octal<S: serde::Serializer>(mode: &Option<u32>, s: S) -> Result<S::Ok, S::Error> {
     match mode {
         Some(m) => s.serialize_str(&format!("{m:04o}")),

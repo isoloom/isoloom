@@ -77,7 +77,7 @@ impl FieldPath {
     #[must_use]
     pub fn key(&self, key: &str) -> FieldPath {
         if self.0.is_empty() {
-            FieldPath(key.to_string())
+            FieldPath(key.to_owned())
         } else {
             FieldPath(format!("{}.{key}", self.0))
         }
@@ -99,7 +99,7 @@ impl FieldPath {
     #[must_use]
     pub fn parent(&self) -> Option<FieldPath> {
         let cut = self.0.rfind(['.', '['])?;
-        Some(FieldPath(self.0[..cut].to_string()))
+        self.0.get(..cut).map(|parent| FieldPath(parent.to_owned()))
     }
 
     /// Whether this path is `other` or a field inside it.
@@ -175,8 +175,7 @@ impl Problem {
     /// The top-level section the problem is in: `machines` for `machines.web.app`.
     #[must_use]
     pub fn section(&self) -> &str {
-        let p = self.path.as_str();
-        &p[..p.find(['.', '[']).unwrap_or(p.len())]
+        self.path.as_str().split(['.', '[']).next().unwrap_or_default()
     }
 }
 

@@ -57,7 +57,7 @@ impl Spans {
     fn scalar(&mut self, stack: &mut [Frame], text: &str, at: Span) {
         if let Some(Frame::Map { path, key: key @ None }) = stack.last_mut() {
             self.0.entry(path.key(text)).or_insert(at);
-            *key = Some(text.to_string());
+            *key = Some(text.to_owned());
         } else {
             self.value(stack, at);
         }

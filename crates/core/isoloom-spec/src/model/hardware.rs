@@ -37,11 +37,13 @@ pub const DEFAULT_GPU_DRIVER: &str = "nvidia";
 
 impl Gpus {
     /// The driver: the spec's, else [`DEFAULT_GPU_DRIVER`].
+    #[must_use]
     pub fn driver(&self) -> &str {
         self.driver.as_deref().unwrap_or(DEFAULT_GPU_DRIVER)
     }
 
     /// How many GPUs a fixed count gives: the count, the ids', else one. `None` for `all`.
+    #[must_use]
     pub fn fixed_count(&self) -> Option<u32> {
         match self.count {
             Some(GpuCount::All) => None,
@@ -174,6 +176,7 @@ pub struct Device {
 
 impl Device {
     /// Its path inside the machine.
+    #[must_use]
     pub fn guest(&self) -> &str {
         self.guest.as_deref().unwrap_or(&self.host)
     }
@@ -249,12 +252,14 @@ mod tests {
 
     #[test]
     fn devices_read_short_or_in_full() {
-        let d: Device = serde_yaml_ng::from_str("/dev/fuse").unwrap();
-        assert_eq!((d.guest(), d.permissions.as_deref()), ("/dev/fuse", None));
-        let d: Device = serde_yaml_ng::from_str("/dev/ttyUSB0:/dev/ttyS1:r").unwrap();
-        assert_eq!((d.guest(), d.permissions.as_deref()), ("/dev/ttyS1", Some("r")));
-        let d: Device = serde_yaml_ng::from_str("{ host: /dev/kvm, permissions: rw }").unwrap();
-        assert_eq!((d.guest(), d.permissions.as_deref()), ("/dev/kvm", Some("rw")));
+        for (yaml, guest, permissions) in [
+            ("/dev/fuse", "/dev/fuse", None),
+            ("/dev/ttyUSB0:/dev/ttyS1:r", "/dev/ttyS1", Some("r")),
+            ("{ host: /dev/kvm, permissions: rw }", "/dev/kvm", Some("rw")),
+        ] {
+            let d: Device = serde_yaml_ng::from_str(yaml).unwrap();
+            assert_eq!((d.guest(), d.permissions.as_deref()), (guest, permissions), "{yaml}");
+        }
         assert!(serde_yaml_ng::from_str::<Device>("/a:/b:r:x").is_err());
     }
 

@@ -14,7 +14,8 @@ use crate::model::CommandLine;
 
 /// A machine's own command: a text the shell runs, or a list run as it is, and the directory
 /// it runs in.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(from = "CommandInput")]
 pub struct Command {
     /// What runs.
     pub run: CommandLine,
@@ -34,10 +35,10 @@ struct CommandFull {
     cwd: Option<String>,
 }
 
+// What the schema shows and the reader returns.
 /// A command as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only.")]
 enum CommandInput {
     /// A text run by the machine's shell (`/bin/sh -c`; PowerShell on Windows).
     Shell(String),
@@ -47,33 +48,41 @@ enum CommandInput {
     Full(CommandFull),
 }
 
-impl<'de> Deserialize<'de> for Command {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Command, D::Error> {
+impl<'de> Deserialize<'de> for CommandInput {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<CommandInput, D::Error> {
         struct V;
         impl<'de> Visitor<'de> for V {
-            type Value = Command;
+            type Value = CommandInput;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.write_str("a text, a list of arguments, or `{ run, cwd }`")
             }
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Command, E> {
-                Ok(Command {
-                    run: CommandLine::Shell(v.to_string()),
-                    cwd: None,
-                })
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<CommandInput, E> {
+                Ok(CommandInput::Shell(v.to_owned()))
             }
-            fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Command, A::Error> {
-                let args = Vec::<String>::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
-                Ok(Command {
-                    run: CommandLine::Exec(args),
-                    cwd: None,
-                })
+            fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<CommandInput, A::Error> {
+                Vec::<String>::deserialize(de::value::SeqAccessDeserializer::new(seq)).map(CommandInput::Exec)
             }
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Command, A::Error> {
-                let c = CommandFull::deserialize(de::value::MapAccessDeserializer::new(map))?;
-                Ok(Command { run: c.run, cwd: c.cwd })
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<CommandInput, A::Error> {
+                CommandFull::deserialize(de::value::MapAccessDeserializer::new(map)).map(CommandInput::Full)
             }
         }
         d.deserialize_any(V)
+    }
+}
+
+impl From<CommandInput> for Command {
+    fn from(written: CommandInput) -> Command {
+        match written {
+            CommandInput::Shell(text) => Command {
+                run: CommandLine::Shell(text),
+                cwd: None,
+            },
+            CommandInput::Exec(args) => Command {
+                run: CommandLine::Exec(args),
+                cwd: None,
+            },
+            CommandInput::Full(c) => Command { run: c.run, cwd: c.cwd },
+        }
     }
 }
 
@@ -140,7 +149,8 @@ pub struct Healthcheck {
 
 /// An environment variable's value: a fixed text (a number or a boolean read as its text), or a
 /// non-sensitive input's value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "EnvInput")]
 pub enum EnvValue {
     /// A fixed value.
     Text(String),
@@ -162,10 +172,10 @@ struct EnvReference {
     secret: Option<String>,
 }
 
+// What the schema shows and the reader returns.
 /// An environment value as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only.")]
 enum EnvInput {
     /// A fixed text.
     Text(String),
@@ -177,39 +187,50 @@ enum EnvInput {
     Reference(EnvReference),
 }
 
-impl<'de> Deserialize<'de> for EnvValue {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<EnvValue, D::Error> {
+impl<'de> Deserialize<'de> for EnvInput {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<EnvInput, D::Error> {
         struct V;
         impl<'de> Visitor<'de> for V {
-            type Value = EnvValue;
+            type Value = EnvInput;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.write_str("a text, a number, a boolean, or `{ input: NAME }`")
             }
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<EnvValue, E> {
-                Ok(EnvValue::Text(v.to_string()))
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<EnvInput, E> {
+                Ok(EnvInput::Text(v.to_owned()))
             }
-            fn visit_bool<E: de::Error>(self, v: bool) -> Result<EnvValue, E> {
-                Ok(EnvValue::Text(v.to_string()))
+            fn visit_bool<E: de::Error>(self, v: bool) -> Result<EnvInput, E> {
+                Ok(EnvInput::Bool(v))
             }
-            fn visit_u64<E: de::Error>(self, v: u64) -> Result<EnvValue, E> {
-                Ok(EnvValue::Text(v.to_string()))
+            // A whole number reads as its digits, exactly (through a float it could round).
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<EnvInput, E> {
+                Ok(EnvInput::Text(v.to_string()))
             }
-            fn visit_i64<E: de::Error>(self, v: i64) -> Result<EnvValue, E> {
-                Ok(EnvValue::Text(v.to_string()))
+            fn visit_i64<E: de::Error>(self, v: i64) -> Result<EnvInput, E> {
+                Ok(EnvInput::Text(v.to_string()))
             }
-            fn visit_f64<E: de::Error>(self, v: f64) -> Result<EnvValue, E> {
-                Ok(EnvValue::Text(v.to_string()))
+            fn visit_f64<E: de::Error>(self, v: f64) -> Result<EnvInput, E> {
+                Ok(EnvInput::Number(v))
             }
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<EnvValue, A::Error> {
-                let r = EnvReference::deserialize(de::value::MapAccessDeserializer::new(map))?;
-                match (r.input, r.secret) {
-                    (Some(i), None) => Ok(EnvValue::Input(i)),
-                    (None, Some(s)) => Ok(EnvValue::Secret(s)),
-                    _ => Err(de::Error::custom("write one of `{ input: NAME }`")),
-                }
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<EnvInput, A::Error> {
+                EnvReference::deserialize(de::value::MapAccessDeserializer::new(map)).map(EnvInput::Reference)
             }
         }
         d.deserialize_any(V)
+    }
+}
+
+impl TryFrom<EnvInput> for EnvValue {
+    type Error = &'static str;
+
+    fn try_from(written: EnvInput) -> Result<EnvValue, &'static str> {
+        match written {
+            EnvInput::Text(text) => Ok(EnvValue::Text(text)),
+            EnvInput::Number(n) => Ok(EnvValue::Text(n.to_string())),
+            EnvInput::Bool(b) => Ok(EnvValue::Text(b.to_string())),
+            EnvInput::Reference(EnvReference { input: Some(i), secret: None }) => Ok(EnvValue::Input(i)),
+            EnvInput::Reference(EnvReference { input: None, secret: Some(s) }) => Ok(EnvValue::Secret(s)),
+            EnvInput::Reference(_) => Err("write one of `{ input: NAME }`"),
+        }
     }
 }
 
@@ -229,20 +250,20 @@ mod tests {
 
     #[test]
     fn a_command_is_a_text_a_list_or_with_its_directory() {
-        let c: Command = serde_yaml_ng::from_str("python3 app.py").unwrap();
-        assert_eq!(c.run, CommandLine::Shell("python3 app.py".into()));
-        let c: Command = serde_yaml_ng::from_str("[nginx, -g, daemon off;]").unwrap();
-        assert!(matches!(c.run, CommandLine::Exec(ref a) if a.len() == 3));
-        let c: Command = serde_yaml_ng::from_str("{ run: [python3, app.py], cwd: /srv }").unwrap();
-        assert_eq!(c.cwd.as_deref(), Some("/srv"));
+        let text: Command = serde_yaml_ng::from_str("python3 app.py").unwrap();
+        assert_eq!(text.run, CommandLine::Shell("python3 app.py".into()));
+        let list: Command = serde_yaml_ng::from_str("[nginx, -g, daemon off;]").unwrap();
+        assert!(matches!(list.run, CommandLine::Exec(ref a) if a.len() == 3));
+        let full: Command = serde_yaml_ng::from_str("{ run: [python3, app.py], cwd: /srv }").unwrap();
+        assert_eq!(full.cwd.as_deref(), Some("/srv"));
     }
 
     #[test]
     fn a_healthcheck_names_its_port() {
-        let h: Healthcheck = serde_yaml_ng::from_str("{ http: { port: site, path: /health } }").unwrap();
-        assert_eq!(h.http.unwrap().port, PortRef::Name("site".parse().unwrap()));
-        let h: Healthcheck = serde_yaml_ng::from_str("{ http: { port: 8000 } }").unwrap();
-        assert!(matches!(h.http.unwrap().port, PortRef::Number(_)));
+        let by_name: Healthcheck = serde_yaml_ng::from_str("{ http: { port: site, path: /health } }").unwrap();
+        assert_eq!(by_name.http.unwrap().port, PortRef::Name("site".parse().unwrap()));
+        let by_number: Healthcheck = serde_yaml_ng::from_str("{ http: { port: 8000 } }").unwrap();
+        assert!(matches!(by_number.http.unwrap().port, PortRef::Number(_)));
     }
 
     #[test]

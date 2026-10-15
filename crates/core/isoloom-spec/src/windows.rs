@@ -16,11 +16,13 @@ pub enum Tpm {
 }
 
 /// Whether an OS expects a TPM 2.0: Windows 11 refuses to install or upgrade without one.
+#[must_use]
 pub fn expects_tpm(os: &str) -> bool {
     os == "windows-11"
 }
 
 /// The TPM a VM gets: what `vm.tpm` says, else what its OS expects.
+#[must_use]
 pub fn tpm(vm: &VmImpl) -> Option<Tpm> {
     match vm.tpm {
         Some(true) => Some(Tpm::Required),
@@ -30,6 +32,7 @@ pub fn tpm(vm: &VmImpl) -> Option<Tpm> {
 }
 
 /// Whether a Windows VM is reached over OpenSSH (`vm.image.winssh`) rather than WinRM.
+#[must_use]
 pub fn winssh(vm: &VmImpl) -> bool {
     is_windows(&vm.os) && vm.image.as_ref().is_some_and(|i| i.winssh)
 }

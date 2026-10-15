@@ -9,15 +9,9 @@
 //! ```
 //!
 //! Those are the only spellings. Once the spec is lowered, each `vm.os` holds the image table's
-//! name for its OS (`debian@12` is `debian-12`), the name every target reads ([`canonical`]). A
+//! name for its OS (`debian@12` is `debian-12`, [`Os::name`]), the name every target reads. A
 //! version left out resolves to the family's pinned default ([`Family::default`]), recorded in
-//! the resolved snapshot. The machine's `os` reaches its `vm:` on the YAML, before `common:` and
-//! the groups fold in ([`fill_vm`]), so a machine's own OS wins over a shared one, as its own
-//! `vm.os` does.
-
-use serde_yaml_ng::{Mapping, Value};
-
-use crate::model::Spec;
+//! the resolved snapshot.
 
 /// An OS family: the versions Isoloom has images for, each with its image-table name, and the
 /// version an omitted one resolves to.
@@ -113,6 +107,7 @@ pub struct Os {
 
 impl Os {
     /// How the spec writes it in full: `debian@12`.
+    #[must_use]
     pub fn id(&self) -> String {
         format!("{}@{}", self.family, self.version)
     }
@@ -165,20 +160,21 @@ pub fn resolve(text: &str) -> Result<Os, OsError> {
     let (family, version) = text.split_once('@').map_or((text, None), |(f, v)| (f, Some(v)));
     let Some(f) = FAMILIES.iter().find(|f| f.name == family) else {
         return Err(OsError::UnknownFamily {
-            text: text.to_string(),
+            text: text.to_owned(),
             known: FAMILIES.iter().map(|f| format!("{} ({})", f.name, f.known())).collect::<Vec<_>>().join(", "),
         });
     };
     let version = version.unwrap_or(f.default);
     f.get(version).ok_or_else(|| OsError::UnknownVersion {
         family: f.name,
-        version: version.to_string(),
+        version: version.to_owned(),
         known: f.known(),
         default: f.default,
     })
 }
 
 /// The OS an image-table name (`debian-12`) stands for: how a parsed spec's `vm.os` names it.
+#[must_use]
 pub fn by_name(name: &str) -> Option<Os> {
     FAMILIES
         .iter()
@@ -187,52 +183,14 @@ pub fn by_name(name: &str) -> Option<Os> {
 
 /// Every spelling an `os` field takes: each family alone and each `<family>@<version>`. The
 /// schema offers them for completion.
+#[must_use]
 pub fn spellings() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for f in FAMILIES {
-        out.push(f.name.to_string());
+        out.push(f.name.to_owned());
         out.extend(f.versions.iter().map(|(v, _)| format!("{}@{v}", f.name)));
     }
     out
-}
-
-fn key(s: &str) -> Value {
-    Value::String(s.to_string())
-}
-
-/// Gives each machine's `os` to its `vm:`, on the YAML before `common:` and the groups fold in:
-/// a machine with neither `docker:` nor `vm:` gets `vm: { os }`, and a `vm:` without `os` gets
-/// the machine's. The text is copied as written; [`canonical`] resolves both once parsed.
-pub fn fill_vm(doc: &mut Value) {
-    let Some(Value::Mapping(machines)) = doc.get_mut("machines") else { return };
-    for m in machines.values_mut() {
-        let Value::Mapping(m) = m else { continue };
-        let Some(os) = m.get("os").filter(|v| v.is_string()).cloned() else { continue };
-        if !m.contains_key("docker") && !m.contains_key("vm") {
-            m.insert(key("vm"), Value::Mapping(Mapping::new()));
-        }
-        if let Some(Value::Mapping(vm)) = m.get_mut("vm")
-            && !vm.contains_key("os")
-        {
-            vm.insert(key("os"), os);
-        }
-    }
-}
-
-/// Writes each machine's OS in its resolved forms: the machine's `os` as `<family>@<version>`
-/// (the default version filled in), its `vm.os` as the image-table name every target reads.
-/// An OS that doesn't resolve is refused, naming its field; an empty `vm.os` is left for
-/// validation, which says how to name one.
-pub fn canonical(spec: &mut Spec) -> Result<(), String> {
-    for (name, m) in &mut spec.machines {
-        if let Some(text) = &m.os {
-            m.os = Some(resolve(text).map_err(|e| format!("machines.{name}.os: {e}"))?.id());
-        }
-        if let Some(vm) = m.vm.as_mut().filter(|vm| !vm.os.is_empty()) {
-            vm.os = resolve(&vm.os).map_err(|e| format!("machines.{name}.vm.os: {e}"))?.name.to_string();
-        }
-    }
-    Ok(())
 }
 
 mod containers;

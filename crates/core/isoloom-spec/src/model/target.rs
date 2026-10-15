@@ -54,6 +54,7 @@ impl Target {
     ];
 
     /// The implementation every machine needs for this target.
+    #[must_use]
     pub fn needs(self) -> Shape {
         match self {
             Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => Shape::Docker,
@@ -66,6 +67,7 @@ impl Target {
     }
 
     /// The target's name on the command line and in its folder under `.isoloom/`.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             Target::Docker => "docker",
@@ -103,6 +105,7 @@ pub enum Shape {
 
 impl Shape {
     /// The spec key that gives a machine this shape, as a refusal names it (`docker`, `vm`).
+    #[must_use]
     pub fn key(self) -> &'static str {
         match self {
             Shape::Docker => "docker",

@@ -13,8 +13,8 @@ fn a_docker_block_gets_its_app() {
         fix.contains("`app: { build: build/web }`") && fix.contains("setup") && fix.contains("input"),
         "{fix}"
     );
-    let p = scanned("machines:\n  bench:\n    docker: { image: alpine:3.20, idle: true }\n");
-    assert!(p[0].fix.as_deref().unwrap().contains("`os: <family>@<version>` alone"));
+    let idle = scanned("machines:\n  bench:\n    docker: { image: alpine:3.20, idle: true }\n");
+    assert!(idle[0].fix.as_deref().unwrap().contains("`os: <family>@<version>` alone"));
 }
 
 #[test]

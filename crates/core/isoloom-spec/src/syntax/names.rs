@@ -70,7 +70,7 @@ macro_rules! name_type {
 
         impl<'de> Deserialize<'de> for $ty {
             fn deserialize<D: Deserializer<'de>>(d: D) -> Result<$ty, D::Error> {
-                d.deserialize_any(Text)?.parse().map_err(serde::de::Error::custom)
+                d.deserialize_any(Text("a name"))?.parse().map_err(serde::de::Error::custom)
             }
         }
 
@@ -138,19 +138,20 @@ impl ServiceRef {
     }
 }
 
-/// A name as written: a text, or a number read as its digits (so `80:` as a port's name is
-/// reported against the naming rule, not as a type error).
-struct Text;
+/// A value as written, a text or a number read as its digits, before its own rule reads it (so
+/// `80:` as a port's name is reported against the naming rule, not as a type error). It holds
+/// what a value of another type says it expected.
+pub(crate) struct Text(pub(crate) &'static str);
 
 impl Visitor<'_> for Text {
     type Value = String;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("a name")
+        f.write_str(self.0)
     }
 
     fn visit_str<E: de::Error>(self, v: &str) -> Result<String, E> {
-        Ok(v.to_string())
+        Ok(v.to_owned())
     }
 
     fn visit_u64<E: de::Error>(self, v: u64) -> Result<String, E> {

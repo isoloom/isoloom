@@ -20,9 +20,14 @@ pub fn schema() -> Value {
     // Optional fields come out as "this, or null". A spec never writes null, and editors report
     // a typo inside such a field as one vague "anyOf" error: keep only the real type.
     drop_null(&mut s);
-    s["$id"] = json!(SCHEMA_URL);
-    s["title"] = json!("isoloom.yml");
-    s["description"] = json!("An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec-reference");
+    set(&mut s, &[], "$id", json!(SCHEMA_URL));
+    set(&mut s, &[], "title", json!("isoloom.yml"));
+    set(
+        &mut s,
+        &[],
+        "description",
+        json!("An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec-reference"),
+    );
     names(&mut s);
     networks(&mut s);
     machines(&mut s);

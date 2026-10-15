@@ -34,8 +34,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
 fn path(at: &str, f: &MachineFile, windows: bool, p: &mut Problems) {
     let path = f.path.as_str();
     let absolute = if windows {
-        let b = path.as_bytes();
-        b.len() > 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/')
+        crate::model::is_drive_path(path)
     } else {
         path.starts_with('/') && path.len() > 1
     };

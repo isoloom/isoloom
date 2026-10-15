@@ -5,22 +5,23 @@
 
 use super::super::Spec;
 use super::super::problem::{Code, FieldPath, Problem, Problems};
+use crate::placeholders::{self, Piece};
 
 /// Every placeholder of the message.
 pub(super) fn check(spec: &Spec, out: &mut Problems) {
     let Some(message) = &spec.message else { return };
     let at = FieldPath::new("message");
-    let mut rest = message.as_str();
-    while let Some(i) = rest.find("{{") {
-        let Some(j) = rest[i + 2..].find("}}") else {
-            out.push(Problem::new(Code::InvalidValue, at.clone(), "a `{{` without its `}}`"));
-            return;
-        };
-        let path = rest[i + 2..i + 2 + j].trim();
-        if let Err(why) = resolve(spec, path) {
-            out.push(Problem::new(Code::UnknownReference, at.clone(), format!("`{{{{ {path} }}}}`: {why}")).fix(example(spec)));
+    for piece in placeholders::pieces(message) {
+        match piece {
+            Piece::Text(_) => {}
+            Piece::Placeholder(inner) => {
+                let path = inner.trim();
+                if let Err(why) = resolve(spec, path) {
+                    out.push(Problem::new(Code::UnknownReference, at.clone(), format!("`{{{{ {path} }}}}`: {why}")).fix(example(spec)));
+                }
+            }
+            Piece::Unclosed(_) => out.push(Problem::new(Code::InvalidValue, at.clone(), "a `{{` without its `}}`")),
         }
-        rest = &rest[i + 2 + j + 2..];
     }
 }
 

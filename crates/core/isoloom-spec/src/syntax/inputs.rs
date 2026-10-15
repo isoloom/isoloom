@@ -39,55 +39,68 @@ fn yes() -> bool {
 }
 
 /// The spec's inputs, by name, in the order written.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Inputs(pub IndexMap<InputName, Input>);
+pub struct Inputs(#[serde(deserialize_with = "inputs")] pub IndexMap<InputName, Input>);
 
 impl Inputs {
     /// The input named `name`, when declared.
+    #[must_use]
     pub fn get(&self, name: &InputName) -> Option<&Input> {
         self.0.get(name)
     }
 }
 
-impl<'de> Deserialize<'de> for Inputs {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Inputs, D::Error> {
+// What the schema shows and the reader returns, before the names are checked once each.
+/// `inputs:` as written, for the schema.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+enum InputsInput {
+    /// Input names, each sensitive.
+    Names(Vec<InputName>),
+    /// Inputs by name, each with whether it is sensitive and what it is.
+    Full(IndexMap<InputName, Input>),
+}
+
+impl<'de> Deserialize<'de> for InputsInput {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<InputsInput, D::Error> {
         struct V;
         impl<'de> Visitor<'de> for V {
-            type Value = Inputs;
+            type Value = InputsInput;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.write_str("a list of input names, or a map of name to `{ sensitive, description }`")
             }
-            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Inputs, A::Error> {
-                let mut out = IndexMap::new();
-                while let Some(name) = seq.next_element::<InputName>()? {
-                    if out.insert(name.clone(), Input::default()).is_some() {
-                        return Err(de::Error::custom(format!("`{name}` is listed twice")));
-                    }
-                }
-                Ok(Inputs(out))
+            fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<InputsInput, A::Error> {
+                Vec::<InputName>::deserialize(de::value::SeqAccessDeserializer::new(seq)).map(InputsInput::Names)
             }
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Inputs, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<InputsInput, A::Error> {
+                // `FLAG:` alone (null) is an input with every default.
                 let raw = IndexMap::<InputName, Option<Input>>::deserialize(de::value::MapAccessDeserializer::new(map))?;
-                Ok(Inputs(raw.into_iter().map(|(k, v)| (k, v.unwrap_or_default())).collect()))
+                Ok(InputsInput::Full(raw.into_iter().map(|(k, v)| (k, v.unwrap_or_default())).collect()))
             }
-            fn visit_unit<E: de::Error>(self) -> Result<Inputs, E> {
-                Ok(Inputs::default())
+            fn visit_unit<E: de::Error>(self) -> Result<InputsInput, E> {
+                Ok(InputsInput::Names(Vec::new()))
             }
         }
         d.deserialize_any(V)
     }
 }
 
-/// `inputs:` as written, for the schema.
-#[derive(JsonSchema)]
-#[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only: `Inputs` reads the values.")]
-enum InputsInput {
-    /// Input names, each sensitive.
-    Names(Vec<InputName>),
-    /// Inputs by name, each with whether it is sensitive and what it is.
-    Full(IndexMap<InputName, Input>),
+/// The inputs `inputs:` declares, each name once.
+fn inputs<'de, D: Deserializer<'de>>(d: D) -> Result<IndexMap<InputName, Input>, D::Error> {
+    match InputsInput::deserialize(d)? {
+        InputsInput::Full(inputs) => Ok(inputs),
+        InputsInput::Names(names) => {
+            let mut out = IndexMap::new();
+            for name in names {
+                if out.contains_key(&name) {
+                    return Err(de::Error::custom(format!("`{name}` is listed twice")));
+                }
+                out.insert(name, Input::default());
+            }
+            Ok(out)
+        }
+    }
 }
 
 impl JsonSchema for Inputs {

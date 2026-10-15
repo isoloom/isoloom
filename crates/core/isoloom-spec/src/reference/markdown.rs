@@ -1,7 +1,7 @@
 //! The reference as Markdown: a section per part of the spec, an entry per field with its type,
 //! default, allowed values, limits and the schema's examples.
 
-use std::fmt::Write;
+use std::fmt::{self, Display, Formatter};
 
 use super::{Field, fields};
 
@@ -16,30 +16,35 @@ for each item of a list.
 ";
 
 /// The whole page.
+#[must_use]
 pub fn markdown() -> String {
-    let all = fields(&crate::schema::schema());
-    let mut md = String::from(INTRO);
-    let sections = sections(&all);
-    md.push_str("\n## Sections\n\n");
-    for (title, _) in &sections {
-        let _ = writeln!(md, "- [{}](#{})", heading(title), slug(&heading(title)));
-    }
-    for (title, members) in &sections {
-        let _ = write!(md, "\n## {}\n", heading(title));
-        for f in members {
-            entry(&mut md, f);
+    Page(&fields(&crate::schema::schema())).to_string()
+}
+
+/// The page of every field, written section by section.
+struct Page<'a>(&'a [Field]);
+
+impl Display for Page<'_> {
+    fn fmt(&self, md: &mut Formatter<'_>) -> fmt::Result {
+        let sections = sections(self.0);
+        md.write_str(INTRO)?;
+        md.write_str("\n## Sections\n\n")?;
+        for (title, _) in &sections {
+            writeln!(md, "- [{}](#{})", heading(title), slug(&heading(title)))?;
         }
+        for (title, members) in &sections {
+            write!(md, "\n## {}\n", heading(title))?;
+            for f in members {
+                entry(md, f)?;
+            }
+        }
+        Ok(())
     }
-    md
 }
 
 /// A section's heading: the part of the spec it covers.
 fn heading(section: &str) -> String {
-    if section.is_empty() {
-        "Top level".to_string()
-    } else {
-        format!("`{section}`")
-    }
+    if section.is_empty() { "Top level".to_owned() } else { format!("`{section}`") }
 }
 
 /// The fields by section, in the schema's order: a top-level field with fields of its own
@@ -70,7 +75,7 @@ fn section_of(path: &str, all: &[Field]) -> String {
     let nested = all
         .iter()
         .any(|f| f.path.len() > top.len() && f.path.starts_with(top) && is_inside(&f.path, top));
-    if nested { top.to_string() } else { String::new() }
+    if nested { top.to_owned() } else { String::new() }
 }
 
 /// Whether `path` is a field inside `parent`.
@@ -79,45 +84,47 @@ fn is_inside(path: &str, parent: &str) -> bool {
 }
 
 /// One field's entry.
-fn entry(md: &mut String, f: &Field) {
-    let _ = write!(md, "\n### `{}`\n\n", f.path);
+fn entry(md: &mut Formatter<'_>, f: &Field) -> fmt::Result {
+    write!(md, "\n### `{}`\n\n", f.path)?;
     if !f.description.is_empty() {
-        let _ = write!(md, "{}\n\n", f.description);
+        write!(md, "{}\n\n", f.description)?;
     }
-    let _ = writeln!(md, "- **Type:** {}", f.kind);
+    writeln!(md, "- **Type:** {}", f.kind)?;
     if let Some(d) = &f.default {
-        let _ = writeln!(md, "- **Default:** `{d}`");
+        writeln!(md, "- **Default:** `{d}`")?;
     }
-    allowed(md, &f.allowed);
+    allowed(md, &f.allowed)?;
     if !f.limits.is_empty() {
-        let _ = writeln!(md, "- **Limits:** {}", f.limits.join("; "));
+        writeln!(md, "- **Limits:** {}", f.limits.join("; "))?;
     }
     if !f.members.is_empty() {
         let names: Vec<String> = f.members.iter().map(|m| format!("`{m}`")).collect();
-        let _ = writeln!(md, "- **Holds:** {}, each as on a machine", names.join(", "));
+        writeln!(md, "- **Holds:** {}, each as on a machine", names.join(", "))?;
     }
     for e in &f.examples {
-        let _ = writeln!(md, "- **Example:** `{e}`");
+        writeln!(md, "- **Example:** `{e}`")?;
     }
+    Ok(())
 }
 
 /// The allowed values: inline when they need no explanation, else one per line.
-fn allowed(md: &mut String, values: &[(String, String)]) {
+fn allowed(md: &mut Formatter<'_>, values: &[(String, String)]) -> fmt::Result {
     if values.is_empty() {
-        return;
+        return Ok(());
     }
     if values.iter().all(|(_, meaning)| meaning.is_empty()) {
         let list: Vec<String> = values.iter().map(|(v, _)| format!("`{v}`")).collect();
-        let _ = writeln!(md, "- **Allowed:** {}", list.join(", "));
-        return;
+        return writeln!(md, "- **Allowed:** {}", list.join(", "));
     }
-    md.push_str("- **Allowed:**\n");
+    md.write_str("- **Allowed:**\n")?;
     for (v, meaning) in values {
-        let _ = writeln!(md, "  - `{v}`: {}", meaning.replace('\n', " "));
+        writeln!(md, "  - `{v}`: {}", meaning.replace('\n', " "))?;
     }
+    Ok(())
 }
 
 /// The anchor GitHub gives a heading: lower case, spaces as `-`, other punctuation dropped.
+#[must_use]
 pub fn slug(heading: &str) -> String {
     heading
         .to_lowercase()

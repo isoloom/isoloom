@@ -42,7 +42,7 @@ pub(super) fn scan(doc: &Value) -> Vec<Problem> {
 }
 
 fn removed(path: FieldPath, reason: &str) -> Problem {
-    Problem::new(Code::RemovedField, path, reason.to_string())
+    Problem::new(Code::RemovedField, path, reason.to_owned())
 }
 
 /// A machine's old keys.
@@ -75,30 +75,30 @@ fn shared(at: &FieldPath, m: &Mapping, out: &mut Vec<Problem>) {
         (
             "inputs",
             "an input reaches a machine as a file or an environment value",
-            "`files: [{ path: /ctf/flag, input: <NAME> }]`, or `environment: { <NAME>: { input: <NAME> } }` for a non-sensitive input".to_string(),
+            "`files: [{ path: /ctf/flag, input: <NAME> }]`, or `environment: { <NAME>: { input: <NAME> } }` for a non-sensitive input".to_owned(),
         ),
         (
             "secrets",
             "a secret reaches a machine as a file",
-            "`files: [{ path: /run/secrets/<name>, secret: <name> }]`".to_string(),
+            "`files: [{ path: /run/secrets/<name>, secret: <name> }]`".to_owned(),
         ),
-        ("arch", "the architecture is hardware", "`hardware: { arch: <arch> }`".to_string()),
-        ("gpus", "GPUs are hardware", "`hardware: { gpus: <gpus> }`".to_string()),
-        ("devices", "host devices are hardware", "`hardware: { devices: [...] }`".to_string()),
+        ("arch", "the architecture is hardware", "`hardware: { arch: <arch> }`".to_owned()),
+        ("gpus", "GPUs are hardware", "`hardware: { gpus: <gpus> }`".to_owned()),
+        ("devices", "host devices are hardware", "`hardware: { devices: [...] }`".to_owned()),
         (
             "nested_virtualization",
             "nested virtualization is hardware",
-            "`hardware: { nested_virtualization: true }`".to_string(),
+            "`hardware: { nested_virtualization: true }`".to_owned(),
         ),
         (
             "before",
             "a per-run value lands as a file before the process starts, and set-up runs once the machine is up",
-            "`files: [{ path, input }]`, or `setup: [...]`".to_string(),
+            "`files: [{ path, input }]`, or `setup: [...]`".to_owned(),
         ),
         (
             "working_dir",
             "the directory belongs to the command",
-            "`command: { run: <command>, cwd: <dir> }`".to_string(),
+            "`command: { run: <command>, cwd: <dir> }`".to_owned(),
         ),
     ];
     for (key, reason, fix) in moved {
@@ -123,7 +123,7 @@ fn docker_fix(name: &str, d: &Mapping) -> String {
     if let Some(a) = text("appliance") {
         parts.push(format!("`app: {{ appliance: {a}, image | firmware, config }}`"));
     } else if d.get("idle").and_then(Value::as_bool) == Some(true) {
-        parts.push("`os: <family>@<version>` alone: the OS's own image, kept running idle".to_string());
+        parts.push("`os: <family>@<version>` alone: the OS's own image, kept running idle".to_owned());
     } else if let Some(b) = text("build") {
         if d.contains_key("dockerfile") || d.contains_key("args") || d.contains_key("target") {
             parts.push(format!("`app: {{ build: {{ context: {b}, dockerfile, target, args }} }}`"));
@@ -134,13 +134,13 @@ fn docker_fix(name: &str, d: &Mapping) -> String {
         parts.push(format!("`app: {{ image: {i} }}`"));
     }
     if d.contains_key("init") {
-        parts.push("`init` → `setup: [...]`, and a flag script becomes `files: [{ path, input }]`".to_string());
+        parts.push("`init` → `setup: [...]`, and a flag script becomes `files: [{ path, input }]`".to_owned());
     }
     if d.get("lxc").and_then(Value::as_bool) == Some(true) {
         parts.push(format!("`overrides: {{ proxmox: {{ machines: {{ {name}: {{ lxc: true }} }} }} }}`"));
     }
     if parts.is_empty() {
-        parts.push("`app: { build: <folder> }` for your Dockerfile, or `app: { image: <ref> }`".to_string());
+        parts.push("`app: { build: <folder> }` for your Dockerfile, or `app: { image: <ref> }`".to_owned());
     }
     parts.join("; ")
 }
@@ -164,10 +164,10 @@ fn vm_fix(name: &str, v: &Mapping) -> String {
         parts.push(format!("`hardware: {{ tpm: {} }}`", if tpm { "required" } else { "none" }));
     }
     if v.contains_key("boot") {
-        parts.push("`hardware: { boot: ... }`".to_string());
+        parts.push("`hardware: { boot: ... }`".to_owned());
     }
     if parts.is_empty() {
-        parts.push("`os: <family>@<version>`".to_string());
+        parts.push("`os: <family>@<version>`".to_owned());
     }
     parts.join("; ")
 }
@@ -175,7 +175,7 @@ fn vm_fix(name: &str, v: &Mapping) -> String {
 /// A `vm.provision` step as an `app.steps` item.
 fn step_fix(s: &str) -> String {
     if s == "reboot" {
-        "reboot".to_string()
+        "reboot".to_owned()
     } else if has_extension(s, "yml") || has_extension(s, "yaml") {
         format!("{{ playbook: {s} }}")
     } else {
@@ -198,9 +198,9 @@ fn ports_fix(list: &[Value]) -> String {
                 (_, false, true) => Some("tls"),
                 _ => None,
             };
-            let name = p.get("name").and_then(Value::as_str).map_or_else(|| format!("p{number}"), str::to_string);
+            let name = p.get("name").and_then(Value::as_str).map_or_else(|| format!("p{number}"), str::to_owned);
             let mut fields = vec![format!("port: {number}")];
-            fields.extend(protocol.map(|p| format!("protocol: {p}")));
+            fields.extend(protocol.map(|kind| format!("protocol: {kind}")));
             if let Some(h) = p.get("publish").and_then(Value::as_u64) {
                 fields.push(if flag("fixed") {
                     format!("publish: {{ host: {h}, fixed: true }}")
@@ -209,7 +209,7 @@ fn ports_fix(list: &[Value]) -> String {
                 });
             }
             if flag("dormant") {
-                fields.push("dormant: true".to_string());
+                fields.push("dormant: true".to_owned());
             }
             format!("{name}: {{ {} }}", fields.join(", "))
         })

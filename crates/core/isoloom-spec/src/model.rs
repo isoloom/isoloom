@@ -20,7 +20,6 @@ mod shared;
 mod storage;
 mod target;
 mod virtiofs;
-mod yaml;
 
 pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub(crate) use checks::is_yaml_file;
@@ -36,12 +35,11 @@ pub use machine_file::{DEFAULT_FILE_MODE, MachineFile};
 pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use private_dns::EnvironmentDns;
 pub use process::{CommandLine, Healthcheck, HttpCheck, seconds};
-pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, is_drive_path, secret_variable};
+pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, after_drive, is_drive_path, secret_variable};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
 pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMount};
 pub use target::{Shape, Target};
 pub use virtiofs::{MAX_VIRTIOFS, Virtiofs, VirtiofsCache, mapping_id};
-pub use yaml::from_yaml;
 
 use indexmap::IndexMap;
 use schemars::JsonSchema;
@@ -142,21 +140,24 @@ pub struct Spec {
 
 impl Spec {
     /// The private DNS zone's domain, when `dns.private` is on.
+    #[must_use]
     pub fn private_domain(&self) -> Option<String> {
         self.dns.as_ref().and_then(|d| d.private_domain(&self.name))
     }
 
     /// The storage behind machine `machine`'s volume `volume`: the shared volume's own name,
     /// else one of its own (`<machine>-<volume>`).
+    #[must_use]
     pub fn volume_key(&self, machine: &str, volume: &str) -> String {
         if self.volumes.contains_key(volume) {
-            volume.to_string()
+            volume.to_owned()
         } else {
             format!("{machine}-{volume}")
         }
     }
 
     /// The machines that mount shared volume `volume`, in spec order.
+    #[must_use]
     pub fn volume_users(&self, volume: &str) -> Vec<&str> {
         self.machines
             .iter()
@@ -166,6 +167,7 @@ impl Spec {
     }
 
     /// The machine holding shared volume `volume`: its `owner`, else its first user.
+    #[must_use]
     pub fn volume_owner(&self, volume: &str) -> Option<&str> {
         match self.volumes.get(volume)?.owner.as_deref() {
             Some(o) => Some(o),
@@ -180,7 +182,7 @@ impl Spec {
         let fill = |t: &str| {
             outputs
                 .iter()
-                .fold(t.to_string(), |acc, (k, v)| acc.replace(&format!("{{{{ cloud.outputs.{k} }}}}"), v))
+                .fold(t.to_owned(), |acc, (k, v)| acc.replace(&format!("{{{{ cloud.outputs.{k} }}}}"), v))
         };
         let mut s = self.clone();
         for c in &mut s.checks {
@@ -201,7 +203,13 @@ impl Spec {
     }
 
     /// The message of a cloud-services environment, its outputs filled in.
+    #[must_use]
     pub fn cloud_message(&self, outputs: &IndexMap<String, String>) -> Option<String> {
         self.with_cloud_outputs(outputs).message
     }
+}
+
+/// Whether `value` is its type's default: a field left out when it holds it.
+pub(crate) fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+    *value == T::default()
 }

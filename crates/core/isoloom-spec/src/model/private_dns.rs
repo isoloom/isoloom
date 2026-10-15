@@ -24,6 +24,7 @@ pub struct EnvironmentDns {
 
 impl EnvironmentDns {
     /// The private zone's domain for environment `name`, when private DNS is on.
+    #[must_use]
     pub fn private_domain(&self, name: &str) -> Option<String> {
         self.private.then(|| self.domain.clone().unwrap_or_else(|| format!("{name}.internal")))
     }

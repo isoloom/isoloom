@@ -6,6 +6,7 @@ use crate::model::Appliance;
 pub const MGMT_CIDR: &str = "10.255.255.0/24";
 
 /// Whether the appliance is a switch (its interfaces take no address).
+#[must_use]
 pub fn is_switch(kind: Appliance) -> bool {
     matches!(kind, Appliance::CiscoIolL2 | Appliance::CiscoViosL2)
 }

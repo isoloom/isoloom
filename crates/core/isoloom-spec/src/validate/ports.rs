@@ -25,13 +25,29 @@ pub(super) fn of_machine(s: &Subject, published: &mut HashMap<(u16, Protocol), S
         match svc.publish {
             Some(0) => p.add(format!("{at}.ports[{i}].publish"), "port 0 isn't a port"),
             Some(port) => {
-                if let Some(other) = published.insert((port, svc.protocol), s.name.to_string()) {
+                if let Some(other) = published.insert((port, svc.protocol), s.name.to_owned()) {
                     p.add(format!("{at}.ports[{i}].publish"), format!("port {port} is already published by `{other}`"));
                 }
             }
             None if svc.fixed => p.add(format!("{at}.ports[{i}].fixed"), "`fixed` keeps the `publish` port: give one"),
             None => {}
         }
+    }
+}
+
+/// Machine `dep`, waited for, has a port that answers a handshake.
+fn waited_for(dep: &str, waited: &crate::model::Machine, at: String, p: &mut Problems) {
+    if waited.ports.is_empty() {
+        p.add(at, format!("`{dep}` has no `ports`, so there's nothing to wait for; give it a port"));
+    } else if waited.ready_ports().is_empty() {
+        let why = if waited.ports.iter().all(|port| port.dormant) {
+            "are all dormant (they answer later)"
+        } else if waited.ports.iter().all(|port| !port.protocol.is_tcp()) {
+            "are all UDP (no handshake to wait for)"
+        } else {
+            "are all dormant (they answer later) or UDP (no handshake to wait for)"
+        };
+        p.add(at, format!("`{dep}`'s ports {why}, so there's nothing to wait for"));
     }
 }
 
@@ -42,20 +58,11 @@ pub(super) fn depends_on(s: &Subject, p: &mut Problems) {
         let at = format!("{}.depends_on[{i}]", s.at);
         if dep == s.name {
             p.add(at, "a machine can't depend on itself");
-        } else if !spec.machines.contains_key(dep) {
-            p.add(at, format!("no machine named `{dep}`"));
-        } else if spec.machines[dep].ports.is_empty() {
-            p.add(at, format!("`{dep}` has no `ports`, so there's nothing to wait for; give it a port"));
-        } else if spec.machines[dep].ready_ports().is_empty() {
-            let dm = &spec.machines[dep];
-            let why = if dm.ports.iter().all(|s| s.dormant) {
-                "are all dormant (they answer later)"
-            } else if dm.ports.iter().all(|s| !s.protocol.is_tcp()) {
-                "are all UDP (no handshake to wait for)"
-            } else {
-                "are all dormant (they answer later) or UDP (no handshake to wait for)"
-            };
-            p.add(at, format!("`{dep}`'s ports {why}, so there's nothing to wait for"));
+        } else {
+            match spec.machines.get(dep) {
+                None => p.add(at, format!("no machine named `{dep}`")),
+                Some(waited) => waited_for(dep, waited, at, p),
+            }
         }
     }
 }

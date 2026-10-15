@@ -101,8 +101,8 @@ pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
     // VLANs written under their LAN become networks of their own, as the backends expect.
     let spec = match isoloom_spec::vlans::flatten(spec.clone()) {
         Ok(flat) => flat,
-        Err(why) => {
-            problems.push(stage_problem(&why));
+        Err(refused) => {
+            problems.push(refused);
             spec
         }
     };
@@ -119,12 +119,6 @@ pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
 #[must_use]
 pub fn missing_form(source: &syntax::Spec, target: Target) -> Option<Problem> {
     refusals::forms(source, target).into_iter().next()
-}
-
-/// A lowering step's refusal (`networks.office.vlans.10: ...`), at the field it names.
-fn stage_problem(why: &str) -> Problem {
-    let (path, reason) = why.split_once(": ").filter(|(p, _)| !p.contains(' ')).unwrap_or(("", why));
-    Problem::new(syntax::Code::InvalidValue, syntax::FieldPath::new(path), reason)
 }
 
 /// The groups, by their members (their shared fields are already in the machines).

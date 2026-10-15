@@ -45,14 +45,15 @@ pub struct Url {
 
 impl Url {
     /// Parses `http://host[:port][/path]`; None when it isn't one.
+    #[must_use]
     pub fn parse(s: &str) -> Option<Url> {
         let (https, rest) = match s.strip_prefix("https://") {
             Some(r) => (true, r),
             None => (false, s.strip_prefix("http://")?),
         };
-        let (hostport, path) = match rest.find('/') {
-            Some(i) => (&rest[..i], rest[i..].to_string()),
-            None => (rest, "/".to_string()),
+        let (hostport, path) = match rest.split_once('/') {
+            Some((hostport, path)) => (hostport, format!("/{path}")),
+            None => (rest, "/".to_owned()),
         };
         let (host, port) = host_and_port(hostport)?;
         if host.is_empty() || host.chars().any(|c| c.is_whitespace() || c == '\'' || c == '"' || c == '@') {
@@ -60,7 +61,7 @@ impl Url {
         }
         Some(Url {
             https,
-            host: Host::Literal(host.to_string()),
+            host: Host::Literal(host.to_owned()),
             port,
             path,
         })
@@ -68,6 +69,7 @@ impl Url {
 
     /// The URL with its host written by `host`, an IPv6 address in brackets
     /// (`http://[fd00:20::10]:80/`).
+    #[must_use]
     pub fn render(&self, host: &str) -> String {
         let scheme = if self.https { "https" } else { "http" };
         let bracketed;
@@ -102,6 +104,7 @@ fn host_and_port(hostport: &str) -> Option<(&str, Option<u16>)> {
 }
 
 /// Whether a machine can run checks: Linux (or supplied by the runner), not Windows.
+#[must_use]
 pub fn can_run_checks(m: &Machine) -> bool {
     // An appliance's container isn't where its traffic is (that's the OS inside it).
     !m.vm.as_ref().is_some_and(|v| images::is_windows(&v.os)) && m.docker.as_ref().is_none_or(|d| d.appliance.is_none())
@@ -114,9 +117,9 @@ mod tests {
     #[test]
     fn an_ipv6_literal_goes_in_brackets() {
         let u = Url::parse("http://[fd00:20::10]:8080/x").unwrap();
-        assert_eq!((u.port, u.host.to_string()), (Some(8080), "fd00:20::10".to_string()));
+        assert_eq!((u.port, u.host.to_string()), (Some(8080), "fd00:20::10".to_owned()));
         assert_eq!(u.render("fd00:20::10"), "http://[fd00:20::10]:8080/x");
-        assert!(Url::parse("http://[fd00::1]/").is_some_and(|u| u.port.is_none()));
+        assert!(Url::parse("http://[fd00::1]/").is_some_and(|bare| bare.port.is_none()));
         assert!(Url::parse("http://[fd00::1/").is_none());
         assert!(Url::parse("http://[fd00::1]x/").is_none());
     }

@@ -26,247 +26,213 @@ use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 
 use crate::model::Spec;
+use crate::syntax::{Code, FieldPath, Problem};
 
 /// Group names Isoloom fills itself in inventories.
 pub(crate) const RESERVED: &[&str] = &["all", "linux", "windows"];
 
-fn key(s: &str) -> Value {
-    Value::String(s.to_string())
-}
-
 /// Whether `pattern` (a name, or a glob with `*`) matches `name`.
+#[must_use]
 pub fn matches(pattern: &str, name: &str) -> bool {
-    if !pattern.contains('*') {
-        return pattern == name;
-    }
-    let parts: Vec<&str> = pattern.split('*').collect();
-    let mut rest = name;
-    for (i, part) in parts.iter().enumerate() {
-        if i == 0 {
-            let Some(r) = rest.strip_prefix(part) else { return false };
-            rest = r;
-        } else if i == parts.len() - 1 {
-            return rest.ends_with(part);
-        } else if let Some(pos) = rest.find(part) {
-            rest = &rest[pos + part.len()..];
-        } else {
-            return false;
+    let mut parts = pattern.split('*');
+    let Some(mut rest) = parts.next().and_then(|first| name.strip_prefix(first)) else {
+        return false;
+    };
+    let Some(last) = parts.next_back() else {
+        return rest.is_empty();
+    };
+    for middle in parts {
+        match rest.split_once(middle) {
+            Some((_, after)) => rest = after,
+            None => return false,
         }
     }
-    true
+    rest.ends_with(last)
+}
+
+/// The groups of a spec and its machines' names: what membership is resolved against, whether
+/// the groups come from the parsed spec or from its YAML.
+struct Membership<'a> {
+    /// Each group's members as written: machine names, globs, other groups.
+    groups: IndexMap<&'a str, Vec<&'a str>>,
+    /// The machines, in spec order.
+    machines: Vec<&'a str>,
+}
+
+impl<'a> Membership<'a> {
+    /// The groups and machines of a parsed spec.
+    fn of_spec(spec: &'a Spec) -> Membership<'a> {
+        Membership {
+            groups: spec
+                .groups
+                .iter()
+                .map(|(name, g)| (name.as_str(), g.members.iter().map(String::as_str).collect()))
+                .collect(),
+            machines: spec.machines.keys().map(String::as_str).collect(),
+        }
+    }
+
+    /// Whether `name` is a group, and not also a machine (a machine's name wins).
+    fn is_group(&self, name: &str) -> bool {
+        self.groups.contains_key(name) && !self.machines.contains(&name)
+    }
+
+    /// The machines of `group`: its member names and globs, and the members of the groups it
+    /// names (recursively, cycles stopped), in spec order.
+    fn machines_of(&self, group: &str) -> Vec<&'a str> {
+        let mut seen = Vec::new();
+        let mut found = Vec::new();
+        self.collect(group, &mut seen, &mut found);
+        self.machines.iter().copied().filter(|m| found.contains(m)).collect()
+    }
+
+    fn collect(&self, group: &str, seen: &mut Vec<String>, found: &mut Vec<&'a str>) {
+        if seen.iter().any(|g| g == group) {
+            return;
+        }
+        seen.push(group.to_owned());
+        for pattern in self.groups.get(group).into_iter().flatten() {
+            if self.is_group(pattern) {
+                self.collect(pattern, seen, found);
+            } else {
+                found.extend(self.machines.iter().copied().filter(|m| matches(pattern, m)));
+            }
+        }
+    }
+
+    /// Whether `group` holds group `target`, directly or through other groups (a member named
+    /// like a machine is the machine).
+    fn contains(&self, group: &str, target: &str, seen: &mut Vec<String>) -> bool {
+        if seen.iter().any(|g| g == group) {
+            return false;
+        }
+        seen.push(group.to_owned());
+        self.groups
+            .get(group)
+            .into_iter()
+            .flatten()
+            .any(|m| self.is_group(m) && (*m == target || self.contains(m, target, seen)))
+    }
+
+    /// The groups a machine is in, least specific first: a group before the groups inside it,
+    /// declaration order otherwise.
+    fn layers_for(&self, machine: &str) -> Vec<&'a str> {
+        let mine: Vec<&'a str> = self.groups.keys().copied().filter(|g| self.machines_of(g).contains(&machine)).collect();
+        // A group's depth: how many of the machine's other groups hold it.
+        let depth = |g: &str| mine.iter().filter(|other| **other != g && self.contains(other, g, &mut Vec::new())).count();
+        let mut ranked: Vec<(usize, &'a str)> = mine.iter().map(|g| (depth(g), *g)).collect();
+        ranked.sort_by_key(|(d, _)| *d);
+        ranked.into_iter().map(|(_, g)| g).collect()
+    }
 }
 
 /// The machines of a group: its member names and globs, and the members of the groups it
 /// names (recursively, cycles stopped). In spec order.
+#[must_use]
 pub fn members(spec: &Spec, group: &str) -> Vec<String> {
-    let mut seen_groups = Vec::new();
-    let mut out: Vec<String> = Vec::new();
-    collect(spec, group, &mut seen_groups, &mut out);
-    spec.machines.keys().filter(|m| out.contains(m)).cloned().collect()
+    Membership::of_spec(spec).machines_of(group).into_iter().map(str::to_owned).collect()
 }
 
-fn collect(spec: &Spec, group: &str, seen: &mut Vec<String>, out: &mut Vec<String>) {
-    if seen.iter().any(|g| g == group) {
-        return;
-    }
-    seen.push(group.to_string());
-    let Some(g) = spec.groups.get(group) else { return };
-    for pattern in &g.members {
-        if spec.groups.contains_key(pattern) && !spec.machines.contains_key(pattern) {
-            collect(spec, pattern, seen, out);
-            continue;
-        }
-        for m in spec.machines.keys() {
-            if matches(pattern, m) && !out.contains(m) {
-                out.push(m.clone());
-            }
-        }
-    }
-}
-
-/// The groups of a spec document, by name (as written: members and shared fields).
-type Groups = IndexMap<String, Mapping>;
-
-/// Expands `common:` and `groups:` into the machines of a spec document (the YAML, parsed).
-/// Unknown members are left for validation to report.
-pub fn expand(doc: &mut Value) -> Result<(), String> {
-    expand_with(doc, Implementations::CompleteOnly)
-}
-
-/// [`expand`] for the authored spec ([`crate::syntax`]): every shared field folds in, `os` and
-/// `app` included.
-pub fn expand_shared(doc: &mut Value) -> Result<(), String> {
-    expand_with(doc, Implementations::Shared)
-}
-
-/// What shared `docker:` and `vm:` blocks do to a machine.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Implementations {
-    /// They only complete one the machine declares itself (the lowered form's rule).
-    CompleteOnly,
-    /// They are fields like any other (the authored spec has none).
-    Shared,
-}
-
-fn expand_with(doc: &mut Value, implementations: Implementations) -> Result<(), String> {
+/// Folds `common:` and `groups:` into the machines of a spec document (the YAML, parsed): a
+/// machine's own value wins over its groups' (the most specific first), and theirs over
+/// `common:`. Unknown members are left for validation to report.
+///
+/// # Errors
+///
+/// An `invalid-value` [`Problem`] when `common:`, `groups:` or a group isn't a mapping.
+pub fn expand(doc: &mut Value) -> Result<(), Problem> {
     let Value::Mapping(top) = doc else { return Ok(()) };
     let common = common_of(top)?;
     let groups = groups_of(top)?;
     if common.is_empty() && groups.is_empty() {
         return Ok(());
     }
-    let Some(Value::Mapping(machines)) = top.get(key("machines")).cloned() else {
+    let Some(Value::Mapping(machines)) = top.get("machines").cloned() else {
         return Ok(());
     };
-    let names: Vec<String> = machines.keys().filter_map(|k| k.as_str().map(str::to_string)).collect();
-    let nesting = Nesting::of(&groups, &names);
+    let membership = Membership {
+        groups: groups.iter().map(|(name, g)| (name.as_str(), members_written(g))).collect(),
+        machines: machines.keys().filter_map(Value::as_str).collect(),
+    };
     let mut expanded = Mapping::new();
     for (k, v) in &machines {
         let merged = match (k.as_str(), v) {
-            (Some(name), Value::Mapping(own)) => merged(own, &common, &nesting.layers_for(name), &groups, implementations),
+            (Some(name), Value::Mapping(own)) => merged(own, &common, &membership.layers_for(name), &groups),
             _ => v.clone(),
         };
         expanded.insert(k.clone(), merged);
     }
-    top.insert(key("machines"), Value::Mapping(expanded));
+    top.insert("machines".into(), Value::Mapping(expanded));
     Ok(())
 }
 
+/// The groups of a spec document, by name (as written: members and shared fields).
+type Groups = IndexMap<String, Mapping>;
+
+/// A group's `members` as written in the YAML.
+fn members_written(group: &Mapping) -> Vec<&str> {
+    match group.get("members") {
+        Some(Value::Sequence(members)) => members.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// `common:`, empty when left out.
-fn common_of(top: &Mapping) -> Result<Mapping, String> {
-    match top.get(key("common")) {
+fn common_of(top: &Mapping) -> Result<Mapping, Problem> {
+    match top.get("common") {
         Some(Value::Mapping(m)) => Ok(m.clone()),
         Some(Value::Null) | None => Ok(Mapping::new()),
-        Some(_) => Err("common: expected a mapping of machine fields".into()),
+        Some(_) => Err(Problem::new(
+            Code::InvalidValue,
+            FieldPath::new("common"),
+            "expected a mapping of machine fields",
+        )),
     }
 }
 
 /// `groups:`, empty when left out.
-fn groups_of(top: &Mapping) -> Result<Groups, String> {
-    match top.get(key("groups")) {
+fn groups_of(top: &Mapping) -> Result<Groups, Problem> {
+    match top.get("groups") {
         Some(Value::Mapping(m)) => m
             .iter()
-            .map(|(k, v)| match v {
-                Value::Mapping(g) => Ok((k.as_str().unwrap_or_default().to_string(), g.clone())),
-                _ => Err(format!(
-                    "groups.{}: expected a mapping with `members` and machine fields",
-                    k.as_str().unwrap_or_default()
-                )),
+            .map(|(k, v)| {
+                let name = k.as_str().unwrap_or_default();
+                match v {
+                    Value::Mapping(g) => Ok((name.to_owned(), g.clone())),
+                    _ => Err(Problem::new(
+                        Code::InvalidValue,
+                        FieldPath::new("groups").key(name),
+                        "expected a mapping with `members` and machine fields",
+                    )),
+                }
             })
             .collect(),
         Some(Value::Null) | None => Ok(Groups::new()),
-        Some(_) => Err("groups: expected a mapping of group name to group".into()),
-    }
-}
-
-/// How the groups hold machines and each other.
-struct Nesting<'a> {
-    groups: &'a Groups,
-    /// Each group's machines (globs and nested groups resolved).
-    machines_of: IndexMap<&'a str, Vec<String>>,
-    /// The groups each one is (transitively) a member of: its ancestors.
-    nested_in: IndexMap<&'a str, Vec<&'a str>>,
-}
-
-impl<'a> Nesting<'a> {
-    fn of(groups: &'a Groups, names: &[String]) -> Nesting<'a> {
-        let mut machines_of = IndexMap::new();
-        let mut nested_in = IndexMap::new();
-        for g in groups.keys() {
-            let mut out = Vec::new();
-            resolve(groups, names, g, &mut Vec::new(), &mut out);
-            machines_of.insert(g.as_str(), out);
-            let ancestors: Vec<&str> = groups
-                .keys()
-                .filter(|other| *other != g)
-                .filter(|other| {
-                    let mut seen = Vec::new();
-                    contains_group(groups, other, g, &mut seen)
-                })
-                .map(String::as_str)
-                .collect();
-            nested_in.insert(g.as_str(), ancestors);
-        }
-        Nesting {
-            groups,
-            machines_of,
-            nested_in,
-        }
-    }
-
-    /// The groups machine `name` is in, least specific first: ancestors before their members,
-    /// declaration order otherwise.
-    fn layers_for(&self, name: &str) -> Vec<&'a str> {
-        let mut mine: Vec<&str> = self
-            .groups
-            .keys()
-            .map(String::as_str)
-            .filter(|g| self.machines_of[*g].iter().any(|m| m == name))
-            .collect();
-        let in_mine = mine.clone();
-        mine.sort_by_key(|g| self.nested_in[*g].iter().filter(|a| in_mine.contains(a)).count());
-        mine
-    }
-}
-
-/// Each group's machines (globs and nested groups resolved).
-fn resolve(groups: &Groups, names: &[String], group: &str, seen: &mut Vec<String>, out: &mut Vec<String>) {
-    if seen.iter().any(|g| g == group) {
-        return;
-    }
-    seen.push(group.to_string());
-    let Some(g) = groups.get(group) else { return };
-    let Some(Value::Sequence(members)) = g.get(key("members")) else { return };
-    for m in members.iter().filter_map(Value::as_str) {
-        if groups.contains_key(m) && !names.iter().any(|n| n == m) {
-            resolve(groups, names, m, seen, out);
-        } else {
-            for n in names {
-                if matches(m, n) && !out.contains(n) {
-                    out.push(n.clone());
-                }
-            }
-        }
+        Some(_) => Err(Problem::new(
+            Code::InvalidValue,
+            FieldPath::new("groups"),
+            "expected a mapping of group name to group",
+        )),
     }
 }
 
 /// A machine's own fields over its groups' (least specific first) over `common:`.
-fn merged(own: &Mapping, common: &Mapping, mine: &[&str], groups: &Groups, implementations: Implementations) -> Value {
+fn merged(own: &Mapping, common: &Mapping, mine: &[&str], groups: &Groups) -> Value {
     let mut merged = Value::Mapping(Mapping::new());
-    let layers = std::iter::once(common).chain(mine.iter().map(|g| &groups[*g]));
+    let layers = std::iter::once(common).chain(mine.iter().filter_map(|g| groups.get(*g)));
     for layer in layers {
         let mut shared = layer.clone();
-        shared.remove(key("members"));
-        // An implementation is only completed, never added.
-        for imp in ["docker", "vm"] {
-            if implementations == Implementations::CompleteOnly && !own.contains_key(key(imp)) {
-                shared.remove(key(imp));
-            }
-        }
+        shared.remove("members");
         crate::defaults::merge(&mut merged, &Value::Mapping(shared));
     }
     crate::defaults::merge(&mut merged, &Value::Mapping(own.clone()));
     merged
 }
 
-/// Whether `group` has `target` among its members, directly or through other groups.
-fn contains_group(groups: &Groups, group: &str, target: &str, seen: &mut Vec<String>) -> bool {
-    if seen.iter().any(|g| g == group) {
-        return false;
-    }
-    seen.push(group.to_string());
-    let Some(g) = groups.get(group) else { return false };
-    let Some(Value::Sequence(members)) = g.get(key("members")) else {
-        return false;
-    };
-    members
-        .iter()
-        .filter_map(Value::as_str)
-        .any(|m| m == target || (groups.contains_key(m) && contains_group(groups, m, target, seen)))
-}
-
 /// The groups' problems: a reserved or taken name, a member that names nothing, a cycle.
+#[must_use]
 pub fn problems(spec: &Spec) -> Vec<(String, String)> {
+    let membership = Membership::of_spec(spec);
     let mut out = Vec::new();
     for (name, g) in &spec.groups {
         let at = format!("groups.{name}");
@@ -286,19 +252,7 @@ pub fn problems(spec: &Spec) -> Vec<(String, String)> {
                 out.push((format!("{at}.members[{i}]"), format!("`{m}` names no machine or group")));
             }
         }
-        let mut seen = Vec::new();
-        let groups_raw: IndexMap<String, Mapping> = spec
-            .groups
-            .iter()
-            .map(|(k, v)| {
-                let mut m = Mapping::new();
-                // Only members that name groups (and not machines) can form a loop.
-                let group_members = v.members.iter().filter(|s| spec.groups.contains_key(*s) && !spec.machines.contains_key(*s));
-                m.insert(key("members"), Value::Sequence(group_members.map(|s| key(s)).collect()));
-                (k.clone(), m)
-            })
-            .collect();
-        if contains_group(&groups_raw, name, name, &mut seen) {
+        if membership.contains(name, name, &mut Vec::new()) {
             out.push((format!("{at}.members"), "groups contain each other in a loop".into()));
         }
     }

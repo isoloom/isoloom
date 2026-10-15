@@ -9,16 +9,6 @@ use std::path::PathBuf;
 pub enum Stage {
     /// `-s key=value` overrides and a profile's `spec:`, merged into the document.
     Overrides,
-    /// `count:` clones of a machine.
-    Clones,
-    /// `common:` and `groups:` folded into the machines.
-    Groups,
-    /// A machine's several addresses on one network (`lan: [10, 11]`), split from its first.
-    Addresses,
-    /// Each machine's `os` and `vm.os`, resolved to a known OS.
-    Os,
-    /// VLANs written under their LAN, made networks of their own.
-    Vlans,
 }
 
 /// Why a spec couldn't be loaded.

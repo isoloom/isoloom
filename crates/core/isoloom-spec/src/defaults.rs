@@ -100,6 +100,7 @@ pub struct Resolved {
 }
 
 /// The user's defaults file.
+#[must_use]
 pub fn user_file() -> PathBuf {
     crate::home::home().join("defaults.yml")
 }
@@ -202,15 +203,16 @@ pub fn parse_set(s: &str) -> Result<(&str, &str), String> {
 }
 
 /// A value as YAML would read it (`3` a number, `true` a boolean, else text).
+#[must_use]
 pub fn scalar(text: &str) -> Value {
-    serde_yaml_ng::from_str(text).unwrap_or_else(|_| Value::String(text.to_string()))
+    serde_yaml_ng::from_str(text).unwrap_or_else(|_| Value::String(text.to_owned()))
 }
 
 /// A nested mapping holding `value` at a dotted path.
 pub(crate) fn at_path(path: &str, value: Value) -> Value {
     path.rsplit('.').fold(value, |inner, key| {
         let mut m = Mapping::new();
-        m.insert(Value::String(key.to_string()), inner);
+        m.insert(Value::String(key.to_owned()), inner);
         Value::Mapping(m)
     })
 }
@@ -233,16 +235,17 @@ pub fn merge(into: &mut Value, from: &Value) {
 }
 
 /// Dotted paths of every leaf of a value.
+#[must_use]
 pub fn leaves(v: &Value, prefix: &str) -> Vec<String> {
     match v {
         Value::Mapping(m) if !m.is_empty() => m
             .iter()
             .flat_map(|(k, c)| {
-                let key = k.as_str().map_or_else(|| format!("{k:?}"), str::to_string);
+                let key = k.as_str().map_or_else(|| format!("{k:?}"), str::to_owned);
                 leaves(c, &if prefix.is_empty() { key } else { format!("{prefix}.{key}") })
             })
             .collect(),
-        _ => vec![prefix.to_string()],
+        _ => vec![prefix.to_owned()],
     }
 }
 
@@ -269,23 +272,23 @@ pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> 
         any = true;
     }
     if !any {
-        return Ok(yaml.to_string());
+        return Ok(yaml.to_owned());
     }
     serde_yaml_ng::to_string(&doc).map_err(|e| e.to_string())
 }
 
 /// Applies the defaults that change generated files: each cloud module's region default.
 /// (Images are applied to the spec before generating; `vagrant.provider` at run time.)
+#[must_use]
 pub fn apply_to_files(files: Vec<GeneratedFile>, d: &Defaults) -> Vec<GeneratedFile> {
     files
         .into_iter()
         .map(|mut f| {
             // .isoloom[-n]/cloud-vm/<cloud>/main.tf, .isoloom[-n]/cloud-docker/<cloud>/main.tf
             let parts: Vec<&str> = f.path.split('/').collect();
-            if parts.len() == 4
-                && parts[1].starts_with("cloud-")
-                && parts[3] == "main.tf"
-                && let Some(region) = d.cloud.get(parts[2]).and_then(|c| c.region.as_deref())
+            if let [_, target, cloud, "main.tf"] = parts.as_slice()
+                && target.starts_with("cloud-")
+                && let Some(region) = d.cloud.get(*cloud).and_then(|c| c.region.as_deref())
             {
                 f.contents = set_region(&f.contents, region);
             }
@@ -295,23 +298,22 @@ pub fn apply_to_files(files: Vec<GeneratedFile>, d: &Defaults) -> Vec<GeneratedF
 }
 
 /// The module text with its `variable "region"` default replaced.
+#[must_use]
 pub fn set_region(tf: &str, region: &str) -> String {
-    let Some(start) = tf.find("variable \"region\"") else { return tf.to_string() };
-    let Some(close) = tf[start..].find("\n}") else { return tf.to_string() };
-    let block = &tf[start..start + close];
-    let Some(d) = block.find("default") else { return tf.to_string() };
-    let Some(q1) = block[d..].find('"') else { return tf.to_string() };
-    let q1 = d + q1 + 1;
-    let Some(q2) = block[q1..].find('"') else { return tf.to_string() };
-    let mut out = String::with_capacity(tf.len());
-    out.push_str(&tf[..start + q1]);
-    out.push_str(region);
-    out.push_str(&tf[start + q1 + q2..]);
-    out
+    const VARIABLE: &str = "variable \"region\"";
+    let replaced = tf.split_once(VARIABLE).and_then(|(before, rest)| {
+        let (block, after) = rest.split_once("\n}")?;
+        let (head, from_default) = block.split_once("default")?;
+        let (to_quote, quoted) = from_default.split_once('"')?;
+        let (_, past_quote) = quoted.split_once('"')?;
+        Some(format!("{before}{VARIABLE}{head}default{to_quote}\"{region}\"{past_quote}\n}}{after}"))
+    });
+    replaced.unwrap_or_else(|| tf.to_owned())
 }
 
 /// What the built-in layer holds, for `isoloom defaults --system`: the clouds' regions (the
 /// image table is documented on its own page and read from the code).
+#[must_use]
 pub fn builtin() -> Value {
     let mut cloud = Mapping::new();
     for (c, r) in BUILTIN_REGIONS {

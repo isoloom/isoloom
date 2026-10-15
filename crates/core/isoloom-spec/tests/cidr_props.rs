@@ -1,8 +1,6 @@
 //! Properties of IPv4 blocks ([`Cidr`]): parsing accepts exactly the network addresses, and
 //! containment, overlap, host and gateway addresses agree with the block's arithmetic.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
-
 use std::net::Ipv4Addr;
 
 use isoloom_spec::validate::Cidr;
@@ -21,14 +19,15 @@ fn text(base: u32, len: u8) -> String {
     format!("{}/{len}", Ipv4Addr::from(base))
 }
 
-fn parsed(base: u32, len: u8) -> Cidr {
-    Cidr::parse(&text(base, len)).unwrap_or_else(|| panic!("{} should parse", text(base, len)))
+/// The block `base/len`, which must parse.
+fn parsed(base: u32, len: u8) -> Result<Cidr, TestCaseError> {
+    Cidr::parse(&text(base, len)).ok_or_else(|| TestCaseError::fail(format!("{} should parse", text(base, len))))
 }
 
 proptest! {
     #[test]
     fn a_network_address_parses_to_itself((base, len) in block()) {
-        let c = parsed(base, len);
+        let c = parsed(base, len)?;
         prop_assert_eq!((c.base, c.len), (base, len));
     }
 
@@ -46,7 +45,7 @@ proptest! {
 
     #[test]
     fn containment_matches_the_masks((a, la) in block(), (b, lb) in block()) {
-        let (x, y) = (parsed(a, la), parsed(b, lb));
+        let (x, y) = (parsed(a, la)?, parsed(b, lb)?);
         prop_assert!(x.contains(x));
         let expected = la <= lb && b & mask(la) == a;
         prop_assert_eq!(x.contains(y), expected);
@@ -56,7 +55,7 @@ proptest! {
 
     #[test]
     fn hosts_and_the_gateway_stay_inside_the_block((base, len) in (any::<u32>(), 24u8..=29).prop_map(|(ip, len)| (ip & mask(len), len)), octet in any::<u8>()) {
-        let c = parsed(base, len);
+        let c = parsed(base, len)?;
         let gateway = u32::from(c.gateway());
         prop_assert_eq!(gateway & mask(len), base);
         if let Some(host) = c.host(octet) {

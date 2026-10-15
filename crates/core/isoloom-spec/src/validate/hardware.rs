@@ -91,7 +91,7 @@ mod tests {
     use crate::validate::validate;
 
     fn problems(machine: &str) -> Vec<String> {
-        let spec = crate::model::from_yaml(&format!(
+        let spec = crate::testing::model(&format!(
             "version: 1\nname: hw\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, {machine} }}\n"
         ))
         .unwrap();

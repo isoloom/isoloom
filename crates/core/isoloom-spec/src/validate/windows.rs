@@ -31,7 +31,7 @@ mod tests {
 
     fn problems(machine: &str) -> Vec<(String, String)> {
         let yaml = format!("version: 1\nname: w\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lab: 10 }}, vm: {machine} }}\n");
-        validate(&crate::model::from_yaml(&yaml).unwrap())
+        validate(&crate::testing::model(&yaml).unwrap())
             .into_iter()
             .map(|p| (p.at, p.message))
             .collect()

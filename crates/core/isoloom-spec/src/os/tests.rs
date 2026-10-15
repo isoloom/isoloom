@@ -83,17 +83,3 @@ fn spellings_cover_every_form_once() {
     assert!(all.iter().all(|s| resolve(s).is_ok()));
     assert!(!all.iter().any(|s| s == "debian-12"), "image-table names are not spellings");
 }
-
-#[test]
-fn the_machines_os_reaches_its_vm_before_the_groups() {
-    let mut doc: Value = serde_yaml_ng::from_str(
-        "machines:\n  a: { os: debian@12 }\n  b: { os: windows, vm: { provision: [x.ps1] } }\n  c: { os: debian, vm: { os: debian@13 } }\n  d: { os: debian, docker: { image: x } }\n",
-    )
-    .unwrap();
-    fill_vm(&mut doc);
-    let vm = |m: &str| serde_yaml_ng::to_string(&doc["machines"][m].get("vm")).unwrap();
-    assert_eq!(vm("a"), "os: debian@12\n");
-    assert_eq!(vm("b"), "provision:\n- x.ps1\nos: windows\n");
-    assert_eq!(vm("c"), "os: debian@13\n", "its own vm.os stays, for validation to compare");
-    assert_eq!(vm("d"), "null\n", "a container keeps its `docker:` alone");
-}

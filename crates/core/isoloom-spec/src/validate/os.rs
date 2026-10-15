@@ -1,5 +1,5 @@
-//! A machine's `os` and its `vm.os` name the same OS when both are set. Parsing resolved both
-//! (an unknown OS is refused there, see [`crate::os::canonical`]).
+//! A machine's `os` and its `vm.os` name the same OS when both are set. Lowering resolved both
+//! (an unknown OS is refused when the spec is parsed, see [`crate::os::resolve`]).
 
 use super::Problems;
 use super::machines::Subject;

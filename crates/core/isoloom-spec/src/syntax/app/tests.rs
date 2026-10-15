@@ -7,27 +7,28 @@ fn app(yaml: &str) -> Result<App, String> {
 #[test]
 fn an_app_is_an_image_a_build_an_appliance_or_steps() {
     assert_eq!(app("{ image: nginx:1.27 }").unwrap().container, Some(Recipe::Image("nginx:1.27".into())));
-    let Some(Recipe::Build(b)) = app("{ build: build/web }").unwrap().container else {
+    let Some(Recipe::Build(folder)) = app("{ build: build/web }").unwrap().container else {
         panic!()
     };
-    assert_eq!((b.context.as_str(), b.dockerfile), ("build/web", None));
-    let Some(Recipe::Build(b)) = app("{ build: { context: build/web, dockerfile: w.Dockerfile, args: { TAG: x } } }")
+    assert_eq!((folder.context.as_str(), folder.dockerfile), ("build/web", None));
+    let Some(Recipe::Build(full)) = app("{ build: { context: build/web, dockerfile: w.Dockerfile, args: { TAG: x } } }")
         .unwrap()
         .container
     else {
         panic!()
     };
-    assert_eq!(b.dockerfile.as_deref(), Some("w.Dockerfile"));
-    let a = app("{ appliance: cisco-iol, image: vrnetlab/cisco_iol:17, config: r1.cfg }").unwrap();
+    assert_eq!(full.dockerfile.as_deref(), Some("w.Dockerfile"));
+    let appliance = app("{ appliance: cisco-iol, image: vrnetlab/cisco_iol:17, config: r1.cfg }").unwrap();
     assert!(matches!(
-        a.container,
+        appliance.container,
         Some(Recipe::Appliance(ApplianceRecipe { kind: Appliance::CiscoIol, .. }))
     ));
-    let a = app("{ steps: [{ packages: [nginx] }, { copy: { from: site/, to: /var/www/ } }, { run: p.sh, creates: /done }, reboot, { playbook: p.yml }] }")
-        .unwrap();
-    assert_eq!(a.steps.len(), 5);
-    assert_eq!(a.steps[3], Step::Reboot);
-    assert!(a.steps[3].container_refusal().is_some() && a.steps[0].container_refusal().is_none());
+    let steps = app("{ steps: [{ packages: [nginx] }, { copy: { from: site/, to: /var/www/ } }, { run: p.sh, creates: /done }, reboot, { playbook: p.yml }] }")
+        .unwrap()
+        .steps;
+    assert_eq!(steps.len(), 5);
+    assert_eq!(steps[3], Step::Reboot);
+    assert!(steps[3].container_refusal().is_some() && steps[0].container_refusal().is_none());
 }
 
 #[test]

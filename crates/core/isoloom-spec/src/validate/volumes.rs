@@ -5,19 +5,19 @@ use std::collections::BTreeSet;
 
 use super::machines::Subject;
 use super::{Problems, kebab};
-use crate::model::Spec;
+use crate::model::{SharedVolume, Spec};
 
 /// The volumes shared between machines: mounted, held by one of their users, reachable from
 /// every other over a network they share (NFS on the VM targets), Linux machines only.
 pub(super) fn shared(spec: &Spec, p: &mut Problems) {
-    for v in spec.volumes.keys() {
+    for (v, volume) in &spec.volumes {
         let at = format!("volumes.{v}");
         let users = spec.volume_users(v);
         if users.is_empty() {
             p.add(at, "no machine mounts it: list it in a machine's `volumes`");
             continue;
         }
-        if let Some(o) = &spec.volumes[v].owner
+        if let Some(o) = &volume.owner
             && !users.contains(&o.as_str())
         {
             p.add(
@@ -26,15 +26,15 @@ pub(super) fn shared(spec: &Spec, p: &mut Problems) {
             );
             continue;
         }
-        kept(spec, v, &at, p);
-        host_folder(spec, v, &at, p);
+        kept(volume, &at, p);
+        host_folder(volume, &at, p);
         let Some(owner) = spec.volume_owner(v) else { continue };
-        for u in &users {
-            let m = &spec.machines[*u];
+        let owner_networks = spec.machines.get(owner).map(|o| &o.networks);
+        for (u, m) in users.iter().filter_map(|u| Some((*u, spec.machines.get(*u)?))) {
             if m.vm.as_ref().is_some_and(|vm| crate::images::is_windows(&vm.os)) {
-                p.add(format!("machines.{u}.volumes.{v}"), windows_why(spec, v));
+                p.add(format!("machines.{u}.volumes.{v}"), windows_why(volume));
             }
-            if *u != owner && !m.networks.keys().any(|n| spec.machines[owner].networks.contains_key(n)) {
+            if u != owner && !m.networks.keys().any(|n| owner_networks.is_some_and(|o| o.contains_key(n))) {
                 p.add(
                     format!("machines.{u}.volumes.{v}"),
                     format!("`{u}` shares no network with `{owner}`, which holds the volume (NFS on the VM targets)"),
@@ -46,8 +46,8 @@ pub(super) fn shared(spec: &Spec, p: &mut Problems) {
 
 /// Why a Windows VM can't mount shared volume `v`: NFS, and with `virtiofs` the virtio-fs
 /// driver and WinFsp, which the guest set-up doesn't install.
-fn windows_why(spec: &Spec, v: &str) -> &'static str {
-    if spec.volumes[v].virtiofs.is_some() {
+fn windows_why(volume: &SharedVolume) -> &'static str {
+    if volume.virtiofs.is_some() {
         "a shared volume is mounted over NFS, or virtiofs on Proxmox, whose Windows driver (virtio-fs and WinFsp) the set-up doesn't install: Linux machines only"
     } else {
         "a shared volume is mounted over NFS: Linux machines only"
@@ -55,8 +55,8 @@ fn windows_why(spec: &Spec, v: &str) -> &'static str {
 }
 
 /// A volume shared as a folder of the Proxmox server: a mapping named as Proxmox names them.
-fn host_folder(spec: &Spec, v: &str, at: &str, p: &mut Problems) {
-    let Some(mapping) = spec.volumes[v].virtiofs.as_ref().and_then(|f| f.mapping.as_deref()) else {
+fn host_folder(volume: &SharedVolume, at: &str, p: &mut Problems) {
+    let Some(mapping) = volume.virtiofs.as_ref().and_then(|f| f.mapping.as_deref()) else {
         return;
     };
     if !crate::model::mapping_id(mapping) {
@@ -69,8 +69,7 @@ fn host_folder(spec: &Spec, v: &str, at: &str, p: &mut Problems) {
 
 /// A volume kept past `down` or existing already: one or the other (an existing volume is
 /// never removed), and an existing one named as Docker and Kubernetes name volumes.
-fn kept(spec: &Spec, v: &str, at: &str, p: &mut Problems) {
-    let vol = &spec.volumes[v];
+fn kept(vol: &SharedVolume, at: &str, p: &mut Problems) {
     let Some(name) = &vol.external else { return };
     if vol.persistent {
         p.add(format!("{at}.persistent"), "an external volume is never removed: leave `persistent` out");

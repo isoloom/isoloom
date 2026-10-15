@@ -95,7 +95,7 @@ impl<'a> Walker<'a> {
         let (inner, at) = match (text::map_value(node), node.get("items")) {
             (Some(value), _) => (value, format!("{path}.*")),
             (_, Some(items)) => (items, format!("{path}[]")),
-            _ => (node, path.to_string()),
+            _ => (node, path.to_owned()),
         };
         for props in self.objects(inner, depth) {
             for (name, child) in props {
@@ -132,7 +132,7 @@ impl<'a> Walker<'a> {
                 .map(|e| e.iter().map(text::json).collect())
                 .unwrap_or_default(),
             members: if shallow { self.member_names(node, depth) } else { Vec::new() },
-            path: path.to_string(),
+            path: path.to_owned(),
         });
         if !shallow {
             self.children(node, path, depth, out);

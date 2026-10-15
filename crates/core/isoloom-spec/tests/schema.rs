@@ -1,43 +1,46 @@
 //! The JSON Schema editors use agrees with the parser: every example is valid, typos are
 //! caught, and the examples point editors to it.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // helpers outside #[test] functions too: a failing test is the report.
-
+use std::error::Error;
 use std::path::Path;
 
 use isoloom_spec::schema::{MODELINE, schema};
 
-fn examples() -> Vec<(String, String)> {
+/// A test's outcome: a failed step is its report.
+type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+
+/// Every example of the project: its folder's name and its spec's text.
+fn examples() -> Outcome<Vec<(String, String)>> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
-    std::fs::read_dir(dir)
-        .unwrap()
-        .map(|e| e.unwrap().path())
-        .filter_map(|p| {
-            Some((
-                p.file_name()?.to_string_lossy().to_string(),
-                std::fs::read_to_string(p.join("isoloom.yml")).ok()?,
-            ))
-        })
-        .collect()
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if let (Some(name), Ok(text)) = (path.file_name(), std::fs::read_to_string(path.join("isoloom.yml"))) {
+            out.push((name.to_string_lossy().into_owned(), text));
+        }
+    }
+    Ok(out)
 }
 
-fn validator() -> jsonschema::Validator {
-    jsonschema::validator_for(&schema()).expect("the schema is a valid JSON Schema")
+/// A validator of the spec's schema.
+fn validator() -> Outcome<jsonschema::Validator> {
+    Ok(jsonschema::validator_for(&schema())?)
 }
 
 #[test]
-fn every_example_is_valid_against_the_schema() {
-    let v = validator();
-    for (name, text) in examples() {
+fn every_example_is_valid_against_the_schema() -> Outcome {
+    let v = validator()?;
+    for (name, text) in examples()? {
         let doc: serde_json::Value = serde_yaml_ng::from_str(&text).unwrap();
         let errors: Vec<String> = v.iter_errors(&doc).map(|e| format!("{} at {}", e, e.instance_path())).collect();
         assert!(errors.is_empty(), "{name}: {errors:?}");
     }
+    Ok(())
 }
 
 #[test]
-fn the_schema_catches_what_editors_should_flag() {
-    let v = validator();
+fn the_schema_catches_what_editors_should_flag() -> Outcome {
+    let v = validator()?;
     for bad in [
         "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, ap: { image: x } } }\n",
         "version: 2\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, app: { image: x } } }\n",
@@ -48,11 +51,13 @@ fn the_schema_catches_what_editors_should_flag() {
         let doc: serde_json::Value = serde_yaml_ng::from_str(bad).unwrap();
         assert!(!v.is_valid(&doc), "should be flagged: {bad}");
     }
+    Ok(())
 }
 
 #[test]
-fn examples_point_editors_to_the_schema() {
-    for (name, text) in examples() {
+fn examples_point_editors_to_the_schema() -> Outcome {
+    for (name, text) in examples()? {
         assert_eq!(text.lines().next(), Some(MODELINE), "{name}: first line should be the schema modeline");
     }
+    Ok(())
 }

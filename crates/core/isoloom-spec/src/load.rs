@@ -1,0 +1,89 @@
+//! Reading a spec: from its text, or from its project folder (the spec file found and read,
+//! merged with a profile and `-s` overrides, then parsed).
+
+use std::path::{Path, PathBuf};
+
+use crate::error::{LoadError, Result, Stage};
+use crate::{defaults, profile, syntax};
+
+/// The spec file names, at the root of a project: `isoloom.yml` (canonical) or `isoloom.yaml`.
+pub const SPEC_FILES: &[&str] = &[SPEC_FILE, "isoloom.yaml"];
+
+/// The spec file's usual name, the one a spec read from text is reported under.
+pub const SPEC_FILE: &str = "isoloom.yml";
+
+/// Reads a spec from YAML text, written in the format authors write ([`syntax`]).
+///
+/// # Errors
+///
+/// [`LoadError::Invalid`] with every problem found, coded and placed (`file` names the spec file
+/// in their first line).
+pub fn parse(yaml: &str) -> Result<syntax::Spec, LoadError> {
+    parse_file(yaml, SPEC_FILE)
+}
+
+/// [`parse`], the problems naming the spec file `file`.
+fn parse_file(yaml: &str, file: &str) -> Result<syntax::Spec, LoadError> {
+    syntax::parse(yaml).map_err(|problems| LoadError::Invalid {
+        file: file.to_owned(),
+        problems,
+    })
+}
+
+/// The spec file in `dir`: `isoloom.yml` or `isoloom.yaml`, never both.
+///
+/// # Errors
+///
+/// [`LoadError::NotFound`] when `dir` has neither, [`LoadError::Ambiguous`] when it has both.
+pub fn find(dir: &Path) -> Result<PathBuf, LoadError> {
+    let found: Vec<PathBuf> = SPEC_FILES.iter().map(|f| dir.join(f)).filter(|p| p.is_file()).collect();
+    match found.as_slice() {
+        [one] => Ok(one.clone()),
+        [] => Err(LoadError::NotFound(dir.to_path_buf())),
+        _ => Err(LoadError::Ambiguous(dir.to_path_buf())),
+    }
+}
+
+/// Reads the spec in `dir` (see [`find`]).
+///
+/// # Errors
+///
+/// [`LoadError`]: no spec file (or two), one that can't be read, or its problems.
+pub fn load(dir: &Path) -> Result<syntax::Spec, LoadError> {
+    load_with(dir, &[])
+}
+
+/// Reads the spec in `dir` with `-s key=value` overrides applied first (see
+/// [`defaults::override_spec`]); keys prefixed `defaults.` are left to the defaults.
+///
+/// # Errors
+///
+/// [`LoadError`], as [`load`], or an override that doesn't apply.
+pub fn load_with(dir: &Path, sets: &[String]) -> Result<syntax::Spec, LoadError> {
+    load_profiled(dir, None, sets)
+}
+
+/// Reads the spec in `dir` with a profile's `spec` merged in (checked against the spec first:
+/// see [`profile::Profile::check`]), then `-s key=value` overrides.
+///
+/// # Errors
+///
+/// [`LoadError`], as [`load_with`], or a profile that names what the spec doesn't have.
+pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[String]) -> Result<syntax::Spec, LoadError> {
+    let path = find(dir)?;
+    let file = path.file_name().map_or_else(|| SPEC_FILE.to_owned(), |f| f.to_string_lossy().into_owned());
+    let text = std::fs::read_to_string(&path).map_err(|source| LoadError::Read { path, source })?;
+    let text = match profile {
+        Some(p) => {
+            let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text)?;
+            let problems = p.check(&doc);
+            if !problems.is_empty() {
+                return Err(LoadError::Profile { problems });
+            }
+            defaults::override_spec_with(&text, Some(&p.spec), sets)
+        }
+        None => defaults::override_spec(&text, sets),
+    }
+    .map_err(LoadError::at(Stage::Overrides))?;
+    parse_file(&text, &file)
+}

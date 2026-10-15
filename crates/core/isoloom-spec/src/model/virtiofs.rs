@@ -54,6 +54,7 @@ pub enum VirtiofsCache {
 
 impl VirtiofsCache {
     /// The value Proxmox takes.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             VirtiofsCache::Auto => "auto",
@@ -66,6 +67,7 @@ impl VirtiofsCache {
 
 impl Virtiofs {
     /// Whether extended attributes pass through: asked for, or implied by ACLs.
+    #[must_use]
     pub fn exposes_xattr(&self) -> bool {
         self.xattr || self.acl
     }
@@ -73,6 +75,7 @@ impl Virtiofs {
 
 /// Whether `id` can name a Proxmox directory mapping: a letter, then letters, digits, `-` and
 /// `_` (Proxmox's configuration ids), at most 64.
+#[must_use]
 pub fn mapping_id(id: &str) -> bool {
     id.len() <= 64 && id.starts_with(|c: char| c.is_ascii_alphabetic()) && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }

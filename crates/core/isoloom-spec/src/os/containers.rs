@@ -56,6 +56,7 @@ const IMAGES: &[(&str, &str)] = &[
 
 /// The official container image of the OS named `os` in the image table (`debian-12`), pinned
 /// by digest; `None` for Windows.
+#[must_use]
 pub fn container_image(os: &str) -> Option<&'static str> {
     IMAGES.iter().find(|(n, _)| *n == os).map(|(_, image)| *image)
 }

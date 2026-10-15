@@ -92,10 +92,10 @@ struct AppInput {
     firmware: Option<String>,
 }
 
+// What the schema shows and the reader returns.
 /// `build:` as written: a folder, or in full.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only.")]
 enum BuildInput {
     /// A folder of the project holding a `Dockerfile`.
     Folder(String),
@@ -103,26 +103,41 @@ enum BuildInput {
     Full(Build),
 }
 
-fn build<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Build>, D::Error> {
-    struct V;
-    impl<'de> Visitor<'de> for V {
-        type Value = Option<Build>;
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("a project folder, or `{ context, dockerfile, target, args }`")
+impl<'de> Deserialize<'de> for BuildInput {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<BuildInput, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = BuildInput;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a project folder, or `{ context, dockerfile, target, args }`")
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<BuildInput, E> {
+                Ok(BuildInput::Folder(v.to_owned()))
+            }
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<BuildInput, A::Error> {
+                Build::deserialize(de::value::MapAccessDeserializer::new(map)).map(BuildInput::Full)
+            }
         }
-        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-            Ok(Some(Build {
-                context: v.to_string(),
+        d.deserialize_any(V)
+    }
+}
+
+impl From<BuildInput> for Build {
+    fn from(written: BuildInput) -> Build {
+        match written {
+            BuildInput::Folder(context) => Build {
+                context,
                 dockerfile: None,
                 target: None,
                 args: IndexMap::new(),
-            }))
-        }
-        fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-            Build::deserialize(de::value::MapAccessDeserializer::new(map)).map(Some)
+            },
+            BuildInput::Full(build) => build,
         }
     }
-    d.deserialize_any(V)
+}
+
+fn build<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Build>, D::Error> {
+    BuildInput::deserialize(d).map(|written| Some(written.into()))
 }
 
 impl TryFrom<AppInput> for App {
@@ -162,7 +177,8 @@ fn appliance(kind: Appliance, image: Option<String>, config: Option<String>, fir
 /// One step of the portable recipe. Steps install and configure: they run as root from the
 /// project copy at `/opt/isoloom`, with no network to the other machines and no inputs or
 /// secrets (on containers they run at image build time). What needs those goes in `setup`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+#[serde(try_from = "StepSchema")]
 #[non_exhaustive]
 pub enum Step {
     /// A project script (`.sh`, or `.ps1` on Windows), skipped when `creates` exists.
@@ -237,10 +253,10 @@ struct StepInput {
     playbook: Option<String>,
 }
 
+// What the schema shows and the reader returns.
 /// A step as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only.")]
 enum StepSchema {
     /// `reboot`: the machine restarts, and the next step runs once it is back.
     Reboot(RebootWord),
@@ -250,7 +266,6 @@ enum StepSchema {
 
 /// The word `reboot`.
 #[derive(JsonSchema)]
-#[expect(dead_code, reason = "the schema's shape only.")]
 enum RebootWord {
     /// Restarts the machine.
     #[serde(rename = "reboot")]
@@ -267,27 +282,37 @@ impl JsonSchema for Step {
     }
 }
 
-impl<'de> Deserialize<'de> for Step {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Step, D::Error> {
+impl<'de> Deserialize<'de> for StepSchema {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<StepSchema, D::Error> {
         struct V;
         impl<'de> Visitor<'de> for V {
-            type Value = Step;
+            type Value = StepSchema;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.write_str("`reboot`, or one of `{ run }`, `{ copy }`, `{ packages }` and `{ playbook }`")
             }
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Step, E> {
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<StepSchema, E> {
                 if v == "reboot" {
-                    Ok(Step::Reboot)
+                    Ok(StepSchema::Reboot(RebootWord::Reboot))
                 } else {
                     Err(E::custom(format!("a step is `reboot` or a map: write `{{ run: {v} }}`")))
                 }
             }
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Step, A::Error> {
-                let s = StepInput::deserialize(de::value::MapAccessDeserializer::new(map))?;
-                step(s).map_err(de::Error::custom)
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<StepSchema, A::Error> {
+                StepInput::deserialize(de::value::MapAccessDeserializer::new(map)).map(StepSchema::Map)
             }
         }
         d.deserialize_any(V)
+    }
+}
+
+impl TryFrom<StepSchema> for Step {
+    type Error = String;
+
+    fn try_from(written: StepSchema) -> Result<Step, String> {
+        match written {
+            StepSchema::Reboot(RebootWord::Reboot) => Ok(Step::Reboot),
+            StepSchema::Map(fields) => step(fields),
+        }
     }
 }
 

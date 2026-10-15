@@ -24,10 +24,10 @@ pub(super) fn map_value(node: &Value) -> Option<&Value> {
 pub(super) fn kind(w: &Walker, node: &Value, depth: usize) -> String {
     let node = w.resolve(node);
     if depth >= MAX_DEPTH {
-        return "value".to_string();
+        return "value".to_owned();
     }
     if closed(w, node).is_some() {
-        return closed_kind(w, node, depth).to_string();
+        return closed_kind(w, node, depth).to_owned();
     }
     let alternatives = variants(node);
     if !alternatives.is_empty() {
@@ -42,16 +42,16 @@ pub(super) fn kind(w: &Walker, node: &Value, depth: usize) -> String {
     }
     match node.get("type").and_then(Value::as_str) {
         Some("array") => {
-            let items = node.get("items").map_or_else(|| "value".to_string(), |i| kind(w, i, depth + 1));
+            let items = node.get("items").map_or_else(|| "value".to_owned(), |i| kind(w, i, depth + 1));
             format!("list of {}", plural(&items))
         }
         Some("object") => match map_value(node) {
             Some(value) => format!("map of name to {}", kind(w, value, depth + 1)),
-            None => "mapping".to_string(),
+            None => "mapping".to_owned(),
         },
-        Some(t) => t.to_string(),
-        None if node.get("properties").is_some() => "mapping".to_string(),
-        None => "value".to_string(),
+        Some(t) => t.to_owned(),
+        None if node.get("properties").is_some() => "mapping".to_owned(),
+        None => "value".to_owned(),
     }
 }
 
@@ -156,7 +156,7 @@ fn range(min: Option<&Value>, max: Option<&Value>, format: Option<&Value>) -> Op
 /// A bound as written: `8`, not `8.0`.
 fn number(n: f64) -> String {
     let s = n.to_string();
-    s.strip_suffix(".0").map_or_else(|| s.clone(), str::to_string)
+    s.strip_suffix(".0").map_or_else(|| s.clone(), str::to_owned)
 }
 
 /// A default worth showing: not null, and not an empty string, list or map.
@@ -178,7 +178,7 @@ pub(super) fn json(v: &Value) -> String {
 
 /// A value as a spec writes it: a string without its quotes, anything else as JSON.
 fn plain(v: &Value) -> String {
-    v.as_str().map_or_else(|| json(v), str::to_string)
+    v.as_str().map_or_else(|| json(v), str::to_owned)
 }
 
 /// A doc comment as prose: wrapped lines joined, paragraphs kept, and rustdoc's links

@@ -2,9 +2,12 @@
 //! it sits on the networks, and the settings every form shares. It never says how a platform
 //! runs it; each target picks the form it uses.
 
+use std::fmt;
+
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::Deserialize;
+use serde::de::{self, SeqAccess, Visitor};
 
 use super::app::App;
 use super::files::File;
@@ -130,9 +133,8 @@ pub(crate) struct MachineInput {
     aliases: Vec<String>,
     /// How many of this machine (2 to 99): clones `<name>-01`, `<name>-02`, ..., each one address
     /// further along on every network. Where the spec names this machine, it means every clone.
-    #[serde(default)]
-    #[expect(dead_code, reason = "expanded into clones before the machines are read.")]
-    count: Option<u8>,
+    #[serde(default, rename = "count")]
+    _count: Option<u8>,
     /// The machine the user lands on (at most one). Without `os`, the runner supplies it.
     #[serde(default)]
     access: bool,
@@ -207,10 +209,10 @@ pub(crate) struct MachineInput {
     rate_limit: Option<String>,
 }
 
+// What the schema shows and the reader returns.
 /// `service:` as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only.")]
 enum ServicesInput {
     /// One service.
     One(ServiceRef),
@@ -218,16 +220,29 @@ enum ServicesInput {
     Several(Vec<ServiceRef>),
 }
 
-fn services<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Vec<ServiceRef>>, D::Error> {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum Raw {
-        One(ServiceRef),
-        Several(Vec<ServiceRef>),
+impl<'de> Deserialize<'de> for ServicesInput {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<ServicesInput, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = ServicesInput;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a catalogue service, `name[@version]`, or a list of them")
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<ServicesInput, E> {
+                v.parse().map(ServicesInput::One).map_err(E::custom)
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<ServicesInput, A::Error> {
+                Vec::<ServiceRef>::deserialize(de::value::SeqAccessDeserializer::new(seq)).map(ServicesInput::Several)
+            }
+        }
+        d.deserialize_any(V)
     }
-    Ok(Some(match Raw::deserialize(d)? {
-        Raw::One(s) => vec![s],
-        Raw::Several(s) => s,
+}
+
+fn services<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Vec<ServiceRef>>, D::Error> {
+    Ok(Some(match ServicesInput::deserialize(d)? {
+        ServicesInput::One(s) => vec![s],
+        ServicesInput::Several(s) => s,
     }))
 }
 
@@ -273,6 +288,7 @@ impl TryFrom<MachineInput> for Machine {
 
 impl Machine {
     /// Its custom app, when it is one.
+    #[must_use]
     pub fn app(&self) -> Option<&App> {
         match &self.kind {
             Kind::App(a) => Some(a),

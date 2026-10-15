@@ -24,6 +24,7 @@ impl Paths<'_> {
 }
 
 /// Checks that every path the spec mentions exists in the project folder.
+#[must_use]
 pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     let mut paths = Paths { lab_dir, problems: Vec::new() };
     if let Some(c) = &spec.cloud {

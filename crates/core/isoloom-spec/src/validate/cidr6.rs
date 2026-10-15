@@ -15,7 +15,8 @@ pub struct Cidr6 {
 
 impl Cidr6 {
     /// The block written `prefix::/64`, when it is one: the address must be the network
-    /// address itself, unique local (fc00::/7) or global unicast (2000::/3).
+    /// address itself, unique local (`fc00::/7`) or global unicast (`2000::/3`).
+    #[must_use]
     pub fn parse(s: &str) -> Option<Cidr6> {
         let (ip, len) = s.split_once('/')?;
         let ip: Ipv6Addr = ip.parse().ok()?;
@@ -30,22 +31,26 @@ impl Cidr6 {
     }
 
     /// Whether the two blocks are the same: two /64 blocks share an address only then.
+    #[must_use]
     pub fn overlaps(self, other: Cidr6) -> bool {
         self.base == other.base
     }
 
     /// The machine at IPv4 octet `octet`: the octet's decimal digits as the last group (10 is
     /// `::10`, 254 is `::254`), so the two addresses of a dual-stack machine read alike.
+    #[must_use]
     pub fn host(self, octet: u8) -> Ipv6Addr {
         Ipv6Addr::from(self.base | interface_id(octet))
     }
 
     /// The gateway (the host's bridge, the first address): `::1`.
+    #[must_use]
     pub fn gateway(self) -> Ipv6Addr {
         Ipv6Addr::from(self.base | 1)
     }
 
     /// The block written back, `prefix::/64`.
+    #[must_use]
     pub fn text(self) -> String {
         format!("{}/{PREFIX}", Ipv6Addr::from(self.base))
     }

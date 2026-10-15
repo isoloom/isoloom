@@ -1,7 +1,7 @@
 use super::{Problem, validate};
 
 fn spec(yaml: &str) -> crate::model::Spec {
-    crate::model::from_yaml(yaml).unwrap()
+    crate::testing::model(yaml).unwrap()
 }
 
 #[test]

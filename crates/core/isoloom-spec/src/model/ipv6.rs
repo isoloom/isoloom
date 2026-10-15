@@ -14,7 +14,7 @@ pub struct Ipv6 {
     /// How machines get their IPv6 address: `static` (default), the one derived from their
     /// octet, or `auto`, the one the target hands out (Docker's address management, the
     /// cluster's, Oracle Cloud's). Isoloom's own addresses stay fixed either way.
-    #[serde(default, skip_serializing_if = "Ipv6Addresses::is_static")]
+    #[serde(default, skip_serializing_if = "super::is_default")]
     pub addresses: Ipv6Addresses,
     /// IPv6 only: the network carries no IPv4. Its `cidr` still numbers the machines (their
     /// octet), but no target puts it on the wire. Such a network has no `reach`, `gateway`,
@@ -32,12 +32,4 @@ pub enum Ipv6Addresses {
     Static,
     /// Handed out by the target.
     Auto,
-}
-
-impl Ipv6Addresses {
-    /// Whether addresses are derived from the octets (the default, left out when written).
-    #[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference.
-    pub fn is_static(&self) -> bool {
-        *self == Ipv6Addresses::Static
-    }
 }

@@ -8,11 +8,10 @@ use std::fmt;
 use std::str::FromStr;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
-use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
 
 use super::invalid::Invalid;
-use super::names::InputName;
+use super::names::{InputName, Text};
 
 /// Where a file's contents come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,11 +28,13 @@ pub enum FileSource {
 
 impl FileSource {
     /// Whether the value is only known at run time (an input or a secret).
+    #[must_use]
     pub fn is_value(&self) -> bool {
         matches!(self, FileSource::Input(_) | FileSource::Secret(_))
     }
 
     /// The field that gives it (`source`, `content`, `input`, `secret`).
+    #[must_use]
     pub fn key(&self) -> &'static str {
         match self {
             FileSource::Source(_) => "source",
@@ -74,7 +75,7 @@ impl FromStr for Mode {
             .ok()
             .filter(|m| *m <= 0o777)
             .map(Mode)
-            .ok_or_else(|| Invalid::Mode(digits.to_string()))
+            .ok_or_else(|| Invalid::Mode(digits.to_owned()))
     }
 }
 
@@ -85,21 +86,11 @@ impl fmt::Display for Mode {
 }
 
 impl<'de> Deserialize<'de> for Mode {
+    /// Octal digits as text (`"0444"`), or the number YAML reads them as (`444`).
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Mode, D::Error> {
-        struct V;
-        impl Visitor<'_> for V {
-            type Value = Mode;
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("octal digits, like \"0444\"")
-            }
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Mode, E> {
-                v.parse().map_err(E::custom)
-            }
-            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Mode, E> {
-                v.to_string().parse().map_err(E::custom)
-            }
-        }
-        d.deserialize_any(V)
+        d.deserialize_any(Text("octal digits, like \"0444\""))?
+            .parse()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -135,6 +126,7 @@ pub struct File {
 
 impl File {
     /// Its mode: the spec's, else `0644` for configuration and `0400` for a value.
+    #[must_use]
     pub fn mode_or_default(&self) -> Mode {
         self.mode.unwrap_or(if self.source.is_value() { Mode::VALUE } else { Mode::CONFIG })
     }
@@ -221,13 +213,13 @@ mod tests {
 
     #[test]
     fn a_file_has_one_source_and_a_mode_by_kind() {
-        let f: File = serde_yaml_ng::from_str("{ path: /ctf/flag, input: FLAG }").unwrap();
-        assert!(f.source.is_value());
-        assert_eq!(f.mode_or_default().to_string(), "0400");
-        let f: File = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 0444 }").unwrap();
-        assert_eq!(f.mode_or_default(), Mode(0o444));
-        let f: File = serde_yaml_ng::from_str("{ path: /a, source: a.ini }").unwrap();
-        assert_eq!(f.mode_or_default(), Mode::CONFIG);
+        let value: File = serde_yaml_ng::from_str("{ path: /ctf/flag, input: FLAG }").unwrap();
+        assert!(value.source.is_value());
+        assert_eq!(value.mode_or_default().to_string(), "0400");
+        let widened: File = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 0444 }").unwrap();
+        assert_eq!(widened.mode_or_default(), Mode(0o444));
+        let config: File = serde_yaml_ng::from_str("{ path: /a, source: a.ini }").unwrap();
+        assert_eq!(config.mode_or_default(), Mode::CONFIG);
     }
 
     #[test]

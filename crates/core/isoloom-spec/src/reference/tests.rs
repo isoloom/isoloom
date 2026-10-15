@@ -102,7 +102,7 @@ fn defaults_values_limits_and_descriptions_read_as_a_spec_writes_them() {
     let version = field(&all, "version");
     assert_eq!(
         (version.limits.clone(), version.examples.clone()),
-        (vec!["from 1 to 1".to_string()], vec!["1".to_string()])
+        (vec!["from 1 to 1".to_owned()], vec!["1".to_owned()])
     );
     let name = field(&all, "name");
     assert_eq!(
@@ -125,9 +125,9 @@ fn closed_sets_shallow_fields_and_rustdoc_links_read_plainly() {
     assert_eq!(arch.default.as_deref(), Some("amd64"));
     assert_eq!(
         arch.allowed,
-        [("amd64".to_string(), "x86-64.".to_string()), ("arm64".to_string(), "ARM.".to_string())]
+        [("amd64".to_owned(), "x86-64.".to_owned()), ("arm64".to_owned(), "ARM.".to_owned())]
     );
-    assert_eq!(field(&all, "os").allowed, [("a".to_string(), String::new()), ("b".to_string(), String::new())]);
+    assert_eq!(field(&all, "os").allowed, [("a".to_owned(), String::new()), ("b".to_owned(), String::new())]);
     assert_eq!(field(&all, "gpus").description, "Overrides `Gpus`.");
     assert_eq!(field(&all, "common").members, ["arch", "dns"]);
     assert_eq!(field(&all, "groups").members, ["arch", "dns"]);

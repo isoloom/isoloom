@@ -198,6 +198,7 @@ pub enum Ulimit {
 
 impl Ulimit {
     /// The limit a process starts with.
+    #[must_use]
     pub fn soft(self) -> u64 {
         match self {
             Ulimit::Both(n) | Ulimit::Pair { soft: n, .. } => n,
@@ -205,6 +206,7 @@ impl Ulimit {
     }
 
     /// The ceiling a process may raise its soft limit to.
+    #[must_use]
     pub fn hard(self) -> u64 {
         match self {
             Ulimit::Both(n) | Ulimit::Pair { hard: n, .. } => n,

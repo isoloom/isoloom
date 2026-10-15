@@ -100,7 +100,7 @@ fn healthcheck(at: &str, h: &Healthcheck, p: &mut Problems) {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::from_yaml as parse;
+    use crate::testing::model as parse;
     use crate::validate;
 
     fn problems(machine: &str) -> Vec<String> {
@@ -120,21 +120,37 @@ mod tests {
     }
 
     #[test]
-    fn mistakes_say_how_to_fix_them() {
+    fn a_before_script_is_a_shell_script_and_the_working_dir_absolute() {
         let p = problems("docker: { image: postgres }, before: [flag.py], working_dir: srv");
         assert!(p.iter().any(|m| m.contains("before[0]: a shell script")), "{p:?}");
         assert!(p.iter().any(|m| m.contains("restate it in `command`")), "{p:?}");
         assert!(p.iter().any(|m| m.contains("working_dir: `srv` must be an absolute path")), "{p:?}");
+    }
+
+    #[test]
+    fn a_healthcheck_says_what_to_check_and_how_often() {
         let p = problems("docker: { image: nginx }, healthcheck: { interval: '5' }");
         assert!(p.iter().any(|m| m.contains("say what to check")), "{p:?}");
         assert!(p.iter().any(|m| m.contains("interval: `5` isn't a duration")), "{p:?}");
+    }
+
+    #[test]
+    fn a_healthcheck_is_a_test_or_a_page_from_its_root() {
         let p = problems("docker: { image: nginx }, healthcheck: { test: x, http: { port: 80, path: health } }");
         assert!(
             p.iter().any(|m| m.contains("not both")) && p.iter().any(|m| m.contains("must start with /")),
             "{p:?}"
         );
+    }
+
+    #[test]
+    fn an_idle_machine_runs_no_command() {
         let p = problems("docker: { image: alpine, idle: true }, command: [sleep, '1']");
         assert!(p.iter().any(|m| m.contains("an `idle` machine")), "{p:?}");
+    }
+
+    #[test]
+    fn a_windows_machine_runs_powershell_before_scripts() {
         let p = problems("vm: { os: windows-server@2022 }, command: x, before: [set.sh]");
         assert!(p.iter().any(|m| m.contains("PowerShell scripts (.ps1)")), "{p:?}");
     }

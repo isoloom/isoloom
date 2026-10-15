@@ -6,6 +6,7 @@
 use crate::model::{Shape, Spec, Target};
 
 /// Machines lacking the implementation a shape needs (the access machine never counts).
+#[must_use]
 pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
     spec.machines
         .iter()
@@ -24,6 +25,7 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
 }
 
 /// Every target the implementations allow, narrowed by the spec's `targets:` when set.
+#[must_use]
 pub fn derive(spec: &Spec) -> Vec<Target> {
     // Cloud services run on their own target only; a spec without machines runs nowhere else.
     if spec.cloud.is_some() {
@@ -42,12 +44,14 @@ pub fn derive(spec: &Spec) -> Vec<Target> {
 
 /// Hybrid is worth it only when the environment mixes both: a machine that can only be a VM
 /// (Windows, say) and one that can be a container. Otherwise Docker or VMs alone run it.
+#[must_use]
 pub fn mixed(spec: &Spec) -> bool {
     let own = || spec.machines.values().filter(|m| !m.access);
     own().any(|m| m.docker.is_some()) && own().any(|m| m.docker.is_none() && m.vm.is_some())
 }
 
 /// The targets the generators should produce: derived, then narrowed by `targets:`.
+#[must_use]
 pub fn effective(spec: &Spec) -> Vec<Target> {
     let possible = derive(spec);
     match &spec.targets {

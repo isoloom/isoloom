@@ -29,6 +29,7 @@ pub struct MountPart {
 
 impl Mount {
     /// The absolute path in the machine.
+    #[must_use]
     pub fn path(&self) -> &str {
         match self {
             Mount::Path(p) => p,
@@ -37,6 +38,7 @@ impl Mount {
     }
 
     /// The folder of a shared volume it takes, if not all of it.
+    #[must_use]
     pub fn subpath(&self) -> Option<&str> {
         match self {
             Mount::Path(_) => None,
@@ -47,7 +49,7 @@ impl Mount {
 
 impl From<&str> for Mount {
     fn from(path: &str) -> Mount {
-        Mount::Path(path.to_string())
+        Mount::Path(path.to_owned())
     }
 }
 
@@ -62,7 +64,7 @@ impl<'de> Deserialize<'de> for Mount {
                 f.write_str("an absolute path, or `{ path, subpath }`")
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Mount, E> {
-                Ok(Mount::Path(v.to_string()))
+                Ok(Mount::Path(v.to_owned()))
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Mount, A::Error> {
                 MountPart::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(Mount::Part)
@@ -100,6 +102,7 @@ pub struct TmpfsMount {
 
 impl Tmpfs {
     /// The absolute path in the machine.
+    #[must_use]
     pub fn path(&self) -> &str {
         match self {
             Tmpfs::Path(p) => p,
@@ -108,6 +111,7 @@ impl Tmpfs {
     }
 
     /// Its size, when given.
+    #[must_use]
     pub fn size(&self) -> Option<&str> {
         match self {
             Tmpfs::Path(_) => None,
@@ -116,6 +120,7 @@ impl Tmpfs {
     }
 
     /// Its mode, when given (octal digits).
+    #[must_use]
     pub fn mode(&self) -> Option<&str> {
         match self {
             Tmpfs::Path(_) => None,
@@ -126,7 +131,7 @@ impl Tmpfs {
 
 impl From<&str> for Tmpfs {
     fn from(path: &str) -> Tmpfs {
-        Tmpfs::Path(path.to_string())
+        Tmpfs::Path(path.to_owned())
     }
 }
 
@@ -139,7 +144,7 @@ impl<'de> Deserialize<'de> for Tmpfs {
                 f.write_str("an absolute path, or `{ path, size, mode }`")
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Tmpfs, E> {
-                Ok(Tmpfs::Path(v.to_string()))
+                Ok(Tmpfs::Path(v.to_owned()))
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Tmpfs, A::Error> {
                 TmpfsMount::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(Tmpfs::Sized)
@@ -183,6 +188,7 @@ pub enum Filesystem {
 
 impl Filesystem {
     /// The name `mkfs` and fstab know it by.
+    #[must_use]
     pub fn id(self) -> &'static str {
         match self {
             Filesystem::Ext4 => "ext4",

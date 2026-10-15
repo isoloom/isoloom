@@ -54,6 +54,7 @@ pub struct Hardware {
 impl Hardware {
     /// What only a VM can give, as the field naming it (`hardware.tpm`), when the machine asks
     /// for any.
+    #[must_use]
     pub fn vm_only(&self) -> Option<&'static str> {
         if self.tpm == Tpm::Required {
             Some("tpm")

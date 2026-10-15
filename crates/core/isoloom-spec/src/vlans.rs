@@ -10,6 +10,7 @@
 use indexmap::IndexMap;
 
 use crate::model::{Network, Reach, Spec, Vlan};
+use crate::syntax::{Code, FieldPath, Problem};
 use crate::validate::Cidr;
 
 /// The network a VLAN becomes: `office` + 10 -> `office-vlan10`.
@@ -25,6 +26,7 @@ pub fn of_lan<'a>(spec: &'a Spec, lan: &'a str) -> impl Iterator<Item = (&'a Str
 }
 
 /// The machine that switches a LAN (its `switch`), if any. After [`flatten`].
+#[must_use]
 pub fn switch_of<'a>(spec: &'a Spec, lan: &str) -> Option<&'a str> {
     spec.networks
         .values()
@@ -33,6 +35,7 @@ pub fn switch_of<'a>(spec: &'a Spec, lan: &str) -> Option<&'a str> {
 }
 
 /// The LAN a machine switches (it is that LAN's `switch`), if any. After [`flatten`].
+#[must_use]
 pub fn switched_by<'a>(spec: &'a Spec, machine: &str) -> Option<&'a str> {
     spec.networks
         .values()
@@ -49,7 +52,13 @@ fn vlan_ref(name: &str) -> Option<(&str, u16)> {
 }
 
 /// The spec with every LAN's VLANs as networks of their own (see the module).
-pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
+///
+/// # Errors
+///
+/// An `invalid-value` [`Problem`] at the field: a LAN split into VLANs with a `gateway` or
+/// `ipv6`, a VLAN id outside 1 to 4094, a VLAN block that doesn't parse or lies outside its LAN,
+/// or a VLAN whose network name the spec already has.
+pub fn flatten(mut spec: Spec) -> Result<Spec, Problem> {
     if spec.networks.values().all(|n| n.vlans.is_empty()) {
         return Ok(spec);
     }
@@ -62,36 +71,36 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, String> {
 }
 
 /// Checks first: ids, blocks inside the LAN, no clash with a network already named so.
-fn check_vlans(spec: &Spec) -> Result<(), String> {
+fn check_vlans(spec: &Spec) -> Result<(), Problem> {
+    let refused = |at: FieldPath, reason: String| Problem::new(Code::InvalidValue, at, reason);
     for (lan, net) in &spec.networks {
         if net.vlans.is_empty() {
             continue;
         }
+        let here = FieldPath::new("networks").key(lan);
         if net.gateway.is_some() {
-            return Err(format!(
-                "networks.{lan}: a LAN split into VLANs can't have a `gateway` (set the gateway machine on each VLAN's network instead)"
-            ));
+            let why = "a LAN split into VLANs can't have a `gateway` (set the gateway machine on each VLAN's network instead)";
+            return Err(refused(here, why.to_owned()));
         }
         if net.ipv6.is_some() {
-            return Err(format!(
-                "networks.{lan}.ipv6: a LAN split into VLANs carries IPv4 only for now (drop `ipv6`, or give it no `vlans`)"
-            ));
+            let why = "a LAN split into VLANs carries IPv4 only for now (drop `ipv6`, or give it no `vlans`)";
+            return Err(refused(here.key("ipv6"), why.to_owned()));
         }
         let outer = Cidr::parse(&net.cidr);
         for (id, vlan) in &net.vlans {
-            let at = format!("networks.{lan}.vlans.{id}");
+            let at = here.key("vlans").key(&id.to_string());
             if !(1..=4094).contains(id) {
-                return Err(format!("{at}: a VLAN id is between 1 and 4094"));
+                return Err(refused(at, "a VLAN id is between 1 and 4094".to_owned()));
             }
-            let inner = Cidr::parse(&vlan.cidr).ok_or_else(|| format!("{at}.cidr: `{}` isn't an IPv4 block such as 10.10.10.0/24", vlan.cidr))?;
+            let inner = Cidr::parse(&vlan.cidr).ok_or_else(|| refused(at.key("cidr"), format!("`{}` isn't an IPv4 block such as 10.10.10.0/24", vlan.cidr)))?;
             if let Some(outer) = outer
                 && !outer.contains(inner)
             {
-                return Err(format!("{at}.cidr: {} isn't inside the LAN's block {}", vlan.cidr, net.cidr));
+                return Err(refused(at.key("cidr"), format!("{} isn't inside the LAN's block {}", vlan.cidr, net.cidr)));
             }
             let flat = vlan_network(lan, *id);
             if spec.networks.contains_key(&flat) {
-                return Err(format!("{at}: it becomes the network `{flat}`, which the spec already has"));
+                return Err(refused(at, format!("it becomes the network `{flat}`, which the spec already has")));
             }
         }
     }
@@ -164,7 +173,7 @@ fn vlan_as_network(lan: &str, net: &Network, id: u16, vlan: &Vlan) -> Network {
         switch: net.switch.clone(),
         // A VLAN carries no impairment of its own (set it on a network the router is on).
         tc: None,
-        vlan: Some((lan.to_string(), id)),
+        vlan: Some((lan.to_owned(), id)),
         ipv6: None,
         // A VLAN is the environment's own network, whatever its LAN joins.
         external: None,
@@ -176,7 +185,7 @@ fn vlan_as_network(lan: &str, net: &Network, id: u16, vlan: &Vlan) -> Network {
 
 /// The `reach` rules between the networks the names cover (none from a network to itself).
 fn flat_reach(reach: &[Reach], covers: &Covers) -> Vec<Reach> {
-    let expand = |name: &str| covers.get(name).cloned().unwrap_or_else(|| vec![name.to_string()]);
+    let expand = |name: &str| covers.get(name).cloned().unwrap_or_else(|| vec![name.to_owned()]);
     let mut out: Vec<Reach> = Vec::new();
     for r in reach {
         for from in expand(&r.from) {
@@ -258,18 +267,20 @@ machines:
         assert!(
             flatten(raw(&OFFICE.replace("10.10.20.0/24", "10.30.20.0/24")))
                 .unwrap_err()
+                .reason
                 .contains("isn't inside")
         );
         assert!(
             flatten(raw(&OFFICE.replace("      10:", "      5000:")))
                 .unwrap_err()
+                .reason
                 .contains("between 1 and 4094")
         );
         let clash = OFFICE.replace(
             "  servers: { cidr: 10.20.0.0/24 }",
             "  servers: { cidr: 10.20.0.0/24 }\n  office-vlan10: { cidr: 10.30.0.0/24 }",
         );
-        assert!(flatten(raw(&clash)).unwrap_err().contains("already has"));
+        assert!(flatten(raw(&clash)).unwrap_err().reason.contains("already has"));
     }
 
     #[test]
@@ -282,7 +293,7 @@ machines:
         assert_eq!(switched_by(&s, "pc1"), None);
         assert_eq!(
             of_lan(&s, "office").collect::<Vec<_>>(),
-            [(&"office-vlan10".to_string(), 10), (&"office-vlan20".to_string(), 20)]
+            [(&"office-vlan10".to_owned(), 10), (&"office-vlan20".to_owned(), 20)]
         );
         assert!(crate::validate(&s).is_empty(), "{:?}", crate::validate(&s));
     }

@@ -75,11 +75,13 @@ pub struct Network {
 impl Network {
     /// Whether the network is outside the environment (`external` or `bridged`): Isoloom
     /// doesn't make it, route it or put its own machines on it.
+    #[must_use]
     pub fn is_outside(&self) -> bool {
         self.external.is_some() || self.bridged.is_some()
     }
 
     /// Whether its machines take their address from the LAN's DHCP server.
+    #[must_use]
     pub fn is_dhcp(&self) -> bool {
         self.bridged.as_ref().is_some_and(|b| b.dhcp)
     }
@@ -107,6 +109,7 @@ pub struct Tc {
 
 impl Tc {
     /// The netem parameters, as `tc qdisc ... netem` takes them.
+    #[must_use]
     pub fn netem(&self) -> String {
         let mut parts = Vec::new();
         if let Some(d) = &self.delay {

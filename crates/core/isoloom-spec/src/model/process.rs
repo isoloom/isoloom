@@ -19,6 +19,7 @@ pub enum CommandLine {
 
 impl CommandLine {
     /// The command as a program and its arguments: a text goes through `/bin/sh -c`.
+    #[must_use]
     pub fn argv(&self) -> Vec<String> {
         match self {
             CommandLine::Shell(text) => vec!["/bin/sh".into(), "-c".into(), text.clone()],
@@ -27,6 +28,7 @@ impl CommandLine {
     }
 
     /// The command as one line of shell: a text as it is, arguments each quoted.
+    #[must_use]
     pub fn shell_line(&self) -> String {
         match self {
             CommandLine::Shell(text) => text.clone(),
@@ -35,6 +37,7 @@ impl CommandLine {
     }
 
     /// Whether there is nothing to run (an empty text or list), which validation rejects.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         match self {
             CommandLine::Shell(text) => text.trim().is_empty(),
@@ -88,6 +91,7 @@ fn root() -> String {
 
 /// Seconds in a duration written `<number><unit>`, one or more times (`90s`, `1m30s`, `2h`):
 /// units `h`, `m` and `s`. `None` when it isn't one.
+#[must_use]
 pub fn seconds(duration: &str) -> Option<u32> {
     let mut total: u32 = 0;
     let mut number = String::new();

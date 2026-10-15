@@ -2,6 +2,7 @@
 
 use super::{Problems, kebab, variable_name};
 use crate::model::Spec;
+use crate::placeholders::{self, Piece};
 
 /// The format version this isoloom reads, and a name every target can carry.
 pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
@@ -32,16 +33,16 @@ pub(super) fn inputs(spec: &Spec, p: &mut Problems) {
 /// The message: balanced placeholders with a path inside.
 pub(super) fn message(spec: &Spec, p: &mut Problems) {
     let Some(m) = &spec.message else { return };
-    let mut rest = m.as_str();
-    while let Some(i) = rest.find("{{") {
-        let Some(j) = rest[i + 2..].find("}}") else {
-            p.add("message", "a `{{` without its `}}`");
-            break;
-        };
-        let path = rest[i + 2..i + 2 + j].trim();
-        if path.is_empty() || path.split('.').any(str::is_empty) {
-            p.add("message", format!("`{{{{ {path} }}}}` isn't a path like machines.web.addresses.front"));
+    for piece in placeholders::pieces(m) {
+        match piece {
+            Piece::Text(_) => {}
+            Piece::Placeholder(inner) => {
+                let path = inner.trim();
+                if path.is_empty() || path.split('.').any(str::is_empty) {
+                    p.add("message", format!("`{{{{ {path} }}}}` isn't a path like machines.web.addresses.front"));
+                }
+            }
+            Piece::Unclosed(_) => p.add("message", "a `{{` without its `}}`"),
         }
-        rest = &rest[i + 2 + j + 2..];
     }
 }

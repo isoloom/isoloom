@@ -91,8 +91,8 @@ fn filesystem(d: &Disk, windows: bool, at: &str, p: &mut Problems) {
 /// Windows.
 fn mount(m: &str, windows: bool, at: &str, p: &mut Problems) {
     if windows {
-        let b = m.as_bytes();
-        if !(b.len() == 2 && b[1] == b':' && (b'D'..=b'Z').contains(&b[0].to_ascii_uppercase())) {
+        let drive_letter = matches!(m.as_bytes(), [letter, b':'] if (b'D'..=b'Z').contains(&letter.to_ascii_uppercase()));
+        if !drive_letter {
             p.add(
                 format!("{at}.mount"),
                 format!("`{m}` isn't a drive letter: a Windows disk mounts at one, D: to Z:"),

@@ -17,6 +17,7 @@ pub enum Check {
 
 impl Check {
     /// The project path this check runs, when it is a script or a playbook.
+    #[must_use]
     pub fn path(&self) -> Option<&str> {
         match self {
             Check::Script(p) => Some(p),
@@ -46,7 +47,7 @@ impl<'de> Deserialize<'de> for Check {
                 f.write_str("a script path, or a check with `http`, `tcp`, `exec` or `script`")
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Check, E> {
-                Ok(Check::Script(v.to_string()))
+                Ok(Check::Script(v.to_owned()))
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Check, A::Error> {
                 Declared::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(|d| Check::Declared(Box::new(d)))
@@ -119,10 +120,10 @@ pub struct Declared {
     pub wait: Option<u32>,
 }
 
+// What the schema shows and the reader returns.
 /// A wait as written, for the schema.
 #[derive(JsonSchema)]
 #[serde(untagged)]
-#[expect(dead_code, reason = "the schema's shape only: `duration` reads the values")]
 enum WaitSchema {
     /// Seconds.
     Seconds(u32),
@@ -130,20 +131,25 @@ enum WaitSchema {
     Duration(String),
 }
 
+impl<'de> Deserialize<'de> for WaitSchema {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<WaitSchema, D::Error> {
+        let not_a_wait = || serde::de::Error::custom("a wait is a number of seconds or a duration (`90s`, `3m`)");
+        match serde_json::Value::deserialize(d)? {
+            serde_json::Value::Number(n) => n.as_u64().and_then(|n| u32::try_from(n).ok()).map(WaitSchema::Seconds).ok_or_else(not_a_wait),
+            serde_json::Value::String(s) => Ok(WaitSchema::Duration(s)),
+            _ => Err(not_a_wait()),
+        }
+    }
+}
+
 /// A wait written as seconds (`90`) or a duration (`90s`, `3m`, `1m30s`), in seconds.
 fn duration<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<u32>, D::Error> {
-    let raw: Option<serde_json::Value> = Deserialize::deserialize(d)?;
-    match raw {
+    match Option::<WaitSchema>::deserialize(d)? {
         None => Ok(None),
-        Some(serde_json::Value::Number(n)) => n
-            .as_u64()
-            .and_then(|n| u32::try_from(n).ok())
-            .map(Some)
-            .ok_or_else(|| serde::de::Error::custom("a wait is a number of seconds or a duration (`90s`, `3m`)")),
-        Some(serde_json::Value::String(s)) => super::seconds(&s)
+        Some(WaitSchema::Seconds(n)) => Ok(Some(n)),
+        Some(WaitSchema::Duration(s)) => super::seconds(&s)
             .map(Some)
             .ok_or_else(|| serde::de::Error::custom(format!("`{s}` isn't a duration: write `90s`, `3m` or `1m30s`"))),
-        Some(_) => Err(serde::de::Error::custom("a wait is a number of seconds or a duration (`90s`, `3m`)")),
     }
 }
 

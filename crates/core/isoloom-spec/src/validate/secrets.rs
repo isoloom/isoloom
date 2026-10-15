@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use super::{Problems, kebab, variable_name};
-use crate::model::{MachineSecret, SecretSource, Spec, is_drive_path};
+use crate::model::{MachineSecret, SecretSource, Spec, after_drive};
 
 /// The declared secrets, then every machine's.
 pub(super) fn check(spec: &Spec, p: &mut Problems) {
@@ -70,7 +70,7 @@ fn of_machine(spec: &Spec, at: &str, s: &MachineSecret, p: &mut Problems) {
     if !spec.secrets.contains_key(source) {
         let known: Vec<&str> = spec.secrets.keys().map(String::as_str).collect();
         let field = if matches!(s, MachineSecret::Name(_)) {
-            at.to_string()
+            at.to_owned()
         } else {
             format!("{at}.source")
         };
@@ -100,7 +100,7 @@ fn safe_path(at: &str, path: &str, p: &mut Problems) {
 /// file is readable by SYSTEM and Administrators only, which a Unix mode can't say).
 fn on_windows(at: &str, s: &MachineSecret, p: &mut Problems) {
     let path = s.path();
-    let rest = if is_drive_path(&path) { &path[2..] } else { path.as_str() };
+    let rest = after_drive(&path).unwrap_or(&path);
     if rest.split(['/', '\\']).any(|c| c == "..") || rest.contains(':') || rest.ends_with(['/', '\\']) {
         p.add(
             format!("{at}.target"),
@@ -123,7 +123,7 @@ mod tests {
         let yaml = format!(
             "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nsecrets: {{ db: {{ env: DB }} }}\nmachines:\n  m:\n    networks: {{ lan: 10 }}\n{machine}"
         );
-        let spec = crate::model::from_yaml(&yaml).expect("parses");
+        let spec = crate::testing::model(&yaml).expect("parses");
         crate::validate(&spec).iter().map(ToString::to_string).collect()
     }
 

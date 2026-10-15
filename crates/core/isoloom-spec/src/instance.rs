@@ -14,15 +14,16 @@ use crate::validate::{Cidr, Cidr6};
 pub const MAX: u8 = 99;
 
 /// Where an instance's generated files go.
+#[must_use]
 pub fn output_dir(instance: Option<u8>) -> String {
     match instance {
         Some(n) => format!(".isoloom-{n}"),
-        None => ".isoloom".to_string(),
+        None => ".isoloom".to_owned(),
     }
 }
 
 /// The spec as instance `n` of itself (validated specs only).
-#[allow(clippy::many_single_char_names)] // an address's octets read best as `a.b.c.d`.
+#[expect(clippy::many_single_char_names)] // an address's octets read best as `a.b.c.d`.
 pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
     if n == 0 || n > MAX {
         return Err(format!("an instance number is 1 to {MAX}"));
@@ -62,7 +63,7 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec, String> {
     Ok(s)
 }
 
-/// IPv6 blocks: the third group moves by n (fd00:20::/64 -> fd00:20:2::/64 for instance 2), on
+/// IPv6 blocks: the third group moves by n (`fd00:20::/64` -> `fd00:20:2::/64` for instance 2), on
 /// every target, since Docker refuses two networks on one IPv6 subnet too.
 fn shift_ipv6(s: &mut Spec, n: u8) -> Result<(), String> {
     for (name, net) in &mut s.networks {
@@ -80,11 +81,12 @@ fn shift_ipv6(s: &mut Spec, n: u8) -> Result<(), String> {
 }
 
 /// A generated file's path and contents, moved from `.isoloom/` to the instance's folder.
+#[must_use]
 pub fn relocate(path: &str, contents: &str, n: u8) -> (String, String) {
     let dir = output_dir(Some(n));
     let path = match path.strip_prefix(".isoloom/") {
         Some(rest) => format!("{dir}/{rest}"),
-        None => path.to_string(),
+        None => path.to_owned(),
     };
     (path, contents.replace(".isoloom/", &format!("{dir}/")))
 }

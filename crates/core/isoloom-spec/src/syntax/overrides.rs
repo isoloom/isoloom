@@ -252,6 +252,7 @@ pub struct ExternalMachine {
 
 impl Overrides {
     /// The cloud overrides, each with its key.
+    #[must_use]
     pub fn clouds(&self) -> [(&'static str, Option<&CloudOverrides>); 6] {
         [
             ("aws", self.aws.as_ref()),
@@ -264,6 +265,7 @@ impl Overrides {
     }
 
     /// The targets an override key applies to.
+    #[must_use]
     pub fn targets_of(key: &str) -> &'static [Target] {
         match key {
             "docker" => &[Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker],

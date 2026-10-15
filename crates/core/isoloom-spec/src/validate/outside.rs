@@ -119,7 +119,7 @@ pub(super) fn dhcp_address(spec: &Spec, net: &str, octet: u8, at: &str, p: &mut 
 
 #[cfg(test)]
 mod tests {
-    use crate::model::from_yaml as parse;
+    use crate::testing::model as parse;
     use crate::validate;
 
     fn problems(yaml: &str) -> Vec<String> {
@@ -162,7 +162,7 @@ mod tests {
         );
         let got = problems(&spec);
         assert!(
-            got.contains(&"machines.a.networks.home: `home` gives addresses by DHCP: write `home: 0`".to_string()),
+            got.contains(&"machines.a.networks.home: `home` gives addresses by DHCP: write `home: 0`".to_owned()),
             "{got:#?}"
         );
         assert!(

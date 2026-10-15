@@ -69,10 +69,13 @@ fn files_name_declared_values_once_each() {
     ] {
         assert!(has(&found, code, path), "{path}: {found:?}");
     }
-    let found = problems(
+    let windows = problems(
         "inputs: [FLAG]\nmachines:\n  dc: { os: windows-server@2019, networks: { lab: 10 }, files: [{ path: 'C:\\flag.txt', input: FLAG, mode: \"0444\" }] }\n",
     );
-    assert!(has(&found, Code::InvalidValue, "machines.dc.files[0].mode") && found.len() == 1, "{found:?}");
+    assert!(
+        has(&windows, Code::InvalidValue, "machines.dc.files[0].mode") && windows.len() == 1,
+        "{windows:?}"
+    );
 }
 
 #[test]
@@ -147,8 +150,10 @@ fn with_message(port: &str, message: &str) -> crate::syntax::Spec {
 
 proptest::proptest! {
     #[test]
-    fn any_message_is_checked_without_panicking(message in "\\PC{0,80}") {
-        let _ = check(&with_message("web", &message));
+    fn any_message_is_checked_and_only_the_message_is_faulted(message in "\\PC{0,80}") {
+        for p in check(&with_message("web", &message)) {
+            proptest::prop_assert_eq!(p.path.as_str(), "message");
+        }
     }
 
     #[test]

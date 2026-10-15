@@ -39,21 +39,8 @@ pub use isoloom_plan::Lab;
 
 use crate::model::{Spec, Target};
 
-/// Targets that have a generator today.
-pub const GENERATED_TARGETS: &[Target] = &[
-    Target::Docker,
-    Target::Hosted,
-    Target::DockerVm,
-    Target::CloudDocker,
-    Target::Kubernetes,
-    Target::Hybrid,
-    Target::Vagrant,
-    Target::Proxmox,
-    Target::Esxi,
-    Target::CloudVm,
-    Target::External,
-    Target::CloudServices,
-];
+/// Targets that have a generator today: every one.
+pub const GENERATED_TARGETS: &[Target] = &Target::ALL;
 
 /// The files for one target.
 ///

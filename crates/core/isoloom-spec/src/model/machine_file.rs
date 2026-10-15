@@ -37,11 +37,13 @@ pub struct MachineFile {
 
 impl MachineFile {
     /// Its mode, the default when the spec gives none.
+    #[must_use]
     pub fn mode_or_default(&self) -> &str {
         self.mode.as_deref().unwrap_or(DEFAULT_FILE_MODE)
     }
 
     /// Whether the spec sets its owner or its mode.
+    #[must_use]
     pub fn sets_owner_or_mode(&self) -> bool {
         self.uid.is_some() || self.gid.is_some() || self.mode.is_some()
     }
@@ -64,17 +66,20 @@ mod tests {
 
     #[test]
     fn a_mode_reads_as_text_or_number() {
-        let f: MachineFile = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 0600 }").unwrap();
-        assert_eq!(f.mode.as_deref(), Some("0600"));
-        let v: serde_yaml_ng::Value = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 0600 }").unwrap();
-        let f: MachineFile = serde_yaml_ng::from_value(v).unwrap();
-        assert_eq!(f.mode.as_deref(), Some("0600"));
-        let f: MachineFile = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 600 }").unwrap();
-        assert_eq!(f.mode.as_deref(), Some("600"));
-        let f: MachineFile = serde_yaml_ng::from_str("{ path: /a, content: x, mode: \"0600\" }").unwrap();
-        assert_eq!(f.mode_or_default(), "0600");
-        let f: MachineFile = serde_yaml_ng::from_str("{ path: /a, content: x }").unwrap();
-        assert_eq!((f.mode_or_default(), f.sets_owner_or_mode()), ("0644", false));
+        let from_text: MachineFile = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 0600 }").unwrap();
+        assert_eq!(from_text.mode.as_deref(), Some("0600"));
+        let value: serde_yaml_ng::Value = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 0600 }").unwrap();
+        let from_value: MachineFile = serde_yaml_ng::from_value(value).unwrap();
+        assert_eq!(from_value.mode.as_deref(), Some("0600"));
+        for (yaml, mode) in [
+            ("{ path: /a, content: x, mode: 600 }", "600"),
+            ("{ path: /a, content: x, mode: \"0600\" }", "0600"),
+        ] {
+            let f: MachineFile = serde_yaml_ng::from_str(yaml).unwrap();
+            assert_eq!(f.mode_or_default(), mode, "{yaml}");
+        }
+        let unset: MachineFile = serde_yaml_ng::from_str("{ path: /a, content: x }").unwrap();
+        assert_eq!((unset.mode_or_default(), unset.sets_owner_or_mode()), ("0644", false));
         assert!(serde_yaml_ng::from_str::<MachineFile>("{ path: /a, mode: [1] }").is_err());
     }
 }

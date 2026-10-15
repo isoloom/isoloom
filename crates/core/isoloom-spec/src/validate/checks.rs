@@ -62,7 +62,7 @@ fn from(spec: &Spec, at: &str, d: &Declared, p: &mut Problems) {
     match &d.from {
         Some(f) => match spec.machines.get(f) {
             None => p.add(format!("{at}.from"), format!("no machine named `{f}`")),
-            Some(m) if m.docker.as_ref().is_some_and(|d| d.appliance.is_some()) => p.add(
+            Some(m) if m.docker.as_ref().is_some_and(|docker| docker.appliance.is_some()) => p.add(
                 format!("{at}.from"),
                 format!("`{f}` is a network appliance: checks run from the machines around it"),
             ),

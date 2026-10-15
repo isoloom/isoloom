@@ -15,19 +15,20 @@
 //! `isoloom exec`. Expansion happens on the YAML before the spec is parsed (before `common:`
 //! and `groups:` fold in), so every reader sees finished machines.
 
-use std::fmt::Write as _;
-
 use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
+
+use crate::syntax::{Code, FieldPath, Problem};
 
 /// The highest `count`.
 pub const MAX: u8 = 99;
 
 fn key(s: &str) -> Value {
-    Value::String(s.to_string())
+    Value::String(s.to_owned())
 }
 
 /// A clone's name.
+#[must_use]
 pub fn name(base: &str, index: u8) -> String {
     format!("{base}-{index:02}")
 }
@@ -37,7 +38,12 @@ type Clones = IndexMap<String, Vec<String>>;
 
 /// Expands every machine with a `count` into its clones, in place, and rewrites the places
 /// that name the base machine. Returns base name -> clone names.
-pub fn expand(doc: &mut Value) -> Result<Clones, String> {
+///
+/// # Errors
+///
+/// An `invalid-value` [`Problem`] at the field: a `count` that isn't 2 to [`MAX`], a count on
+/// the access machine, or a network's `gateway` or `switch` naming a counted machine.
+pub fn expand(doc: &mut Value) -> Result<Clones, Problem> {
     let Value::Mapping(top) = doc else { return Ok(Clones::new()) };
     let Some(Value::Mapping(machines)) = top.get(key("machines")).cloned() else {
         return Ok(Clones::new());
@@ -54,7 +60,7 @@ pub fn expand(doc: &mut Value) -> Result<Clones, String> {
 }
 
 /// The machines with each counted one replaced by its clones, and the clones of each.
-fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), String> {
+fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Problem> {
     let mut clones = Clones::new();
     let mut expanded = Mapping::new();
     for (k, v) in machines {
@@ -72,24 +78,25 @@ fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), String> {
             expanded.insert(key(&n), Value::Mapping(clone_of(m, i)));
             names.push(n);
         }
-        clones.insert(base.to_string(), names);
+        clones.insert(base.to_owned(), names);
     }
     Ok((expanded, clones))
 }
 
 /// A machine's `count` (None without one), checked.
-fn count_of(base: &str, m: &Mapping) -> Result<Option<u8>, String> {
+fn count_of(base: &str, m: &Mapping) -> Result<Option<u8>, Problem> {
+    let refused = |reason: String| Problem::new(Code::InvalidValue, FieldPath::new("machines").key(base).key("count"), reason);
     let count = match m.get(key("count")) {
         None | Some(Value::Null) => return Ok(None),
         Some(Value::Number(n)) => n
             .as_u64()
             .and_then(|n| u8::try_from(n).ok())
             .filter(|n| (2..=MAX).contains(n))
-            .ok_or_else(|| format!("machines.{base}.count: 2 to {MAX} (one machine needs no count)"))?,
-        Some(_) => return Err(format!("machines.{base}.count: a number of machines, 2 to {MAX}")),
+            .ok_or_else(|| refused(format!("2 to {MAX} (one machine needs no count)")))?,
+        Some(_) => return Err(refused(format!("a number of machines, 2 to {MAX}"))),
     };
     if matches!(m.get(key("access")), Some(Value::Bool(true))) {
-        return Err(format!("machines.{base}.count: the access machine is one machine; leave `count` out"));
+        return Err(refused("the access machine is one machine; leave `count` out".to_owned()));
     }
     Ok(Some(count))
 }
@@ -170,12 +177,12 @@ fn expand_checks(top: &mut Mapping, clones: &Clones) {
     for c in checks.iter() {
         match c {
             Value::Mapping(m) if m.get(key("from")).and_then(Value::as_str).is_some_and(|f| clones.contains_key(f)) => {
-                let base = m.get(key("from")).and_then(Value::as_str).unwrap_or_default().to_string();
-                for n in &clones[&base] {
+                let base = m.get(key("from")).and_then(Value::as_str).unwrap_or_default().to_owned();
+                for n in clones.get(&base).into_iter().flatten() {
                     let mut each = m.clone();
                     each.insert(key("from"), key(n));
                     if let Some(Value::String(name)) = each.get_mut(key("name")) {
-                        let _ = write!(name, " ({n})");
+                        *name = format!("{name} ({n})");
                     }
                     out.push(Value::Mapping(each));
                 }
@@ -187,7 +194,7 @@ fn expand_checks(top: &mut Mapping, clones: &Clones) {
 }
 
 /// A gateway, or a LAN's switch, is one machine.
-fn one_machine_fields(top: &Mapping, clones: &Clones) -> Result<(), String> {
+fn one_machine_fields(top: &Mapping, clones: &Clones) -> Result<(), Problem> {
     let Some(Value::Mapping(nets)) = top.get(key("networks")) else {
         return Ok(());
     };
@@ -197,10 +204,8 @@ fn one_machine_fields(top: &Mapping, clones: &Clones) -> Result<(), String> {
                 && let Some(m) = net.get(key(field)).and_then(Value::as_str)
                 && clones.contains_key(m)
             {
-                return Err(format!(
-                    "networks.{}.{field}: `{m}` has a count; a {field} is one machine",
-                    n.as_str().unwrap_or_default()
-                ));
+                let at = FieldPath::new("networks").key(n.as_str().unwrap_or_default()).key(field);
+                return Err(Problem::new(Code::InvalidValue, at, format!("`{m}` has a count; a {field} is one machine")));
             }
         }
     }
