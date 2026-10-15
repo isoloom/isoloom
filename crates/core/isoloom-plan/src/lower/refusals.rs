@@ -134,6 +134,15 @@ overrides:
     }
 
     #[test]
+    fn an_lxc_container_builds_its_steps_as_a_container_does() {
+        let l = testing::lab(
+            "version: 1\nname: t\nmachines:\n  ct: { os: debian@12, app: { image: alpine, steps: [{ copy: { from: f, to: /f } }] } }\noverrides: { proxmox: { machines: { ct: { lxc: true } } } }\n",
+        );
+        assert_eq!(of(l.source(), Target::Proxmox), []);
+        assert_eq!(of(l.source(), Target::Vagrant).len(), 1, "a VM doesn't run a copy step yet");
+    }
+
+    #[test]
     fn hybrid_refuses_only_a_machine_with_neither_form_and_runs_a_vm_only_where_it_must() {
         let l = testing::lab(
             "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: postgres }\n",
