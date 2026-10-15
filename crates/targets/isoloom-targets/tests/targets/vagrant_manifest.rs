@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use isoloom_manifest::{Delivery, Identity, Manifest, Provider, Role, Version};
+use isoloom_manifest::{Action, Delivery, Identity, Manifest, Provider, Role, Run, Version};
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
@@ -106,6 +106,15 @@ fn the_controller_is_infra_halted_after_up_but_not_on_qemu() -> Outcome {
     assert_eq!((controller.role, controller.keep_running), (Role::Infra, false));
     let park = m.lifecycle.up.iter().find(|s| s.id.as_str() == "park-controller").unwrap();
     assert!(!park.providers.contains(&Provider::Qemu) && park.providers.contains(&Provider::Virtualbox));
+    // An action, not `vagrant halt`: after `up` the controller powers itself off, and a halt
+    // racing that fails over SSH (libvirt).
+    assert!(matches!(
+        park.run,
+        Run::Action {
+            action: Action::VagrantParkController,
+            ..
+        }
+    ));
     // The play's failure leads the error, and a resume never boots the controller.
     let up = m.lifecycle.up.iter().find(|s| s.id.as_str() == "up").unwrap();
     assert!(up.verdict.as_deref().is_some_and(|v| v.starts_with("fatal:")));

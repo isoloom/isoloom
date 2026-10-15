@@ -3,6 +3,8 @@
 //! once the lab is built (it comes back for provisioning and checks), except on QEMU, where it is
 //! the player's position on the lab network, and when the spec keeps it running.
 
+use std::num::NonZeroU32;
+
 use isoloom_manifest::{Action, Condition, Lifecycle, Name, NonEmpty, Park, Placeholder, Provider, Provision, Recovery, Retries, Step, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{act, cleanup, noted, run, tolerated};
@@ -105,13 +107,16 @@ fn running<'a>(env: &Environment, shape: &'a Shape) -> Vec<&'a str> {
         .collect()
 }
 
-/// The controller halted: after `up` (tolerated: it powers itself off after its play), after a
-/// re-provision and after the checks (`always`). Not on QEMU, nor when the spec keeps it on.
+/// The controller halted (`vagrant.park_controller`): after `up` (tolerated), after a
+/// re-provision and after the checks (`always`). After `up` it powers itself off at the end of its
+/// play, and a `vagrant halt` racing that fails over SSH (libvirt): the action waits for it to be
+/// off instead. Not on QEMU, nor when the spec keeps it on.
 pub(super) fn park_controller(env: &Environment, shape: &Shape, always: bool) -> Result<Option<Step>> {
     if shape.controller().is_none() || keeps_controller(env) {
         return Ok(None);
     }
-    let halt = run("park-controller", vagrant_argv(&["halt", CONTROLLER])?, CONTROLLER_HALT_S)?;
+    let mut halt = act("park-controller", Action::VagrantParkController)?;
+    halt.timeout_s = NonZeroU32::new(CONTROLLER_HALT_S);
     let mut s = if always { cleanup(halt) } else { tolerated(halt) };
     s.note = Some("Powering off the setup machine (it comes back for provisioning and checks)…".into());
     s.providers = [
@@ -157,8 +162,10 @@ fn provision(env: &Environment, shape: &Shape) -> Result<Provision> {
             machine: vec![one],
         });
     }
+    // Woken as the checks wake it: one still powering itself off after `up` is waited for.
     let wake = || -> Result<Step> {
-        let s = run("wake-controller", vagrant_argv(&["up", CONTROLLER, "--no-provision"])?, 1800)?;
+        let mut s = act("wake-controller", Action::VagrantWakeController)?;
+        s.timeout_s = NonZeroU32::new(1800);
         Ok(noted(s, "Booting the setup machine…"))
     };
     let play = || -> Result<Step> {

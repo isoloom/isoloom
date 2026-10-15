@@ -1236,11 +1236,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       {
         "id": "park-controller",
         "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
-        "argv": [
-          "vagrant",
-          "halt",
-          "isoloom-controller"
-        ],
+        "action": "vagrant.park_controller",
         "timeout_s": 300,
         "failure": "tolerate",
         "providers": [
@@ -1445,11 +1441,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       {
         "id": "park-controller",
         "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
-        "argv": [
-          "vagrant",
-          "halt",
-          "isoloom-controller"
-        ],
+        "action": "vagrant.park_controller",
         "timeout_s": 300,
         "when": "always",
         "failure": "tolerate",

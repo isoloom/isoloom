@@ -48,6 +48,9 @@ pub enum Action {
     /// Boots the controller, waiting for a halting one first.
     #[serde(rename = "vagrant.wake_controller")]
     VagrantWakeController,
+    /// Halts the controller, waiting for one that powers itself off.
+    #[serde(rename = "vagrant.park_controller")]
+    VagrantParkController,
     /// Removes a stale Terraform state lock.
     #[serde(rename = "terraform.clear_lock")]
     TerraformClearLock,

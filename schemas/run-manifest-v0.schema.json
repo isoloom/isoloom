@@ -1915,6 +1915,11 @@
         },
         {
           "type": "string",
+          "const": "vagrant.park_controller",
+          "description": "Halts the controller, waiting for one that powers itself off."
+        },
+        {
+          "type": "string",
           "const": "terraform.clear_lock",
           "description": "Removes a stale Terraform state lock."
         },
