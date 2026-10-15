@@ -38,8 +38,10 @@
 //! `ISOLOOM_NODE_BIN` names its bin folder when the one on `PATH` is another version. A set
 //! `CARGO_TARGET_DIR` gets one subfolder per repository, so they never share one.
 //!
-//! `--deep` adds the slow gates to this Mac's part: every fuzz target for a minute (`cargo xtask
-//! fuzz`) and mutation testing of the core crates (`cargo xtask mutants`).
+//! Isoloom and Isothrum run the same gates, each through its own xtask (Isothrum's is `cargo run
+//! -p xtask --`). `--deep` adds the slow ones to this Mac's part: every fuzz target for a minute
+//! (the `fuzz` task) and mutation testing (`mutants`: Isoloom's core crates, Isothrum's compiler
+//! and runner executor).
 //!
 //! `--clean` removes the hosts' build folders and copies, every checkout's (the remote folders,
 //! the Docker volumes and image). `--prune-volumes` removes only those of checkouts no longer on

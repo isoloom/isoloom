@@ -30,11 +30,31 @@ fn gate(name: &'static str, argv: &[&'static str]) -> Gate {
     }
 }
 
-/// Isoloom's gates: every one on the full profile, the tests (`cargo xtask test`: nextest, then
-/// the doctests) on the others, and fuzzing and mutation testing after them on the deep one.
-/// Clippy runs without `-D warnings`: a lint at deny fails it, and the lints still at warn are
-/// counted by the ratchet (`cargo xtask quality`), which fails when a count goes up.
+/// How Isoloom runs its development tasks: the `cargo xtask` alias.
+const ISOLOOM_XTASK: [&str; 2] = ["cargo", "xtask"];
+
+/// How Isothrum runs its development tasks: its `.cargo/config.toml` is the one `dev-link`
+/// writes, so it has no alias.
+const ISOTHRUM_XTASK: [&str; 6] = ["cargo", "run", "--quiet", "--package", "xtask", "--"];
+
+/// Isoloom's gates (see [`workspace_gates`]).
 pub(super) fn isoloom(profile: Profile) -> Vec<Gate> {
+    workspace_gates(profile, &ISOLOOM_XTASK)
+}
+
+/// Isothrum's gates, its libraries' workspace (the desktop app is its own and moves out): the
+/// same as Isoloom's, through its own xtask (see [`workspace_gates`]).
+pub(super) fn isothrum(profile: Profile) -> Vec<Gate> {
+    workspace_gates(profile, &ISOTHRUM_XTASK)
+}
+
+/// A Rust workspace's gates, its tasks run by `xtask` (the program and the arguments before the
+/// task): every one on the full profile, the tests (the `test` task: nextest, then the doctests)
+/// on the others, and fuzzing and mutation testing after them on the deep one. Clippy runs
+/// without `-D warnings`: a lint at deny fails it, and the lints still at warn are counted by the
+/// ratchet (the `quality` task), which fails when a count goes up.
+fn workspace_gates(profile: Profile, xtask: &[&'static str]) -> Vec<Gate> {
+    let task = |name: &'static str, args: &[&'static str]| gate(name, &[xtask, args].concat());
     let mut gates = Vec::new();
     if profile.statics() {
         gates.push(gate("fmt", &["cargo", "fmt", "--all", "--check"]));
@@ -48,27 +68,16 @@ pub(super) fn isoloom(profile: Profile) -> Vec<Gate> {
         let mut doc = gate("doc", &["cargo", "doc", "--workspace", "--no-deps"]);
         doc.env.push(("RUSTDOCFLAGS", "-Dwarnings"));
         gates.push(doc);
-        gates.push(gate("quality", &["cargo", "xtask", "quality"]));
-        gates.push(gate("msrv", &["cargo", "xtask", "msrv"]));
-        gates.push(gate("features", &["cargo", "xtask", "features"]));
-        gates.push(gate("fuzz-check", &["cargo", "xtask", "fuzz", "--check"]));
+        gates.push(task("quality", &["quality"]));
+        gates.push(task("msrv", &["msrv"]));
+        gates.push(task("features", &["features"]));
+        gates.push(task("fuzz-check", &["fuzz", "--check"]));
     }
-    gates.push(gate("test", &["cargo", "xtask", "test"]));
+    gates.push(task("test", &["test"]));
     if profile == Profile::Deep {
-        gates.push(gate("fuzz", &["cargo", "xtask", "fuzz"]));
-        gates.push(gate("mutants", &["cargo", "xtask", "mutants"]));
+        gates.push(task("fuzz", &["fuzz"]));
+        gates.push(task("mutants", &["mutants"]));
     }
-    gates
-}
-
-/// Isothrum's libraries (its root workspace; the desktop app is its own and moves out).
-pub(super) fn isothrum(profile: Profile) -> Vec<Gate> {
-    let mut gates = Vec::new();
-    if profile.statics() {
-        gates.push(gate("fmt", &["cargo", "fmt", "--all", "--check"]));
-        gates.push(gate("clippy", &["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]));
-    }
-    gates.push(gate("test", &["cargo", "test", "--workspace", "--no-fail-fast"]));
     gates
 }
 
@@ -268,7 +277,20 @@ mod tests {
         assert_eq!(platform, ["test"]);
         let deep: Vec<&str> = isoloom(Profile::Deep).iter().map(|g| g.name).skip(full.len()).collect();
         assert_eq!(deep, ["fuzz", "mutants"]);
-        assert_eq!(isothrum(Profile::Full).len(), 3);
+    }
+
+    #[test]
+    fn isothrum_runs_the_same_gates_through_its_own_xtask() {
+        let names = |gates: &[Gate]| gates.iter().map(|g| g.name).collect::<Vec<_>>();
+        for profile in [Profile::Full, Profile::Platform, Profile::Deep] {
+            assert_eq!(names(&isothrum(profile)), names(&isoloom(profile)));
+        }
+        let gates = isothrum(Profile::Deep);
+        let line = |name: &str| gates.iter().find(|g| g.name == name).map(|g| g.argv.join(" "));
+        assert_eq!(line("quality").as_deref(), Some("cargo run --quiet --package xtask -- quality"));
+        assert_eq!(line("test").as_deref(), Some("cargo run --quiet --package xtask -- test"));
+        assert_eq!(line("fuzz-check").as_deref(), Some("cargo run --quiet --package xtask -- fuzz --check"));
+        assert_eq!(line("clippy").as_deref(), Some("cargo clippy --workspace --all-targets"));
     }
 
     #[test]
