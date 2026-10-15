@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-targets"
-description = "Isoloom's targets: dispatch to every backend, refusals and the resolved snapshot."
+description = "Isoloom's targets: the registry of backends, the targets made of two, refusals, the resolved snapshot and its reports."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -19,18 +19,14 @@ isoloom-vagrant.workspace = true
 isoloom-ansible.workspace = true
 isoloom-manifest.workspace = true
 serde_json.workspace = true
-indexmap.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+proptest.workspace = true
 serde_yaml_ng.workspace = true
 jsonschema.workspace = true
 criterion.workspace = true
-
-# Unused today; kept while this crate moves onto the plan IR (Wave 1, unit 6).
-[package.metadata.cargo-machete]
-ignored = ["indexmap"]
 
 # The hot paths of generation, measured by `cargo xtask bench` (criterion, its own main).
 [[bench]]

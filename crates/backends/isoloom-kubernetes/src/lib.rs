@@ -81,5 +81,6 @@ mod values_schema;
 
 pub use backend::KubernetesBackend;
 pub use error::{Error, Result};
+pub use network::network_member;
 pub use project::project_copies;
 pub use secrets::SECRETS;

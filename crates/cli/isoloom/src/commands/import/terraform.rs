@@ -1,33 +1,34 @@
 //! `isoloom import terraform`: a draft from the `.tf` files of a folder.
 
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
 
-use super::draft::{Dest, write_draft};
-use crate::Res;
+use super::draft::{self, Dest, Source};
+use crate::console::Console;
+use crate::error::{CliError, Result};
+use crate::exit::Verdict;
 
-pub fn run(dir: Option<PathBuf>, dest: &Dest) -> Res<ExitCode> {
+/// Drafts the spec from the `.tf` files of `dir`, else of the current folder.
+pub(crate) fn run(dir: Option<PathBuf>, dest: &Dest, console: &mut Console) -> Result<Verdict> {
     let dir = dir.unwrap_or_else(|| PathBuf::from("."));
     let files = tf_files(&dir)?;
     if files.is_empty() {
-        return Err(format!("no .tf files in {}", dir.display()).into());
+        return Err(CliError::NothingToImport(format!("no .tf files in {}", dir.display())));
     }
-    let folder = dir.canonicalize()?;
-    let fallback = folder.file_name().and_then(|n| n.to_str()).unwrap_or("env").to_string();
-    let source = format!("{} (.tf files)", folder.file_name().and_then(|n| n.to_str()).unwrap_or("."));
-    let draft = isoloom_import::terraform::draft(&files, &fallback, &source)?;
-    write_draft(&draft, folder, dest)
+    let source = Source::folder(&dir, ".tf files")?;
+    let drafted = isoloom_import::terraform::draft(&files, &source.fallback, &source.named)?;
+    draft::write(&drafted, &source.folder, dest, console)
 }
 
 /// The folder's `.tf` files, as (name, text), sorted.
-fn tf_files(dir: &Path) -> Res<Vec<(String, String)>> {
+fn tf_files(dir: &Path) -> Result<Vec<(String, String)>> {
     let mut files = Vec::new();
-    for e in std::fs::read_dir(dir).map_err(|e| format!("can't read {}: {e}", dir.display()))? {
-        let p = e?.path();
-        if p.extension().and_then(|x| x.to_str()) == Some("tf")
-            && let Some(name) = p.file_name()
+    for entry in std::fs::read_dir(dir).map_err(CliError::reading(dir))? {
+        let path = entry.map_err(CliError::reading(dir))?.path();
+        if path.extension().and_then(|x| x.to_str()) == Some("tf")
+            && let Some(name) = path.file_name()
         {
-            files.push((name.to_string_lossy().to_string(), std::fs::read_to_string(&p)?));
+            let text = std::fs::read_to_string(&path).map_err(CliError::reading(&path))?;
+            files.push((name.to_string_lossy().into_owned(), text));
         }
     }
     files.sort();

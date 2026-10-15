@@ -1,19 +1,10 @@
 //! `isoloom profiles`: each of the project's profiles, checked against the spec.
 
-use std::path::{Path, PathBuf};
-use std::process::ExitCode;
-
-use crate::{Res, output};
-
-#[derive(clap::Args)]
-pub struct Args {
-    #[arg(default_value = ".")]
-    dir: PathBuf,
-    #[arg(long)]
-    json: bool,
-}
+use super::{Console, Listing, Result, Verdict};
+use std::path::Path;
 
 /// A profile as listed: its name, target, description and problems.
+#[derive(Debug)]
 struct Checked {
     name: String,
     target: Option<&'static str>,
@@ -21,8 +12,9 @@ struct Checked {
     problems: Vec<String>,
 }
 
-pub fn run(a: &Args) -> Res<ExitCode> {
-    let dir = &a.dir;
+/// Lists each profile with its problems; a no when one has any.
+pub(crate) fn run(a: &Listing, console: &mut Console) -> Result<Verdict> {
+    let dir = &a.project.dir;
     let out: Vec<Checked> = isoloom_spec::profile::list(dir).iter().map(|name| check(dir, name)).collect();
     let failed = out.iter().any(|c| !c.problems.is_empty());
     if a.json {
@@ -30,31 +22,31 @@ pub fn run(a: &Args) -> Res<ExitCode> {
             .iter()
             .map(|c| serde_json::json!({ "name": c.name, "target": c.target, "description": c.description, "ok": c.problems.is_empty(), "problems": c.problems }))
             .collect();
-        output::print_json(&items)?;
+        console.json(&items)?;
     } else if out.is_empty() {
-        println!(
+        console.line(format_args!(
             "no profiles in {} (one file per customer or site: profiles/<name>.yml)",
             dir.join(isoloom_spec::profile::DIR).display()
-        );
+        ))?;
     } else {
         let width = out.iter().map(|c| c.name.len()).max().unwrap_or(0);
         for c in &out {
             let mark = if c.problems.is_empty() { '✓' } else { '✗' };
-            println!(
-                "{mark} {:<width$}  {:<14}  {}",
+            let target = c.target.unwrap_or("any target");
+            console.line(format_args!(
+                "{mark} {:<width$}  {target:<14}  {}",
                 c.name,
-                c.target.unwrap_or("any target"),
                 c.description.as_deref().unwrap_or("")
-            );
+            ))?;
             for problem in &c.problems {
-                println!("    {problem}");
+                console.line(format_args!("    {problem}"))?;
             }
         }
     }
-    Ok(output::exit_code(!failed))
+    Ok(Verdict::of(!failed))
 }
 
-/// A profile loaded, the spec it makes validated, and its target checked against that spec.
+/// A profile loaded, the spec it makes checked, and its target checked against that spec.
 fn check(dir: &Path, name: &str) -> Checked {
     let profile = isoloom_spec::profile::load(dir, name);
     let (target, description) = match &profile {
@@ -66,17 +58,18 @@ fn check(dir: &Path, name: &str) -> Checked {
         Ok(p) => problems_of(dir, &p),
     };
     Checked {
-        name: name.to_string(),
+        name: name.to_owned(),
         target,
         description,
         problems,
     }
 }
 
+/// What is wrong with the spec a profile makes, and with the target it pins.
 fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile) -> Vec<String> {
     let spec = match isoloom_spec::load_profiled(dir, Some(p), &[]) {
         Err(isoloom_spec::LoadError::Invalid { problems, .. }) => return problems.iter().map(|e| format!("the spec it makes: {}", e.line())).collect(),
-        Err(e) => return e.to_string().lines().map(str::to_string).collect(),
+        Err(e) => return e.to_string().lines().map(str::to_owned).collect(),
         Ok(spec) => spec,
     };
     let lab = match isoloom_spec::defaults::load_profiled(dir, None, Some(p), &[]) {

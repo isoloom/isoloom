@@ -1,12 +1,11 @@
 //! `isoloom validate`: the spec's mistakes, and the paths it mentions that don't exist.
 
 use std::path::PathBuf;
-use std::process::ExitCode;
 
-use crate::{Res, output, spec};
+use super::{Console, Result, Verdict, spec};
 
-#[derive(clap::Args)]
-pub struct Args {
+#[derive(Debug, clap::Args)]
+pub(crate) struct Args {
     /// The project folder (holding isoloom.yml).
     #[arg(default_value = ".")]
     dir: PathBuf,
@@ -18,10 +17,12 @@ pub struct Args {
     json: bool,
 }
 
-pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
-    let file = isoloom_spec::find(&a.dir)?
-        .file_name()
-        .map_or_else(|| isoloom_spec::SPEC_FILE.to_owned(), |f| f.to_string_lossy().into_owned());
+/// Lists the spec's problems: its answer is the verdict, so a spec with problems is a no, not
+/// an error.
+pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
+    // A folder with no spec is an error: there is nothing to give a verdict on.
+    isoloom_spec::find(&a.dir)?;
+    let file = spec::file_name(&a.dir);
     let profile = profile.load(&a.dir)?;
     let (name, problems) = match isoloom_spec::load_profiled(&a.dir, profile.as_ref(), &[]) {
         Ok(spec) => {
@@ -33,17 +34,14 @@ pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
         Err(e) => return Err(e.into()),
     };
     if a.json {
-        let out = serde_json::json!({ "ok": problems.is_empty(), "problems": problems });
-        output::print_json(&out)?;
-        return Ok(output::exit_code(problems.is_empty()));
-    }
-    if problems.is_empty() {
-        println!("✓ {name} is valid");
+        console.json(&serde_json::json!({ "ok": problems.is_empty(), "problems": problems }))?;
+    } else if problems.is_empty() {
+        console.line(format_args!("✓ {name} is valid"))?;
     } else {
         for p in &problems {
-            println!("✗ {}", p.render(&file));
+            console.line(format_args!("✗ {}", p.render(&file)))?;
         }
-        println!("{} problem{}", problems.len(), if problems.len() == 1 { "" } else { "s" });
+        console.line(format_args!("{} problem{}", problems.len(), if problems.len() == 1 { "" } else { "s" }))?;
     }
-    Ok(output::exit_code(problems.is_empty()))
+    Ok(Verdict::of(problems.is_empty()))
 }

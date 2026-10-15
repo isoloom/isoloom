@@ -1,13 +1,12 @@
 //! `isoloom schema`: the JSON Schema of isoloom.yml, for editors.
 
-use std::process::ExitCode;
+use super::{Console, Result, Verdict};
 
-use crate::{Res, output};
+#[derive(Debug, clap::Args)]
+pub(crate) struct Args {}
 
-#[derive(clap::Args)]
-pub struct Args {}
-
-pub fn run(_: &Args) -> Res<ExitCode> {
-    output::print_json(&isoloom_spec::schema::schema())?;
-    Ok(ExitCode::SUCCESS)
+/// Prints the schema.
+pub(crate) fn run(_: &Args, console: &mut Console) -> Result<Verdict> {
+    console.json(&isoloom_spec::schema::schema())?;
+    Ok(Verdict::Pass)
 }

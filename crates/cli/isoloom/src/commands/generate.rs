@@ -1,14 +1,14 @@
 //! `isoloom generate`: each target's files under .isoloom/, or one target's.
 
 use std::path::PathBuf;
-use std::process::ExitCode;
 
-use crate::{Res, generated, output, spec, target};
+use super::{Console, Project, Result, Verdict};
+use crate::{generated, spec, target};
 
-#[derive(clap::Args)]
-pub struct Args {
-    #[arg(default_value = ".")]
-    dir: PathBuf,
+#[derive(Debug, clap::Args)]
+pub(crate) struct Args {
+    #[command(flatten)]
+    project: Project,
     /// Only this target (docker, vagrant).
     #[arg(long)]
     target: Option<String>,
@@ -22,28 +22,28 @@ pub struct Args {
     sets: Vec<String>,
 }
 
-pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
-    let dir = &a.dir;
+/// Writes the files, then says why each target left out wasn't generated. Asking for one target
+/// that can't be generated is a no; skipping some of all of them isn't.
+pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
+    let dir = &a.project.dir;
     let target = spec::pinned(profile, dir, a.target.as_deref())?;
-    let (lab, settings) = spec::load_settings(profile, dir, a.images.as_deref(), &a.sets)?;
-    if spec::report_invalid(dir, &lab) {
-        return Ok(ExitCode::FAILURE);
-    }
+    let (lab, settings) = spec::with_settings(profile, dir, a.images.as_deref(), &a.sets)?;
+    let lab = spec::checked(lab, dir)?;
     let (files, skipped) = match &target {
         Some(id) => match isoloom_targets::generate(&lab, target::by_id(id)?) {
             Ok(f) => (f, vec![]),
-            Err(e) => (vec![], vec![e]),
+            Err(isoloom_targets::Error::Refused(e)) => (vec![], vec![e]),
+            Err(e) => return Err(e.into()),
         },
         None => isoloom_targets::generate_all(&lab),
     };
     let files = generated::finish(files, &settings.defaults, dir)?;
     for f in &files {
         generated::write_file(dir, f)?;
-        println!("✓ {}", f.path);
+        console.line(format_args!("✓ {}", f.path))?;
     }
     for e in &skipped {
-        println!("· {e}");
+        console.line(format_args!("· {e}"))?;
     }
-    // Asking for one target that can't be generated is an error; skipping some of "all" isn't.
-    Ok(output::exit_code(target.is_none() || !files.is_empty()))
+    Ok(Verdict::of(target.is_none() || !files.is_empty()))
 }

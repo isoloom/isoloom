@@ -1,13 +1,15 @@
 //! `cargo xtask bench`: the generation benchmarks (criterion, in
 //! `crates/targets/isoloom-targets/benches/pipeline.rs`: parsing, lowering and rendering
-//! representative examples), each median compared with the stored baseline,
-//! `bench-baseline.json`.
+//! representative examples, and generating every example on every target), each median
+//! compared with the stored baseline, `bench-baseline.json`.
 //!
 //! A benchmark more than `--threshold` percent slower than its baseline fails the run; one the
-//! baseline doesn't know, or one gone, is only reported. `--update` writes today's medians as the
-//! baseline (the first run writes it too). The baseline names the host it was measured on (its
-//! OS and architecture): on another host the comparison is printed, never failed, since the
-//! numbers aren't comparable. Criterion's reports go to `<target dir>/xtask-bench`.
+//! baseline doesn't know, or one gone, is only reported. A benchmark with a budget
+//! ([`BUDGETS`]: generating every example on every target) fails the run when it is over it,
+//! on any host. `--update` writes today's medians as the baseline (the first run writes it
+//! too). The baseline names the host it was measured on (its OS and architecture): on another
+//! host the comparison is printed, never failed, since the numbers aren't comparable.
+//! Criterion's reports go to `<target dir>/xtask-bench`.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -31,6 +33,24 @@ pub(crate) struct Args {
 /// Each benchmark's median, in nanoseconds, by its id (`parse/hello-stack`).
 type Medians = BTreeMap<String, f64>;
 
+/// The benchmarks held to an absolute budget, in nanoseconds, on every host. Generating every
+/// example on every target, parsing included, stays under 8 s: the budget set on 2026-10-15 as
+/// about four times what a debug build took on the Intel Mac. The benchmarks are a release
+/// build, measured as a median, so only a gross regression reaches it; the baseline comparison
+/// catches the smaller ones. Raise it only with the reason in the commit.
+const BUDGETS: [(&str, f64); 1] = [("generate/every-example", 8e9)];
+
+/// One line per benchmark over its budget.
+fn over_budget(now: &Medians) -> Vec<String> {
+    BUDGETS
+        .iter()
+        .filter_map(|(id, budget)| {
+            let median = now.get(*id)?;
+            (median > budget).then(|| format!("{id:<28} {:>10}  over its budget of {}\n", shown(*median), shown(*budget)))
+        })
+        .collect()
+}
+
 /// The host the numbers come from.
 fn host() -> String {
     format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH)
@@ -48,6 +68,12 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
         return Ok(ExitCode::FAILURE);
     }
     let now = medians(&reports)?;
+    let over = over_budget(&now);
+    print!("{}", over.concat());
+    if !over.is_empty() {
+        println!("bench: {} benchmark(s) over budget", over.len());
+        return Ok(ExitCode::FAILURE);
+    }
     let file = root.join("bench-baseline.json");
     let stored = match std::fs::read_to_string(&file) {
         Ok(text) => Some(serde_json::from_str::<Value>(&text)?),
@@ -160,6 +186,17 @@ mod tests {
         assert!(text.contains("parse/a") && text.contains("+30.0%  SLOWER"), "{text}");
         assert!(text.contains("render/b") && text.contains("not in the baseline"), "{text}");
         assert!(text.contains("render/a                     gone"), "{text}");
+    }
+
+    #[test]
+    fn a_benchmark_over_its_budget_is_named() {
+        assert_eq!(over_budget(&medians(&[("generate/every-example", 7.9e9)])), Vec::<String>::new());
+        let over = over_budget(&medians(&[("generate/every-example", 8.1e9), ("parse/a", 9e9)]));
+        assert_eq!(over.len(), 1);
+        assert!(
+            over[0].contains("generate/every-example") && over[0].contains("over its budget of 8.00 s"),
+            "{over:?}"
+        );
     }
 
     #[test]

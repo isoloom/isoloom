@@ -11,21 +11,31 @@ pub(crate) const MACHINE_LABEL: &str = "isoloom.com/machine";
 /// The label naming a check's pod.
 pub(crate) const CHECK_LABEL: &str = "isoloom.com/check";
 
+/// The value of a member's network label.
+const MEMBER: &str = "member";
+
 /// The label of a network's members.
 pub(crate) fn net_label(net: &str) -> String {
     format!("net.isoloom.com/{net}")
 }
 
+/// The label a pod on network `net` carries, as `key=value` (`net.isoloom.com/lan=member`):
+/// what selects the network's members.
+#[must_use]
+pub fn network_member(net: &str) -> String {
+    format!("{}={MEMBER}", net_label(net))
+}
+
 /// The members of `net`.
 fn members(net: &str) -> Selector {
-    Selector::of(&net_label(net), "member")
+    Selector::of(&net_label(net), MEMBER)
 }
 
 /// The labels a pod on these networks carries (what the network policies select): the
 /// machine's name first, when it is one.
 pub(crate) fn pod_labels<'a>(machine: Option<&str>, nets: impl IntoIterator<Item = &'a String>) -> Labels {
     let own = machine.map(|m| (MACHINE_LABEL.to_owned(), m.to_owned()));
-    own.into_iter().chain(nets.into_iter().map(|n| (net_label(n), "member".to_owned()))).collect()
+    own.into_iter().chain(nets.into_iter().map(|n| (net_label(n), MEMBER.to_owned()))).collect()
 }
 
 /// An egress policy for the pods `selector` matches: other pods of the environment, and DNS.

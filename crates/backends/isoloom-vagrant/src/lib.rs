@@ -48,4 +48,5 @@ mod vms;
 
 pub use backend::VagrantBackend;
 pub use error::{Error, Result};
+pub use vms::network_name;
 pub use vms::provider::{disk_refusal, provider_refusal};

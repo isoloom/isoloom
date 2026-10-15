@@ -94,7 +94,7 @@ impl<'a> HyperV<'a> {
 
     /// The private switch of a network.
     fn switch(&self, net: &str) -> String {
-        format!("isoloom-{}-{net}", self.env)
+        super::network_name(self.env, net)
     }
 
     /// The networks' switches, as a Ruby array.

@@ -3,10 +3,10 @@
 
 use serde_json::{Map, Value, json};
 
-use crate::model::{Machine, Port, Protocol, Spec};
+use isoloom_spec::model::{Machine, Port, Protocol, Spec};
 
 /// What a port speaks, as the spec writes it (`tcp`, `udp`, `http`, `https`, `tls`).
-pub(super) fn protocol(p: &Port) -> &'static str {
+fn protocol(p: &Port) -> &'static str {
     match (p.protocol, p.http, p.tls) {
         (Protocol::Udp, ..) => "udp",
         (_, true, true) => "https",
@@ -17,7 +17,7 @@ pub(super) fn protocol(p: &Port) -> &'static str {
 }
 
 /// The page of an HTTP or HTTPS port published on host port `host`, at the host's loopback.
-pub(super) fn url(p: &Port, host: u16) -> Option<String> {
+fn url(p: &Port, host: u16) -> Option<String> {
     p.http.then(|| format!("{}://127.0.0.1:{host}/", if p.tls { "https" } else { "http" }))
 }
 
@@ -46,6 +46,16 @@ fn port(p: &Port) -> Value {
     Value::Object(v)
 }
 
+/// A port of the snapshot as a table or a diagram shows it: `53`, or `53/udp` for a UDP one.
+pub(crate) fn shown(port: &Value) -> String {
+    let number = port.get("port").map_or_else(String::new, ToString::to_string);
+    if port.get("protocol").and_then(Value::as_str) == Some("udp") {
+        format!("{number}/udp")
+    } else {
+        number
+    }
+}
+
 /// Every published port: its machine, name, port and host port.
 pub(super) fn published(spec: &Spec) -> Vec<Value> {
     spec.machines
@@ -57,4 +67,15 @@ pub(super) fn published(spec: &Spec) -> Vec<Value> {
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_udp_port_is_shown_with_its_protocol() {
+        assert_eq!(shown(&json!({ "port": 53, "protocol": "udp" })), "53/udp");
+        assert_eq!(shown(&json!({ "port": 80, "protocol": "http" })), "80");
+    }
 }

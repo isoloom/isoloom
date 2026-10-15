@@ -40,6 +40,13 @@ mod qemu;
 mod transport;
 mod windows;
 
+/// The name of a network on the host, `isoloom-<environment>-<network>`: its VirtualBox
+/// internal network, its libvirt network and its Hyper-V private switch.
+#[must_use]
+pub fn network_name(environment: &str, network: &str) -> String {
+    format!("isoloom-{environment}-{network}")
+}
+
 use indexmap::IndexMap;
 use isoloom_plan::{Controller, Environment, MachineShape};
 use isoloom_render::backend::Files;

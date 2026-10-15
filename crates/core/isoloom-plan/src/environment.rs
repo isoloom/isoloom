@@ -387,7 +387,8 @@ pub fn on_docker(target: Target) -> bool {
 }
 
 /// The spec as `target` lays it out: on the Docker targets, every network on its Docker block.
-pub(crate) fn lay_out(spec: &Spec, target: Target) -> Spec {
+#[must_use]
+pub fn lay_out(spec: &Spec, target: Target) -> Spec {
     let mut s = spec.clone();
     if on_docker(target) {
         for (name, c) in docker_cidrs(spec) {

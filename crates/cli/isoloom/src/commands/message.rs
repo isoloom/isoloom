@@ -1,14 +1,12 @@
 //! `isoloom message`: the spec's `message` (how to use the environment), its placeholders filled.
 
-use std::path::PathBuf;
-use std::process::ExitCode;
+use super::{Console, Project, Result, Verdict};
+use crate::{spec, target};
 
-use crate::{Res, spec, target};
-
-#[derive(clap::Args)]
-pub struct Args {
-    #[arg(default_value = ".")]
-    dir: PathBuf,
+#[derive(Debug, clap::Args)]
+pub(crate) struct Args {
+    #[command(flatten)]
+    project: Project,
     /// The message of instance N.
     #[arg(long, value_name = "N")]
     instance: Option<u8>,
@@ -21,8 +19,9 @@ pub struct Args {
     sets: Vec<String>,
 }
 
-pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
-    let lab = spec::load_valid(profile, &a.dir, a.instance, &a.sets)?;
+/// Prints the message as it reads where the environment runs.
+pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
+    let lab = spec::valid(profile, &a.project.dir, a.instance, &a.sets)?;
     // Where it runs decides the addresses (Docker blocks on the Compose targets).
     let on = match a.target.as_deref() {
         Some(id) => Some(target::by_id(id)?),
@@ -36,8 +35,8 @@ pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
         None => isoloom_targets::resolved::render_message(&lab, a.instance)?,
     };
     match message {
-        Some(m) => println!("{}", m.trim_end()),
-        None => eprintln!("the spec has no `message:`"),
+        Some(m) => console.line(m.trim_end())?,
+        None => console.note("the spec has no `message:`\n")?,
     }
-    Ok(ExitCode::SUCCESS)
+    Ok(Verdict::Pass)
 }

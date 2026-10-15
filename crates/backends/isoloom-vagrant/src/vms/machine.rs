@@ -81,7 +81,7 @@ fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, name: &str, os: Os) {
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
 /// provider's VM gets its IPv6 address from the set-up steps.
 pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
-    let netname = format!("isoloom-{}-{net}", env.name);
+    let netname = super::network_name(&env.name, net);
     let mut call = Call::new("m.vm.network")
         .arg(Value::str("private_network"))
         .kw("ip", Value::str(&ip.to_string()))

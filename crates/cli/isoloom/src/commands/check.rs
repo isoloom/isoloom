@@ -1,14 +1,14 @@
 //! `isoloom check`: whether the generated files under .isoloom/ still match the spec (for CI).
 
 use std::path::PathBuf;
-use std::process::ExitCode;
 
-use crate::{Res, generated, spec};
+use super::{Console, Project, Result, Verdict};
+use crate::{generated, spec};
 
-#[derive(clap::Args)]
-pub struct Args {
-    #[arg(default_value = ".")]
-    dir: PathBuf,
+#[derive(Debug, clap::Args)]
+pub(crate) struct Args {
+    #[command(flatten)]
+    project: Project,
     /// The image table the files were generated with (see `generate --images`).
     #[arg(long, value_name = "FILE")]
     images: Option<PathBuf>,
@@ -18,30 +18,28 @@ pub struct Args {
     sets: Vec<String>,
 }
 
-pub fn run(a: &Args, profile: &spec::Profile) -> Res<ExitCode> {
-    let (lab, settings) = spec::load_settings(profile, &a.dir, a.images.as_deref(), &a.sets)?;
-    if spec::report_invalid(&a.dir, &lab) {
-        return Ok(ExitCode::FAILURE);
-    }
+/// Generates every target in memory and compares each file with the one on disk.
+pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
+    let (lab, settings) = spec::with_settings(profile, &a.project.dir, a.images.as_deref(), &a.sets)?;
+    let lab = spec::checked(lab, &a.project.dir)?;
     let (files, _) = isoloom_targets::generate_all(&lab);
-    let files = generated::finish(files, &settings.defaults, &a.dir)?;
+    let files = generated::finish(files, &settings.defaults, &a.project.dir)?;
     let mut stale = 0;
     for f in &files {
-        match std::fs::read_to_string(a.dir.join(&f.path)) {
-            Ok(current) if current == f.contents => println!("✓ {}", f.path),
+        match std::fs::read_to_string(a.project.dir.join(&f.path)) {
+            Ok(current) if current == f.contents => console.line(format_args!("✓ {}", f.path))?,
             Ok(_) => {
-                println!("✗ {} is out of date", f.path);
+                console.line(format_args!("✗ {} is out of date", f.path))?;
                 stale += 1;
             }
             Err(_) => {
-                println!("✗ {} is missing", f.path);
+                console.line(format_args!("✗ {} is missing", f.path))?;
                 stale += 1;
             }
         }
     }
     if stale > 0 {
-        println!("run `isoloom generate` and commit the result");
-        return Ok(ExitCode::FAILURE);
+        console.line("run `isoloom generate` and commit the result")?;
     }
-    Ok(ExitCode::SUCCESS)
+    Ok(Verdict::of(stale == 0))
 }

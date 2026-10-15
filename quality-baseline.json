@@ -1,62 +1,14 @@
 {
   "rules": {
     "clippy/allow_attributes_without_reason": {
-      "isoloom": 5,
-      "isoloom-spec": 1,
-      "isoloom-targets": 35
-    },
-    "clippy/as_conversions": {
-      "isoloom-targets": 2
-    },
-    "clippy/doc_markdown": {
-      "isoloom": 1,
-      "isoloom-targets": 2
-    },
-    "clippy/indexing_slicing": {
-      "isoloom-targets": 12
-    },
-    "clippy/let_underscore_must_use": {
-      "isoloom": 10,
-      "isoloom-targets": 32
+      "isoloom-spec": 1
     },
     "clippy/missing_errors_doc": {
-      "isoloom-spec": 13,
-      "isoloom-targets": 2
-    },
-    "clippy/must_use_candidate": {
-      "isoloom-targets": 4
-    },
-    "clippy/print_stderr": {
-      "isoloom": 6
-    },
-    "clippy/shadow_unrelated": {
-      "isoloom": 7,
-      "isoloom-targets": 32
-    },
-    "clippy/similar_names": {
-      "isoloom-targets": 2
-    },
-    "clippy/str_to_string": {
-      "isoloom": 11,
-      "isoloom-targets": 38
-    },
-    "clippy/string_slice": {
-      "isoloom": 2,
-      "isoloom-targets": 51
-    },
-    "dup/clone": {
-      "isoloom": 5,
-      "isoloom-targets": 14
+      "isoloom-spec": 13
     },
     "exception/expect": {
       "isoloom-spec": 4,
       "xtask": 1
-    },
-    "machete/ignored": {
-      "isoloom-targets": 1
-    },
-    "rustc/unreachable_pub": {
-      "isoloom": 66
     }
   }
 }

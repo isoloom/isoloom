@@ -709,7 +709,6 @@ name = "isoloom-targets"
 version = "0.10.1"
 dependencies = [
  "criterion",
- "indexmap",
  "insta",
  "isoloom-ansible",
  "isoloom-compose",
@@ -721,6 +720,7 @@ dependencies = [
  "isoloom-terraform",
  "isoloom-vagrant",
  "jsonschema",
+ "proptest",
  "serde_json",
  "serde_yaml_ng",
  "thiserror",
