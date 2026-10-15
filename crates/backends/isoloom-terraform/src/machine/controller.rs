@@ -6,7 +6,7 @@
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
-use isoloom_plan::{Environment, Step};
+use isoloom_plan::{Controller, Environment, Step};
 use isoloom_render::hcl_builder::{Expression, Module, Template, call, reference, string};
 use isoloom_render::inventory::{self, Access, WinrmAuth};
 use isoloom_render::{address, ansible_runs, names_of, steps};
@@ -36,8 +36,8 @@ pub(crate) fn needed(env: &Environment) -> bool {
 
 /// Its (CPUs, memory in MB, disk in GB if set): 1 CPU and 512 MB unless the spec says otherwise.
 pub(crate) fn size(env: &Environment) -> (u32, u32, Option<u32>) {
-    let s = env.controller.map(|c| c.size).unwrap_or_default();
-    (s.cpus.unwrap_or(1), s.memory_mb.unwrap_or(512), s.disk_gb)
+    env.controller
+        .map_or((Controller::CPUS, Controller::MEMORY_MB, None), |c| (c.cpus, c.memory_mb, c.disk_gb))
 }
 
 /// Its key, `tls_private_key.controller`, when the environment needs a controller.

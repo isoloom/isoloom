@@ -277,11 +277,41 @@ pub struct Size {
     pub disk_gb: Option<u32>,
 }
 
-/// The controller VM, which runs the environment's playbooks and Ansible checks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The controller VM, which runs the environment's playbooks and Ansible checks: its size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Controller {
-    /// Its size (1 CPU and 512 MB unless the spec says otherwise).
-    pub size: Size,
+    /// CPUs: [`Controller::CPUS`] unless the spec says.
+    pub cpus: u32,
+    /// Memory in MB: [`Controller::MEMORY_MB`] unless the spec says.
+    pub memory_mb: u32,
+    /// Disk in GB, when the spec sets one (else its image's own).
+    pub disk_gb: Option<u32>,
+}
+
+impl Controller {
+    /// Its CPUs when the spec leaves them out.
+    pub const CPUS: u32 = 1;
+    /// Its memory in MB when the spec leaves it out: Python, ansible-core and pywinrm fit.
+    pub const MEMORY_MB: u32 = 512;
+
+    /// The controller of `spec` (`controller.resources`, else the defaults), whether or not
+    /// the environment needs one.
+    #[must_use]
+    pub fn of(spec: &Spec) -> Controller {
+        let r = spec.controller.as_ref().and_then(|c| c.resources.as_ref());
+        Controller {
+            cpus: r.and_then(|r| r.cpus).unwrap_or(Controller::CPUS),
+            memory_mb: r.and_then(|r| r.memory_mb).unwrap_or(Controller::MEMORY_MB),
+            disk_gb: r.and_then(|r| r.disk_gb),
+        }
+    }
+
+    /// Whether `spec` needs a controller: it has `provision:` steps or Ansible checks.
+    #[must_use]
+    pub fn needed(spec: &Spec) -> bool {
+        !spec.provision.is_empty() || spec.checks.iter().any(isoloom_spec::Check::is_playbook)
+    }
 }
 
 impl Environment {
@@ -324,7 +354,7 @@ impl Environment {
             machines,
             start_order: start_order(spec).into_iter().map(String::from).collect(),
             checks: checks::plan(spec),
-            controller: controller(spec),
+            controller: Controller::needed(spec).then(|| Controller::of(spec)),
             constraints: spec.constraints.clone(),
             requirements,
             images: Images::of(spec),
@@ -504,16 +534,49 @@ fn volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Volume> {
         .collect()
 }
 
-fn controller(spec: &Spec) -> Option<Controller> {
-    let needed = !spec.provision.is_empty() || spec.checks.iter().any(isoloom_spec::Check::is_playbook);
-    needed.then(|| {
-        let r = spec.controller.as_ref().and_then(|c| c.resources.as_ref());
-        Controller {
-            size: Size {
-                cpus: Some(r.and_then(|r| r.cpus).unwrap_or(1)),
-                memory_mb: Some(r.and_then(|r| r.memory_mb).unwrap_or(512)),
-                disk_gb: r.and_then(|r| r.disk_gb),
-            },
-        }
-    })
+#[cfg(test)]
+mod tests {
+    use isoloom_spec::model::Target;
+
+    use super::{Controller, Environment};
+    use crate::Lab;
+
+    const NEEDS_ONE: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nprovision: [{ ansible: site.yml }]\n";
+
+    fn controller(extra: &str) -> Option<Controller> {
+        let lab = Lab::parse(&format!("{NEEDS_ONE}{extra}")).expect("the test's spec parses");
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).controller
+    }
+
+    #[test]
+    fn the_controller_has_one_cpu_and_512_mb_unless_the_spec_sizes_it() {
+        assert_eq!(
+            controller(""),
+            Some(Controller {
+                cpus: 1,
+                memory_mb: 512,
+                disk_gb: None
+            })
+        );
+        assert_eq!(
+            controller("controller: { resources: { cpus: 2, memory_mb: 768, disk_gb: 10 } }\n"),
+            Some(Controller {
+                cpus: 2,
+                memory_mb: 768,
+                disk_gb: Some(10)
+            })
+        );
+    }
+
+    #[test]
+    fn only_playbooks_need_a_controller() {
+        let lab = Lab::parse("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.sh]\n")
+            .expect("the test's spec parses");
+        let spec = lab.for_target(Target::Vagrant);
+        assert!(!Controller::needed(&spec) && Environment::build(&spec, Target::Vagrant, None).controller.is_none());
+        let playbook = Lab::parse("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.yml]\n")
+            .expect("the test's spec parses");
+        assert!(Controller::needed(&playbook.for_target(Target::Vagrant)));
+        assert_eq!(Controller::of(&spec).memory_mb, Controller::MEMORY_MB);
+    }
 }

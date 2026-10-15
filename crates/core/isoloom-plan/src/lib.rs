@@ -24,7 +24,9 @@ pub mod routing;
 pub mod secrets;
 pub mod storage;
 
-pub use environment::{Build, Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind};
+pub use environment::{
+    Build, Controller, Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind,
+};
 pub use lab::{Lab, problems_in};
 pub use lifecycle::{MachineLifecycle, Step};
 pub use outside::{Join, OutsideAddress, OutsideNetwork};
