@@ -1,0 +1,15 @@
+crates/core/isoloom-render/src/ignore.rs:133:23: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:155:23: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:164:31: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:178:11: replace += with -= in tokens
+crates/core/isoloom-render/src/ignore.rs:178:11: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:219:23: replace += with *= in ends
+crates/core/isoloom-render/src/steps.rs:107:9: delete match arm Step::Run{path, kind:RunKind::PowerShell,} in windows
+crates/core/isoloom-render/src/steps.rs:122:9: delete match arm Step::Disks{disks} in windows
+crates/core/isoloom-render/src/steps.rs:81:36: replace match guard !entries.is_empty() with true in windows
+crates/core/isoloom-render/src/steps.rs:296:5: replace reboot_check -> String with String::new()
+crates/core/isoloom-render/src/hcl_builder/write.rs:146:17: replace < with == in entries
+crates/core/isoloom-render/src/hcl_builder/write.rs:146:17: replace < with <= in entries
+crates/core/isoloom-render/src/hcl_builder/write.rs:150:50: replace + with - in entries
+crates/core/isoloom-render/src/hcl_builder/write.rs:150:50: replace + with * in entries
+crates/core/isoloom-render/src/hcl_builder/write.rs:150:46: replace + with * in entries
