@@ -101,3 +101,52 @@ fn an_extension_matches_in_any_case_and_only_whole() {
     assert!(has_extension("setup.sh", "sh") && has_extension("setup.SH", "sh") && has_extension("a/b.Ps1", "ps1"));
     assert!(!has_extension("setup.shx", "sh") && !has_extension("sh", "sh") && !has_extension("setup.ps1", "sh"));
 }
+
+/// The steps of machine `m` of a lab whose machines are `machines`.
+fn steps_of(machines: &str, m: &str) -> MachineLifecycle {
+    let yaml = format!(
+        "version: 1\nname: t\nsecrets: {{ db: {{ env: DB }} }}\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24, ipv6: {{ cidr: \"fd00:9::/64\" }} }}, b: {{ cidr: 10.8.0.0/24 }} }}\nvolumes: {{ shared: {{ owner: a }} }}\nmachines:\n{machines}"
+    );
+    testing::environment(&yaml, Target::Vagrant)
+        .machines
+        .get(m)
+        .map(|p| p.lifecycle.clone())
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_vm_grows_its_disk_formats_its_disks_and_makes_its_own_volumes_only_when_it_has_them() {
+    let plain = steps_of("  a: { networks: { b: 10 }, os: debian@12 }\n", "a");
+    assert!(!plain.iter().any(|s| matches!(
+        s,
+        Step::DiskGrow | Step::Disks { .. } | Step::Volumes { .. } | Step::Secrets | Step::Ipv6 { .. }
+    )));
+    let full = steps_of(
+        "  a: { networks: { lan: 10 }, os: debian@12, resources: { disk_gb: 20 }, disks: { data: { size_gb: 2, mount: /data } }, volumes: { shared: /s, own: /o }, files: [{ path: /run/db, secret: db }] }\n",
+        "a",
+    );
+    assert!(full.contains(&Step::DiskGrow));
+    assert!(full.iter().any(|s| matches!(s, Step::Disks { disks } if disks.len() == 1)));
+    assert!(full.contains(&Step::Volumes { paths: vec!["/o".into()] }), "its own volume only: {full:?}");
+    assert!(full.contains(&Step::Secrets));
+    assert!(full.iter().any(|s| matches!(s, Step::Ipv6 { addresses, .. } if addresses.len() == 1)));
+}
+
+#[test]
+fn a_machines_further_addresses_are_named_after_it_in_the_others_hosts() {
+    let machines = "  a: { networks: { b: [10, 11, 12] }, os: debian@12 }\n  c: { networks: { b: 20 }, os: debian@12 }\n  w: { networks: { b: [30, 31] }, os: windows-server@2022 }\n";
+    let entries = |m: &str| {
+        steps_of(machines, m)
+            .into_iter()
+            .find_map(|s| match s {
+                Step::Hosts { entries } => Some(entries),
+                _ => None,
+            })
+            .unwrap_or_default()
+    };
+    let a = |o: u8| (Ipv4Addr::new(10, 8, 0, o), vec!["a".to_owned()]);
+    assert_eq!(entries("c"), [a(10), a(11), a(12)], "a Linux machine leaves the Windows one out");
+    let w = entries("w");
+    assert!(w.contains(&a(11)) && w.contains(&(Ipv4Addr::new(10, 8, 0, 20), vec!["c".to_owned()])), "{w:?}");
+    assert!(!entries("a").iter().any(|(_, names)| names == &["a".to_owned()]), "never itself");
+}

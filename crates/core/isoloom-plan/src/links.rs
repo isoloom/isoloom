@@ -73,6 +73,21 @@ mod tests {
         ("gbps", 1e9),
     ];
 
+    #[test]
+    fn a_networks_mtu_and_a_machines_rate_limit_are_asked_for_first_found_each() {
+        let spec = crate::testing::spec(
+            "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24, mtu: 1400 }, c: { cidr: 10.3.0.0/24, mtu: 9000 } }\nmachines:\n  m: { networks: { a: 10 }, app: { image: x } }\n  n: { networks: { b: 10 }, app: { image: x }, rate_limit: 10mbit }\n",
+        );
+        assert_eq!(
+            super::requirements(&spec),
+            [
+                crate::Requirement::NetworkMtu { network: "b".into() },
+                crate::Requirement::RateLimit { machine: "n".into() }
+            ]
+        );
+        assert_eq!(super::requirements(&crate::testing::spec("version: 1\nname: t\nmachines: {}\n")), []);
+    }
+
     proptest! {
         #[test]
         fn a_rate_is_its_value_times_its_unit(value in 0u32..1_000_000, unit in 0..UNITS.len()) {

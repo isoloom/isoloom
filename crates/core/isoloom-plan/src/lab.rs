@@ -328,3 +328,78 @@ fn copied_files(source: &syntax::Spec, dir: &Path) -> Vec<Problem> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use isoloom_spec::model::Target;
+
+    use super::*;
+    use crate::testing;
+
+    const LAB: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, app: { image: nginx, steps: [{ run: a.sh }] } }\n";
+
+    #[test]
+    fn every_scope_is_lowered_once_and_kept() {
+        let lab = testing::lab(LAB);
+        let scopes = std::iter::once(Scope::Lab).chain(Target::ALL.into_iter().map(Scope::Target));
+        for scope in scopes {
+            assert!(matches!(lab.raw(scope), Cow::Borrowed(_)), "{scope:?}");
+            assert_eq!(lab.raw(scope).spec, lower(lab.source(), scope).spec, "{scope:?}: its own lowering");
+        }
+    }
+
+    #[test]
+    fn two_labs_of_one_spec_are_equal_whatever_each_has_worked_out() {
+        let (a, b) = (testing::lab(LAB), testing::lab(LAB));
+        assert_eq!(a.problems(), []);
+        assert_eq!(a, b);
+        assert_ne!(a, testing::lab(&LAB.replace("lan: 10", "lan: 11")));
+    }
+
+    #[test]
+    fn an_existing_network_is_checked_under_the_override_that_names_it() {
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\noverrides:\n  proxmox: { networks: { lan: { external: 'vmbr 1' } } }\n  docker: { networks: { lan: { external: 'corp net' } } }\n",
+        );
+        let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
+        assert!(paths.contains(&"overrides.proxmox.networks.lan.external".to_owned()), "{paths:?}");
+        assert!(paths.contains(&"overrides.docker.networks.lan.external".to_owned()), "{paths:?}");
+    }
+
+    #[test]
+    fn a_machine_the_authored_checks_refuse_shows_nothing_lowering_finds_under_it() {
+        // `db` has no OS: the authored check says so, and what its lowered form lacks isn't shown.
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { networks: { lan: 10 }, app: { steps: [{ run: a.sh }] }, depends_on: [ghost] }\n  web: { networks: { lan: 11 }, app: { image: nginx }, depends_on: [nowhere] }\n",
+        );
+        let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
+        assert!(paths.contains(&"machines.db.os".to_owned()), "{paths:?}");
+        assert!(!paths.iter().any(|p| p.starts_with("machines.db.depends_on")), "{paths:?}");
+        assert!(
+            paths.iter().any(|p| p.starts_with("machines.web.depends_on")),
+            "an unrefused machine's: {paths:?}"
+        );
+    }
+
+    #[test]
+    fn a_copy_step_takes_a_file_inside_the_project_that_exists() {
+        let dir = std::env::temp_dir().join(format!("isoloom-plan-copy-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("site")).expect("a project folder");
+        let lab = testing::lab(
+            "version: 1\nname: t\nmachines:\n  web: { os: debian@12, app: { steps: [{ copy: { from: site, to: /srv } }, { copy: { from: /etc/x, to: /x } }, { copy: { from: a/../../b, to: /b } }, { copy: { from: missing, to: /m } }] } }\n",
+        );
+        let found: Vec<(String, String)> = copied_files(lab.source(), &dir).into_iter().map(|p| (p.path.to_string(), p.reason)).collect();
+        std::fs::remove_dir_all(&dir).ok();
+        let at = |i: usize| format!("machines.web.app.steps[{i}].copy.from");
+        assert_eq!(
+            found,
+            [
+                (at(1), "`/etc/x` must be a path inside the project folder".to_owned()),
+                (at(2), "`a/../../b` must be a path inside the project folder".to_owned()),
+                (at(3), "`missing` doesn't exist in the project folder".to_owned()),
+            ]
+        );
+    }
+}
