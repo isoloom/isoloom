@@ -98,7 +98,7 @@ mod tests {
         }
 
         #[test]
-        fn another_registrys_image_goes_through_its_own_mirror_only(path in "[a-z0-9]{1,8}(/[a-z0-9]{1,8})?(:[0-9]{1,3})?") {
+        fn an_image_of_another_registry_goes_through_its_own_mirror_only(path in "[a-z0-9]{1,8}(/[a-z0-9]{1,8})?(:[0-9]{1,3})?") {
             let image = format!("ghcr.io/{path}");
             prop_assert_eq!(rewrite_image(&mirrors(&[("ghcr.io", "mirror.corp/ghcr")]), &image), format!("mirror.corp/ghcr/{path}"));
             prop_assert_eq!(rewrite_image(&mirrors(&[("docker.io", "mirror.corp/hub")]), &image), image);
