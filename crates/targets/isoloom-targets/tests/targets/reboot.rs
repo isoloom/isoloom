@@ -97,7 +97,7 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() -> Outcome {
     let boot2 = before(boot2, "\n        }")?;
     assert!(boot2.contains("sh last.sh"), "{boot2}");
     assert!(
-        at(boot2, "echo ready > /var/lib/isoloom/ready") < at(boot2, "systemctl disable isoloom-steps.service"),
+        at(boot2, "echo ready > /var/lib/isoloom/ready")? < at(boot2, "systemctl disable isoloom-steps.service")?,
         "{boot2}"
     );
     assert!(boot2.contains("failed: last.sh"), "{boot2}");
