@@ -88,8 +88,7 @@
       "isoloom-plan": 1,
       "isoloom-render": 1,
       "isoloom-spec": 3,
-      "isoloom-targets": 14,
-      "isoloom-terraform": 23
+      "isoloom-targets": 14
     },
     "exception/expect": {
       "isoloom-spec": 11,
