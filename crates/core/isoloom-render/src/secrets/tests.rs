@@ -1,6 +1,6 @@
 #[cfg(unix)]
-use super::{DELIVERED, KEPT_DIR, host_environment};
-use super::{compose_variable, from_environment, of_containers, place, receive, step, wait};
+use super::{DELIVERED, KEPT_DIR, from_environment, host_environment};
+use super::{compose_variable, of_containers, place, receive, step, wait};
 use crate::testing;
 use isoloom_plan::SecretFile;
 use isoloom_spec::model::Target;
