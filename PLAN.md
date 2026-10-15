@@ -232,6 +232,7 @@ isoloom.yml ──► isoloom-spec ──► isoloom-plan ──► backends ─
 ### Process
 - **Every change:** format, lint, test, the ratchet and the dependency-direction check, all through `check-all`.
 - **Every phase ends with a review pass** over its own diff: a code review for bugs, a simplify pass for duplication and dead code, and the principles table as a checklist. Findings are fixed before the next phase starts.
+- **Docs stay alignable.** Every phase appends what it changed to `plan/docs-facts.md` (one line per user-visible fact: field, command, target, behaviour, limit). Generated docs (spec reference, targets matrix, catalogue, CLI help, manifest schema) stay current through their stale-file tests. No hand-written docs are written before Phase 7.
 - **Dev tasks are `cargo xtask` commands, not shell scripts,** so they run the same on macOS, Windows and Linux. `scripts/*.sh` move into `xtask` in Phase 1.
 
 ### Repository layouts
@@ -455,7 +456,13 @@ Kubernetes, Helm, Kustomize, hybrid, hosted, external and Terraform ESXi, onto t
 ### Phase 7: Release 1.0, together (M)
 
 1. **Minimal docs** in each repository: getting started, the generated spec reference, targets, secrets. Then the two websites (3c): isoloom.com from the new docs, and isothrum.com on the 1.0 spec and the npm WASM.
-2. **Squash each repository's history,** with the maintainer's confirmation at that moment, and re-enable CI.
+2. **The docs alignment gate.** No release until every doc matches the code, in every repository and both websites:
+   - **Generated** from the code, with stale-file tests: the spec reference, the targets and capability matrix with tiers, the catalogue, the CLI reference, the manifest schema, and the error codes.
+   - **Executed:** every code block in the docs (specs, commands) runs in a test. Specs pass `isoloom validate` and `verify`; commands run against the examples. A doc example that stops working fails the build.
+   - **Audited:** every hand-written claim (READMEs, guides, comparisons, both websites' pages, each repository's `AGENTS.md`/`CLAUDE.md` and contributor files) is checked against `plan/docs-facts.md`, the tests and the tier evidence. No claim without proof: "supported" means Tier 1 or Tier 2 with the evidence named.
+   - **One source:** isoloom.com's docs come from the repository through `sync:isoloom`; nothing is edited only on the site.
+   - **Exit:** an audit checklist covering every doc file, each item closed.
+3. **Squash each repository's history,** with the maintainer's confirmation at that moment, and re-enable CI.
 3. **Publish to crates.io:** the Isoloom crates, then the Isothrum runner.
 4. **Rewrite every CTF lab file in the new syntax** (by hand, with each lab's real run as proof).
 5. **Switch the launcher from path dependencies to the published versions,** and release the launcher.
