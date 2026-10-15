@@ -117,6 +117,29 @@ fn packed(run: &Run, out: &mut Collector, repo: Repo, root: &str) -> Res<std::pa
     Ok(tar)
 }
 
+/// Readies a host whose clock reads `clock` for its copies: says when the clock is off (the copies
+/// are then dated when they land), and brings the host's mirrors up to date with `sync` when the
+/// run needs them. Whether its copies are dated when they land; `None` when the host failed
+/// (reported).
+fn prepare_host(run: &Run, out: &mut Collector, clock: Option<u64>, sync: impl FnOnce() -> Res<String>) -> Option<bool> {
+    let touch = clock.and_then(|remote| dated_on_landing(now(), remote));
+    if let Some(note) = &touch {
+        out.line(note);
+    }
+    if mirrors::needed(&run.repos) {
+        match sync() {
+            Ok(note) => out.line(&note),
+            Err(e) => {
+                out.line(&e.to_string());
+                let log = out.host().id();
+                out.host_failed(Status::Fail, &format!("syncing the Isoloom and Isothrum mirrors failed (see {log}.log)"));
+                return None;
+            }
+        }
+    }
+    Some(touch.is_some())
+}
+
 /// The Linux host's part.
 pub(super) fn linux(run: &Run, out: &mut Collector) {
     let host = &run.ssh.linux;
@@ -127,19 +150,9 @@ pub(super) fn linux(run: &Run, out: &mut Collector) {
         }
         Err(_) => return out.host_failed(Status::Unreachable, "not reachable (set ISOLOOM_LINUX_USER and authorize the key)"),
     };
-    let touch = clock.and_then(|remote| dated_on_landing(now(), remote));
-    if let Some(note) = &touch {
-        out.line(note);
-    }
-    if mirrors::needed(&run.repos) {
-        match mirrors::sync_linux(run, &home) {
-            Ok(note) => out.line(&note),
-            Err(e) => {
-                out.line(&e.to_string());
-                return out.host_failed(Status::Fail, "syncing the Isoloom and Isothrum mirrors failed (see linux.log)");
-            }
-        }
-    }
+    let Some(touch) = prepare_host(run, out, clock, || mirrors::sync_linux(run, &home)) else {
+        return;
+    };
     let root = host.dir.clone().unwrap_or_else(|| format!("{home}/isoloom-check-all"));
     let folder = checkout::remote_folder(&root, &checkouts(run));
     out.line(&format!("copies and build folders: {folder}"));
@@ -153,7 +166,7 @@ pub(super) fn linux(run: &Run, out: &mut Collector) {
         return out.host_failed(Status::Fail, &format!("can't write {folder}/{} (see linux.log)", checkout::MARKER));
     }
     for repo in shipped(run) {
-        if let Err(e) = copy_linux(run, out, repo, &folder, touch.is_some()) {
+        if let Err(e) = copy_linux(run, out, repo, &folder, touch) {
             out.line(&e.to_string());
             return out.host_failed(Status::Fail, &format!("copying {} failed (see linux.log)", repo.id()));
         }
@@ -197,21 +210,11 @@ pub(super) fn windows(run: &Run, out: &mut Collector) {
     let Ok(said) = process::output(&mut win_ps(win, &mark)) else {
         return out.host_failed(Status::Unreachable, "not reachable (set ISOLOOM_WIN_USER and authorize the key)");
     };
-    let touch = seconds_in(&said).and_then(|remote| dated_on_landing(now(), remote));
-    if let Some(note) = &touch {
-        out.line(note);
-    }
-    if mirrors::needed(&run.repos) {
-        match mirrors::sync_windows(run) {
-            Ok(note) => out.line(&note),
-            Err(e) => {
-                out.line(&e.to_string());
-                return out.host_failed(Status::Fail, "syncing the Isoloom and Isothrum mirrors failed (see windows.log)");
-            }
-        }
-    }
+    let Some(touch) = prepare_host(run, out, seconds_in(&said), || mirrors::sync_windows(run)) else {
+        return;
+    };
     for repo in shipped(run) {
-        if let Err(e) = copy_windows(run, out, repo, dir, touch.is_some()) {
+        if let Err(e) = copy_windows(run, out, repo, dir, touch) {
             out.line(&e.to_string());
             return out.host_failed(Status::Fail, &format!("copying {} failed (see windows.log)", repo.id()));
         }
