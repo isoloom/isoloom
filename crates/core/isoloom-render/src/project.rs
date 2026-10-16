@@ -10,6 +10,8 @@
 //!   exclusion list (`-X`, a file next to the module: `local_file.isoloom_project`). Each entry
 //!   starts with the project folder's name (the archive's top folder, stripped when unpacked),
 //!   since bsdtar (macOS, Windows) matches exclusions at any depth.
+//! - A module that only makes the machines lists nothing: the runner archives the project and
+//!   pipes it into each guest over SSH (`Copy::Runner`).
 
 pub use isoloom_manifest::ignore;
 
@@ -21,6 +23,9 @@ pub enum Copy {
     Files,
     /// An archive made where Terraform runs, with `tar`: its exclusion list is a file too.
     Archive,
+    /// None: Terraform only makes the machines, and the runner copies the project in over SSH
+    /// (the run manifest's `project.archive`, piped to the guest), so the module lists nothing.
+    Runner,
 }
 
 /// The rules and both lists. `SKIP` is a regular expression of the paths Proxmox leaves out.
@@ -69,6 +74,7 @@ pub fn lists(copy: Copy) -> String {
     match copy {
         Copy::Files => lists,
         Copy::Archive => lists + EXCLUSIONS,
+        Copy::Runner => String::new(),
     }
 }
 
@@ -86,5 +92,7 @@ mod tests {
             archive.starts_with(&files) && archive.contains("resource \"local_file\" \"isoloom_project\""),
             "{archive}"
         );
+        // The runner's copy needs nothing of the module.
+        assert_eq!(lists(Copy::Runner), "");
     }
 }
