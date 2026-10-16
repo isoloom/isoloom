@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The apache entry: the Apache HTTP Server, from the OS's own packages, the same in every form (a
+# Dockerfile from the Debian image, or a VM's apt install). It serves a folder of the project. The
+# PHP image keeps its own httpd under /usr/local, the Debian package under /etc/apache2, so
+# building from the OS keeps the paths the same in both forms and parity holds by construction.
+# lock.yml beside it is written only by `cargo xtask catalogue refresh apache`.
+name: apache
+description: >-
+  The Apache HTTP Server (httpd), from the OS's own packages: it serves a folder of the project
+  over HTTP.
+upstream: https://httpd.apache.org/
+licence:
+  software: Apache-2.0
+  notes: The OS's Apache packages bundle their dependencies under those packages' own licences.
+
+# The OS's own Apache: Debian 12 ships the 2.4 series, which the recipe installs and the VM gets.
+releases:
+  - version: "2.4"
+    source: distro
+    os: [debian@12]
+default: "2.4"
+
+settings:
+  port:
+    type: port
+    default: 80
+    description: The port Apache listens on, and the number of the machine's `http` port.
+  root:
+    type: folder
+    description: >-
+      A folder of the project served at `/` (`site/`), holding an `index.html`. It replaces what
+      is at /var/www/html, as a container's mount of it would. Without it, Apache's own welcome
+      page.
+
+ports:
+  http: { setting: port, protocol: http }
+
+recipe:
+  # Skipped on an official image's form; apache has none, so this always runs.
+  install:
+    - packages: [apache2]
+
+  configure:
+    # The port Apache listens on, and the single virtual host that serves the document root.
+    - template: { from: files/ports.conf, to: /etc/apache2/ports.conf, mode: "0644" }
+    - template: { from: files/000-default.conf, to: /etc/apache2/sites-available/000-default.conf, mode: "0644" }
+    # Apache's runtime directory, which the OS's tmpfiles would make on a VM.
+    - file: { path: /var/run/apache2, state: directory, mode: "0755" }
+    # A folder replaces what is at /var/www/html, as a container's mount of it would.
+    - file: { path: /var/www/html, state: absent }
+      when: { set: root }
+    - copy: { from: "{{ with.root }}/", to: /var/www/html/ }
+      when: { set: root }
+    # Rocky's firewalld would otherwise block the port on a VM. Nothing to do in a container.
+    - firewall: { allow: [http] }
+    # On a VM: enabled and started, restarted when a step above changed something. In a built
+    # container: the runner's one foreground process (the shared `apache` daemon).
+    - service: apache
+
+  # Nothing to prepare at start: Apache needs no secret and no first-start initialisation.
+  start: []

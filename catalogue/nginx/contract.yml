@@ -22,7 +22,7 @@ cases:
   php:
     with: { root: site/, php_fpm: "fpm:9000" }
     machines:
-      fpm: { service: php-fpm, with: { root: site/, clients: [web] } }
+      fpm: { service: php-fpm, with: { root: site/ } }
     project:
       site/index.php: "<?php echo 6 * 7;\n"
 

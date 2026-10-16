@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What apache does the same as a container and as a VM. `cargo xtask catalogue check apache`
+# builds one small lab per case (`web`, the case's helpers and an access machine `probe`) and runs
+# it on `docker` and on `vagrant` through the Isothrum CLI. A case passes when every check passes
+# in both forms and every fact reads the same in both.
+cases:
+  default: {}
+  site:
+    with: { root: site/ }
+    project:
+      site/index.html: "parity-ok\n"
+
+checks:
+  - name: the port answers
+    http: "http://{{ machine }}:{{ with.port }}/"
+    expect: any
+    wait: 2m
+  - name: apache reports the release asked for
+    exec: apache2ctl -v 2>&1
+    expect: "Apache/{{ version }}"
+  - name: the root's index is what is served
+    case: site
+    http: "http://{{ machine }}:{{ with.port }}/"
+    contains: parity-ok
+
+# Equal in both forms, or the case fails: the claim behind `os:` and the build behind the version.
+facts:
+  - name: the OS
+    exec: . /etc/os-release && echo "$ID $VERSION_ID"
+  - name: apache's build
+    exec: apache2ctl -v 2>&1 | head -n 1

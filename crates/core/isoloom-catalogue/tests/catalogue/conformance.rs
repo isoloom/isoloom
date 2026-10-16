@@ -43,11 +43,15 @@ fn a_case_is_a_lab_of_the_service_its_probe_and_its_checks() {
 
 #[test]
 fn a_case_whose_helper_needs_a_missing_entry_isnt_run_yet() {
-    let (catalogue, nginx) = nginx().unwrap();
-    let release = nginx.definition().release(&nginx.definition().default).unwrap();
-    let case: CaseName = "php".parse().unwrap();
-    let wrong = nginx.conformance_lab(catalogue, &case, release, "debian@12".parse().unwrap()).unwrap_err();
-    assert!(matches!(&wrong, LabError::MissingEntry { service, .. } if service == "php-fpm"), "{wrong}");
+    let catalogue = crate::testing::demo().unwrap();
+    let demo = catalogue.entry("demo").unwrap();
+    let release = demo.definition().release(&demo.definition().default).unwrap();
+    let case: CaseName = "missing".parse().unwrap();
+    let wrong = demo.conformance_lab(&catalogue, &case, release, "debian@12".parse().unwrap()).unwrap_err();
+    assert!(
+        matches!(&wrong, LabError::MissingEntry { service, .. } if service == "no-such-service"),
+        "{wrong}"
+    );
 }
 
 #[test]

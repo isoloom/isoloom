@@ -651,6 +651,43 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^apache(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "apache's settings.",
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "The port Apache listens on, and the number of the machine's `http` port.",
+                    "default": 80
+                  },
+                  "root": {
+                    "type": "string",
+                    "pattern": "^[^/\\\\]",
+                    "description": "A folder of the project served at `/` (`site/`), holding an `index.html`. It replaces what is at /var/www/html, as a container's mount of it would. Without it, Apache's own welcome page."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^nginx(@.+)?$"
               }
             },
@@ -685,6 +722,43 @@
                     "type": "string",
                     "pattern": "^\\S+:[0-9]{1,5}$",
                     "description": "A php-fpm machine and its port (`app:9000`) that runs the `.php` files under `root`, from its own copy at /var/www/html (the php-fpm entry's `root`)."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^php-fpm(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "php-fpm's settings.",
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "The TCP port php-fpm listens on for FastCGI, and the number of the machine's `fastcgi` port.",
+                    "default": 9000
+                  },
+                  "root": {
+                    "type": "string",
+                    "pattern": "^[^/\\\\]",
+                    "description": "A folder of the project php-fpm runs the `.php` files of (`site/`), placed at /var/www/html, where the web machine's `SCRIPT_FILENAME` points. Without it, an empty document root."
                   }
                 },
                 "required": [],
