@@ -37,7 +37,7 @@ pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], se
     let vars = format!("isoloom_machine_{}", c.machine());
     match r {
         Resource::Repository(p) => repository(p, notify),
-        Resource::Packages(ps) => vec![packages(c.recipe().family, ps, notify)],
+        Resource::Packages(ps) => packages(c.recipe().family, ps, notify, &vars, seq),
         Resource::Copy(cp) => vec![copy(cp, notify)],
         Resource::Template(t) => vec![template(c, t, notify)],
         Resource::File(f) => vec![file(f, notify)],
@@ -165,9 +165,12 @@ fn key_task(url: &str, dest: &str, sha: &Value, mode: &str) -> Value {
         .into_value()
 }
 
-/// The `packages` step: each package at its version, installed with the family's module (a
-/// guarded `command` on Alpine, since the `apk` module is in `community.general`).
-fn packages(family: Family, ps: &[PinnedPackage], notify: &[String]) -> Value {
+/// The `packages` step: each package at its version, installed with the family's module (a guarded
+/// `command` on Alpine, since the `apk` module is in `community.general`). On Red Hat a guard skips
+/// the install when every package is already installed or provided by another one (`rpm -q
+/// --whatprovides`, as the shell library does: Rocky's `curl-minimal` is its `curl`), so `dnf`
+/// never tries to swap a provider and conflict.
+fn packages(family: Family, ps: &[PinnedPackage], notify: &[String], vars: &str, seq: usize) -> Vec<Value> {
     let name = |p: &PinnedPackage| match (&p.version, family) {
         (Some(v), Family::RedHat) => format!("{}-{v}", p.name),
         (Some(v), _) => format!("{}={v}", p.name),
@@ -176,16 +179,46 @@ fn packages(family: Family, ps: &[PinnedPackage], notify: &[String]) -> Value {
     let specs: Vec<String> = ps.iter().map(name).collect();
     let names: Vec<Value> = specs.iter().map(|s| Value::String(s.clone())).collect();
     let task = Task::new(format!("packages {}", specs.join(" ")));
-    let task = match family {
-        Family::Debian => task.module("ansible.builtin.apt", json!({ "name": names, "update_cache": true, "state": "present" })),
-        Family::RedHat => task.module("ansible.builtin.dnf", json!({ "name": names, "state": "present" })),
-        Family::Alpine => task
-            .module("ansible.builtin.command", json!({ "argv": apk_argv(&specs) }))
-            .set("register", json!("isoloom_apk"))
-            .set("changed_when", json!("'Installing' in isoloom_apk.stdout or 'Upgrading' in isoloom_apk.stdout")),
-        Family::Windows => task.module("ansible.windows.win_feature", json!({ "name": names, "state": "present" })),
+    let (reg, task) = match family {
+        Family::Debian => (
+            None,
+            task.module("ansible.builtin.apt", json!({ "name": names, "update_cache": true, "state": "present" })),
+        ),
+        Family::RedHat => {
+            let reg = format!("{vars}_pkg_{seq}");
+            let dnf = task
+                .module("ansible.builtin.dnf", json!({ "name": names, "state": "present" }))
+                .set("when", Value::String(format!("{reg}.rc != 0")));
+            (Some(reg), dnf)
+        }
+        Family::Alpine => (
+            None,
+            task.module("ansible.builtin.command", json!({ "argv": apk_argv(&specs) }))
+                .set("register", json!("isoloom_apk"))
+                .set("changed_when", json!("'Installing' in isoloom_apk.stdout or 'Upgrading' in isoloom_apk.stdout")),
+        ),
+        Family::Windows => (None, task.module("ansible.windows.win_feature", json!({ "name": names, "state": "present" }))),
     };
-    task.notify(notify).into_value()
+    match reg {
+        Some(reg) => vec![rpm_present(ps, &reg), task.notify(notify).into_value()],
+        None => vec![task.notify(notify).into_value()],
+    }
+}
+
+/// The guard that registers whether every Red Hat package is already present: each one by its exact
+/// `name-version` when pinned, else by any package that provides it, joined with `&&`.
+fn rpm_present(ps: &[PinnedPackage], reg: &str) -> Value {
+    let term = |p: &PinnedPackage| match &p.version {
+        Some(v) => format!("rpm -q {}-{v}", p.name),
+        None => format!("rpm -q --whatprovides {}", p.name),
+    };
+    let check: Vec<String> = ps.iter().map(|p| format!("{} >/dev/null 2>&1", term(p))).collect();
+    Task::new("are the packages installed")
+        .module("ansible.builtin.shell", json!({ "cmd": check.join(" && ") }))
+        .set("register", Value::String(reg.to_owned()))
+        .set("changed_when", Value::Bool(false))
+        .set("failed_when", Value::Bool(false))
+        .into_value()
 }
 
 /// `apk add` with the package specs, as an argv so no word is split.

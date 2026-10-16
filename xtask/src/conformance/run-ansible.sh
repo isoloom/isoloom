@@ -12,9 +12,11 @@ cd /opt/isoloom || exit 2
 # Ansible isn't in the family's base image: install ansible-core (and, for apt, python3-debian,
 # which the deb822_repository module needs) from the family's package manager.
 # ca-certificates too: the get_url module verifies TLS from the system trust store, and a slim
-# base image may ship none; python3-debian is what the deb822_repository module needs.
+# base image may ship none; python3-debian is what the deb822_repository module needs. On apt the
+# distribution's ansible-core can be too old for deb822_repository (Debian 12 ships 2.14), so a
+# recent ansible-core is installed from pip there; rpm and apk ship a new enough one.
 case $kind in
-  apt) export DEBIAN_FRONTEND=noninteractive; apt-get update -qq >/tmp/install.log 2>&1 && apt-get install -y -qq --no-install-recommends ansible-core python3-debian ca-certificates >>/tmp/install.log 2>&1 ;;
+  apt) export DEBIAN_FRONTEND=noninteractive; apt-get update -qq >/tmp/install.log 2>&1 && apt-get install -y -qq --no-install-recommends python3-pip python3-debian ca-certificates >>/tmp/install.log 2>&1 && pip install --quiet --break-system-packages ansible-core >>/tmp/install.log 2>&1 ;;
   rpm) dnf install -y -q ansible-core ca-certificates >/tmp/install.log 2>&1 ;;
   apk) apk add --no-cache -q ansible-core ca-certificates >/tmp/install.log 2>&1 ;;
   *) echo "APPLY-FAILED unknown-kind $kind"; exit 0 ;;

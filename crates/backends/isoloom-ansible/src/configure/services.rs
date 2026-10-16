@@ -54,6 +54,9 @@ pub(super) fn service(c: &Configured<'_>, s: &ServicePlan) -> Vec<Value> {
 pub(super) fn command(cmd: &CommandPlan, notify: &[String], vars: &str, seq: usize) -> Vec<Value> {
     let (module, run) = invocation(&cmd.run);
     let mut out = Vec::new();
+    // Without `creates`, the command runs every apply, so it reports `changed` when it runs
+    // (and `ansible-lint`'s `no-changed-when` is satisfied); with `creates`, the module itself
+    // reports `changed` only when it actually ran, so `changed_when` would wrongly force it.
     let mut task = Task::new(format!("command {}", summary(&cmd.run)))
         .module(module, run.clone())
         .set("changed_when", Value::Bool(true));
@@ -61,9 +64,7 @@ pub(super) fn command(cmd: &CommandPlan, notify: &[String], vars: &str, seq: usi
         Guard::Creates(path) => {
             let mut args = run.as_object().cloned().unwrap_or_default();
             args.insert("creates".to_owned(), Value::String(path.to_string()));
-            task = Task::new(format!("command {}", summary(&cmd.run)))
-                .module(module, Value::Object(args))
-                .set("changed_when", Value::Bool(true));
+            task = Task::new(format!("command {}", summary(&cmd.run))).module(module, Value::Object(args));
         }
         Guard::Unless(check) => {
             let (gmod, grun) = invocation(check);
