@@ -62,15 +62,42 @@ pub const DOCKER_VERSION: &str = "29.9.0";
 /// The Compose plugin a Docker host gets, exactly (on hosts with `apt`: Debian and Ubuntu).
 pub const COMPOSE_VERSION: &str = "5.6.0";
 
-/// Installs Docker from Docker's own script, unless it is there (a root script): the engine at
-/// [`DOCKER_VERSION`] (the script's `VERSION`), then, where `apt` installs packages, the Compose
-/// plugin at [`COMPOSE_VERSION`] (the script installs the newest). TODO(4.7): from Docker's own
-/// repository with exact versions and its key pinned, through the configuration model's
-/// `repository` step, once the catalogue refresh keeps those pins.
-pub const INSTALL_DOCKER: &str = concat!(
-    "command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && ",
-    "if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }"
-);
+/// Docker's apt signing key, pinned by SHA-256 (the same armored key for Debian and Ubuntu,
+/// `download.docker.com/linux/<id>/gpg`); verified against download.docker.com on 2026-10-16.
+pub const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570";
+
+/// Installs Docker, unless it is there, as a root script. On the apt family (Debian, Ubuntu) it
+/// adds Docker's own repository with the signing key pinned by SHA-256 ([`DOCKER_APT_KEY_SHA256`],
+/// no `curl | sh`), then installs the engine at [`DOCKER_VERSION`] (the exact package resolved from
+/// the repository, so its epoch and build suffix are the repo's) and the Compose plugin at
+/// [`COMPOSE_VERSION`]. The RPM family (Rocky, AlmaLinux, CentOS, Fedora) still uses Docker's own
+/// install script, pinned to [`DOCKER_VERSION`]. TODO(4.7): inline the dnf/RPM path too, its key
+/// pinned by SHA-256 (`e6c650e0…`), proven on a Rocky/Fedora guest. The apt branch fails closed (a
+/// `set -e` subshell, the key verified before use).
+pub const INSTALL_DOCKER: &str = r#"command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
+  set -e
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq ca-certificates curl
+  install -m 0755 -d /etc/apt/keyrings
+  k=$(mktemp)
+  # shellcheck disable=SC1091,SC2154 # /etc/os-release is on the guest, not here.
+  _id=$(. /etc/os-release && printf %s "$ID")
+  # shellcheck disable=SC1091,SC2154
+  _cn=$(. /etc/os-release && printf %s "$VERSION_CODENAME")
+  curl -fsSL "https://download.docker.com/linux/$_id/gpg" -o "$k"
+  echo "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570  $k" | sha256sum -c -
+  install -m 0644 "$k" /etc/apt/keyrings/docker.asc
+  rm -f "$k"
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$_id $_cn stable" > /etc/apt/sources.list.d/docker.list
+  apt-get update -qq
+  v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
+  [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
+  apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
+)
+else
+  curl -fsSL https://get.docker.com | VERSION=29.9.0 sh
+fi"#;
 
 /// Where the project is unpacked on a Windows VM, and the machine's own scripts with it.
 const WINDOWS_PROJECT_DIR: &str = "C:\\isoloom";

@@ -57,7 +57,13 @@ fn the_module_is_infrastructure_only_and_the_host_installs_docker_from_its_setup
         .find(|f| f.path.ends_with("cloud-docker/aws/setup.sh"))
         .expect("a setup.sh")
         .contents;
-    assert!(setup.contains("get.docker.com") && setup.contains("docker-compose-plugin"), "{setup}");
+    // The apt family installs from Docker's own repository with the signing key pinned by SHA-256
+    // and the engine resolved from the repo; get.docker.com is only the RPM fallback (the `else`
+    // branch), once. Compose is pinned either way.
+    assert!(setup.contains("signed-by=/etc/apt/keyrings/docker.asc"), "{setup}");
+    assert!(setup.contains("apt-cache madison docker-ce") && setup.contains("docker-compose-plugin"), "{setup}");
+    assert_eq!(setup.matches("get.docker.com").count(), 1, "{setup}");
+    assert!(setup.find("get.docker.com") > setup.find("apt-cache madison docker-ce"), "get.docker.com is the RPM fallback: {setup}");
     for cloud in Cloud::ALL {
         let tf = module(cloud);
         for gone in [

@@ -365,11 +365,22 @@ mod hosts_in_a_real_shell {
 
 #[test]
 fn a_docker_host_gets_the_engine_and_compose_at_their_pinned_versions() {
-    use super::{COMPOSE_VERSION, DOCKER_VERSION, INSTALL_DOCKER};
-    assert!(INSTALL_DOCKER.contains(&format!("VERSION={DOCKER_VERSION} sh")), "{INSTALL_DOCKER}");
+    use super::{COMPOSE_VERSION, DOCKER_APT_KEY_SHA256, DOCKER_VERSION, INSTALL_DOCKER};
+    assert!(INSTALL_DOCKER.starts_with("command -v docker >/dev/null || "), "an installed Docker is kept");
     assert!(
         INSTALL_DOCKER.contains(&format!("\"docker-compose-plugin={COMPOSE_VERSION}-*\"")),
         "{INSTALL_DOCKER}"
     );
-    assert!(INSTALL_DOCKER.starts_with("command -v docker >/dev/null || "), "an installed Docker is kept");
+    // The apt family adds Docker's repository with the key pinned by SHA-256, no `curl | sh`, and
+    // resolves the engine's exact package from the repo at the pinned upstream version.
+    assert!(INSTALL_DOCKER.contains(DOCKER_APT_KEY_SHA256), "the apt signing key is pinned by sha256");
+    assert!(
+        INSTALL_DOCKER.contains("signed-by=/etc/apt/keyrings/docker.asc"),
+        "the repository is signed by the pinned key"
+    );
+    assert!(INSTALL_DOCKER.contains("apt-cache madison docker-ce"), "the engine version is resolved from the repo");
+    let (apt, rpm) = INSTALL_DOCKER.split_once("\nelse\n").expect("an apt branch and an rpm fallback");
+    assert!(!apt.contains("get.docker.com"), "the apt family no longer pipes get.docker.com into sh: {apt}");
+    // The RPM family keeps Docker's pinned install script for now.
+    assert!(rpm.contains(&format!("VERSION={DOCKER_VERSION} sh")), "{rpm}");
 }
