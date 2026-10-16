@@ -44,6 +44,7 @@
 mod catalogue;
 mod check;
 mod collections;
+pub mod conformance;
 mod contract;
 mod embedded;
 mod entry;

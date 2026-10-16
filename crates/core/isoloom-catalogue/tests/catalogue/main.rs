@@ -2,6 +2,7 @@
 //! into Isoloom: how a machine's service resolves, the rules a broken entry breaks, and the
 //! generated schemas.
 
+mod conformance;
 mod embedded;
 mod resolve;
 mod rules;
