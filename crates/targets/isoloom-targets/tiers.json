@@ -313,6 +313,13 @@
           "result": "pass",
           "server": "esxi-lab",
           "note": "up, status, checks, park, resume and down through the Isothrum runner"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-16",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "up, status, checks, provisioning and down through the launcher (the Isothrum runner)"
         }
       ]
     },
