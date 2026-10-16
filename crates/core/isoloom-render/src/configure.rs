@@ -28,7 +28,7 @@ pub mod runner;
 pub mod shell;
 mod units;
 
-pub use units::systemd_word;
+pub use units::{linux_unit, systemd_word};
 
 /// Where the configuration renderers' own files go, from the project folder.
 pub const DIR: &str = ".isoloom/configure";

@@ -620,6 +620,7 @@ dependencies = [
 name = "isoloom-ansible"
 version = "0.10.1"
 dependencies = [
+ "isoloom-catalogue",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -1747,6 +1748,7 @@ dependencies = [
  "clap",
  "flate2",
  "indexmap",
+ "isoloom-ansible",
  "isoloom-catalogue",
  "isoloom-plan",
  "isoloom-render",

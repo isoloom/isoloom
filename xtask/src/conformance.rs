@@ -10,6 +10,10 @@
 //!   writes the recipe's script from a `write_files` entry (gzip then base64) and runs it from
 //!   `runcmd` (the first apply), then the VM's shell script is applied on top (the second apply)
 //!   and must change nothing. That proves the cloud-init carrier leaves what the shell leaves.
+//! - **ansible:** real Ansible (installed in the family's image) applies the generated role (the
+//!   first apply), then applies it again (the second apply) and must change nothing (the PLAY
+//!   RECAP reports no changed task). The probe is the shell renderer's own, so a pass proves
+//!   Ansible reached the state the shell reaches, through its native modules.
 //!
 //! After the first apply a probe checks each kind's state (the repository read by the package
 //! manager, the package, the group, the user and its hashed password, each file state, the
@@ -40,7 +44,7 @@ pub(crate) struct Args {
     /// every one).
     #[arg(long = "family", value_name = "FAMILY")]
     families: Vec<String>,
-    /// The renderers to run (`shell`, `dockerfile`; default: both).
+    /// The renderers to run (`shell`, `dockerfile`, `cloud-init`, `ansible`; default: every one).
     #[arg(long = "renderer", value_name = "RENDERER")]
     renderers: Vec<String>,
 }
@@ -55,11 +59,14 @@ enum Renderer {
     /// The cloud-init carrier: real cloud-init writes and runs the recipe, then the shell library
     /// runs on top and must change nothing (parity with the shell renderer).
     CloudInit,
+    /// The Ansible renderer: real Ansible applies the generated role, then applies it again and
+    /// must change nothing; the shell renderer's probe proves it reached the same state.
+    Ansible,
 }
 
 impl Renderer {
     /// Every renderer, in the order the table and `--renderer` default lists them.
-    const ALL: [Renderer; 3] = [Renderer::Shell, Renderer::Dockerfile, Renderer::CloudInit];
+    const ALL: [Renderer; 4] = [Renderer::Shell, Renderer::Dockerfile, Renderer::CloudInit, Renderer::Ansible];
 
     /// Its name, as `--renderer` and the table write it.
     fn id(self) -> &'static str {
@@ -67,6 +74,7 @@ impl Renderer {
             Renderer::Shell => "shell",
             Renderer::Dockerfile => "dockerfile",
             Renderer::CloudInit => "cloud-init",
+            Renderer::Ansible => "ansible",
         }
     }
 }
@@ -155,6 +163,15 @@ fn one(family: lab::Family, renderer: Renderer, out: &Path, cpus: u16) -> Res<Ou
         Renderer::CloudInit => {
             lab::write(&test, "run.sh", container::RUN_CLOUD_INIT)?;
             lab::write(&test, "user-data", &lab::cloud_config(family)?)?;
+            container::fresh(family, &dir, cpus)?
+        }
+        // Real Ansible applies the generated role (`site.yml` plus the role under the test folder),
+        // twice: the first reaches the state, the second must change nothing.
+        Renderer::Ansible => {
+            lab::write(&test, "run.sh", container::RUN_ANSIBLE)?;
+            for f in lab::ansible_files(family)? {
+                lab::write(&test, &f.path, &f.contents)?;
+            }
             container::fresh(family, &dir, cpus)?
         }
     };

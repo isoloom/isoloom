@@ -248,7 +248,7 @@ fn the_controller_takes_its_vagrant_box_from_the_overrides() {
 }
 
 /// An app written in the configuration model (the design's parcel-tracker `api`, trimmed): valid,
-/// and every form renders every step; only hosts that already exist wait for the Ansible CM tool.
+/// and every form renders every step, a Linux host that already exists through the Ansible CM tool.
 #[test]
 fn the_configuration_model_renders_on_each_form() {
     let yaml = "version: 1\nname: parcels\nnetworks: { lab: { cidr: 10.63.0.0/24 } }\nmachines:\n  api:\n    os: debian@12\n    networks: { lab: 20 }\n    ports: { api: { port: 8000, protocol: http } }\n    app:\n      steps:\n        - packages: [python3, python3-venv]\n        - group: { name: parcels, gid: 1500, system: true }\n        - copy: { from: api/, to: /srv/parcels/app/, owner: parcels }\n        - command: python3 -m venv /srv/parcels/venv\n          creates: /srv/parcels/venv/bin/python\n        - firewall: { allow: [api] }\n        - service: { name: parcels-api, run: [/srv/parcels/venv/bin/gunicorn, parcels.wsgi:app], user: parcels }\noverrides: { external: { machines: { api: { ssh: { address: 192.0.2.1 } } } } }\n";
@@ -261,9 +261,12 @@ fn the_configuration_model_renders_on_each_form() {
             .map(|r| r.path.to_string())
             .collect()
     };
-    let at = |i: usize| format!("machines.api.app.steps[{i}]");
     assert_eq!(refused(Target::Docker), Vec::<String>::new());
     assert_eq!(refused(Target::Vagrant), Vec::<String>::new());
     assert_eq!(refused(Target::Proxmox), Vec::<String>::new());
-    assert_eq!(refused(Target::External), [at(0), at(1), at(2), at(3), at(4), at(5)]);
+    assert_eq!(
+        refused(Target::External),
+        Vec::<String>::new(),
+        "a Linux existing host runs every step through Ansible"
+    );
 }

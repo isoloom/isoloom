@@ -69,6 +69,9 @@ fn render(env: &Environment) -> Result<Files> {
     let inventory = format!("{}{}", header("#"), inventory::render(env, &Access::external()));
     let mut files = vec![output("inventory.ini", inventory), output("machines.json", endpoints::json(env))];
     files.extend(checks::runners(env).into_iter().map(|(path, script)| output(&path, script)));
+    // The Ansible CM project (`site.yml`, the machine roles and `requirements.yml`) that
+    // provisions the existing hosts: the recipe's steps as native tasks, run over this inventory.
+    files.extend(crate::configure::project(env, &format!("{OUTPUT_DIR}/{DIR}")));
     Ok(files)
 }
 

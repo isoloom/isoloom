@@ -6,6 +6,14 @@ use isoloom_plan::configure::Family;
 use isoloom_spec::shell::quote;
 use isoloom_spec::syntax::{AbsPath, Argv, UnitName, UserName};
 
+/// A Linux service unit's file for `family`: the same text the shell renderer writes and the
+/// Ansible backend copies, so a defined service runs the same under either carrier. An OpenRC
+/// script on Alpine, else a systemd unit.
+#[must_use]
+pub fn linux_unit(family: Family, name: &UnitName, run: &Argv, user: Option<&UserName>, cwd: Option<&AbsPath>) -> String {
+    linux(family, name, run, user, cwd)
+}
+
 /// The unit's file for `family`: an OpenRC script on Alpine, else a systemd unit.
 #[must_use]
 pub(super) fn linux(family: Family, name: &UnitName, run: &Argv, user: Option<&UserName>, cwd: Option<&AbsPath>) -> String {

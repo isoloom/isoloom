@@ -35,12 +35,13 @@ pub(super) fn of(source: &syntax::Spec, services: &Services, target: Target) -> 
     for (name, m) in &source.machines {
         let service = services.get(name);
         out.extend(form(source, name, m, service, target));
+        let windows = m.os.is_some_and(|os| configure::Family::from(os) == configure::Family::Windows);
         if runs_as_vm(source, name, m, service, target) {
             let host = if target.needs() == Shape::External { Host::Existing } else { Host::New };
             out.extend(vm_steps(name, m, host));
-            out.extend(service_steps(name, service, Carrier::Vm(host)));
+            out.extend(service_steps(name, service, Carrier::Vm(host), windows));
         } else if let Some(carrier) = built(source, name, m, service, target) {
-            out.extend(service_steps(name, service, carrier));
+            out.extend(service_steps(name, service, carrier, windows));
         }
     }
     out
@@ -58,8 +59,8 @@ enum Carrier {
 }
 
 /// The first step of a service machine's recipe that what renders it can't carry yet, as a
-/// `refused` problem at its `service`.
-fn service_steps(name: &str, service: Service<'_>, carrier: Carrier) -> Option<Problem> {
+/// `refused` problem at its `service` (`windows`: its OS is Windows).
+fn service_steps(name: &str, service: Service<'_>, carrier: Carrier, windows: bool) -> Option<Problem> {
     let Some(Ok(resolved)) = service else { return None };
     resolved.iter().find_map(|r| {
         // Over the official image, `configure` alone: the image is `install`, and its own
@@ -71,7 +72,7 @@ fn service_steps(name: &str, service: Service<'_>, carrier: Carrier) -> Option<P
         };
         let mut steps = install.iter().chain(&r.configure).chain(start);
         let (reason, fix) = steps.find_map(|s| match carrier {
-            Carrier::Vm(host) => carry::on_vm(s, host),
+            Carrier::Vm(host) => carry::on_vm(s, host, windows),
             Carrier::Built | Carrier::Image => carry::in_container(s),
         })?;
         let at = FieldPath::new("machines").key(name).key("service");
@@ -137,9 +138,10 @@ fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Servic
 /// (on hosts that already exist) those the configuration renderers don't reach there yet.
 fn vm_steps(name: &str, m: &syntax::Machine, host: Host) -> Vec<Problem> {
     let Some(os) = m.os else { return Vec::new() };
+    let windows = configure::Family::from(os) == configure::Family::Windows;
     let at = |i: usize| FieldPath::new("machines").key(name).key("app").key("steps").index(i);
     let unportable = configure::recipe(os, m, &DaemonTable::common()).err().unwrap_or_default();
-    let mut later = carry::vm_refusals(name, m, host);
+    let mut later = carry::vm_refusals(name, m, host, windows);
     let steps = m.app().map(|a| a.steps.as_slice()).unwrap_or_default();
     // In step order, each step once: what its family can't carry at all says it best.
     let mut out = Vec::new();
@@ -231,9 +233,9 @@ overrides:
             [
                 "overrides.external.machines.img",
                 "overrides.external.machines.both",
-                "machines.both.app.steps[0]",
                 "overrides.external.machines.ct"
-            ]
+            ],
+            "a Linux existing host's steps now run through Ansible, so only the missing hosts are refused"
         );
         assert!(found.iter().all(|p| p.code == Code::Refused));
     }

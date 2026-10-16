@@ -17,6 +17,11 @@ pub(super) const RUN: &str = include_str!("run.sh");
 /// on top (the second apply), with the probes.
 pub(super) const RUN_CLOUD_INIT: &str = include_str!("run-cloudinit.sh");
 
+/// What the Ansible container runs: real Ansible applies the generated role (the first apply),
+/// then applies it again (the second apply) and must change nothing, with the probes. The probe is
+/// the shell renderer's own, so a pass means Ansible reached the state the shell reaches.
+pub(super) const RUN_ANSIBLE: &str = include_str!("run-ansible.sh");
+
 /// The family's pinned official image.
 fn image(family: Family) -> Res<&'static str> {
     isoloom_spec::os::container_image(family.id).ok_or_else(|| format!("{} has no pinned container image", family.id).into())

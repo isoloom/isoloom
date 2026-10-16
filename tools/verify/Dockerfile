@@ -120,6 +120,18 @@ ARG VAGRANT_VERSION
 ARG VAGRANT_SHA256=42d830d05e6e9e647f8a5c854d9f5295e319dac74edd37d54b97b4f29cbbd70d
 RUN get "https://releases.hashicorp.com/vagrant/${VAGRANT_VERSION}/vagrant_${VAGRANT_VERSION}-1_amd64.deb" "$VAGRANT_SHA256" vagrant.deb
 
+# The official Ansible collections the generated roles name (ansible.posix for `firewalld`,
+# ansible.windows for Windows hosts), pinned exactly as catalogue/collections.yml pins them. They
+# are GPL-3.0: ansible-lint installs them to resolve the module names, and they are never embedded
+# in Isoloom or in its generated output (the generated project's requirements.yml references them).
+ARG ANSIBLE_POSIX_VERSION=2.2.2
+ARG ANSIBLE_POSIX_SHA256=00a58c5d804c9adc99c3c3dc1b9f2246f4bb5f7337941440e0956f0e31c3b82b
+ARG ANSIBLE_WINDOWS_VERSION=3.8.0
+ARG ANSIBLE_WINDOWS_SHA256=9e57b57ef052dd93727fe3aa2b633d4f99c8eae38cf84a30d62b382636b2a373
+RUN mkdir -p /out/collections; \
+    get "https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/ansible-posix-${ANSIBLE_POSIX_VERSION}.tar.gz" "$ANSIBLE_POSIX_SHA256" /out/collections/ansible-posix.tar.gz; \
+    get "https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/ansible-windows-${ANSIBLE_WINDOWS_VERSION}.tar.gz" "$ANSIBLE_WINDOWS_SHA256" /out/collections/ansible-windows.tar.gz
+
 # ---- Python: ansible-core, ansible-lint, cloud-init -------------------------------------------
 FROM ${BASE} AS python
 SHELL ["/bin/sh", "-eu", "-c"]
@@ -135,6 +147,10 @@ RUN printf '%s\n' '#!/opt/venv/bin/python3' 'import sys' 'from cloudinit.cmd imp
       > /opt/venv/bin/cloud-init; \
     chmod +x /opt/venv/bin/cloud-init; \
     find /opt/venv -name __pycache__ -type d -prune -exec rm -rf {} +
+# The pinned Ansible collections, installed where ansible-lint resolves them (ANSIBLE_COLLECTIONS_PATH).
+RUN --mount=type=bind,from=fetch,source=/out/collections,target=/tmp/collections \
+    /opt/venv/bin/ansible-galaxy collection install /tmp/collections/ansible-posix.tar.gz /tmp/collections/ansible-windows.tar.gz -p /opt/ansible; \
+    find /opt/ansible -name __pycache__ -type d -prune -exec rm -rf {} +
 
 # ---- The image -------------------------------------------------------------------------------
 FROM ${BASE}
@@ -163,6 +179,7 @@ COPY --from=fetch /out/tflint/ /opt/tflint/
 COPY --from=fetch /out/pwsh/ /opt/microsoft/powershell/7/
 COPY --from=fetch /out/psmodules/ /usr/local/share/powershell/Modules/
 COPY --from=python /opt/venv/ /opt/venv/
+COPY --from=python /opt/ansible/ /opt/ansible/
 RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
 
 ENV PATH=/opt/venv/bin:$PATH \
@@ -178,5 +195,6 @@ ENV PATH=/opt/venv/bin:$PATH \
     POWERSHELL_TELEMETRY_OPTOUT=1 \
     POWERSHELL_UPDATECHECK=Off \
     ANSIBLE_NOCOLOR=1 \
+    ANSIBLE_COLLECTIONS_PATH=/opt/ansible \
     PYTHONDONTWRITEBYTECODE=1
 WORKDIR /work

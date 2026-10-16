@@ -144,7 +144,7 @@ fn several_services_are_refused_on_a_container_target() {
 }
 
 #[test]
-fn every_form_renders_the_recipe_of_an_entry_and_an_existing_host_waits_for_ansible() {
+fn every_form_renders_the_recipe_of_an_entry_including_a_linux_host_that_exists() {
     for (os, target) in [("debian@12", Target::Docker), ("debian@13", Target::Docker), ("debian@12", Target::Vagrant)] {
         let found = refused(&format!("{{ os: {os}, service: nginx, networks: {{ lab: 10 }} }}"), target);
         assert_eq!(found, [], "{os} on {target:?}");
@@ -152,17 +152,8 @@ fn every_form_renders_the_recipe_of_an_entry_and_an_existing_host_waits_for_ansi
     let existing = testing::lab(
         "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@12, service: nginx, networks: { lab: 10 } }\noverrides: { external: { machines: { web: { ssh: { address: 192.0.2.1 } } } } }\n",
     );
-    let external: Vec<(String, String)> = existing
-        .lowered(crate::lower::Scope::Target(Target::External))
-        .refusals
-        .into_iter()
-        .map(|p| (p.path.to_string(), p.reason))
-        .collect();
-    assert_eq!(external[0].0, "machines.web.service");
-    assert!(
-        external[0].1.starts_with("nginx's recipe: a `repository` step on a host that already exists"),
-        "{external:?}"
-    );
+    let external = existing.lowered(crate::lower::Scope::Target(Target::External)).refusals;
+    assert_eq!(external, [], "nginx's recipe runs on a Linux existing host through the Ansible CM tool");
 }
 
 #[test]

@@ -13,6 +13,7 @@ isoloom-catalogue.workspace = true
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true
+isoloom-ansible.workspace = true
 clap.workspace = true
 flate2.workspace = true
 indexmap.workspace = true

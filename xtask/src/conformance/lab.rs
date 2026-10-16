@@ -183,6 +183,26 @@ pub(super) fn cloud_config(family: Family) -> Res<String> {
     ))
 }
 
+/// The Ansible rendering: the machine's generated role (`isoloom_machine_m`) and a `site.yml`
+/// that applies it to localhost, as files under the test folder. The role's tasks are the
+/// recipe's steps in `ansible.builtin`/`ansible.posix` modules; `isoloom_project` points at the
+/// project, which the harness copies to `/opt/isoloom`.
+pub(super) fn ansible_files(family: Family) -> Res<Vec<GeneratedFile>> {
+    let lab = lab(family)?;
+    let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+    let c = Configured::of(&env, "m").ok_or_else(|| format!("{}: the machine has no recipe", family.id))?;
+    let mut files = isoloom_ansible::configure::role_files(&c, "roles/isoloom_machine_m");
+    if files.is_empty() {
+        return Err(format!("{}: the recipe rendered no Ansible role", family.id).into());
+    }
+    files.push(GeneratedFile {
+        path: "site.yml".to_owned(),
+        contents: "- name: Conformance\n  hosts: all\n  gather_facts: false\n  vars:\n    isoloom_project: /opt/isoloom\n  roles:\n    - isoloom_machine_m\n"
+            .to_owned(),
+    });
+    Ok(files)
+}
+
 /// The Dockerfile rendering: the container's Dockerfile and the files it builds with.
 pub(super) fn container_files(family: Family) -> Res<Vec<GeneratedFile>> {
     let lab = lab(family)?;
@@ -214,6 +234,15 @@ mod tests {
             assert!(doc.starts_with("#cloud-config\n"), "{}", family.id);
             assert!(doc.contains("encoding: gz+b64"), "{}", family.id);
             assert!(doc.contains("  - [sh, /var/lib/isoloom/configure/configure-0.sh]"), "{}: {doc}", family.id);
+            let ansible = ansible_files(family).unwrap();
+            let tasks = ansible
+                .iter()
+                .find(|f| f.path == "roles/isoloom_machine_m/tasks/main.yml")
+                .map(|f| f.contents.as_str())
+                .unwrap_or_default();
+            assert!(tasks.contains("ansible.posix.firewalld:"), "{}: {tasks}", family.id);
+            assert!(ansible.iter().any(|f| f.path == "site.yml"), "{}", family.id);
+            assert!(!tasks.contains("community"), "{}: no community modules: {tasks}", family.id);
         }
     }
 }

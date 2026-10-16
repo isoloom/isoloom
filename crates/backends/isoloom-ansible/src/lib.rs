@@ -46,6 +46,7 @@
 
 mod backend;
 mod checks;
+pub mod configure;
 mod endpoints;
 mod error;
 #[cfg(test)]
