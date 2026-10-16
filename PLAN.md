@@ -31,18 +31,43 @@ Working document for the local rebuild. It is squashed away with the history at 
 - the Windows leg of Phase 1b's final run;
 - **first:** the launcher's Windows-only Rust code moved during the cleanup has never been compiled (`platform::sys::windows`, the elevate split, job objects, registry, winget ids). Run Windows `pnpm check` and clippy on karen. Once that's clean, raise the launcher's zero-count lints from warn to deny.
 
-## Resume point (session usage limit hit, Fri 2026-10-16 about 03:15; reset 08:00 Paris)
+## Resume point (session usage limit hit, Fri 2026-10-16 about 10:45; reset 13:30 Paris)
 
-Workers stopped mid-step. Their state is safe in their worktrees. To resume, message each by id (SendMessage keeps its context); start a fresh worker from the worktree only if a resume is refused.
+Workers stopped mid-step; their state is safe in their worktrees. Resume each by id with SendMessage, which keeps its context. Start a fresh worker from the worktree only if a resume is refused.
+
+**Maintainer decisions taken 2026-10-16, before the stop. Apply them on resume:**
+- **CyberBackend:** "Tests + security fixes". Workers may change `~/code/cyberbackend` on its local main only, never pushed or deployed. Allowed:
+  - the flag-check tests, `isObjectiveKey`, the leak test and `test/e2e/server.ts`;
+  - validating `contentRepo`/`contentPath`/`contentRef` in syncActivities;
+  - counting only a learner's first correct attempt per activity;
+  - refusing a sync that overwrites an activity whose stored contentRepo differs.
+
+  **Not yet approved:** the AMOUNT decimal-compare fix (ask), and a separate `courses:sync` scope in Cyber Auth (ask).
+- **Course grading:** "Embed the CTF form". cyber-courses-web gets the per-objective form, `submitObjective(labId, key, answer)` with the implicit key `main`, `lab.objectives` and `myProgress`, reusing cyberctf-web's code.
+- **SQLi capstone:** "Build invoice-portal-sqli". Build it as a real CyberCTF lab: an invoice portal with a MySQL injection, and the analyst's credentials as objectives.
+  - **Where:** in a new private local repo (`~/code/invoice-portal-sqli`), git init'ed with local main. No GitHub repo is created without the maintainer's OK.
+  - **Isoloom spec:** the new syntax.
+  - **Course pointers:** the lesson's `<Lab slug>` and the course's lab reference both point at it.
+  - **Production:** the placeholder DRAFT lab in production stays until an admin action, which needs the maintainer.
 
 | Worker (id) | Worktree / branch | State at stop | Next step |
 |---|---|---|---|
-| Phase 4.2 renderers (`ab16abd1636a84517`) | `isoloom-4.2-render` (30 changed files) | the recipe carrier landed (`5ad734eb`); rewriting `carry.rs` down to the one remaining refusal (existing hosts), removing the VM copies path; infra containers to stop on SIGTERM (`init`) | finish the shell, PowerShell, Dockerfile and runner renderers plus the conformance tests, land |
-| Phase 4.3 catalogue (`a759f864c0984100c`) | — | **done** (`ab7d4463`) | — |
-| Phase 3 docker-vm (`aec8376e1618bb59f`) | `isoloom-dvm-manifest` (19 changed files: the `isoloom-manifest` change), `isoloom-dvm` (34), Isothrum `isothrum-wt/dvm`, launcher `cyber-ctf-launcher-wt/dvm` | was on the Vagrantfile side of docker-vm | **land the `isoloom-manifest` change alone first** (`Step.stdin` as a `PathTemplate`, `project.archive` `with: root`, `isoloom_manifest::ignore`, `Manifest.guest`, `vagrant.check_forwarded_ports`); then the runner pieces it **owns** (`project.archive`, stdin from a path template, `ssh.run` `SendEnv`), alone, on Isothrum; then docker-vm |
-| Phase 3 clouds (`a781d690309c173fb`) | `isoloom-cloud`, Isothrum `isothrum-wt/cloud`, launcher `cyber-ctf-launcher-wt/cloud` (a helper `a0cb135bbe4435ce4` was on runner cloud support) | design approved (see Phase 3) | the Isoloom cloud modules, secrets layer, cloud-services `run.json`, launcher import; build on docker-vm's runner pieces once they land; `with.wait_s`; reap; credential-guarded real-run |
-| Phase 5b verify (`a8fa25ccb1210df50`) | `isoloom-5b-verify` (2 ahead, 1 changed file) | running 6a's `tf-test` suites against its generator changes | finish, land; baseline toward zero |
-| Phase 6a, 1c spec wrap-up, Isothrum 1c | — | **all done** (`906f93e0`, `efef9156`, `isothrum@4c03a3a`) | — |
+| Phase 4.2 renderers (`ab16abd1636a84517`) | `isoloom-4.2-render` | **floor renderers landed** (`1acdbe8c`, then `84155a47`); conformance 8/8 | the runner for `image.start: run`, lifting 4.3's last runner refusal; then report. Then start 4.4 cloud-init, 4.5 Ansible and 4.6 conformance |
+| Phase 3 docker-vm (`aec8376e1618bb59f`) | `isoloom-dvm` (`tmp/dvm`), `isoloom-dvm-manifest` (`tmp/dvm-shared`, the shared guest commit `7f125358` in gates), Isothrum `isothrum-wt/dvm`/`dvm2`, launcher `cyber-ctf-launcher-wt/dvm` | was persisting the VBoxVGA controller in the docker-vm Vagrantfile and a published-port masquerade on Docker host VMs | land the shared commit (`Placed`, `run_manifests`, `run_manifest::guest`, `isoloom_compose::guest`, setup.sh **with a pinned Docker version**, guarded clear); send the SHA to the cloud worker; then docker-vm. Rebase the launcher worktree on `4ae15b1` |
+| Phase 3 clouds (`a781d690309c173fb`) + runner helper (`a0cb135bbe4435ce4`) + cloud launcher (`a0a56435d62ac83c0`) | `isoloom-cloud`, `isoloom-cloud2-pin`, Isothrum `isothrum-wt/cloud2` (`tmp/applyfix`), launcher `cyber-ctf-launcher-wt/cloud` | runner: `wait_s`, sensitive outputs masked (`isothrum@40eb4c5`); launcher import landed (`36088b9`); seal design approved (`Option<Seal>`) | rebase on 5b `edb0d9c4`; adopt the shared guest commit once landed; fix the two gaps the launcher worker found: `Runner::adopt` must accept an `absent` record with no state, and cloud-services `run.json` needs a `region` param replayed at destroy |
+| Phase 5b verify (`a8fa25ccb1210df50`) | — | **done** (`edb0d9c4`: baseline 344 → 0) | the Windows leg is owed (karen down) |
+| cyberctf-web standard (`a7c75d5880c99fac2`) | `cyberctf-web-standard` (`tmp/web-standard`) | main at `b081cbb`; was turning home sections into components | finish the ratchet to zero and the layout by feature; land; report |
+| Flag contract (`a573c63cf2a7ee092`) | launcher `cyber-ctf-launcher-wt/flag`, Isothrum `isothrum-wt/flag`, `isoloom-flag`, `cyberctf-web-flag` | **launcher fix landed** (`8b34643`: `CTF_FLAG_*` passed through); harness green on both engines but not landed; was writing the Isothrum leak tests | CyberBackend is now approved: land `test/e2e/server.ts`, `isObjectiveKey` plus its property test, and the leak test there; land the harness; the Isothrum leak tests |
+| cyber-courses-web (`af28428e203e61834`) | main checkout (alone); `courses-hotfix` (detached, the hotfix) | **hotfix ready**: `hotfix/content-fetch` = main = `099adc6`, not pushed; consolidation in progress | consolidation, standard, tests; the four drift items; then embed the CTF per-objective form (maintainer's decision) |
+| Course contract (`a1b0a1fd8dac5460c`) | `cyber-course-sync` main checkout (uncommitted: `bin/cli.mjs`, `lib/sync.mjs` deleted, TS rewrite in progress) | Phase A findings delivered (see 3c); Phase B: the sync rewrite, config/ref tests, a golden dry-run and a dist test | finish and land the sync; then the approved CyberBackend items; the web e2e after the consolidation SHA |
+| scripts fork (`a23308a98257c826f`) | — | e2e passed (42), ports freed | — |
+
+**For the maintainer when back:**
+1. **Push hotfix?** The cyber-courses-web `hotfix/content-fetch` (`099adc6`) fixes a production security flaw in the lesson fetch. All 9 published lessons already store a commit ref, so none breaks. **Push it alone?**
+2. **Two approvals:** the AMOUNT decimal fix (about 1 player in 10 can't solve invoice-portal-api), and a separate `courses:sync` scope in Cyber Auth.
+3. **Production admin action:** unpublish or delete the placeholder DRAFT lab `invoice-portal-sqli` until the real one exists.
+4. **Azure cost:** machines on 3 to 8 networks now get `Standard_D8as_v5` (B1s can't take 3 NICs, and B-series v1 retires). The cheaper v6 sizes need Gen2 images.
+5. **Two free 10.0.0.x addresses** for the bridged LAN lab VMs.
 
 ## 0. Three products
 
