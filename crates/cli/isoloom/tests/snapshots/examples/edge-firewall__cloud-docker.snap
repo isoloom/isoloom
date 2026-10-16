@@ -587,7 +587,8 @@ output "ssh_user" {
         "with": {
           "command": "sudo sh -s",
           "host": "${outputs.ip}",
-          "user": "admin"
+          "user": "admin",
+          "wait_s": "300"
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
@@ -1528,7 +1529,8 @@ output "ssh_user" {
         "with": {
           "command": "sudo sh -s",
           "host": "${outputs.ip}",
-          "user": "isoloom"
+          "user": "isoloom",
+          "wait_s": "300"
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
@@ -2352,7 +2354,8 @@ output "ssh_user" {
         "with": {
           "command": "sudo sh -s",
           "host": "${outputs.ip}",
-          "user": "root"
+          "user": "root",
+          "wait_s": "300"
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
@@ -3283,7 +3286,8 @@ output "ssh_user" {
         "with": {
           "command": "sudo sh -s",
           "host": "${outputs.ip}",
-          "user": "isoloom"
+          "user": "isoloom",
+          "wait_s": "300"
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
@@ -4091,7 +4095,8 @@ output "ssh_user" {
         "with": {
           "command": "sudo sh -s",
           "host": "${outputs.ip}",
-          "user": "root"
+          "user": "root",
+          "wait_s": "300"
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
@@ -4964,7 +4969,8 @@ output "ssh_user" {
         "with": {
           "command": "sudo sh -s",
           "host": "${outputs.ip}",
-          "user": "ubuntu"
+          "user": "ubuntu",
+          "wait_s": "300"
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
