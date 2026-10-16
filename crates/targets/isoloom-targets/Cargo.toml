@@ -6,7 +6,13 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-targets"
+keywords = ["isoloom", "targets", "iac", "matrix"]
+categories = ["config"]
+# tiers.json and src/matrix/probes.yml are embedded, so they stay; tests/ and benches/ go.
+exclude = ["tests/", "benches/"]
+publish = true
 
 [dependencies]
 isoloom-spec.workspace = true

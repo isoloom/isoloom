@@ -6,7 +6,12 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-plan"
+keywords = ["isoloom", "plan", "iac", "infrastructure"]
+categories = ["config"]
+exclude = ["tests/"]
+publish = true
 
 [dependencies]
 isoloom-spec.workspace = true

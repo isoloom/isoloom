@@ -6,7 +6,13 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-catalogue"
+keywords = ["isoloom", "catalogue", "services", "iac"]
+categories = ["config"]
+# tests/ only: the `catalogue` symlink (the embedded catalogue data) must stay in the package.
+exclude = ["tests/"]
+publish = true
 build = "build.rs"
 
 [dependencies]

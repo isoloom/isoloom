@@ -6,7 +6,13 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-manifest"
+keywords = ["isoloom", "manifest", "runner", "iac"]
+categories = ["config"]
+# fixtures/ ships (the crate's shared run-manifest fixtures); only tests/ is dropped.
+exclude = ["tests/"]
+publish = true
 
 [dependencies]
 serde.workspace = true

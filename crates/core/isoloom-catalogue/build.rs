@@ -15,7 +15,11 @@ const NOT_DATA: [&str; 3] = ["entry.schema.json", "contract.schema.json", "confo
 
 fn main() -> Result<(), Box<dyn Error>> {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?);
-    let root = manifest.join("../../../catalogue");
+    // In the repository the catalogue lives at the workspace root; in a published package it is
+    // vendored beside the crate (the `catalogue` symlink is copied in as real files when cargo
+    // packages the crate). Prefer the repository copy, fall back to the vendored one.
+    let repo_root = manifest.join("../../../catalogue");
+    let root = if repo_root.is_dir() { repo_root } else { manifest.join("catalogue") };
     // Cargo's protocol: its instructions go on standard output.
     writeln!(std::io::stdout(), "cargo:rerun-if-changed={}", root.display())?;
     let mut files = Vec::new();

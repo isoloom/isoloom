@@ -6,7 +6,12 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-compose"
+keywords = ["isoloom", "docker", "compose", "iac"]
+categories = ["config", "virtualization"]
+exclude = ["tests/"]
+publish = true
 
 [dependencies]
 isoloom-spec.workspace = true

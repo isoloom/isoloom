@@ -6,7 +6,12 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom"
+keywords = ["isoloom", "iac", "cli", "infrastructure", "converter"]
+categories = ["command-line-utilities", "config"]
+exclude = ["tests/"]
+publish = true
 
 [[bin]]
 name = "isoloom"

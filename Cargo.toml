@@ -16,22 +16,24 @@ version = "0.10.1"
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/isoloom/isoloom"
+homepage = "https://www.isoloom.com"
 license = "Apache-2.0"
+# Default-deny: a crate opts in with `publish = true`. xtask and the fuzz targets stay unpublished.
 publish = false
 
 [workspace.dependencies]
-isoloom-spec = { path = "crates/core/isoloom-spec" }
-isoloom-catalogue = { path = "crates/core/isoloom-catalogue" }
-isoloom-plan = { path = "crates/core/isoloom-plan" }
-isoloom-render = { path = "crates/core/isoloom-render" }
-isoloom-compose = { path = "crates/backends/isoloom-compose" }
-isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes" }
-isoloom-terraform = { path = "crates/backends/isoloom-terraform" }
-isoloom-vagrant = { path = "crates/backends/isoloom-vagrant" }
-isoloom-ansible = { path = "crates/backends/isoloom-ansible" }
-isoloom-targets = { path = "crates/targets/isoloom-targets" }
-isoloom-import = { path = "crates/tools/isoloom-import" }
-isoloom-manifest = { path = "crates/core/isoloom-manifest" }
+isoloom-spec = { path = "crates/core/isoloom-spec", version = "0.10.1" }
+isoloom-catalogue = { path = "crates/core/isoloom-catalogue", version = "0.10.1" }
+isoloom-plan = { path = "crates/core/isoloom-plan", version = "0.10.1" }
+isoloom-render = { path = "crates/core/isoloom-render", version = "0.10.1" }
+isoloom-compose = { path = "crates/backends/isoloom-compose", version = "0.10.1" }
+isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes", version = "0.10.1" }
+isoloom-terraform = { path = "crates/backends/isoloom-terraform", version = "0.10.1" }
+isoloom-vagrant = { path = "crates/backends/isoloom-vagrant", version = "0.10.1" }
+isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "0.10.1" }
+isoloom-targets = { path = "crates/targets/isoloom-targets", version = "0.10.1" }
+isoloom-import = { path = "crates/tools/isoloom-import", version = "0.10.1" }
+isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "0.10.1" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
