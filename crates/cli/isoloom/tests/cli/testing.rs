@@ -55,3 +55,10 @@ pub(crate) fn isoloom_with(home: &Path, args: &[&dyn AsRef<std::ffi::OsStr>], en
 pub(crate) fn isoloom(home: &Path, args: &[&dyn AsRef<std::ffi::OsStr>]) -> Outcome<Run> {
     isoloom_with(home, args, &[])
 }
+
+/// `isoloom validate <target> --json`, with the run and its parsed report.
+pub(crate) fn validate_json(home: &Path, target: &dyn AsRef<std::ffi::OsStr>) -> Outcome<(Run, serde_json::Value)> {
+    let run = isoloom(home, &[&"validate", target, &"--json"])?;
+    let report = serde_json::from_str(&run.stdout)?;
+    Ok((run, report))
+}

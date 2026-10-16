@@ -1,7 +1,7 @@
 //! What the commands print and the exit code they give: validation, targets, generation with
 //! a refused cloud, and profiles.
 
-use crate::testing::{Outcome, example, isoloom, isoloom_with, project, scratch};
+use crate::testing::{Outcome, example, isoloom, isoloom_with, project, scratch, validate_json};
 
 #[test]
 fn an_example_validates() -> Outcome {
@@ -78,11 +78,34 @@ fn validate_lists_an_invalid_specs_problems_as_json_and_gives_1() -> Outcome {
         "invalid-spec",
         "version: 1\nname: broken\nnetworks:\n  lan: { cidr: 10.0.0.0/24 }\nmachines:\n  a:\n    networks: { wan: 5 }\n    app: { image: alpine }\n",
     )?;
-    let o = isoloom(&dir, &[&"validate", &dir, &"--json"])?;
-    assert_eq!(o.code, Some(1), "{o:?}");
-    let v: serde_json::Value = serde_json::from_str(&o.stdout)?;
+    let (run, v) = validate_json(&dir, &dir)?;
+    assert_eq!(run.code, Some(1), "{run:?}");
     assert_eq!(v["ok"], false);
     assert!(v["problems"].as_array().is_some_and(|p| !p.is_empty()), "{v}");
+    Ok(())
+}
+
+#[test]
+fn validate_json_reports_v1_and_the_isoloom_version_for_a_valid_spec() -> Outcome {
+    let home = scratch("validate-json-v1")?;
+    let (run, v) = validate_json(&home, &example("hello-stack"))?;
+    assert_eq!(run.code, Some(0), "{run:?}");
+    assert_eq!(v["ok"], true, "{v}");
+    assert_eq!(v["specFormat"], "v1", "{v}");
+    assert_eq!(v["isoloomVersion"], env!("CARGO_PKG_VERSION"), "{v}");
+    Ok(())
+}
+
+#[test]
+fn validate_json_reports_legacy_for_a_spec_with_a_removed_key() -> Outcome {
+    let dir = project(
+        "legacy-spec",
+        "version: 1\nname: legacy-demo\nmachines:\n  web:\n    docker: { image: nginx }\n",
+    )?;
+    let (run, v) = validate_json(&dir, &dir)?;
+    assert_eq!(run.code, Some(1), "{run:?}");
+    assert_eq!(v["ok"], false, "{v}");
+    assert_eq!(v["specFormat"], "legacy", "{v}");
     Ok(())
 }
 
