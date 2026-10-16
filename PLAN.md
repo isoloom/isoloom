@@ -66,6 +66,16 @@ Workers stopped mid-step; their state is safe in their worktrees. Resume each by
 - **docker-vm — DONE 2026-10-16** (`isoloom@690d585e`, `isothrum@3dd6005`): the runner runs the lab's containers inside a VM. Real VirtualBox run of hello-stack passed (up/check 12-0/down, clean teardown), tier `docker-vm/virtualbox` pass on mac. Mac + Linux(jarvis) gates green, 1996 tests, verify 0 new. **Windows leg owed** (karen was down at land time; it's up now — run `check-all --hosts windows`).
 - **clouds (`a781d690309c173fb`)** — deep WIP in `~/code/isoloom-cloud` (`tmp/cloud`, `619a6d81 wip4`, 32 dirty): cloud-vm, cloud-docker on GuestCompose, cloud-services+region, the egress seal on all six clouds (Azure vnet-deny, OCI/DO/Linode SSH secrets). Generates + terraform-validates. Left: rewrite ~30 `tests/terraform/cloud-*` suites for self-setup machines (drop the ready_file/provisioner assertions, flip the internet:false known_bugs), then land against Isothrum `07e07fc`.
 
+**Phase 6 security review done (2026-10-16, REVIEW ONLY; full report `scratchpad/p6sec-report.md`).** Verdict: strong — quoting centralised + proptested + fuzzed across all 5 languages, secrets/flags never in generated files (references only; runner masks + delivers over SSH stdin), sensitive input refused in `environment:`, seal fail-closed, path traversal confined, images digest-pinned, zero `unsafe`, zero `set_var`, SSH exec argv with exact-name SendEnv/AcceptEnv. Findings routed:
+- **C1 HIGH** unpinned `get.docker.com` installer → security worker (pin via Docker repo + key + version, the TODO(4.7) fix).
+- **C2 MED** Galaxy collections installed without the pinned sha256 → 4.5/4.6 Ansible worker.
+- **C3/C4 MED** Proxmox/ESXi cloud images on floating `latest`/`current` URLs, no checksum → cloud worker.
+- **S1 MED → DECIDED:** `internet:false` on local docker/docker-vm was only guest-enforced; a privileged/NET_ADMIN container could egress. **Fix: refuse privileged/NET_ADMIN/NET_RAW on `internet:false`/offline-network machines** (fail-closed, no silent opt-out) → security worker. Makes internet:false a real local guarantee, matching the cloud seal.
+- **S2 LOW/MED** file `mode` unquoted in chmod (lib-consumer hole, not CLI-reachable) → security worker (quote / `Mode` newtype), matters now Isoloom ships as a crate.
+- **S3 LOW** Isothrum dotenv key not escaped → security worker.
+- **S4** resume replays sealed=true via apply (acceptable) — add a test.
+- **S5 by-design** (TF_VAR via `-e` visible to docker-daemon holders; `ANSIBLE_HOST_KEY_CHECKING=False`; `proxmox_insecure` TLS opt-out) — documented as conscious trade-offs for ephemeral labs; a code comment added at each.
+
 **For the maintainer when back:**
 1. **Push hotfix?** The cyber-courses-web `hotfix/content-fetch` (`099adc6`) fixes a production security flaw in the lesson fetch. All 9 published lessons already store a commit ref, so none breaks. **Push it alone?**
 2. **Two approvals:** the AMOUNT decimal fix (about 1 player in 10 can't solve invoice-portal-api), and a separate `courses:sync` scope in Cyber Auth.
