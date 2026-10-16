@@ -580,6 +580,13 @@ Each step means: lowered generation passes the snapshots and `verify`, then a ma
      - **With promiscuous mode on,** the router gets its uplink by DHCP. The fallback that reported the lab-side address (10.80.0.254) must still turn into a clear failure, not a wrong output.
    - **Tier 1 for server mode** needs runs from Linux and Windows hosts too. `pve-lab` and `esxi-lab` sit on VMware Fusion's private NAT (172.16.1.0/24), which jarvis and karen can't reach. Track C task: move both lab VMs to **bridged networking on the LAN** (static 10.0.0.x addresses, reserved on the router), so the runner can drive them from jarvis and karen. Then record `proxmox` and `vagrant/vmware_esxi` from both hosts.
    - **`cargo xtask tiers record` doesn't deduplicate:** recording the same run twice lists it twice. Make it idempotent (same entry, host, date and server means an update, not a new row), with a test.
+   - **Cloud design (approved 2026-10-16):**
+     - Terraform keeps only the infrastructure. Each machine sets itself up from its own user data, and the runner delivers the project over `ssh.run` stdin. This replaces the earlier "`project.archive` with a `tf_var`": Terraform no longer reaches the guest, and user data is capped at 16 KB.
+     - `ssh.run` gains `with.wait_s` (retry only while ssh can't connect).
+     - **Secrets:** each cloud's store gets one secret per value, through a write-only attribute fed by an ephemeral variable, so the value is in neither a generated file nor the state (Terraform ≥ 1.11). The machine reads its secrets at boot through its identity. DigitalOcean and Linode fall back to guest delivery over SSH.
+     - **The runner** strips ambient cloud credentials from Terraform steps (destroy replays the recorded profile and region). It adds `isothrum reap <cloud>` and a credential-guarded `real-run cloud`.
+     - **The launcher** gets the one-time import of its old deployment records.
+     - **Windows on cloud-vm** sets itself up from its user data (PowerShell), or keeps Terraform's WinRM provisioner, as a reported gap, if that runs long.
    - **Brought back through the runner** (removed with Isoloom's runtime in Phase 2): the cloud-services `cloud.requires` pre-check (as the runner's tool probes), the launcher's Machine page per-target readiness (from the manifests' `tools`), and Settings' lab list (from the runner's run store).
    - **Retiring the launcher's old Docker path:** its resume still passes empty inputs, a patch that disappears when the runner path becomes the default.
 4. **Secrets conversion and native checks** for these targets only:
