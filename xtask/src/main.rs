@@ -4,6 +4,7 @@
 //! - `check-all`: every repository's gates (Isoloom, Isothrum, the launcher) on this machine and
 //!   the test hosts, in one table;
 //! - `verify`: the official validators on every generated file, in the pinned image;
+//! - `tf-test`: the cloud and server modules' logic, `terraform test` with mocked providers;
 //! - `generate-all`: every example generated into one tree, for `verify`;
 //! - `dev-link`: the consumers built against this checkout, without touching their pins;
 //! - `host-setup`: a test host's tools, installed once;
@@ -41,6 +42,7 @@ mod quality;
 mod repo;
 mod test;
 mod text;
+mod tf_test;
 mod tiers;
 mod verify;
 
@@ -66,6 +68,10 @@ enum Task {
     /// The official validators on generated files, in the pinned image (tools/verify), against
     /// the baseline (tools/verify/baseline.json); exits 1 on a failure the baseline doesn't know.
     Verify(verify::Args),
+    /// The cloud and server modules' routing, gateways, firewalls, published ports, private
+    /// names and ready file, asserted by `terraform test` with mocked providers in the pinned
+    /// image (tests/terraform); exits 1 when an assertion fails.
+    TfTest(tf_test::Args),
     /// Every example (or the spec folders given) generated for every target it can be, into one
     /// tree that `verify` checks.
     GenerateAll(generate_all::Args),
@@ -110,6 +116,7 @@ fn run(cli: Cli) -> Res<ExitCode> {
     match cli.task {
         Task::CheckAll(a) => check_all::run(&a),
         Task::Verify(a) => Ok(verify::run(&a)),
+        Task::TfTest(a) => Ok(tf_test::run(&a)),
         Task::GenerateAll(a) => generate_all::run(&a),
         Task::DevLink(a) => Ok(dev_link::run(&a)),
         Task::HostSetup(a) => host_setup::run(&a),

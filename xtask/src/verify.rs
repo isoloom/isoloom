@@ -83,7 +83,7 @@ fn verify(a: &Args) -> Res<ExitCode> {
 
 /// The image, tagged with a checksum (POSIX `cksum`) of what it is built from, so a changed
 /// Dockerfile builds a new one and an unchanged one is built once per host.
-fn image(root: &Path) -> Res<String> {
+pub(crate) fn image(root: &Path) -> Res<String> {
     let dir = root.join("tools/verify");
     let mut inputs = std::fs::read(dir.join("Dockerfile"))?;
     inputs.extend(std::fs::read(dir.join("requirements.txt"))?);
@@ -131,7 +131,7 @@ pub(crate) fn cksum(data: &[u8]) -> u32 {
 }
 
 /// Adds `dir` to the archive as `name`, without the [`SKIPPED`] folders, symlinks as links.
-fn add_tree(tar: &mut tar::Builder<File>, dir: &Path, name: &Path) -> Res<()> {
+pub(crate) fn add_tree(tar: &mut tar::Builder<File>, dir: &Path, name: &Path) -> Res<()> {
     tar.append_dir(name, dir)?;
     for entry in std::fs::read_dir(dir)?.flatten() {
         let file_name = entry.file_name();
@@ -190,7 +190,7 @@ const DEFAULT_CPUS: u16 = 4;
 
 /// The CPUs the container may use: `setting` (`ISOLOOM_VERIFY_CPUS`), a whole number from 1, or
 /// [`DEFAULT_CPUS`] when it is unset or blank.
-fn cpus(setting: Option<&str>) -> Res<u16> {
+pub(crate) fn cpus(setting: Option<&str>) -> Res<u16> {
     match setting.map(str::trim) {
         None | Some("") => Ok(DEFAULT_CPUS),
         Some(s) => s
