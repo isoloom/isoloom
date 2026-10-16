@@ -10,7 +10,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 | Target | Tier | Exists on | Evidence |
 |---|---|---|---|
-| `docker` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-15); tier 1 pending: linux, windows |
+| `docker` | 1 | linux, macos, windows | real runs: linux (jarvis, 2026-10-15), macos (mac, 2026-10-15), windows (karen, 2026-10-15) |
 | `hosted` | 2 | linux, macos, windows | validated only |
 | `docker-vm/virtualbox` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `docker-vm/vmware_desktop` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
@@ -51,7 +51,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ## Fields
 
-| Field | What | `docker` (2) | `hosted` (2) | `docker-vm` (2) | `cloud-docker` (2) | `kubernetes` (2) | `hybrid` (2) | `vagrant/virtualbox` (2) | `vagrant/vmware_desktop` (2) | `vagrant/hyperv` (2) | `vagrant/parallels` (2) | `vagrant/libvirt` (1) | `vagrant/qemu` (2) | `vagrant/utm` (2) | `vagrant/vmware_esxi` (2) | `proxmox` (2) | `esxi` (2) | `cloud-vm/aws` (2) | `cloud-vm/azure` (2) | `cloud-vm/gcp` (2) | `cloud-vm/digitalocean` (2) | `cloud-vm/linode` (2) | `cloud-vm/oci` (2) | `external` (2) | `cloud-services` (2) |
+| Field | What | `docker` (1) | `hosted` (2) | `docker-vm` (2) | `cloud-docker` (2) | `kubernetes` (2) | `hybrid` (2) | `vagrant/virtualbox` (2) | `vagrant/vmware_desktop` (2) | `vagrant/hyperv` (2) | `vagrant/parallels` (2) | `vagrant/libvirt` (1) | `vagrant/qemu` (2) | `vagrant/utm` (2) | `vagrant/vmware_esxi` (2) | `proxmox` (2) | `esxi` (2) | `cloud-vm/aws` (2) | `cloud-vm/azure` (2) | `cloud-vm/gcp` (2) | `cloud-vm/digitalocean` (2) | `cloud-vm/linode` (2) | `cloud-vm/oci` (2) | `external` (2) | `cloud-services` (2) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `machines.*.app.image` | a published image, the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.app.build` | the project's own Dockerfile, the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |

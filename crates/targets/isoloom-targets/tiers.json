@@ -20,6 +20,18 @@
           "date": "2026-10-15",
           "result": "pass",
           "note": "hello-stack, segmented and invoice-portal-api: up, checks, park, resume and down, through the launcher and the Isothrum runner (Docker Desktop 29.8.1)"
+        },
+        {
+          "host": "jarvis",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the Isothrum runner (Debian 13, Docker 29.9.0, Compose 5.6.0). Flag proof: each file holds the input with its owner and mode (0:0 0400 by default, 999:1000 0440 as asked), after up and after resume; the flag is in no env, container config, generated file or run state"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the Isothrum runner over SSH (Windows 11, Docker Desktop 29.8.2 on WSL 2, Compose 5.6.0; the session's Docker CLI without Docker Desktop's credential helper, which fails without a logon session). Flag proof: as on jarvis, after up and after resume"
         }
       ]
     },

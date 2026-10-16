@@ -125,7 +125,7 @@ mod tests {
         );
         let lines = tier_lines(&entries, &[Target::Docker, Target::Vagrant, Target::CloudVm], &lab);
         assert_eq!(lines.first().map(String::as_str), Some(""));
-        assert!(lines.iter().any(|l| l.starts_with("  docker    2  real runs: macos (mac, ")), "{lines:#?}");
+        assert!(lines.iter().any(|l| l.starts_with("  docker    1  real runs: linux (jarvis, ")), "{lines:#?}");
         let vagrant = lines.iter().position(|l| l.starts_with("  vagrant   ")).unwrap();
         assert!(lines[vagrant].contains("  1  libvirt"), "{lines:#?}");
         assert!(lines[vagrant + 1].starts_with("            2  virtualbox, "), "{lines:#?}");
