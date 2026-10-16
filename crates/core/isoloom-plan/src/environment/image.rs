@@ -4,6 +4,8 @@
 use indexmap::IndexMap;
 use isoloom_spec::model::{Machine, Spec};
 
+use crate::configure::{ContainerProcess, Recipe};
+
 use super::MachineShape;
 use crate::images::{Images, tag_of};
 
@@ -38,14 +40,17 @@ pub enum Build {
         /// The spec's build arguments.
         args: IndexMap<String, String>,
     },
-    /// A Dockerfile Isoloom generates from the machine's portable steps (`app.steps`), built
-    /// with the project folder as its context.
+    /// A Dockerfile Isoloom generates from the machine's recipe ([`super::MachinePlan::recipe`]),
+    /// built with the project folder as its context.
     Generated {
         /// Where the generated Dockerfile is written, from the project folder
         /// (`.isoloom/docker/build/<machine>/Dockerfile`).
         dockerfile: String,
-        /// The image and steps it is generated from.
-        recipe: isoloom_spec::model::Generated,
+        /// The image it starts `FROM`: the OS's official image, pinned by digest.
+        base: String,
+        /// What the container runs: Isoloom's runner as its entrypoint for its services, its own
+        /// command, or nothing (idle).
+        process: ContainerProcess,
     },
 }
 
@@ -55,8 +60,9 @@ pub(crate) fn generated_dockerfile(machine: &str) -> String {
     format!(".isoloom/docker/build/{machine}/Dockerfile")
 }
 
-/// What machine `name` runs from on the target, in `shape`.
-pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine) -> Option<Image> {
+/// What machine `name` runs from on the target, in `shape`, its configuration resolved as
+/// `recipe`.
+pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, recipe: Option<&Recipe>) -> Option<Image> {
     match shape {
         MachineShape::Container => {
             let d = m.docker.as_ref()?;
@@ -67,9 +73,13 @@ pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine) -> O
                 target: d.target.clone(),
                 args: d.args.clone(),
             });
-            let generated = d.generated.as_ref().map(|recipe| Build::Generated {
+            let generated = d.generated.as_ref().map(|g| Build::Generated {
                 dockerfile: generated_dockerfile(name),
-                recipe: recipe.clone(),
+                base: g.base.clone(),
+                // Lowering refuses a container whose services it can't run, so this resolves.
+                process: recipe
+                    .and_then(|r| ContainerProcess::resolve(r, m.command.as_ref(), !m.ports.is_empty()).ok())
+                    .unwrap_or(ContainerProcess::Idle),
             });
             Some(Image::Container {
                 reference: Images::of(spec).pull(&tag),
@@ -86,6 +96,7 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::{Build, Image};
+    use crate::configure::ContainerProcess;
     use crate::testing;
 
     #[test]
@@ -121,7 +132,11 @@ mod tests {
         assert_eq!(args.get("A").map(String::as_str), Some("1"));
         let Some(Image::Container {
             reference: generated,
-            build: Some(Build::Generated { dockerfile: written, recipe }),
+            build: Some(Build::Generated {
+                dockerfile: written,
+                base,
+                process,
+            }),
         }) = image("gen")
         else {
             panic!("a generated build")
@@ -130,7 +145,8 @@ mod tests {
             (generated.as_str(), written.as_str()),
             ("isoloom/lab-gen", ".isoloom/docker/build/gen/Dockerfile")
         );
-        assert!(recipe.base.starts_with("debian:12@sha256:"));
+        assert!(base.starts_with("debian:12@sha256:"));
+        assert_eq!(process, ContainerProcess::Idle, "nothing to run: kept idle");
         assert_eq!(image("user"), None, "a supplied machine runs from nothing of ours");
         let vm = testing::environment("version: 1\nname: lab\nmachines:\n  m: { os: debian@12 }\n", Target::Vagrant);
         assert_eq!(vm.machines.get("m").and_then(|m| m.image.clone()), Some(Image::Vm { os: "debian-12".into() }));

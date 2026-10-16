@@ -82,3 +82,7 @@ None of this reaches the launcher or Isothrum, which read `isoloom-targets` (its
     - `Step::Packages(Vec<Package>)`: each `Package { name: PackageName, version: Option<PackageVersion> }`.
     - `syntax::placeholder` reads `{{ path }}` (the message's, a template's, an entry's) into a `Reference`; `syntax::placeholder_problems` resolves them against a spec. `syntax::Warning` is a warning's shape (path, line, reason, fix), and `Lab::warnings()` lists them.
     - `isoloom_plan::configure` is the resolved model: `recipe()` gives a machine's `Recipe` (or its `Unportable` steps), `ContainerProcess::of` what its container runs, `fill` a template's text, `Configure` and `Handoff` the CM tools. `isoloom_plan::Error` is the plan's one error type.
+
+## Phase 4.2, the floor renderers (the 4.2 unit)
+
+27. **The recipe travels on the plan:** lowering hands a machine's configuration to the plan as `model::Machine.configuration` (`model::Configuration { os, install, configure, start, files }`, steps still in the authored types); `Environment::build` resolves it once into `MachinePlan.recipe: Option<configure::Recipe>` (`Recipe::of`), which every CM renderer reads. `model::Generated` loses `steps`; `Build::Generated` is `{ dockerfile, base, process: ContainerProcess }` (`ContainerProcess::resolve` and `is_runner()`). `Recipe` gains `os` and `files` (template texts by their `from`).

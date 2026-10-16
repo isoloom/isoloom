@@ -214,6 +214,12 @@ pub struct Machine {
     #[serde(skip)]
     #[schemars(skip)]
     pub supplied: bool,
+    /// What configures it (an app's steps), in the configuration model, for every form: the
+    /// plan resolves it into the recipe a container's build and a VM's set-up render. Set by
+    /// lowering, never written in a spec.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub configuration: Option<super::Configuration>,
 }
 
 /// A port a machine answers on.

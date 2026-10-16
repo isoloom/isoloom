@@ -55,7 +55,12 @@ fn each_target_gets_its_own_overrides() {
     assert_eq!(docker.spec.networks["office"].docker.as_ref().map(|d| d.cidr.as_str()), Some("10.70.0.0/24"));
     let portal = &docker.spec.machines["portal"];
     let generated = portal.docker.as_ref().and_then(|d| d.generated.as_ref()).unwrap();
-    assert!(generated.base.starts_with("debian:12@sha256:") && generated.steps.len() == 3);
+    assert!(generated.base.starts_with("debian:12@sha256:"));
+    assert_eq!(
+        portal.configuration.as_ref().map(|c| c.install.len()),
+        Some(3),
+        "its steps configure it in every form"
+    );
     assert_eq!(portal.vm.as_ref().unwrap().provision, ["provision/portal.sh"]);
     assert_eq!(
         portal.vm.as_ref().and_then(|v| v.image.as_ref()).and_then(|i| i.vagrant.as_deref()),

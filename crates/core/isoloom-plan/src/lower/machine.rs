@@ -57,14 +57,7 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         sysctls: m.sysctls.clone(),
         ulimits: m.ulimits.clone(),
         ports,
-        inputs: m
-            .environment
-            .values()
-            .filter_map(|v| match v {
-                EnvValue::Input(i) => Some(i.to_string()),
-                _ => None,
-            })
-            .collect(),
+        inputs: environment_inputs(m),
         secrets,
         resources: m.resources,
         command: m.command.as_ref().map(|c| c.run.clone()),
@@ -80,6 +73,7 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         vm: vm(source, name, m),
         external: overrides::external(source, name),
         supplied: false,
+        configuration: configuration(m),
     };
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
@@ -90,6 +84,23 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         inputs,
         problems,
     }
+}
+
+/// The inputs its environment reads.
+fn environment_inputs(m: &syntax::Machine) -> Vec<String> {
+    m.environment
+        .values()
+        .filter_map(|v| match v {
+            EnvValue::Input(i) => Some(i.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// What configures the machine in every form: its app's steps on its OS, when it has both.
+fn configuration(m: &syntax::Machine) -> Option<model::Configuration> {
+    let (os, steps) = (m.os?, &m.app()?.steps);
+    (!steps.is_empty()).then(|| model::Configuration::app(os, steps.clone()))
 }
 
 /// Each network's first address, and the further ones where a list gives several.
@@ -288,7 +299,6 @@ fn docker(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope) 
             d.generated = Some(Generated {
                 os: os.name().to_owned(),
                 base: base.to_owned(),
-                steps: m.app().map(|a| a.steps.clone()).unwrap_or_default(),
             });
             d.idle = idle;
         }

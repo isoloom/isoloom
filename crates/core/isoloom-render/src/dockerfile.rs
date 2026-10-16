@@ -1,12 +1,11 @@
-//! The Dockerfile Isoloom generates from a machine's portable steps (`app.steps`): `FROM` its
-//! OS's official image (pinned by digest), the files the steps use copied to the project folder
+//! The Dockerfile Isoloom generates from a machine's recipe (`app.steps`): `FROM` its OS's
+//! official image (pinned by digest), the files the steps use copied to the project folder
 //! (`/opt/isoloom`, the same path a VM has), then each step. The project folder is the build
 //! context; only the paths the steps name are copied.
 
+use isoloom_plan::configure::{Recipe, Resource};
 use isoloom_plan::{Build, Environment, Image, MachineShape};
-use isoloom_spec::model::Generated;
 use isoloom_spec::os::by_name;
-use isoloom_spec::syntax::Step;
 
 use crate::steps::PROJECT_DIR;
 use crate::{GeneratedFile, header};
@@ -18,13 +17,16 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
     env.machines
         .iter()
         .filter(|(_, mp)| mp.shape == MachineShape::Container)
-        .filter_map(|(name, mp)| match &mp.image {
-            Some(Image::Container {
-                build: Some(Build::Generated { dockerfile, recipe }),
-                ..
-            }) => Some(GeneratedFile {
+        .filter_map(|(name, mp)| match (&mp.image, &mp.recipe) {
+            (
+                Some(Image::Container {
+                    build: Some(Build::Generated { dockerfile, base, .. }),
+                    ..
+                }),
+                Some(recipe),
+            ) => Some(GeneratedFile {
                 path: dockerfile.clone(),
-                contents: render(name, &env.images.pull(&recipe.base), recipe),
+                contents: render(name, &env.images.pull(base), recipe),
             }),
             _ => None,
         })
@@ -33,9 +35,9 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
 
 /// The Dockerfile of machine `machine`'s generated image, from `base`.
 #[must_use]
-pub fn render(machine: &str, base: &str, recipe: &Generated) -> String {
-    let installer = Installer::of(&recipe.os);
-    let steps: String = recipe.steps.iter().map(|step| instructions(installer, step)).collect();
+pub fn render(machine: &str, base: &str, recipe: &Recipe) -> String {
+    let installer = Installer::of(recipe.os.name());
+    let steps: String = recipe.resources().map(|r| instructions(installer, r)).collect();
     format!(
         "{}# The container form of machine `{machine}`: its OS's image and its steps.\nFROM {base}\nWORKDIR {PROJECT_DIR}\n{steps}",
         header("#")
@@ -43,23 +45,24 @@ pub fn render(machine: &str, base: &str, recipe: &Generated) -> String {
 }
 
 /// One step's instructions.
-fn instructions(installer: Installer, step: &Step) -> String {
+fn instructions(installer: Installer, step: &Resource) -> String {
     match step {
-        Step::Run { script, creates } => {
-            let run = match creates {
+        Resource::Run(run) => {
+            let script = &run.script;
+            let line = match &run.creates {
                 Some(path) => format!("[ -e {path} ] || sh {script}"),
                 None => format!("sh {script}"),
             };
-            format!("COPY {script} {script}\nRUN {run}\n")
+            format!("COPY {script} {script}\nRUN {line}\n")
         }
-        Step::Copy(c) => {
+        Resource::Copy(c) => {
             let owner = c.owner.as_ref().map(|o| format!("--chown={o} ")).unwrap_or_default();
             let mode = c.mode.map(|m| format!("--chmod={m} ")).unwrap_or_default();
             format!("COPY {owner}{mode}{} {}\n", c.from, c.to)
         }
         // A pinned version waits for the configuration renderers: lowering refuses it in a
         // container until then, so only names reach this line.
-        Step::Packages(packages) => {
+        Resource::Packages(packages) => {
             let names: Vec<&str> = packages.iter().map(|p| p.name.as_str()).collect();
             format!("{}\n", installer.install(&names.join(" ")))
         }
@@ -109,50 +112,24 @@ impl Installer {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::syntax::{Copy, Mode, Package};
+    use isoloom_plan::configure::{DaemonTable, recipe};
+    use isoloom_spec::syntax;
 
     use super::*;
 
-    fn recipe(os: &str, steps: Vec<Step>) -> Generated {
-        Generated {
-            os: os.into(),
-            base: isoloom_spec::os::container_image(os).unwrap_or_default().into(),
-            steps,
-        }
-    }
-
-    fn render(machine: &str, recipe: &Generated) -> String {
-        super::render(machine, &recipe.base, recipe)
-    }
-
-    fn run(script: &str, creates: Option<&str>) -> Step {
-        Step::Run {
-            script: script.parse().unwrap(),
-            creates: creates.map(|c| c.parse().unwrap()),
-        }
-    }
-
-    fn packages(names: &[&str]) -> Step {
-        Step::Packages(
-            names
-                .iter()
-                .map(|n| Package {
-                    name: n.parse().unwrap(),
-                    version: None,
-                })
-                .collect(),
-        )
+    /// The Dockerfile of a machine `{ os: <os>, app: { steps: <steps> } }`.
+    fn render(os: &str, steps: &str) -> String {
+        let m: syntax::Machine = serde_yaml_ng::from_str(&format!("{{ os: {os}, app: {{ steps: {steps} }} }}")).unwrap();
+        let r = recipe(m.os.unwrap(), &m, &DaemonTable::common()).unwrap();
+        super::render("web", isoloom_spec::os::container_image(m.os.unwrap().name()).unwrap_or_default(), &r)
     }
 
     #[test]
     fn steps_become_instructions_from_the_os_image() {
-        let copy = Step::Copy(Copy {
-            from: "site/".parse().unwrap(),
-            to: "/var/www/".parse().unwrap(),
-            owner: "www-data".parse().ok(),
-            mode: "0755".parse::<Mode>().ok(),
-        });
-        let d = render("web", &recipe("debian-12", vec![packages(&["nginx"]), copy, run("provision/web.sh", None)]));
+        let d = render(
+            "debian@12",
+            "[{ packages: [nginx] }, { copy: { from: site/, to: /var/www/, owner: www-data, mode: \"0755\" } }, { run: provision/web.sh }]",
+        );
         assert!(d.starts_with("# Generated by isoloom"));
         assert!(d.contains("# The container form of machine `web`: its OS's image and its steps.\nFROM "), "{d}");
         assert!(d.contains("FROM debian:12@sha256:"));
@@ -164,12 +141,12 @@ mod tests {
 
     #[test]
     fn each_family_installs_its_way() {
-        let curl = || vec![packages(&["curl"])];
-        assert!(render("a", &recipe("alpine-3.19", curl())).contains("RUN apk add --no-cache curl"));
-        assert!(render("a", &recipe("rocky-9", curl())).contains("RUN dnf install -y curl && dnf clean all"));
-        assert!(render("a", &recipe("centos-7", curl())).contains("# hadolint ignore=DL3033\nRUN yum install -y curl && yum clean all\n"));
-        assert!(render("a", &recipe("ubuntu-24.04", curl())).contains("apt-get install -y --no-install-recommends curl"));
-        assert!(render("a", &recipe("debian-12", vec![run("a.sh", Some("/done"))])).contains("RUN [ -e /done ] || sh a.sh"));
+        let curl = "[{ packages: [curl] }]";
+        assert!(render("alpine@3.19", curl).contains("RUN apk add --no-cache curl"));
+        assert!(render("rocky@9", curl).contains("RUN dnf install -y curl && dnf clean all"));
+        assert!(render("centos@7", curl).contains("# hadolint ignore=DL3033\nRUN yum install -y curl && yum clean all\n"));
+        assert!(render("ubuntu@24.04", curl).contains("apt-get install -y --no-install-recommends curl"));
+        assert!(render("debian@12", "[{ run: a.sh, creates: /done }]").contains("RUN [ -e /done ] || sh a.sh"));
     }
 
     #[test]

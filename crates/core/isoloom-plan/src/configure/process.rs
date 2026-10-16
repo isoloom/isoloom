@@ -54,6 +54,16 @@ impl ContainerProcess {
     ///
     /// [`NoProcess`]: a service the container can't run, or ports nothing serves.
     pub fn of(recipe: &Recipe, m: &syntax::Machine) -> Result<ContainerProcess, NoProcess> {
+        ContainerProcess::resolve(recipe, m.command.as_ref().map(|c| &c.run), !m.ports.is_empty())
+    }
+
+    /// What a container runs, its recipe resolved as `recipe`, with `command` (the machine's own)
+    /// and ports (`ports`: whether it answers on any).
+    ///
+    /// # Errors
+    ///
+    /// [`NoProcess`]: a service the container can't run, or ports nothing serves.
+    pub fn resolve(recipe: &Recipe, command: Option<&CommandLine>, ports: bool) -> Result<ContainerProcess, NoProcess> {
         let mut daemons = Vec::new();
         for r in recipe.resources() {
             let Resource::Service(s) = r else { continue };
@@ -65,14 +75,20 @@ impl ContainerProcess {
                 None => return Err(NoProcess::NoForeground { unit: s.unit.clone() }),
             }
         }
-        let command = m.command.as_ref().map(|c| c.run.clone());
-        match (daemons.len(), command) {
-            (0, None) if !m.ports.is_empty() && recipe.resources().next().is_some() => Err(NoProcess::NothingServes),
+        match (daemons.len(), command.cloned()) {
+            (0, None) if ports && recipe.resources().next().is_some() => Err(NoProcess::NothingServes),
             (0, None) => Ok(ContainerProcess::Idle),
             (0, Some(c)) => Ok(ContainerProcess::Command(c)),
             (1, None) => Ok(daemons.pop().map_or(ContainerProcess::Idle, ContainerProcess::One)),
             (_, command) => Ok(ContainerProcess::Supervised { daemons, command }),
         }
+    }
+
+    /// Whether Isoloom's runner is the container's process (one daemon, or several): it needs
+    /// the engine's init (Compose's `init: true`, a pod sharing its process namespace).
+    #[must_use]
+    pub fn is_runner(&self) -> bool {
+        matches!(self, ContainerProcess::One(_) | ContainerProcess::Supervised { .. })
     }
 }
 

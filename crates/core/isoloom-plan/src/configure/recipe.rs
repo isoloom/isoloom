@@ -1,22 +1,27 @@
 //! A machine's recipe resolved: its steps for its OS's family, its firewall's ports by number, its
 //! services' units and foreground forms. Steps a family can't carry at all (a repository on
 //! Windows, a file's owner or mode there) are refused here, so the rule is one, whichever
-//! renderer asks.
+//! renderer asks. Lowering resolves the authored machine ([`recipe`]); the environment resolves
+//! the configuration lowering hands it ([`Recipe::of`]), once per machine, for every renderer.
+
+use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
-use isoloom_spec::model::Protocol;
-use isoloom_spec::syntax::{self, FileState, FirewallPort, OsRef, PortName, PortProtocol, Service, Step};
+use isoloom_spec::model::{self, Configuration, Protocol};
+use isoloom_spec::syntax::{self, FileState, FirewallPort, OsRef, PortName, PortProtocol, ProjectPath, Service, Step};
 
 use super::daemons::{Daemon, DaemonTable};
 use super::family::{Family, codename};
 use super::resources::{PortSpec, RepositoryKind, RepositoryPlan, Resource, RunPlan, ServicePlan, ServiceSource, Shell};
 
-/// A recipe resolved for one machine: its phases in order (`install`, `configure`, `start`) and
-/// the daemons its container form runs.
+/// A recipe resolved for one machine: its phases in order (`install`, `configure`, `start`), the
+/// daemons its container form runs, and the texts of its templates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Recipe {
-    /// The family it is resolved for.
+    /// The OS it is resolved for.
+    pub os: OsRef,
+    /// The OS's family.
     pub family: Family,
     /// Install: an app's steps; a catalogue entry's `install` (which its official image skips).
     pub install: Vec<Resource>,
@@ -26,12 +31,36 @@ pub struct Recipe {
     pub start: Vec<Resource>,
     /// The foreground forms of its enabled services, in recipe order: the container's daemons.
     pub daemons: Vec<Daemon>,
+    /// The text of each of its templates, by the template's `from`, its lab placeholders not yet
+    /// filled in ([`super::fill`] does, per machine and target). A template missing here wasn't
+    /// read: the renderers refuse it rather than install something else.
+    pub files: BTreeMap<ProjectPath, String>,
 }
 
 impl Recipe {
     /// Its resources, phase after phase.
     pub fn resources(&self) -> impl Iterator<Item = &Resource> {
         self.install.iter().chain(&self.configure).chain(&self.start)
+    }
+
+    /// The recipe of configuration `c`, its firewall's port names read in `ports` (the lowered
+    /// machine's), its services in `daemons`.
+    ///
+    /// # Errors
+    ///
+    /// Every step `c`'s family can't carry ([`Unportable`]), in step order. Lowering refuses
+    /// those first, so a lowered machine's configuration always resolves.
+    pub fn of(c: &Configuration, ports: &[model::Port], daemons: &DaemonTable) -> Result<Recipe, Vec<Unportable>> {
+        let port = |name: &PortName| {
+            let found = ports.iter().find(|p| p.name.as_deref() == Some(name.as_str()))?;
+            Some(PortSpec {
+                port: std::num::NonZeroU16::new(found.port)?,
+                protocol: found.protocol,
+            })
+        };
+        let mut r = resolve(c.os, [&c.install, &c.configure, &c.start], &port, daemons)?;
+        r.files.clone_from(&c.files);
+        Ok(r)
     }
 }
 
@@ -54,37 +83,58 @@ pub struct Unportable {
 ///
 /// Every step `os`'s family can't carry ([`Unportable`]), in step order.
 pub fn recipe(os: OsRef, m: &syntax::Machine, daemons: &DaemonTable) -> Result<Recipe, Vec<Unportable>> {
-    let family = Family::from(os);
     let steps = m.app().map(|a| a.steps.as_slice()).unwrap_or_default();
-    let unportable: Vec<Unportable> = steps.iter().enumerate().filter_map(|(i, s)| unportable(i, s, family)).collect();
+    resolve(os, [steps, &[], &[]], &|name| named_port(name, &m.ports), daemons)
+}
+
+/// Where a recipe's firewall reads a port by its name.
+type PortOf<'a> = dyn Fn(&PortName) -> Option<PortSpec> + 'a;
+
+/// The recipe of `phases` (`install`, `configure`, `start`) on `os`. A step is numbered by its
+/// place in the phases one after the other (an app's: its index in `app.steps`).
+fn resolve(os: OsRef, phases: [&[Step]; 3], port: &PortOf<'_>, daemons: &DaemonTable) -> Result<Recipe, Vec<Unportable>> {
+    let family = Family::from(os);
+    let all = || phases.iter().flat_map(|p| p.iter());
+    let unportable: Vec<Unportable> = all().enumerate().filter_map(|(i, s)| unportable(i, s, family)).collect();
     if !unportable.is_empty() {
         return Err(unportable);
     }
-    let mut out = Recipe {
-        family,
-        install: Vec::new(),
-        configure: Vec::new(),
-        start: Vec::new(),
-        daemons: Vec::new(),
-    };
     let mut unknown = Vec::new();
-    for (i, step) in steps.iter().enumerate() {
-        if let Step::Service(s) = step
-            && s.enabled()
-        {
-            out.daemons.extend(foreground(s, family, daemons));
-        }
-        match resource(step, os, &m.ports, daemons) {
-            Some(r) => out.install.push(r),
-            None => unknown.push(Unportable {
-                step: i,
-                field: None,
-                reason: format!("this Isoloom can't resolve a `{}` step", step.kind()),
-                fix: "upgrade Isoloom's plan with its spec".into(),
-            }),
+    let mut resolved: [Vec<Resource>; 3] = Default::default();
+    let mut i = 0;
+    for (phase, steps) in resolved.iter_mut().zip(phases) {
+        for step in steps {
+            match resource(step, os, port, daemons) {
+                Some(r) => phase.push(r),
+                None => unknown.push(Unportable {
+                    step: i,
+                    field: None,
+                    reason: format!("this Isoloom can't resolve a `{}` step", step.kind()),
+                    fix: "upgrade Isoloom's plan with its spec".into(),
+                }),
+            }
+            i += 1;
         }
     }
-    if unknown.is_empty() { Ok(out) } else { Err(unknown) }
+    if !unknown.is_empty() {
+        return Err(unknown);
+    }
+    let daemons = all()
+        .filter_map(|s| match s {
+            Step::Service(s) if s.enabled() => foreground(s, family, daemons),
+            _ => None,
+        })
+        .collect();
+    let [install, configure, start] = resolved;
+    Ok(Recipe {
+        os,
+        family,
+        install,
+        configure,
+        start,
+        daemons,
+        files: BTreeMap::new(),
+    })
 }
 
 /// Why `family` can't carry step `i` at all, when it can't.
@@ -129,9 +179,9 @@ fn first_set(fields: &[(&'static str, bool)]) -> Option<&'static str> {
     fields.iter().find_map(|(field, set)| set.then_some(*field))
 }
 
-/// Step `step` resolved on `os` (`ports`: its machine's, for the firewall's names); `None` for a
-/// kind the spec has and this plan doesn't (the two crates ship together, so never).
-fn resource(step: &Step, os: OsRef, ports: &IndexMap<PortName, syntax::Port>, daemons: &DaemonTable) -> Option<Resource> {
+/// Step `step` resolved on `os` (`port`: its machine's ports, for the firewall's names); `None`
+/// for a kind the spec has and this plan doesn't (the two crates ship together, so never).
+fn resource(step: &Step, os: OsRef, port: &PortOf<'_>, daemons: &DaemonTable) -> Option<Resource> {
     let family = Family::from(os);
     let r = match step {
         Step::Run { script, creates } => Resource::Run(RunPlan {
@@ -150,7 +200,7 @@ fn resource(step: &Step, os: OsRef, ports: &IndexMap<PortName, syntax::Port>, da
         Step::Group(g) => Resource::Group(g.clone()),
         Step::Service(s) => Resource::Service(service(s, family, daemons)),
         Step::Command(c) => Resource::Command(c.clone()),
-        Step::Firewall(f) => Resource::Firewall(f.allow.iter().filter_map(|p| port(p, ports)).collect()),
+        Step::Firewall(f) => Resource::Firewall(f.allow.iter().filter_map(|p| firewall_port(p, port)).collect()),
         _ => return None,
     };
     Some(r)
@@ -216,19 +266,22 @@ fn foreground(s: &Service, family: Family, daemons: &DaemonTable) -> Option<Daem
 
 /// A firewall port by number: a named one is the machine's port (the spec's checks report a
 /// name the machine doesn't have).
-fn port(p: &FirewallPort, ports: &IndexMap<PortName, syntax::Port>) -> Option<PortSpec> {
+fn firewall_port(p: &FirewallPort, named: &PortOf<'_>) -> Option<PortSpec> {
     match p {
-        FirewallPort::Named(name) => {
-            let found = ports.get(name)?;
-            let protocol = if found.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp };
-            Some(PortSpec { port: found.port?, protocol })
-        }
+        FirewallPort::Named(name) => named(name),
         FirewallPort::Number { port, protocol } => Some(PortSpec {
             port: *port,
             protocol: *protocol,
         }),
         _ => None,
     }
+}
+
+/// The authored machine's port `name`, by number and transport.
+fn named_port(name: &PortName, ports: &IndexMap<PortName, syntax::Port>) -> Option<PortSpec> {
+    let found = ports.get(name)?;
+    let protocol = if found.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp };
+    Some(PortSpec { port: found.port?, protocol })
 }
 
 #[cfg(test)]

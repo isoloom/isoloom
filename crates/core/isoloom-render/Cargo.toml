@@ -19,6 +19,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+serde_yaml_ng.workspace = true
 insta.workspace = true
 
 [lints]

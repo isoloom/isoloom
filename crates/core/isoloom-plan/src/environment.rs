@@ -23,6 +23,7 @@ pub use image::{Build, Image};
 use crate::addressing::{address, address_for, host_address, start_order};
 use crate::ansible;
 use crate::checks::{self, Resolved};
+use crate::configure::{DaemonTable, Recipe};
 use crate::hardware::{self, Hardware};
 use crate::images::Images;
 use crate::ipv6::{self, Ipv6Plan, Route6};
@@ -184,6 +185,9 @@ pub struct MachinePlan {
     pub process: Process,
     /// The GPUs, host devices and nested virtualization it asks for.
     pub hardware: Hardware,
+    /// Its configuration resolved (an app's steps), which its container's build or its VM's
+    /// set-up renders: the one source every CM renderer reads.
+    pub recipe: Option<Recipe>,
 }
 
 impl MachinePlan {
@@ -467,6 +471,8 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
 /// Machine `name` (`m`), planned for `target`.
 fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan {
     let shape = shape(target, m);
+    // Lowering refuses a step the machine's family can't carry, so its configuration resolves.
+    let recipe = m.configuration.as_ref().and_then(|c| Recipe::of(c, &m.ports, &DaemonTable::common()).ok());
     MachinePlan {
         shape,
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
@@ -502,16 +508,12 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
             .unwrap_or_default(),
         arch: m.arch,
         rate_limit: m.rate_limit.clone(),
-        image: image::of(spec, shape, name, m),
+        image: image::of(spec, shape, name, m, recipe.as_ref()),
         vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
         boot: m.vm.as_ref().and_then(|v| v.boot.clone()),
         depends_on: m.depends_on.clone(),
         lifecycle: if shape == MachineShape::Vm {
-            let mut steps = lifecycle::of(spec, name, m);
-            if target == Target::CloudVm {
-                ipv6::cloud_routes(&mut steps);
-            }
-            steps
+            vm_lifecycle(spec, target, name, m)
         } else {
             Vec::new()
         },
@@ -524,7 +526,17 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         outside: IndexMap::new(),
         process: Process::of(m),
         hardware: Hardware::of(m),
+        recipe,
     }
+}
+
+/// VM `name`'s set-up steps on `target`.
+fn vm_lifecycle(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachineLifecycle {
+    let mut steps = lifecycle::of(spec, name, m);
+    if target == Target::CloudVm {
+        ipv6::cloud_routes(&mut steps);
+    }
+    steps
 }
 
 fn published(m: &Machine) -> Vec<PublishedPort> {
