@@ -377,3 +377,8 @@ Every phase appends one line per user-visible fact it changed. The facts kept fr
 - **Run manifest v0, `project.archive`:** `with: { root }`, the project's folder relative to the manifest's (`../../..` from `.isoloom/docker-vm/proxmox`). It writes `${run.state_dir}/project.tgz`: Isoloom's outputs (`.isoloom*`) in; `.git`, `.vagrant` and `.terraform` at any depth, `.isoloom-project*` at the top and what `.isoloomignore` lists out (the same rules as every generated file: `isoloom_manifest::ignore`).
 - **Run manifest v0, `guest`:** `{ machine, host?, status }`, Compose running inside one VM of the run (`docker-vm`): `machine` is the VM, `status` reads the containers in it (`docker compose ps --all --format json`, an empty output meaning none), `host` says where their published ports answer when the VM's driver can't (Terraform: `${outputs.ip}`).
 - **Run manifest v0, `vagrant.check_forwarded_ports`:** unless the run's VMs exist, fails with `port_in_use` when a host port the VMs forward (a `fixed` published port) is taken on 127.0.0.1 or 0.0.0.0.
+
+## The Cyber CTF website (cyberctf-web)
+
+- **The lab page submits per objective** (cyberctf-web `d06301e`): each challenge of a lab (`Lab.objectives`, role `CHALLENGE`) has its own answer field, checked by CyberBackend's `submitObjective(labId, key, answer)`; guided steps and hints open on demand through `openObjectiveHelp` (recorded). A lab without objectives shows its implicit challenge, the lab question, submitted with the key `main`. The single evidence form and `submitEvidence` are gone from the site.
+- **Catalogue and SEO** (cyberctf-web `4283e1a`): the sitemap lists `/contact`, `/privacy` and `/terms`; the site's contact email is `hello@cyberctf.org` and its author URL `https://www.cyberctf.org`.
