@@ -96,3 +96,11 @@ None of this reaches the launcher or Isothrum, which read `isoloom-targets` (its
 
 30. **The catalogue resolves `service:`:** `isoloom_catalogue::Catalogue` (`Catalogue::embedded()`, `resolve(&syntax::Spec, machine)` → `Vec<Resolved>`) is the new core crate at rank 1. `Lab` carries it (`Lab::catalogue()`), and `isoloom_plan::lower::lower(source, catalogue, scope)` and `lower::missing_form(source, catalogue, target)` take it. `isoloom_plan::configure::Family` and `codename` are the catalogue's, re-exported; `DaemonTable::common()` is the catalogue's daemon table (`DaemonTable::from(&Catalogue)`).
 31. **`model::Generated` gains `from: BaseImage`** (`Os`, or `Entry`: an entry's official image, whose container keeps its own process, `ContainerProcess::Image`, and whose recipe skips `install`). `model::Configuration::entry(os, install, configure, start, files)` builds an entry's configuration. `resolved.json` lists a service machine's `services` (`entry`, `release`, `source`, `image`).
+
+## Phase 3, `docker-vm` (the docker-vm unit)
+
+32. **Run manifest v0, additive (`docker-vm`):** existing manifests read the same.
+    - `Step.stdin` is a `PathTemplate` (was `RelPath`): `PathTemplate::relative(&rel)` for a file beside the manifest, `PathTemplate::in_state_dir(&rel)` for one of the run's state folder; render it like any template, then join it to the manifest's folder (a state-folder path is absolute). The JSON is unchanged.
+    - `Action::ProjectArchive` (`project.archive`) takes `with.root` (the project's folder, relative to the manifest's) and writes `${run.state_dir}/project.tgz`; `Action::VagrantCheckForwardedPorts` (`vagrant.check_forwarded_ports`) is new.
+    - `Manifest.guest: Option<Guest>` (`Guest { machine: Name, host: Option<Template>, status: Step }`); `guest.status` is in `step_lists()` (`"guest.status"`), `guest.host` in `templates()`, and every step's `stdin` in `templates()` (`<list>[i].stdin`).
+    - The `.isoloomignore` matcher is `isoloom_manifest::ignore` (`Rules::parse`, `ignored`, `brings_back`, `is_empty`, `FILE`); `isoloom_render::project::ignore` re-exports it.

@@ -77,6 +77,7 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
         },
         recovery: None,
         expiry: None,
+        guest: None,
     })
 }
 

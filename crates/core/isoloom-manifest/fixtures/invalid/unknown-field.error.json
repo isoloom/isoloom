@@ -1,5 +1,5 @@
 {
   "code": "field",
-  "message": "shell: unknown field `shell`, expected one of `$schema`, `manifest_version`, `generator`, `lab`, `target`, `cloud`, `driver`, `hosts`, `tools`, `identity`, `params`, `secrets`, `networks`, `machines`, `lifecycle`, `ready`, `outputs`, `checks`, `recovery`, `expiry`",
+  "message": "shell: unknown field `shell`, expected one of `$schema`, `manifest_version`, `generator`, `lab`, `target`, `cloud`, `driver`, `hosts`, `tools`, `identity`, `params`, `secrets`, `networks`, `machines`, `lifecycle`, `ready`, `outputs`, `checks`, `recovery`, `expiry`, `guest`",
   "schema": true
 }

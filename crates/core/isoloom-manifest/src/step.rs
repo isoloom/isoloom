@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::argv::HostArgv;
 use crate::identity::{HostOs, Provider};
 use crate::names::{EnvName, SnakeName, StepId};
-use crate::path::RelPath;
+use crate::path::{PathTemplate, RelPath};
 use crate::template::Template;
 use crate::{Error, Result};
 
@@ -51,6 +51,10 @@ pub enum Action {
     /// Halts the controller, waiting for one that powers itself off.
     #[serde(rename = "vagrant.park_controller")]
     VagrantParkController,
+    /// Fails with `PortInUse` when a host port the VMs forward (a published port with a `fixed`
+    /// host port) is taken, unless the run's VMs exist: two labs forwarding one port collide.
+    #[serde(rename = "vagrant.check_forwarded_ports")]
+    VagrantCheckForwardedPorts,
     /// Removes a stale Terraform state lock.
     #[serde(rename = "terraform.clear_lock")]
     TerraformClearLock,
@@ -60,7 +64,9 @@ pub enum Action {
     /// Runs a command over SSH with the runner's key (`with`: `host`, `user`, `via`, `command`).
     #[serde(rename = "ssh.run")]
     SshRun,
-    /// Archives the project for a module (`project.tgz` in the run's state folder).
+    /// Archives the project as `${run.state_dir}/project.tgz` (`with`: `root`, the project's folder
+    /// relative to the manifest's): Isoloom's outputs in, version control, the tools' state and
+    /// what `.isoloomignore` lists ([`crate::ignore`]) out. A step pipes it to a guest.
     #[serde(rename = "project.archive")]
     ProjectArchive,
 }
@@ -115,8 +121,10 @@ pub struct Step {
     pub cwd: Option<RelPath>,
     /// Its non-secret environment, values as templates.
     pub env: BTreeMap<EnvName, Template>,
-    /// A generated file piped into the program: the shell runs in the guest, never on the host.
-    pub stdin: Option<RelPath>,
+    /// A file piped into the program: a generated one beside the manifest (a guest script), or one
+    /// of the run's state folder (`${run.state_dir}/project.tgz`). A shell runs in the guest, never
+    /// on the host.
+    pub stdin: Option<PathTemplate>,
     /// How long it may run.
     pub timeout_s: Option<NonZeroU32>,
     /// How long it may run on these Vagrant providers, in place of `timeout_s` (only there): a
@@ -201,10 +209,12 @@ struct StepFields {
     /// `TF_IN_AUTOMATION`). Secrets and params come through their slots.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     env: BTreeMap<EnvName, Template>,
-    /// A generated file piped into the program (a check script into `docker compose exec -T <m>
-    /// sh -s` or `ssh … sh -s`): the shell runs in the guest, never on the host.
+    /// A file piped into the program: a generated one beside the manifest (a check script into
+    /// `docker compose exec -T <m> sh -s` or `ssh … sh -s`), or one of the run's state folder (the
+    /// project's archive, `${run.state_dir}/project.tgz`). A shell runs in the guest, never on the
+    /// host.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    stdin: Option<RelPath>,
+    stdin: Option<PathTemplate>,
     /// How long it may run, in seconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     timeout_s: Option<NonZeroU32>,

@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use isoloom_manifest::{Action, CheckRunner, Failure, Name, RelPath, SnakeName, Step, StepId, Template};
+use isoloom_manifest::{Action, CheckRunner, Failure, Name, PathTemplate, RelPath, SnakeName, Step, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Position, Probe, Resolved};
 use isoloom_render::run_manifest::{check, timeout_s};
@@ -68,7 +68,7 @@ fn compose_runner(pos: &Position, service: &str, group: &[&Resolved]) -> Result<
 fn exec_runner_of(pos: &Position, machine: &str, execs: &[&Resolved]) -> Result<CheckRunner> {
     let id = format!("check-exec-{}", pos.id());
     let mut step = Step::argv(StepId::parse(&id)?, compose(&["exec", "-T", machine, "sh", "-s"])?);
-    step.stdin = Some(RelPath::parse(&format!("checks/{}", exec_runner(machine)))?);
+    step.stdin = Some(PathTemplate::relative(&RelPath::parse(&format!("checks/{}", exec_runner(machine)))?));
     step.timeout_s = NonZeroU32::new(timeout_s(execs));
     Ok(CheckRunner {
         id: Name::parse(&format!("exec-{}", pos.id()))?,

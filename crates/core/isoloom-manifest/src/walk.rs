@@ -36,6 +36,9 @@ impl Manifest {
         if let Some(r) = &self.recovery {
             out.push(("recovery.steps".into(), r.steps.iter().collect()));
         }
+        if let Some(g) = &self.guest {
+            out.push(("guest.status".into(), vec![&g.status]));
+        }
         out
     }
 
@@ -72,6 +75,9 @@ impl Manifest {
         }
         for (i, o) in self.outputs.iter().enumerate() {
             out.extend(o.format.iter().map(|t| (format!("outputs[{i}].format"), t)));
+        }
+        if let Some(host) = self.guest.as_ref().and_then(|g| g.host.as_ref()) {
+            out.push(("guest.host".into(), host));
         }
         out
     }
@@ -112,6 +118,7 @@ fn step<'a>(at: &str, s: &'a Step, out: &mut Vec<(String, &'a Template)>) {
         Run::Action { with, .. } => out.extend(with.iter().map(|(k, t)| (format!("{at}.with.{k}"), t))),
     }
     out.extend(s.env.iter().map(|(k, t)| (format!("{at}.env.{k}"), t)));
+    out.extend(s.stdin.iter().map(|p| (format!("{at}.stdin"), p.template())));
 }
 
 fn condition<'a>(at: &str, c: &'a Condition, out: &mut Vec<(String, &'a Template)>) {

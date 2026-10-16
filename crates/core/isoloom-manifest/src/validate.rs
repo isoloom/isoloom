@@ -18,7 +18,7 @@ impl Manifest {
     /// The first of: [`Error::NoHosts`], [`Error::DriverIdentity`] (an identity
     /// for another driver), [`Error::DuplicateStep`], [`Error::UnknownStep`] (a
     /// delivery's step), [`Error::ReadyNotUp`], [`Error::DuplicateMachine`],
-    /// [`Error::DuplicatePort`], [`Error::UnknownMachine`],
+    /// [`Error::DuplicatePort`], [`Error::UnknownMachine`] (the guest's VM among them),
     /// [`Error::UnknownPublished`], [`Error::UnknownParam`],
     /// [`Error::UnknownOutput`] and [`Error::PlaceholderOutOfPlace`].
     pub fn validate(&self) -> Result<()> {
@@ -35,6 +35,9 @@ impl Manifest {
         self.deliveries()?;
         self.ready_conditions()?;
         self.machine_references()?;
+        if let Some(g) = &self.guest {
+            self.machine_exists("guest.machine", g.machine.as_str())?;
+        }
         self.placeholders()
     }
 

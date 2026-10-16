@@ -57,6 +57,7 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
         },
         recovery: Some(lifecycle::recovery()?),
         expiry: None,
+        guest: None,
     })
 }
 

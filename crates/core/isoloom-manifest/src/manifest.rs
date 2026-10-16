@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::guest::Guest;
 use crate::identity::{Cloud, Driver, HostOs, Identity, Target, Tool};
 use crate::lifecycle::{Condition, Expiry, Lifecycle, Recovery};
 use crate::machine::{Machine, Network};
@@ -64,6 +65,9 @@ pub struct Manifest {
     /// When the run stops itself.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expiry: Option<Expiry>,
+    /// The VM the lab's containers run in, when Compose runs inside one (`docker-vm`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guest: Option<Guest>,
 }
 
 /// Reads a manifest: JSON, then version 0, then the types, then [`Manifest::validate`].

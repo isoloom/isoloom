@@ -60,6 +60,7 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
         },
         recovery: Some(lifecycle::recovery()?),
         expiry: None,
+        guest: None,
     })
 }
 

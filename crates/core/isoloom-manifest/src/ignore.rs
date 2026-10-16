@@ -1,6 +1,7 @@
 //! `.isoloomignore`: the project's paths the machines don't get when the project is copied into
 //! them (Vagrant's `project` step, Proxmox's cloud-init, the cloud modules' archive, and the
-//! runner's own copies). Gitignore-style, at the project's root:
+//! runner's `project.archive`). Part of the contract: a runner archiving the project leaves out
+//! exactly what the generated files do. Gitignore-style, at the project's root:
 //!
 //! - one pattern per line; blank lines and `#` comments are skipped, spaces around a pattern
 //!   too;
@@ -17,6 +18,14 @@
 //! regular expression (`^<glob>(/|$)`, or `^<glob>/` for folders only); this matcher follows the
 //! same rules, for a copy made outside those tools (the runner's), so it can't disagree with
 //! them. It reads text only: walking the project is the caller's.
+//!
+//! ```
+//! use isoloom_manifest::ignore::Rules;
+//!
+//! let rules = Rules::parse("*.log\n!keep.log\nbuild/\n");
+//! assert!(rules.ignored("logs/x.log") && !rules.ignored("keep.log"));
+//! assert!(rules.ignored("src/build/") && !rules.ignored("src/app.py"));
+//! ```
 
 use std::collections::BTreeSet;
 

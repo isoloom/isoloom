@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, CheckRunner, Condition, EnvName, Error as ManifestError, HostArgv, Lifecycle, Name, NonEmpty, Part, Placeholder, Program, ReadyGrammar,
-    RelPath, Run, RunVar, SnakeName, Step, StepId, Template,
+    Action, Argv, CheckRunner, Condition, EnvName, Error as ManifestError, HostArgv, Lifecycle, Name, NonEmpty, Part, PathTemplate, Placeholder, Program,
+    ReadyGrammar, RelPath, Run, RunVar, SnakeName, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_plan::checks::by_position;
@@ -179,7 +179,7 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
                 .map(|(k, v)| Ok((SnakeName::parse(k)?, v)))
                 .collect::<Result<_, ManifestError>>()?,
         };
-        step.stdin = Some(RelPath::parse(&format!("checks/{}.sh", pos.id()))?);
+        step.stdin = Some(PathTemplate::relative(&RelPath::parse(&format!("checks/{}.sh", pos.id()))?));
         step.timeout_s = secs(timeout_s(&group));
         out.push(CheckRunner {
             id: Name::parse(pos.id())?,

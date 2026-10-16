@@ -35,7 +35,9 @@
 
 mod argv;
 mod error;
+mod guest;
 mod identity;
+pub mod ignore;
 mod lifecycle;
 mod list;
 mod machine;
@@ -54,6 +56,7 @@ mod walk;
 
 pub use argv::{Argv, HostArgv, PerHostArgv, Program};
 pub use error::{Error, Result};
+pub use guest::Guest;
 pub use identity::{
     Cloud, ComposeIdentity, Driver, Elevation, HostOs, Identity, Provider, StateOwner, Target, TerraformIdentity, Tool, VagrantIdentity, VagrantProvider,
 };

@@ -126,7 +126,7 @@ fn each_check_runner_is_piped_to_its_machine_through_the_router() {
     let arg = |k: &str| with.iter().find(|(n, _)| n.as_str() == k).map(|(_, v)| v.to_string());
     assert_eq!(arg("via").as_deref(), Some("isoloom@${outputs.ip}"));
     assert_eq!(arg("command").as_deref(), Some("ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s"));
-    assert_eq!(r.step.stdin.as_ref().map(RelPath::as_str), Some("checks/networks.sh"));
+    assert_eq!(r.step.stdin.as_ref().map(ToString::to_string).as_deref(), Some("checks/networks.sh"));
     let waits: u32 = r.checks.iter().map(|c| c.wait_s).sum();
     assert!(r.step.timeout_s.unwrap().get() >= waits + 60);
 }

@@ -1,6 +1,7 @@
 //! The project copied into the machines, without what `.isoloomignore` leaves out: its rules
-//! ([`ignore`]), and the same rules in the Terraform outputs, read when Terraform runs, exactly as
-//! the Vagrantfiles read them (`vagrant_project.rb`), so every target leaves out the same files.
+//! ([`ignore`], the run manifest's: the runner's `project.archive` follows them too), and the
+//! same rules in the Terraform outputs, read when Terraform runs, exactly as the Vagrantfiles read
+//! them (`vagrant_project.rb`), so every target leaves out the same files.
 //!
 //! - Proxmox writes the project's files through cloud-init: `local.project_paths`, the files
 //!   that go (not version control, the tools' state, or Isoloom's outputs).
@@ -10,7 +11,7 @@
 //!   starts with the project folder's name (the archive's top folder, stripped when unpacked),
 //!   since bsdtar (macOS, Windows) matches exclusions at any depth.
 
-pub mod ignore;
+pub use isoloom_manifest::ignore;
 
 /// How a Terraform module copies the project into its machines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

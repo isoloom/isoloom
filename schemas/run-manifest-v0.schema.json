@@ -134,6 +134,17 @@
         }
       ],
       "description": "When the run stops itself."
+    },
+    "guest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Guest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The VM the lab's containers run in, when Compose runs inside one (`docker-vm`)."
     }
   },
   "required": [
@@ -1794,13 +1805,13 @@
         "stdin": {
           "anyOf": [
             {
-              "$ref": "#/$defs/RelPath"
+              "$ref": "#/$defs/PathTemplate"
             },
             {
               "type": "null"
             }
           ],
-          "description": "A generated file piped into the program (a check script into `docker compose exec -T <m> sh -s` or `ssh … sh -s`): the shell runs in the guest, never on the host."
+          "description": "A file piped into the program: a generated one beside the manifest (a check script into `docker compose exec -T <m> sh -s` or `ssh … sh -s`), or one of the run's state folder (the project's archive, `${run.state_dir}/project.tgz`). A shell runs in the guest, never on the host."
         },
         "timeout_s": {
           "type": [
@@ -1934,6 +1945,11 @@
         },
         {
           "type": "string",
+          "const": "vagrant.check_forwarded_ports",
+          "description": "Fails with `PortInUse` when a host port the VMs forward (a published port with a `fixed` host port) is taken, unless the run's VMs exist: two labs forwarding one port collide."
+        },
+        {
+          "type": "string",
           "const": "terraform.clear_lock",
           "description": "Removes a stale Terraform state lock."
         },
@@ -1950,7 +1966,7 @@
         {
           "type": "string",
           "const": "project.archive",
-          "description": "Archives the project for a module (`project.tgz` in the run's state folder)."
+          "description": "Archives the project as `${run.state_dir}/project.tgz` (`with`: `root`, the project's folder relative to the manifest's): Isoloom's outputs in, version control, the tools' state and what `.isoloomignore` lists ([`crate::ignore`]) out. A step pipes it to a guest."
         }
       ],
       "description": "A driver primitive: a read-then-act sequence one argv can't express (list, then remove what was listed). The manifest's documentation fixes each action's native commands."
@@ -2589,6 +2605,36 @@
         }
       ],
       "description": "How a run's expiry is passed to the module."
+    },
+    "Guest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "machine": {
+          "$ref": "#/$defs/Name",
+          "description": "The VM: a machine of the manifest. Every machine named by a Compose service runs in it."
+        },
+        "host": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Template"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the containers' published ports answer, when the VM's driver can't say it (Terraform: `${outputs.ip}`, the server VM's address). Absent: where the driver says the VM answers (Vagrant: this computer's loopback, to which it forwards the ports; the VM's own address on a provider that forwards nothing)."
+        },
+        "status": {
+          "$ref": "#/$defs/Step",
+          "description": "Reads the containers inside the VM, once it runs: `docker compose ps --all --format json` (an argv through the VM's tool, or `ssh.run`). Never elevated, always time-bounded; an empty output means no container."
+        }
+      },
+      "required": [
+        "machine",
+        "status"
+      ],
+      "description": "The VM the lab's containers run in, and how the runner reads them there: its own machines are the VM's driver's (Vagrant, Terraform), the containers' are Compose's inside it."
     }
   }
 }
