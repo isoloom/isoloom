@@ -57,6 +57,7 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
     for (name, m) in &spec.machines {
         super::settings::machine(name, m, p);
         super::hardware::machine(name, m, p);
+        super::hardware::offline_privilege(spec, name, m, p);
         let s = Subject {
             spec,
             name,

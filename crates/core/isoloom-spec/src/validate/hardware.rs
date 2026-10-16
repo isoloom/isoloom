@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use super::Problems;
-use crate::model::{Device, GpuCount, Gpus, Machine};
+use crate::model::{Device, GpuCount, Gpus, Machine, Spec};
 
 /// The machine's hardware fields, each checked in turn.
 pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
@@ -25,6 +25,26 @@ pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
         if !guests.insert(d.guest()) {
             p.add(at, format!("`{}` is already given to the machine: one device per path inside it", d.guest()));
         }
+    }
+}
+
+/// An `internet: false` network keeps a container offline by removing its default route inside
+/// its own network namespace (the host doesn't route it out). A privileged container can add the
+/// route back and reach the internet, so the seal would be a guarantee root could lift. Refuse a
+/// privileged container on such a network: it must drop `privileged`, or sit on a network with
+/// internet. A VM is sealed at the hypervisor or router, out of its own reach, so this is for
+/// containers only.
+pub(super) fn offline_privilege(spec: &Spec, name: &str, m: &Machine, p: &mut Problems) {
+    if m.vm.is_some() || !m.privileged {
+        return;
+    }
+    if let Some(net) = m.networks.keys().find(|net| spec.networks.get(*net).is_some_and(|n| !n.internet)) {
+        p.add(
+            format!("machines.{name}.privileged"),
+            format!(
+                "a privileged container can lift the seal of `{net}` (an `internet: false` network) from inside: drop `privileged`, or put the machine on a network with internet"
+            ),
+        );
     }
 }
 
@@ -96,6 +116,37 @@ mod tests {
         ))
         .unwrap();
         validate(&spec).into_iter().map(|p| p.to_string()).collect()
+    }
+
+    /// The problems of a spec whose `lan` network is given by `lan` and whose machine `a` by
+    /// `machine`.
+    fn offline_problems(lan: &str, machine: &str) -> Vec<String> {
+        let spec = crate::testing::model(&format!(
+            "version: 1\nname: hw\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24, {lan} }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, {machine} }}\n"
+        ))
+        .unwrap();
+        validate(&spec).into_iter().map(|p| p.to_string()).collect()
+    }
+
+    #[test]
+    fn a_privileged_container_is_refused_on_an_internet_false_network() {
+        assert_eq!(
+            offline_problems("internet: false", "docker: { image: x }, privileged: true"),
+            ["machines.a.privileged: a privileged container can lift the seal of `lan` (an `internet: false` network) from inside: drop `privileged`, or put the machine on a network with internet"]
+        );
+    }
+
+    #[test]
+    fn privilege_is_fine_with_internet_or_on_a_vm() {
+        // Internet on the network: nothing to seal.
+        assert_eq!(offline_problems("internet: true", "docker: { image: x }, privileged: true"), Vec::<String>::new());
+        // A VM is sealed at the hypervisor or router, out of its own reach.
+        assert_eq!(
+            offline_problems("internet: false", "vm: { os: debian@12, provision: [a.sh] }, privileged: true"),
+            Vec::<String>::new()
+        );
+        // An unprivileged container on an offline network is the normal case.
+        assert_eq!(offline_problems("internet: false", "docker: { image: x }"), Vec::<String>::new());
     }
 
     #[test]
