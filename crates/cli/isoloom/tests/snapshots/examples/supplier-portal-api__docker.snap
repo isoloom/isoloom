@@ -485,7 +485,7 @@ secrets:
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.10.1"
+    "version": "0.11.0"
   },
   "lab": {
     "name": "supplier-portal-api",
