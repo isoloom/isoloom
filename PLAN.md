@@ -380,6 +380,11 @@ These go beyond lints. Each one names the tool or review that enforces it.
 - **The engineering standard (3b) applies in full:** lint levels, the ratchet to zero, `knip` and `jscpd`, components ≤ 200 lines, typed boundaries.
 - **The two sites stay in separate repositories** (maintainer, 2026-10-15). Their shared scaffolding is not merged; each repository meets 3b on its own.
 
+**The Cyber CTF website** (`cyberctf-web`, Cyber-Courses/CyberCTF-Web, Next.js 16; labs catalogue from CyberBackend, per-player evidence submission, launcher download, docs, dashboard). Maintainer (2026-10-16): "let's make cyber ctf great as the launcher". It follows the same rules: local `main`, no PRs, no push without the maintainer's OK (a push deploys production).
+- **Running now:** consolidating its local branches onto `main` (archived first), the 3b standard to zero, Vitest plus Playwright, and security tests pinning the audit's fixes.
+- **Running now:** an end-to-end check of the flag contract: CyberBackend's per-player keyed flag → the launcher → Isoloom `files: [{input}]` → the runner's slot → the lab → cyberctf-web's evidence submission → CyberBackend.
+- **Later:** a sync that shows each launcher mode's real tiers (from Isoloom's `tiers.json` and `docs/matrix.md`), and where each lab runs, after the lab rewrite. The launcher page and docs copy come at the docs gate.
+
 **When:**
 - **Phase 0.7, the engineering standard in both sites:** measure, then lint configs, the ratchet, the folder layout, and driving to zero. It can run alongside other phases, because the sites don't block the converter.
 - **Phase 2:** the Isothrum compiler (`isothrum-core`, soon `isothrum-compiler`) and the website editor **write the new spec syntax**. The editor's model must accept exactly what Isoloom accepts. For example, a rate with no unit is reported, as Isoloom does; today the editor reads it as bits. With no old-format support, a drawn lab would otherwise break. They test against Isoloom's spec examples and schema.
