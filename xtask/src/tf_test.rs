@@ -153,5 +153,9 @@ mod tests {
         assert!(SCRIPT.contains("terraform test -json"), "the report reads Terraform's JSON");
         assert!(SCRIPT.contains("-backend=false"), "no state backend is ever configured");
         assert!(SCRIPT.contains("timeout while waiting for plugin to start"), "a slow provider start is retried");
+        assert!(
+            SCRIPT.contains("for pass in init_one test_one"),
+            "no test runs while an init writes in the tree"
+        );
     }
 }
