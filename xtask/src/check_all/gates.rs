@@ -37,9 +37,19 @@ const ISOLOOM_XTASK: [&str; 2] = ["cargo", "xtask"];
 /// writes, so it has no alias.
 const ISOTHRUM_XTASK: [&str; 6] = ["cargo", "run", "--quiet", "--package", "xtask", "--"];
 
-/// Isoloom's gates (see [`workspace_gates`]).
+/// Isoloom's gates (see [`workspace_gates`]), and after its tests the generated cloud and server
+/// modules' logic (`tf-test`, in Docker on this Mac): its fast subset on the full profile, every
+/// suite on the deep one.
 pub(super) fn isoloom(profile: Profile) -> Vec<Gate> {
-    workspace_gates(profile, &ISOLOOM_XTASK)
+    let mut gates = workspace_gates(profile, &ISOLOOM_XTASK);
+    let tf_test: &[&'static str] = match profile {
+        Profile::Full => &["tf-test", "--fast"],
+        Profile::Deep => &["tf-test"],
+        Profile::Platform => return gates,
+    };
+    let after_tests = gates.iter().position(|g| g.name == "test").map_or(gates.len(), |i| i + 1);
+    gates.insert(after_tests, gate("tf-test", &[&ISOLOOM_XTASK[..], tf_test].concat()));
+    gates
 }
 
 /// Isothrum's gates, its libraries' workspace (the desktop app is its own and moves out): the
@@ -270,7 +280,8 @@ mod tests {
                 "msrv",
                 "features",
                 "fuzz-check",
-                "test"
+                "test",
+                "tf-test"
             ]
         );
         let platform: Vec<&str> = isoloom(Profile::Platform).iter().map(|g| g.name).collect();
@@ -280,10 +291,19 @@ mod tests {
     }
 
     #[test]
+    fn the_cloud_modules_logic_runs_its_fast_subset_unless_deep() {
+        let line = |profile| isoloom(profile).iter().find(|g| g.name == "tf-test").map(|g| g.argv.join(" "));
+        assert_eq!(line(Profile::Full).as_deref(), Some("cargo xtask tf-test --fast"));
+        assert_eq!(line(Profile::Deep).as_deref(), Some("cargo xtask tf-test"));
+        assert_eq!(line(Profile::Platform), None, "the other hosts run the tests only");
+    }
+
+    #[test]
     fn isothrum_runs_the_same_gates_through_its_own_xtask() {
         let names = |gates: &[Gate]| gates.iter().map(|g| g.name).collect::<Vec<_>>();
+        let isoloom_own = |gates: &[Gate]| gates.iter().map(|g| g.name).filter(|n| *n != "tf-test").collect::<Vec<_>>();
         for profile in [Profile::Full, Profile::Platform, Profile::Deep] {
-            assert_eq!(names(&isothrum(profile)), names(&isoloom(profile)));
+            assert_eq!(names(&isothrum(profile)), isoloom_own(&isoloom(profile)), "all but Isoloom's tf-test");
         }
         let gates = isothrum(Profile::Deep);
         let line = |name: &str| gates.iter().find(|g| g.name == name).map(|g| g.argv.join(" "));
