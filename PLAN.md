@@ -76,6 +76,10 @@ Workers stopped mid-step; their state is safe in their worktrees. Resume each by
 - **S4** resume replays sealed=true via apply (acceptable) — add a test.
 - **S5 by-design** (TF_VAR via `-e` visible to docker-daemon holders; `ANSIBLE_HOST_KEY_CHECKING=False`; `proxmox_insecure` TLS opt-out) — documented as conscious trade-offs for ephemeral labs; a code comment added at each.
 
+**Release plan (decided 2026-10-16): tag v0.9.0 / RC tonight, 1.0.0 after docs+labs.** No squash (tag on current history). crates.io via **Trusted Publishing** (OIDC, maintainer configures Trusted Publishers per crate; first publish of a new crate name may need one manual `cargo publish`). Desktop: **unsigned draft** release. Both held CyberBackend/Auth changes **approved** (AMOUNT decimal fix; `courses:sync` least-privilege scope) — landing test-first on local main, not deployed.
+**Gates before the v0.9.0 tag:** (1) clouds land; (2) C1 Docker-install pin (option a: apt repo-based + pinned key, get.docker.com kept for RPM with a 1.0 follow-up) lands after clouds; (3) AMOUNT + courses:sync land; (4) a clean full check-all (mac+jarvis+karen) on the final main; (5) workspace version bump to 0.9.0; (6) tag.
+**Desktop draft dependency:** release.yml checks out the PRIVATE `isoloom/isothrum-website` for the editor sources, so a CI draft needs `WEBSITE_REPO_TOKEN` (read-only) OR the website repo made public. Local build proved a mac dmg unsigned (`Isothrum_0.1.0_x64.dmg`, 10.4 MiB); win/linux need the CI run.
+
 **For the maintainer when back:**
 1. **Push hotfix?** The cyber-courses-web `hotfix/content-fetch` (`099adc6`) fixes a production security flaw in the lesson fetch. All 9 published lessons already store a commit ref, so none breaks. **Push it alone?**
 2. **Two approvals:** the AMOUNT decimal fix (about 1 player in 10 can't solve invoice-portal-api), and a separate `courses:sync` scope in Cyber Auth.
