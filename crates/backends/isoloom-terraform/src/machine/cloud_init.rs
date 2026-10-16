@@ -6,7 +6,10 @@
 //! cloud-init's own: each found by its serial (the disk's name, as the target attaches it),
 //! partitioned, formatted with its name as the label and mounted from `/etc/fstab`.
 
+use isoloom_plan::configure::Resource;
 use isoloom_plan::{DataDisk, Environment, MachinePlan, Step};
+use isoloom_render::configure::Configured;
+use isoloom_render::configure::cloud_init as cloud_init_carrier;
 use isoloom_render::hcl_builder::{Expression, boolean, call, list, object, string};
 use isoloom_render::steps;
 
@@ -219,6 +222,17 @@ pub(crate) fn file(path: &str, permissions: Option<&str>, content: Expression) -
     object(items)
 }
 
+/// A `write_files` entry whose content cloud-init decodes first (`encoding`, such as `gz+b64`):
+/// a recipe's configure script, compressed (see `isoloom_render::configure::cloud_init`).
+pub(crate) fn encoded_file(path: &str, encoding: &str, permissions: &str, content: &str) -> Expression {
+    object([
+        ("path", string(path)),
+        ("encoding", string(encoding)),
+        ("permissions", string(permissions)),
+        ("content", string(content)),
+    ])
+}
+
 /// The constraints' preamble as a `bootcmd` command, when the spec has constraints.
 pub(crate) fn prelude(env: &Environment) -> Option<String> {
     Shell::Root.step(env, "", &Step::Prelude)
@@ -236,11 +250,22 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
     }
     let mut parts: Vec<Vec<String>> = vec![Vec::new()];
     let mut again: Vec<String> = Vec::new();
+    let mut configures = 0usize;
     for step in &mp.lifecycle {
         match step {
             Step::Prelude | Step::Project => {}
             Step::Disks { disks } => config.disks.clone_from(disks),
             Step::Reboot => parts.push(again.clone()),
+            // The recipe's script is carried in `write_files`, compressed, and run from here, so
+            // the library isn't inlined in every machine's `runcmd`: the same text a VM's shell
+            // set-up runs (`isoloom_render::configure::cloud_init`).
+            Step::Configure { resources, fresh } => {
+                if let Some((cmd, written)) = configure_run(env, machine, resources, *fresh, configures) {
+                    configures += 1;
+                    config.files.push(written);
+                    parts.last_mut().into_iter().for_each(|p| p.push(cmd.clone()));
+                }
+            }
             _ => {
                 let Some(c) = Shell::Root.step(env, machine, step).map(|c| tracked(&label(step), &c)) else {
                     continue;
@@ -266,6 +291,17 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
         config.files.extend(reboot_files(&later));
         config.restart = true;
     }
+}
+
+/// Machine `machine`'s `index`-th configure run: the `runcmd` command that runs it (tracked in
+/// the ready file), and the `write_files` entry that delivers its script compressed. The script
+/// is the shell renderer's own, so cloud-init leaves what the shell set-up leaves. `None` only
+/// when the machine has no recipe (nothing to configure).
+fn configure_run(env: &Environment, machine: &str, resources: &[Resource], fresh: bool, index: usize) -> Option<(String, Expression)> {
+    let c = Configured::of(env, machine)?;
+    let carried = cloud_init_carrier::configure(&c, resources, fresh, index);
+    let written = encoded_file(&carried.file.path, "gz+b64", carried.file.permissions, &carried.file.content);
+    Some((tracked(cloud_init_carrier::LABEL, &carried.command), written))
 }
 
 /// The files of a machine's `reboot` steps: a unit run at each boot while `next-boot` names a

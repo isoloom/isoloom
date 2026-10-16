@@ -17,6 +17,8 @@ indexmap.workspace = true
 hcl.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
+# The cloud-init carrier compresses a recipe's script for `write_files` (`encoding: gz+b64`).
+flate2.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

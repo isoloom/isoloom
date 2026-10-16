@@ -13,6 +13,10 @@ pub(super) const PROBE: &str = include_str!("probe.sh");
 /// What the container runs: the applies and the probes.
 pub(super) const RUN: &str = include_str!("run.sh");
 
+/// What the cloud-init container runs: real cloud-init (the first apply), then the shell library
+/// on top (the second apply), with the probes.
+pub(super) const RUN_CLOUD_INIT: &str = include_str!("run-cloudinit.sh");
+
 /// The family's pinned official image.
 fn image(family: Family) -> Res<&'static str> {
     isoloom_spec::os::container_image(family.id).ok_or_else(|| format!("{} has no pinned container image", family.id).into())

@@ -3,12 +3,13 @@
 //! steps, the container's Dockerfile and its files), rendered by Isoloom's own crates.
 
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::Path;
 
 use isoloom_plan::lifecycle::Step;
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
-use isoloom_render::configure::dockerfile;
+use isoloom_render::configure::{Configured, cloud_init, dockerfile};
 use isoloom_render::steps;
 use isoloom_spec::model::Target;
 
@@ -146,6 +147,36 @@ pub(super) fn vm_script(family: Family) -> Res<String> {
     Ok(format!("#!/bin/sh\nset -eu\n{script}"))
 }
 
+/// The cloud-init rendering: the cloud-config document that carries the recipe, as the targets
+/// that hand a VM its user data write it (Proxmox): each `Step::Configure`'s script in a
+/// `write_files` entry (gzip then base64), run from `runcmd`. The script is the shell renderer's
+/// own, so cloud-init leaves what [`vm_script`] leaves; the harness proves it by running the
+/// shell script on top and finding nothing changed.
+pub(super) fn cloud_config(family: Family) -> Res<String> {
+    let lab = lab(family)?;
+    let env = Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None);
+    let c = Configured::of(&env, "m").ok_or_else(|| format!("{}: the machine has no recipe", family.id))?;
+    let lifecycle = env.machines.get("m").map(|m| m.lifecycle.clone()).unwrap_or_default();
+    let mut files = String::new();
+    let mut runcmd = String::new();
+    for (index, step) in lifecycle.iter().filter(|s| matches!(s, Step::Configure { .. })).enumerate() {
+        let Step::Configure { resources, fresh } = step else { continue };
+        let carried = cloud_init::configure(&c, resources, *fresh, index);
+        let f = &carried.file;
+        writeln!(files, "  - path: {}\n    encoding: gz+b64\n    permissions: \"{}\"\n    content: {}", f.path, f.permissions, f.content)?;
+        writeln!(runcmd, "  - [sh, {}]", f.path)?;
+    }
+    if files.is_empty() {
+        return Err(format!("{}: the recipe has no configuration step", family.id).into());
+    }
+    // Only for the harness, not the generated document: in a container (no DMI, no lsb_release)
+    // cloud-init's apt module rewrites Ubuntu's sources.list with the codename `UNAVAILABLE`,
+    // which breaks apt before the recipe's `runcmd` runs. A real VM resolves its mirror, so the
+    // production renderer leaves this out; here it keeps the carrier (write_files + runcmd) the
+    // thing under test.
+    Ok(format!("#cloud-config\napt:\n  preserve_sources_list: true\nwrite_files:\n{files}runcmd:\n{runcmd}"))
+}
+
 /// The Dockerfile rendering: the container's Dockerfile and the files it builds with.
 pub(super) fn container_files(family: Family) -> Res<Vec<GeneratedFile>> {
     let lab = lab(family)?;
@@ -173,6 +204,10 @@ mod tests {
             let files = container_files(family).unwrap();
             assert!(files[0].contents.contains("isoloom_repository"), "{}", family.id);
             assert!(files.iter().any(|f| f.path.ends_with("rendered/files/app.conf")), "{}", family.id);
+            let doc = cloud_config(family).unwrap();
+            assert!(doc.starts_with("#cloud-config\n"), "{}", family.id);
+            assert!(doc.contains("encoding: gz+b64"), "{}", family.id);
+            assert!(doc.contains("  - [sh, /var/lib/isoloom/configure/configure-0.sh]"), "{}: {doc}", family.id);
         }
     }
 }

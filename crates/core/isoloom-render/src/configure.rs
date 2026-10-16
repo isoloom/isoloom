@@ -4,6 +4,8 @@
 //!
 //! - [`shell`]: the POSIX library and a recipe's calls, for a Linux VM's set-up and every
 //!   generated Dockerfile (cloud-init carries the VM's script).
+//! - [`cloud_init`]: the same shell script, delivered in a cloud-config `write_files` entry
+//!   (gzip then base64) and run from `runcmd`, for the targets that hand a VM its user data.
 //! - [`powershell`]: the PowerShell library and a recipe's calls, for a Windows VM's set-up.
 //! - [`dockerfile`]: the image a container builds from its recipe, its process Isoloom's
 //!   [`runner`] when it runs services.
@@ -18,6 +20,7 @@ use isoloom_spec::syntax::ProjectPath;
 
 use crate::GeneratedFile;
 
+pub mod cloud_init;
 pub mod dockerfile;
 mod password;
 pub mod powershell;

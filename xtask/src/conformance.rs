@@ -6,6 +6,10 @@
 //!   applied in a fresh container, then again;
 //! - **dockerfile:** the image the container form builds (its Dockerfile `RUN`s the library's
 //!   calls), then the VM's script applied in it.
+//! - **cloud-init:** real cloud-init (installed in the family's image, seeded through `NoCloud`)
+//!   writes the recipe's script from a `write_files` entry (gzip then base64) and runs it from
+//!   `runcmd` (the first apply), then the VM's shell script is applied on top (the second apply)
+//!   and must change nothing. That proves the cloud-init carrier leaves what the shell leaves.
 //!
 //! After the first apply a probe checks each kind's state (the repository read by the package
 //! manager, the package, the group, the user and its hashed password, each file state, the
@@ -48,14 +52,21 @@ enum Renderer {
     Shell,
     /// The Dockerfile the container form builds.
     Dockerfile,
+    /// The cloud-init carrier: real cloud-init writes and runs the recipe, then the shell library
+    /// runs on top and must change nothing (parity with the shell renderer).
+    CloudInit,
 }
 
 impl Renderer {
+    /// Every renderer, in the order the table and `--renderer` default lists them.
+    const ALL: [Renderer; 3] = [Renderer::Shell, Renderer::Dockerfile, Renderer::CloudInit];
+
     /// Its name, as `--renderer` and the table write it.
     fn id(self) -> &'static str {
         match self {
             Renderer::Shell => "shell",
             Renderer::Dockerfile => "dockerfile",
+            Renderer::CloudInit => "cloud-init",
         }
     }
 }
@@ -90,7 +101,7 @@ fn conformance(a: &Args) -> Res<ExitCode> {
         .into_iter()
         .filter(|f| a.families.is_empty() || a.families.iter().any(|w| w == f.id))
         .collect();
-    let renderers: Vec<Renderer> = [Renderer::Shell, Renderer::Dockerfile]
+    let renderers: Vec<Renderer> = Renderer::ALL
         .into_iter()
         .filter(|r| a.renderers.is_empty() || a.renderers.iter().any(|w| w == r.id()))
         .collect();
@@ -127,14 +138,24 @@ fn one(family: lab::Family, renderer: Renderer, out: &Path, cpus: u16) -> Res<Ou
     let test = dir.join("test");
     lab::write(&test, "apply.sh", &lab::vm_script(family)?)?;
     lab::write(&test, "probe.sh", container::PROBE)?;
-    lab::write(&test, "run.sh", container::RUN)?;
     let lines = match renderer {
-        Renderer::Shell => container::fresh(family, &dir, cpus)?,
+        Renderer::Shell => {
+            lab::write(&test, "run.sh", container::RUN)?;
+            container::fresh(family, &dir, cpus)?
+        }
         Renderer::Dockerfile => {
+            lab::write(&test, "run.sh", container::RUN)?;
             for f in lab::container_files(family)? {
                 lab::write(&project, &f.path, &f.contents)?;
             }
             container::built(family, &dir, cpus)?
+        }
+        // Real cloud-init runs `run.sh`: it installs cloud-init, writes and runs the recipe from
+        // `user-data`, then the shell `apply.sh` on top must change nothing.
+        Renderer::CloudInit => {
+            lab::write(&test, "run.sh", container::RUN_CLOUD_INIT)?;
+            lab::write(&test, "user-data", &lab::cloud_config(family)?)?;
+            container::fresh(family, &dir, cpus)?
         }
     };
     std::fs::write(out.join(format!("{}-{}.log", family.id, renderer.id())), &lines)?;

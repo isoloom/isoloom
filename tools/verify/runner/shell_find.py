@@ -16,6 +16,9 @@ Each script found also yields the shell scripts it writes with a quoted heredoc 
 
 from __future__ import annotations
 
+import base64
+import binascii
+import gzip
 import re
 import shlex
 from dataclasses import dataclass, replace
@@ -258,8 +261,28 @@ def command_line(command: object) -> str:
     return str(command)
 
 
+def decoded_content(content: str, encoding: object) -> str | None:
+    """A `write_files` content as the script it holds, by its `encoding`. Plain (no encoding) is
+    the content itself. A gzipped entry (`gz+b64`, `gzip`: the configuration carrier's script) is
+    decoded. A plain-base64 entry (`b64`) is left alone: those are the project's own files, which
+    the standalone `shellcheck` validator checks as files, so re-checking them here would only
+    double-report. None when it isn't a script to check (plain base64, or bytes we can't read)."""
+    enc = str(encoding or "").strip().lower().replace("application/", "")
+    if not enc or enc in ("text/plain", "text"):
+        return content
+    tokens = enc.split("+")
+    if not any(t in ("gz", "gzip", "x-gzip") for t in tokens):
+        return None
+    try:
+        data = base64.b64decode(content, validate=True) if any(t in ("b64", "base64") for t in tokens) else content.encode("utf-8")
+        return gzip.decompress(data).decode("utf-8")
+    except (binascii.Error, OSError, UnicodeDecodeError):
+        return None
+
+
 def cloud_config(text: str, where: str = "") -> list[Script]:
-    """A cloud-config document's shell: `bootcmd`, `runcmd`, and its shell `write_files`."""
+    """A cloud-config document's shell: `bootcmd`, `runcmd`, and its shell `write_files`, those
+    `gz+b64`/`b64`-encoded (a recipe's configure script) decoded first."""
     try:
         doc = yaml.safe_load(text)
     except yaml.YAMLError:
@@ -273,12 +296,15 @@ def cloud_config(text: str, where: str = "") -> list[Script]:
         if lines:
             found.append(Script(f"{prefix}{key}", "sh", "\n".join(lines) + "\n"))
     for f in doc.get("write_files") or []:
-        if not isinstance(f, dict) or not isinstance(f.get("content"), str) or f.get("encoding"):
+        if not isinstance(f, dict) or not isinstance(f.get("content"), str):
+            continue
+        content = decoded_content(f["content"], f.get("encoding"))
+        if content is None:
             continue
         path = str(f.get("path", ""))
-        shell = shell_of(f["content"], "sh" if path.endswith(".sh") else None)
+        shell = shell_of(content, "sh" if path.endswith(".sh") else None)
         if shell:
-            found.append(Script(f"{prefix}write_files {path}", shell, f["content"]))
+            found.append(Script(f"{prefix}write_files {path}", shell, content))
     return with_written(found)
 
 

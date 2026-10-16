@@ -722,6 +722,7 @@ dependencies = [
 name = "isoloom-render"
 version = "0.10.1"
 dependencies = [
+ "flate2",
  "hcl-rs",
  "indexmap",
  "insta",
