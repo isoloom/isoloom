@@ -5,7 +5,7 @@
 //! service on Windows: the metadata holds the VM's name and its network configuration (each
 //! interface found by its MAC), the user data its set-up.
 
-use isoloom_render::hcl_builder::{Block, Expression, boolean, call, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, boolean, call, entry, list, number, object, reference, string};
 
 use crate::module::resource;
 use crate::server::slotted;
@@ -103,7 +103,7 @@ impl Guest {
             .add_attribute(("guest_name", slotted(&format!("-{}", self.name))))
             .add_attribute(("notes", string(format!("isoloom: {env_name}"))))
             .add_attribute(("disk_store", reference("var.disk_store")))
-            .add_attribute(("ovf_source", call("lookup", [reference("var.images"), string(self.os.as_str())])))
+            .add_attribute(("ovf_source", entry(reference("var.images"), self.os.as_str())))
             .add_attribute(("numvcpus", string(cpus.to_string())))
             .add_attribute(("memsize", string(memory.to_string())))
             .add_attribute(("boot_disk_size", string(disk.to_string())))

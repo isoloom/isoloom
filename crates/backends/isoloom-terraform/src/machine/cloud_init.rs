@@ -84,17 +84,17 @@ impl CloudConfig {
         }
     }
 
-    /// The document: `#cloud-config` then the YAML Terraform encodes.
+    /// The document: `#cloud-config` then the YAML Terraform encodes. A list with nothing in it
+    /// is left out: cloud-init's schema wants its lists non-empty.
     pub(crate) fn document(self) -> Expression {
         let mut items = vec![("hostname", string(self.hostname))];
         items.extend(self.fqdn.map(|f| ("fqdn", string(f))));
-        items.extend([("users", self.users), ("packages", list(self.packages.into_iter().map(string)))]);
-        if !self.bootcmd.is_empty() {
-            items.push(("bootcmd", list(self.bootcmd.into_iter().map(string))));
-        }
+        items.push(("users", self.users));
+        items.extend(commands("packages", self.packages));
+        items.extend(commands("bootcmd", self.bootcmd));
         items.extend(disks(&self.disks));
-        items.push(("write_files", write_files(self.file_lists, self.files)));
-        items.push(("runcmd", list(self.runcmd.into_iter().map(string))));
+        items.extend(write_files(self.file_lists, self.files).map(|f| ("write_files", f)));
+        items.extend(commands("runcmd", self.runcmd));
         if self.restart {
             let power = object([
                 ("mode", string("reboot")),
@@ -112,11 +112,14 @@ const READY_DIR: &str = "/var/lib/isoloom";
 
 /// `command` as the set-up step `label`: its name in [`READY_FILE`] first; when it fails,
 /// `failed: <label>` there and the end of the set-up (cloud-init runs `runcmd` as one script
-/// that otherwise goes on to the next command, and to `ready`).
+/// that otherwise goes on to the next command, and to `ready`). The progress mark is
+/// best-effort, its own command rather than chained with `&&` (`A && B || C` reads as an
+/// if-then-else that isn't one): a mark that can't be written doesn't skip the step, and the
+/// step's own failure always reaches the failure mark.
 pub(crate) fn tracked(label: &str, command: &str) -> String {
     let running = quote(&format!("running: {label}"));
     let failed = quote(&format!("failed: {label}"));
-    format!("echo {running} > {READY_FILE} && {command} || {{ echo {failed} > {READY_FILE}; exit 1; }}")
+    format!("echo {running} > {READY_FILE}; {command} || {{ echo {failed} > {READY_FILE}; exit 1; }}")
 }
 
 /// What the ready file calls a step of `machine`'s set-up.
@@ -190,16 +193,21 @@ fn disks(disks: &[DataDisk]) -> Vec<(&'static str, Expression)> {
     ]
 }
 
-/// The files: the lists, then the single files.
-fn write_files(lists: Vec<Expression>, files: Vec<Expression>) -> Expression {
+/// `key` and its list of words (packages or commands), unless it has none.
+fn commands(key: &'static str, words: Vec<String>) -> Option<(&'static str, Expression)> {
+    (!words.is_empty()).then(|| (key, list(words.into_iter().map(string))))
+}
+
+/// The files: the lists, then the single files. Nothing when there are neither.
+fn write_files(lists: Vec<Expression>, files: Vec<Expression>) -> Option<Expression> {
     if lists.is_empty() {
-        return list(files);
+        return (!files.is_empty()).then(|| list(files));
     }
     let mut args = lists;
     if !files.is_empty() {
         args.push(list(files));
     }
-    if args.len() == 1 { args.remove(0) } else { call("concat", args) }
+    Some(if args.len() == 1 { args.remove(0) } else { call("concat", args) })
 }
 
 /// A `write_files` entry.
@@ -265,7 +273,7 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
 /// command: no ready marker then (`journalctl -u isoloom-steps` says why).
 fn reboot_files(parts: &[Vec<String>]) -> Vec<Expression> {
     let unit = "[Unit]\nDescription=Isoloom: the provisioning steps after a reboot\nWants=network-online.target\nAfter=network-online.target\nConditionPathExists=/var/lib/isoloom/next-boot\n\n[Service]\nType=oneshot\nExecStart=/bin/sh /var/lib/isoloom/steps.sh\nStandardOutput=journal+console\nTimeoutStartSec=0\n\n[Install]\nWantedBy=multi-user.target\n";
-    let steps = format!("#!/bin/sh\nset -e\nn=$(cat {REBOOT_DIR}/next-boot)\nrm -f {REBOOT_DIR}/next-boot\nexec sh -e {REBOOT_DIR}/boot-$n.sh\n");
+    let steps = format!("#!/bin/sh\nset -e\nn=$(cat {REBOOT_DIR}/next-boot)\nrm -f {REBOOT_DIR}/next-boot\nexec sh -e \"{REBOOT_DIR}/boot-$n.sh\"\n");
     let mut files = vec![
         file("/etc/systemd/system/isoloom-steps.service", Some("0644"), string(unit)),
         file(&format!("{REBOOT_DIR}/steps.sh"), Some("0700"), string(steps)),

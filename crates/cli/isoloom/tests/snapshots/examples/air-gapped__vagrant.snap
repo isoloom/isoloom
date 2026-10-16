@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -571,7 +570,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-air-gapped-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "for l in '192.168.62.10 app'; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '192.168.62.10 app' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "provision/store.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/store.sh'"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
@@ -747,7 +746,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-air-gapped-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "for l in '192.168.62.20 store'; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '192.168.62.20 store' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "wait for store", inline: "i=0; until (bash -c '</dev/tcp/store/6379' 2>/dev/null || nc -z -w 2 store 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"store didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"store answers\""
     m.vm.provision "shell", name: "provision/app.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/app.sh'"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'

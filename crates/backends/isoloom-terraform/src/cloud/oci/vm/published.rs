@@ -5,7 +5,7 @@ use isoloom_plan::MachinePlan;
 use isoloom_render::hcl_builder::{Block, Expression, Module, number, reference, string};
 
 use crate::cloud::instance::name_with;
-use crate::cloud::oci::in_compartment;
+use crate::cloud::oci::owned;
 use crate::cloud::vm::published;
 use crate::module::{ident, resource};
 
@@ -19,7 +19,7 @@ pub(super) fn group(name: &str, mp: &MachinePlan, m: &mut Module) -> Option<Expr
     let id = ident(name);
     m.commented(
         &format!("The ports `{name}` publishes, from allowed_cidr: on its VNIC only."),
-        in_compartment(resource("oci_core_network_security_group", &id))
+        owned(resource("oci_core_network_security_group", &id))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
             .add_attribute(("display_name", name_with(&format!("-{name}"))))
             .build(),

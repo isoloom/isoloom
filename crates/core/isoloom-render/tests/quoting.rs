@@ -94,6 +94,8 @@ proptest! {
 
     #[test]
     fn template_text_never_becomes_an_interpolation(a in tricky(), b in tricky()) {
+        // Without text around it, the interpolation is written as its bare expression.
+        prop_assume!(!a.is_empty() || !b.is_empty());
         let text = written(Template::text(a.clone()).with_expr(reference("var.slot")).with_text(b.clone()).into_expression())?;
         let mut expected = text_only(&a);
         expected.push(Piece::Expr("var.slot".into()));

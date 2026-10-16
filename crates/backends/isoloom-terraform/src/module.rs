@@ -54,17 +54,20 @@ pub(crate) fn start(usage: &Usage) -> Module {
 }
 
 /// Module `m` of `target` as its file, `.isoloom/<folder>/main.tf`, ending with the project's
-/// lists.
+/// lists it reads.
 pub(crate) fn file(target: Target, folder: &str, mut m: Module, copy: ProjectCopy) -> Result<GeneratedFile> {
-    m.fragment(&project::lists(copy));
-    let contents = m.render().map_err(|source| Error::Module {
+    let failed = |source| Error::Module {
         target,
         folder: folder.to_owned(),
         source,
-    })?;
+    };
+    let lists = project::lists(copy, &m.render().map_err(failed)?);
+    if !lists.is_empty() {
+        m.fragment(&lists);
+    }
     Ok(GeneratedFile {
         path: format!("{OUTPUT_DIR}/{folder}/main.tf"),
-        contents,
+        contents: m.render().map_err(failed)?,
     })
 }
 
@@ -96,7 +99,17 @@ mod tests {
         let archived = file(Target::CloudVm, "t", start(&usage), ProjectCopy::Archive).unwrap();
         assert_eq!(archived.path, ".isoloom/t/main.tf");
         assert!(archived.contents.contains("local_file\" \"isoloom_project\""), "{}", archived.contents);
-        let written = file(Target::Proxmox, "t", start(&usage), ProjectCopy::Files).unwrap();
-        assert!(!written.contents.contains("local_file"), "{}", written.contents);
+        assert!(!archived.contents.contains("project_paths"), "{}", archived.contents);
+        let mut reading = start(&usage);
+        reading.block(output("files", isoloom_render::hcl_builder::reference("local.project_paths")));
+        let written = file(Target::Proxmox, "t", reading, ProjectCopy::Files).unwrap();
+        assert!(written.contents.contains("  project_paths = [for f"), "{}", written.contents);
+        assert!(
+            !written.contents.contains("local_file") && !written.contents.contains("project_ignored"),
+            "{}",
+            written.contents
+        );
+        let unread = file(Target::Proxmox, "t", start(&usage), ProjectCopy::Files).unwrap();
+        assert!(!unread.contents.contains("project_"), "{}", unread.contents);
     }
 }

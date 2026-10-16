@@ -282,7 +282,13 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
     let disk = disk.unwrap_or(30).max(30);
-    m.block(linux_vm(id, "controller", (controller::OS, None), (size(memory), disk, false), list(ids)));
+    m.block(linux_vm(
+        id,
+        "controller",
+        (controller::OS, None),
+        (size(memory, addresses.len()), disk, false),
+        list(ids),
+    ));
     let ssh = controller::Ssh {
         env,
         replace_on: reference(&format!("azurerm_linux_virtual_machine.{id}.id")),

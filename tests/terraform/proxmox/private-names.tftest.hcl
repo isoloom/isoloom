@@ -56,7 +56,7 @@ run "each_vm_s_hosts_file_names_the_others_in_the_zone" {
     error_message = "client's hosts file must give web by its name, its alias www, and both in the zone"
   }
   assert {
-    condition     = startswith(element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1), "echo 'running: hosts file' > /var/lib/isoloom/ready && ")
+    condition     = startswith(element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1), "echo 'running: hosts file' > /var/lib/isoloom/ready; ")
     error_message = "the hosts file must be a set-up step that says so in the ready file"
   }
 }

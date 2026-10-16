@@ -26,7 +26,7 @@ pub fn leaf_jobs(spec: &Spec) -> Vec<String> {
 /// The shell command that starts a Compose project with `compose` (e.g. `docker compose -f x`):
 /// plain `up -d --build --wait` when no job is left over, else everything but the jobs up and
 /// waited for, then each job attached. `jobs` are the leaf jobs ([`leaf_jobs`]); the services
-/// to wait for are listed at run time.
+/// to wait for are listed at run time ([`as_arguments`]).
 #[must_use]
 pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>) -> String {
     let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
@@ -39,5 +39,14 @@ pub fn start_commands(compose: &str, jobs: &[String], wait_timeout: Option<u32>)
         .map(|j| format!(" && {compose} up --no-deps --exit-code-from {j} {j}"))
         .collect::<Vec<_>>()
         .concat();
-    format!("{compose} up -d --build --wait{timeout} $({compose} config --services | grep -vx{exclude}){attached}")
+    let services = as_arguments(&format!("{compose} config --services | grep -vx{exclude}"));
+    format!("{{ {services}; }} && {compose} up -d --build --wait{timeout} \"$@\"{attached}")
+}
+
+/// The shell commands making the words `listing` prints the positional parameters (`"$@"`), one
+/// argument each: a list known only at run time, handed to a command without splitting an
+/// unquoted expansion.
+#[must_use]
+pub fn as_arguments(listing: &str) -> String {
+    format!("set --; for w in $({listing}); do set -- \"$@\" \"$w\"; done")
 }

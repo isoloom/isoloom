@@ -98,6 +98,22 @@ fn cloud_init_runs_the_rest_at_the_next_boot() {
 }
 
 #[test]
+fn a_cloud_config_leaves_its_empty_lists_out() {
+    let empty = text(&CloudConfig::new("a", string("users")).document());
+    for key in ["packages", "bootcmd", "write_files", "runcmd"] {
+        assert!(!empty.contains(key), "{key}: {empty}");
+    }
+    let mut c = CloudConfig::new("a", string("users"));
+    c.packages.push("curl".into());
+    c.runcmd.push("true".into());
+    let some = text(&c.document());
+    assert!(
+        some.contains("packages = [\"curl\"]") && some.contains("runcmd = [\"true\"]") && !some.contains("write_files"),
+        "{some}"
+    );
+}
+
+#[test]
 fn a_machine_waiting_for_secrets_announces_its_address_first() {
     let spec = format!("{SPEC}secrets:\n  db: {{ env: DB }}\n").replace(
         "    environment: { TOKEN: { input: TOKEN } }\n",
@@ -117,4 +133,30 @@ fn a_machine_waiting_for_secrets_announces_its_address_first() {
         hcl.find("mkdir -p \\\"${path.module}/.isoloom-reach\\\" && echo \\\"admin@${aws_instance.a.public_ip}\\\" > \\\"${path.module}/.isoloom-reach/a\\\"");
     let upload = hcl.find("provisioner \"file\"");
     assert!(announce.is_some() && announce < upload, "{hcl}");
+}
+
+/// A tracked step run by a real `sh`, its ready file at `ready`: its exit status and what the
+/// ready file says after.
+#[cfg(unix)]
+fn run_tracked(command: &str, ready: &std::path::Path) -> (bool, String) {
+    let script = cloud_init::tracked("step", command).replace(cloud_init::READY_FILE, &ready.display().to_string());
+    let status = std::process::Command::new("sh").arg("-c").arg(&script).status().expect("sh runs");
+    (status.success(), std::fs::read_to_string(ready).unwrap_or_default())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_tracked_step_marks_its_progress_best_effort_and_its_failure_always() {
+    let dir = std::env::temp_dir().join(format!("isoloom-tracked-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("a folder");
+    let ready = dir.join("ready");
+    // It runs: the progress is marked, and stays the last word.
+    assert_eq!(run_tracked("true", &ready), (true, "running: step\n".to_owned()));
+    // It fails: the failure is marked and the set-up ends there.
+    assert_eq!(run_tracked("false", &ready), (false, "failed: step\n".to_owned()));
+    // The progress can't be written (no such folder): the step still runs, and succeeds.
+    let ran = dir.join("ran");
+    let (ok, _) = run_tracked(&format!("touch {}", ran.display()), &dir.join("missing/ready"));
+    assert!(ok && ran.exists(), "a progress mark that can't be written doesn't skip the step");
+    std::fs::remove_dir_all(&dir).ok();
 }

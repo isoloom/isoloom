@@ -72,7 +72,9 @@ def dump(baseline: dict) -> str:
     image = json.dumps(baseline.get("image", {}), ensure_ascii=False)
     causes = ",\n".join(f"    {json.dumps(c)}: {json.dumps(r, ensure_ascii=False)}" for c, r in baseline["causes"].items())
     failures = ",\n".join("    " + json.dumps(e, ensure_ascii=False) for e in baseline["failures"])
-    return f'{{\n  "image": {image},\n  "causes": {{\n{causes}\n  }},\n  "failures": [\n{failures}\n  ]\n}}\n'
+    causes = f"{{\n{causes}\n  }}" if causes else "{}"
+    failures = f"[\n{failures}\n  ]" if failures else "[]"
+    return f'{{\n  "image": {image},\n  "causes": {causes},\n  "failures": {failures}\n}}\n'
 
 
 def line(r: Result, known: bool | None) -> str:

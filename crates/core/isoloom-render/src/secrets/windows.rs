@@ -3,7 +3,7 @@
 //! waits for; each file is then written at its path with the same two readers and nobody else.
 //!
 //! The values come on the connection's standard input (WinRM's or OpenSSH's), after the
-//! receiving script itself: the command line `isoloom run` starts is [`BOOTSTRAP`], the same
+//! receiving script itself: the command line the runner starts is [`BOOTSTRAP`], the same
 //! for every machine, which reads the script's first line and runs it. Nothing of a value is
 //! in a command line, a generated file or the output.
 //!
@@ -26,7 +26,7 @@ pub const PLACE_SCRIPT: &str = "C:\\ProgramData\\isoloom\\apply-secrets.ps1";
 /// The startup task running [`PLACE_SCRIPT`] at every boot.
 pub const PLACE_TASK: &str = "isoloom-apply-secrets";
 
-/// What `isoloom run` starts on the machine (as `powershell -EncodedCommand`): it reads the
+/// What the runner starts on the machine (as `powershell -EncodedCommand`): it reads the
 /// first line of its standard input, the receiving script in base64, and runs it. The script
 /// reads the values from the lines that follow.
 pub const BOOTSTRAP: &str = "$s = [Console]::In.ReadLine(); Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($s)))";
@@ -88,10 +88,8 @@ pub fn place(files: &[SecretFile]) -> String {
 /// [`DELIVERY_TIMEOUT`](super::DELIVERY_TIMEOUT) seconds with what to do.
 #[must_use]
 pub fn wait(who: &str) -> String {
-    let waiting = powershell::quote(&format!("{who}: waiting for `isoloom run` to deliver its secrets"));
-    let missing = powershell::quote(&format!(
-        "{who}: its secrets never came; start the environment with `isoloom run`, which reads them from their stores and delivers them"
-    ));
+    let (waiting, missing) = super::messages(who);
+    let (waiting, missing) = (powershell::quote(&waiting), powershell::quote(&missing));
     format!(
         "$t = (Get-Date).AddSeconds({}); $said = $false; while (-not (Test-Path {})) {{ if (-not $said) {{ Write-Output {waiting}; $said = $true }}; if ((Get-Date) -gt $t) {{ throw {missing} }}; Start-Sleep 5 }}\n",
         super::DELIVERY_TIMEOUT,

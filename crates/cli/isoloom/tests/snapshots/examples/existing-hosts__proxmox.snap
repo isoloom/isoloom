@@ -486,9 +486,9 @@ resource "proxmox_virtual_environment_file" "web" {
       write_files = local.project_files
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''192.168.1.21 cache'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: provision/web.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.1.21 cache'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/web.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -577,18 +577,18 @@ resource "proxmox_virtual_environment_file" "cache" {
         {
           path        = "/var/lib/isoloom/steps.sh"
           permissions = "0700"
-          content     = "#!/bin/sh\nset -e\nn=$(cat /var/lib/isoloom/next-boot)\nrm -f /var/lib/isoloom/next-boot\nexec sh -e /var/lib/isoloom/boot-$n.sh\n"
+          content     = "#!/bin/sh\nset -e\nn=$(cat /var/lib/isoloom/next-boot)\nrm -f /var/lib/isoloom/next-boot\nexec sh -e \"/var/lib/isoloom/boot-$n.sh\"\n"
         },
         {
           path        = "/var/lib/isoloom/boot-1.sh"
           permissions = "0700"
-          content     = "#!/bin/sh\nset -e\necho 'running: provision/cache.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\''' || { echo 'failed: provision/cache.sh' > /var/lib/isoloom/ready; exit 1; }\necho 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }\nsystemctl disable isoloom-steps.service\n"
+          content     = "#!/bin/sh\nset -e\necho 'running: provision/cache.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\''' || { echo 'failed: provision/cache.sh' > /var/lib/isoloom/ready; exit 1; }\necho 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }\nsystemctl disable isoloom-steps.service\n"
         }
       ])
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''192.168.1.20 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: provision/cache-boot.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache-boot.sh'\\''' || { echo 'failed: provision/cache-boot.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.1.20 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/cache-boot.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache-boot.sh'\\''' || { echo 'failed: provision/cache-boot.sh' > /var/lib/isoloom/ready; exit 1; }",
         "mkdir -p /var/lib/isoloom && echo 1 > /var/lib/isoloom/next-boot && systemctl enable isoloom-steps.service"
       ]
       power_state = {
@@ -722,9 +722,8 @@ locals {
     "/[.+^$(){}|\\\\]/", "\\$0"), "[!", "[^"), "**/", "\u0001"), "**", "\u0002"), "*", "[^/]*"), "?", "[^/]"), "\u0001", "(.*/)?"), "\u0002", ".*"))
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
-  project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
-  project_ignored = [for f, keep in local.project_keep : f if !keep]
+  project_keep  = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
+  project_paths = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
 }
 
 ## .isoloom/proxmox/run.json

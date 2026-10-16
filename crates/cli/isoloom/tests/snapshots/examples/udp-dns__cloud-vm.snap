@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -240,7 +239,7 @@ resource "terraform_data" "dns" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.20.10 client'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/dns.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting udp dport 10053 redirect to :53",
@@ -312,7 +311,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.10.53 dns'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
@@ -379,7 +378,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -604,7 +602,7 @@ resource "azurerm_linux_virtual_machine" "dns" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.dns_servers.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -646,7 +644,7 @@ resource "terraform_data" "dns" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.20.10 client'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/dns.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting udp dport 10053 redirect to :53",
@@ -730,7 +728,7 @@ resource "azurerm_linux_virtual_machine" "client" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.client_users.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -772,7 +770,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.10.53 dns'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
@@ -839,7 +837,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1281,7 +1278,7 @@ resource "terraform_data" "dns" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.20.10 client'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/dns.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting udp dport 10053 redirect to :53",
@@ -1365,7 +1362,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.10.53 dns'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
@@ -1437,7 +1434,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1730,7 +1726,7 @@ resource "terraform_data" "dns" {
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo ip route replace 10.66.20.0/24 via 10.66.10.1",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.20.10 client'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/dns.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting udp dport 10053 redirect to :53",
@@ -1796,7 +1792,7 @@ resource "terraform_data" "client" {
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo ip route replace 10.66.10.0/24 via 10.66.20.1",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.10.53 dns'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
@@ -1863,7 +1859,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1943,6 +1938,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-udp-dns-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
+  tags = merge({ isoloom-environment = "udp-dns", managed-by = "isoloom", isoloom-instance = local.name }, var.expires_at == "" ? {} : { isoloom-expires-at = var.expires_at })
 }
 
 # The compartment's availability domains; the instances land in the first.
@@ -1963,18 +1959,21 @@ data "oci_core_images" "ubuntu_2404" {
 # The environment's networks: a VCN holding each one's block, routed to the internet.
 resource "oci_core_vcn" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   display_name   = local.name
   cidr_blocks    = ["10.66.10.0/24", "10.66.20.0/24"]
 }
 
 resource "oci_core_internet_gateway" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
 }
 
 resource "oci_core_route_table" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
   route_rules {
@@ -1986,6 +1985,7 @@ resource "oci_core_route_table" "env" {
 # Network `servers`: what may reach its machines, and where they may go.
 resource "oci_core_security_list" "servers" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = "${local.name}-servers"
   ingress_security_rules {
@@ -2202,6 +2202,7 @@ resource "oci_core_security_list" "servers" {
 
 resource "oci_core_subnet" "servers" {
   compartment_id    = var.compartment_id
+  freeform_tags     = local.tags
   vcn_id            = oci_core_vcn.env.id
   cidr_block        = "10.66.10.0/24"
   display_name      = "${local.name}-servers"
@@ -2212,6 +2213,7 @@ resource "oci_core_subnet" "servers" {
 # Network `users`: what may reach its machines, and where they may go.
 resource "oci_core_security_list" "users" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = "${local.name}-users"
   ingress_security_rules {
@@ -2428,6 +2430,7 @@ resource "oci_core_security_list" "users" {
 
 resource "oci_core_subnet" "users" {
   compartment_id    = var.compartment_id
+  freeform_tags     = local.tags
   vcn_id            = oci_core_vcn.env.id
   cidr_block        = "10.66.20.0/24"
   display_name      = "${local.name}-users"
@@ -2438,6 +2441,7 @@ resource "oci_core_subnet" "users" {
 # The ports `dns` publishes, from allowed_cidr: on its VNIC only.
 resource "oci_core_network_security_group" "dns" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = "${local.name}-dns"
 }
@@ -2460,6 +2464,7 @@ resource "oci_core_network_security_group_security_rule" "dns_udp_10053" {
 # Machine `dns`, at its fixed address 10.66.10.53.
 resource "oci_core_instance" "dns" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-dns"
   shape               = "VM.Standard.E4.Flex"
@@ -2507,7 +2512,7 @@ resource "terraform_data" "dns" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.20.10 client'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/dns.sh'\\'''",
       "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
       "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting udp dport 10053 redirect to :53",
@@ -2520,6 +2525,7 @@ resource "terraform_data" "dns" {
 # Machine `client`, at its fixed address 10.66.20.10.
 resource "oci_core_instance" "client" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-client"
   shape               = "VM.Standard.E4.Flex"
@@ -2566,7 +2572,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.66.10.53 dns'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
@@ -2633,7 +2639,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 

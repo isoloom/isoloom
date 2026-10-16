@@ -10,12 +10,26 @@ use isoloom_render::hcl_builder::{
 /// The labels on every resource: the environment, who manages it, its instance and its expiry
 /// (what a reaper reads).
 pub(crate) fn tags(env: &Environment) -> Expression {
-    object([
+    let mut tags = named(env);
+    tags.push(("isoloom-expires-at", reference("var.expires_at")));
+    object(tags)
+}
+
+/// The same for a cloud whose tag values can't be counted on to take an empty one (Oracle
+/// Cloud's free-form tags): the expiry only when the environment has one.
+pub(crate) fn tags_when_set(env: &Environment) -> Expression {
+    let none = binary(reference("var.expires_at"), BinaryOperator::Eq, string(""));
+    let expiry = object([("isoloom-expires-at", reference("var.expires_at"))]);
+    call("merge", [object(named(env)), conditional(none, object::<&str>([]), expiry)])
+}
+
+/// The labels naming the environment, who manages it, and its instance.
+fn named(env: &Environment) -> Vec<(&'static str, Expression)> {
+    vec![
         ("isoloom-environment", string(env.name.as_str())),
         ("managed-by", string("isoloom")),
         ("isoloom-instance", reference("local.name")),
-        ("isoloom-expires-at", reference("var.expires_at")),
-    ])
+    ]
 }
 
 /// The environment's random id (`terraform_data.id`) and the locals: its `name`, the project's
@@ -65,4 +79,25 @@ pub(crate) fn tag_list(env: &Environment) -> Expression {
 /// `"${local.name}<suffix>"`: a resource's name in the environment.
 pub(crate) fn name_with(suffix: &str) -> Expression {
     Template::new().with_expr(reference("local.name")).with_text(suffix).into_expression()
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_spec::model::Target;
+
+    use super::*;
+
+    #[test]
+    fn tags_that_cannot_be_empty_carry_the_expiry_only_when_there_is_one() {
+        let env = crate::testing::planned("version: 1\nname: lab\nmachines:\n  web: { os: debian@12 }\n", Target::CloudVm);
+        let written = tags_when_set(&env).to_string();
+        assert!(
+            written.starts_with("merge({ isoloom-environment = \"lab\", managed-by = \"isoloom\""),
+            "{written}"
+        );
+        assert!(
+            written.ends_with("var.expires_at == \"\" ? {} : { isoloom-expires-at = var.expires_at })"),
+            "{written}"
+        );
+    }
 }

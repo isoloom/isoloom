@@ -79,7 +79,7 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() -> Outcome {
     assert!(runcmd.contains("sh kernel.sh"));
     assert!(!runcmd.contains("middle.sh") && !runcmd.contains("last.sh") && !runcmd.contains("echo ready > /var/lib/isoloom/ready"));
     // Each step says it runs in the ready file, and a failing one ends the set-up there.
-    assert!(runcmd.contains("echo 'running: kernel.sh' > /var/lib/isoloom/ready && "), "{runcmd}");
+    assert!(runcmd.contains("echo 'running: kernel.sh' > /var/lib/isoloom/ready; "), "{runcmd}");
     assert!(runcmd.contains("|| { echo 'failed: kernel.sh' > /var/lib/isoloom/ready; exit 1; }"), "{runcmd}");
     assert!(runcmd.contains("echo 1 > /var/lib/isoloom/next-boot && systemctl enable isoloom-steps.service"));
     assert!(tf.contains("mode      = \"reboot\""), "{tf}");

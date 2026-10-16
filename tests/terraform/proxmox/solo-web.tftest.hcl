@@ -127,7 +127,7 @@ run "web_reports_its_set_up_in_the_ready_file" {
   command = plan
 
   assert {
-    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 3) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready && ", l)[0]] == ["provision/web.sh", "health check"]
+    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 3) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready; ", l)[0]] == ["provision/web.sh", "health check"]
     error_message = "web's steps must each say `running: <step>` in the ready file first"
   }
   assert {

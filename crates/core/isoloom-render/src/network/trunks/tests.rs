@@ -143,7 +143,7 @@ fn a_vm_builds_its_trunk_once_per_boot() {
         sh.starts_with("ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s && "),
         "{sh}"
     );
-    assert!(sh.contains("ip link set $IF address 02:1f:0a:46:0a:32"), "{sh}");
+    assert!(sh.contains("ip link set \"$IF\" address 02:1f:0a:46:0a:32"), "{sh}");
     assert!(
         sh.contains("ip link add link office-s name office-s.20 type vlan id 20 && ip link set office-s.20 master br20"),
         "{sh}"

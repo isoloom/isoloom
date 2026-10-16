@@ -13,9 +13,12 @@ use crate::powershell;
 use crate::secrets;
 
 /// The lines every script of the process starts with: its inputs, its environment, its
-/// directory.
+/// directory. The inputs file exists only on the machine, so shellcheck is told not to look for
+/// it.
 fn prelude(env: &Environment, machine: &str, mp: &MachinePlan) -> String {
-    let inputs = inputs_file(env, machine).map(|file| format!("set -a; . {file}; set +a\n")).unwrap_or_default();
+    let inputs = inputs_file(env, machine)
+        .map(|file| format!("set -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. {file}\nset +a\n"))
+        .unwrap_or_default();
     let exports: String = mp
         .settings
         .environment
@@ -232,7 +235,7 @@ machines:
         let sh = super::super::linux(&env, "web", &setup).expect("renders");
         assert!(
             sh.contains(
-                "set -a; . /var/lib/isoloom/inputs.env; set +a\nexport MODE='lab'\nmkdir -p '/srv/site' && cd '/srv/site'\nsh '/opt/isoloom/flag.sh'\n"
+                "set -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /var/lib/isoloom/inputs.env\nset +a\nexport MODE='lab'\nmkdir -p '/srv/site' && cd '/srv/site'\nsh '/opt/isoloom/flag.sh'\n"
             ),
             "{sh}"
         );

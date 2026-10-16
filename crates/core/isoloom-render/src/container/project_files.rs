@@ -1,6 +1,6 @@
 //! The project files Compose reads from its own environment: a container's file from the project
 //! with an owner or a mode (outside Swarm, Compose ignores both for a `file` config), copied in
-//! from a variable whoever starts Compose sets first (`isoloom run`, a Docker host's start
+//! from a variable whoever starts Compose sets first (the runner, a Docker host's start
 //! script).
 
 use isoloom_plan::{Environment, MachineShape};

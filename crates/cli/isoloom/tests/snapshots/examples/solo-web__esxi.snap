@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ esxi
@@ -218,7 +217,7 @@ resource "esxi_guest" "isoloom_router" {
   guest_name            = "iso${var.slot}-router"
   notes                 = "isoloom: solo-web"
   disk_store            = var.disk_store
-  ovf_source            = lookup(var.images, "ubuntu-24.04")
+  ovf_source            = var.images["ubuntu-24.04"]
   numvcpus              = "1"
   memsize               = "512"
   boot_disk_size        = "10"
@@ -283,7 +282,7 @@ resource "esxi_guest" "web" {
   guest_name     = "iso${var.slot}-web"
   notes          = "isoloom: solo-web"
   disk_store     = var.disk_store
-  ovf_source     = lookup(var.images, "debian-12")
+  ovf_source     = var.images["debian-12"]
   numvcpus       = "1"
   memsize        = "1024"
   boot_disk_size = "20"
@@ -310,7 +309,7 @@ resource "esxi_guest" "web" {
       }
     }))
     "metadata.encoding" = "base64"
-    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "web", users = local.users, packages = [], write_files = [], runcmd = [] })))
+    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "web", users = local.users })))
     "userdata.encoding" = "base64"
   }
   depends_on = [esxi_guest.isoloom_router]
@@ -405,7 +404,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 

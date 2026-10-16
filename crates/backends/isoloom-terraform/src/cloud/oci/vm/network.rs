@@ -21,7 +21,7 @@ use isoloom_plan::{Environment, NetworkPlan};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, index, list, number, reference, string};
 
 use crate::cloud::instance::name_with;
-use crate::cloud::oci::{in_compartment, route_out};
+use crate::cloud::oci::{owned, route_out};
 use crate::cloud::vm::gateways::{Hop, routed, through, toward};
 use crate::cloud::vm::reach::{self, Rule};
 use crate::module::{ident, resource};
@@ -35,7 +35,7 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
 }
 
 fn in_vcn(b: BlockBuilder, name: Expression) -> BlockBuilder {
-    in_compartment(b)
+    owned(b)
         .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
         .add_attribute(("display_name", name))
 }
@@ -47,7 +47,7 @@ fn display(net: &str) -> Expression {
 /// The VCN, its internet gateway and route tables, a security list and a subnet per network.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
     let cidrs: Vec<&str> = env.networks.values().map(|n| n.cidr.as_str()).collect();
-    let vcn = in_compartment(resource("oci_core_vcn", "env")).add_attribute(("display_name", reference("local.name")));
+    let vcn = owned(resource("oci_core_vcn", "env")).add_attribute(("display_name", reference("local.name")));
     let vcn = match cidrs.as_slice() {
         [one] => vcn.add_attribute(("cidr_block", string(*one))),
         many => vcn.add_attribute(("cidr_blocks", list(many.iter().map(|c| string(*c))))),
@@ -67,7 +67,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             &format!("Network `{net}`: what may reach its machines, and where they may go."),
             security_list(env, (net, p)),
         );
-        let mut subnet = in_compartment(resource("oci_core_subnet", &ident(net)))
+        let mut subnet = owned(resource("oci_core_subnet", &ident(net)))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
             .add_attribute(("cidr_block", string(p.cidr.as_str())))
             .add_attributes(p.ipv6.as_ref().map(|v| ("ipv6cidr_block", string(v.cidr.as_str()))))

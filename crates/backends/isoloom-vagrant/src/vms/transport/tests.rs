@@ -115,7 +115,7 @@ fn inputs_come_from_the_hosts_environment_into_the_file_the_steps_read() {
         "{inputs}"
     );
     assert!(
-        inputs.contains("for k in TOKEN; do") && inputs.contains("/var/lib/isoloom/inputs.env"),
+        inputs.contains("printf \"%s='%s'\\n\" 'TOKEN' \"$(printenv 'TOKEN' |") && inputs.contains("/var/lib/isoloom/inputs.env"),
         "kept for the reboot: {inputs}"
     );
     assert!(s.contains(". /var/lib/isoloom/inputs.env"), "the steps read the kept file: {s}");

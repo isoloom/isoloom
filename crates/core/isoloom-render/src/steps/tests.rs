@@ -313,3 +313,41 @@ machines:
     assert_eq!(linux(&env, "user", &Step::Tc), None);
     assert_eq!(linux(&env, "nobody", &Step::Tc), None);
 }
+
+/// The hosts step run by a real `sh` on a stand-in hosts file: every line lands once and as
+/// written, whatever it holds (a backslash, runs of spaces, trailing blanks: the lines are read
+/// with `IFS= read -r`), however often the step runs.
+#[cfg(unix)]
+mod hosts_in_a_real_shell {
+    use std::net::Ipv4Addr;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use proptest::prelude::*;
+
+    use super::super::network::hosts;
+
+    static RUN: AtomicUsize = AtomicUsize::new(0);
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(32))]
+
+        #[test]
+        fn every_line_lands_once_and_unchanged(names in prop::collection::vec("[ a-z0-9.\\\\-]{1,8}", 1..4)) {
+            let entries = vec![
+                (Ipv4Addr::new(10, 0, 0, 1), names),
+                (Ipv4Addr::new(10, 0, 0, 2), vec!["  lead".to_owned(), r"back\slash".to_owned(), "trail ".to_owned()]),
+            ];
+            let script = hosts(&entries).expect("a step").replace("/etc/hosts", "\"$HOSTS\"");
+            let file = std::env::temp_dir().join(format!("isoloom-hosts-{}-{}", std::process::id(), RUN.fetch_add(1, Ordering::Relaxed)));
+            std::fs::write(&file, "127.0.0.1 localhost\n").expect("a stand-in hosts file");
+            for _ in 0..2 {
+                let status = std::process::Command::new("sh").arg("-c").arg(&script).env("HOSTS", &file).status().expect("sh runs");
+                prop_assert!(status.success());
+            }
+            let written = std::fs::read_to_string(&file).expect("the hosts file");
+            std::fs::remove_file(&file).ok();
+            let lines: Vec<String> = entries.iter().map(|(a, n)| format!("{a} {}", n.join(" "))).collect();
+            prop_assert_eq!(written, format!("127.0.0.1 localhost\n{}\n", lines.join("\n")));
+        }
+    }
+}

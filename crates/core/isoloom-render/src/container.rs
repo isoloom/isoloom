@@ -12,7 +12,7 @@ mod project_files;
 
 pub use host::HostSize;
 pub use hybrid::{HybridContainers, docker_net};
-pub use jobs::{init_names, leaf_jobs, start_commands};
+pub use jobs::{as_arguments, init_names, leaf_jobs, start_commands};
 pub use project_files::{copied_from_project, host_environment, project_variables, variable};
 
 use isoloom_plan::Health;

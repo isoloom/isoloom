@@ -268,17 +268,17 @@ pub fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> Ipv4Add
         // The NIC keeps a local MAC; `<lan>.<id>` takes the one the hypervisor gave it.
         let local = format!("02:1f:{}", addr.octets().map(|o| format!("{o:02x}")).join(":"));
         steps.push(format!(
-            "{} && MAC=$(cat /sys/class/net/$IF/address) && ip addr flush dev $IF && ip link set $IF address {local}",
+            "{} && MAC=$(cat \"/sys/class/net/$IF/address\") && ip addr flush dev \"$IF\" && ip link set \"$IF\" address {local}",
             find_by_address(addr)
         ));
         steps.push(format!(
-            "ip link add br{id} type bridge && ip link set $IF master br{id} && ip link set br{id} up"
+            "ip link add br{id} type bridge && ip link set \"$IF\" master br{id} && ip link set br{id} up"
         ));
         steps.push(format!(
             "ip link add link {peer} name {peer}.{id} type vlan id {id} && ip link set {peer}.{id} master br{id} && ip link set {peer}.{id} up"
         ));
         steps.push(format!(
-            "ip link add link {name} name {name}.{id} address $MAC type vlan id {id} && ip addr add {addr}/{len} dev {name}.{id} && ip link set {name}.{id} up"
+            "ip link add link {name} name {name}.{id} address \"$MAC\" type vlan id {id} && ip addr add {addr}/{len} dev {name}.{id} && ip link set {name}.{id} up"
         ));
     }
     vec![format!("ip link show {name} >/dev/null 2>&1 || {{ {}; }}", steps.join(" && "))]

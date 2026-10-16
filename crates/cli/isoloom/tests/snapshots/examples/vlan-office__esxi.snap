@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ esxi
@@ -512,7 +511,7 @@ resource "esxi_guest" "isoloom_router" {
   guest_name            = "iso${var.slot}-router"
   notes                 = "isoloom: vlan-office"
   disk_store            = var.disk_store
-  ovf_source            = lookup(var.images, "ubuntu-24.04")
+  ovf_source            = var.images["ubuntu-24.04"]
   numvcpus              = "1"
   memsize               = "512"
   boot_disk_size        = "10"
@@ -595,7 +594,7 @@ resource "esxi_guest" "intranet" {
   guest_name     = "iso${var.slot}-intranet"
   notes          = "isoloom: vlan-office"
   disk_store     = var.disk_store
-  ovf_source     = lookup(var.images, "debian-12")
+  ovf_source     = var.images["debian-12"]
   numvcpus       = "1"
   memsize        = "1024"
   boot_disk_size = "20"
@@ -622,7 +621,7 @@ resource "esxi_guest" "intranet" {
       }
     }))
     "metadata.encoding" = "base64"
-    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "intranet", users = local.users, packages = [], write_files = [], runcmd = [] })))
+    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "intranet", users = local.users })))
     "userdata.encoding" = "base64"
   }
   depends_on = [esxi_guest.isoloom_router]
@@ -653,7 +652,7 @@ resource "terraform_data" "intranet" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\'' '\\''10.70.10.50 admin'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\'' '\\''10.70.10.50 admin'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'ip route replace 10.70.10.0/24 via 10.70.99.254\nip route replace 10.70.20.0/24 via 10.70.99.254'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/intranet.sh'\\'''",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
@@ -667,7 +666,7 @@ resource "esxi_guest" "staff" {
   guest_name     = "iso${var.slot}-staff"
   notes          = "isoloom: vlan-office"
   disk_store     = var.disk_store
-  ovf_source     = lookup(var.images, "debian-12")
+  ovf_source     = var.images["debian-12"]
   numvcpus       = "1"
   memsize        = "1024"
   boot_disk_size = "20"
@@ -694,7 +693,7 @@ resource "esxi_guest" "staff" {
       }
     }))
     "metadata.encoding" = "base64"
-    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "staff", users = local.users, packages = [], write_files = [], runcmd = [] })))
+    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "staff", users = local.users })))
     "userdata.encoding" = "base64"
   }
   depends_on = [esxi_guest.isoloom_router]
@@ -725,7 +724,7 @@ resource "terraform_data" "staff" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.20.10 guest'\\'' '\\''10.70.10.50 admin'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.70.99.10 intranet'\\'' '\\''10.70.20.10 guest'\\'' '\\''10.70.10.50 admin'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'ip route replace 10.70.20.0/24 via 10.70.10.254\nip route replace 10.70.99.0/24 via 10.70.10.254'",
       "sudo sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -738,7 +737,7 @@ resource "esxi_guest" "guest" {
   guest_name     = "iso${var.slot}-guest"
   notes          = "isoloom: vlan-office"
   disk_store     = var.disk_store
-  ovf_source     = lookup(var.images, "debian-12")
+  ovf_source     = var.images["debian-12"]
   numvcpus       = "1"
   memsize        = "1024"
   boot_disk_size = "20"
@@ -765,7 +764,7 @@ resource "esxi_guest" "guest" {
       }
     }))
     "metadata.encoding" = "base64"
-    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "guest", users = local.users, packages = [], write_files = [], runcmd = [] })))
+    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "guest", users = local.users })))
     "userdata.encoding" = "base64"
   }
   depends_on = [esxi_guest.isoloom_router]
@@ -796,7 +795,7 @@ resource "terraform_data" "guest" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.50 admin'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.50 admin'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'ip route replace 10.70.10.0/24 via 10.70.20.254\nip route replace 10.70.99.0/24 via 10.70.20.254'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -808,7 +807,7 @@ resource "esxi_guest" "admin" {
   guest_name     = "iso${var.slot}-admin"
   notes          = "isoloom: vlan-office"
   disk_store     = var.disk_store
-  ovf_source     = lookup(var.images, "debian-12")
+  ovf_source     = var.images["debian-12"]
   numvcpus       = "1"
   memsize        = "1024"
   boot_disk_size = "20"
@@ -844,7 +843,7 @@ resource "esxi_guest" "admin" {
       }
     }))
     "metadata.encoding" = "base64"
-    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "admin", users = local.users, packages = [], write_files = [], runcmd = [] })))
+    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "admin", users = local.users })))
     "userdata.encoding" = "base64"
   }
   depends_on = [esxi_guest.isoloom_router]
@@ -875,8 +874,8 @@ resource "terraform_data" "admin" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s && ip link set office up && ip link set office-s up && IF=$(ip -o -4 addr show | awk '\\''$4 ~ /^10\\.70\\.10\\.50\\//{print $2}'\\'' | head -n 1) && MAC=$(cat /sys/class/net/$IF/address) && ip addr flush dev $IF && ip link set $IF address 02:1f:0a:46:0a:32 && ip link add br10 type bridge && ip link set $IF master br10 && ip link set br10 up && ip link add link office-s name office-s.10 type vlan id 10 && ip link set office-s.10 master br10 && ip link set office-s.10 up && ip link add link office name office.10 address $MAC type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && IF=$(ip -o -4 addr show | awk '\\''$4 ~ /^10\\.70\\.20\\.50\\//{print $2}'\\'' | head -n 1) && MAC=$(cat /sys/class/net/$IF/address) && ip addr flush dev $IF && ip link set $IF address 02:1f:0a:46:14:32 && ip link add br20 type bridge && ip link set $IF master br20 && ip link set br20 up && ip link add link office-s name office-s.20 type vlan id 20 && ip link set office-s.20 master br20 && ip link set office-s.20 up && ip link add link office name office.20 address $MAC type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up; }'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.70.99.10 intranet'\\'' '\\''10.70.10.10 staff'\\'' '\\''10.70.20.10 guest'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s && ip link set office up && ip link set office-s up && IF=$(ip -o -4 addr show | awk '\\''$4 ~ /^10\\.70\\.10\\.50\\//{print $2}'\\'' | head -n 1) && MAC=$(cat \"/sys/class/net/$IF/address\") && ip addr flush dev \"$IF\" && ip link set \"$IF\" address 02:1f:0a:46:0a:32 && ip link add br10 type bridge && ip link set \"$IF\" master br10 && ip link set br10 up && ip link add link office-s name office-s.10 type vlan id 10 && ip link set office-s.10 master br10 && ip link set office-s.10 up && ip link add link office name office.10 address \"$MAC\" type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && IF=$(ip -o -4 addr show | awk '\\''$4 ~ /^10\\.70\\.20\\.50\\//{print $2}'\\'' | head -n 1) && MAC=$(cat \"/sys/class/net/$IF/address\") && ip addr flush dev \"$IF\" && ip link set \"$IF\" address 02:1f:0a:46:14:32 && ip link add br20 type bridge && ip link set \"$IF\" master br20 && ip link set br20 up && ip link add link office-s name office-s.20 type vlan id 20 && ip link set office-s.20 master br20 && ip link set office-s.20 up && ip link add link office name office.20 address \"$MAC\" type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up; }'",
       "sudo sh -c 'ip route replace 10.70.99.0/24 via 10.70.10.254'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -957,7 +956,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 

@@ -49,6 +49,12 @@ pub fn index(expr: Expression, i: u64) -> Expression {
     Traversal::new(expr, [TraversalOperator::Index(number(i))]).into()
 }
 
+/// `expr["key"]`: a map's entry by its key.
+#[must_use]
+pub fn entry(expr: Expression, key: &str) -> Expression {
+    Traversal::new(expr, [TraversalOperator::Index(string(key))]).into()
+}
+
 /// `expr.name`: an attribute of an expression that isn't a plain path (`list[0].id`).
 #[must_use]
 pub fn attr(expr: Expression, name: &str) -> Expression {
@@ -142,6 +148,7 @@ mod tests {
         assert_eq!(written(&reference("aws_vpc.env.id")), "aws_vpc.env.id");
         assert_eq!(written(&index(reference("x.list"), 2)), "x.list[2]");
         assert_eq!(written(&attr(index(reference("x.list"), 0), "id")), "x.list[0].id");
+        assert_eq!(written(&entry(reference("var.images"), "debian-12")), r#"var.images["debian-12"]"#);
     }
 
     #[test]

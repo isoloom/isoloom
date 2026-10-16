@@ -17,6 +17,8 @@ from pathlib import Path
 
 import cloud_init
 import hcl
+import shell_embedded
+import shell_find
 from common import ERROR, SKIP, Ctx, Done, Result, run, tail
 from discover import OUTPUT_DIR
 from tfcli import data_dir, init
@@ -67,7 +69,8 @@ def project_of(module: Path) -> Path:
 
 
 def rendered(ctx: Ctx, copy: Path, tf: Path, e: hcl.Embedded, init_done: Done) -> list[Result]:
-    """One document, named by where it is (`resource.attribute`): evaluated, then checked."""
+    """One document, named by where it is (`resource.attribute`): evaluated, then checked,
+    its shell too (shell_embedded.py)."""
     where = f"{e.resource}.{e.attribute}"
     if init_done.code != 0:
         status = SKIP if "doesn't validate" in init_done.err else ERROR
@@ -76,7 +79,8 @@ def rendered(ctx: Ctx, copy: Path, tf: Path, e: hcl.Embedded, init_done: Done) -
     if text is None:
         status = SKIP if why == UNKNOWN else ERROR
         return [Result(ctx.rel(tf), "cloud-init", status, f"{where}: not evaluated: {why}", "evaluate")]
-    return cloud_init.check_text(ctx, tf, text, where)
+    shell = shell_embedded.check(ctx, tf, shell_find.cloud_config(text, where))
+    return cloud_init.check_text(ctx, tf, text, where) + shell
 
 
 def check(ctx: Ctx, module: Path, valid: bool) -> list[Result]:

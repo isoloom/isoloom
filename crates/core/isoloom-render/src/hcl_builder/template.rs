@@ -94,9 +94,16 @@ impl Template {
         self.parts.iter().all(|p| matches!(p, Part::Text(_)))
     }
 
-    /// The template as an expression: a plain string when it has no interpolation.
+    /// The template as an expression: a plain string when it has no interpolation, the
+    /// expression itself when it is one interpolation and nothing else (`"${x}"` is a form
+    /// Terraform deprecates for `x`, which it converts where a string is wanted).
     #[must_use]
-    pub fn into_expression(self) -> Expression {
+    pub fn into_expression(mut self) -> Expression {
+        if let [Part::Expr(_)] = self.parts.as_slice()
+            && let Some(Part::Expr(e)) = self.parts.pop()
+        {
+            return e;
+        }
         if self.is_text() {
             let text: String = self
                 .parts
@@ -189,6 +196,19 @@ mod tests {
         assert_eq!(Template::from("a").into_expression(), hcl::Expression::String("a".into()));
         assert_eq!(Template::from(String::from("b")).into_expression(), hcl::Expression::String("b".into()));
         assert_eq!(hcl::Expression::from(Template::text("c")), hcl::Expression::String("c".into()));
+    }
+
+    #[test]
+    fn a_lone_interpolation_is_its_expression_not_a_string_around_it() {
+        assert_eq!(Template::new().with_expr(reference("var.x")).into_expression(), reference("var.x"));
+        assert_eq!(
+            Template::new().with_expr(reference("var.x")).with_text("").into_expression(),
+            reference("var.x")
+        );
+        assert_eq!(
+            Template::text(" ").with_expr(reference("var.x")).into_expression().to_string(),
+            r#"" ${var.x}""#
+        );
     }
 
     #[test]

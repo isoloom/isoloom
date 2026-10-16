@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -202,7 +201,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.11/24 dev \"$dev\"\nip addr replace 10.86.0.12/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -286,7 +285,7 @@ resource "terraform_data" "decoy" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.40/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.48/24 dev \"$dev\"\nip addr replace 10.86.0.49/24 dev \"$dev\"\nip addr replace 10.86.0.50/24 dev \"$dev\"\nip addr replace 10.86.0.51/24 dev \"$dev\"\nip addr replace 10.86.0.52/24 dev \"$dev\"\nip addr replace 10.86.0.53/24 dev \"$dev\"\nip addr replace 10.86.0.54/24 dev \"$dev\"\nip addr replace 10.86.0.55/24 dev \"$dev\"\nip addr replace 10.86.0.56/24 dev \"$dev\"\nip addr replace 10.86.0.57/24 dev \"$dev\"\nip addr replace 10.86.0.58/24 dev \"$dev\"\nip addr replace 10.86.0.59/24 dev \"$dev\"\nip addr replace 10.86.0.60/24 dev \"$dev\"\nip addr replace 10.86.0.61/24 dev \"$dev\"\nip addr replace 10.86.0.62/24 dev \"$dev\"\nip addr replace 10.86.0.63/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/decoy.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -356,7 +355,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -420,7 +419,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -617,7 +615,7 @@ resource "azurerm_linux_virtual_machine" "web" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.web_office.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -659,7 +657,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.11/24 dev \"$dev\"\nip addr replace 10.86.0.12/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -838,7 +836,7 @@ resource "azurerm_linux_virtual_machine" "decoy" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.decoy_office.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -880,7 +878,7 @@ resource "terraform_data" "decoy" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.40/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.48/24 dev \"$dev\"\nip addr replace 10.86.0.49/24 dev \"$dev\"\nip addr replace 10.86.0.50/24 dev \"$dev\"\nip addr replace 10.86.0.51/24 dev \"$dev\"\nip addr replace 10.86.0.52/24 dev \"$dev\"\nip addr replace 10.86.0.53/24 dev \"$dev\"\nip addr replace 10.86.0.54/24 dev \"$dev\"\nip addr replace 10.86.0.55/24 dev \"$dev\"\nip addr replace 10.86.0.56/24 dev \"$dev\"\nip addr replace 10.86.0.57/24 dev \"$dev\"\nip addr replace 10.86.0.58/24 dev \"$dev\"\nip addr replace 10.86.0.59/24 dev \"$dev\"\nip addr replace 10.86.0.60/24 dev \"$dev\"\nip addr replace 10.86.0.61/24 dev \"$dev\"\nip addr replace 10.86.0.62/24 dev \"$dev\"\nip addr replace 10.86.0.63/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/decoy.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -962,7 +960,7 @@ resource "azurerm_linux_virtual_machine" "client" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.client_office.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -1004,7 +1002,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -1068,7 +1066,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1469,7 +1466,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.11/24 dev \"$dev\"\nip addr replace 10.86.0.12/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -1599,7 +1596,7 @@ resource "terraform_data" "decoy" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.40/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.48/24 dev \"$dev\"\nip addr replace 10.86.0.49/24 dev \"$dev\"\nip addr replace 10.86.0.50/24 dev \"$dev\"\nip addr replace 10.86.0.51/24 dev \"$dev\"\nip addr replace 10.86.0.52/24 dev \"$dev\"\nip addr replace 10.86.0.53/24 dev \"$dev\"\nip addr replace 10.86.0.54/24 dev \"$dev\"\nip addr replace 10.86.0.55/24 dev \"$dev\"\nip addr replace 10.86.0.56/24 dev \"$dev\"\nip addr replace 10.86.0.57/24 dev \"$dev\"\nip addr replace 10.86.0.58/24 dev \"$dev\"\nip addr replace 10.86.0.59/24 dev \"$dev\"\nip addr replace 10.86.0.60/24 dev \"$dev\"\nip addr replace 10.86.0.61/24 dev \"$dev\"\nip addr replace 10.86.0.62/24 dev \"$dev\"\nip addr replace 10.86.0.63/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/decoy.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -1681,7 +1678,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -1745,7 +1742,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1992,7 +1988,7 @@ resource "terraform_data" "web" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.11/24 dev \"$dev\"\nip addr replace 10.86.0.12/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -2073,7 +2069,7 @@ resource "terraform_data" "decoy" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.40/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.48/24 dev \"$dev\"\nip addr replace 10.86.0.49/24 dev \"$dev\"\nip addr replace 10.86.0.50/24 dev \"$dev\"\nip addr replace 10.86.0.51/24 dev \"$dev\"\nip addr replace 10.86.0.52/24 dev \"$dev\"\nip addr replace 10.86.0.53/24 dev \"$dev\"\nip addr replace 10.86.0.54/24 dev \"$dev\"\nip addr replace 10.86.0.55/24 dev \"$dev\"\nip addr replace 10.86.0.56/24 dev \"$dev\"\nip addr replace 10.86.0.57/24 dev \"$dev\"\nip addr replace 10.86.0.58/24 dev \"$dev\"\nip addr replace 10.86.0.59/24 dev \"$dev\"\nip addr replace 10.86.0.60/24 dev \"$dev\"\nip addr replace 10.86.0.61/24 dev \"$dev\"\nip addr replace 10.86.0.62/24 dev \"$dev\"\nip addr replace 10.86.0.63/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/decoy.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -2136,7 +2132,7 @@ resource "terraform_data" "client" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -2201,7 +2197,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -2281,6 +2276,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-several-addresses-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
+  tags = merge({ isoloom-environment = "several-addresses", managed-by = "isoloom", isoloom-instance = local.name }, var.expires_at == "" ? {} : { isoloom-expires-at = var.expires_at })
 }
 
 # The compartment's availability domains; the instances land in the first.
@@ -2301,18 +2297,21 @@ data "oci_core_images" "ubuntu_2404" {
 # The environment's networks: a VCN holding each one's block, routed to the internet.
 resource "oci_core_vcn" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   display_name   = local.name
   cidr_block     = "10.86.0.0/24"
 }
 
 resource "oci_core_internet_gateway" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
 }
 
 resource "oci_core_route_table" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
   route_rules {
@@ -2324,6 +2323,7 @@ resource "oci_core_route_table" "env" {
 # Network `office`: what may reach its machines, and where they may go.
 resource "oci_core_security_list" "office" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = "${local.name}-office"
   ingress_security_rules {
@@ -2522,6 +2522,7 @@ resource "oci_core_security_list" "office" {
 
 resource "oci_core_subnet" "office" {
   compartment_id    = var.compartment_id
+  freeform_tags     = local.tags
   vcn_id            = oci_core_vcn.env.id
   cidr_block        = "10.86.0.0/24"
   display_name      = "${local.name}-office"
@@ -2532,6 +2533,7 @@ resource "oci_core_subnet" "office" {
 # Machine `web`, at its fixed address 10.86.0.10.
 resource "oci_core_instance" "web" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-web"
   shape               = "VM.Standard.E4.Flex"
@@ -2596,7 +2598,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.11/24 dev \"$dev\"\nip addr replace 10.86.0.12/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -2607,6 +2609,7 @@ resource "terraform_data" "web" {
 # Machine `decoy`, at its fixed address 10.86.0.40.
 resource "oci_core_instance" "decoy" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-decoy"
   shape               = "VM.Standard.E4.Flex"
@@ -2755,7 +2758,7 @@ resource "terraform_data" "decoy" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.20 client'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.86.0.40/'\\'' | awk '\\''{print $2; exit}'\\'')\nip addr replace 10.86.0.48/24 dev \"$dev\"\nip addr replace 10.86.0.49/24 dev \"$dev\"\nip addr replace 10.86.0.50/24 dev \"$dev\"\nip addr replace 10.86.0.51/24 dev \"$dev\"\nip addr replace 10.86.0.52/24 dev \"$dev\"\nip addr replace 10.86.0.53/24 dev \"$dev\"\nip addr replace 10.86.0.54/24 dev \"$dev\"\nip addr replace 10.86.0.55/24 dev \"$dev\"\nip addr replace 10.86.0.56/24 dev \"$dev\"\nip addr replace 10.86.0.57/24 dev \"$dev\"\nip addr replace 10.86.0.58/24 dev \"$dev\"\nip addr replace 10.86.0.59/24 dev \"$dev\"\nip addr replace 10.86.0.60/24 dev \"$dev\"\nip addr replace 10.86.0.61/24 dev \"$dev\"\nip addr replace 10.86.0.62/24 dev \"$dev\"\nip addr replace 10.86.0.63/24 dev \"$dev\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/decoy.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -2766,6 +2769,7 @@ resource "terraform_data" "decoy" {
 # Machine `client`, at its fixed address 10.86.0.20.
 resource "oci_core_instance" "client" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-client"
   shape               = "VM.Standard.E4.Flex"
@@ -2812,7 +2816,7 @@ resource "terraform_data" "client" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.86.0.10 web'\\'' '\\''10.86.0.40 decoy'\\'' '\\''10.86.0.11 web'\\'' '\\''10.86.0.12 web'\\'' '\\''10.86.0.48 decoy'\\'' '\\''10.86.0.49 decoy'\\'' '\\''10.86.0.50 decoy'\\'' '\\''10.86.0.51 decoy'\\'' '\\''10.86.0.52 decoy'\\'' '\\''10.86.0.53 decoy'\\'' '\\''10.86.0.54 decoy'\\'' '\\''10.86.0.55 decoy'\\'' '\\''10.86.0.56 decoy'\\'' '\\''10.86.0.57 decoy'\\'' '\\''10.86.0.58 decoy'\\'' '\\''10.86.0.59 decoy'\\'' '\\''10.86.0.60 decoy'\\'' '\\''10.86.0.61 decoy'\\'' '\\''10.86.0.62 decoy'\\'' '\\''10.86.0.63 decoy'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -2876,7 +2880,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 

@@ -12,6 +12,7 @@
 use isoloom_plan::{Environment, SecretFile, ValueSource};
 use isoloom_render::{secrets, steps};
 use isoloom_spec::model::secret_variable;
+use isoloom_spec::shell::quote;
 
 use super::transport::Os;
 use crate::ruby::{Ruby, Value};
@@ -51,10 +52,17 @@ fn list(names: &[String]) -> String {
 pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step: &isoloom_plan::lifecycle::Step) {
     let Some(mp) = env.machines.get(machine) else { return };
     let file = steps::INPUTS_FILE;
-    let mut script = format!(
-        "umask 077\n: > {file}\nfor k in {}; do printf \"%s='%s'\\n\" \"$k\" \"$(printenv \"$k\" | base64 -d | sed \"s/'/'\\\\\\\\''/g\")\" >> {file}; done\n",
-        mp.inputs.join(" ")
-    );
+    // A line per input, rather than a loop over them, which would run once for one input.
+    let lines = mp
+        .inputs
+        .iter()
+        .map(|k| {
+            let k = quote(k);
+            format!("printf \"%s='%s'\\n\" {k} \"$(printenv {k} | base64 -d | sed \"s/'/'\\\\\\\\''/g\")\" >> {file}\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let mut script = format!("umask 077\n: > {file}\n{lines}");
     script.push_str(&steps::linux(env, machine, step).unwrap_or_default());
     let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
     r.script(call, "inline", &script);

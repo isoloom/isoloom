@@ -39,7 +39,7 @@ fn another_machine_mounts_the_export_and_waits_for_its_owner() {
         "{sh}"
     );
     assert!(
-        sh.contains("if [ $i -ge 180 ]; then echo 'volume shared: writer doesn'\\''t serve it (NFS)' >&2; exit 1; fi"),
+        sh.contains("if [ $i -ge 180 ]; then echo 'volume shared: writer does not serve it (NFS)' >&2; exit 1; fi"),
         "{sh}"
     );
 }

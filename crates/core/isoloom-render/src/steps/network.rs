@@ -14,12 +14,13 @@ use crate::network::{ipv6, router, trunks};
 use crate::{boot, powershell};
 
 /// The other machines by name, appended to `/etc/hosts`, each line once (running the step again
-/// adds nothing).
+/// adds nothing). The lines are read from a pipe, not looped over as words: a loop over one
+/// line is one shellcheck reports.
 pub(super) fn hosts(entries: &[(Ipv4Addr, Vec<String>)]) -> Option<String> {
     let lines: Vec<String> = entries.iter().map(|(a, names)| quote(&format!("{a} {}", names.join(" ")))).collect();
     (!lines.is_empty()).then(|| {
         format!(
-            "for l in {}; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done\n",
+            "printf '%s\\n' {} | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done\n",
             lines.join(" ")
         )
     })

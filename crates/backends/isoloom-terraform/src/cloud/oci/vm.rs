@@ -27,7 +27,7 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, index, list, number, object, reference, string};
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
-use super::{SHAPE, availability_domain, availability_domains, in_compartment, provider, ubuntu_images};
+use super::{SHAPE, availability_domain, availability_domains, owned, provider, ubuntu_images};
 use crate::cloud::instance::name_with;
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
@@ -121,10 +121,7 @@ pub(crate) const DRIVER: Driver = Driver {
                 .block(),
         ]
     },
-    provider: |_, m| {
-        m.block(provider());
-        Vec::new()
-    },
+    provider,
     refusal,
     write,
 };
@@ -229,7 +226,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
             call("base64encode", [auto_stop::if_set(auto_stop::script(), string("#!/bin/sh\n"))]),
         ),
     ]);
-    in_compartment(resource("oci_core_instance", &ident(name)))
+    owned(resource("oci_core_instance", &ident(name)))
         .add_attribute(("availability_domain", availability_domain()))
         .add_attribute(("display_name", name_with(&format!("-{name}"))))
         .add_attribute(("shape", string(SHAPE)))

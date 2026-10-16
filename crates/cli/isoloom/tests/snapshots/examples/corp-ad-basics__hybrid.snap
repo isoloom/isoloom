@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ hybrid
@@ -1171,7 +1170,7 @@ Vagrant.configure("2") do |config|
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp", "isoloom-corp-ad-basics-access"]) }
     end
-    m.vm.provision "shell", name: "hosts", inline: "for l in '10.40.20.5 dc01' '10.40.20.21 ws-01' '10.40.20.22 ws-02' '10.40.10.10 web01' '10.40.99.10 user'; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.40.20.5 dc01' '10.40.20.21 ws-01' '10.40.20.22 ws-02' '10.40.10.10 web01' '10.40.99.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "controller", inline: <<~'SH'
       set -e
@@ -1436,7 +1435,7 @@ echo '== checks/domain-up.sh'
 if _retry 0 sh -c 'cd /opt/isoloom && sh checks/domain-up.sh'; then pass 'checks/domain-up.sh'; else fail 'checks/domain-up.sh' "checks/domain-up.sh exited non-zero"; fi
 
 echo '== checks/web01-reaches-dc01.sh'
-if _retry 0 sh -c 'cd /opt/isoloom && sh checks/web01-reaches-dc01.sh'; then pass 'checks/web01-reaches-dc01.sh'; else fail 'checks/web01-reaches-dc01.sh' "checks/web01-reaches-dc01.sh exited non-zero"; fi
+if _retry 0 sh -c 'cd /opt/isoloom && sh checks/web01-reaches-dc01.sh'; then pass 'web01 reaches the directory on dc01'; else fail 'web01 reaches the directory on dc01' "checks/web01-reaches-dc01.sh exited non-zero"; fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _tcp '10.40.20.5' 53; then pass 'dc01:53 from the networks'; else fail 'dc01:53 from the networks' "nothing listens at 10.40.20.5:53"; fi
@@ -1927,14 +1926,6 @@ volumes:
             "wait": 0
           },
           {
-            "name": "checks/web01-reaches-dc01.sh",
-            "derived": false,
-            "kind": "script",
-            "target": "checks/web01-reaches-dc01.sh",
-            "expect": "",
-            "wait": 0
-          },
-          {
             "name": "dc01:53 blocked from user",
             "derived": true,
             "kind": "tcp",
@@ -1981,6 +1972,14 @@ volumes:
         "machine": "web01",
         "runner": "isoloom-check-web01",
         "checks": [
+          {
+            "name": "web01 reaches the directory on dc01",
+            "derived": false,
+            "kind": "script",
+            "target": "checks/web01-reaches-dc01.sh",
+            "expect": "",
+            "wait": 0
+          },
           {
             "name": "dc01:53 from web01",
             "derived": true,

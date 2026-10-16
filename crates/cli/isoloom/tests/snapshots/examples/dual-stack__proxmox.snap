@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ proxmox
@@ -528,12 +527,12 @@ resource "proxmox_virtual_environment_file" "web" {
       write_files = local.project_files
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.67.10.10 user'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: routes' > /var/lib/isoloom/ready && sh -c 'ip route replace 10.67.10.0/24 via 10.67.20.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: IPv6' > /var/lib/isoloom/ready && sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.67.20.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace fd00:67:20::10/64 dev \"$dev\" nodad\nip -6 route replace fd00:67:10::/64 via fd00:67:20::254' || { echo 'failed: IPv6' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: provision/web.sh' > /var/lib/isoloom/ready && sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: closing the internet' > /var/lib/isoloom/ready && sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.67.10.0/24, 10.67.20.0/24 } ct state new drop'\\'' '\\''    ip6 daddr != { fd00:67:10::/64, fd00:67:20::/64 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi' || { echo 'failed: closing the internet' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.67.10.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.67.10.0/24 via 10.67.20.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: IPv6' > /var/lib/isoloom/ready; sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.67.20.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace fd00:67:20::10/64 dev \"$dev\" nodad\nip -6 route replace fd00:67:10::/64 via fd00:67:20::254' || { echo 'failed: IPv6' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: provision/web.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: closing the internet' > /var/lib/isoloom/ready; sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.67.10.0/24, 10.67.20.0/24 } ct state new drop'\\'' '\\''    ip6 daddr != { fd00:67:10::/64, fd00:67:20::/64 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi' || { echo 'failed: closing the internet' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -636,16 +635,15 @@ resource "proxmox_virtual_environment_file" "user" {
   source_raw {
     file_name = "iso${var.slot}-user.yaml"
     data = format("#cloud-config\n%s", yamlencode({
-      hostname    = "user"
-      users       = local.users
-      packages    = ["nftables", "curl", "netcat-openbsd"]
-      write_files = []
+      hostname = "user"
+      users    = local.users
+      packages = ["nftables", "curl", "netcat-openbsd"]
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready && sh -c 'for l in '\\''10.67.20.10 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: routes' > /var/lib/isoloom/ready && sh -c 'ip route replace 10.67.20.0/24 via 10.67.10.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: IPv6' > /var/lib/isoloom/ready && sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.67.10.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace fd00:67:10::10/64 dev \"$dev\" nodad\nip -6 route replace fd00:67:20::/64 via fd00:67:10::254' || { echo 'failed: IPv6' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: health check' > /var/lib/isoloom/ready && sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.67.20.10 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.67.20.0/24 via 10.67.10.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: IPv6' > /var/lib/isoloom/ready; sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.67.10.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace fd00:67:10::10/64 dev \"$dev\" nodad\nip -6 route replace fd00:67:20::/64 via fd00:67:10::254' || { echo 'failed: IPv6' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
     }))
   }
@@ -773,9 +771,8 @@ locals {
     "/[.+^$(){}|\\\\]/", "\\$0"), "[!", "[^"), "**/", "\u0001"), "**", "\u0002"), "*", "[^/]*"), "?", "[^/]"), "\u0001", "(.*/)?"), "\u0002", ".*"))
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
-  project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
-  project_ignored = [for f, keep in local.project_keep : f if !keep]
+  project_keep  = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
+  project_paths = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
 }
 
 ## .isoloom/proxmox/run.json

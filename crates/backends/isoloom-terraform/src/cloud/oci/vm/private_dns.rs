@@ -4,24 +4,22 @@
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, Module, number, reference, string};
 
+use crate::cloud::oci::owned;
 use crate::cloud::vm::private_dns::{TTL, records};
 use crate::module::resource;
 
 /// The zone, its records and the resolver's view, when the environment has one.
 pub(super) fn write(env: &Environment, m: &mut Module) {
     let Some(zone) = &env.private_dns else { return };
-    let compartment = || reference("var.compartment_id");
     m.commented(
         "The environment's names, served by the VCN's resolver from a private view (`dns.private`).",
-        resource("oci_dns_view", "private")
-            .add_attribute(("compartment_id", compartment()))
+        owned(resource("oci_dns_view", "private"))
             .add_attribute(("scope", string("PRIVATE")))
             .add_attribute(("display_name", reference("local.name")))
             .build(),
     );
     m.block(
-        resource("oci_dns_zone", "private")
-            .add_attribute(("compartment_id", compartment()))
+        owned(resource("oci_dns_zone", "private"))
             .add_attribute(("name", string(zone.domain.as_str())))
             .add_attribute(("zone_type", string("PRIMARY")))
             .add_attribute(("scope", string("PRIVATE")))

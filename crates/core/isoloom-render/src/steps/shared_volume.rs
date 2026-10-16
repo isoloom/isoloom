@@ -59,7 +59,7 @@ fn mount(volume: &str, path: &str, source: &str, owner: &str) -> String {
          i=0; until mountpoint -q {p} || mount {p} 2>/dev/null; do i=$((i+1)); if [ $i -ge 180 ]; then echo {} >&2; exit 1; fi; sleep 5; done\n",
         quote(&format!("{source} ")),
         quote(&fstab),
-        quote(&format!("volume {volume}: {owner} doesn't serve it (NFS)")),
+        quote(&format!("volume {volume}: {owner} does not serve it (NFS)")),
         p = quote(path),
     )
 }

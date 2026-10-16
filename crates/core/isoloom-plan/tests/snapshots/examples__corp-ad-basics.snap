@@ -1,6 +1,5 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 62
 expression: example(&name).unwrap().spec()
 ---
 version: 1
@@ -196,5 +195,12 @@ provision:
     requirements: ~
 checks:
   - checks/domain-up.sh
-  - checks/web01-reaches-dc01.sh
+  - name: web01 reaches the directory on dc01
+    from: web01
+    http: ~
+    tcp: ~
+    exec: ~
+    script: checks/web01-reaches-dc01.sh
+    expect: ~
+    wait: ~
 targets: ~

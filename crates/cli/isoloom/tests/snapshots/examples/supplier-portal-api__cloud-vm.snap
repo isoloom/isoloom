@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -216,10 +215,10 @@ resource "terraform_data" "database" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for `isoloom run` to deliver its secrets'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with `isoloom run`, which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
-      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a; . /tmp/isoloom-inputs.env; set +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /tmp/isoloom-inputs.env\nset +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -294,7 +293,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -360,7 +359,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -551,7 +549,7 @@ resource "azurerm_linux_virtual_machine" "database" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.database_lab.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -600,10 +598,10 @@ resource "terraform_data" "database" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for `isoloom run` to deliver its secrets'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with `isoloom run`, which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
-      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a; . /tmp/isoloom-inputs.env; set +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /tmp/isoloom-inputs.env\nset +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -694,7 +692,7 @@ resource "azurerm_linux_virtual_machine" "web" {
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.web_lab.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -736,7 +734,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -802,7 +800,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1274,10 +1271,10 @@ resource "terraform_data" "database" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for `isoloom run` to deliver its secrets'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with `isoloom run`, which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
-      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a; . /tmp/isoloom-inputs.env; set +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /tmp/isoloom-inputs.env\nset +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1370,7 +1367,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -1441,7 +1438,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1673,10 +1669,10 @@ resource "terraform_data" "database" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for `isoloom run` to deliver its secrets'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with `isoloom run`, which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
-      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a; . /tmp/isoloom-inputs.env; set +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /tmp/isoloom-inputs.env\nset +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -1737,7 +1733,7 @@ resource "terraform_data" "web" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -1803,7 +1799,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1890,6 +1885,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-supplier-portal-api-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
+  tags = merge({ isoloom-environment = "supplier-portal-api", managed-by = "isoloom", isoloom-instance = local.name }, var.expires_at == "" ? {} : { isoloom-expires-at = var.expires_at })
 }
 
 # The compartment's availability domains; the instances land in the first.
@@ -1910,18 +1906,21 @@ data "oci_core_images" "ubuntu_2404" {
 # The environment's networks: a VCN holding each one's block, routed to the internet.
 resource "oci_core_vcn" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   display_name   = local.name
   cidr_block     = "10.20.0.0/24"
 }
 
 resource "oci_core_internet_gateway" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
 }
 
 resource "oci_core_route_table" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
   route_rules {
@@ -1933,6 +1932,7 @@ resource "oci_core_route_table" "env" {
 # Network `lab`: what may reach its machines, and where they may go.
 resource "oci_core_security_list" "lab" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = "${local.name}-lab"
   ingress_security_rules {
@@ -2131,6 +2131,7 @@ resource "oci_core_security_list" "lab" {
 
 resource "oci_core_subnet" "lab" {
   compartment_id    = var.compartment_id
+  freeform_tags     = local.tags
   vcn_id            = oci_core_vcn.env.id
   cidr_block        = "10.20.0.0/24"
   display_name      = "${local.name}-lab"
@@ -2141,6 +2142,7 @@ resource "oci_core_subnet" "lab" {
 # Machine `database`, at its fixed address 10.20.0.32.
 resource "oci_core_instance" "database" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-database"
   shape               = "VM.Standard.E4.Flex"
@@ -2194,10 +2196,10 @@ resource "terraform_data" "database" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.31 web'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
-      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for `isoloom run` to deliver its secrets'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with `isoloom run`, which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.31 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''database: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''database: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '\\''/run/lab/launch-token'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'\\'''",
-      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a; . /tmp/isoloom-inputs.env; set +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
+      "sudo sh -c '[ -f /var/lib/isoloom/setup.done ] || (\nset -e\nset -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /tmp/isoloom-inputs.env\nset +a\nmkdir -p '\\''/opt/isoloom'\\'' && cd '\\''/opt/isoloom'\\''\nsh '\\''/opt/isoloom/build/database/seed.sh'\\''\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
@@ -2206,6 +2208,7 @@ resource "terraform_data" "database" {
 # The ports `web` publishes, from allowed_cidr: on its VNIC only.
 resource "oci_core_network_security_group" "web" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = "${local.name}-web"
 }
@@ -2228,6 +2231,7 @@ resource "oci_core_network_security_group_security_rule" "web_tcp_3206" {
 # Machine `web`, at its fixed address 10.20.0.31.
 resource "oci_core_instance" "web" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-web"
   shape               = "VM.Standard.E4.Flex"
@@ -2275,7 +2279,7 @@ resource "terraform_data" "web" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'for l in '\\''10.20.0.32 database'\\''; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
+      "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.20.0.32 database'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done'",
       "sudo sh -c 'i=0; until (bash -c '\\''</dev/tcp/database/3207'\\'' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\"'",
       "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
@@ -2341,7 +2345,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 

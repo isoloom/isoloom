@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -266,7 +265,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -452,7 +450,7 @@ resource "azurerm_linux_virtual_machine" "web" {
   tags                  = local.tags
   secure_boot_enabled   = true
   vtpm_enabled          = true
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2ts_v2"
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.web_app.id]
   custom_data           = var.auto_stop_minutes > 0 ? base64encode("#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n") : null
@@ -565,7 +563,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -927,7 +924,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 
@@ -1007,6 +1003,7 @@ resource "terraform_data" "id" {
 locals {
   name = "isoloom-tuned-web-${terraform_data.id.output}"
   root = abspath("${path.module}/../../..")
+  tags = merge({ isoloom-environment = "tuned-web", managed-by = "isoloom", isoloom-instance = local.name }, var.expires_at == "" ? {} : { isoloom-expires-at = var.expires_at })
 }
 
 # The compartment's availability domains; the instances land in the first.
@@ -1027,18 +1024,21 @@ data "oci_core_images" "ubuntu_2404" {
 # The environment's networks: a VCN holding each one's block, routed to the internet.
 resource "oci_core_vcn" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   display_name   = local.name
   cidr_block     = "10.83.0.0/24"
 }
 
 resource "oci_core_internet_gateway" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
 }
 
 resource "oci_core_route_table" "env" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = local.name
   route_rules {
@@ -1050,6 +1050,7 @@ resource "oci_core_route_table" "env" {
 # Network `app`: what may reach its machines, and where they may go.
 resource "oci_core_security_list" "app" {
   compartment_id = var.compartment_id
+  freeform_tags  = local.tags
   vcn_id         = oci_core_vcn.env.id
   display_name   = "${local.name}-app"
   ingress_security_rules {
@@ -1248,6 +1249,7 @@ resource "oci_core_security_list" "app" {
 
 resource "oci_core_subnet" "app" {
   compartment_id    = var.compartment_id
+  freeform_tags     = local.tags
   vcn_id            = oci_core_vcn.env.id
   cidr_block        = "10.83.0.0/24"
   display_name      = "${local.name}-app"
@@ -1258,6 +1260,7 @@ resource "oci_core_subnet" "app" {
 # Machine `web`, at its fixed address 10.83.0.10.
 resource "oci_core_instance" "web" {
   compartment_id      = var.compartment_id
+  freeform_tags       = local.tags
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   display_name        = "${local.name}-web"
   shape               = "VM.Standard.E4.Flex"
@@ -1374,7 +1377,6 @@ locals {
   } if r.glob != ""]
   # Each file: whether it goes (the last matching pattern decides; none: it goes).
   project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_paths   = [for f, keep in local.project_keep : f if keep && length(regexall("^\\.isoloom|(^|/)\\.(git|vagrant|terraform)/", f)) == 0]
   project_ignored = [for f, keep in local.project_keep : f if !keep]
 }
 

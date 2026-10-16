@@ -49,4 +49,6 @@ provision:
 
 checks:
   - checks/domain-up.sh
-  - checks/web01-reaches-dc01.sh
+  - name: web01 reaches the directory on dc01
+    from: web01                          # from web01 itself: its own route to dc01
+    script: checks/web01-reaches-dc01.sh

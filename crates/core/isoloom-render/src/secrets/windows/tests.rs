@@ -79,7 +79,10 @@ fn the_step_waits_then_places_now_and_at_every_boot() {
 #[test]
 fn the_wait_names_the_machine_and_the_way_out() {
     let ps = wait("win");
-    assert!(ps.contains("win: waiting for `isoloom run`") && ps.contains("AddSeconds(1800)"), "{ps}");
+    assert!(
+        ps.contains("win: waiting for its secrets, which the runner (isothrum up) delivers") && ps.contains("AddSeconds(1800)"),
+        "{ps}"
+    );
     assert!(place_first().contains(PLACE_SCRIPT));
 }
 

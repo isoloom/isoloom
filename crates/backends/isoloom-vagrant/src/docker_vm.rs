@@ -157,8 +157,9 @@ fn checks(r: &mut Ruby, env: &Environment) {
         return;
     }
     let profile = format!("docker compose -f {COMPOSE} --profile check");
+    let access = docker::as_arguments(&format!("{profile} config --services | grep -x -e isoloom-access -e isoloom-access-routes"));
     let script = format!(
-        "cd /opt/isoloom && failed=0; sa=$({profile} config --services | grep -x -e isoloom-access -e isoloom-access-routes); [ -z \"$sa\" ] || {profile} up -d --wait --no-deps $sa; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; {}exit $failed",
+        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} up -d --wait --no-deps \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; {}exit \"$failed\"",
         exec_runs(env)
     );
     let derived = Value::hash([(Value::str("ISOLOOM_DERIVED"), Value::raw(DERIVED))]);

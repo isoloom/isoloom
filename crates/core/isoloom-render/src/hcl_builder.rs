@@ -16,7 +16,7 @@ mod expr;
 mod template;
 mod write;
 
-pub use expr::{attr, binary, boolean, call, conditional, for_list, index, list, not, null, number, object, reference, string};
+pub use expr::{attr, binary, boolean, call, conditional, entry, for_list, index, list, not, null, number, object, reference, string};
 pub use hcl::expr::BinaryOperator;
 pub use hcl::{Attribute, Block, BlockBuilder, Body, Expression, Structure};
 pub use template::{Piece, Template};

@@ -60,7 +60,7 @@ fn the_jobs_nothing_waits_for_run_attached_after_the_rest() {
     assert_eq!(start_commands("dc", &[], Some(60)), "dc up -d --build --wait --wait-timeout 60");
     assert_eq!(
         start_commands("dc", &leaf_jobs(&spec), None),
-        "dc up -d --build --wait $(dc config --services | grep -vx -e web-init-1 -e web-init-2) && dc up --no-deps --exit-code-from web-init-1 web-init-1 && dc up --no-deps --exit-code-from web-init-2 web-init-2"
+        "{ set --; for w in $(dc config --services | grep -vx -e web-init-1 -e web-init-2); do set -- \"$@\" \"$w\"; done; } && dc up -d --build --wait \"$@\" && dc up --no-deps --exit-code-from web-init-1 web-init-1 && dc up --no-deps --exit-code-from web-init-2 web-init-2"
     );
 }
 

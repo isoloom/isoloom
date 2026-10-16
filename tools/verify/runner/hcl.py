@@ -1,6 +1,7 @@
 """Just enough HCL reading to evaluate the cloud-config documents a Terraform module builds
 (see embedded.py): each such attribute's expression, whole; the module's variables, for
-placeholder inputs; and the module without its variables' validation rules.
+placeholder inputs; and the module without its variables' validation rules. And to find the
+shell scripts a module holds (see shell_find.py): its strings, read, and a list's items.
 
 The scanner knows strings, interpolations, heredocs, comments and brackets, which is what it
 takes to find where an expression ends in the generated modules.
@@ -9,6 +10,7 @@ takes to find where an expression ends in the generated modules.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 ATTRIBUTE = re.compile(r"^[ \t]*([A-Za-z_][\w-]*)[ \t]*=(?!=)[ \t]*", re.M)
@@ -34,22 +36,10 @@ def skip_heredoc(text: str, i: int) -> int:
     return end.end() if end else len(text)
 
 
-STRING = -1  # a quoted string on the scanner's stack; an interpolation is its bracket depth
-
-
-def string_step(text: str, i: int, stack: list[int], depth: int) -> tuple[int, int]:
-    """One step inside a quoted string: the next index and bracket depth. An interpolation
-    pushes the depth it closes at; the closing quote pops the string."""
-    if text[i] == "\\":
-        return i + 2, depth
-    if text.startswith(("$${", "%%{"), i):
-        return i + 3, depth
-    if text.startswith(("${", "%{"), i):
-        stack.append(depth)
-        return i + 2, depth + 1
-    if text[i] == '"':
-        stack.pop()
-    return i + 1, depth
+# What an interpolation reads as, in a string's text: the value is known only when Terraform
+# runs, and a number fits wherever shell takes a word (a path, an argument, an arithmetic term).
+PLACEHOLDER = "0"
+ESCAPES = {"n": "\n", "r": "\r", "t": "\t", '"': '"', "\\": "\\"}
 
 
 def skip_comment(text: str, i: int) -> int:
@@ -58,32 +48,71 @@ def skip_comment(text: str, i: int) -> int:
     return len(text) if end < 0 else end
 
 
+def skip(text: str, i: int) -> int:
+    """The index just past what starts at `i`: a quoted string, a bracketed group (with all it
+    holds), a heredoc or a comment; else past the one character."""
+    c = text[i]
+    if c == '"':
+        return read_string(text, i)[1]
+    if c in "([{":
+        j = i + 1
+        while j < len(text) and text[j] not in ")]}":
+            j = skip(text, j)
+        return j + 1
+    if text.startswith("<<", i):
+        return skip_heredoc(text, i)
+    if text.startswith("/*", i):
+        end = text.find("*/", i + 2)
+        return len(text) if end < 0 else end + 2
+    if c == "#" or text.startswith("//", i):
+        return skip_comment(text, i)
+    return i + 1
+
+
+def escape(text: str, i: int) -> tuple[str, int]:
+    """The character the escape at `i` (a backslash) stands for, and the index past it."""
+    kind = text[i + 1 : i + 2]
+    if kind in ("u", "U"):
+        width = 4 if kind == "u" else 8
+        digits = text[i + 2 : i + 2 + width]
+        try:
+            return chr(int(digits, 16)), i + 2 + width
+        except ValueError:
+            return digits, i + 2 + width
+    return ESCAPES.get(kind, kind), i + 2
+
+
+def read_string(text: str, i: int) -> tuple[str, int]:
+    """The quoted string whose opening quote is at `i`: its text, escapes read, each
+    interpolation as [`PLACEHOLDER`] and each directive (`%{ if }`) left out; and the index
+    past its closing quote."""
+    out: list[str] = []
+    i += 1
+    while i < len(text):
+        c = text[i]
+        if c == '"':
+            return "".join(out), i + 1
+        if c == "\\":
+            char, i = escape(text, i)
+            out.append(char)
+        elif text.startswith(("$${", "%%{"), i):
+            out.append(text[i + 1 : i + 3])
+            i += 3
+        elif text.startswith(("${", "%{"), i):
+            out.append(PLACEHOLDER if c == "$" else "")
+            i = skip(text, i + 1)
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out), len(text)
+
+
 def expression_end(text: str, i: int) -> int:
     """The end of the expression starting at `i`: the first newline outside any bracket,
     string, interpolation or heredoc."""
-    depth = 0
-    stack: list[int] = []
-    while i < len(text):
-        c = text[i]
-        if stack and stack[-1] == STRING:
-            i, depth = string_step(text, i, stack, depth)
-            continue
-        if c == "\n" and depth <= 0 and not stack:
-            return i
-        if c == '"':
-            stack.append(STRING)
-        elif c in "([{":
-            depth += 1
-        elif c in ")]}":
-            depth -= 1
-            if c == "}" and stack and stack[-1] == depth:
-                stack.pop()
-        elif text.startswith("<<", i):
-            i = skip_heredoc(text, i) - 1
-        elif c == "#" or text.startswith("//", i):
-            i = skip_comment(text, i) - 1
-        i += 1
-    return len(text)
+    while i < len(text) and text[i] != "\n":
+        i = skip(text, i)
+    return min(i, len(text))
 
 
 def enclosing(text: str, at: int) -> str:
@@ -94,16 +123,60 @@ def enclosing(text: str, at: int) -> str:
     return last or "module"
 
 
-def cloud_configs(text: str) -> list[Embedded]:
-    """Every attribute (or object key) whose expression holds a cloud-config document: the
-    innermost one, so `guestinfo = { userdata = base64encode(...) }` yields `userdata`."""
+def config_spans(text: str) -> list[tuple[int, int, str]]:
+    """Each attribute (or object key) whose expression holds a cloud-config document, the
+    innermost one: where it starts and ends, and its name."""
     spans: list[tuple[int, int, str]] = []
     for m in ATTRIBUTE.finditer(text):
         end = expression_end(text, m.end())
         if "#cloud-config" in text[m.end() : end]:
             spans.append((m.start(), end, m.group(1)))
-    innermost = [s for s in spans if not any(o != s and s[0] < o[0] and o[1] <= s[1] for o in spans)]
-    return [Embedded(enclosing(text, a), name, text[text.index("=", a) + 1 : b].strip()) for a, b, name in innermost]
+    return [s for s in spans if not any(o != s and s[0] < o[0] and o[1] <= s[1] for o in spans)]
+
+
+def cloud_configs(text: str) -> list[Embedded]:
+    """Every attribute (or object key) whose expression holds a cloud-config document: the
+    innermost one, so `guestinfo = { userdata = base64encode(...) }` yields `userdata`."""
+    return [Embedded(enclosing(text, a), name, text[text.index("=", a) + 1 : b].strip()) for a, b, name in config_spans(text)]
+
+
+def cloud_config_spans(text: str) -> list[tuple[int, int]]:
+    """Where the cloud-config documents' expressions are."""
+    return [(a, b) for a, b, _ in config_spans(text)]
+
+
+def strings(text: str) -> Iterator[tuple[int, str]]:
+    """Every quoted string (not those inside another's interpolation), read: where it starts,
+    and its text."""
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if c == '"':
+            string, end = read_string(text, i)
+            yield i, string
+            i = end
+        elif text.startswith(("<<", "/*"), i) or c == "#" or text.startswith("//", i):
+            i = skip(text, i)
+        else:
+            i += 1
+
+
+def elements(text: str, i: int) -> list[str]:
+    """The items of the list whose `[` is the first thing from `i`, each as written."""
+    while i < len(text) and text[i] in " \t\n":
+        i += 1
+    if i >= len(text) or text[i] != "[":
+        return []
+    items, start, i = [], i + 1, i + 1
+    while i < len(text) and text[i] != "]":
+        if text[i] == ",":
+            items.append(text[start:i])
+            start = i + 1
+            i += 1
+        else:
+            i = skip(text, i)
+    items.append(text[start:i])
+    return [x.strip() for x in items if x.strip()]
 
 
 VARIABLE = re.compile(r'^variable[ \t]+"([^"]+)"[ \t]*\{', re.M)

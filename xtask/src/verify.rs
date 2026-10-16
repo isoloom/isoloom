@@ -9,8 +9,9 @@
 //!
 //! Each file goes to its format's validator (`docker compose config`, terraform and tflint,
 //! `vagrant validate`, kubeconform and helm, cloud-init, hadolint, ansible-lint, shellcheck,
-//! `PSScriptAnalyzer`); the runner that does this is `tools/verify/runner`, handed to the image
-//! with the tree. Written to `$VERIFY_OUT` (default `target/verify`): `results.jsonl`,
+//! `PSScriptAnalyzer`), and the shell scripts inside Vagrantfiles, Terraform modules and
+//! cloud-config documents to shellcheck too (`shellcheck-embedded`); the runner that does this is
+//! `tools/verify/runner`, handed to the image with the tree. Written to `$VERIFY_OUT` (default `target/verify`): `results.jsonl`,
 //! `new.jsonl` (the failures the baseline doesn't know), `stale.jsonl` (baseline entries no
 //! failure matches any more) and `summary.txt`, also printed. `--update-baseline` rewrites the
 //! baseline with today's failures instead, keeping the reasons already written.

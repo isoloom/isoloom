@@ -195,7 +195,8 @@ machines:
     let cmd = start_commands("docker compose", &plan.jobs, Some(900));
     assert_eq!(
         cmd,
-        "docker compose up -d --build --wait --wait-timeout 900 $(docker compose config --services | grep -vx -e web-init-1 -e web-init-2) \
+        "{ set --; for w in $(docker compose config --services | grep -vx -e web-init-1 -e web-init-2); do set -- \"$@\" \"$w\"; done; } \
+         && docker compose up -d --build --wait --wait-timeout 900 \"$@\" \
          && docker compose up --no-deps --exit-code-from web-init-1 web-init-1 \
          && docker compose up --no-deps --exit-code-from web-init-2 web-init-2"
     );

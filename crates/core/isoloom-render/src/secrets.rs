@@ -1,12 +1,13 @@
 //! Secrets on a VM and on a Docker host. The generated set-up never holds a value: it waits
-//! for `isoloom run` to deliver them over the machine's own connection (SSH), then puts each
+//! for the runner (Isothrum's `isothrum up`) to deliver them over the machine's own connection
+//! (SSH), then puts each
 //! file in place. Delivery writes a root-only copy of each value under [`KEPT_DIR`] (it outlives
 //! a reboot, which empties `/run/secrets`) and the mark [`DELIVERED`] the set-up waits for.
 //!
 //! The order is the plan's `Secrets` step: after the machine's files, before what may read a
 //! secret (its `provision` steps, its `before` steps and its command). The set-up runs inside
 //! the target's own tool (`vagrant up`, `terraform apply`, cloud-init), so the step is a gate:
-//! it waits for the mark, and `isoloom run` delivers while the tool runs.
+//! it waits for the mark, and the runner delivers while the tool runs.
 
 use isoloom_plan::secrets::VM_DEFAULT_MODE;
 use isoloom_plan::{Environment, MachineShape, SecretFile};
@@ -22,16 +23,16 @@ pub const KEPT_DIR: &str = "/var/lib/isoloom/secrets";
 /// The mark delivery leaves once every secret is kept.
 pub const DELIVERED: &str = "/var/lib/isoloom/secrets/.delivered";
 /// Where a Terraform set-up that waits for its secrets says how to reach its machine, under
-/// its module: one file per machine, `<user>@<address>`. `isoloom run` reads it while Terraform
+/// its module: one file per machine, `<user>@<address>`. The runner reads it while Terraform
 /// runs (the module's outputs come only once every set-up is done) and delivers there.
 pub const REACH_DIR: &str = ".isoloom-reach";
-/// Seconds the set-up waits for `isoloom run` to deliver the secrets.
+/// Seconds the set-up waits for the runner to deliver the secrets.
 pub const DELIVERY_TIMEOUT: u32 = 1800;
 /// The boot service putting the secrets back in place (`/run` is emptied at every boot). Its
 /// name sorts before `before` and `command`, the order OpenRC runs `/etc/local.d` in.
 pub const PLACE_SERVICE: &str = "apply-secrets";
 
-/// The script `isoloom run` runs as root on the machine. Its standard input holds one line per
+/// The script the runner runs as root on the machine. Its standard input holds one line per
 /// secret of `names`, in that order, each value in base64 (so any text fits on one line); the
 /// script keeps each one, marks the delivery, then puts `files` in place (so a run again
 /// refreshes them). Nothing of a value reaches its command line or its output.
@@ -75,13 +76,20 @@ pub fn place(files: &[SecretFile]) -> String {
 /// what to do. `who` names the machine in the messages.
 #[must_use]
 pub fn wait(who: &str) -> String {
-    let waiting = quote(&format!("{who}: waiting for `isoloom run` to deliver its secrets"));
-    let missing = quote(&format!(
-        "{who}: its secrets never came; start the environment with `isoloom run`, which reads them from their stores and delivers them"
-    ));
+    let (waiting, missing) = messages(who);
+    let (waiting, missing) = (quote(&waiting), quote(&missing));
     let tries = DELIVERY_TIMEOUT / 5;
     format!(
         "n=0; until [ -f {DELIVERED} ]; do [ \"$n\" -gt 0 ] || echo {waiting}; n=$((n+1)); if [ \"$n\" -gt {tries} ]; then echo {missing} >&2; exit 1; fi; sleep 5; done\n"
+    )
+}
+
+/// What the wait says while it waits, and when it gives up: who delivers (the runner; the
+/// target's own tool, Terraform, can't), and what to do.
+fn messages(who: &str) -> (String, String) {
+    (
+        format!("{who}: waiting for its secrets, which the runner (isothrum up) delivers"),
+        format!("{who}: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them"),
     )
 }
 

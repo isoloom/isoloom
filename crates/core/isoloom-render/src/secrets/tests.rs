@@ -156,7 +156,8 @@ fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
     let sh = wait("web");
     assert!(sh.contains("if [ \"$n\" -gt 360 ]; then echo"), "{sh}");
     assert!(sh.ends_with("sleep 5; done\n"), "{sh}");
-    assert!(sh.contains("'web: waiting for `isoloom run` to deliver its secrets'"), "{sh}");
+    assert!(sh.contains("'web: waiting for its secrets, which the runner (isothrum up) delivers'"), "{sh}");
+    assert!(!sh.contains('`'), "no backquote, which shellcheck reads as an expansion left unexpanded: {sh}");
 }
 
 #[test]

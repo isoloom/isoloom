@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ esxi
@@ -237,7 +236,7 @@ resource "esxi_guest" "isoloom_router" {
   guest_name            = "iso${var.slot}-router"
   notes                 = "isoloom: windows-hello"
   disk_store            = var.disk_store
-  ovf_source            = lookup(var.images, "ubuntu-24.04")
+  ovf_source            = var.images["ubuntu-24.04"]
   numvcpus              = "1"
   memsize               = "512"
   boot_disk_size        = "10"
@@ -302,7 +301,7 @@ resource "esxi_guest" "web01" {
   guest_name     = "iso${var.slot}-web01"
   notes          = "isoloom: windows-hello"
   disk_store     = var.disk_store
-  ovf_source     = lookup(var.images, "windows-server-2019")
+  ovf_source     = var.images["windows-server-2019"]
   numvcpus       = "2"
   memsize        = "3072"
   boot_disk_size = "20"
@@ -341,7 +340,7 @@ resource "esxi_guest" "isoloom_controller" {
   guest_name     = "iso${var.slot}-controller"
   notes          = "isoloom: windows-hello"
   disk_store     = var.disk_store
-  ovf_source     = lookup(var.images, "ubuntu-24.04")
+  ovf_source     = var.images["ubuntu-24.04"]
   numvcpus       = "1"
   memsize        = "512"
   boot_disk_size = "10"
@@ -368,13 +367,7 @@ resource "esxi_guest" "isoloom_controller" {
       }
     }))
     "metadata.encoding" = "base64"
-    userdata = base64encode(format("#cloud-config\n%s", yamlencode({
-      hostname    = "isoloom-controller"
-      users       = local.users
-      packages    = []
-      write_files = []
-      runcmd      = []
-    })))
+    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "isoloom-controller", users = local.users })))
     "userdata.encoding" = "base64"
   }
   depends_on = [esxi_guest.isoloom_router]

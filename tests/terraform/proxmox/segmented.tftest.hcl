@@ -242,7 +242,7 @@ run "each_machine_reports_its_set_up_in_the_ready_file" {
   command = plan
 
   assert {
-    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.cache.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 8) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready && ", l)[0]] == ["growing the disk", "hosts file", "routes", "volume folders", "provision/cache.sh", "closing the internet", "health check"]
+    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.cache.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 8) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready; ", l)[0]] == ["growing the disk", "hosts file", "routes", "volume folders", "provision/cache.sh", "closing the internet", "health check"]
     error_message = "cache's steps must each say `running: <step>` in the ready file first, in order"
   }
   assert {
@@ -254,11 +254,11 @@ run "each_machine_reports_its_set_up_in_the_ready_file" {
     error_message = "cache's set-up must end by writing `ready`"
   }
   assert {
-    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 6) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready && ", l)[0]] == ["hosts file", "routes", "waiting for cache", "provision/web.sh", "health check"]
+    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 6) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready; ", l)[0]] == ["hosts file", "routes", "waiting for cache", "provision/web.sh", "health check"]
     error_message = "web's steps must each say `running: <step>` first, waiting for cache before its own"
   }
   assert {
-    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.user.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 4) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready && ", l)[0]] == ["hosts file", "routes", "health check"]
+    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.user.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 4) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready; ", l)[0]] == ["hosts file", "routes", "health check"]
     error_message = "user's steps must each say `running: <step>` first"
   }
   assert {

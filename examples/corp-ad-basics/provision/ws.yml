@@ -1,0 +1,8 @@
+# The workstations' own settings, once they are in the domain: a note on every desktop.
+- hosts: domain:!dc01
+  gather_facts: false
+  tasks:
+    - name: A welcome note
+      ansible.windows.win_copy:
+        content: "Welcome to a corp.example workstation.\r\n"
+        dest: C:\Users\Public\Desktop\welcome.txt

@@ -7,7 +7,7 @@ use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, attr, boolean, index, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
-use super::{SHAPE, availability_domain, availability_domains, in_compartment, provider, route_out, ubuntu_images};
+use super::{SHAPE, availability_domain, availability_domains, owned, provider, route_out, ubuntu_images};
 use crate::cloud::docker::Driver;
 use crate::docker_host::{Access, AutoStop, published};
 use crate::module::providers;
@@ -23,10 +23,7 @@ pub(crate) const DRIVER: Driver = Driver {
         ]
     },
     size: None,
-    provider: |_, m| {
-        m.block(provider());
-        Vec::new()
-    },
+    provider,
     resources,
 };
 
@@ -45,9 +42,9 @@ fn resources(env: &Environment, m: &mut Module) -> Access {
     }
 }
 
-/// `resource "<kind>" "env"` in the compartment.
+/// `resource "<kind>" "env"` in the compartment, with its tags.
 fn resource(kind: &str) -> BlockBuilder {
-    in_compartment(crate::module::resource(kind, "env"))
+    owned(crate::module::resource(kind, "env"))
 }
 
 /// In the VCN.

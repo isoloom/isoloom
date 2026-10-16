@@ -28,6 +28,7 @@ import cloud_init
 import infra
 import kubernetes
 import scripts
+import shell_embedded
 import terraform
 import tfcli
 from common import ERROR, PASS, SKIP, WARN, Ctx, Result
@@ -57,6 +58,9 @@ def jobs(ctx: Ctx, found: Found) -> list[Job]:
     work += [(p, "ansible-inventory", lambda p=p: infra.inventory(ctx, p)) for p in found.inventories]
     work += [(p, "ansible-lint", lambda p=p: infra.playbook(ctx, p)) for p in found.playbooks]
     work += [(c[0], "shellcheck", lambda c=c: scripts.shellcheck(ctx, c)) for c in chunks(found.shell, 40)]
+    work += [(p, shell_embedded.VALIDATOR, lambda p=p: shell_embedded.vagrantfile(ctx, p)) for p in found.vagrantfiles]
+    work += [(p, shell_embedded.VALIDATOR, lambda p=p: shell_embedded.module(ctx, p)) for p in found.modules]
+    work += [(p, shell_embedded.VALIDATOR, lambda p=p: shell_embedded.cloud_config(ctx, p)) for p in found.cloud_configs]
     work += [(t, "hadolint", lambda: scripts.hadolint(ctx, found.dockerfiles))]
     work += [(t, "psscriptanalyzer", lambda: scripts.psscriptanalyzer(ctx, found.powershell))]
     work += [(t, "none", lambda: [Result(ctx.rel(f), "none", SKIP, "no validator reads this format") for f in found.unknown])]
