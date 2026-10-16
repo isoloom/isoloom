@@ -163,7 +163,11 @@ fn several_services_each_read_their_own_settings() {
     // Each service keeps the `with:` keys that are its own: demo reads `port`, mini reads `size`.
     let web = resolved[0].ports.iter().find(|(n, _)| n.as_str() == "web").map(|(_, p)| p.port.get());
     assert_eq!(web, Some(81), "demo's web port comes from its `port` setting");
-    assert!(format!("{:?}", resolved[1].configure).contains("--size 2"), "mini applies its `size`: {:?}", resolved[1].configure);
+    assert!(
+        format!("{:?}", resolved[1].configure).contains("--size 2"),
+        "mini applies its `size`: {:?}",
+        resolved[1].configure
+    );
     let nope = crate::testing::lab("debian@12", "[demo, mini]", "{ port: 81, nope: 1 }").unwrap();
     let p = catalogue.resolve(&nope, "web").unwrap_err();
     assert_eq!(p.len(), 1, "{p:?}");
