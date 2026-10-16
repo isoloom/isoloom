@@ -31,7 +31,7 @@ Working document for the local rebuild. It is squashed away with the history at 
 - the Windows leg of Phase 1b's final run;
 - **first:** the launcher's Windows-only Rust code moved during the cleanup has never been compiled (`platform::sys::windows`, the elevate split, job objects, registry, winget ids). Run Windows `pnpm check` and clippy on karen. Once that's clean, raise the launcher's zero-count lints from warn to deny.
 
-## Resume point (session usage limit hit, Fri 2026-10-16 about 10:45; reset 13:30 Paris)
+## Resume point (usage limits hit Fri 2026-10-16: session limit about 10:45, then the **weekly limit**. It resets **Sun 2026-10-18 at 20:00 Paris**. Restart with `/loop continue until the plan is finished`.)
 
 Workers stopped mid-step; their state is safe in their worktrees. Resume each by id with SendMessage, which keeps its context. Start a fresh worker from the worktree only if a resume is refused.
 
@@ -52,7 +52,7 @@ Workers stopped mid-step; their state is safe in their worktrees. Resume each by
 
 | Worker (id) | Worktree / branch | State at stop | Next step |
 |---|---|---|---|
-| Phase 4.2 renderers (`ab16abd1636a84517`) | `isoloom-4.2-render` | **floor renderers landed** (`1acdbe8c`, then `84155a47`); conformance 8/8 | the runner for `image.start: run`, lifting 4.3's last runner refusal; then report. Then start 4.4 cloud-init, 4.5 Ansible and 4.6 conformance |
+| Phase 4.2 renderers (`ab16abd1636a84517`) | — (remove `isoloom-4.2-render`) | **done** (`1acdbe8c` renderers, `69e311bc` the runner for `image.start: run`, `84155a47` the systemd `WorkingDirectory` fix found on a real VirtualBox run; conformance 8/8, `vagrant/virtualbox` tier evidence) | start **4.4 cloud-init** (`shell::script` in `write_files`, `shell::library_file()`), **4.5 Ansible** (match the shell library's guards; reuse the conformance renderer axis; lift `carry::on_vm(Host::Existing)`) and **4.6 conformance** (nginx parity). Follow-up: on VMs, a recipe's `start` steps run once at provisioning; the design wants a boot unit before the services |
 | Phase 3 docker-vm (`aec8376e1618bb59f`) | `isoloom-dvm` (`tmp/dvm`), `isoloom-dvm-manifest` (`tmp/dvm-shared`, the shared guest commit `7f125358` in gates), Isothrum `isothrum-wt/dvm`/`dvm2`, launcher `cyber-ctf-launcher-wt/dvm` | was persisting the VBoxVGA controller in the docker-vm Vagrantfile and a published-port masquerade on Docker host VMs | land the shared commit (`Placed`, `run_manifests`, `run_manifest::guest`, `isoloom_compose::guest`, setup.sh **with a pinned Docker version**, guarded clear); send the SHA to the cloud worker; then docker-vm. Rebase the launcher worktree on `4ae15b1` |
 | Phase 3 clouds (`a781d690309c173fb`) + runner helper (`a0cb135bbe4435ce4`) + cloud launcher (`a0a56435d62ac83c0`) | `isoloom-cloud`, `isoloom-cloud2-pin`, Isothrum `isothrum-wt/cloud2` (`tmp/applyfix`), launcher `cyber-ctf-launcher-wt/cloud` | runner: `wait_s`, sensitive outputs masked (`isothrum@40eb4c5`); launcher import landed (`36088b9`); seal design approved (`Option<Seal>`) | rebase on 5b `edb0d9c4`; adopt the shared guest commit once landed; fix the two gaps the launcher worker found: `Runner::adopt` must accept an `absent` record with no state, and cloud-services `run.json` needs a `region` param replayed at destroy |
 | Phase 5b verify (`a8fa25ccb1210df50`) | — | **done** (`edb0d9c4`: baseline 344 → 0) | the Windows leg is owed (karen down) |
