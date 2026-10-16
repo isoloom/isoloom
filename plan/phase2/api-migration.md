@@ -91,3 +91,8 @@ None of this reaches the launcher or Isothrum, which read `isoloom-targets` (its
 
 28. **A lowered spec's problem has a code:** `isoloom_spec::Problem` (`validate::Problem`) carries `code: syntax::Code` (`UnknownReference` for a name that names nothing, else `InvalidValue`), and `Problem::new(code, at, message)` takes it first. `groups::problems` returns these problems instead of `(path, message)` pairs. The plan places them with their own code instead of reading their wording.
 29. **`model::Machine.before` is gone**, with its checks: the authored spec has no `before`, and lowering always left it empty.
+
+## Phase 4.3, the catalogue engine (the 4.3 unit)
+
+30. **The catalogue resolves `service:`:** `isoloom_catalogue::Catalogue` (`Catalogue::embedded()`, `resolve(&syntax::Spec, machine)` → `Vec<Resolved>`) is the new core crate at rank 1. `Lab` carries it (`Lab::catalogue()`), and `isoloom_plan::lower::lower(source, catalogue, scope)` and `lower::missing_form(source, catalogue, target)` take it. `isoloom_plan::configure::Family` and `codename` are the catalogue's, re-exported; `DaemonTable::common()` is the catalogue's daemon table (`DaemonTable::from(&Catalogue)`).
+31. **`model::Generated` gains `from: BaseImage`** (`Os`, or `Entry`: an entry's official image, whose container keeps its own process, `ContainerProcess::Image`, and whose recipe skips `install`). `model::Configuration::entry(os, install, configure, start, files)` builds an entry's configuration. `resolved.json` lists a service machine's `services` (`entry`, `release`, `source`, `image`).

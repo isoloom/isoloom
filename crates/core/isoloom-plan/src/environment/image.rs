@@ -2,7 +2,7 @@
 //! project's Dockerfile or from the steps Isoloom turns into one) or a VM's OS.
 
 use indexmap::IndexMap;
-use isoloom_spec::model::{Machine, Spec};
+use isoloom_spec::model::{BaseImage, Configuration, Machine, Spec};
 
 use crate::configure::{ContainerProcess, Recipe};
 
@@ -60,6 +60,17 @@ pub(crate) fn generated_dockerfile(machine: &str) -> String {
     format!(".isoloom/docker/build/{machine}/Dockerfile")
 }
 
+/// Configuration `c` as machine `m` runs it in `shape`: a container over its entry's official
+/// image skips `install`, which the image is.
+pub(super) fn configuration(c: &Configuration, shape: MachineShape, m: &Machine) -> Configuration {
+    let official = m.docker.as_ref().and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry);
+    if shape == MachineShape::Container && official {
+        Configuration::entry(c.os, Vec::new(), c.configure.clone(), c.start.clone(), c.files.clone())
+    } else {
+        c.clone()
+    }
+}
+
 /// What machine `name` runs from on the target, in `shape`, its configuration resolved as
 /// `recipe`.
 pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, recipe: Option<&Recipe>) -> Option<Image> {
@@ -76,10 +87,14 @@ pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, reci
             let generated = d.generated.as_ref().map(|g| Build::Generated {
                 dockerfile: generated_dockerfile(name),
                 base: g.base.clone(),
-                // Lowering refuses a container whose services it can't run, so this resolves.
-                process: recipe
-                    .and_then(|r| ContainerProcess::resolve(r, m.command.as_ref(), !m.ports.is_empty()).ok())
-                    .unwrap_or(ContainerProcess::Idle),
+                process: match g.from {
+                    // An entry's official image keeps its own entrypoint and command.
+                    BaseImage::Entry => ContainerProcess::Image,
+                    // Lowering refuses a container whose services it can't run, so this resolves.
+                    _ => recipe
+                        .and_then(|r| ContainerProcess::resolve(r, m.command.as_ref(), !m.ports.is_empty()).ok())
+                        .unwrap_or(ContainerProcess::Idle),
+                },
             });
             Some(Image::Container {
                 reference: Images::of(spec).pull(&tag),

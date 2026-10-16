@@ -85,7 +85,9 @@ pub fn resolve_with(lab: &Lab, instance: Option<u8>) -> Value {
         "reach".into(),
         spec.reach.iter().map(|r| json!({ "from": r.from, "to": r.to, "ports": r.ports })).collect(),
     );
-    out.insert("machines".into(), machines::machines(spec, &docker).into());
+    let mut resolved_machines = machines::machines(spec, &docker);
+    machines::add_services(&mut resolved_machines, lab);
+    out.insert("machines".into(), resolved_machines.into());
     out.insert("start_order".into(), json!(isoloom_plan::addressing::start_order(spec)));
     out.insert("clones".into(), json!(spec.clones));
     out.insert("tools".into(), networks::tools(spec, &docker).into());

@@ -3,15 +3,17 @@
 //! `vm:` blocks, each built from the recipe that gives it ([`super::forms`]).
 
 use indexmap::IndexMap;
-use isoloom_spec::model::{self, DockerImpl, Generated, HttpCheck, MachineFile, MachineSecret, Protocol, SecretMount, VmImpl};
+use isoloom_spec::model::{self, BaseImage, DockerImpl, Generated, HttpCheck, MachineFile, MachineSecret, Protocol, SecretMount, VmImpl};
 use isoloom_spec::syntax::{
     self, Code, EnvValue, FieldPath, FileSource, HealthProbe, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm,
 };
 
-use super::Scope;
-use super::forms::{self, Container, Vm};
+use isoloom_spec::model::Shape;
+
+use super::forms::{self, Container, Service, Vm};
 use super::overrides;
 use super::trail::Trail;
+use super::{Lowering, Scope};
 
 /// A lowered machine, the inputs its files read (the secret each becomes → the input), and what
 /// couldn't be lowered, at the field the author wrote.
@@ -27,16 +29,21 @@ pub(super) fn input_secret(input: &str) -> String {
     format!("input-{}", input.to_ascii_lowercase().replace('_', "-"))
 }
 
-/// Machine `name`, lowered for `scope`.
-pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope, trail: &mut Trail) -> LoweredMachine {
-    let (networks, more_addresses) = addresses(&m.networks);
+/// Machine `name` (as written: `written`), lowered: as its catalogue services make it, when it
+/// runs any.
+pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, trail: &mut Trail) -> LoweredMachine {
+    let service = l.services.get(name);
+    let (m, mut problems) = super::service::effective(name, written, service);
+    let m = m.as_ref();
     let (files, secrets, inputs) = files(name, m, trail);
     trail.machine(name, m);
     let at = FieldPath::new("machines").key(name);
-    let (ports, mut problems) = ports(&at, m);
+    let (ports, unnumbered) = ports(&at, m);
+    problems.extend(unnumbered);
     let (healthcheck, unknown_port) = m.healthcheck.as_ref().map(|h| healthcheck(&at, m, h)).unzip();
     problems.extend(unknown_port.flatten());
-    let healthcheck = healthcheck.flatten();
+    let docker = docker(l, name, m, service);
+    let (networks, more_addresses) = addresses(&m.networks);
     let mut out = model::Machine {
         networks,
         more_addresses,
@@ -53,7 +60,7 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         tmpfs: m.tmpfs.clone(),
         shm_size: m.shm_size.clone(),
         dns: m.dns.clone(),
-        environment: environment(m),
+        environment: environment(m, image_environment(l, docker.as_ref(), service)),
         sysctls: m.sysctls.clone(),
         ulimits: m.ulimits.clone(),
         ports,
@@ -62,17 +69,17 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         resources: m.resources,
         command: m.command.as_ref().map(|c| c.run.clone()),
         working_dir: m.command.as_ref().and_then(|c| c.cwd.clone()),
-        healthcheck,
+        healthcheck: healthcheck.flatten(),
         depends_on: m.depends_on.clone(),
         volumes: m.volumes.clone(),
         files,
         disks: m.disks.clone(),
         access: m.access,
-        docker: docker(source, name, m, scope),
-        vm: vm(source, name, m),
-        external: overrides::external(source, name),
+        vm: vm(l.source, name, m, service),
+        docker,
+        external: overrides::external(l.source, name),
         supplied: false,
-        configuration: configuration(m),
+        configuration: configuration(m, service),
     };
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
@@ -82,6 +89,17 @@ pub(super) fn lower(source: &syntax::Spec, name: &str, m: &syntax::Machine, scop
         machine: out,
         inputs,
         problems,
+    }
+}
+
+/// The variables an entry's official image reads, when the target runs the machine as that
+/// image.
+fn image_environment(l: &Lowering<'_>, docker: Option<&DockerImpl>, service: Service<'_>) -> IndexMap<String, String> {
+    let official = docker.and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry);
+    let container_target = l.scope.target().is_some_and(|t| t.needs() == Shape::Docker);
+    match service {
+        Some(Ok(resolved)) if official && container_target => super::service::image_environment(resolved),
+        _ => IndexMap::new(),
     }
 }
 
@@ -96,8 +114,12 @@ fn environment_inputs(m: &syntax::Machine) -> Vec<String> {
         .collect()
 }
 
-/// What configures the machine in every form: its app's steps on its OS, when it has both.
-fn configuration(m: &syntax::Machine) -> Option<model::Configuration> {
+/// What configures the machine in every form: its services' phases, else its app's steps on its
+/// OS, when it has both.
+fn configuration(m: &syntax::Machine, service: Service<'_>) -> Option<model::Configuration> {
+    if let Some(Ok(resolved)) = service {
+        return super::service::configuration(resolved);
+    }
     let (os, steps) = (m.os?, &m.app()?.steps);
     (!steps.is_empty()).then(|| model::Configuration::app(os, steps.clone()))
 }
@@ -124,15 +146,14 @@ fn addresses(networks: &IndexMap<String, Octets>) -> (IndexMap<String, u8>, Inde
     (first, more)
 }
 
-/// The fixed environment values (an input's goes through `inputs`).
-fn environment(m: &syntax::Machine) -> IndexMap<String, String> {
-    m.environment
-        .iter()
-        .filter_map(|(k, v)| match v {
-            EnvValue::Text(t) => Some((k.clone(), t.clone())),
-            EnvValue::Input(_) | EnvValue::Secret(_) => None,
-        })
-        .collect()
+/// The fixed environment values (an input's goes through `inputs`), after `image`'s (an entry's
+/// official image's): the machine's own win.
+fn environment(m: &syntax::Machine, image: IndexMap<String, String>) -> IndexMap<String, String> {
+    let own = m.environment.iter().filter_map(|(k, v)| match v {
+        EnvValue::Text(t) => Some((k.clone(), t.clone())),
+        EnvValue::Input(_) | EnvValue::Secret(_) => None,
+    });
+    image.into_iter().chain(own).collect()
 }
 
 /// The ports, each named after its key (`at`: the machine's path). A port without its number
@@ -261,7 +282,8 @@ fn value_file(secret: &str, f: &syntax::File, windows: bool) -> MachineSecret {
 }
 
 /// The container form, as a `docker:` block.
-fn docker(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope) -> Option<DockerImpl> {
+fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_>) -> Option<DockerImpl> {
+    let (source, scope) = (l.source, l.scope);
     let idle = m.command.is_none();
     let mut d = DockerImpl {
         image: None,
@@ -279,7 +301,7 @@ fn docker(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope) 
     };
     // No container form: the target refuses the machine there (`refusals`), or the lab lowers
     // it with the forms it has.
-    match forms::container(m).ok()? {
+    match forms::container(m, service).ok()? {
         Container::Supplied => return None,
         Container::Recipe(Recipe::Image(i)) => d.image = Some(i.clone()),
         Container::Recipe(Recipe::Build(b)) => {
@@ -298,6 +320,7 @@ fn docker(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope) 
             d.generated = Some(Generated {
                 os: os.name().to_owned(),
                 base: base.to_owned(),
+                from: BaseImage::Os,
             });
             d.idle = idle;
         }
@@ -305,15 +328,22 @@ fn docker(source: &syntax::Spec, name: &str, m: &syntax::Machine, scope: Scope) 
             d.image = Some(image.to_owned());
             d.idle = idle;
         }
+        Container::Entry { os, image } => {
+            d.generated = Some(Generated {
+                os: os.name().to_owned(),
+                base: image.to_owned(),
+                from: BaseImage::Entry,
+            });
+        }
     }
     Some(d)
 }
 
 /// The VM form, as a `vm:` block: a fresh VM of the OS, set up by the steps a VM runs.
-fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine) -> Option<VmImpl> {
+fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>) -> Option<VmImpl> {
     // No VM form: the target refuses the machine there (`refusals`), or the lab lowers it with
     // the forms it has; a supplied machine has no VM to describe.
-    let Ok(Vm::Os(os)) = forms::vm(m) else { return None };
+    let Ok(Vm::Os(os)) = forms::vm(m, service) else { return None };
     let provision = m
         .app()
         .map(|a| {

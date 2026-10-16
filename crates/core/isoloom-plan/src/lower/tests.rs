@@ -5,6 +5,11 @@ use isoloom_spec::syntax::Code;
 
 use super::*;
 
+/// The catalogue built into Isoloom.
+fn built_in() -> &'static isoloom_catalogue::Catalogue {
+    crate::testing::lab("version: 1\nname: t\n").catalogue()
+}
+
 /// A design example of `plan/phase2/spec-examples`, parsed.
 fn example(name: &str) -> syntax::Spec {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -16,7 +21,7 @@ fn example(name: &str) -> syntax::Spec {
 }
 
 fn on(name: &str, target: Target) -> Lowered {
-    lower(&example(name), Scope::Target(target))
+    lower(&example(name), built_in(), Scope::Target(target))
 }
 
 #[test]
@@ -115,7 +120,7 @@ fn a_windows_domain_lowers_onto_vms() {
 
 #[test]
 fn the_lab_scope_applies_no_targets_own_facts() {
-    let l = lower(&example("legacy-intranet"), Scope::Lab);
+    let l = lower(&example("legacy-intranet"), built_in(), Scope::Lab);
     assert!(!l.spec.machines["status"].docker.as_ref().unwrap().lxc && l.refusals.is_empty());
     assert_eq!(l.trail.path("machines.portal.ports[0].publish").as_str(), "machines.portal.ports.web.publish");
 }
@@ -186,7 +191,7 @@ fn what_lowering_cant_lower_is_a_problem_at_the_authored_field() {
     let lab = crate::testing::lab(
         "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n    ports: { site: { protocol: http }, admin: 8080 }\n    healthcheck: { http: { port: status, path: /health } }\n",
     );
-    let l = lower(lab.source(), Scope::Lab);
+    let l = lower(lab.source(), built_in(), Scope::Lab);
     let found: Vec<(Code, &str)> = l.problems.iter().map(|p| (p.code, p.path.as_str())).collect();
     assert_eq!(
         found,
@@ -209,7 +214,7 @@ fn a_healthcheck_page_on_a_named_port_takes_its_number() {
     let lab = crate::testing::lab(
         "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n    ports: { site: 8000 }\n    healthcheck: { http: { port: site, path: /health } }\n",
     );
-    let l = lower(lab.source(), Scope::Lab);
+    let l = lower(lab.source(), built_in(), Scope::Lab);
     assert_eq!(l.problems, []);
     let page = l.spec.machines["web"].healthcheck.as_ref().and_then(|h| h.http.clone()).expect("a page");
     assert_eq!((page.port, page.path.as_str()), (8000, "/health"));
@@ -220,11 +225,11 @@ fn a_dns_server_named_by_machine_is_its_address_on_a_network_both_share() {
     let lab = crate::testing::lab(
         "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  dns: { networks: { a: 53, b: 53 }, app: { image: coredns } }\n  pc: { networks: { b: 10 }, dns: { servers: [dns, 9.9.9.9] }, app: { image: x } }\n  far: { networks: { a: 11 }, dns: { servers: [pc] }, app: { image: x } }\n",
     );
-    let l = lower(lab.source(), Scope::Lab);
+    let l = lower(lab.source(), built_in(), Scope::Lab);
     let servers = |m: &str| l.spec.machines[m].dns.as_ref().map(|d| d.servers.clone()).unwrap_or_default();
     assert_eq!(servers("pc"), ["10.2.0.53", "9.9.9.9"]);
     assert_eq!(servers("far"), ["pc"], "they share no network: the name stays");
-    let docker = lower(lab.source(), Scope::Target(Target::Docker));
+    let docker = lower(lab.source(), built_in(), Scope::Target(Target::Docker));
     assert!(docker.spec.machines["pc"].dns.as_ref().is_some_and(|d| d.servers[0] != "dns"));
 }
 
@@ -232,7 +237,7 @@ fn a_dns_server_named_by_machine_is_its_address_on_a_network_both_share() {
 fn the_controller_takes_its_vagrant_box_from_the_overrides() {
     let controller = |overrides: &str| {
         let yaml = format!("version: 1\nname: t\nmachines:\n  m: {{ os: debian@12 }}\n{overrides}");
-        lower(crate::testing::lab(&yaml).source(), Scope::Lab).spec.controller
+        lower(crate::testing::lab(&yaml).source(), built_in(), Scope::Lab).spec.controller
     };
     assert_eq!(controller(""), None);
     let boxed = controller("overrides: { vagrant: { controller: { box: corp/ansible, box_version: '2.1' } } }\n").and_then(|c| c.image);
@@ -253,14 +258,20 @@ fn the_configuration_model_waits_for_its_renderers_on_each_form() {
     let yaml = "version: 1\nname: parcels\nnetworks: { lab: { cidr: 10.63.0.0/24 } }\nmachines:\n  api:\n    os: debian@12\n    networks: { lab: 20 }\n    ports: { api: { port: 8000, protocol: http } }\n    app:\n      steps:\n        - packages: [python3, python3-venv]\n        - group: { name: parcels, gid: 1500, system: true }\n        - copy: { from: api/, to: /srv/parcels/app/, owner: parcels }\n        - command: python3 -m venv /srv/parcels/venv\n          creates: /srv/parcels/venv/bin/python\n        - firewall: { allow: [api] }\n        - service: { name: parcels-api, run: [/srv/parcels/venv/bin/gunicorn, parcels.wsgi:app], user: parcels }\n";
     let source = syntax::parse(yaml).unwrap_or_else(|p| panic!("{p:?}"));
     assert_eq!(crate::Lab::new(source.clone()).problems(), []);
-    let refused = |t: Target| -> Vec<String> { lower(&source, Scope::Target(t)).refusals.iter().map(|r| r.path.to_string()).collect() };
+    let refused = |t: Target| -> Vec<String> {
+        lower(&source, built_in(), Scope::Target(t))
+            .refusals
+            .iter()
+            .map(|r| r.path.to_string())
+            .collect()
+    };
     let at = |i: usize| format!("machines.api.app.steps[{i}]");
     // A container builds the packages and the copy, needs nothing for the firewall, and waits for
     // the group, the command and the runner that runs the service.
     assert_eq!(refused(Target::Docker), [at(1), at(3), at(5)]);
     // A VM runs scripts only until then.
     assert_eq!(refused(Target::Vagrant), [at(0), at(1), at(2), at(3), at(4), at(5)]);
-    let first = lower(&source, Scope::Target(Target::Vagrant)).refusals.remove(0);
+    let first = lower(&source, built_in(), Scope::Target(Target::Vagrant)).refusals.remove(0);
     assert_eq!(
         first.reason,
         "a `packages` step on a VM is rendered by the configuration renderers, in Phase 4.2"

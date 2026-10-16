@@ -611,3 +611,42 @@ fn cloud_module_without_tf_files() {
     let found = file_problems(&cloud("  terraform: tf\n"), &dir);
     assert_eq!(found, ["cloud.terraform: `tf` holds no .tf file: it must be a Terraform root module"]);
 }
+
+#[test]
+fn a_catalogue_service_names_an_entry_a_release_an_os_and_settings_it_has() {
+    let service = |s: &str| with_machine(&format!("{{ networks: {{ lab: 5 }}, {s} }}"));
+    assert_problem(
+        &service("os: debian@12, service: nginz"),
+        "machines.m.service",
+        "the catalogue has no entry `nginz`",
+    );
+    assert_problem(
+        &service("os: debian@12, service: nginx@0.9"),
+        "machines.m.service",
+        "nginx has no release `0.9`",
+    );
+    assert_problem(
+        &service("os: kali, service: nginx"),
+        "machines.m.os",
+        "nginx 1.30.6 doesn't run on kali@rolling",
+    );
+    assert_problem(
+        &service("os: debian@12, service: nginx, with: { prot: 81 }"),
+        "machines.m.with.prot",
+        "nginx has no setting `prot`",
+    );
+    assert_problem(
+        &service("os: debian@12, service: nginx, with: { port: http }"),
+        "machines.m.with.port",
+        "`port` is a port number",
+    );
+    assert_problem(
+        &service("os: debian@12, service: nginx, with: { php_fpm: 'nope:9000' }"),
+        "machines.m.with.php_fpm",
+        "no machine named `nope`",
+    );
+    assert_eq!(
+        problems(&service("os: debian@12, service: nginx@1.31, with: { port: 8080 }")),
+        Vec::<String>::new()
+    );
+}

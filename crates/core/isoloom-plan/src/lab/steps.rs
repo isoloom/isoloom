@@ -72,6 +72,24 @@ pub(super) fn step_files(source: &syntax::Spec, dir: &Path) -> Vec<Problem> {
     out
 }
 
+/// The project files and folders the catalogue services' settings name (`with: { root: site/
+/// }`), each present in `dir`.
+pub(super) fn setting_files(source: &syntax::Spec, catalogue: &isoloom_catalogue::Catalogue, dir: &Path) -> Vec<Problem> {
+    let mut out = Vec::new();
+    for name in source.machines.keys() {
+        let Ok(resolved) = catalogue.resolve(source, name) else { continue };
+        for (setting, value) in resolved.iter().flat_map(|r| r.settings.iter()) {
+            let (isoloom_catalogue::SettingValue::Folder(path) | isoloom_catalogue::SettingValue::File(path)) = value else {
+                continue;
+            };
+            if !dir.join(path.as_str()).exists() {
+                out.push(missing(FieldPath::new("machines").key(name).key("with").key(setting.as_str()), path.as_str()));
+            }
+        }
+    }
+    out
+}
+
 /// A project file the spec names that isn't there.
 fn missing(at: FieldPath, path: &str) -> Problem {
     Problem::new(Code::InvalidValue, at, format!("`{path}` doesn't exist in the project folder"))

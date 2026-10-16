@@ -55,6 +55,34 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Map<String, V
     out
 }
 
+/// Each service machine's catalogue services (design §4.9, step 8): the entry, the release its
+/// version picked, where it comes from, and the official image a container runs where its OS
+/// has one (else the container is built from the OS's image).
+pub(super) fn add_services(machines: &mut Map<String, Value>, lab: &isoloom_plan::Lab) {
+    for (name, entry) in machines.iter_mut() {
+        let Ok(resolved) = lab.catalogue().resolve(lab.source(), name) else {
+            continue;
+        };
+        if resolved.is_empty() {
+            continue;
+        }
+        let services: Vec<Value> = resolved
+            .iter()
+            .map(|r| {
+                json!({
+                    "entry": r.entry.as_str(),
+                    "release": r.release.as_str(),
+                    "source": r.source.id(),
+                    "image": r.image.as_ref().map(|i| i.reference.clone()),
+                })
+            })
+            .collect();
+        if let Value::Object(m) = entry {
+            m.insert("services".into(), Value::Array(services));
+        }
+    }
+}
+
 /// The machine's size, the defaults filled in.
 fn resources(m: &Machine) -> Value {
     json!({

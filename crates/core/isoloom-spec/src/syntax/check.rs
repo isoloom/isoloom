@@ -1,5 +1,5 @@
 //! The checks a parsed spec needs beyond its types: what a machine is (its `os`, its recipe, a
-//! catalogue service), where its values come from (inputs, secrets, sensitive values), and what
+//! catalogue service's fields the spec alone rules on), where its values come from (inputs, secrets, sensitive values), and what
 //! its names refer to (ports, overrides, the message's placeholders). The checks on the parts
 //! this format keeps from the earlier one (networks, addresses, reach, volumes, checks) run on
 //! the lowered spec ([`crate::validate`]).
@@ -48,22 +48,10 @@ fn what_it_is(at: &FieldPath, m: &Machine, out: &mut Problems) {
         }
         _ => {}
     }
-    if let Kind::Service(s) = &m.kind {
-        for (i, service) in s.services.iter().enumerate() {
-            let path = if s.services.len() == 1 {
-                at.key("service")
-            } else {
-                at.key("service").index(i)
-            };
-            let reason = format!("no catalogue entry `{}` yet: the catalogue arrives in Phase 4", service.name());
-            out.push(
-                Problem::new(Code::UnknownReference, path, reason)
-                    .fix("until then, a custom app: `app: { image: <ref> }` or `app: { steps: [...] }` with `os`"),
-            );
-        }
-        if m.command.is_some() {
-            out.push(Problem::new(Code::Conflict, at.key("command"), "a catalogue service runs its own process").fix("leave `command` out, or use `app:`"));
-        }
+    // The catalogue's entries, releases and settings are the plan's to resolve (it has the
+    // catalogue): here, what the spec alone says.
+    if matches!(m.kind, Kind::Service(_)) && m.command.is_some() {
+        out.push(Problem::new(Code::Conflict, at.key("command"), "a catalogue service runs its own process").fix("leave `command` out, or use `app:`"));
     }
     if let Some(a) = m.app() {
         for (i, step) in a.steps.iter().enumerate() {
@@ -93,6 +81,16 @@ fn process(at: &FieldPath, m: &Machine, out: &mut Problems) {
     }
     let service = matches!(m.kind, Kind::Service(_));
     for (name, p) in &m.ports {
+        if p.port.is_some() && service {
+            out.push(
+                Problem::new(
+                    Code::Conflict,
+                    at.key("ports").key(name.as_str()).key("port"),
+                    "a catalogue service's entry gives its ports' numbers",
+                )
+                .fix("leave `port` out (publish it with `publish`), and change the number through `with:`"),
+            );
+        }
         if p.port.is_none() && !service {
             out.push(
                 Problem::new(Code::MissingField, at.key("ports").key(name.as_str()).key("port"), "a port says its number")

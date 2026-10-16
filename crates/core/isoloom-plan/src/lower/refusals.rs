@@ -7,39 +7,78 @@ use isoloom_spec::model::{Shape, Target};
 use isoloom_spec::syntax::{self, Code, FieldPath, Problem};
 
 use super::carry;
-use super::forms::{self, Container, Vm};
+use super::forms::{self, Container, Service, Vm};
 use super::overrides;
+use super::service::Services;
 use crate::configure::{self, DaemonTable};
 
-/// The machines `target` has no form for, in machine order.
-pub(super) fn forms(source: &syntax::Spec, target: Target) -> Vec<Problem> {
+/// The machines `target` has no form for, in machine order (`services`: the lab's catalogue
+/// services, resolved).
+pub(super) fn forms(source: &syntax::Spec, services: &Services, target: Target) -> Vec<Problem> {
     if source.cloud.is_some() {
         return Vec::new();
     }
-    source.machines.iter().filter_map(|(name, m)| form(source, name, m, target)).collect()
+    source
+        .machines
+        .iter()
+        .filter_map(|(name, m)| form(source, name, m, services.get(name), target))
+        .collect()
 }
 
 /// Everything `target` refuses in `source`, in machine order.
-pub(super) fn of(source: &syntax::Spec, target: Target) -> Vec<Problem> {
+pub(super) fn of(source: &syntax::Spec, services: &Services, target: Target) -> Vec<Problem> {
     if source.cloud.is_some() {
         return Vec::new();
     }
     let mut out = Vec::new();
     for (name, m) in &source.machines {
-        out.extend(form(source, name, m, target));
-        if runs_as_vm(source, name, m, target) {
+        let service = services.get(name);
+        out.extend(form(source, name, m, service, target));
+        if runs_as_vm(source, name, m, service, target) {
             out.extend(vm_steps(name, m));
-        } else if built_from_steps(source, name, m, target) {
+            out.extend(service_steps(name, service, Carrier::Vm));
+        } else if let Some(carrier) = built(source, name, m, service, target) {
             out.extend(carry::container_refusals(name, m));
+            out.extend(service_steps(name, service, carrier));
         }
     }
     out
 }
 
+/// What renders a service machine's recipe on the target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Carrier {
+    /// The VM's set-up: every phase.
+    Vm,
+    /// A build from the OS's image: every phase.
+    Built,
+    /// A thin build over the entry's official image: `configure` and `start`.
+    Image,
+}
+
+/// The first step of a service machine's recipe that what renders it can't carry yet, as a
+/// `refused` problem at its `service`.
+fn service_steps(name: &str, service: Service<'_>, carrier: Carrier) -> Option<Problem> {
+    let Some(Ok(resolved)) = service else { return None };
+    resolved.iter().find_map(|r| {
+        let install = if carrier == Carrier::Image { &[][..] } else { &r.install[..] };
+        let mut steps = install.iter().chain(&r.configure).chain(&r.start);
+        let (reason, fix) = steps.find_map(|s| if carrier == Carrier::Vm { carry::on_vm(s) } else { carry::in_container(s) })?;
+        let at = FieldPath::new("machines").key(name).key("service");
+        Some(
+            Problem::new(Code::Refused, at, format!("{}'s recipe: {reason}", r.entry)).fix(if carrier == Carrier::Vm {
+                "a container target for now".to_owned()
+            } else {
+                fix
+            }),
+        )
+    })
+}
+
 /// The form `target` needs that the machine lacks, if it lacks it.
-fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) -> Option<Problem> {
-    let container = forms::container(m);
-    let vm = forms::vm(m);
+fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, target: Target) -> Option<Problem> {
+    let container = forms::container(m, service);
+    let vm = forms::vm(m, service);
     match target.needs() {
         Shape::Docker => container.err().map(|no| no.refusal(name)),
         Shape::Vm => vm.err().map(|no| no.refusal(name)),
@@ -64,24 +103,30 @@ fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) 
 }
 
 /// Whether `target` runs machine `name` as a VM.
-fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) -> bool {
-    let vm = matches!(forms::vm(m), Ok(Vm::Os(_)));
+fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, target: Target) -> bool {
+    let vm = matches!(forms::vm(m, service), Ok(Vm::Os(_)));
     match target.needs() {
         Shape::Vm | Shape::External => vm,
         Shape::VmOrLxc => vm && !overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
-        Shape::Either => vm && forms::container(m).is_err(),
+        Shape::Either => vm && forms::container(m, service).is_err(),
         Shape::Docker | Shape::Cloud => false,
     }
 }
 
-/// Whether `target` runs machine `name` as a container built from its steps.
-fn built_from_steps(source: &syntax::Spec, name: &str, m: &syntax::Machine, target: Target) -> bool {
-    let steps = matches!(forms::container(m), Ok(Container::Steps { .. }));
-    match target.needs() {
-        Shape::Docker | Shape::Either => steps,
-        Shape::VmOrLxc => steps && overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
+/// How `target` builds machine `name`'s container from a recipe, when it does: from the OS's
+/// image (its steps, or its entry's recipe), or over its entry's official image.
+fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, target: Target) -> Option<Carrier> {
+    let carrier = match forms::container(m, service) {
+        Ok(Container::Steps { .. }) => Carrier::Built,
+        Ok(Container::Entry { .. }) => Carrier::Image,
+        _ => return None,
+    };
+    let container = match target.needs() {
+        Shape::Docker | Shape::Either => true,
+        Shape::VmOrLxc => overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
         Shape::Vm | Shape::External | Shape::Cloud => false,
-    }
+    };
+    container.then_some(carrier)
 }
 
 /// The steps machine `name`'s VM can't run: those its family can't carry at all, then those
@@ -127,7 +172,12 @@ overrides:
 
     /// What `target` refuses, as (path, code).
     fn refused_on(target: Target) -> Vec<String> {
-        of(testing::lab(LAB).source(), target).iter().map(|p| p.path.to_string()).collect()
+        on(&testing::lab(LAB), target).iter().map(|p| p.path.to_string()).collect()
+    }
+
+    /// What `target` refuses in `lab`.
+    fn on(lab: &crate::Lab, target: Target) -> Vec<Problem> {
+        of(lab.source(), &Services::of(lab.catalogue(), lab.source()), target)
     }
 
     #[test]
@@ -153,8 +203,8 @@ overrides:
         let l = testing::lab(
             "version: 1\nname: t\nmachines:\n  ct: { os: debian@12, app: { image: alpine, steps: [{ copy: { from: f, to: /f } }] } }\noverrides: { proxmox: { machines: { ct: { lxc: true } } } }\n",
         );
-        assert_eq!(of(l.source(), Target::Proxmox), []);
-        assert_eq!(of(l.source(), Target::Vagrant).len(), 1, "a VM doesn't run a copy step yet");
+        assert_eq!(on(&l, Target::Proxmox), []);
+        assert_eq!(on(&l, Target::Vagrant).len(), 1, "a VM doesn't run a copy step yet");
     }
 
     #[test]
@@ -162,7 +212,7 @@ overrides:
         let l = testing::lab(
             "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: postgres }\n",
         );
-        let found: Vec<String> = of(l.source(), Target::Hybrid).iter().map(|p| p.path.to_string()).collect();
+        let found: Vec<String> = on(&l, Target::Hybrid).iter().map(|p| p.path.to_string()).collect();
         assert_eq!(found, ["machines.db.app.steps[0]", "machines.svc.service"]);
         assert_eq!(
             refused_on(Target::Hybrid),
@@ -173,7 +223,7 @@ overrides:
 
     #[test]
     fn external_needs_a_host_for_every_machine_but_the_supplied_one() {
-        let found = of(testing::lab(LAB).source(), Target::External);
+        let found = on(&testing::lab(LAB), Target::External);
         let paths: Vec<&str> = found.iter().map(|p| p.path.as_str()).collect();
         assert_eq!(
             paths,
@@ -190,7 +240,7 @@ overrides:
     #[test]
     fn a_cloud_services_lab_refuses_nothing() {
         let l = testing::lab("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n");
-        assert_eq!(of(l.source(), Target::CloudServices), []);
-        assert_eq!(forms(l.source(), Target::Vagrant), []);
+        assert_eq!(on(&l, Target::CloudServices), []);
+        assert_eq!(forms(l.source(), &Services::default(), Target::Vagrant), []);
     }
 }

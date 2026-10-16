@@ -200,6 +200,7 @@ fn a_generated_image_needs_no_image_or_build() {
         d.generated = Some(crate::model::Generated {
             os: "debian-12".into(),
             base: "debian@sha256:0".into(),
+            from: crate::model::BaseImage::Os,
         });
     }
     assert_eq!(crate::validate(&spec), Vec::new());

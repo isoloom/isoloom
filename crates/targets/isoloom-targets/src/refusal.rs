@@ -99,7 +99,7 @@ pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<Clouds> {
 /// that rules it out.
 #[must_use]
 pub fn not_possible_reason(lab: &Lab, t: Target) -> String {
-    if let Some(missing) = isoloom_plan::lower::missing_form(lab.source(), t) {
+    if let Some(missing) = isoloom_plan::lower::missing_form(lab.source(), lab.catalogue(), t) {
         missing.line()
     } else if t == Target::Hybrid && !isoloom_spec::targets::mixed(&lab.spec()) {
         "only when some machines are containers and others are VMs".to_owned()

@@ -33,9 +33,11 @@ fn a_machine_says_what_it_is() {
 }
 
 #[test]
-fn a_catalogue_service_waits_for_phase_4() {
-    let found = problems("machines:\n  db: { os: debian@12, networks: { lab: 10 }, service: postgres@16 }\n");
-    assert!(has(&found, Code::UnknownReference, "machines.db.service"), "{found:?}");
+fn a_catalogue_service_is_the_plans_to_resolve_and_its_port_numbers_the_entry_ones() {
+    let entry = problems("machines:\n  db: { os: debian@12, networks: { lab: 10 }, service: postgres@16 }\n");
+    assert_eq!(entry, [], "the plan resolves the entry against the catalogue");
+    let numbered = problems("machines:\n  db: { os: debian@12, networks: { lab: 10 }, service: postgres, ports: { pg: { port: 5433 } } }\n");
+    assert!(has(&numbered, Code::Conflict, "machines.db.ports.pg.port"), "{numbered:?}");
 }
 
 #[test]

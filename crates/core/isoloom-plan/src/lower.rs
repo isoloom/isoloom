@@ -12,11 +12,13 @@ mod forms;
 mod machine;
 mod overrides;
 mod refusals;
+mod service;
 mod trail;
 
 pub use trail::Trail;
 
 use indexmap::IndexMap;
+use isoloom_catalogue::Catalogue;
 use isoloom_spec::model::{self, Controller, Group, SecretSource, Target, VmImage};
 use isoloom_spec::syntax::{self, Problem};
 
@@ -58,15 +60,29 @@ pub struct Lowered {
     pub problems: Vec<Problem>,
 }
 
-/// Lowers `source` for `scope`.
+/// What lowering reads besides a machine: the spec, the scope, and the lab's catalogue services,
+/// resolved once.
+pub(super) struct Lowering<'a> {
+    source: &'a syntax::Spec,
+    scope: Scope,
+    services: &'a service::Services,
+}
+
+/// Lowers `source` for `scope`, its catalogue services resolved in `catalogue`.
 #[must_use]
-pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
+pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowered {
     let mut trail = Trail::default();
     let mut secrets = source.secrets.clone();
     let mut machines = IndexMap::new();
-    let mut problems = Vec::new();
+    let services = service::Services::of(catalogue, source);
+    let mut problems = services.problems();
+    let l = Lowering {
+        source,
+        scope,
+        services: &services,
+    };
     for (name, m) in &source.machines {
-        let lowered = machine::lower(source, name, m, scope, &mut trail);
+        let lowered = machine::lower(&l, name, m, &mut trail);
         for (secret, input) in lowered.inputs {
             secrets.insert(secret, SecretSource::Input { input });
         }
@@ -97,7 +113,7 @@ pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
         clones: source.clones.clone(),
     };
     machine::resolve_dns(&mut spec, scope);
-    let refusals = scope.target().map(|t| refusals::of(source, t)).unwrap_or_default();
+    let refusals = scope.target().map(|t| refusals::of(source, &services, t)).unwrap_or_default();
     trail.inputs(source);
     // VLANs written under their LAN become networks of their own, as the backends expect.
     let spec = match isoloom_spec::vlans::flatten(spec.clone()) {
@@ -116,10 +132,10 @@ pub fn lower(source: &syntax::Spec, scope: Scope) -> Lowered {
 }
 
 /// The first machine `target` has no form for, as a `refused` problem at the field that rules it
-/// out: the target can't run the lab at all.
+/// out: the target can't run the lab at all (its catalogue services resolved in `catalogue`).
 #[must_use]
-pub fn missing_form(source: &syntax::Spec, target: Target) -> Option<Problem> {
-    refusals::forms(source, target).into_iter().next()
+pub fn missing_form(source: &syntax::Spec, catalogue: &Catalogue, target: Target) -> Option<Problem> {
+    refusals::forms(source, &service::Services::of(catalogue, source), target).into_iter().next()
 }
 
 /// The groups, by their members (their shared fields are already in the machines).

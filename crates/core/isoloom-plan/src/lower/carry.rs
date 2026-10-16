@@ -75,20 +75,31 @@ pub(super) fn vm_refusals(name: &str, m: &syntax::Machine) -> Vec<Problem> {
 /// problems at each step.
 pub(super) fn container_refusals(name: &str, m: &syntax::Machine) -> Vec<Problem> {
     let Some(app) = m.app() else { return Vec::new() };
-    let refused = |(i, s): (usize, &Step)| {
-        let (reason, fix) = match s {
-            Step::Run { .. } | Step::Copy(_) | Step::Firewall(_) => return None,
-            Step::Packages(p) if p.iter().all(|p| p.version.is_none()) => return None,
-            Step::Packages(_) => (format!("a pinned package in a container {LATER}"), "leave the version out for now".to_owned()),
-            Step::Service(_) => (
-                format!("a service in a container runs under Isoloom's runner, which {LATER}"),
-                "`command:` (the service in the foreground) for now".to_owned(),
-            ),
-            _ => (format!("a `{}` step in a container {LATER}", s.kind()), MEANWHILE.to_owned()),
-        };
-        Some(Problem::new(syntax::Code::Refused, step(name, i), reason).fix(fix))
-    };
+    let refused = |(i, s): (usize, &Step)| in_container(s).map(|(reason, fix)| Problem::new(syntax::Code::Refused, step(name, i), reason).fix(fix));
     app.steps.iter().enumerate().filter_map(refused).collect()
+}
+
+/// Why a container can't carry step `s` yet, and what to write meanwhile.
+pub(super) fn in_container(s: &Step) -> Option<(String, String)> {
+    Some(match s {
+        Step::Run { .. } | Step::Copy(_) | Step::Firewall(_) => return None,
+        Step::Packages(p) if p.iter().all(|p| p.version.is_none()) => return None,
+        Step::Packages(_) => (format!("a pinned package in a container {LATER}"), "leave the version out for now".to_owned()),
+        Step::Service(_) => (
+            format!("a service in a container runs under Isoloom's runner, which {LATER}"),
+            "`command:` (the service in the foreground) for now".to_owned(),
+        ),
+        _ => (format!("a `{}` step in a container {LATER}", s.kind()), MEANWHILE.to_owned()),
+    })
+}
+
+/// Why a VM can't carry step `s` of a catalogue entry's recipe yet, and what to write meanwhile:
+/// its set-up runs scripts, playbooks and reboots only.
+pub(super) fn on_vm(s: &Step) -> Option<(String, String)> {
+    match s {
+        Step::Run { .. } | Step::Reboot | Step::Playbook(_) => None,
+        _ => Some((format!("a `{}` step on a VM {LATER}", s.kind()), MEANWHILE.to_owned())),
+    }
 }
 
 /// Step `i` of machine `name`.

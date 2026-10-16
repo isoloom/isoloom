@@ -39,6 +39,19 @@ impl Configuration {
         }
     }
 
+    /// A catalogue entry's configuration on `os`: its three phases, resolved, and the texts of
+    /// its templates by the `from` its steps name.
+    #[must_use]
+    pub fn entry(os: OsRef, install: Vec<Step>, configure: Vec<Step>, start: Vec<Step>, files: BTreeMap<ProjectPath, String>) -> Configuration {
+        Configuration {
+            os,
+            install,
+            configure,
+            start,
+            files,
+        }
+    }
+
     /// Its steps, phase after phase.
     pub fn steps(&self) -> impl Iterator<Item = &Step> {
         self.install.iter().chain(&self.configure).chain(&self.start)

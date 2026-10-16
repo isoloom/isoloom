@@ -67,8 +67,23 @@ pub struct DockerImpl {
 pub struct Generated {
     /// The OS's image-table name (`debian-12`): its package installer.
     pub os: String,
-    /// The OS's official image, pinned by digest: the `FROM`.
+    /// The image it starts `FROM`, pinned by digest.
     pub base: String,
+    /// What that image is.
+    pub from: BaseImage,
+}
+
+/// What a generated image starts from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum BaseImage {
+    /// The OS's official image: the configuration installs everything, and the container runs
+    /// the recipe's services (or the machine's command, or nothing).
+    #[default]
+    Os,
+    /// A catalogue entry's official image, whose OS is the machine's: the image is the entry's
+    /// `install` phase, and the container keeps the image's own entrypoint and command.
+    Entry,
 }
 
 /// A network appliance image (see [`DockerImpl::appliance`]). The images aren't Isoloom's to

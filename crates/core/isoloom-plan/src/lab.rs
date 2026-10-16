@@ -7,9 +7,10 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::sync::OnceLock;
 
+use isoloom_catalogue::Catalogue;
 use isoloom_spec::images::Table;
 use isoloom_spec::model::{self, Target};
-use isoloom_spec::syntax::{self, FieldPath, Problem, Problems};
+use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems};
 
 use crate::lower::{Lowered, Scope, lower};
 
@@ -20,7 +21,15 @@ mod steps;
 pub struct Lab {
     source: syntax::Spec,
     images: Table,
+    catalogue: &'static Catalogue,
     memo: Memo,
+}
+
+/// The catalogue built into Isoloom, or an empty one when it doesn't load (its own tests rule
+/// that out; [`Lab::problems`] says so at each service it would have resolved).
+fn built_in() -> &'static Catalogue {
+    static EMPTY: OnceLock<Catalogue> = OnceLock::new();
+    Catalogue::embedded().unwrap_or_else(|_| EMPTY.get_or_init(Catalogue::default))
 }
 
 /// [`Scope::Lab`], then one scope per target of [`Target::ALL`].
@@ -60,6 +69,7 @@ impl Lab {
         Lab {
             source,
             images: Table::default(),
+            catalogue: built_in(),
             memo: Memo::default(),
         }
     }
@@ -87,6 +97,12 @@ impl Lab {
         &self.source
     }
 
+    /// The catalogue its services resolve in: Isoloom's own.
+    #[must_use]
+    pub fn catalogue(&self) -> &'static Catalogue {
+        self.catalogue
+    }
+
     /// The spec lowered for `scope`, the image table applied.
     #[must_use]
     pub fn lowered(&self, scope: Scope) -> Lowered {
@@ -98,8 +114,8 @@ impl Lab {
     /// The spec lowered for `scope` before the image table, lowered once.
     fn raw(&self, scope: Scope) -> Cow<'_, Lowered> {
         match slot(scope).and_then(|i| self.memo.lowered.get(i)) {
-            Some(cell) => Cow::Borrowed(cell.get_or_init(|| lower(&self.source, scope))),
-            None => Cow::Owned(lower(&self.source, scope)),
+            Some(cell) => Cow::Borrowed(cell.get_or_init(|| lower(&self.source, self.catalogue, scope))),
+            None => Cow::Owned(lower(&self.source, self.catalogue, scope)),
         }
     }
 
@@ -127,7 +143,7 @@ impl Lab {
         Target::ALL
             .into_iter()
             .filter(|t| *t != Target::CloudServices)
-            .filter(|t| crate::lower::missing_form(&self.source, *t).is_none())
+            .filter(|t| crate::lower::missing_form(&self.source, self.catalogue, *t).is_none())
             .filter(|t| *t != Target::Hybrid || isoloom_spec::targets::mixed(&self.spec()))
             .filter(|t| self.source.targets.as_ref().is_none_or(|wanted| wanted.contains(t)))
             .collect()
@@ -151,13 +167,23 @@ impl Lab {
     /// [`Lab::problems`], worked out.
     fn find_problems(&self) -> Problems {
         let mut out = syntax::check(&self.source);
+        if let Err(broken) = Catalogue::embedded() {
+            add(
+                &mut out,
+                self.services()
+                    .map(|at| Problem::new(Code::Refused, at, format!("this Isoloom's catalogue doesn't load: {broken}"))),
+            );
+        }
         let lowered = self.raw(Scope::Lab);
+        // The catalogue's problems (and the entries' ports and data a machine conflicts with)
+        // say what is wrong with a service machine better than its lowered form would.
+        add(&mut out, lowered.problems.iter().cloned());
         let model: Vec<Problem> = isoloom_spec::validate(&lowered.spec)
             .iter()
             .map(|p| translated(&lowered, p))
             .filter(|p| !follows_from(&out, p, &self.source))
             .collect();
-        add(&mut out, lowered.problems.iter().cloned().chain(model));
+        add(&mut out, model);
         // What only a target's overrides set (an existing network or volume) is checked once
         // lowered for that target.
         for (key, target) in override_targets(&self.source.overrides) {
@@ -182,6 +208,7 @@ impl Lab {
             isoloom_spec::validate_files(&lowered.spec, dir).iter().map(|p| translated(&lowered, p)),
         );
         add(&mut out, steps::step_files(&self.source, dir));
+        add(&mut out, steps::setting_files(&self.source, self.catalogue, dir));
         self.sorted(out)
     }
 
@@ -194,6 +221,15 @@ impl Lab {
 }
 
 impl Lab {
+    /// The `service` field of each machine that runs catalogue services.
+    fn services(&self) -> impl Iterator<Item = FieldPath> + '_ {
+        self.source
+            .machines
+            .iter()
+            .filter(|(_, m)| matches!(m.kind, syntax::Kind::Service(_)))
+            .map(|(name, _)| FieldPath::new("machines").key(name).key("service"))
+    }
+
     /// `p` placed, a clone's field (`machines.ws-01.os`) at its counted machine's (`machines.ws.os`).
     fn place(&self, mut p: Problem) -> Problem {
         if p.span.is_none()
@@ -253,9 +289,9 @@ fn under_overrides_of(key: &str, mut p: Problem) -> Problem {
     p
 }
 
-/// The fields that say what a machine is: an authored problem there leaves the lowered machine
-/// a guess, so what lowering finds under it isn't shown.
-const FORM_FIELDS: [&str; 3] = ["os", "service", "app"];
+/// The fields that say what a machine is: a problem there leaves the lowered machine a guess,
+/// so what lowering finds under it isn't shown.
+const FORM_FIELDS: [&str; 4] = ["os", "service", "with", "app"];
 
 /// Whether lowered problem `p` only follows from a machine the authored spec's own checks
 /// already refused (a catalogue service, a machine without its OS): it would say the same thing
@@ -303,7 +339,11 @@ mod tests {
         let scopes = std::iter::once(Scope::Lab).chain(Target::ALL.into_iter().map(Scope::Target));
         for scope in scopes {
             assert!(matches!(lab.raw(scope), Cow::Borrowed(_)), "{scope:?}");
-            assert_eq!(lab.raw(scope).spec, lower(lab.source(), scope).spec, "{scope:?}: its own lowering");
+            assert_eq!(
+                lab.raw(scope).spec,
+                lower(lab.source(), lab.catalogue(), scope).spec,
+                "{scope:?}: its own lowering"
+            );
         }
     }
 

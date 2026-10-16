@@ -20,7 +20,7 @@ fn plan(name: &str) -> Outcome<Environment> {
         .join(name)
         .join("isoloom.yml");
     let source = isoloom_spec::syntax::parse(&std::fs::read_to_string(path)?).map_err(|problems| format!("{name} doesn't parse: {problems:?}"))?;
-    let lowered = lower(&source, Scope::Target(Target::Docker));
+    let lowered = lower(&source, isoloom_plan::Lab::new(source.clone()).catalogue(), Scope::Target(Target::Docker));
     Ok(Environment::build(&lowered.spec, Target::Docker, None))
 }
 

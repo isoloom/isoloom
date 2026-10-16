@@ -87,9 +87,9 @@ fn an_unknown_os_version() {
 }
 
 #[test]
-fn a_catalogue_service_before_the_catalogue() {
+fn a_catalogue_service_with_its_own_process_and_port_number() {
     insta::assert_snapshot!(rendered(&spec(
-        "machines:\n  db:\n    os: debian@12\n    networks: { lab: 10 }\n    service: postgres@16\n    with: { database: books }\n"
+        "machines:\n  db:\n    os: debian@12\n    networks: { lab: 10 }\n    service: postgres@16\n    command: postgres\n    ports: { pg: { port: 5433 } }\n"
     )));
 }
 
