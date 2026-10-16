@@ -472,10 +472,7 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
 fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan {
     let shape = shape(target, m);
     // Lowering refuses a step the machine's family can't carry, so its configuration resolves.
-    let recipe = m
-        .configuration
-        .as_ref()
-        .and_then(|c| Recipe::of(&image::configuration(c, shape, m), &m.ports, &DaemonTable::common()).ok());
+    let recipe = m.configuration.as_ref().and_then(|c| Recipe::of(c, &m.ports, &DaemonTable::common()).ok());
     MachinePlan {
         shape,
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),

@@ -52,7 +52,7 @@ enum Carrier {
     Vm,
     /// A build from the OS's image: every phase.
     Built,
-    /// A thin build over the entry's official image: `configure` and `start`.
+    /// A thin build over the entry's official image: `configure`.
     Image,
 }
 
@@ -61,8 +61,14 @@ enum Carrier {
 fn service_steps(name: &str, service: Service<'_>, carrier: Carrier) -> Option<Problem> {
     let Some(Ok(resolved)) = service else { return None };
     resolved.iter().find_map(|r| {
-        let install = if carrier == Carrier::Image { &[][..] } else { &r.install[..] };
-        let mut steps = install.iter().chain(&r.configure).chain(&r.start);
+        // Over the official image, `configure` alone: the image is `install`, and its own
+        // entrypoint prepares each start.
+        let (install, start) = if carrier == Carrier::Image {
+            (&[][..], &[][..])
+        } else {
+            (&r.install[..], &r.start[..])
+        };
+        let mut steps = install.iter().chain(&r.configure).chain(start);
         let (reason, fix) = steps.find_map(|s| if carrier == Carrier::Vm { carry::on_vm(s) } else { carry::in_container(s) })?;
         let at = FieldPath::new("machines").key(name).key("service");
         Some(

@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use isoloom_spec::model::Arch;
 use isoloom_spec::syntax::{AbsPath, PortName, PortProtocol, ProjectPath, Step, UserName};
 
-use super::fill::{Text, Values};
+use super::fill::{Text, Unfilled, Values};
 use super::recipe::Context;
 use crate::entry::{ImageStart, PortNumber, SettingType};
 use crate::family::Family;
@@ -110,11 +110,11 @@ fn image(context: &Context<'_>) -> Result<Option<OfficialImage>, String> {
     let files = use_
         .files
         .iter()
-        .filter_map(|(to, from)| match fill(from) {
-            // An unset folder or file setting places nothing.
-            Err(_) if !from.contains("{{") => None,
+        .filter_map(|(to, from)| match values.text(from, Text::Field) {
             Ok(path) => Some(path.parse::<ProjectPath>().map(|p| (to.clone(), p)).map_err(|e| e.to_string())),
-            Err(_) => None,
+            // An unset folder or file setting places nothing.
+            Err(Unfilled::Unknown(_)) => None,
+            Err(e) => Some(Err(e.to_string())),
         })
         .collect::<Result<_, String>>()?;
     let command_override = use_.command.as_ref().map(|c| c.iter().map(fill).collect::<Result<Vec<_>, _>>()).transpose()?;

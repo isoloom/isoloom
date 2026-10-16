@@ -49,3 +49,13 @@ fn a_case_whose_helper_needs_a_missing_entry_isnt_run_yet() {
     let wrong = nginx.conformance_lab(catalogue, &case, release, "debian@12".parse().unwrap()).unwrap_err();
     assert!(matches!(&wrong, LabError::MissingEntry { service, .. } if service == "php-fpm"), "{wrong}");
 }
+
+#[test]
+fn the_default_case_lab_of_nginx() {
+    let (catalogue, nginx) = nginx().unwrap();
+    let release = nginx.definition().release(&nginx.definition().default).unwrap();
+    let lab = nginx
+        .conformance_lab(catalogue, &"default".parse().unwrap(), release, "debian@12".parse().unwrap())
+        .unwrap();
+    insta::assert_snapshot!(lab.spec);
+}

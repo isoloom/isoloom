@@ -155,7 +155,37 @@ impl JsonSchema for OsFamily {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
+
+    /// A step's own fields: a key, and a text or a list of texts.
+    fn body() -> impl Strategy<Value = serde_json::Map<String, serde_json::Value>> {
+        let value = prop_oneof![
+            "[a-z{} ./]{0,12}".prop_map(serde_json::Value::from),
+            proptest::collection::vec("[a-z]{1,6}", 0..3).prop_map(serde_json::Value::from),
+        ];
+        proptest::collection::btree_map("[a-z_]{1,8}", value, 0..4).prop_map(|m| m.into_iter().filter(|(k, _)| k != "when" && k != "for_each").collect())
+    }
+
+    proptest! {
+        /// Whatever a step holds, the reader keeps it as written and takes `when` and `for_each`
+        /// apart, never failing on the step's own fields.
+        #[test]
+        fn a_step_reads_back_as_written(fields in body(), unset in proptest::option::of("[a-z][a-z0-9_]{0,6}"), each in proptest::option::of("[a-z][a-z0-9_]{0,6}")) {
+            let mut written = fields.clone();
+            if let Some(u) = &unset {
+                written.insert("when".into(), serde_json::json!({ "unset": u }));
+            }
+            if let Some(e) = &each {
+                written.insert("for_each".into(), serde_json::json!(e));
+            }
+            let step: EntryStep = serde_json::from_value(serde_json::Value::Object(written)).unwrap();
+            prop_assert_eq!(step.body, serde_json::Value::Object(fields));
+            prop_assert_eq!(step.when.and_then(|w| w.unset).map(|s| s.to_string()), unset);
+            prop_assert_eq!(step.for_each.map(|s| s.to_string()), each);
+        }
+    }
 
     #[test]
     fn a_step_keeps_its_body_apart_from_when_and_for_each() {

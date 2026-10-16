@@ -173,6 +173,31 @@ pub(super) fn configuration(resolved: &[Resolved]) -> Option<model::Configuratio
     Some(model::Configuration::entry(first.os, install, configure, start, files))
 }
 
+/// What configures a container over its entry's official image: `configure` alone, since the
+/// image is the `install` phase and its own entrypoint prepares each start, then the project
+/// files and folders the entry's `image.files` places in it.
+pub(super) fn image_configuration(resolved: &[Resolved]) -> Option<model::Configuration> {
+    let r = resolved.first()?;
+    let image = r.image.as_ref()?;
+    let mut configure = r.configure.clone();
+    configure.extend(image.files.iter().map(|(to, from)| {
+        let folder = from.as_str().ends_with('/');
+        let to = if folder && !to.as_str().ends_with('/') {
+            format!("{to}/").parse().unwrap_or_else(|_| to.clone())
+        } else {
+            to.clone()
+        };
+        syntax::Step::Copy(syntax::Copy {
+            from: from.clone(),
+            to,
+            owner: None,
+            mode: None,
+        })
+    }));
+    let files = r.files.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    Some(model::Configuration::entry(r.os, Vec::new(), configure, Vec::new(), files))
+}
+
 /// The variables the official image reads, when the container runs it.
 pub(super) fn image_environment(resolved: &[Resolved]) -> IndexMap<String, String> {
     resolved

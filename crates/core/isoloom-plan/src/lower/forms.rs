@@ -6,7 +6,7 @@
 //! machine a target lowers without its form is always a refusal at that field, never a silent
 //! stand-in.
 
-use isoloom_catalogue::Resolved;
+use isoloom_catalogue::{ImageStart, Resolved};
 use isoloom_spec::syntax::{self, Form, NoForm, OsRef, Problems, Recipe, Step};
 
 use crate::configure::{self, ContainerProcess, DaemonTable, NoProcess, Recipe as Resolution};
@@ -160,6 +160,16 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved]) -> Resul
         });
     }
     if let Some(image) = &r.image {
+        if image.start == ImageStart::Run && !r.start.is_empty() {
+            return Err(NoForm {
+                field: "service".to_owned(),
+                reason: format!(
+                    "{}'s image runs its `start` steps through Isoloom's runner (`image.start: run`), which no container renders yet",
+                    r.entry
+                ),
+                fix: "a VM target".to_owned(),
+            });
+        }
         if !image.platforms.contains(&m.hardware.arch) {
             return Err(NoForm {
                 field: "hardware.arch".to_owned(),

@@ -43,6 +43,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     let (healthcheck, unknown_port) = m.healthcheck.as_ref().map(|h| healthcheck(&at, m, h)).unzip();
     problems.extend(unknown_port.flatten());
     let docker = docker(l, name, m, service);
+    let official = docker.as_ref().and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry);
     let (networks, more_addresses) = addresses(&m.networks);
     let mut out = model::Machine {
         networks,
@@ -60,7 +61,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
         tmpfs: m.tmpfs.clone(),
         shm_size: m.shm_size.clone(),
         dns: m.dns.clone(),
-        environment: environment(m, image_environment(l, docker.as_ref(), service)),
+        environment: environment(m, image_environment(l, official, service)),
         sysctls: m.sysctls.clone(),
         ulimits: m.ulimits.clone(),
         ports,
@@ -79,7 +80,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
         docker,
         external: overrides::external(l.source, name),
         supplied: false,
-        configuration: configuration(m, service),
+        configuration: configuration(l, m, service, official),
     };
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
@@ -93,14 +94,18 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
 }
 
 /// The variables an entry's official image reads, when the target runs the machine as that
-/// image.
-fn image_environment(l: &Lowering<'_>, docker: Option<&DockerImpl>, service: Service<'_>) -> IndexMap<String, String> {
-    let official = docker.and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry);
-    let container_target = l.scope.target().is_some_and(|t| t.needs() == Shape::Docker);
+/// image (`official`: its container form is the image).
+fn image_environment(l: &Lowering<'_>, official: bool, service: Service<'_>) -> IndexMap<String, String> {
     match service {
-        Some(Ok(resolved)) if official && container_target => super::service::image_environment(resolved),
+        Some(Ok(resolved)) if official && runs_containers(l) => super::service::image_environment(resolved),
         _ => IndexMap::new(),
     }
+}
+
+/// Whether the target runs a machine with a container form as a container (`docker` and the
+/// container targets; `hybrid` too).
+fn runs_containers(l: &Lowering<'_>) -> bool {
+    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker | Shape::Either))
 }
 
 /// The inputs its environment reads.
@@ -114,11 +119,16 @@ fn environment_inputs(m: &syntax::Machine) -> Vec<String> {
         .collect()
 }
 
-/// What configures the machine in every form: its services' phases, else its app's steps on its
-/// OS, when it has both.
-fn configuration(m: &syntax::Machine, service: Service<'_>) -> Option<model::Configuration> {
+/// What configures the machine: its services' phases (on a container target over its entry's
+/// official image, `configure` and the image's files alone), else its app's steps on its OS,
+/// when it has both.
+fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, official: bool) -> Option<model::Configuration> {
     if let Some(Ok(resolved)) = service {
-        return super::service::configuration(resolved);
+        return if official && runs_containers(l) {
+            super::service::image_configuration(resolved)
+        } else {
+            super::service::configuration(resolved)
+        };
     }
     let (os, steps) = (m.os?, &m.app()?.steps);
     (!steps.is_empty()).then(|| model::Configuration::app(os, steps.clone()))
