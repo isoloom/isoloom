@@ -53,7 +53,14 @@
         "macos",
         "windows"
       ],
-      "runs": []
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-16",
+          "result": "pass",
+          "note": "hello-stack up, 12 checks, down through the Isothrum runner on VirtualBox 7.2 (bento/debian-12, Docker inside); no VM or container left behind"
+        }
+      ]
     },
     {
       "entry": "docker-vm/vmware_desktop",

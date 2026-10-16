@@ -12,7 +12,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 |---|---|---|---|
 | `docker` | 1 | linux, macos, windows | real runs: linux (jarvis, 2026-10-15), macos (mac, 2026-10-15), windows (karen, 2026-10-15) |
 | `hosted` | 2 | linux, macos, windows | validated only |
-| `docker-vm/virtualbox` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
+| `docker-vm/virtualbox` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-16); tier 1 pending: linux, windows |
 | `docker-vm/vmware_desktop` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `docker-vm/parallels` | 2 | macos | validated only; tier 1 pending: macos |
 | `docker-vm/utm` | 2 | macos | validated only; tier 1 pending: macos |
