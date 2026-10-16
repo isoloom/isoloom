@@ -609,6 +609,11 @@
           "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
           "default": false
         },
+        "seal": {
+          "$ref": "#/$defs/Seal",
+          "description": "How strongly its `internet: false` seal holds (`guaranteed` by default; `best-effort` lets a\nprivileged container sit on an offline network, acknowledging it can lift the seal).",
+          "default": "guaranteed"
+        },
         "read_only": {
           "type": "boolean",
           "description": "A read-only root filesystem (containers).",
@@ -2206,6 +2211,21 @@
         }
       },
       "description": "How a machine resolves names."
+    },
+    "Seal": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "guaranteed",
+          "description": "The seal holds: nothing in the machine can lift it (the default)."
+        },
+        {
+          "type": "string",
+          "const": "best-effort",
+          "description": "The machine can lift the seal from inside (a privileged container): it is applied but not\nguaranteed."
+        }
+      ],
+      "description": "How strongly a machine's offline seal holds. `internet: false` is enforced for every machine,\nbut a privileged container can lift it from inside its own network namespace, so such a machine\nmust declare `seal: best-effort` to acknowledge the seal is advisory for it (it is refused\notherwise). Defaults to `guaranteed`."
     },
     "ScalarSchema": {
       "anyOf": [

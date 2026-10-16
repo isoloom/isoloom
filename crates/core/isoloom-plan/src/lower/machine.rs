@@ -54,6 +54,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
         arch: m.hardware.arch,
         rate_limit: m.rate_limit.clone(),
         privileged: m.privileged,
+        seal: m.seal,
         nested_virtualization: m.hardware.nested_virtualization,
         gpus: m.hardware.gpus.clone(),
         devices: m.hardware.devices.clone(),

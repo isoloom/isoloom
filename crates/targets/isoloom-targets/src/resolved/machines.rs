@@ -3,7 +3,7 @@
 
 use isoloom_plan::addressing::address;
 use isoloom_render::router;
-use isoloom_spec::model::{Machine, Spec};
+use isoloom_spec::model::{Machine, Seal, Spec};
 use serde_json::{Map, Value, json};
 
 use super::ports;
@@ -50,6 +50,9 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Map<String, V
     out.insert("routes".into(), json!(routes));
     out.insert("default_gateway".into(), json!(default_gateway.map(|a| a.to_string())));
     out.insert("offline".into(), json!(!online && default_gateway.is_none()));
+    if m.seal == Seal::BestEffort {
+        out.insert("seal".into(), json!("best-effort"));
+    }
     add_os(&mut out, m);
     add_more_addresses(&mut out, spec, m);
     out

@@ -4,6 +4,7 @@
 
 use std::path::Path;
 
+use isoloom_spec::model::Seal;
 use isoloom_spec::syntax::placeholder::Place;
 use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Step, Warning};
 
@@ -42,6 +43,17 @@ impl Lab {
                 w.span = self.source.spans.find(&w.path);
                 out.push(w);
             }
+        }
+        for (name, m) in &self.source.machines {
+            if m.seal != Seal::BestEffort {
+                continue;
+            }
+            let mut w = Warning::new(
+                FieldPath::new("machines").key(name).key("seal"),
+                "`seal: best-effort` makes this machine's `internet: false` seal advisory: it is applied, but a privileged container can lift it from inside, so treat the machine as able to reach the internet",
+            );
+            w.span = self.source.spans.find(&w.path);
+            out.push(w);
         }
         out.sort_by_key(|w| w.span.map(|s| (s.line, s.column)));
         out

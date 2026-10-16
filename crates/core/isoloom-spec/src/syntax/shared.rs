@@ -15,7 +15,7 @@ use serde::{Deserialize, Deserializer};
 use super::machine::MachineInput;
 
 /// The machine fields `common:` and groups can't share: each is one machine's own.
-pub(crate) const OWN_FIELDS: &[&str] = &["networks", "ports", "access", "count", "aliases"];
+pub(crate) const OWN_FIELDS: &[&str] = &["networks", "ports", "access", "count", "aliases", "seal"];
 
 /// The machine fields `common:` and groups share.
 pub(crate) const SHARED_FIELDS: &[&str] = &[

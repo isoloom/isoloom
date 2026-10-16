@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use super::Problems;
-use crate::model::{Device, GpuCount, Gpus, Machine, Spec};
+use crate::model::{Device, GpuCount, Gpus, Machine, Seal, Spec};
 
 /// The machine's hardware fields, each checked in turn.
 pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
@@ -30,19 +30,20 @@ pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
 
 /// An `internet: false` network keeps a container offline by removing its default route inside
 /// its own network namespace (the host doesn't route it out). A privileged container can add the
-/// route back and reach the internet, so the seal would be a guarantee root could lift. Refuse a
-/// privileged container on such a network: it must drop `privileged`, or sit on a network with
-/// internet. A VM is sealed at the hypervisor or router, out of its own reach, so this is for
-/// containers only.
+/// route back and reach the internet, so the seal is a guarantee it could lift. Refuse a
+/// privileged container on such a network unless it opts in with `seal: best-effort`, which
+/// acknowledges the seal is advisory for it; otherwise it must drop `privileged` or sit on a
+/// network with internet. A VM is sealed at the hypervisor or router, out of its own reach, so
+/// this is for containers only.
 pub(super) fn offline_privilege(spec: &Spec, name: &str, m: &Machine, p: &mut Problems) {
-    if m.vm.is_some() || !m.privileged {
+    if m.vm.is_some() || !m.privileged || m.seal == Seal::BestEffort {
         return;
     }
     if let Some(net) = m.networks.keys().find(|net| spec.networks.get(*net).is_some_and(|n| !n.internet)) {
         p.add(
             format!("machines.{name}.privileged"),
             format!(
-                "a privileged container can lift the seal of `{net}` (an `internet: false` network) from inside: drop `privileged`, or put the machine on a network with internet"
+                "a privileged container can lift the seal of `{net}` (an `internet: false` network) from inside: drop `privileged`, put the machine on a network with internet, or set `seal: best-effort` to accept that the seal is advisory for it"
             ),
         );
     }
@@ -129,12 +130,20 @@ mod tests {
     }
 
     #[test]
-    fn a_privileged_container_is_refused_on_an_internet_false_network() {
+    fn a_privileged_container_is_refused_on_an_internet_false_network_without_opt_in() {
         assert_eq!(
             offline_problems("internet: false", "docker: { image: x }, privileged: true"),
             [
-                "machines.a.privileged: a privileged container can lift the seal of `lan` (an `internet: false` network) from inside: drop `privileged`, or put the machine on a network with internet"
+                "machines.a.privileged: a privileged container can lift the seal of `lan` (an `internet: false` network) from inside: drop `privileged`, put the machine on a network with internet, or set `seal: best-effort` to accept that the seal is advisory for it"
             ]
+        );
+    }
+
+    #[test]
+    fn seal_best_effort_opts_a_privileged_offline_container_in() {
+        assert_eq!(
+            offline_problems("internet: false", "docker: { image: x }, privileged: true, seal: best-effort"),
+            Vec::<String>::new()
         );
     }
 

@@ -17,7 +17,7 @@ use super::os::OsRef;
 use super::ports::Port;
 use super::process::{Command, EnvValue, Healthcheck};
 use crate::Error;
-use crate::model::{Disk, Dns, Mount, Resources, ScalarSchema, Tmpfs, Ulimit};
+use crate::model::{Disk, Dns, Mount, Resources, ScalarSchema, Seal, Tmpfs, Ulimit};
 
 /// What a machine is, besides its OS.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +92,8 @@ pub struct Machine {
     pub dns: Option<Dns>,
     /// Kernel-level access.
     pub privileged: bool,
+    /// How strongly its `internet: false` seal holds.
+    pub seal: Seal,
     /// A read-only root filesystem.
     pub read_only: bool,
     /// The size of `/dev/shm`.
@@ -192,6 +194,10 @@ pub(crate) struct MachineInput {
     /// Kernel-level access (nested containers, kernel modules, raw devices).
     #[serde(default)]
     privileged: bool,
+    /// How strongly its `internet: false` seal holds (`guaranteed` by default; `best-effort` lets a
+    /// privileged container sit on an offline network, acknowledging it can lift the seal).
+    #[serde(default)]
+    seal: Seal,
     /// A read-only root filesystem (containers).
     #[serde(default)]
     read_only: bool,
@@ -278,6 +284,7 @@ impl TryFrom<MachineInput> for Machine {
             hardware: m.hardware,
             dns: m.dns,
             privileged: m.privileged,
+            seal: m.seal,
             read_only: m.read_only,
             shm_size: m.shm_size,
             sysctls: m.sysctls,

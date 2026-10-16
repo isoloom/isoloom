@@ -12,7 +12,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_spec::images;
-use isoloom_spec::model::{Arch, Boot, Constraints, External, Machine, MachineFile, Network, Protocol, Spec, Target, Tc, Ulimit, VmImage, Winrm};
+use isoloom_spec::model::{Arch, Boot, Constraints, External, Machine, MachineFile, Network, Protocol, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm};
 use isoloom_spec::validate::docker_cidrs;
 use isoloom_spec::windows::{self, Tpm};
 
@@ -135,6 +135,9 @@ pub struct MachinePlan {
     pub is_gateway: bool,
     /// Whether nothing it is on reaches the internet and no gateway decides for it.
     pub offline: bool,
+    /// How strongly its offline seal holds: `best-effort` when the machine (a privileged
+    /// container) can lift it from inside, `guaranteed` (the default) otherwise.
+    pub seal: Seal,
     /// The ports it publishes on the host.
     pub ports: Vec<PublishedPort>,
     /// Its volumes, in spec order.
@@ -487,6 +490,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         default_gateway: routing::default_gateway(spec, name, m),
         is_gateway: routing::is_gateway(spec, name),
         offline: routing::offline(spec, name, m),
+        seal: m.seal,
         ports: published(m),
         volumes: volumes(spec, name, m),
         files: m.files.clone(),

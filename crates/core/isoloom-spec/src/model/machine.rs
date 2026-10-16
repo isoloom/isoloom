@@ -39,6 +39,30 @@ impl Arch {
     }
 }
 
+/// How strongly a machine's offline seal holds. `internet: false` is enforced for every machine,
+/// but a privileged container can lift it from inside its own network namespace, so such a machine
+/// must declare `seal: best-effort` to acknowledge the seal is advisory for it (it is refused
+/// otherwise). Defaults to `guaranteed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum Seal {
+    /// The seal holds: nothing in the machine can lift it (the default).
+    #[default]
+    Guaranteed,
+    /// The machine can lift the seal from inside (a privileged container): it is applied but not
+    /// guaranteed.
+    BestEffort,
+}
+
+impl Seal {
+    /// Whether the seal is the default, guaranteed one.
+    #[must_use]
+    pub fn is_guaranteed(&self) -> bool {
+        matches!(self, Seal::Guaranteed)
+    }
+}
+
 /// A machine of the environment: where it sits on the networks, what it serves, and how each
 /// kind of target produces it (`docker:`, `vm:`, `external:`).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
@@ -88,6 +112,12 @@ pub struct Machine {
     /// inside a VM need `nested_virtualization`.
     #[serde(default)]
     pub privileged: bool,
+    /// How strongly the machine's `internet: false` seal holds. A privileged container can lift
+    /// the seal from inside its network namespace, so a privileged container on an offline network
+    /// must set `seal: best-effort` to acknowledge that (it is refused otherwise). `guaranteed`
+    /// (the default) means nothing in the machine can lift it.
+    #[serde(default, skip_serializing_if = "Seal::is_guaranteed")]
+    pub seal: Seal,
     /// The machine runs VMs of its own: its VM gets the CPU's virtualization extensions (each
     /// hypervisor's nested virtualization). A VM only: a container can't, so the machine needs
     /// a `vm:`. Targets whose VMs can't nest refuse it.

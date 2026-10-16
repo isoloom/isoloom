@@ -1363,6 +1363,16 @@ Kernel-level access (nested containers, kernel modules, raw devices).
 - **Type:** boolean
 - **Default:** `false`
 
+### `machines.*.seal`
+
+How strongly its `internet: false` seal holds (`guaranteed` by default; `best-effort` lets a privileged container sit on an offline network, acknowledging it can lift the seal).
+
+- **Type:** string
+- **Default:** `guaranteed`
+- **Allowed:**
+  - `guaranteed`: The seal holds: nothing in the machine can lift it (the default).
+  - `best-effort`: The machine can lift the seal from inside (a privileged container): it is applied but not guaranteed.
+
 ### `machines.*.read_only`
 
 A read-only root filesystem (containers).
