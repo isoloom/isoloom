@@ -21,6 +21,7 @@ publish = false
 
 [workspace.dependencies]
 isoloom-spec = { path = "crates/core/isoloom-spec" }
+isoloom-catalogue = { path = "crates/core/isoloom-catalogue" }
 isoloom-plan = { path = "crates/core/isoloom-plan" }
 isoloom-render = { path = "crates/core/isoloom-render" }
 isoloom-compose = { path = "crates/backends/isoloom-compose" }
@@ -47,10 +48,15 @@ serde_path_to_error = "0.1"
 criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
 saphyr-parser = "0.2"
 jsonschema = { version = "0.58", default-features = false }
+# A catalogue setting's `pattern`.
+regex = "1"
 # The development tasks (xtask) only.
 toml = "1"
 tar = { version = "0.4", default-features = false }
 sha2 = "0.11"
+# The catalogue's refresh (xtask): a GPG key's fingerprint, and the gzip of package indexes.
+sha1 = "0.11"
+flate2 = "1"
 
 # Every crate inherits these (`[lints] workspace = true`): the strictest set (PLAN 1c). A lint is at
 # "deny" once its count is zero; while it isn't, it is at "warn", and `cargo xtask quality` counts

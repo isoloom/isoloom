@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=../entry.schema.json
 #
-# The nginx entry in full, in the format plan/phase4/design.md §4 designs. It is written by hand;
-# lock.yml beside it is written only by `cargo xtask catalogue refresh`. The recipe below is
-# rendered for every form and CM tool:
+# The nginx entry (plan/phase4/design.md §4), written by hand; lock.yml beside it is written only
+# by `cargo xtask catalogue refresh nginx`. The recipe below is rendered for every form and CM
+# tool:
 # - the official image's thin build (only `configure`);
 # - a Dockerfile from the OS image (`install`, then `configure`);
 # - a VM's set-up, in shell, cloud-init or Ansible (`install`, then `configure`).
@@ -67,6 +67,7 @@ ports:
 daemons:
   nginx:
     unit: nginx
+    package: nginx
     foreground: [nginx, -g, "daemon off;"]
     logs:
       /var/log/nginx/access.log: stdout

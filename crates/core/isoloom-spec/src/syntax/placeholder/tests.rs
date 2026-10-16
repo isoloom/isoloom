@@ -25,6 +25,7 @@ fn each_path_of_the_grammar_reads_into_its_reference() {
         }
     );
     assert_eq!(parsed("item.name"), Reference::Item("name".into()));
+    assert_eq!(parsed("item.password.path"), Reference::ItemPath("password".into()));
     assert_eq!(parsed("cloud.outputs.bucket"), Reference::CloudOutput("bucket".into()));
 }
 

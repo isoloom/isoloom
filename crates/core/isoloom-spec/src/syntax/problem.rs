@@ -184,7 +184,8 @@ impl fmt::Display for Problem {
 pub type Problems = Vec<Problem>;
 
 /// The known name closest to `word`, when it is close (a typo).
-pub(crate) fn closest<'a>(word: &str, known: &[&'a str]) -> Option<&'a str> {
+#[must_use]
+pub fn closest<'a>(word: &str, known: &[&'a str]) -> Option<&'a str> {
     known
         .iter()
         .map(|k| (distance(word, k), *k))

@@ -41,7 +41,7 @@ pub use overrides::{
 };
 pub use parse::parse;
 pub use ports::{Port, PortProtocol, Publish};
-pub use problem::{Code, FieldPath, Problem, Problems, Span};
+pub use problem::{Code, FieldPath, Problem, Problems, Span, closest};
 pub use process::{Command, EnvValue, HealthPage, HealthProbe, Healthcheck, PortRef};
 pub use shared::{Group, Shared};
 pub use spans::Spans;

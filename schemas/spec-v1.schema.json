@@ -639,7 +639,56 @@
           "description": "A bandwidth cap on each of its links, as `tc` writes a rate (`10mbit`)."
         }
       },
-      "description": "A machine as written."
+      "description": "A machine as written.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^nginx(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "nginx's settings.",
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "The port nginx listens on, and the number of the machine's `http` port.",
+                    "default": 80
+                  },
+                  "root": {
+                    "type": "string",
+                    "pattern": "^[^/\\\\]",
+                    "description": "A folder of the project served at `/` (`site/`), holding an `index.html`. It replaces what is at /usr/share/nginx/html, as a container's mount of it would. Without it, nginx's own welcome page."
+                  },
+                  "config": {
+                    "type": "string",
+                    "pattern": "^[^/\\\\]",
+                    "description": "A file of the project holding nginx's `server { … }` block, in place of the one the entry writes from `port` and `root`. It should listen on `port`."
+                  },
+                  "php_fpm": {
+                    "type": "string",
+                    "pattern": "^\\S+:[0-9]{1,5}$",
+                    "description": "A php-fpm machine and its port (`app:9000`) that runs the `.php` files under `root`, from its own copy at /var/www/html (the php-fpm entry's `root`)."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      ]
     },
     "Os": {
       "description": "An OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default version (`debian` is `debian@12`).",
@@ -662,6 +711,7 @@
         "alma@9",
         "alpine",
         "alpine@3.19",
+        "alpine@3.24",
         "kali",
         "kali@rolling",
         "fedora",

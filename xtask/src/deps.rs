@@ -2,7 +2,8 @@
 //! `cargo metadata` says: spec → plan → render → backends → targets → cli. A crate depends only
 //! on crates below it, so no backend depends on another backend, the tools (import) depend on
 //! the core alone, the manifest crate depends on no other crate of the workspace (it is the
-//! serde-only contract the runner reads too), and nothing depends on the xtask.
+//! serde-only contract the runner reads too), and nothing depends on the xtask (which may use
+//! any crate: the catalogue's refresh reads the catalogue's types).
 
 use serde_json::Value;
 
@@ -90,7 +91,8 @@ fn level(name: &str, dir: &str) -> Result<Level, String> {
 /// Whether `from` may depend on `to`.
 fn allowed(from: Level, to: Level) -> bool {
     match (from, to) {
-        (Level::Xtask, _) | (_, Level::Xtask) | (Level::Backend | Level::Tool, Level::Backend | Level::Tool) => false,
+        (_, Level::Xtask) | (Level::Backend | Level::Tool, Level::Backend | Level::Tool) => false,
+        (Level::Xtask, _) => true,
         _ => to.height() < from.height(),
     }
 }
@@ -190,7 +192,8 @@ mod tests {
                 &[("isoloom-spec", None), ("serde", None), ("proptest", Some("dev"))],
             ),
             package("isoloom", "crates/cli/isoloom", &[("xtask", Some("dev"))]),
-            package("xtask", "xtask", &[]),
+            // The xtask may use any crate (the catalogue's refresh reads its types).
+            package("xtask", "xtask", &[("isoloom-spec", None)]),
         ]);
         // isoloom-spec twice: a workspace crate, and not serde.
         assert_eq!(found.len(), 3, "{found:?}");

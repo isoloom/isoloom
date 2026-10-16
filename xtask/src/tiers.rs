@@ -184,7 +184,7 @@ fn is_date(text: &str) -> bool {
 
 /// The UTC day `secs` seconds after the Unix epoch, `YYYY-MM-DD` (Howard Hinnant's
 /// days-to-civil algorithm, for the proleptic Gregorian calendar).
-fn civil_date(secs: u64) -> String {
+pub(crate) fn civil_date(secs: u64) -> String {
     let days = secs / 86_400 + 719_468;
     let era = days / 146_097;
     let doe = days % 146_097;

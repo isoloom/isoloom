@@ -3,10 +3,10 @@
 //! container form from here, and a recipe that installs a daemon's package without a `service`
 //! step for it gets a warning (a daemon runs only where a step says so).
 //!
-//! Phase 4.3 fills the table from the catalogue (each entry's `daemons:`, and
-//! `catalogue/daemons.yml` for daemons no entry owns). Until then it holds the common daemons
-//! below, whose foreground forms are the ones their official images run.
+//! The catalogue fills the table: each entry's `daemons:`, and `catalogue/daemons.yml` for the
+//! daemons no entry owns.
 
+use isoloom_catalogue::{Catalogue, LogStream};
 use isoloom_spec::syntax::{AbsPath, Argv, PackageName, UnitName, UserName};
 
 use super::family::Family;
@@ -69,59 +69,6 @@ pub struct DaemonTable {
     entries: Vec<DaemonEntry>,
 }
 
-/// A daemon written as data: a key, then its forms.
-type Seed = (&'static str, &'static [FormSeed]);
-
-/// A daemon's form on a family, written as data: the family, its unit, its package, its
-/// foreground form and its log files (`path=stdout` or `path=stderr`).
-type FormSeed = (Family, &'static str, &'static str, &'static [&'static str], &'static [&'static str]);
-
-/// The common daemons, until the catalogue fills the table (Phase 4.3).
-const SEED: &[Seed] = &[
-    (
-        "nginx",
-        &[
-            (Family::Debian, "nginx", "nginx", &["nginx", "-g", "daemon off;"], NGINX_LOGS),
-            (Family::RedHat, "nginx", "nginx", &["nginx", "-g", "daemon off;"], NGINX_LOGS),
-            (Family::Alpine, "nginx", "nginx", &["nginx", "-g", "daemon off;"], NGINX_LOGS),
-        ],
-    ),
-    (
-        "apache",
-        &[
-            (Family::Debian, "apache2", "apache2", &["apache2ctl", "-D", "FOREGROUND"], &[]),
-            (Family::RedHat, "httpd", "httpd", &["httpd", "-D", "FOREGROUND"], &[]),
-            (Family::Alpine, "apache2", "apache2", &["httpd", "-D", "FOREGROUND"], &[]),
-        ],
-    ),
-    (
-        "ssh",
-        &[
-            (Family::Debian, "ssh", "openssh-server", &["/usr/sbin/sshd", "-D", "-e"], &[]),
-            (Family::RedHat, "sshd", "openssh-server", &["/usr/sbin/sshd", "-D", "-e"], &[]),
-            (Family::Alpine, "sshd", "openssh-server", &["/usr/sbin/sshd", "-D", "-e"], &[]),
-        ],
-    ),
-    (
-        "cron",
-        &[
-            (Family::Debian, "cron", "cron", &["cron", "-f"], &[]),
-            (Family::RedHat, "crond", "cronie", &["crond", "-n"], &[]),
-        ],
-    ),
-    (
-        "rsyslog",
-        &[
-            (Family::Debian, "rsyslog", "rsyslog", &["rsyslogd", "-n"], &[]),
-            (Family::RedHat, "rsyslog", "rsyslog", &["rsyslogd", "-n"], &[]),
-            (Family::Alpine, "rsyslog", "rsyslog", &["rsyslogd", "-n"], &[]),
-        ],
-    ),
-];
-
-/// nginx's logs, sent to the container's output as its official image does.
-const NGINX_LOGS: &[&str] = &["/var/log/nginx/access.log=stdout", "/var/log/nginx/error.log=stderr"];
-
 impl DaemonTable {
     /// A table of `entries`.
     #[must_use]
@@ -129,11 +76,11 @@ impl DaemonTable {
         DaemonTable { entries }
     }
 
-    /// The common daemons (nginx, apache, ssh, cron, rsyslog), until the catalogue fills the
-    /// table.
+    /// The daemons of the catalogue built into Isoloom (empty only if it doesn't load, which
+    /// its own tests rule out).
     #[must_use]
     pub fn common() -> DaemonTable {
-        DaemonTable::new(SEED.iter().filter_map(|(key, forms)| entry(key, forms)).collect())
+        Catalogue::embedded().map(DaemonTable::from).unwrap_or_default()
     }
 
     /// The entries.
@@ -161,36 +108,48 @@ impl DaemonTable {
     }
 }
 
-/// A seed entry, typed: `None` when one of its names breaks its rule (a test proves none does).
-fn entry(key: &str, forms: &[FormSeed]) -> Option<DaemonEntry> {
-    let forms = forms
-        .iter()
-        .map(|(family, unit, package, foreground, logs)| {
-            let logs = logs
-                .iter()
-                .map(|l| {
-                    let (path, stream) = l.split_once('=')?;
-                    let stream = if stream == "stderr" { Stream::Stderr } else { Stream::Stdout };
-                    Some(LogLink {
-                        path: path.parse().ok()?,
-                        stream,
+impl From<&Catalogue> for DaemonTable {
+    /// The catalogue's daemon table: each daemon on each family its unit exists on.
+    fn from(catalogue: &Catalogue) -> DaemonTable {
+        let entries = catalogue
+            .daemons()
+            .map(|(key, d)| DaemonEntry {
+                key: key.clone(),
+                forms: d
+                    .unit
+                    .families()
+                    .into_iter()
+                    .filter_map(|family| {
+                        let daemon = Daemon {
+                            unit: d.unit.on(family)?.clone(),
+                            foreground: d.foreground.on(family)?.clone(),
+                            user: d.user.clone(),
+                            logs: d
+                                .logs
+                                .iter()
+                                .map(|(path, stream)| LogLink {
+                                    path: path.clone(),
+                                    stream: (*stream).into(),
+                                })
+                                .collect(),
+                        };
+                        let package = d.package.as_ref().and_then(|p| p.on(family)).cloned();
+                        Some(FamilyDaemon { family, package, daemon })
                     })
-                })
-                .collect::<Option<Vec<_>>>()?;
-            let daemon = Daemon {
-                unit: unit.parse().ok()?,
-                foreground: Argv::try_from(foreground.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>()).ok()?,
-                user: None,
-                logs,
-            };
-            Some(FamilyDaemon {
-                family: *family,
-                package: Some(package.parse().ok()?),
-                daemon,
+                    .collect(),
             })
-        })
-        .collect::<Option<Vec<_>>>()?;
-    Some(DaemonEntry { key: key.parse().ok()?, forms })
+            .collect();
+        DaemonTable::new(entries)
+    }
+}
+
+impl From<LogStream> for Stream {
+    fn from(s: LogStream) -> Stream {
+        match s {
+            LogStream::Stderr => Stream::Stderr,
+            _ => Stream::Stdout,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -202,8 +161,12 @@ mod tests {
     }
 
     #[test]
-    fn every_common_daemon_is_typed() {
-        assert_eq!(DaemonTable::common().entries().len(), SEED.len());
+    fn the_catalogue_fills_the_table() {
+        let table = DaemonTable::common();
+        let keys: Vec<&str> = table.entries().iter().map(|e| e.key.as_str()).collect();
+        for key in ["nginx", "apache", "ssh", "cron", "rsyslog"] {
+            assert!(keys.contains(&key), "{key}: {keys:?}");
+        }
     }
 
     #[test]

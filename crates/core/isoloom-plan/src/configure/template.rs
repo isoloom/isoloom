@@ -4,7 +4,7 @@
 //! same bytes.
 
 use isoloom_spec::model::Spec;
-use isoloom_spec::syntax::placeholder::{self, Part, Place, PortField, Reference};
+use isoloom_spec::syntax::placeholder::{self, Place, PortField, Reference};
 
 use crate::Environment;
 use crate::addressing;
@@ -66,15 +66,7 @@ pub fn fill(text: &str, context: &Context<'_>) -> Result<String> {
             .next()
             .map_or(Error::Placeholder(isoloom_spec::Error::Unclosed), Error::Placeholder)
     })?;
-    let mut out = String::with_capacity(text.len());
-    for part in parts {
-        match part {
-            Part::Text(t) => out.push_str(&t),
-            Part::Placeholder(r) => out.push_str(&context.value(&r).ok_or(Error::Unfilled(r))?),
-            _ => {}
-        }
-    }
-    Ok(out)
+    placeholder::join(parts, |r| context.value(r).ok_or_else(|| Error::Unfilled(r.clone())))
 }
 
 #[cfg(test)]

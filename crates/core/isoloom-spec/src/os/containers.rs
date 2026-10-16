@@ -47,6 +47,10 @@ const IMAGES: &[(&str, &str)] = &[
         "alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1",
     ),
     (
+        "alpine-3.24",
+        "alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+    ),
+    (
         "kali",
         "kalilinux/kali-rolling@sha256:02f5d6c019e549b0f55da58e835cad5355ef1030c6b2645265a324e37dfc4acc",
     ),

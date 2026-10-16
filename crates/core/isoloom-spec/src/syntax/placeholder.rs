@@ -9,7 +9,7 @@
 //! | `machines.<m>.ports.<name>.published`, `.url` | the message only: run-time values |
 //! | `cloud.outputs.<name>` | the message |
 //! | `version`, `os.family`, `os.version`, `os.codename`, `vars.<x>`, `with.<setting>`, `with.<setting>.path` | a catalogue entry |
-//! | `item.<field>` | a catalogue entry's step repeated with `for_each` |
+//! | `item.<field>`, `item.<field>.path` | a catalogue entry's step repeated with `for_each` |
 //!
 //! Templates are logic-free: no conditionals, no loops. A secret's or an input's value is never
 //! a placeholder; an entry reaches such a setting's file by its path (`with.<setting>.path`).
@@ -65,6 +65,8 @@ pub enum Reference {
     },
     /// `item.<field>`: a field of the list item a `for_each` step is repeated for.
     Item(String),
+    /// `item.<field>.path`: the value file of a list item's password field.
+    ItemPath(String),
 }
 
 /// What of a port a placeholder names.
@@ -142,7 +144,7 @@ impl Reference {
             }
             Reference::CloudOutput(_) if place != Place::Message => Err("a cloud output is the message's only"),
             Reference::Version | Reference::Os(_) | Reference::Var(_) | Reference::Setting { .. } if !entry => Err("only a catalogue entry has it"),
-            Reference::Item(_) if place != Place::EntryItem => Err("only a step repeated with `for_each` has an `item`"),
+            Reference::Item(_) | Reference::ItemPath(_) if place != Place::EntryItem => Err("only a step repeated with `for_each` has an `item`"),
             _ => Ok(()),
         }
     }
@@ -182,6 +184,7 @@ impl FromStr for Reference {
                 field: SettingField::Path,
             }),
             ["item", field] => Ok(Reference::Item((*field).to_owned())),
+            ["item", field, "path"] => Ok(Reference::ItemPath((*field).to_owned())),
             _ => Err(unknown(
                 "the paths start with `machine.`, `machines.<m>.`, `cloud.outputs.`, `version`, `os.`, `vars.`, `with.` or `item.`",
             )),
@@ -243,6 +246,7 @@ impl fmt::Display for Reference {
                 field: SettingField::Path,
             } => write!(f, "with.{name}.path"),
             Reference::Item(field) => write!(f, "item.{field}"),
+            Reference::ItemPath(field) => write!(f, "item.{field}.path"),
         }
     }
 }
@@ -276,6 +280,22 @@ pub fn read(text: &str, place: Place) -> Result<Vec<Part>, Vec<Error>> {
         }
     }
     if wrong.is_empty() { Ok(parts) } else { Err(wrong) }
+}
+
+/// `parts` joined back into a text, each placeholder replaced by what `value` gives it.
+///
+/// # Errors
+///
+/// The first error `value` gives.
+pub fn join<E>(parts: Vec<Part>, mut value: impl FnMut(&Reference) -> Result<String, E>) -> Result<String, E> {
+    let mut out = String::new();
+    for part in parts {
+        match part {
+            Part::Text(t) => out.push_str(&t),
+            Part::Placeholder(r) => out.push_str(&value(&r)?),
+        }
+    }
+    Ok(out)
 }
 
 /// Each placeholder of `text`, written at `place`, in order: what it names, or why it can't be

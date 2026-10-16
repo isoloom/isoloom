@@ -1,0 +1,8 @@
+cases:
+  default: {}
+  greeting: { with: { greeting: hello there } }
+checks:
+  - { name: the port answers, http: "http://{{ machine }}:{{ with.port }}/", expect: any }
+  - { name: the greeting, case: greeting, exec: cat /etc/demo/greeting, expect: "{{ with.greeting }}" }
+facts:
+  - { name: the version, exec: demo --version }

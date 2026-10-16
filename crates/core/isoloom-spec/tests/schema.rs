@@ -10,31 +10,24 @@ use isoloom_spec::schema::{MODELINE, schema};
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
-const WRITE: &str = "cargo test -p isoloom-spec --test schema -- --ignored write_the_committed_schema";
+/// The committed schema is written by the catalogue, which adds each entry's `with:` rule.
+const WRITE: &str = "cargo test -p isoloom-catalogue --test catalogue -- --ignored write_the_generated_schemas";
 
 /// The committed copy of the schema.
 fn committed() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/spec-v1.schema.json")
 }
 
-/// The schema the types generate, as the committed file holds it.
-fn generated() -> serde_json::Result<String> {
-    serde_json::to_string_pretty(&schema()).map(|text| text + "\n")
-}
-
 #[test]
-fn the_committed_schema_is_current() -> Outcome {
-    let on_disk = std::fs::read_to_string(committed()).unwrap_or_default();
-    assert!(on_disk == generated()?, "schemas/spec-v1.schema.json is out of date: run `{WRITE}`");
-    Ok(())
-}
-
-/// Writes the schema the types generate to `schemas/spec-v1.schema.json`.
-#[test]
-#[ignore = "writes the committed schema; run it after changing the types"]
-fn write_the_committed_schema() -> Outcome {
-    std::fs::write(committed(), generated()?)?;
-    Ok(())
+fn the_committed_schema_is_current() {
+    let on_disk: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(committed()).unwrap_or_default()).unwrap_or_default();
+    // The catalogue adds one rule per entry (`with:` follows its settings); the rest is the
+    // spec's own.
+    let mut own = on_disk;
+    if let Some(machine) = own.pointer_mut("/$defs/Machine").and_then(serde_json::Value::as_object_mut) {
+        machine.remove("allOf");
+    }
+    assert!(own == schema(), "schemas/spec-v1.schema.json is out of date: run `{WRITE}`");
 }
 
 /// Every example of the project: its folder's name and its spec's text.

@@ -59,7 +59,7 @@ pub const FAMILIES: &[Family] = &[
     },
     Family {
         name: "alpine",
-        versions: &[("3.19", "alpine-3.19")],
+        versions: &[("3.19", "alpine-3.19"), ("3.24", "alpine-3.24")],
         default: "3.19",
     },
     Family {

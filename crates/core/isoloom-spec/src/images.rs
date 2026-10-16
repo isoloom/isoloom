@@ -245,6 +245,9 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "fedora-42" => no_hyperv(b("bento/fedora-42", None, None)),
         // The box Isoloom's own controller boots (roboxes, with libvirt and Hyper-V builds).
         "alpine-3.19" => b("generic/alpine319", None, None),
+        // A supported Alpine: the official cloud image as a box (VirtualBox, libvirt and QEMU
+        // builds, none for Hyper-V).
+        "alpine-3.24" => no_hyperv(b("cloud-image/alpine-3.24", None, None)),
         // Kali's own box has a Hyper-V build.
         "kali" => b("kalilinux/rolling", None, None),
         _ => return None,

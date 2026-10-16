@@ -16,7 +16,9 @@
 //! - `mutants`: mutation testing of the core crates (cargo-mutants);
 //! - `bench`: the generation benchmarks against `bench-baseline.json`;
 //! - `tiers record`: a real run added to the tier list, the evidence the tiers are worked out
-//!   from.
+//!   from;
+//! - `catalogue refresh` and `catalogue check`: the catalogue's pins, and an entry's parity
+//!   contract run for real.
 //!
 //! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts. `deps`
 //! is the test that keeps the workspace's dependencies one way.
@@ -28,6 +30,7 @@
 )]
 
 mod bench;
+mod catalogue;
 mod check_all;
 #[cfg(test)]
 mod deps;
@@ -100,6 +103,9 @@ enum Task {
     /// The tier list (crates/targets/isoloom-targets/tiers.json): `record <entry> <host>
     /// <result>` adds a real run, the evidence a tier is worked out from.
     Tiers(tiers::Args),
+    /// The catalogue: `refresh` pins what the entries fetch (lock.yml); `check <entry>` runs an
+    /// entry's parity contract in both forms through the Isothrum CLI.
+    Catalogue(catalogue::Args),
 }
 
 fn main() -> ExitCode {
@@ -128,5 +134,6 @@ fn run(cli: Cli) -> Res<ExitCode> {
         Task::Mutants(a) => mutants::run(&a),
         Task::Bench(a) => bench::run(&a),
         Task::Tiers(a) => tiers::run(&a),
+        Task::Catalogue(a) => catalogue::run(&a),
     }
 }
