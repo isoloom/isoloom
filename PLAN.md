@@ -382,6 +382,7 @@ These go beyond lints. Each one names the tool or review that enforces it.
 
 **The Cyber CTF website** (`cyberctf-web`, Cyber-Courses/CyberCTF-Web, Next.js 16; labs catalogue from CyberBackend, per-player evidence submission, launcher download, docs, dashboard). Maintainer (2026-10-16): "let's make cyber ctf great as the launcher". It follows the same rules: local `main`, no PRs, no push without the maintainer's OK (a push deploys production).
 - **Running now:** consolidating its local branches onto `main` (archived first), the 3b standard to zero, Vitest plus Playwright, and security tests pinning the audit's fixes.
+- **Bug found (2026-10-16):** the launcher's `labs::launch_env` dropped every `CTF_FLAG_<KEY>` CyberBackend sends (it kept only `CTF_API_URL` and `CTF_LAUNCH_TOKEN`), so per-player flags never reached any lab on either engine. Being fixed test-first; flags must arrive as files, never in the environment.
 - **Running now:** an end-to-end check of the flag contract: CyberBackend's per-player keyed flag → the launcher → Isoloom `files: [{input}]` → the runner's slot → the lab → cyberctf-web's evidence submission → CyberBackend.
 - **Later:** a sync that shows each launcher mode's real tiers (from Isoloom's `tiers.json` and `docs/matrix.md`), and where each lab runs, after the lab rewrite. The launcher page and docs copy come at the docs gate.
 
