@@ -31,23 +31,18 @@ Working document for the local rebuild. It is squashed away with the history at 
 - the Windows leg of Phase 1b's final run;
 - **first:** the launcher's Windows-only Rust code moved during the cleanup has never been compiled (`platform::sys::windows`, the elevate split, job objects, registry, winget ids). Run Windows `pnpm check` and clippy on karen. Once that's clean, raise the launcher's zero-count lints from warn to deny.
 
-## Resume point (weekly usage limit hit, Thu 2026-10-15 22:3x; reset expected Fri 2026-10-16 20:00 Paris)
+## Resume point (session usage limit hit, Fri 2026-10-16 about 03:15; reset 08:00 Paris)
 
-Every worker stopped mid-step. Their state is safe in their worktrees. To resume, message each worker by its id (SendMessage keeps its context); start a fresh worker from the worktree only if a resume is refused.
+Workers stopped mid-step. Their state is safe in their worktrees. To resume, message each by id (SendMessage keeps its context); start a fresh worker from the worktree only if a resume is refused.
 
 | Worker (id) | Worktree / branch | State at stop | Next step |
 |---|---|---|---|
-| Phase 4.1 model (`af3ea7f9476963ba1`) | — | **done** (`a524ebd5`) | — |
-| 1c spec + manifest (`aeff7ecf52e9445f1`) | `isoloom-1c-spec*` (t1/t2/t3 ahead 6/6/9; s3 has 3 changed files) | the rename is landed (`d7f83f2c`); updating the quality baseline and gates | the review checklists, the final spec mutants count (the shard on friday), verify, check-all |
-| 1c plan + render (`a753fa47995a027b7`) | — | **done** (`a2528719`) | — |
-| Phase 3 Vagrant (`a19a8c03a200ce0c7`) | — | **done** (Isoloom `149d4666`/`0da652a3`/`042925e9`, launcher `efb13a6`, Isothrum `8db4074`) | — |
-| Phase 3 Server (`ab3309f1e356f5806`) | — | **done** (Proxmox and ESXi through the runner and the launcher) | — |
-| Phase 5a verify (`a86b1bccb663441c3`) | — | **done** (`16cd2692`) | — |
-| Phase 6a tf-test (`a3f179567b157182b`) | `isoloom-6a-tftest` (5 changed files) | writing suites (edge-firewall on AWS); a helper was writing the cloud-docker suites | finish the suites, land |
-| Phase 6b matrix (`a33676fb13a1fef95`) | — | **done** (`e2c94630`) | — |
-| Isothrum 1c (`abf4a43ac2afc7507`) | `isothrum-wt/1c` | **still running.** Steps 1–3 landed (`isothrum@5c39819`, `isoloom@edb4af0f`): the tooling, compiler/WASM/CLI at zero, all pins on `d7f83f2c`, Windows playbooks from the controller | the runner to zero, then check-all on mac, linux and windows |
-
-Also pending: the launcher's next pin bump adapts to the rename (`plan/phase2/api-migration.md` items 11–20).
+| Phase 4.2 renderers (`ab16abd1636a84517`) | `isoloom-4.2-render` (30 changed files) | the recipe carrier landed (`5ad734eb`); rewriting `carry.rs` down to the one remaining refusal (existing hosts), removing the VM copies path; infra containers to stop on SIGTERM (`init`) | finish the shell, PowerShell, Dockerfile and runner renderers plus the conformance tests, land |
+| Phase 4.3 catalogue (`a759f864c0984100c`) | `isoloom-4.3-catalogue` (88 changed files) | building `isoloom-catalogue`; fills `model::Configuration` for `service:` machines on the `5ad734eb` carrier | finish the engine, `service:` lowering and nginx end to end, land |
+| Phase 3 docker-vm (`aec8376e1618bb59f`) | `isoloom-dvm-manifest` (19 changed files: the `isoloom-manifest` change), `isoloom-dvm` (34), Isothrum `isothrum-wt/dvm`, launcher `cyber-ctf-launcher-wt/dvm` | was on the Vagrantfile side of docker-vm | **land the `isoloom-manifest` change alone first** (`Step.stdin` as a `PathTemplate`, `project.archive` `with: root`, `isoloom_manifest::ignore`, `Manifest.guest`, `vagrant.check_forwarded_ports`); then the runner pieces it **owns** (`project.archive`, stdin from a path template, `ssh.run` `SendEnv`), alone, on Isothrum; then docker-vm |
+| Phase 3 clouds (`a781d690309c173fb`) | `isoloom-cloud`, Isothrum `isothrum-wt/cloud`, launcher `cyber-ctf-launcher-wt/cloud` (a helper `a0cb135bbe4435ce4` was on runner cloud support) | design approved (see Phase 3) | the Isoloom cloud modules, secrets layer, cloud-services `run.json`, launcher import; build on docker-vm's runner pieces once they land; `with.wait_s`; reap; credential-guarded real-run |
+| Phase 5b verify (`a8fa25ccb1210df50`) | `isoloom-5b-verify` (2 ahead, 1 changed file) | running 6a's `tf-test` suites against its generator changes | finish, land; baseline toward zero |
+| still running at last check (may also stop): Phase 6a tf-test (`a3f179567b157182b`), 1c spec wrap-up (`aeff7ecf52e9445f1`, `isoloom-1c-spec-s3` 5 ahead), Isothrum 1c (`abf4a43ac2afc7507`) | — | — | resume if they stopped |
 
 ## 0. Three products
 
