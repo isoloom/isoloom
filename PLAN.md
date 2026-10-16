@@ -63,7 +63,7 @@ Workers stopped mid-step; their state is safe in their worktrees. Resume each by
 | scripts fork (`a23308a98257c826f`) | — | e2e passed (42), ports freed | — |
 
 **Blocked by the weekly limit (Opus 4.8), resets Oct 22 00:00 Paris:**
-- **docker-vm (`aec8376e1618bb59f`)** — essentially complete in worktree `~/code/isoloom-dvm` (`tmp/dvm`): commit `486425b7 "docker-vm end to end"` (manifests, fixtures, composite, 183-line target test, 17 example snapshots) plus one uncommitted file `crates/backends/isoloom-vagrant/src/manifest/docker_vm.rs` (the VBoxVGA + published-port masquerade fixes). Real VirtualBox cycles already passed. To land: commit that file, rebase `tmp/dvm` onto `885b870c` (watch `run_manifest.rs` vs 4.4), run gates, ff. Launcher/Isothrum dvm worktrees pin the matching revs.
+- **docker-vm — DONE 2026-10-16** (`isoloom@690d585e`, `isothrum@3dd6005`): the runner runs the lab's containers inside a VM. Real VirtualBox run of hello-stack passed (up/check 12-0/down, clean teardown), tier `docker-vm/virtualbox` pass on mac. Mac + Linux(jarvis) gates green, 1996 tests, verify 0 new. **Windows leg owed** (karen was down at land time; it's up now — run `check-all --hosts windows`).
 - **clouds (`a781d690309c173fb`)** — deep WIP in `~/code/isoloom-cloud` (`tmp/cloud`, `619a6d81 wip4`, 32 dirty): cloud-vm, cloud-docker on GuestCompose, cloud-services+region, the egress seal on all six clouds (Azure vnet-deny, OCI/DO/Linode SSH secrets). Generates + terraform-validates. Left: rewrite ~30 `tests/terraform/cloud-*` suites for self-setup machines (drop the ready_file/provisioner assertions, flip the internet:false known_bugs), then land against Isothrum `07e07fc`.
 
 **For the maintainer when back:**
