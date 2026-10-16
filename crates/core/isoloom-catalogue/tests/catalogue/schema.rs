@@ -73,3 +73,19 @@ fn the_spec_schema_checks_with_against_the_entry_settings() {
     assert!(!v.is_valid(&lab("{ prot: 8080 }")), "a key outside the settings");
     assert!(!v.is_valid(&lab("{ port: http }")), "a port that isn't a number");
 }
+
+#[test]
+fn a_password_setting_takes_a_literal_a_secret_or_an_input() {
+    let catalogue = crate::testing::demo().unwrap();
+    let with = schema::with(catalogue.entry("demo").unwrap());
+    let v = jsonschema::validator_for(&with).unwrap();
+    for ok in [
+        serde_json::json!({ "admin": "hunter2" }),
+        serde_json::json!({ "admin": { "secret": "a" } }),
+        serde_json::json!({ "admin": { "input": "A" } }),
+    ] {
+        assert!(v.is_valid(&ok), "{ok}");
+    }
+    assert!(!v.is_valid(&serde_json::json!({ "admin": { "vault": "a" } })));
+    assert!(!v.is_valid(&serde_json::json!({ "admin": 3 })));
+}

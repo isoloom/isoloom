@@ -172,6 +172,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_type_is_named_as_an_entry_writes_it() {
+        let all = [
+            SettingType::String,
+            SettingType::Integer,
+            SettingType::Boolean,
+            SettingType::Port,
+            SettingType::Endpoint,
+            SettingType::Folder,
+            SettingType::File,
+            SettingType::Password,
+            SettingType::List,
+        ];
+        for t in all {
+            assert_eq!(serde_yaml_ng::from_str::<SettingType>(t.id()).ok(), Some(t));
+            assert_ne!(t.expected(), "");
+        }
+    }
+
+    #[test]
     fn a_pattern_matches_the_whole_value() {
         let p = Pattern::try_from("[a-z]+".to_owned()).unwrap();
         assert!(p.matches("abc") && !p.matches("abc1") && !p.matches("1abc"));

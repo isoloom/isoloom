@@ -251,6 +251,12 @@ mod tests {
     }
 
     #[test]
+    fn a_name_is_its_text() {
+        let name: EntryName = "php-fpm".parse().unwrap();
+        assert_eq!((name.as_ref(), name.as_str(), name.to_string().as_str()), ("php-fpm", "php-fpm", "php-fpm"));
+    }
+
+    #[test]
     fn a_name_reads_from_yaml_with_its_rule() {
         let wrong = serde_yaml_ng::from_str::<EntryName>("Nginx").unwrap_err().to_string();
         assert!(wrong.contains("an entry is named in kebab case"), "{wrong}");

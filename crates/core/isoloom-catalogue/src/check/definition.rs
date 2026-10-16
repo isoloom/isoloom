@@ -78,7 +78,7 @@ pub(super) fn check(entry: &Entry) -> Vec<Finding> {
 /// What setting `s`'s fields break: each field fits its type, a default fits the setting.
 fn setting_rules(s: &Setting) -> Vec<String> {
     let mut out = Vec::new();
-    let only = |field: &str, kinds: &str| format!("`{field}` is for {kinds} settings");
+    let only = |field: &str, kinds: &str| format!("only {kinds} settings take `{field}`");
     if s.description.trim().is_empty() {
         out.push("say what it sets, in `description`".to_owned());
     }

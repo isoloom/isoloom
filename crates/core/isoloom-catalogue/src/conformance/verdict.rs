@@ -15,17 +15,6 @@ pub enum Form {
     Vm,
 }
 
-impl Form {
-    /// How a report names it.
-    #[must_use]
-    pub fn id(self) -> &'static str {
-        match self {
-            Form::Container => "container",
-            Form::Vm => "vm",
-        }
-    }
-}
-
 /// One form's run: each check the runner reported (its name, whether it passed, why not).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Run {
@@ -176,6 +165,14 @@ mod tests {
         let v = verdict(&lab(), Some(&container), Some(&vm));
         assert!(!v.passed() && !v.facts[0].equal());
         assert_eq!(v.checks[1].vm, CheckOutcome::Failed("nginx/1.30.5".into()));
+    }
+
+    #[test]
+    fn a_differing_fact_alone_fails_the_case() {
+        let container = run(&[("answers", true, ""), ("version", true, ""), ("fact: os", false, "debian 13")]);
+        let vm = run(&[("answers", true, ""), ("version", true, ""), ("fact: os", false, "debian 12")]);
+        let v = verdict(&lab(), Some(&container), Some(&vm));
+        assert!(v.passed_where_run() && !v.passed(), "every check passed, but the OS differs");
     }
 
     #[test]

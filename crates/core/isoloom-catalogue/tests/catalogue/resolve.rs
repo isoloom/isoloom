@@ -157,7 +157,26 @@ fn a_password_gets_its_value_file_and_its_owner_a_start_step() {
 #[test]
 fn several_services_each_read_their_own_settings() {
     let catalogue = demo().unwrap();
-    let spec = crate::testing::lab("debian@12", "[demo, demo@2.5.0]", "{ port: 81, nope: 1 }").unwrap();
-    let p = catalogue.resolve(&spec, "web").unwrap_err();
-    assert_eq!((p[0].code, p[0].path.as_str()), (Code::UnknownField, "machines.web.with.nope"));
+    let both = crate::testing::lab("debian@12", "[demo, mini]", "{ port: 81, size: 2 }").unwrap();
+    let resolved = catalogue.resolve(&both, "web").unwrap();
+    assert_eq!(resolved.iter().map(|r| r.entry.as_str()).collect::<Vec<_>>(), ["demo", "mini"]);
+    let nope = crate::testing::lab("debian@12", "[demo, mini]", "{ port: 81, nope: 1 }").unwrap();
+    let p = catalogue.resolve(&nope, "web").unwrap_err();
+    assert_eq!(p.len(), 1, "{p:?}");
+    assert_eq!(
+        (p[0].code, p[0].path.as_str(), p[0].reason.as_str()),
+        (Code::UnknownField, "machines.web.with.nope", "no service of the machine has a setting `nope`")
+    );
+    let typo = crate::testing::lab("debian@12", "[demo, mnii]", "{}").unwrap();
+    let unknown = catalogue.resolve(&typo, "web").unwrap_err();
+    assert_eq!(unknown[0].path.as_str(), "machines.web.service[1]", "each service at its index");
+}
+
+#[test]
+fn an_empty_catalogue_says_to_write_an_app() {
+    let empty = isoloom_catalogue::Catalogue::from_files([]).unwrap();
+    let p = resolve(&empty, "debian@12", "nginx", "{}").unwrap_err();
+    assert_eq!(p[0].fix.as_deref(), Some("a custom app: `app: { image: <ref> }`, or `os` and `app.steps`"));
+    let listed = resolve(&demo().unwrap(), "debian@12", "postgres", "{}").unwrap_err();
+    assert_eq!(listed[0].fix.as_deref(), Some("its entries: `demo`, `mini`, or a custom `app:`"));
 }

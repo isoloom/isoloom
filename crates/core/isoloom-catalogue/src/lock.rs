@@ -2,22 +2,20 @@
 //! refresh` (design §4.8): each repository key's SHA-256 (a GPG key's fingerprint checked first),
 //! and per release each official image's multi-platform digest, its platforms, its own
 //! entrypoint and command, and each OS's exact package versions. People review intent in
-//! `entry.yml`; a tool owns the pins.
+//! `entry.yml`; a tool owns the pins (so `lock.yml` has no schema for editors).
 
-use std::borrow::Cow;
 use std::fmt;
 use std::str::FromStr;
 
 use indexmap::IndexMap;
 use isoloom_spec::model::Arch;
 use isoloom_spec::syntax::{HttpsUrl, OsRef, PackageName, PackageVersion, Sha256};
-use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::version::Version;
 
 /// An entry's pins.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Lock {
     /// The day of the refresh that wrote it (`2026-10-16`).
@@ -31,7 +29,7 @@ pub struct Lock {
 }
 
 /// A repository key, pinned.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LockedKey {
     /// A GPG key's fingerprint, as the entry gives it and the refresh checked.
@@ -42,7 +40,7 @@ pub struct LockedKey {
 }
 
 /// A release's pins.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LockedRelease {
     /// Each official image, by the OS it is used for.
@@ -54,7 +52,7 @@ pub struct LockedRelease {
 }
 
 /// An official image, pinned.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LockedImage {
     /// The digest of its multi-platform index: what a run pulls, whatever the tag moves to.
@@ -119,20 +117,6 @@ impl<'de> Deserialize<'de> for Digest {
     }
 }
 
-impl JsonSchema for Digest {
-    fn schema_name() -> Cow<'static, str> {
-        "Digest".into()
-    }
-
-    fn inline_schema() -> bool {
-        true
-    }
-
-    fn json_schema(_: &mut SchemaGenerator) -> Schema {
-        json_schema!({ "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" })
-    }
-}
-
 impl Lock {
     /// The image pinned for release `version` on `os`.
     #[must_use]
@@ -153,7 +137,8 @@ mod tests {
 
     #[test]
     fn a_digest_is_sha256_and_64_hex_digits() {
-        assert!(format!("sha256:{}", "a".repeat(64)).parse::<Digest>().is_ok());
+        let d = format!("sha256:{}", "a".repeat(64));
+        assert_eq!(d.parse::<Digest>().map(|x| x.as_str().to_owned()), Ok(d));
         assert!(format!("sha256:{}", "A".repeat(64)).parse::<Digest>().is_err());
         assert!("sha256:abc".parse::<Digest>().is_err());
         assert!("a".repeat(64).parse::<Digest>().is_err());

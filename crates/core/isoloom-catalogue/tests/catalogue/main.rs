@@ -4,6 +4,7 @@
 
 mod conformance;
 mod embedded;
+mod fetches;
 mod resolve;
 mod rules;
 mod schema;

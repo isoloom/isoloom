@@ -59,3 +59,16 @@ fn the_default_case_lab_of_nginx() {
         .unwrap();
     insta::assert_snapshot!(lab.spec);
 }
+
+#[test]
+fn a_helper_that_runs_no_service_needs_no_entry() {
+    let catalogue = crate::testing::demo().unwrap();
+    let demo = catalogue.entry("demo").unwrap();
+    let release = demo.definition().release(&demo.definition().default).unwrap();
+    let lab = demo
+        .conformance_lab(&catalogue, &"peer".parse().unwrap(), release, "debian@12".parse().unwrap())
+        .unwrap();
+    let spec = isoloom_spec::syntax::parse(&lab.spec).unwrap();
+    assert!(spec.machines.contains_key("client"));
+    assert_eq!(spec.machines["client"].networks.get("lab"), Some(&isoloom_spec::syntax::Octets::One(20)));
+}

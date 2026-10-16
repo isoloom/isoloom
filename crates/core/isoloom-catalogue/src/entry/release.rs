@@ -84,3 +84,23 @@ impl Release {
         self.channel.as_deref() == Some(word) || word.parse::<Version>().is_ok_and(|v| self.version.starts_with(&v))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_source_is_named_as_an_entry_writes_it() {
+        for source in [Source::Vendor, Source::Distro, Source::Download] {
+            assert_eq!(serde_yaml_ng::from_str::<Source>(source.id()).ok(), Some(source));
+        }
+    }
+
+    #[test]
+    fn a_release_is_its_channel_or_a_prefix_of_its_version() {
+        let r: Release = serde_yaml_ng::from_str("{ version: 1.30.6, channel: stable, source: vendor, os: [debian@12] }").unwrap();
+        assert!(r.is("stable") && r.is("1.30") && r.is("1.30.6") && !r.is("1.3") && !r.is("mainline"));
+        assert_eq!((r.label(), r.os_list()), ("1.30.6 (stable)".to_owned(), "debian@12".to_owned()));
+        assert!(r.runs_on("debian@12".parse().unwrap()) && !r.runs_on("debian@13".parse().unwrap()));
+    }
+}

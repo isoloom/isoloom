@@ -184,3 +184,61 @@ fn an_entry_without_its_lock_doesnt_load() {
     let wrong = load(&files).unwrap_err().to_string();
     assert_eq!(wrong, "catalogue/demo: no lock.yml; every entry has entry.yml, lock.yml and contract.yml");
 }
+
+#[test]
+fn a_settings_fields_fit_its_type() {
+    let files = edited("demo/entry.yml", |t| {
+        t.replace(
+            "settings:\n",
+            "settings:\n  a: { type: integer, pattern: '[0-9]+', description: A. }\n  b: { type: string, maximum: 3, description: B. }\n  c: { type: list, description: C. }\n  d: { type: port, owner: demo, description: D. }\n  e: { type: boolean, max: 2, description: E. }\n  f: { type: string, required: true, default: x, description: F. }\n",
+        )
+    });
+    breaks(&files, "settings.a: only `string` settings take `pattern` and `values`");
+    breaks(&files, "settings.b: only `integer` settings take `minimum` and `maximum`");
+    breaks(&files, "settings.c: a `list` says its items' fields, in `items`");
+    breaks(&files, "settings.d: only `password` settings take `owner`");
+    breaks(&files, "settings.e: only `list` settings take `items` and `max`");
+    breaks(&files, "settings.f: `required` and `default` contradict each other");
+}
+
+#[test]
+fn the_lock_pins_only_releases_the_entry_has_and_no_distro_package() {
+    let files = edited("demo/lock.yml", |t| {
+        format!("{t}  \"2.4\":\n    packages:\n      ubuntu@24.04: {{ demo: 2.4.0-1 }}\n  \"9.9\": {{}}\n")
+    });
+    breaks(
+        &files,
+        "catalogue/demo/lock.yml: releases.2.4.packages: a `distro` release follows its OS's archive: it pins no package version",
+    );
+    breaks(&files, "catalogue/demo/lock.yml: releases.9.9: no such release in entry.yml");
+}
+
+#[test]
+fn a_string_no_sample_fits_is_resolved_with_its_default_or_left_unset() {
+    let files = edited("demo/entry.yml", |t| {
+        t.replace(
+            "settings:\n",
+            "settings:\n  code: { type: string, pattern: \"[0-9]+\", description: A code. }\n",
+        )
+        .replace(
+            "    - service: demo\n",
+            "    - command: \"demo-code {{ with.code }}\"\n      creates: /etc/demo/code\n      when: { set: code }\n    - service: demo\n",
+        )
+    });
+    assert_eq!(findings(&files), "", "a pattern no made-up value fits isn't sampled");
+}
+
+#[test]
+fn a_setting_a_step_reads_is_used_and_a_string_outside_templates_needs_no_pattern() {
+    let files = edited("demo/entry.yml", |t| {
+        t.replace(
+            "settings:\n",
+            "settings:\n  motd: { type: string, default: hello, description: The message of the day. }\n",
+        )
+        .replace(
+            "    - service: demo\n",
+            "    - command: [demo-motd, \"{{ with.motd }}\"]\n      unless: [demo-motd, --check]\n    - service: demo\n",
+        )
+    });
+    assert_eq!(findings(&files), "");
+}

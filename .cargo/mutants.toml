@@ -12,6 +12,8 @@ exclude_re = [
     'isoloom-manifest/src/list\.rs:\d+:\d+: replace <impl JsonSchema for NonEmpty<T>>::schema_name ',
     # A file mode's and the spec version's schemas are inlined too: their names are never written.
     'isoloom-spec/src/syntax/(files|names)\.rs:\d+:\d+: replace <impl JsonSchema for (Mode|Version)>::schema_name ',
+    # The catalogue's names, versions and patterns are inlined the same way.
+    'isoloom-catalogue/src/(names|version|entry/setting)\.rs:\d+:\d+: replace <impl JsonSchema for (Name<K>|Version|Pattern)>::schema_name ',
     # `common: ~` reads as no shared fields: the body already is `Ok(Group::default())`.
     'isoloom-spec/src/syntax/shared\.rs:\d+:\d+: replace <impl Visitor<.de> for Fields>::visit_unit -> Result<Group, E> with Ok\(Default::default\(\)\)$',
     # Bits put together where they can't overlap, so `|` and `^` agree: base64's sextets (each
