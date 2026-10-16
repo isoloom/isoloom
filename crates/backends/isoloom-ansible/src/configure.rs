@@ -80,6 +80,10 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
 
 /// `requirements.yml` naming the pinned collections the roles use (today only `ansible.posix`,
 /// for a `firewall` step), from the embedded catalogue; `None` when no role names one.
+///
+/// Each entry carries the exact version, its archive `source`, and the `sha256` that
+/// `catalogue/collections.yml` pins (never dropped): a run checks the archive against it before
+/// installing, so it can't fetch a mutated collection (the design's vendored/pinned rule).
 fn requirements(configured: &[(String, Configured<'_>)]) -> Option<String> {
     let firewall = configured
         .iter()
@@ -89,7 +93,12 @@ fn requirements(configured: &[(String, Configured<'_>)]) -> Option<String> {
     }
     let catalogue = Catalogue::embedded().ok()?;
     let posix = catalogue.collections().get("ansible.posix")?;
-    let collections = json!([{ "name": posix.name, "version": posix.version, "source": posix.url.to_string() }]);
+    let collections = json!([{
+        "name": posix.name,
+        "version": posix.version,
+        "source": posix.url.to_string(),
+        "sha256": posix.sha256.to_string(),
+    }]);
     let body = task::document(&json!({ "collections": collections }));
     Some(format!("{}{body}", header("#")))
 }

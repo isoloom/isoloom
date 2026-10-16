@@ -208,4 +208,15 @@ overrides:
     let reqs = file(&files, ".isoloom/external/requirements.yml");
     assert!(reqs.contains("name: ansible.posix"), "{reqs}");
     assert!(reqs.contains("version:"), "{reqs}");
+    // The pinned sha256 from collections.yml is carried, not dropped, so a run can't fetch a
+    // mutated collection (security finding C2).
+    let posix = isoloom_catalogue::Catalogue::embedded()
+        .expect("catalogue")
+        .collections()
+        .get("ansible.posix")
+        .expect("posix pinned")
+        .sha256
+        .to_string();
+    assert_eq!(posix.len(), 64, "a sha256 is 64 hex chars: {posix}");
+    assert!(reqs.contains(&format!("sha256: {posix}")), "requirements.yml carries the pinned sha256: {reqs}");
 }
