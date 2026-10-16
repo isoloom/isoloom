@@ -60,7 +60,7 @@ pub use guest::Guest;
 pub use identity::{
     Cloud, ComposeIdentity, Driver, Elevation, HostOs, Identity, Provider, StateOwner, Target, TerraformIdentity, Tool, VagrantIdentity, VagrantProvider,
 };
-pub use lifecycle::{Condition, Expiry, ExpiryUnit, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries};
+pub use lifecycle::{Condition, Expiry, ExpiryUnit, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries, Seal};
 pub use list::{NonEmpty, StepSelection};
 pub use machine::{Arch, Cidr, Machine, Native, Network, Resources, Role, Volume};
 pub use manifest::{Manifest, parse, to_json};

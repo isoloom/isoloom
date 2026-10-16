@@ -8,7 +8,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::list::NonEmpty;
-use crate::names::{Name, SnakeName, StepId};
+use crate::names::{EnvName, Name, SnakeName, StepId};
 use crate::step::Step;
 use crate::template::Template;
 use crate::{Error, Result};
@@ -56,9 +56,31 @@ pub struct Lifecycle {
     /// Set-up again on running machines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provision: Option<Provision>,
+    /// What closes the lab off once its machines are set up, before the run counts as ready.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seal: Option<Seal>,
     /// The read-only probe the driver parses into machine states (an argv) or reads from files
     /// (an action). Never elevated, always time-bounded.
     pub status: Step,
+}
+
+/// What closes a lab off once its machines are set up: a cloud's `internet: false` networks
+/// sealed at the network (its firewalls), where root in a guest can't undo it. The machines had
+/// what they needed to set themselves up; from then on they don't.
+///
+/// Once `up` succeeded and the ready conditions hold, the runner sets [`Seal::param`] to `true`,
+/// records it with the run, then runs [`Seal::steps`] (a second `terraform apply`, the module's
+/// variable switching its rules). A failed seal fails `up`: the run is never ready unsealed. Every
+/// later operation replays the recorded value, so a later apply keeps the seal; a successful `down`
+/// forgets it, and the next `up` starts unsealed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Seal {
+    /// The param that says the run is sealed (`true`, else `false`): one of the manifest's, set
+    /// by the runner.
+    pub param: EnvName,
+    /// The steps that seal the run, with the param at `true`.
+    pub steps: NonEmpty<Step>,
 }
 
 /// The grammar of a ready file: its first line is `ready`, `failed: <step>` or `running: <step>`;

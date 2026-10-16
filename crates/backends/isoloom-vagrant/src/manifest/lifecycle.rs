@@ -82,6 +82,7 @@ pub(super) fn lifecycle(env: &Environment, shape: &Shape) -> Result<Lifecycle> {
         }),
         resume,
         provision: Some(provision(env, shape)?),
+        seal: None,
         status: status(shape)?,
     })
 }

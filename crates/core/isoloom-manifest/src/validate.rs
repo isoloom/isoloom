@@ -19,7 +19,7 @@ impl Manifest {
     /// for another driver), [`Error::DuplicateStep`], [`Error::UnknownStep`] (a
     /// delivery's step), [`Error::ReadyNotUp`], [`Error::DuplicateMachine`],
     /// [`Error::DuplicatePort`], [`Error::UnknownMachine`] (the guest's VM among them),
-    /// [`Error::UnknownPublished`], [`Error::UnknownParam`],
+    /// [`Error::UnknownPublished`], [`Error::UnknownParam`] (the seal's param among them),
     /// [`Error::UnknownOutput`] and [`Error::PlaceholderOutOfPlace`].
     pub fn validate(&self) -> Result<()> {
         if self.hosts.is_empty() {
@@ -37,6 +37,12 @@ impl Manifest {
         self.machine_references()?;
         if let Some(g) = &self.guest {
             self.machine_exists("guest.machine", g.machine.as_str())?;
+        }
+        if let Some(seal) = self.lifecycle.seal.as_ref().filter(|s| !self.params.iter().any(|p| p.name == s.param)) {
+            return Err(Error::UnknownParam {
+                at: "lifecycle.seal.param".into(),
+                name: seal.param.to_string(),
+            });
         }
         self.placeholders()
     }

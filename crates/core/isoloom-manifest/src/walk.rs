@@ -17,6 +17,7 @@ impl Manifest {
             ("lifecycle.up".into(), l.up.iter().collect()),
             ("lifecycle.down".into(), l.down.iter().collect()),
             ("lifecycle.resume".into(), l.resume.iter().collect()),
+            ("lifecycle.seal.steps".into(), l.seal.iter().flat_map(|s| s.steps.iter()).collect()),
             ("lifecycle.status".into(), vec![&l.status]),
             ("checks.setup".into(), self.checks.setup.iter().collect()),
             ("checks.runners".into(), self.checks.runners.iter().map(|r| &r.step).collect()),

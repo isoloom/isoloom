@@ -101,6 +101,7 @@ pub(super) fn lifecycle() -> Result<Lifecycle, ManifestError> {
         park: None,
         resume: Vec::new(),
         provision: None,
+        seal: None,
         status: Step::action(id("state")?, Action::TerraformReadState),
     })
 }

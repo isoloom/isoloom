@@ -1722,6 +1722,17 @@
           ],
           "description": "Set-up again on running machines."
         },
+        "seal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Seal"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What closes the lab off once its machines are set up, before the run counts as ready."
+        },
         "status": {
           "$ref": "#/$defs/Step",
           "description": "The read-only probe the driver parses into machine states (an argv) or reads from files (an action). Never elevated, always time-bounded."
@@ -1960,8 +1971,13 @@
         },
         {
           "type": "string",
+          "const": "terraform.copy_module",
+          "description": "Copies the lab's own Terraform module (`with`: `from`, its folder relative to the manifest's, inside the project) into `${run.state_dir}/module`, where the steps run it: the lock file and what the module writes stay with the run, out of the project. The copy's Terraform files are replaced (a file renamed or removed in the module isn't applied any more), what the module wrote there before is kept, and `.terraform` and state files are left out. `with.when: missing` copies only when there is no copy (a `down` destroys with the module as it was applied)."
+        },
+        {
+          "type": "string",
           "const": "ssh.run",
-          "description": "Runs a command over SSH with the runner's key (`with`: `host`, `user`, `via`, `command`)."
+          "description": "Runs a command over SSH with the runner's key (`with`: `host`, `user`, `via`, `command`; `wait_s`, at most 1800, the seconds the runner retries while ssh itself can't connect (its exit 255 before the command ran: a machine still booting), its failure then naming the machine's address. Only for an idempotent command, such as a delivery)."
         },
         {
           "type": "string",
@@ -2048,6 +2064,29 @@
         }
       },
       "description": "Set-up again on running machines."
+    },
+    "Seal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "param": {
+          "$ref": "#/$defs/EnvName",
+          "description": "The param that says the run is sealed (`true`, else `false`): one of the manifest's, set by the runner."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "description": "The steps that seal the run, with the param at `true`."
+        }
+      },
+      "required": [
+        "param",
+        "steps"
+      ],
+      "description": "What closes a lab off once its machines are set up: a cloud's `internet: false` networks sealed at the network (its firewalls), where root in a guest can't undo it. The machines had what they needed to set themselves up; from then on they don't.\n\nOnce `up` succeeded and the ready conditions hold, the runner sets [`Seal::param`] to `true`, records it with the run, then runs [`Seal::steps`] (a second `terraform apply`, the module's variable switching its rules). A failed seal fails `up`: the run is never ready unsealed. Every later operation replays the recorded value, so a later apply keeps the seal; a successful `down` forgets it, and the next `up` starts unsealed."
     },
     "Condition": {
       "oneOf": [

@@ -61,7 +61,19 @@ pub enum Action {
     /// Reads the Terraform state's outputs, resources and taint.
     #[serde(rename = "terraform.read_state")]
     TerraformReadState,
-    /// Runs a command over SSH with the runner's key (`with`: `host`, `user`, `via`, `command`).
+    /// Copies the lab's own Terraform module (`with`: `from`, its folder relative to the
+    /// manifest's, inside the project) into `${run.state_dir}/module`, where the steps run it:
+    /// the lock file and what the module writes stay with the run, out of the project. The
+    /// copy's Terraform files are replaced (a file renamed or removed in the module isn't applied
+    /// any more), what the module wrote there before is kept, and `.terraform` and state files
+    /// are left out. `with.when: missing` copies only when there is no copy (a `down` destroys
+    /// with the module as it was applied).
+    #[serde(rename = "terraform.copy_module")]
+    TerraformCopyModule,
+    /// Runs a command over SSH with the runner's key (`with`: `host`, `user`, `via`, `command`;
+    /// `wait_s`, at most 1800, the seconds the runner retries while ssh itself can't connect
+    /// (its exit 255 before the command ran: a machine still booting), its failure then naming the
+    /// machine's address. Only for an idempotent command, such as a delivery).
     #[serde(rename = "ssh.run")]
     SshRun,
     /// Archives the project as `${run.state_dir}/project.tgz` (`with`: `root`, the project's folder

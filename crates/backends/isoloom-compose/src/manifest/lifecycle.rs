@@ -45,6 +45,7 @@ pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member])
         }),
         resume: vec![run("start", compose(&["start"])?, 600)?],
         provision: None,
+        seal: None,
         status: run("ps", compose(&["ps", "--all", "--format", "json"])?, 25)?,
     })
 }
