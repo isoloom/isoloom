@@ -10,7 +10,9 @@
 //! Cargo compares a source's time with its last build's, written by the host's own clock. A host
 //! whose clock is off ([`MAX_SKEW_S`]) would take a source changed here for older than its last
 //! build, and test that build: its copies are dated when they land instead (`tar -m`), so every
-//! run rebuilds them, and the log says the clock is off.
+//! run rebuilds them, and the log says the clock is off. Builds made while a host's clock ran
+//! ahead stay dated in its future once the clock is set right, and would hide every change until
+//! the clock caught up: a build folder holding one is removed before the copies land.
 
 use std::fs::File;
 use std::process::Command;
@@ -52,6 +54,35 @@ fn now() -> u64 {
 /// The Unix seconds a host printed (its first number), if any.
 fn seconds_in(text: &str) -> Option<u64> {
     text.split_whitespace().find_map(|w| w.parse().ok())
+}
+
+/// What a host's log says when its build folder held builds dated in its future. No quote (it is
+/// echoed inside quotes) and no digit (the Windows host prints its clock beside it).
+const FUTURE_BUILDS: &str = "note: the build folder held builds dated ahead of this host clock (made while it ran ahead): removed, so everything rebuilds";
+
+/// A script for the Linux host (GNU `find`) removing the build folder `target` when a Cargo stamp
+/// in it (a file of a `.fingerprint` folder) is dated more than [`MAX_SKEW_S`] past the host's
+/// clock; it then says [`FUTURE_BUILDS`].
+fn future_builds_sh(target: &str) -> String {
+    format!(
+        "cut=$(( $(date +%s) + {MAX_SKEW_S} )); if find '{target}' -path '*/.fingerprint/*' -newermt \"@$cut\" -print 2>/dev/null | grep -q .; \
+         then rm -rf '{target}' && echo '{FUTURE_BUILDS}'; fi"
+    )
+}
+
+/// The same for PowerShell (the stamps sit at `<target>/<repo>/[<triple>/]<profile>/.fingerprint`).
+fn future_builds_ps(target: &str) -> String {
+    format!(
+        "$cut = [DateTime]::UtcNow.AddSeconds({MAX_SKEW_S}); \
+         $stamps = @('{target}/*/*/.fingerprint/*/*', '{target}/*/*/*/.fingerprint/*/*'); \
+         if (Get-ChildItem -Path $stamps -File -Force -ErrorAction SilentlyContinue | Where-Object {{ $_.LastWriteTimeUtc -gt $cut }} | Select-Object -First 1) \
+         {{ Remove-Item -Recurse -Force '{target}'; '{FUTURE_BUILDS}' }}"
+    )
+}
+
+/// The notes among what a host printed.
+fn notes(said: &str) -> impl Iterator<Item = &str> {
+    said.lines().map(str::trim).filter(|l| l.starts_with("note:"))
 }
 
 /// The Windows host's folder when its settings name none.
@@ -157,13 +188,17 @@ pub(super) fn linux(run: &Run, out: &mut Collector) {
     let folder = checkout::remote_folder(&root, &checkouts(run));
     out.line(&format!("copies and build folders: {folder}"));
     let mark = format!(
-        "mkdir -p '{folder}' && echo '{}' | base64 -d > '{folder}/{}'",
+        "mkdir -p '{folder}' && echo '{}' | base64 -d > '{folder}/{}' && {{ {}; }}",
         marker_base64(run),
-        checkout::MARKER
+        checkout::MARKER,
+        future_builds_sh(&format!("{folder}/target"))
     );
-    if let Err(e) = process::quiet(ssh(host).arg(mark)) {
-        out.line(&e.to_string());
-        return out.host_failed(Status::Fail, &format!("can't write {folder}/{} (see linux.log)", checkout::MARKER));
+    match process::output(ssh(host).arg(mark)) {
+        Ok(said) => notes(&said).for_each(|n| out.line(n)),
+        Err(e) => {
+            out.line(&e.to_string());
+            return out.host_failed(Status::Fail, &format!("can't write {folder}/{} (see linux.log)", checkout::MARKER));
+        }
     }
     for repo in shipped(run) {
         if let Err(e) = copy_linux(run, out, repo, &folder, touch) {
@@ -203,13 +238,15 @@ pub(super) fn windows(run: &Run, out: &mut Collector) {
     out.line(&format!("copies and build folders: {dir}"));
     let mark = format!(
         "New-Item -ItemType Directory -Force '{dir}/incoming' | Out-Null; \
-         [IO.File]::WriteAllBytes('{dir}/{}', [Convert]::FromBase64String('{}')); [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()",
+         [IO.File]::WriteAllBytes('{dir}/{}', [Convert]::FromBase64String('{}')); [DateTimeOffset]::UtcNow.ToUnixTimeSeconds(); {}",
         checkout::MARKER,
-        marker_base64(run)
+        marker_base64(run),
+        future_builds_ps(&format!("{dir}/target"))
     );
     let Ok(said) = process::output(&mut win_ps(win, &mark)) else {
         return out.host_failed(Status::Unreachable, "not reachable (set ISOLOOM_WIN_USER and authorize the key)");
     };
+    notes(&said).for_each(|n| out.line(n));
     let Some(touch) = prepare_host(run, out, seconds_in(&said), || mirrors::sync_windows(run)) else {
         return;
     };
@@ -343,6 +380,48 @@ mod tests {
     fn copies_keep_their_times_unless_dated_on_landing() {
         assert_eq!(extract_flags(false, "-"), "-xf -");
         assert_eq!(extract_flags(true, "'C:/x/incoming/isoloom.tar'"), "-xf 'C:/x/incoming/isoloom.tar' -m");
+    }
+
+    /// A build folder whose one Cargo stamp is dated `ahead_s` past now, after the script of the
+    /// host this runs on (Linux's, or Windows'): whether the folder is still there, and what the
+    /// script said.
+    #[cfg(any(target_os = "linux", windows))]
+    fn after_the_future_builds_check(name: &str, ahead_s: u64) -> (bool, String) {
+        let root = std::env::temp_dir().join(format!("isoloom-future-builds-{}-{name}", std::process::id()));
+        let unit = root.join("target/isothrum/debug/.fingerprint/isoloom-plan-0123");
+        std::fs::create_dir_all(&unit).unwrap();
+        let stamp = File::create(unit.join("dep-lib-isoloom_plan")).unwrap();
+        stamp
+            .set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(ahead_s))
+            .unwrap();
+        let target = repo::slashed(&root.join("target"));
+        let said = if cfg!(windows) {
+            process::output(Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", &future_builds_ps(&target)]))
+        } else {
+            process::output(Command::new("sh").args(["-c", &future_builds_sh(&target)]))
+        };
+        let kept = root.join("target").exists();
+        std::fs::remove_dir_all(&root).ok();
+        (kept, said.unwrap())
+    }
+
+    #[test]
+    #[cfg(any(target_os = "linux", windows))]
+    fn a_build_folder_dated_ahead_of_the_hosts_clock_is_removed_before_the_copies_land() {
+        // karen, 2026-10-16: its clock set right, its builds of the day before still dated seven
+        // hours ahead, so Cargo took every source copied since for older, and tested those builds.
+        let (ahead_kept, ahead_said) = after_the_future_builds_check("ahead", 7 * 3600);
+        assert!(!ahead_kept, "{ahead_said}");
+        assert_eq!(notes(&ahead_said).collect::<Vec<_>>(), [FUTURE_BUILDS]);
+        let (drift_kept, drift_said) = after_the_future_builds_check("drift", MAX_SKEW_S / 2);
+        assert!(drift_kept, "a little drift keeps the builds: {drift_said}");
+        assert_eq!(notes(&drift_said).count(), 0);
+    }
+
+    #[test]
+    fn the_future_builds_note_survives_the_shells_quotes_and_the_clock_reading() {
+        assert!(!FUTURE_BUILDS.contains(['\'', '"']) && !FUTURE_BUILDS.contains(|c: char| c.is_ascii_digit()));
+        assert_eq!(seconds_in(&format!("1792065600\r\n{FUTURE_BUILDS}\r\n")), Some(1_792_065_600));
     }
 
     #[test]
