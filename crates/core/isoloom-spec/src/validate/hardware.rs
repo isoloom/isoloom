@@ -132,14 +132,19 @@ mod tests {
     fn a_privileged_container_is_refused_on_an_internet_false_network() {
         assert_eq!(
             offline_problems("internet: false", "docker: { image: x }, privileged: true"),
-            ["machines.a.privileged: a privileged container can lift the seal of `lan` (an `internet: false` network) from inside: drop `privileged`, or put the machine on a network with internet"]
+            [
+                "machines.a.privileged: a privileged container can lift the seal of `lan` (an `internet: false` network) from inside: drop `privileged`, or put the machine on a network with internet"
+            ]
         );
     }
 
     #[test]
     fn privilege_is_fine_with_internet_or_on_a_vm() {
         // Internet on the network: nothing to seal.
-        assert_eq!(offline_problems("internet: true", "docker: { image: x }, privileged: true"), Vec::<String>::new());
+        assert_eq!(
+            offline_problems("internet: true", "docker: { image: x }, privileged: true"),
+            Vec::<String>::new()
+        );
         // A VM is sealed at the hypervisor or router, out of its own reach.
         assert_eq!(
             offline_problems("internet: false", "vm: { os: debian@12, provision: [a.sh] }, privileged: true"),
