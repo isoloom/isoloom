@@ -30,6 +30,9 @@ const HOST: &str = "isoloom-docker-host";
 /// The host's address (`${outputs.ip}`): where SSH reaches it and its containers' ports answer.
 const IP: &str = "ip";
 
+/// How long the runner retries the first SSH while the fresh VM is still booting, in seconds.
+const SSH_BOOT_WAIT_S: u32 = 300;
+
 /// The run manifest of `env`'s containers on `cloud`, run in one VM whose module `driver` writes;
 /// `guest` is the Compose-in-a-VM plan (`isoloom_compose::guest`). Its message is left to the
 /// caller.
@@ -98,7 +101,9 @@ fn up_steps(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, guest: &Gu
         steps::init_step()?,
         steps::apply_step("apply", "Creating the Docker host in the cloud…")?,
     ];
-    up.extend(into_vm(way_in, &RelPath::parse("setup.sh")?, "../../..")?);
+    let mut into = into_vm(way_in, &RelPath::parse("setup.sh")?, "../../..")?;
+    boot_wait(&mut into)?;
+    up.extend(into);
     for command in &guest.start {
         up.push(command.step(way_in)?);
     }
@@ -118,6 +123,17 @@ fn docker_outputs(guest_machines: &[Machine]) -> Result<Vec<Output>, ManifestErr
     ];
     outputs.extend(outputs_on_their_hosts(guest_machines)?);
     Ok(outputs)
+}
+
+/// The first SSH step into the fresh VM retries while ssh can't connect yet (the VM is still
+/// booting): `with.wait_s`. Later steps run once it answered.
+fn boot_wait(steps: &mut [isoloom_manifest::Step]) -> Result<(), ManifestError> {
+    if let Some(first) = steps.first_mut()
+        && let isoloom_manifest::Run::Action { with, .. } = &mut first.run
+    {
+        with.insert(SnakeName::parse("wait_s")?, Template::text(&SSH_BOOT_WAIT_S.to_string()));
+    }
+    Ok(())
 }
 
 /// The host VM, sized for every container at once: Isoloom's own machine (`infra`), where the
