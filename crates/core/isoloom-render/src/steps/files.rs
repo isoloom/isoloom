@@ -30,7 +30,7 @@ pub(super) fn linux(files: &[MachineFile]) -> String {
                 "{folder}{write} && chown {}:{} {path} && chmod {} {path}\n",
                 f.uid.unwrap_or(0),
                 f.gid.unwrap_or(0),
-                f.mode_or_default()
+                quote(f.mode_or_default())
             )
         })
         .collect::<Vec<_>>()
@@ -84,9 +84,22 @@ mod tests {
         let sh = super::linux(&[owned, file("/b.conf", Some("conf/b.conf"), None)]);
         assert_eq!(
             sh,
-            "mkdir -p '/etc/app' && printf '%s' 'it'\\''s\n' > '/etc/app/a.ini' && chown 1000:1001 '/etc/app/a.ini' && chmod 0600 '/etc/app/a.ini'\n\
-             cp '/opt/isoloom/conf/b.conf' '/b.conf' && chown 0:0 '/b.conf' && chmod 0644 '/b.conf'\n"
+            "mkdir -p '/etc/app' && printf '%s' 'it'\\''s\n' > '/etc/app/a.ini' && chown 1000:1001 '/etc/app/a.ini' && chmod '0600' '/etc/app/a.ini'\n\
+             cp '/opt/isoloom/conf/b.conf' '/b.conf' && chown 0:0 '/b.conf' && chmod '0644' '/b.conf'\n"
         );
+    }
+
+    #[test]
+    fn the_mode_is_quoted_so_it_cannot_break_out_of_chmod() {
+        // Validation keeps a mode to octal digits, but the renderer must not depend on it: a
+        // library consumer rendering an unvalidated lowered spec still gets a safe word.
+        let crafted = MachineFile {
+            mode: Some("0644 /etc/shadow; rm -rf /".into()),
+            ..file("/b.conf", None, Some("x"))
+        };
+        let sh = super::linux(&[crafted]);
+        assert!(sh.contains("chmod '0644 /etc/shadow; rm -rf /' '/b.conf'"), "{sh}");
+        assert!(!sh.contains("chmod 0644 "), "the mode reached the shell unquoted: {sh}");
     }
 
     #[test]
