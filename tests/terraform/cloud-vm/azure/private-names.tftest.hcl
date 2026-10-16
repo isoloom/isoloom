@@ -6,10 +6,6 @@ mock_provider "azurerm" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -37,7 +33,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "the_zone_is_linked_to_the_virtual_network" {
@@ -93,15 +88,17 @@ run "the_machines_admit_their_network_and_ssh_only" {
     condition = sort([for r in azurerm_network_security_group.web.security_rule : "${r.access} ${r.protocol} ${r.destination_port_range} ${r.source_address_prefix}" if r.direction == "Inbound"]) == sort([
       "Allow * * 10.84.0.0/24",
       "Allow Tcp 22 203.0.113.7/32",
+      "Deny * * VirtualNetwork",
     ])
-    error_message = "web publishes nothing: it must admit office and SSH from allowed_cidr only"
+    error_message = "web publishes nothing: it must admit office and SSH from allowed_cidr, then deny the rest of the virtual network"
   }
   assert {
     condition = sort([for r in azurerm_network_security_group.client.security_rule : "${r.access} ${r.protocol} ${r.destination_port_range} ${r.source_address_prefix}" if r.direction == "Inbound"]) == sort([
       "Allow * * 10.84.0.0/24",
       "Allow Tcp 22 203.0.113.7/32",
+      "Deny * * VirtualNetwork",
     ])
-    error_message = "client must admit office and SSH from allowed_cidr only"
+    error_message = "client must admit office and SSH from allowed_cidr, then deny the rest of the virtual network"
   }
   assert {
     condition     = output.ready_file == "/var/lib/isoloom/ready"

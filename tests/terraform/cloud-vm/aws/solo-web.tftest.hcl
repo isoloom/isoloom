@@ -7,10 +7,6 @@ mock_provider "aws" {
   source          = "./tests/mocks/aws"
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -56,7 +52,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "the_network_reaches_the_internet_through_the_gateway" {

@@ -8,10 +8,6 @@ mock_provider "google" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -48,7 +44,6 @@ variables {
   project              = "tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "the_network_is_a_vpc_network_of_its_own_that_reaches_the_internet" {

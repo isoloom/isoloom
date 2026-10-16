@@ -7,10 +7,6 @@ mock_provider "aws" {
   source          = "./tests/mocks/aws"
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -33,6 +29,12 @@ override_resource {
   target          = aws_route_table.env
   override_during = plan
   values          = { id = "rtb-env" }
+}
+
+override_resource {
+  target          = aws_route_table.sealed
+  override_during = plan
+  values          = { id = "rtb-sealed" }
 }
 
 override_resource {
@@ -80,7 +82,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_subnet_of_the_vpc_at_its_exact_range" {
@@ -116,8 +117,12 @@ run "the_internet_gateway_is_the_only_way_out" {
     error_message = "front's subnet must use the environment's route table"
   }
   assert {
-    condition     = [aws_route_table_association.back.subnet_id, aws_route_table_association.back.route_table_id] == ["subnet-back", "rtb-env"]
-    error_message = "back's subnet must use the environment's route table"
+    condition     = [aws_route_table_association.back.subnet_id, aws_route_table_association.back.route_table_id] == ["subnet-back", "rtb-sealed"]
+    error_message = "back (internet: false) must use the sealed route table, so its way out can be closed once its machines are set up"
+  }
+  assert {
+    condition     = [for r in aws_route_table.sealed.route : { cidr = r.cidr_block, gateway = r.gateway_id }] == [{ cidr = "0.0.0.0/0", gateway = "igw-env" }]
+    error_message = "until the run is sealed, back reaches the internet (its machines set themselves up over SSH)"
   }
   assert {
     condition     = [aws_route_table_association.access.subnet_id, aws_route_table_association.access.route_table_id] == ["subnet-access", "rtb-env"]
@@ -198,19 +203,25 @@ run "the_outputs_name_the_way_in_and_the_ready_file" {
   }
 }
 
-# The spec: `back` has `internet: false`, so its machines may not reach the internet. On AWS every
-# subnet shares the one route table whose default route goes to the internet gateway, and cache
-# has a public address (Terraform sets it up over SSH): only the guest's own nftables rule
-# (`isoloom-egress`) stops it, which root on the machine can lift.
-run "known_bug_a_network_without_internet_still_routes_to_it" {
+# The spec: `back` has `internet: false`, so once its machines are set up they may not reach the
+# internet. The runner applies the module again with `isoloom_sealed = true` (the manifest's
+# `seal`) once every machine is ready; back's own route table then drops the default route and
+# keeps only a route to allowed_cidr, so the runner's SSH and the published ports' replies still
+# get out, but the internet does not — at the network, where root in the guest can't lift it. The
+# machines keep their public addresses (the seal is egress-only), the way the runner reaches them.
+run "a_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
+  variables {
+    isoloom_sealed = true
+  }
+
   assert {
-    condition     = aws_route_table_association.back.route_table_id != "rtb-env" || length([for r in aws_route_table.env.route : r if r.cidr_block == "0.0.0.0/0"]) == 0
-    error_message = "back (internet: false) must have no route to the internet"
+    condition     = [for r in aws_route_table.sealed.route : { cidr = r.cidr_block, gateway = r.gateway_id }] == [{ cidr = "203.0.113.7/32", gateway = "igw-env" }]
+    error_message = "once sealed, back's only way out must be to allowed_cidr through the internet gateway, never 0.0.0.0/0"
   }
   assert {
-    condition     = aws_instance.cache.associate_public_ip_address == false
-    error_message = "cache, on back (internet: false), must have no public address"
+    condition     = length([for r in aws_route_table.sealed.route : r if r.cidr_block == "0.0.0.0/0"]) == 0
+    error_message = "once sealed, back must have no default route to the internet"
   }
 }

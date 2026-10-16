@@ -9,10 +9,6 @@ mock_provider "oci" {
   source          = "./tests/mocks/oci"
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -83,7 +79,6 @@ variables {
   compartment_id       = "ocid1.compartment.oc1..tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "every_network_is_a_subnet_of_the_vcn_at_its_exact_range" {
@@ -209,18 +204,24 @@ run "the_outputs_name_the_way_in_and_the_ready_file" {
   }
 }
 
-# The spec: lan has `internet: false` and `gateway: fw`, so what leaves lan is fw's to decide. On
-# Oracle Cloud lan's own table still sends 0.0.0.0/0 straight to the internet gateway, and cache
-# has a public address (it is set up over SSH there), so lan's traffic to the internet never
-# crosses fw. (lan's security list lets its machines out to every public block, which a route
-# through fw needs: the list judges the destination, not the next hop.) Only the public address
-# is asserted: a failing assertion that reads a route table's `route_rules` crashes Terraform
-# 1.16's JSON view (the rules carry a deprecated attribute's mark).
-run "known_bug_a_routed_network_without_internet_goes_out_around_its_gateway" {
+# The spec: lan has `internet: false` and `gateway: fw`. During set-up lan's security list lets
+# its machines out to every public block (they set themselves up over SSH); once every machine is
+# ready the runner applies with `isoloom_sealed = true` (the manifest's `seal`), and lan's
+# security list keeps no egress rule to a public block, so the internet is closed at the network
+# (the list judges the destination, not the next hop), while lan still reaches the other networks.
+# The seal is where root in the guest can't lift it, and cache keeps its public address, the way
+# the runner reaches it. (Only the egress rules are asserted: a failing assertion that reads a
+# route table's `route_rules` crashes Terraform 1.16's JSON view, the rules carry a deprecated
+# attribute's mark.)
+run "a_routed_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
+  variables {
+    isoloom_sealed = true
+  }
+
   assert {
-    condition     = tostring(one(oci_core_instance.cache.create_vnic_details).assign_public_ip) == "false"
-    error_message = "cache, on lan (internet: false, routed by fw), must have no public address: its traffic to the internet must cross fw"
+    condition     = length([for r in oci_core_security_list.lan.egress_security_rules : r.destination if r.protocol == "all" && !startswith(r.destination, "10.")]) == 0
+    error_message = "once sealed, lan (internet: false, routed by fw) must keep no egress rule to a public block"
   }
 }

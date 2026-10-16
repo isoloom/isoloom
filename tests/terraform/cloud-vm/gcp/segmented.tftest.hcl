@@ -10,10 +10,6 @@ mock_provider "google" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -80,7 +76,6 @@ variables {
   project              = "tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_vpc_network_of_its_own_at_its_exact_range" {
@@ -212,20 +207,26 @@ run "the_outputs_name_the_machines_and_the_ready_file" {
   }
 }
 
-# The spec: `back` has `internet: false`, so its machines may not reach the internet. On Google
-# Cloud back's VPC network keeps the default route to the internet gateway Google creates with
-# it (`delete_default_routes_on_create` is unset: false), and cache has an external address
-# (`access_config`: it is set up over SSH there): only the guest's own nftables rule
-# (`isoloom-egress`) stops it, which root on the machine can lift.
-run "known_bug_a_network_without_internet_still_routes_to_it" {
+# The spec: `back` has `internet: false`, so once its machines are set up they may not reach the
+# internet. During set-up cache reaches it over its external address; once every machine is ready
+# the runner applies with `isoloom_sealed = true` (the manifest's `seal`), and cache then gets
+# two EGRESS firewall rules: the lab's own blocks allowed (priority 900), everything else denied
+# (priority 1000). The seal is at the network, where root in the guest can't lift it; Google
+# Cloud's firewall is stateful, so the runner's SSH and the published ports' replies still get
+# out, and cache keeps its external address, the way the runner reaches it.
+run "a_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
+  variables {
+    isoloom_sealed = true
+  }
+
   assert {
-    condition     = coalesce(google_compute_network.back.delete_default_routes_on_create, false) == true
-    error_message = "back (internet: false) must have no default route to the internet"
+    condition     = google_compute_firewall.cache_sealed_back[0].direction == "EGRESS" && tolist(google_compute_firewall.cache_sealed_back[0].destination_ranges) == tolist(["0.0.0.0/0"]) && google_compute_firewall.cache_sealed_back[0].priority == 1000 && [for d in google_compute_firewall.cache_sealed_back[0].deny : d.protocol] == ["all"]
+    error_message = "once sealed, cache (on back) must deny all egress to the internet"
   }
   assert {
-    condition     = length(google_compute_instance.cache.network_interface[0].access_config) == 0
-    error_message = "cache, on back (internet: false), must have no external address"
+    condition     = toset(google_compute_firewall.cache_lab_back[0].destination_ranges) == toset(["10.61.10.0/24", "10.61.20.0/24", "10.61.99.0/24"]) && google_compute_firewall.cache_lab_back[0].priority == 900 && [for a in google_compute_firewall.cache_lab_back[0].allow : a.protocol] == ["all"]
+    error_message = "once sealed, cache may still reach the lab's own networks, a higher-priority allow before the deny"
   }
 }

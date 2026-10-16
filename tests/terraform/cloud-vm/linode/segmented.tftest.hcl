@@ -7,10 +7,6 @@ mock_provider "linode" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 mock_provider "random" {
   override_during = plan
 }
@@ -60,7 +56,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_subnet_of_the_vpc_at_its_exact_range" {
@@ -113,6 +108,9 @@ run "the_cache_admits_back_and_front_on_6379_and_reaches_no_other_network" {
   }
   assert {
     condition = sort([for r in linode_firewall.cache.outbound : "${r.action} ${r.protocol} ${coalesce(r.ports, "-")} ${join(",", r.ipv4)}"]) == sort([
+      "ACCEPT TCP 1-65535 10.61.20.0/24",
+      "ACCEPT UDP 1-65535 10.61.20.0/24",
+      "ACCEPT ICMP - 10.61.20.0/24",
       "DROP TCP 1-65535 10.61.10.0/24",
       "DROP UDP 1-65535 10.61.10.0/24",
       "DROP ICMP - 10.61.10.0/24",
@@ -120,7 +118,7 @@ run "the_cache_admits_back_and_front_on_6379_and_reaches_no_other_network" {
       "DROP UDP 1-65535 10.61.99.0/24",
       "DROP ICMP - 10.61.99.0/24",
     ])
-    error_message = "cache must not open connections to front or access (no reach rule out of back)"
+    error_message = "cache (on back, internet: false) accepts its own network outbound and drops front and access (no reach rule out of back); the default outbound policy (DROP once sealed) stops everything else"
   }
 }
 
@@ -203,15 +201,22 @@ run "the_outputs_name_the_way_in_and_the_ready_file" {
   }
 }
 
-# The spec: `back` has `internet: false`, so its machines may not reach the internet. On Linode
-# cache has a public interface (Terraform sets it up over SSH there) and its firewall accepts
-# everything outbound but the other networks: only the guest's own nftables rule
-# (`isoloom-egress`) stops it, which root on the machine can lift.
-run "known_bug_a_network_without_internet_still_has_a_way_out" {
+# The spec: `back` has `internet: false`, so once its machines are set up they may not reach the
+# internet. During set-up cache's firewall lets everything out (it has a public interface the
+# runner sets it up over); once every machine is ready the runner applies with
+# `isoloom_sealed = true` (the manifest's `seal`), and cache's outbound policy becomes DROP, so
+# only its own network and its reach rules get out (the firewall is stateful, so the runner's SSH
+# and the published ports' replies still leave). The seal is at the network, where root in the
+# guest can't lift it.
+run "a_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
+
+  variables {
+    isoloom_sealed = true
+  }
 
   assert {
     condition     = linode_firewall.cache.outbound_policy == "DROP"
-    error_message = "cache's firewall, on back (internet: false), must drop outbound traffic it doesn't accept"
+    error_message = "once sealed, cache's firewall (on back, internet: false) must drop the outbound traffic it doesn't accept"
   }
 }

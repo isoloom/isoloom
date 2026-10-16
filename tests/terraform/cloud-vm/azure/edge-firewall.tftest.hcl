@@ -8,10 +8,6 @@ mock_provider "azurerm" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -81,7 +77,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_subnet_at_its_exact_range" {
@@ -158,8 +153,9 @@ run "each_machine_admits_its_networks_ssh_and_its_reach_rules_only" {
       "Allow * * 10.70.10.0/24",
       "Allow * * 10.70.20.0/24",
       "Allow Tcp 22 203.0.113.7/32",
+      "Deny * * VirtualNetwork",
     ])
-    error_message = "fw routes: it must admit its three networks and SSH from allowed_cidr, and nothing else"
+    error_message = "fw routes: it must admit its three networks and SSH from allowed_cidr, then deny the rest of the virtual network, and nothing else"
   }
   assert {
     condition = sort([for r in azurerm_network_security_group.web.security_rule : "${r.access} ${r.protocol} ${r.destination_port_range} ${r.source_address_prefix}" if r.direction == "Inbound"]) == sort([
@@ -167,8 +163,9 @@ run "each_machine_admits_its_networks_ssh_and_its_reach_rules_only" {
       "Allow Tcp 22 203.0.113.7/32",
       "Allow Tcp 80 10.70.0.0/24",
       "Allow Udp 80 10.70.0.0/24",
+      "Deny * * VirtualNetwork",
     ])
-    error_message = "web (on dmz) must admit dmz, SSH, and outside on 80 (reach), and nothing else"
+    error_message = "web (on dmz) must admit dmz, SSH, and outside on 80 (reach), then deny the rest of the virtual network, and nothing else"
   }
   assert {
     condition = sort([for r in azurerm_network_security_group.cache.security_rule : "${r.access} ${r.protocol} ${r.destination_port_range} ${r.source_address_prefix}" if r.direction == "Inbound"]) == sort([
@@ -176,26 +173,34 @@ run "each_machine_admits_its_networks_ssh_and_its_reach_rules_only" {
       "Allow Tcp 22 203.0.113.7/32",
       "Allow Tcp 6379 10.70.10.0/24",
       "Allow Udp 6379 10.70.10.0/24",
+      "Deny * * VirtualNetwork",
     ])
-    error_message = "cache (on lan) must admit lan, SSH, and dmz on 6379 (reach), and nothing else"
+    error_message = "cache (on lan) must admit lan, SSH, and dmz on 6379 (reach), then deny the rest of the virtual network, and nothing else"
   }
   assert {
     condition = sort([for r in azurerm_network_security_group.user.security_rule : "${r.access} ${r.protocol} ${r.destination_port_range} ${r.source_address_prefix}" if r.direction == "Inbound"]) == sort([
       "Allow * * 10.70.0.0/24",
       "Allow Tcp 22 203.0.113.7/32",
+      "Deny * * VirtualNetwork",
     ])
-    error_message = "user (on outside) must admit outside and SSH from allowed_cidr only"
+    error_message = "user (on outside) must admit outside and SSH from allowed_cidr, then deny the rest of the virtual network"
   }
 }
 
-# The spec: lan has `internet: false` and `gateway: fw`. Its subnet has no default outbound
-# access, but cache's interface carries a Standard public address (the machines are set up over
-# SSH there), which gives it a way to the internet that never crosses fw.
-run "known_bug_a_routed_network_without_internet_goes_out_around_its_gateway" {
+# The spec: lan has `internet: false` and `gateway: fw`. During set-up cache reaches the internet
+# over its Standard public address; once every machine is ready the runner applies with
+# `isoloom_sealed = true` (the manifest's `seal`) and cache's group then denies the internet
+# outbound, at the network, where root in the guest can't lift it. cache still reaches the other
+# networks through fw, and keeps its public address, the way the runner reaches it.
+run "a_routed_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
+  variables {
+    isoloom_sealed = true
+  }
+
   assert {
-    condition     = azurerm_network_interface.cache_lan.ip_configuration[0].public_ip_address_id == null
-    error_message = "cache, on lan (internet: false), must have no public address"
+    condition     = [for r in azurerm_network_security_group.cache.security_rule : "${r.access} ${r.destination_address_prefix}" if r.direction == "Outbound"] == ["Deny Internet"]
+    error_message = "once sealed, cache (on lan, internet: false) must deny the internet outbound, at the network"
   }
 }

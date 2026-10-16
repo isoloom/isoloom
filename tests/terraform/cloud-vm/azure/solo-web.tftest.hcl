@@ -6,10 +6,6 @@ mock_provider "azurerm" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -43,7 +39,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "the_network_is_a_subnet_with_its_range_and_internet" {
@@ -75,8 +70,9 @@ run "the_web_server_publishes_8080_to_allowed_cidr_only" {
       "Allow * * 10.80.0.0/24",
       "Allow Tcp 22 203.0.113.7/32",
       "Allow Tcp 8080 203.0.113.7/32",
+      "Deny * * VirtualNetwork",
     ])
-    error_message = "web must admit its network, SSH and its published port (8080/tcp) from allowed_cidr, and nothing else"
+    error_message = "web must admit its network, SSH and its published port (8080/tcp) from allowed_cidr, then deny the rest of the virtual network, and nothing else"
   }
 }
 

@@ -8,10 +8,6 @@ mock_provider "aws" {
   source          = "./tests/mocks/aws"
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -93,7 +89,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "every_network_holds_its_range_inside_the_vpc_block" {
@@ -202,19 +197,25 @@ run "each_machine_admits_its_networks_ssh_and_its_reach_rules_only" {
   }
 }
 
-# The spec: lan has `internet: false` and `gateway: fw`, so what leaves lan is fw's to decide. On
-# AWS lan's table still sends 0.0.0.0/0 straight to the internet gateway and cache has a public
-# address (the machines are set up over SSH there), so lan's traffic to the internet never
-# crosses fw, and nothing else stops it.
-run "known_bug_a_routed_network_without_internet_goes_out_around_its_gateway" {
+# The spec: lan has `internet: false` and `gateway: fw`. Until the run is sealed, lan's table
+# sends 0.0.0.0/0 to the internet gateway so its machines set themselves up. Once every machine is
+# ready the runner applies with `isoloom_sealed = true`: lan's default route becomes a route to
+# allowed_cidr alone, so the internet is closed at the network (root in the guest can't lift it),
+# while the runner's SSH and the published ports' replies still get out. lan still reaches the
+# other networks through fw either way.
+run "a_routed_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
+  variables {
+    isoloom_sealed = true
+  }
+
   assert {
-    condition     = length([for r in aws_route_table.lan.route : r if r.cidr_block == "0.0.0.0/0" && r.gateway_id == "igw-env"]) == 0
-    error_message = "lan (internet: false, routed by fw) must have no route to the internet gateway"
+    condition     = length([for r in aws_route_table.lan.route : r if r.cidr_block == "0.0.0.0/0"]) == 0
+    error_message = "once sealed, lan (internet: false, routed by fw) must have no default route to the internet"
   }
   assert {
-    condition     = aws_instance.cache.associate_public_ip_address == false
-    error_message = "cache, on lan (internet: false), must have no public address"
+    condition     = sort([for r in aws_route_table.lan.route : "${r.cidr_block} ${coalesce(r.gateway_id, r.network_interface_id)}"]) == sort(["203.0.113.7/32 igw-env", "10.70.0.0/24 eni-fw-lan", "10.70.10.0/24 eni-fw-lan"])
+    error_message = "once sealed, lan's way out is to allowed_cidr through the internet gateway; it still reaches the other networks through fw"
   }
 }

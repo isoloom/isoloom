@@ -11,10 +11,6 @@ mock_provider "google" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -81,7 +77,6 @@ variables {
   project              = "tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_vpc_network_of_its_own_at_its_exact_range" {
@@ -228,19 +223,25 @@ run "the_outputs_name_the_machines_and_the_ready_file" {
   }
 }
 
-# The spec: lan has `internet: false` and `gateway: fw`, so what leaves lan is fw's to decide. On
-# Google Cloud lan's VPC network keeps the default route to the internet gateway Google creates
-# with it, and cache has an external address (`access_config`: it is set up over SSH there), so
-# lan's traffic to the internet never crosses fw.
-run "known_bug_a_routed_network_without_internet_goes_out_around_its_gateway" {
+# The spec: lan has `internet: false` and `gateway: fw`. During set-up cache reaches the internet
+# over its external address; once every machine is ready the runner applies with
+# `isoloom_sealed = true` (the manifest's `seal`), and cache then gets two EGRESS firewall rules:
+# the lab's own blocks allowed (priority 900), everything else denied (priority 1000). The seal
+# is at the network, where root in the guest can't lift it; cache still reaches the other
+# networks through fw, and keeps its external address, the way the runner reaches it.
+run "a_routed_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
+  variables {
+    isoloom_sealed = true
+  }
+
   assert {
-    condition     = coalesce(google_compute_network.lan.delete_default_routes_on_create, false) == true
-    error_message = "lan (internet: false, routed by fw) must have no default route to the internet"
+    condition     = google_compute_firewall.cache_sealed_lan[0].direction == "EGRESS" && tolist(google_compute_firewall.cache_sealed_lan[0].destination_ranges) == tolist(["0.0.0.0/0"]) && google_compute_firewall.cache_sealed_lan[0].priority == 1000 && [for d in google_compute_firewall.cache_sealed_lan[0].deny : d.protocol] == ["all"]
+    error_message = "once sealed, cache (on lan) must deny all egress to the internet"
   }
   assert {
-    condition     = length(google_compute_instance.cache.network_interface[0].access_config) == 0
-    error_message = "cache, on lan (internet: false), must have no external address"
+    condition     = toset(google_compute_firewall.cache_lab_lan[0].destination_ranges) == toset(["10.70.0.0/24", "10.70.10.0/24", "10.70.20.0/24"]) && google_compute_firewall.cache_lab_lan[0].priority == 900 && [for a in google_compute_firewall.cache_lab_lan[0].allow : a.protocol] == ["all"]
+    error_message = "once sealed, cache may still reach the lab's own networks, a higher-priority allow before the deny"
   }
 }

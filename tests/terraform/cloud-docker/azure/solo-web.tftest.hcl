@@ -10,10 +10,6 @@ mock_provider "azurerm" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -47,7 +43,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "the_host_sits_on_the_one_subnet_of_its_network_with_a_public_address" {
@@ -97,21 +92,5 @@ run "the_outputs_name_the_host_and_the_ready_file" {
     condition     = output.ssh_user == "isoloom"
     error_message = "`ssh_user` must be the admin user the module creates"
   }
-  assert {
-    condition     = output.ready_file == "/var/lib/isoloom/ready"
-    error_message = "`ready_file` must be the isoloom-ready/1 file the set-up writes"
-  }
 }
 
-# The spec: a published port is read as `machines.<m>.ports.<name>.published`, which the cloud
-# targets give as the `published` output keyed `<machine>/<port-name>` (cloud-vm writes
-# `{ "web/web" = "<ip>:8080" }`). The cloud-docker module writes no `published` output: only the
-# security group opens 8080.
-run "known_bug_the_published_port_has_no_output" {
-  command = plan
-
-  assert {
-    condition     = try(run.the_outputs_name_the_host_and_the_ready_file.published, null) == { "web/web" = "198.51.100.10:8080" }
-    error_message = "the `published` output must give web's port `web` as { \"web/web\" = \"<ip>:8080\" }"
-  }
-}

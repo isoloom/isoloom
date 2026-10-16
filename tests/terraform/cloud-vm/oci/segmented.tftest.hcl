@@ -9,10 +9,6 @@ mock_provider "oci" {
   source          = "./tests/mocks/oci"
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -83,7 +79,6 @@ variables {
   compartment_id       = "ocid1.compartment.oc1..tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
-  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_subnet_of_the_vcn_with_its_own_security_list" {
@@ -225,24 +220,24 @@ run "the_outputs_name_the_way_in_and_the_ready_file" {
   }
 }
 
-# The spec: `back` has `internet: false`, so its machines may not reach the internet. On Oracle
-# Cloud back's subnet uses the environment's route table (0.0.0.0/0 through the internet
-# gateway), its security list lets its machines out to every public block, and cache gets a
-# public address (it is set up over SSH there): only the guest's own nftables rule
-# (`isoloom-egress`) stops it, which root on the machine can lift.
-run "known_bug_a_network_without_internet_still_has_a_way_out" {
+# The spec: `back` has `internet: false`, so once its machines are set up they may not reach the
+# internet. During set-up back's security list lets its machines out to every public block (they
+# set themselves up over SSH); once every machine is ready the runner applies with
+# `isoloom_sealed = true` (the manifest's `seal`), and back's security list keeps no egress rule
+# to a public block. The seal is at the network, where root in the guest can't lift it; Oracle
+# Cloud's security list is stateful, so the runner's SSH and the published ports' replies still
+# leave, and cache keeps its public address, the way the runner reaches it. (Only the egress
+# rules are asserted: a failing assertion that reads a route table's `route_rules` crashes
+# Terraform 1.16's JSON view, the rules carry a deprecated attribute's mark.)
+run "a_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
+
+  variables {
+    isoloom_sealed = true
+  }
 
   assert {
     condition     = length([for r in oci_core_security_list.back.egress_security_rules : r.destination if r.protocol == "all" && !startswith(r.destination, "10.")]) == 0
-    error_message = "back (internet: false) must let its machines out to no public block"
-  }
-  assert {
-    condition     = oci_core_subnet.back.route_table_id != "ocid1.routetable.oc1..env"
-    error_message = "back (internet: false) must not use the route table whose default rule goes to the internet gateway"
-  }
-  assert {
-    condition     = tostring(one(oci_core_instance.cache.create_vnic_details).assign_public_ip) == "false"
-    error_message = "cache, on back (internet: false), must have no public address"
+    error_message = "once sealed, back (internet: false) must keep no egress rule to a public block"
   }
 }

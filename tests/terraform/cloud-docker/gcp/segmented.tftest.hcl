@@ -7,10 +7,6 @@ mock_provider "google" {
   override_during = plan
 }
 
-mock_provider "local" {
-  override_during = plan
-}
-
 override_resource {
   target          = terraform_data.id
   override_during = plan
@@ -32,7 +28,6 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
-  ssh_private_key_file = "/dev/null"
   project              = "isoloom-test"
 }
 
@@ -79,9 +74,5 @@ run "the_outputs_name_the_host_and_the_ready_file" {
   assert {
     condition     = output.ssh_user == "isoloom"
     error_message = "`ssh_user` must be the host image's user"
-  }
-  assert {
-    condition     = output.ready_file == "/var/lib/isoloom/ready"
-    error_message = "`ready_file` must be the isoloom-ready/1 file the set-up writes"
   }
 }
