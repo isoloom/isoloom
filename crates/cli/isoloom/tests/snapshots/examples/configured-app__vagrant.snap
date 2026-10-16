@@ -1459,7 +1459,7 @@ Vagrant.configure("2") do |config|
 
       [Service]
       ExecStart="python3" "-m" "http.server" "8081" "--directory" "/srv/api"
-      WorkingDirectory="/srv/api"
+      WorkingDirectory=/srv/api
       Restart=on-failure
 
       [Install]

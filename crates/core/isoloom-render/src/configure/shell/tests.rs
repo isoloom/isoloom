@@ -140,7 +140,7 @@ fn a_service_is_the_unit_its_family_names_and_one_isoloom_defines_comes_with_its
     let defined = one("debian@12", "{ service: { name: api, run: [/srv/api, --port, '8000'], user: api, cwd: /srv } }");
     assert!(defined.starts_with("isoloom_unit 'api' '[Unit]\n"), "{defined}");
     assert!(
-        defined.contains("ExecStart=\"/srv/api\" \"--port\" \"8000\"\nUser=api\nWorkingDirectory=\"/srv\"\n"),
+        defined.contains("ExecStart=\"/srv/api\" \"--port\" \"8000\"\nUser=api\nWorkingDirectory=/srv\n"),
         "{defined}"
     );
     assert!(defined.ends_with("'\nisoloom_service 'api' 'yes'\n"), "{defined}");

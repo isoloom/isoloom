@@ -20,7 +20,8 @@ pub(super) fn linux(family: Family, name: &UnitName, run: &Argv, user: Option<&U
 fn systemd(name: &UnitName, run: &Argv, user: Option<&UserName>, cwd: Option<&AbsPath>) -> String {
     let exec: Vec<String> = run.args().iter().map(|a| systemd_word(a)).collect();
     let user = user.map(|u| format!("User={u}\n")).unwrap_or_default();
-    let cwd = cwd.map(|d| format!("WorkingDirectory={}\n", systemd_word(d.as_str()))).unwrap_or_default();
+    // A bare path: systemd doesn't unquote `WorkingDirectory=`, but expands its `%` specifiers.
+    let cwd = cwd.map(|d| format!("WorkingDirectory={}\n", d.as_str().replace('%', "%%"))).unwrap_or_default();
     format!(
         "[Unit]\nDescription={name}, defined by Isoloom\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nExecStart={}\n{user}{cwd}Restart=on-failure\n\n[Install]\nWantedBy=multi-user.target\n",
         exec.join(" ")
@@ -79,10 +80,24 @@ mod tests {
             "/srv".parse().ok().as_ref(),
         );
         assert!(
-            unit.contains("ExecStart=\"/srv/api\" \"--name\" \"a \\\"b\\\" $$HOME 100%%\"\nUser=api\nWorkingDirectory=\"/srv\"\nRestart=on-failure\n"),
+            unit.contains("ExecStart=\"/srv/api\" \"--name\" \"a \\\"b\\\" $$HOME 100%%\"\nUser=api\nWorkingDirectory=/srv\nRestart=on-failure\n"),
             "{unit}"
         );
         assert!(unit.ends_with("[Install]\nWantedBy=multi-user.target\n"));
+    }
+
+    /// systemd takes `WorkingDirectory=` as a bare path (quoted, it isn't absolute: a real
+    /// VirtualBox run refused the unit), with `%` its only specifier.
+    #[test]
+    fn a_working_directory_is_a_bare_path_its_percent_signs_doubled() {
+        let unit = linux(
+            Family::Debian,
+            &"api".parse().unwrap(),
+            &argv(&["/srv/api"]),
+            None,
+            "/srv/my app/100%".parse().ok().as_ref(),
+        );
+        assert!(unit.contains("\nWorkingDirectory=/srv/my app/100%%\n"), "{unit}");
     }
 
     #[test]
