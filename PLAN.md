@@ -82,6 +82,8 @@ Workers stopped mid-step; their state is safe in their worktrees. Resume each by
 
 **C3/C4 (owed, needs network access):** pin the Proxmox and ESXi base OS images to a dated release + embedded sha256 in the image table (like the catalogue lock), replacing the floating `latest`/`current` URLs. Server-target generators (part of the Proxmox/ESXi server follow-up), not blocking the RC.
 
+**Phase 6 security remediation COMPLETE (2026-10-16).** Landed test-first on main: C1 `isoloom@bd48a798` (apt-repo Docker install, key pinned by sha256, madison version resolution, get.docker.com only the RPM fallback, fails closed), S1 `57928f91`, S2 `47918dba`, S5 `1a942452`; isothrum S3 `6a86253`, S5 `6c096ad`; C2 `7158a3ca`. All gates green (verify 0, full nextest, 44 Docker-only snapshot regens). **Owed before 1.0 (not RC blockers):** (a) inline C1's dnf/RPM repo path with its pinned key `e6c650e0…`, proven on a Rocky/Fedora guest (TODO 4.7); (b) a real apt-guest run on jarvis to exercise the new Docker bootstrap. **C3/C4** (Proxmox/ESXi image pinning) still owed to the maintainer (needs network access).
+
 **For the maintainer when back:**
 1. **Push hotfix?** The cyber-courses-web `hotfix/content-fetch` (`099adc6`) fixes a production security flaw in the lesson fetch. All 9 published lessons already store a commit ref, so none breaks. **Push it alone?**
 2. **Two approvals:** the AMOUNT decimal fix (about 1 player in 10 can't solve invoice-portal-api), and a separate `courses:sync` scope in Cyber Auth.
