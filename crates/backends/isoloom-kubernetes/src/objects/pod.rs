@@ -34,6 +34,11 @@ pub(crate) struct PodSpec {
     /// Its namespaced sysctls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) security_context: Option<PodSecurity>,
+    /// Its containers share one process namespace, so the pod's pause process is PID 1 and
+    /// reaps orphans (what Compose's `init: true` does): set when Isoloom's runner runs its
+    /// services.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) share_process_namespace: bool,
     /// What runs before it, in order.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) init_containers: Vec<Container>,

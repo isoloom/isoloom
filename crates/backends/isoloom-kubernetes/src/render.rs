@@ -52,7 +52,7 @@ pub(crate) fn render(env: &Environment) -> Result<Files> {
     ];
     files.extend(checks::files(&r.checks, &r.namespace)?);
     files.extend(chart::files(env, &r)?);
-    files.extend(isoloom_render::dockerfile::files(env));
+    files.extend(isoloom_render::configure::dockerfile::files(env));
     Ok(files)
 }
 

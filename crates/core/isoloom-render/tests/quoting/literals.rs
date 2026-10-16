@@ -143,3 +143,49 @@ pub(crate) fn ps_decode(lit: &str) -> Option<String> {
     }
     Some(out)
 }
+
+/// A word of a systemd command line in double quotes, as systemd reads it: C escapes (`\\`,
+/// `\"`, `\n`) unescaped, `%%` a percent sign, `$$` a dollar sign; a lone `%` (a specifier) or
+/// `$` (a variable) would expand, so it isn't plain text.
+pub(crate) fn systemd_decode(word: &str) -> Option<String> {
+    let inner = word.strip_prefix('"')?.strip_suffix('"')?;
+    let mut out = String::new();
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => out.push(match chars.next()? {
+                'n' => '\n',
+                escaped @ ('\\' | '"') => escaped,
+                _ => return None,
+            }),
+            '%' | '$' => {
+                if chars.next()? != c {
+                    return None;
+                }
+                out.push(c);
+            }
+            '"' => return None,
+            _ => out.push(c),
+        }
+    }
+    Some(out)
+}
+
+/// Standard base64 (RFC 4648), padded, decoded.
+pub(crate) fn b64_decode(text: &str) -> Option<Vec<u8>> {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    if !text.len().is_multiple_of(4) {
+        return None;
+    }
+    let (mut bits, mut held, mut out) = (0u32, 0u32, Vec::new());
+    for symbol in text.trim_end_matches('=').bytes() {
+        let sextet = ALPHABET.iter().position(|a| *a == symbol)?;
+        bits = (bits << 6) | u32::try_from(sextet).ok()?;
+        held += 6;
+        if held >= 8 {
+            held -= 8;
+            out.push(u8::try_from((bits >> held) & 0xff).ok()?);
+        }
+    }
+    Some(out)
+}

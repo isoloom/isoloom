@@ -58,6 +58,7 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
         // Namespaced sysctls are the pod's (the kubelet allows the safe ones; others need its
         // --allowed-unsafe-sysctls).
         security_context: (!sysctls.is_empty()).then_some(PodSecurity { sysctls }),
+        share_process_namespace: runs_runner(m),
         init_containers: init_containers(m),
         containers,
         // Scheduled on a node of the machine's architecture.
@@ -69,6 +70,17 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
         volumes: volumes(m),
         ..PodSpec::default()
     }
+}
+
+/// Whether Isoloom's runner is the machine's process (its recipe runs services).
+fn runs_runner(m: &Machine) -> bool {
+    matches!(
+        &m.plan.image,
+        Some(isoloom_plan::Image::Container {
+            build: Some(isoloom_plan::Build::Generated { process, .. }),
+            ..
+        }) if process.is_runner()
+    )
 }
 
 /// The machine's own container.

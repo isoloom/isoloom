@@ -1,12 +1,13 @@
 //! What a target can't run, found while lowering: a machine without the form the target needs
 //! (named by the field that rules it out), a step its family can't carry at all (a repository on
-//! Windows), a step the form the target uses doesn't render yet ([`super::carry`]), a machine
-//! with no existing host on `external`. Each is a `refused` problem; the spec itself stays valid.
+//! Windows), a step an existing host doesn't run yet ([`super::carry`]), a machine with no
+//! existing host on `external`. Each is a `refused` problem; the spec itself stays valid.
 
 use isoloom_spec::model::{Shape, Target};
 use isoloom_spec::syntax::{self, Code, FieldPath, Problem};
 
 use super::carry;
+use super::carry::Host;
 use super::forms::{self, Container, Service, Vm};
 use super::overrides;
 use super::service::Services;
@@ -35,10 +36,10 @@ pub(super) fn of(source: &syntax::Spec, services: &Services, target: Target) -> 
         let service = services.get(name);
         out.extend(form(source, name, m, service, target));
         if runs_as_vm(source, name, m, service, target) {
-            out.extend(vm_steps(name, m));
-            out.extend(service_steps(name, service, Carrier::Vm));
+            let host = if target.needs() == Shape::External { Host::Existing } else { Host::New };
+            out.extend(vm_steps(name, m, host));
+            out.extend(service_steps(name, service, Carrier::Vm(host)));
         } else if let Some(carrier) = built(source, name, m, service, target) {
-            out.extend(carry::container_refusals(name, m));
             out.extend(service_steps(name, service, carrier));
         }
     }
@@ -49,7 +50,7 @@ pub(super) fn of(source: &syntax::Spec, services: &Services, target: Target) -> 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Carrier {
     /// The VM's set-up: every phase.
-    Vm,
+    Vm(Host),
     /// A build from the OS's image: every phase.
     Built,
     /// A thin build over the entry's official image: `configure`.
@@ -69,15 +70,12 @@ fn service_steps(name: &str, service: Service<'_>, carrier: Carrier) -> Option<P
             (&r.install[..], &r.start[..])
         };
         let mut steps = install.iter().chain(&r.configure).chain(start);
-        let (reason, fix) = steps.find_map(|s| if carrier == Carrier::Vm { carry::on_vm(s) } else { carry::in_container(s) })?;
+        let (reason, fix) = steps.find_map(|s| match carrier {
+            Carrier::Vm(host) => carry::on_vm(s, host),
+            Carrier::Built | Carrier::Image => carry::in_container(s),
+        })?;
         let at = FieldPath::new("machines").key(name).key("service");
-        Some(
-            Problem::new(Code::Refused, at, format!("{}'s recipe: {reason}", r.entry)).fix(if carrier == Carrier::Vm {
-                "a container target for now".to_owned()
-            } else {
-                fix
-            }),
-        )
+        Some(Problem::new(Code::Refused, at, format!("{}'s recipe: {reason}", r.entry)).fix(fix))
     })
 }
 
@@ -135,13 +133,13 @@ fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Servic
     container.then_some(carrier)
 }
 
-/// The steps machine `name`'s VM can't run: those its family can't carry at all, then those
-/// today's VM set-up doesn't carry yet.
-fn vm_steps(name: &str, m: &syntax::Machine) -> Vec<Problem> {
+/// The steps machine `name`'s VM on `host` can't run: those its family can't carry at all, then
+/// (on hosts that already exist) those the configuration renderers don't reach there yet.
+fn vm_steps(name: &str, m: &syntax::Machine, host: Host) -> Vec<Problem> {
     let Some(os) = m.os else { return Vec::new() };
     let at = |i: usize| FieldPath::new("machines").key(name).key("app").key("steps").index(i);
     let unportable = configure::recipe(os, m, &DaemonTable::common()).err().unwrap_or_default();
-    let mut later = carry::vm_refusals(name, m);
+    let mut later = carry::vm_refusals(name, m, host);
     let steps = m.app().map(|a| a.steps.as_slice()).unwrap_or_default();
     // In step order, each step once: what its family can't carry at all says it best.
     let mut out = Vec::new();
@@ -192,16 +190,13 @@ overrides:
     }
 
     #[test]
-    fn a_vm_target_refuses_what_has_no_vm_form_and_the_vm_steps_it_doesnt_run_yet() {
-        assert_eq!(
-            refused_on(Target::Vagrant),
-            ["machines.img.app.image", "machines.both.app.steps[0]", "machines.ct.app.image"]
-        );
+    fn a_vm_target_refuses_what_has_no_vm_form_and_renders_every_step() {
+        assert_eq!(refused_on(Target::Vagrant), ["machines.img.app.image", "machines.ct.app.image"]);
     }
 
     #[test]
     fn proxmox_runs_an_lxc_machine_as_its_container_form() {
-        assert_eq!(refused_on(Target::Proxmox), ["machines.img.app.image", "machines.both.app.steps[0]"]);
+        assert_eq!(refused_on(Target::Proxmox), ["machines.img.app.image"]);
     }
 
     #[test]
@@ -210,7 +205,7 @@ overrides:
             "version: 1\nname: t\nmachines:\n  ct: { os: debian@12, app: { image: alpine, steps: [{ copy: { from: f, to: /f } }] } }\noverrides: { proxmox: { machines: { ct: { lxc: true } } } }\n",
         );
         assert_eq!(on(&l, Target::Proxmox), []);
-        assert_eq!(on(&l, Target::Vagrant).len(), 1, "a VM doesn't run a copy step yet");
+        assert_eq!(on(&l, Target::Vagrant), [], "a VM renders its copy step");
     }
 
     #[test]
@@ -219,7 +214,7 @@ overrides:
             "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: postgres }\n",
         );
         let found: Vec<String> = on(&l, Target::Hybrid).iter().map(|p| p.path.to_string()).collect();
-        assert_eq!(found, ["machines.db.app.steps[0]", "machines.svc.service"]);
+        assert_eq!(found, ["machines.svc.service"], "a Windows feature is the PowerShell library's");
         assert_eq!(
             refused_on(Target::Hybrid),
             Vec::<String>::new(),

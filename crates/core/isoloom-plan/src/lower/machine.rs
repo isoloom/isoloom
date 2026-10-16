@@ -134,6 +134,12 @@ fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, of
     (!steps.is_empty()).then(|| model::Configuration::app(os, steps.clone()))
 }
 
+/// Whether the machine's configuration starts a service (in a container, its runner runs it).
+fn serves(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>) -> bool {
+    let Some(c) = configuration(l, m, service, false) else { return false };
+    crate::configure::Recipe::of(&c, &[], &crate::configure::DaemonTable::common()).is_ok_and(|r| !r.daemons.is_empty())
+}
+
 /// Each network's first address, and the further ones where a list gives several.
 fn addresses(networks: &IndexMap<String, Octets>) -> (IndexMap<String, u8>, IndexMap<String, Vec<u8>>) {
     let mut first = IndexMap::new();
@@ -332,7 +338,8 @@ fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_
                 base: base.to_owned(),
                 from: BaseImage::Os,
             });
-            d.idle = idle;
+            // Isoloom's runner is the process of a container that runs services.
+            d.idle = idle && !serves(l, m, service);
         }
         Container::Os { image } => {
             d.image = Some(image.to_owned());
@@ -363,8 +370,7 @@ fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'
                     Step::Run { script, .. } => Some(script.to_string()),
                     Step::Reboot => Some(model::REBOOT_STEP.to_owned()),
                     Step::Playbook(p) => Some(p.to_string()),
-                    // The first copies are its files (`carry`); the other steps wait for the
-                    // configuration renderers, refused until then (`refusals`).
+                    // The other steps are its configuration's, which the set-up renders.
                     _ => None,
                 })
                 .collect()
@@ -381,7 +387,6 @@ fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'
         },
         boot: m.hardware.boot.clone(),
         setup: m.setup.clone(),
-        copies: super::carry::copies(m),
     })
 }
 

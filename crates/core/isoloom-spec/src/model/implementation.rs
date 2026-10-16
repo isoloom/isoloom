@@ -142,12 +142,6 @@ pub struct VmImpl {
     #[serde(skip)]
     #[schemars(skip)]
     pub setup: Vec<String>,
-    /// The project files its first `copy` steps place, as its `Files` step writes them (until
-    /// the configuration renderers render every step in its place). Set by lowering, never
-    /// written in a spec.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub copies: Vec<super::MachineFile>,
 }
 
 /// The `vm.provision` step that restarts a Linux machine; the steps after it run once the

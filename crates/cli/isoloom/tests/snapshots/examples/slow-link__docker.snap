@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -113,6 +112,7 @@ services:
     image: alpine:3.20
     sysctls:
       net.ipv4.ip_forward: '1'
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -188,6 +188,7 @@ services:
     restart: unless-stopped
   web-routes:
     image: nicolaka/netshoot:v0.13
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -214,6 +215,7 @@ services:
   user:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
+    init: true
     entrypoint:
     - sleep
     - infinity
@@ -229,6 +231,7 @@ services:
     restart: unless-stopped
   user-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -277,6 +280,7 @@ services:
       isoloom.environment: slow-link
   isoloom-tool-shell:
     image: nicolaka/netshoot
+    init: true
     entrypoint:
     - sleep
     - infinity

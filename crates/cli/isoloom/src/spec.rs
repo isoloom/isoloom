@@ -75,7 +75,18 @@ pub(crate) fn with_settings(profile: &Profile, dir: &Path, images: Option<&Path>
     let spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
     let settings = isoloom_spec::defaults::load(&defaults_of(dir, images, profile.as_ref(), sets)).map_err(CliError::Defaults)?;
     let lab = Lab::new(spec).with_images(settings.defaults.images.clone());
-    Ok((lab, settings))
+    let templates = templates(&lab, dir);
+    Ok((lab.with_templates(templates), settings))
+}
+
+/// The texts of the project files `lab`'s steps fill in as templates, read from `dir`. One that
+/// can't be read is left out: validation reports it, and its machine's configuration fails
+/// saying so.
+fn templates(lab: &Lab, dir: &Path) -> std::collections::BTreeMap<isoloom_spec::syntax::ProjectPath, String> {
+    lab.template_paths()
+        .into_iter()
+        .filter_map(|p| Some((p.clone(), std::fs::read_to_string(dir.join(p.as_str())).ok()?)))
+        .collect()
 }
 
 /// The lab, when it has no problem: generators assume a checked spec, so a spec that parses but

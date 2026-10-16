@@ -5,9 +5,10 @@
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-use isoloom_spec::model::{Machine, MachineFile, Spec, is_reboot};
+use isoloom_spec::model::{Machine, MachineFile, Spec};
 
 use crate::addressing::address_for;
+use crate::configure::{Recipe, Resource, Shell};
 use crate::environment::Route;
 use crate::ipv6::{self, Route6};
 use crate::routing;
@@ -96,12 +97,23 @@ pub enum Step {
         /// The ports it must answer on.
         ports: Vec<u16>,
     },
-    /// One of its `provision` steps.
+    /// One of its app's scripts or playbooks.
     Run {
         /// The script or playbook, from the project folder.
         path: String,
         /// How it runs.
         kind: RunKind,
+        /// A path whose existence means it already ran (a script's `creates`).
+        creates: Option<String>,
+    },
+    /// A run of its recipe's other steps (packages, files, users, services...), between its
+    /// scripts, playbooks and reboots, rendered by the configuration library of its OS.
+    Configure {
+        /// The steps, in recipe order.
+        resources: Vec<Resource>,
+        /// Whether no script, playbook or reboot ran before it in this set-up, so nothing has
+        /// changed yet (the services after one restart: the rule errs on restarting).
+        fresh: bool,
     },
     /// Restarts the machine; the steps after it run once it is back.
     Reboot,
@@ -160,9 +172,9 @@ pub enum RunKind {
     PowerShell,
 }
 
-/// The set-up steps of VM `name`.
+/// The set-up steps of VM `name`, its configuration resolved as `recipe`.
 #[must_use]
-pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
+pub fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) -> MachineLifecycle {
     let mut steps = vec![Step::Prelude];
     if m.resources.and_then(|r| r.disk_gb).is_some() {
         steps.push(Step::DiskGrow);
@@ -200,7 +212,7 @@ pub fn of(spec: &Spec, name: &str, m: &Machine) -> MachineLifecycle {
         let ports = spec.machines.get(dep)?.ready_ports();
         (!ports.is_empty()).then(|| Step::WaitFor { machine: dep.clone(), ports })
     }));
-    steps.extend(runs(m));
+    steps.extend(runs(m, recipe));
     if m.command.is_some() {
         steps.push(Step::Command);
     }
@@ -295,29 +307,58 @@ fn shared_volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Step> {
         .collect()
 }
 
-fn runs(m: &Machine) -> Vec<Step> {
-    let Some(vm) = &m.vm else { return Vec::new() };
-    // Kept on disk when a reboot comes, and for the command, which reads
-    // them again at every boot.
-    let persist = vm.provision.iter().any(|s| is_reboot(s)) || m.command.is_some();
+/// Its inputs made available, then its recipe in order: each script, playbook and reboot a step
+/// of its own, the steps between them runs of the configuration library.
+fn runs(m: &Machine, recipe: Option<&Recipe>) -> Vec<Step> {
+    if m.vm.is_none() {
+        return Vec::new();
+    }
     let mut steps = Vec::new();
     if !m.inputs.is_empty() {
-        steps.push(Step::Inputs { persist });
+        // Kept on disk when a reboot comes, and for the command, which reads them again at
+        // every boot.
+        let reboots = recipe.is_some_and(|r| r.resources().any(|x| matches!(x, Resource::Reboot)));
+        steps.push(Step::Inputs {
+            persist: reboots || m.command.is_some(),
+        });
     }
-    steps.extend(vm.provision.iter().map(|s| {
-        if is_reboot(s) {
-            Step::Reboot
-        } else {
-            let kind = if has_extension(s, "sh") {
-                RunKind::Shell
-            } else if has_extension(s, "ps1") {
-                RunKind::PowerShell
-            } else {
-                RunKind::Playbook
-            };
-            Step::Run { path: s.clone(), kind }
+    let Some(recipe) = recipe else { return steps };
+    let mut run: Vec<Resource> = Vec::new();
+    let mut fresh = true;
+    for r in recipe.resources() {
+        let own = match r {
+            Resource::Run(script) => Step::Run {
+                path: script.script.to_string(),
+                kind: if script.shell == Shell::PowerShell {
+                    RunKind::PowerShell
+                } else {
+                    RunKind::Shell
+                },
+                creates: script.creates.as_ref().map(ToString::to_string),
+            },
+            Resource::Playbook(p) => Step::Run {
+                path: p.to_string(),
+                kind: RunKind::Playbook,
+                creates: None,
+            },
+            Resource::Reboot => Step::Reboot,
+            other => {
+                run.push(other.clone());
+                continue;
+            }
+        };
+        if !run.is_empty() {
+            steps.push(Step::Configure {
+                resources: std::mem::take(&mut run),
+                fresh,
+            });
         }
-    }));
+        steps.push(own);
+        fresh = false;
+    }
+    if !run.is_empty() {
+        steps.push(Step::Configure { resources: run, fresh });
+    }
     steps
 }
 

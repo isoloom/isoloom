@@ -97,9 +97,8 @@ fn each_target_gets_its_own_overrides() {
 #[test]
 fn a_windows_domain_lowers_onto_vms() {
     let l = on("forest-mini", Target::Vagrant);
-    // The station's `packages` step waits for VM configuration steps (Phase 4).
-    let refused: Vec<&str> = l.refusals.iter().map(|r| r.path.as_str()).collect();
-    assert_eq!(refused, ["machines.station.app.steps[0]"]);
+    // The station's `packages` step is the PowerShell library's.
+    assert_eq!(l.refusals, []);
     let dc = &l.spec.machines["dc01"];
     let MachineSecret::Mount(m) = &dc.secrets[0] else { panic!() };
     assert_eq!((m.source.as_str(), m.mode), ("input-flag-admin", None));
@@ -126,14 +125,11 @@ fn the_lab_scope_applies_no_targets_own_facts() {
 }
 
 #[test]
-fn configuration_steps_on_a_vm_wait_for_phase_3() {
-    let l = on("branch-office", Target::Vagrant);
-    let paths: Vec<&str> = l.refusals.iter().map(|r| r.path.as_str()).collect();
-    assert!(
-        paths.contains(&"machines.edge.app.steps[0]") && paths.contains(&"machines.web.app.steps[2]"),
-        "{paths:?}"
-    );
-    assert!(on("branch-office", Target::Docker).refusals.iter().all(|r| !r.path.as_str().contains("steps")));
+fn configuration_steps_render_on_a_vm_and_in_a_container() {
+    for target in [Target::Vagrant, Target::Docker] {
+        let l = on("branch-office", target);
+        assert!(l.refusals.iter().all(|r| !r.path.as_str().contains("steps")), "{target:?}: {:?}", l.refusals);
+    }
 }
 
 #[test]
@@ -252,10 +248,10 @@ fn the_controller_takes_its_vagrant_box_from_the_overrides() {
 }
 
 /// An app written in the configuration model (the design's parcel-tracker `api`, trimmed): valid,
-/// and each form refuses what waits for the renderers of Phase 4.2, at its step, in step order.
+/// and every form renders every step; only hosts that already exist wait for the Ansible CM tool.
 #[test]
-fn the_configuration_model_waits_for_its_renderers_on_each_form() {
-    let yaml = "version: 1\nname: parcels\nnetworks: { lab: { cidr: 10.63.0.0/24 } }\nmachines:\n  api:\n    os: debian@12\n    networks: { lab: 20 }\n    ports: { api: { port: 8000, protocol: http } }\n    app:\n      steps:\n        - packages: [python3, python3-venv]\n        - group: { name: parcels, gid: 1500, system: true }\n        - copy: { from: api/, to: /srv/parcels/app/, owner: parcels }\n        - command: python3 -m venv /srv/parcels/venv\n          creates: /srv/parcels/venv/bin/python\n        - firewall: { allow: [api] }\n        - service: { name: parcels-api, run: [/srv/parcels/venv/bin/gunicorn, parcels.wsgi:app], user: parcels }\n";
+fn the_configuration_model_renders_on_each_form() {
+    let yaml = "version: 1\nname: parcels\nnetworks: { lab: { cidr: 10.63.0.0/24 } }\nmachines:\n  api:\n    os: debian@12\n    networks: { lab: 20 }\n    ports: { api: { port: 8000, protocol: http } }\n    app:\n      steps:\n        - packages: [python3, python3-venv]\n        - group: { name: parcels, gid: 1500, system: true }\n        - copy: { from: api/, to: /srv/parcels/app/, owner: parcels }\n        - command: python3 -m venv /srv/parcels/venv\n          creates: /srv/parcels/venv/bin/python\n        - firewall: { allow: [api] }\n        - service: { name: parcels-api, run: [/srv/parcels/venv/bin/gunicorn, parcels.wsgi:app], user: parcels }\noverrides: { external: { machines: { api: { ssh: { address: 192.0.2.1 } } } } }\n";
     let source = syntax::parse(yaml).unwrap_or_else(|p| panic!("{p:?}"));
     assert_eq!(crate::Lab::new(source.clone()).problems(), []);
     let refused = |t: Target| -> Vec<String> {
@@ -266,14 +262,8 @@ fn the_configuration_model_waits_for_its_renderers_on_each_form() {
             .collect()
     };
     let at = |i: usize| format!("machines.api.app.steps[{i}]");
-    // A container builds the packages and the copy, needs nothing for the firewall, and waits for
-    // the group, the command and the runner that runs the service.
-    assert_eq!(refused(Target::Docker), [at(1), at(3), at(5)]);
-    // A VM runs scripts only until then.
-    assert_eq!(refused(Target::Vagrant), [at(0), at(1), at(2), at(3), at(4), at(5)]);
-    let first = lower(&source, built_in(), Scope::Target(Target::Vagrant)).refusals.remove(0);
-    assert_eq!(
-        first.reason,
-        "a `packages` step on a VM is rendered by the configuration renderers, in Phase 4.2"
-    );
+    assert_eq!(refused(Target::Docker), Vec::<String>::new());
+    assert_eq!(refused(Target::Vagrant), Vec::<String>::new());
+    assert_eq!(refused(Target::Proxmox), Vec::<String>::new());
+    assert_eq!(refused(Target::External), [at(0), at(1), at(2), at(3), at(4), at(5)]);
 }

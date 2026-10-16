@@ -89,7 +89,7 @@ pub(crate) fn compose_file(target: Target, env: &Environment) -> Result<Rendered
     file.networks.extend(outside::networks(env));
     let mut files = runners;
     files.extend(out.files);
-    files.extend(isoloom_render::dockerfile::files(env));
+    files.extend(isoloom_render::configure::dockerfile::files(env));
     Ok(Rendered { file, files })
 }
 
@@ -138,6 +138,7 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
             ..Service::default()
         };
         if tool.command.is_empty() && shell {
+            t.init = true;
             t.entrypoint = vec!["sleep".into(), "infinity".into()];
         }
         if shell {

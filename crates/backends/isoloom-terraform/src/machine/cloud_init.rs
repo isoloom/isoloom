@@ -126,6 +126,7 @@ pub(crate) fn tracked(label: &str, command: &str) -> String {
 fn label(step: &Step) -> String {
     match step {
         Step::Run { path, .. } => path.clone(),
+        Step::Configure { .. } => "its configuration".into(),
         Step::WaitFor { machine, .. } => format!("waiting for {machine}"),
         Step::SharedVolume { volume, .. } => format!("shared volume {volume}"),
         Step::DiskGrow => "growing the disk".into(),

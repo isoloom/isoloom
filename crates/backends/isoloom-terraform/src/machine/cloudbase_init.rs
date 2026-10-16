@@ -50,7 +50,7 @@ pub(crate) fn user_data(env: &Environment, (name, mp): (&str, &MachinePlan)) -> 
     t.push_text(format!(
         "' -AsPlainText -Force\nif (Get-LocalUser -Name isoloom -ErrorAction SilentlyContinue) {{ Set-LocalUser -Name isoloom -Password $password -PasswordNeverExpires $true }} else {{ New-LocalUser -Name isoloom -Password $password -PasswordNeverExpires | Out-Null }}\nif (-not (Get-LocalGroupMember -SID S-1-5-32-544 | Where-Object {{ $_.Name -like '*\\isoloom' }})) {{ Add-LocalGroupMember -SID S-1-5-32-544 -Member isoloom }}\n# Its name takes a restart: cloudbase-init runs this script again after it (exit code 1003).\nif ($env:COMPUTERNAME -ne '{host}') {{ Rename-Computer -NewName '{name}' -Force; exit 1003 }}\n"
     ));
-    if mp.lifecycle.iter().any(|s| matches!(s, Step::Run { .. })) {
+    if mp.lifecycle.iter().any(|s| matches!(s, Step::Run { .. }) || copies(s)) {
         t.append(project_files());
     }
     let ports = env.spec().machines.get(name).map(|m| m.ports.as_slice()).unwrap_or_default();
@@ -66,6 +66,11 @@ pub(crate) fn user_data(env: &Environment, (name, mp): (&str, &MachinePlan)) -> 
     ps.push(format!("New-Item -ItemType File -Force '{DONE}' | Out-Null"));
     t.push_text(ps.join("\n") + "\n");
     t.into_expression()
+}
+
+/// Whether a step copies from the project (a recipe's `copy`).
+fn copies(step: &Step) -> bool {
+    matches!(step, Step::Configure { resources, .. } if resources.iter().any(|r| matches!(r, isoloom_plan::configure::Resource::Copy(_))))
 }
 
 /// The project's files, each written under `C:\isoloom` from its content (cloudbase-init has no

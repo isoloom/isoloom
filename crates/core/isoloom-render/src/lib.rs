@@ -6,9 +6,11 @@
 //! - **The port:** [`backend`] (the [`Backend`](backend::Backend) trait a target's renderer
 //!   implements) and its [`Error`].
 //! - **The builders**, one per language a target writes: [`hcl_builder`] (Terraform), [`ruby`]
-//!   (a Vagrantfile's literals), [`powershell`] (a Windows machine's), [`dockerfile`] (the image
-//!   built from a machine's steps) and [`inventory`] (Ansible's); shell is
-//!   `isoloom_spec::shell`, below every crate.
+//!   (a Vagrantfile's literals), [`powershell`] (a Windows machine's) and [`inventory`]
+//!   (Ansible's); shell is `isoloom_spec::shell`, below every crate.
+//! - **The configuration renderers** ([`configure`]): a machine's recipe as the shell and
+//!   PowerShell libraries' calls, the Dockerfile its container builds from, and Isoloom's runner,
+//!   the process of a container that runs services.
 //! - **A VM's set-up:** [`steps`] (each [`Step`](isoloom_plan::Step) as Linux shell or
 //!   PowerShell), the scripts kept across restarts ([`boot`]), [`secrets`] delivered at run time,
 //!   the network's [`constraints`], the [`controller`] that runs the playbooks, and the
@@ -37,10 +39,10 @@
 pub mod backend;
 pub mod boot;
 pub mod checks;
+pub mod configure;
 pub mod constraints;
 pub mod container;
 pub mod controller;
-pub mod dockerfile;
 mod error;
 pub mod hcl_builder;
 pub mod inventory;

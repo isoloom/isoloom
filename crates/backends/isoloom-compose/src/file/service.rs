@@ -57,6 +57,10 @@ pub(crate) struct Service {
     /// The container's domain name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) domainname: Option<String>,
+    /// Runs the engine's init (tini) as PID 1 in front of the process: it reaps orphans and
+    /// forwards `SIGTERM`, so a shell or `sleep` that ignores it as PID 1 still stops at once.
+    #[serde(skip_serializing_if = "Not::not")]
+    pub(crate) init: bool,
     /// Replaces the image's entrypoint.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) entrypoint: Vec<String>,

@@ -4,23 +4,26 @@
 //! problem reported at the field the author wrote.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::OnceLock;
 
 use isoloom_catalogue::Catalogue;
 use isoloom_spec::images::Table;
 use isoloom_spec::model::{self, Target};
-use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems};
+use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems, ProjectPath};
 
 use crate::lower::{Lowered, Scope, lower};
 
 mod steps;
+mod templates;
 
 /// An authored spec, ready to plan.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lab {
     source: syntax::Spec,
     images: Table,
+    templates: templates::Texts,
     catalogue: &'static Catalogue,
     memo: Memo,
 }
@@ -69,6 +72,7 @@ impl Lab {
         Lab {
             source,
             images: Table::default(),
+            templates: templates::Texts::new(),
             catalogue: built_in(),
             memo: Memo::default(),
         }
@@ -91,6 +95,26 @@ impl Lab {
         self
     }
 
+    /// The lab with the texts of its project's templates (read by the caller that generates,
+    /// from [`Lab::template_paths`]): the renderers install them filled in. A template whose text
+    /// isn't given fails the machine's configuration where it is applied, saying so.
+    #[must_use]
+    pub fn with_templates(mut self, texts: BTreeMap<ProjectPath, String>) -> Lab {
+        self.templates = texts;
+        self
+    }
+
+    /// The project files the lab's steps fill in as templates, each once.
+    #[must_use]
+    pub fn template_paths(&self) -> Vec<ProjectPath> {
+        templates::paths(&self.source)
+    }
+
+    /// `spec` with the image table and the templates' texts applied.
+    fn finish(&self, spec: &model::Spec) -> model::Spec {
+        templates::add(self.images.apply(spec), &self.templates)
+    }
+
     /// The spec as written.
     #[must_use]
     pub fn source(&self) -> &syntax::Spec {
@@ -107,7 +131,7 @@ impl Lab {
     #[must_use]
     pub fn lowered(&self, scope: Scope) -> Lowered {
         let mut l = self.raw(scope).into_owned();
-        l.spec = self.images.apply(&l.spec);
+        l.spec = self.finish(&l.spec);
         l
     }
 
@@ -122,13 +146,13 @@ impl Lab {
     /// The spec as `target` runs it.
     #[must_use]
     pub fn for_target(&self, target: Target) -> model::Spec {
-        self.images.apply(&self.raw(Scope::Target(target)).spec)
+        self.finish(&self.raw(Scope::Target(target)).spec)
     }
 
     /// The spec as the lab itself: every form, no target's own facts.
     #[must_use]
     pub fn spec(&self) -> model::Spec {
-        self.images.apply(&self.raw(Scope::Lab).spec)
+        self.finish(&self.raw(Scope::Lab).spec)
     }
 
     /// The targets every machine has the form for, narrowed by the spec's `targets:`.

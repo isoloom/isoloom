@@ -1,110 +1,56 @@
-//! What today's set-up carries of an app's steps, until the configuration renderers render every
-//! step of the model in its place (Phase 4.2). A VM runs its scripts, playbooks and reboots, and
-//! places the files of its first `copy` steps through its `Files` step, exactly as a container's
-//! `COPY` does when the copy is one file with its `mode`, owned by root, before any other kind of
-//! step. A container built from steps renders `run`, `copy` and unpinned `packages`, and needs
-//! nothing for `firewall` (a container has no host firewall; `reach` governs). Lowering and the
-//! refusals both read these rules, so a step is either carried or refused with its reason, never
-//! dropped.
+//! What the set-up of each form carries of a recipe's steps (an app's, or a catalogue entry's),
+//! read by lowering and the refusals alike, so a step is either carried or refused with its
+//! reason, never dropped:
+//!
+//! - **a container built from a recipe** carries every step with a container form: its scripts,
+//!   copies and templates as the Dockerfile's own instructions, every other step as the shell
+//!   library's, and its services under Isoloom's runner;
+//! - **a new VM** carries every step, through the shell library (the PowerShell library on
+//!   Windows);
+//! - **a host that already exists** (the `external` target) runs scripts, playbooks and reboots
+//!   from the project, and the other steps with the Ansible CM tool (Phase 4.5): until then those
+//!   are refused there.
 
-use isoloom_spec::model::MachineFile;
-use isoloom_spec::syntax::{self, Copy, FieldPath, Problem, Step};
+use isoloom_spec::syntax::{self, FieldPath, Problem, Step};
 
-/// Why the step can't be carried yet, and what to write meanwhile.
-const LATER: &str = "is rendered by the configuration renderers, in Phase 4.2";
-/// The fix while a step waits for its renderer.
-const MEANWHILE: &str = "a `run:` script for now";
-
-/// The files machine `m`'s first `copy` steps place on its VM, in step order.
-pub(super) fn copies(m: &syntax::Machine) -> Vec<MachineFile> {
-    let windows = m.os.is_some_and(syntax::OsRef::is_windows);
-    let Some(app) = m.app() else { return Vec::new() };
-    app.steps
-        .iter()
-        .map_while(|s| match s {
-            Step::Copy(c) if placed(c, windows) => Some(MachineFile {
-                path: c.to.to_string(),
-                source: Some(c.from.to_string()),
-                content: None,
-                uid: None,
-                gid: None,
-                mode: c.mode.map(|mode| mode.to_string()),
-            }),
-            _ => None,
-        })
-        .collect()
+/// The VM a recipe runs on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Host {
+    /// A VM the target creates: its set-up renders every step.
+    New,
+    /// A host that already exists (the `external` target).
+    Existing,
 }
 
-/// Whether a VM's `Files` step places this copy as a container's `COPY` would: one file, owned
-/// by root, with its mode (a Windows file has neither owner nor mode).
-fn placed(c: &Copy, windows: bool) -> bool {
-    let root = c.owner.as_ref().is_none_or(|o| o.as_str() == "root");
-    !c.is_folder()
-        && if windows {
-            c.owner.is_none() && c.mode.is_none()
-        } else {
-            root && c.mode.is_some()
-        }
+/// Why a container can't carry step `s`, and what to write instead.
+pub(super) fn in_container(s: &Step) -> Option<(String, String)> {
+    s.container_refusal().map(|why| (why.to_owned(), "a VM target".to_owned()))
 }
 
-/// The steps of machine `name` its VM can't carry yet, as `refused` problems at each step.
-pub(super) fn vm_refusals(name: &str, m: &syntax::Machine) -> Vec<Problem> {
+/// Why a VM on `host` can't carry step `s` yet, and what to write meanwhile.
+pub(super) fn on_vm(s: &Step, host: Host) -> Option<(String, String)> {
+    if host == Host::New || matches!(s, Step::Run { .. } | Step::Reboot | Step::Playbook(_)) {
+        return None;
+    }
+    Some((
+        format!("a `{}` step on a host that already exists runs with the Ansible CM tool (Phase 4.5)", s.kind()),
+        "a `run:` script for now, or a VM target".to_owned(),
+    ))
+}
+
+/// The steps of machine `name` its VM on `host` can't carry yet, as `refused` problems at each
+/// step.
+pub(super) fn vm_refusals(name: &str, m: &syntax::Machine, host: Host) -> Vec<Problem> {
     let Some(app) = m.app() else { return Vec::new() };
-    let carried = copies(m).len();
     app.steps
         .iter()
         .enumerate()
-        .filter(|(i, s)| match s {
-            Step::Run { .. } | Step::Reboot | Step::Playbook(_) => false,
-            Step::Copy(_) => *i >= carried,
-            _ => true,
-        })
-        .map(|(i, s)| {
-            let reason = match s {
-                Step::Copy(_) => format!(
-                    "a `copy` step on a VM {LATER}; until then a VM places a copy of one file, with its `mode` and owned by root, before any other kind of step"
-                ),
-                _ => format!("a `{}` step on a VM {LATER}", s.kind()),
-            };
-            Problem::new(syntax::Code::Refused, step(name, i), reason).fix(MEANWHILE)
+        .filter_map(|(i, s)| {
+            let (reason, fix) = on_vm(s, host)?;
+            let at = FieldPath::new("machines").key(name).key("app").key("steps").index(i);
+            Some(Problem::new(syntax::Code::Refused, at, reason).fix(fix))
         })
         .collect()
-}
-
-/// The steps of machine `name` a container built from them can't carry yet, as `refused`
-/// problems at each step.
-pub(super) fn container_refusals(name: &str, m: &syntax::Machine) -> Vec<Problem> {
-    let Some(app) = m.app() else { return Vec::new() };
-    let refused = |(i, s): (usize, &Step)| in_container(s).map(|(reason, fix)| Problem::new(syntax::Code::Refused, step(name, i), reason).fix(fix));
-    app.steps.iter().enumerate().filter_map(refused).collect()
-}
-
-/// Why a container can't carry step `s` yet, and what to write meanwhile.
-pub(super) fn in_container(s: &Step) -> Option<(String, String)> {
-    Some(match s {
-        Step::Run { .. } | Step::Copy(_) | Step::Firewall(_) => return None,
-        Step::Packages(p) if p.iter().all(|p| p.version.is_none()) => return None,
-        Step::Packages(_) => (format!("a pinned package in a container {LATER}"), "leave the version out for now".to_owned()),
-        Step::Service(_) => (
-            format!("a service in a container runs under Isoloom's runner, which {LATER}"),
-            "`command:` (the service in the foreground) for now".to_owned(),
-        ),
-        _ => (format!("a `{}` step in a container {LATER}", s.kind()), MEANWHILE.to_owned()),
-    })
-}
-
-/// Why a VM can't carry step `s` of a catalogue entry's recipe yet, and what to write meanwhile:
-/// its set-up runs scripts, playbooks and reboots only.
-pub(super) fn on_vm(s: &Step) -> Option<(String, String)> {
-    match s {
-        Step::Run { .. } | Step::Reboot | Step::Playbook(_) => None,
-        _ => Some((format!("a `{}` step on a VM {LATER}", s.kind()), MEANWHILE.to_owned())),
-    }
-}
-
-/// Step `i` of machine `name`.
-fn step(name: &str, i: usize) -> FieldPath {
-    FieldPath::new("machines").key(name).key("app").key("steps").index(i)
 }
 
 #[cfg(test)]
@@ -115,62 +61,31 @@ mod tests {
         serde_yaml_ng::from_str(yaml).unwrap_or_else(|e| panic!("{yaml}: {e}"))
     }
 
-    fn refused(found: &[Problem]) -> Vec<&str> {
-        found.iter().map(|p| p.path.as_str()).collect()
+    #[test]
+    fn a_new_vm_carries_every_step() {
+        let m = machine("{ os: debian@12, app: { steps: [{ run: a.sh }, { packages: [nginx] }, { copy: { from: site/, to: /s/ } }, { service: nginx }] } }");
+        assert_eq!(vm_refusals("m", &m, Host::New), []);
     }
 
     #[test]
-    fn a_vms_first_copies_of_one_file_with_its_mode_are_placed_as_files() {
-        let m = machine(
-            "{ os: debian@12, app: { steps: [{ copy: { from: conf/a.ini, to: /etc/a.ini, mode: \"0600\" } }, { run: a.sh }, { copy: { from: b, to: /b, mode: \"0644\" } }] } }",
-        );
-        let placed = copies(&m);
-        assert_eq!(placed.len(), 1);
-        assert_eq!(
-            (placed[0].path.as_str(), placed[0].source.as_deref(), placed[0].mode.as_deref()),
-            ("/etc/a.ini", Some("conf/a.ini"), Some("0600"))
-        );
-        // After a script, a copy keeps its place only with the renderers.
-        assert_eq!(refused(&vm_refusals("m", &m)), ["machines.m.app.steps[2]"]);
-    }
-
-    #[test]
-    fn a_copy_today_s_vm_set_up_cant_place_waits_for_the_renderers() {
-        for step in [
-            "{ copy: { from: site/, to: /var/www/, mode: \"0755\" } }",
-            "{ copy: { from: a, to: /a } }",
-            "{ copy: { from: a, to: /a, mode: \"0600\", owner: www-data } }",
-        ] {
-            let m = machine(&format!("{{ os: debian@12, app: {{ steps: [{step}] }} }}"));
-            assert_eq!(copies(&m), [], "{step}");
-            let found = vm_refusals("m", &m);
-            assert!(found[0].reason.contains("Phase 4.2"), "{step}: {found:?}");
-        }
-        let windows = machine("{ os: windows-server@2022, app: { steps: [{ copy: { from: a.ini, to: 'C:\\a.ini' } }] } }");
-        assert_eq!(copies(&windows).len(), 1);
-    }
-
-    #[test]
-    fn a_vm_runs_its_scripts_and_waits_for_every_other_kind() {
+    fn an_existing_host_runs_its_scripts_and_waits_for_every_other_kind() {
         let m = machine("{ os: debian@12, app: { steps: [{ run: a.sh }, reboot, { playbook: p.yml }, { packages: [nginx] }, { service: nginx }] } }");
-        let found = vm_refusals("m", &m);
-        assert_eq!(refused(&found), ["machines.m.app.steps[3]", "machines.m.app.steps[4]"]);
+        let found = vm_refusals("m", &m, Host::Existing);
+        let paths: Vec<&str> = found.iter().map(|p| p.path.as_str()).collect();
+        assert_eq!(paths, ["machines.m.app.steps[3]", "machines.m.app.steps[4]"]);
         assert_eq!(
             found[0].reason,
-            "a `packages` step on a VM is rendered by the configuration renderers, in Phase 4.2"
+            "a `packages` step on a host that already exists runs with the Ansible CM tool (Phase 4.5)"
         );
     }
 
     #[test]
-    fn a_container_renders_its_scripts_copies_and_packages_and_waits_for_the_rest() {
-        let m = machine(
-            "{ os: debian@12, app: { steps: [{ run: a.sh }, { copy: { from: site/, to: /s/ } }, { packages: [curl] }, { firewall: { allow: [80] } }, { packages: [{ name: nginx, version: \"1.2\" }] }, { user: { name: a } }, { service: nginx }] } }",
-        );
-        let found = container_refusals("m", &m);
-        assert_eq!(
-            refused(&found),
-            ["machines.m.app.steps[4]", "machines.m.app.steps[5]", "machines.m.app.steps[6]"]
-        );
-        assert!(found[2].reason.contains("Isoloom's runner"), "{found:?}");
+    fn a_container_carries_every_step_with_a_container_form() {
+        let steps: Vec<Step> = serde_yaml_ng::from_str(
+            "[{ run: a.sh }, { packages: [{ name: nginx, version: \"1.2\" }] }, { user: { name: a } }, { service: nginx }, { firewall: { allow: [80] } }]",
+        )
+        .unwrap();
+        assert!(steps.iter().all(|s| in_container(s).is_none()));
+        assert!(in_container(&Step::Reboot).is_some());
     }
 }

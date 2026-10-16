@@ -119,6 +119,7 @@ fn stand_in(env: &Environment, m: Machine<'_>) -> Service {
         hostname: Some(m.name.into()),
         networks: networks::attachments(env, m.plan),
         extra_hosts: networks::extra_hosts(env, m),
+        init: true,
         entrypoint: vec!["sleep".into(), "infinity".into()],
         profiles: vec![PROFILE.into()],
         ..Service::default()

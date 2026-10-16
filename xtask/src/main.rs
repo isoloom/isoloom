@@ -13,6 +13,8 @@
 //! - `msrv` and `features`: every crate checked with its declared minimum Rust, and with every
 //!   combination of its features (cargo-hack);
 //! - `fuzz`: the fuzz targets of `fuzz/` (cargo-fuzz), each for a while;
+//! - `conformance`: the configuration renderers' resource conformance, each step kind applied
+//!   twice in each Linux family's container image;
 //! - `mutants`: mutation testing of the core crates (cargo-mutants);
 //! - `bench`: the generation benchmarks against `bench-baseline.json`;
 //! - `tiers record`: a real run added to the tier list, the evidence the tiers are worked out
@@ -32,6 +34,7 @@
 mod bench;
 mod catalogue;
 mod check_all;
+mod conformance;
 #[cfg(test)]
 mod deps;
 mod dev_link;
@@ -95,6 +98,10 @@ enum Task {
     /// The fuzz targets of fuzz/ (cargo-fuzz, nightly), each for a while; exits 1 when one
     /// crashes.
     Fuzz(fuzz::Args),
+    /// The configuration renderers' resource conformance: each step kind, rendered by the shell
+    /// library and the Dockerfile, applied twice in each Linux family's container image; the
+    /// second apply must change nothing.
+    Conformance(conformance::Args),
     /// Mutation testing of the core crates (cargo-mutants): exits 1 when a mutant survives.
     Mutants(mutants::Args),
     /// The generation benchmarks (criterion) against bench-baseline.json; exits 1 when one is
@@ -131,6 +138,7 @@ fn run(cli: Cli) -> Res<ExitCode> {
         Task::Msrv => hack::msrv(),
         Task::Features => hack::features(),
         Task::Fuzz(a) => fuzz::run(&a),
+        Task::Conformance(a) => Ok(conformance::run(&a)),
         Task::Mutants(a) => mutants::run(&a),
         Task::Bench(a) => bench::run(&a),
         Task::Tiers(a) => tiers::run(&a),

@@ -127,6 +127,7 @@ fn label(step: &Step) -> String {
         Step::Inputs { .. } => "inputs".into(),
         Step::WaitFor { machine, .. } => format!("wait for {machine}"),
         Step::Run { path, .. } => path.clone(),
+        Step::Configure { .. } => "configure".into(),
         Step::Reboot => "reboot".into(),
         Step::Command => "command".into(),
         Step::Setup { .. } => "setup".into(),

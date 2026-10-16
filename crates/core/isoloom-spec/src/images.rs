@@ -122,7 +122,6 @@ impl Table {
                     tpm: None,
                     boot: None,
                     setup: Vec::new(),
-                    copies: Vec::new(),
                 });
                 m.supplied = true;
             }

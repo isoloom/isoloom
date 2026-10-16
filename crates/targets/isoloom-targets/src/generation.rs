@@ -106,6 +106,13 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     let spec = lowered(lab, target, instance)?;
     let env = Environment::build(&spec, target, instance);
     let mut files = backend.render(&env)?;
+    // The configuration renderers' own files (the libraries a VM's set-up embeds, a container's
+    // runner and templates), once each: a backend may have written some already.
+    for f in isoloom_render::configure::files(&env) {
+        if !files.iter().any(|x| x.path == f.path) {
+            files.push(f);
+        }
+    }
     if let Some(manifest) = backend.run_manifest(&env)? {
         files.push(run_manifest(lab, instance, target, manifest)?);
     }

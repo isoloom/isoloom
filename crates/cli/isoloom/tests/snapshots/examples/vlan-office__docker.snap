@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -381,6 +380,7 @@ services:
     image: alpine:3.20
     sysctls:
       net.ipv4.ip_forward: '1'
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -418,6 +418,7 @@ services:
     restart: unless-stopped
   isoloom-switch-office:
     image: nicolaka/netshoot:v0.13
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -476,6 +477,7 @@ services:
     restart: unless-stopped
   intranet-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -502,6 +504,7 @@ services:
   staff:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
+    init: true
     entrypoint:
     - sleep
     - infinity
@@ -519,6 +522,7 @@ services:
     restart: unless-stopped
   staff-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -545,6 +549,7 @@ services:
   guest:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
+    init: true
     entrypoint:
     - sleep
     - infinity
@@ -562,6 +567,7 @@ services:
     restart: unless-stopped
   guest-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -588,6 +594,7 @@ services:
   admin:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     platform: linux/amd64
+    init: true
     entrypoint:
     - sleep
     - infinity
@@ -605,6 +612,7 @@ services:
     restart: unless-stopped
   admin-routes:
     image: nicolaka/netshoot:v0.13
+    init: true
     entrypoint:
     - /bin/sh
     - -c

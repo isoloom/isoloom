@@ -78,7 +78,16 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
     // A stock image the runner supplies for the user to work from, or one the spec marks
     // `idle`: kept running idle (its own command may be a shell that exits at once).
     if spec.supplied || spec.docker.as_ref().is_some_and(|d| d.idle) {
+        svc.init = true;
         svc.entrypoint = vec!["sleep".into(), "infinity".into()];
+    }
+    // Isoloom's runner runs its services: under the engine's init, which reaps what they leave.
+    if let Some(Image::Container {
+        build: Some(isoloom_plan::Build::Generated { process, .. }),
+        ..
+    }) = &plan.image
+    {
+        svc.init |= process.is_runner();
     }
     process::apply(plan, &mut svc);
     // A VLAN it reaches through a trunk isn't an interface of its own: the trunk is.

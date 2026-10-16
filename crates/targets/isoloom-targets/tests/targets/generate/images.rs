@@ -14,9 +14,11 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
     let table = isoloom_spec::images::Table::parse("access:\n  docker: kalilinux/kali-rolling\n  vm: kali\n").unwrap();
     let applied = Lab::new(supplied).with_images(table.clone());
     let compose = generated(&applied, Target::Docker, ".isoloom/docker/compose.yml")?;
-    // The access machine is a real container now (kept running idle), not the check stand-in.
+    // The access machine is a real container now (kept running idle under the engine's init, so
+    // it stops at once), not the check stand-in.
     assert!(
-        compose.contains("  user:\n    image: kalilinux/kali-rolling\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"),
+        compose
+            .contains("  user:\n    image: kalilinux/kali-rolling\n    platform: linux/amd64\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"),
         "{compose}"
     );
     assert!(!compose.contains("isoloom-access"));

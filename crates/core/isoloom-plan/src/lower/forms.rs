@@ -113,7 +113,7 @@ fn process(os: OsRef, m: &syntax::Machine) -> Result<(), NoForm> {
         Err(_) => Err(NoForm {
             field: "command".to_owned(),
             reason: "its steps install services, but no `service` step or `command` runs one in a container".to_owned(),
-            fix: "add `command:` (the service in the foreground); a `service` step runs one in containers from Phase 4.2".to_owned(),
+            fix: "a `service` step for what the steps install, or `command:` (the service in the foreground)".to_owned(),
         }),
     }
 }

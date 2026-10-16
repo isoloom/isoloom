@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# An app written in the configuration model, in both forms: the steps a machine runs, each kind
+# rendered by Isoloom's shell library (on a VM's set-up and in the image a container builds),
+# behind its guard, so a second apply changes nothing.
+# - `web` (Debian 12): nginx from Debian's packages, a group and a user, a folder, the site
+#   copied, nginx's configuration a template filled in with `api`'s address, the package's own
+#   site removed, a guarded command, its port opened in the firewall, and nginx as its one
+#   service: on a VM a systemd unit, in a container the process Isoloom's runner `exec`s.
+# - `api` (Ubuntu 24.04): two services Isoloom defines from `run` (Python's web server on two
+#   ports, one as `nobody`): systemd units on a VM, two daemons under the runner and the engine's
+#   init in a container.
+version: 1
+name: configured-app
+
+networks:
+  lab: { cidr: 10.66.0.0/24, internet: true }
+
+machines:
+  web:
+    os: debian@12
+    networks: { lab: 10 }
+    ports: { http: { port: 80, protocol: http, publish: 8086 } }
+    app:
+      steps:
+        - packages: [nginx]
+        - group: { name: site, gid: 1600 }
+        - user: { name: editor, uid: 1600, group: site, shell: /bin/sh, password: lab-content }
+        - file: { path: /srv/site, state: directory, owner: editor, mode: "0755" }
+        - copy: { from: site/, to: /srv/site/, owner: editor }
+        - template: { from: conf/site.conf, to: /etc/nginx/conf.d/site.conf, mode: "0644" }
+        - file: { path: /etc/nginx/sites-enabled/default, state: absent }
+        - command: [sh, -c, "echo configured > /srv/site/stamp.txt"]
+          creates: /srv/site/stamp.txt
+        - firewall: { allow: [http] }
+        - service: nginx
+
+  api:
+    os: ubuntu@24.04
+    networks: { lab: 20 }
+    ports:
+      status: { port: 8080, protocol: http }
+      health: { port: 8081, protocol: http }
+    app:
+      steps:
+        - packages: [python3]
+        - copy: { from: api/, to: /srv/api/ }
+        - service:
+            name: api-status
+            run: [python3, -m, http.server, "8080", --directory, /srv/api]
+            user: nobody
+        - service:
+            name: api-health
+            run: [python3, -m, http.server, "8081", --directory, /srv/api]
+            cwd: /srv/api
+
+checks:
+  - checks/web-answers.sh
+  - checks/api-answers.sh

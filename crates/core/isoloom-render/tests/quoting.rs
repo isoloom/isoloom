@@ -14,7 +14,7 @@ use proptest::prelude::*;
 #[path = "quoting/literals.rs"]
 mod literals;
 
-use literals::{Piece, hcl_decode, hcl_pieces, hcl_string, ps_decode, rb_decode, sh_decode};
+use literals::{Piece, b64_decode, hcl_decode, hcl_pieces, hcl_string, ps_decode, rb_decode, sh_decode, systemd_decode};
 
 /// Characters that matter to some quoting rule, mixed with ordinary text.
 fn tricky() -> impl Strategy<Value = String> {
@@ -47,6 +47,19 @@ proptest! {
     #[test]
     fn a_powershell_string_round_trips(s in tricky()) {
         prop_assert_eq!(ps_decode(&powershell::quote(&s)), Some(s));
+    }
+
+    /// A service Isoloom defines: each word of its `run` in its systemd unit.
+    #[test]
+    fn a_systemd_word_round_trips(s in tricky()) {
+        prop_assert_eq!(systemd_decode(&isoloom_render::configure::systemd_word(&s)), Some(s));
+    }
+
+    /// A template's filled-in text, as a VM's set-up carries it: base64 in a shell word.
+    #[test]
+    fn a_templates_text_round_trips_through_its_encoding(s in tricky()) {
+        let word = quote(&isoloom_spec::shell::base64(s.as_bytes()));
+        prop_assert_eq!(sh_decode(&word).as_deref().and_then(b64_decode), Some(s.into_bytes()));
     }
 }
 

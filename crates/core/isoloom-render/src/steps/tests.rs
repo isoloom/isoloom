@@ -146,7 +146,17 @@ fn inputs_are_kept_only_when_a_reboot_or_a_service_needs_them() {
 #[test]
 fn a_provision_step_runs_from_the_project_folder_its_way() {
     let env = env();
-    let run = |path: &str, kind| linux(&env, "web", &Step::Run { path: path.into(), kind });
+    let run = |path: &str, kind| {
+        linux(
+            &env,
+            "web",
+            &Step::Run {
+                path: path.into(),
+                kind,
+                creates: None,
+            },
+        )
+    };
     assert_eq!(
         run("steps/web.sh", RunKind::Shell).as_deref(),
         Some("cd /opt/isoloom && sh -c 'sh steps/web.sh'\n")
@@ -255,6 +265,7 @@ fn a_typographic_quote_in_a_windows_path_stays_inside_its_string() {
     let run = Step::Run {
         path: "it\u{2019}s.ps1".into(),
         kind: RunKind::PowerShell,
+        creates: None,
     };
     let ps = windows(&env, "win", &run).expect("a PowerShell step");
     assert!(ps.contains("-File 'it\u{2019}\u{2019}s.ps1';"), "{ps}");

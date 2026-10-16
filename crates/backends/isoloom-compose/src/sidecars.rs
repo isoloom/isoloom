@@ -39,6 +39,7 @@ pub(crate) fn routes(env: &Environment, host: &str, m: Machine<'_>) -> Service {
         image: Some(env.images.pull(image)),
         network_mode: Some(NetworkMode::Service(host.to_owned())),
         cap_add: vec!["NET_ADMIN".into()],
+        init: true,
         entrypoint: vec!["/bin/sh".into(), "-c".into(), script],
         healthcheck: Some(Healthcheck::shell(ready(env, m), Seconds(2), 30)),
         restart: Some(Restart::UnlessStopped),

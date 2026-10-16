@@ -7,6 +7,7 @@ use isoloom_plan::Environment;
 use isoloom_plan::lifecycle::{RunKind, Step};
 use isoloom_spec::shell::quote;
 
+use crate::configure::{self, Configured, shell};
 use crate::network::{ipv6, more_addresses};
 use crate::{constraints, powershell, secrets};
 
@@ -63,7 +64,8 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Secrets => env.machines.get(machine).map(|mp| secrets::step(machine, &mp.secrets)),
         Step::Inputs { persist } => persist.then(|| format!("mkdir -p /var/lib/isoloom && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
         Step::WaitFor { machine: dep, ports } => Some(wait::linux(dep, ports)),
-        Step::Run { path, kind } => run(env, machine, path, *kind),
+        Step::Run { path, kind, creates } => run(env, machine, path, *kind).map(|line| guarded(line, creates.as_deref())),
+        Step::Configure { resources, fresh } => Configured::of(env, machine).map(|c| shell::script(&c, resources, *fresh)),
         Step::Reboot => Some(format!("{}(sleep 2 && reboot) >/dev/null 2>&1 &\n", record_boot())),
         Step::Egress => Some(network::egress(env)),
         Step::Tc => network::tc(env, machine),
@@ -98,10 +100,18 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Run {
             path,
             kind: RunKind::PowerShell,
-        } => Some(format!(
-            "Set-Location {WINDOWS_PROJECT_DIR}; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-            powershell::quote(path)
-        )),
+            creates,
+        } => {
+            let run = format!(
+                "Set-Location {WINDOWS_PROJECT_DIR}; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
+                powershell::quote(path)
+            );
+            Some(match creates {
+                Some(done) => format!("if (-not (Test-Path -LiteralPath {})) {{ {run} }}", powershell::quote(done)),
+                None => run,
+            })
+        }
+        Step::Configure { resources, fresh } => Configured::of(env, machine).map(|c| configure::powershell::script(&c, resources, *fresh)),
         Step::Command => process::windows_command(env, machine),
         Step::Setup { paths } => Some(process::windows_setup(paths)),
         Step::Ready => Some(format!(
@@ -135,6 +145,14 @@ fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> Option<St
             "{PKG}\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\ncd {PROJECT_DIR} && sh -c {}\n",
             quote(&format!("{inputs}ansible-playbook -c local -i {machine}, {path}"))
         )),
+    }
+}
+
+/// A script's line behind its `creates`: skipped when that path exists.
+fn guarded(line: String, creates: Option<&str>) -> String {
+    match creates {
+        Some(path) => format!("[ -e {} ] || {{ {} }}\n", quote(path), line.trim_end()),
+        None => line,
     }
 }
 

@@ -731,6 +731,7 @@ dependencies = [
  "proptest",
  "serde_json",
  "serde_yaml_ng",
+ "sha2",
  "thiserror",
 ]
 
@@ -1746,6 +1747,8 @@ dependencies = [
  "flate2",
  "indexmap",
  "isoloom-catalogue",
+ "isoloom-plan",
+ "isoloom-render",
  "isoloom-spec",
  "proptest",
  "serde_json",

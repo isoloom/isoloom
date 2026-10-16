@@ -63,16 +63,19 @@ fn each_app_step_runs_its_way_and_a_reboot_keeps_the_inputs() {
         [
             &Step::Run {
                 path: "a.sh".into(),
-                kind: RunKind::Shell
+                kind: RunKind::Shell,
+                creates: None
             },
             &Step::Reboot,
             &Step::Run {
                 path: "site.yml".into(),
-                kind: RunKind::Playbook
+                kind: RunKind::Playbook,
+                creates: None
             },
             &Step::Run {
                 path: "b.SH".into(),
-                kind: RunKind::Shell
+                kind: RunKind::Shell,
+                creates: None
             },
         ]
     );
@@ -83,7 +86,8 @@ fn each_app_step_runs_its_way_and_a_reboot_keeps_the_inputs() {
     }));
     assert!(steps("files").contains(&Step::Run {
         path: "share.ps1".into(),
-        kind: RunKind::PowerShell
+        kind: RunKind::PowerShell,
+        creates: None
     }));
     let sql = steps("sql");
     assert!(sql.contains(&Step::Command) && !sql.iter().any(|s| matches!(s, Step::Inputs { .. })));

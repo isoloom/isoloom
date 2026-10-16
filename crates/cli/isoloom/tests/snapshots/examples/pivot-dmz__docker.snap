@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -417,6 +416,7 @@ services:
     image: alpine:3.20
     sysctls:
       net.ipv4.ip_forward: '1'
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -493,6 +493,7 @@ services:
     restart: unless-stopped
   gateway-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -553,6 +554,7 @@ services:
     restart: unless-stopped
   app-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -608,6 +610,7 @@ services:
     restart: unless-stopped
   db-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -634,6 +637,7 @@ services:
   user:
     image: kalilinux/kali-rolling@sha256:02f5d6c019e549b0f55da58e835cad5355ef1030c6b2645265a324e37dfc4acc
     platform: linux/amd64
+    init: true
     entrypoint:
     - sleep
     - infinity
@@ -651,6 +655,7 @@ services:
     restart: unless-stopped
   user-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c

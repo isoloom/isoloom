@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -415,6 +414,7 @@ services:
     restart: unless-stopped
   cache-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c
@@ -498,6 +498,7 @@ services:
     restart: unless-stopped
   web-routes:
     image: alpine:3.20
+    init: true
     entrypoint:
     - /bin/sh
     - -c

@@ -170,6 +170,30 @@ fn unportable(i: usize, step: &Step, family: Family) -> Option<Unportable> {
             fix: "copy the file instead, or make the link from a `.ps1` step".into(),
         }),
         Step::File(f) => first_set(&[("owner", f.owner.is_some()), ("group", f.group.is_some()), ("mode", f.mode.is_some())]).map(acl),
+        Step::User(u) => first_set(&[
+            ("uid", u.uid.is_some()),
+            ("home", u.home.is_some()),
+            ("shell", u.shell.is_some()),
+            ("system", u.system),
+        ])
+        .map(|field| Unportable {
+            step: i,
+            field: Some(field),
+            reason: format!("a Windows account has no `{field}`"),
+            fix: format!("leave `{field}` out on Windows"),
+        }),
+        Step::Group(g) => first_set(&[("gid", g.gid.is_some()), ("system", g.system)]).map(|field| Unportable {
+            step: i,
+            field: Some(field),
+            reason: format!("a Windows group has no `{field}`"),
+            fix: format!("leave `{field}` out on Windows"),
+        }),
+        Step::Service(Service::Defined { user: Some(_), .. }) => Some(Unportable {
+            step: i,
+            field: Some("user"),
+            reason: "a Windows service Isoloom defines runs as SYSTEM in 1.0".into(),
+            fix: "leave `user` out on Windows".into(),
+        }),
         _ => None,
     }
 }

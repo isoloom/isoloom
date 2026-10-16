@@ -139,7 +139,7 @@ fn a_network_can_name_its_docker_block() -> Outcome {
 
 #[test]
 fn an_idle_container_is_kept_running() -> Outcome {
-    // The OS alone: its official image, pinned, kept running idle.
+    // The OS alone: its official image, pinned, kept running idle under the engine's init.
     let spec = lab(
         "version: 1\nname: idle\nnetworks:\n  lan: { cidr: 10.10.1.0/24 }\nmachines:\n  box:\n    os: alpine\n    networks: { lan: 10 }\n  web:\n    networks: { lan: 11 }\n    ports: { web: 80 }\n    app: { image: \"nginx:1.27-alpine\" }\n",
     )?;
@@ -147,7 +147,7 @@ fn an_idle_container_is_kept_running() -> Outcome {
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(
         compose.contains(&format!(
-            "  box:\n    image: {image}\n    platform: linux/amd64\n    entrypoint:\n    - sleep\n    - infinity\n"
+            "  box:\n    image: {image}\n    platform: linux/amd64\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"
         )),
         "{compose}"
     );

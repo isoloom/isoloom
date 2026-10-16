@@ -513,7 +513,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         boot: m.vm.as_ref().and_then(|v| v.boot.clone()),
         depends_on: m.depends_on.clone(),
         lifecycle: if shape == MachineShape::Vm {
-            vm_lifecycle(spec, target, name, m)
+            vm_lifecycle(spec, target, name, m, recipe.as_ref())
         } else {
             Vec::new()
         },
@@ -530,9 +530,9 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
     }
 }
 
-/// VM `name`'s set-up steps on `target`.
-fn vm_lifecycle(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachineLifecycle {
-    let mut steps = lifecycle::of(spec, name, m);
+/// VM `name`'s set-up steps on `target`, its configuration resolved as `recipe`.
+fn vm_lifecycle(spec: &Spec, target: Target, name: &str, m: &Machine, recipe: Option<&Recipe>) -> MachineLifecycle {
+    let mut steps = lifecycle::of(spec, name, m, recipe);
     if target == Target::CloudVm {
         ipv6::cloud_routes(&mut steps);
     }

@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -327,6 +326,7 @@ services:
         isoloom.environment: private-names
     image: isoloom/private-names-client
     platform: linux/amd64
+    init: true
     entrypoint:
     - sleep
     - infinity

@@ -144,17 +144,25 @@ fn several_services_are_refused_on_a_container_target() {
 }
 
 #[test]
-fn what_the_renderers_dont_carry_yet_is_refused_at_the_service() {
-    let docker = refused("{ os: debian@12, service: nginx, networks: { lab: 10 } }", Target::Docker);
-    assert_eq!(docker[0].0, "machines.web.service");
-    assert!(docker[0].1.starts_with("nginx's recipe: a `repository` step in a container"), "{docker:?}");
-    let image = refused("{ os: debian@13, service: nginx, networks: { lab: 10 } }", Target::Docker);
-    assert!(
-        image[0].1.starts_with("nginx's recipe: a `template` step in a container"),
-        "the image skips install: {image:?}"
+fn every_form_renders_the_recipe_of_an_entry_and_an_existing_host_waits_for_ansible() {
+    for (os, target) in [("debian@12", Target::Docker), ("debian@13", Target::Docker), ("debian@12", Target::Vagrant)] {
+        let found = refused(&format!("{{ os: {os}, service: nginx, networks: {{ lab: 10 }} }}"), target);
+        assert_eq!(found, [], "{os} on {target:?}");
+    }
+    let existing = testing::lab(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@12, service: nginx, networks: { lab: 10 } }\noverrides: { external: { machines: { web: { ssh: { address: 192.0.2.1 } } } } }\n",
     );
-    let vm = refused("{ os: debian@12, service: nginx, networks: { lab: 10 } }", Target::Vagrant);
-    assert!(vm[0].1.starts_with("nginx's recipe: a `repository` step on a VM"), "{vm:?}");
+    let external: Vec<(String, String)> = existing
+        .lowered(crate::lower::Scope::Target(Target::External))
+        .refusals
+        .into_iter()
+        .map(|p| (p.path.to_string(), p.reason))
+        .collect();
+    assert_eq!(external[0].0, "machines.web.service");
+    assert!(
+        external[0].1.starts_with("nginx's recipe: a `repository` step on a host that already exists"),
+        "{external:?}"
+    );
 }
 
 #[test]
