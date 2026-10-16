@@ -133,7 +133,14 @@
         "macos",
         "windows"
       ],
-      "runs": []
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "solo-web through the Isothrum runner: up (Docker in the VM over SSH, Compose), web check, down, reap; zero AWS leftovers"
+        }
+      ]
     },
     {
       "entry": "cloud-docker/azure",
@@ -387,7 +394,14 @@
         "macos",
         "windows"
       ],
-      "runs": []
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "solo-web and segmented through the Isothrum runner: up, seal, checks (segmented: no-internet-from-cache plus reachability), down, reap; zero AWS leftovers"
+        }
+      ]
     },
     {
       "entry": "cloud-vm/azure",
@@ -456,7 +470,14 @@
         "macos",
         "windows"
       ],
-      "runs": []
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "cloud-bucket (S3 site) through the Isothrum CLI: up, the site answers 200 'hello from isoloom', down; no bucket left"
+        }
+      ]
     },
     {
       "entry": "cloud-services/azure",

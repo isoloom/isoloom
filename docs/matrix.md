@@ -20,7 +20,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `docker-vm/libvirt` | 2 | linux | validated only; tier 1 pending: linux |
 | `docker-vm/vmware_esxi` | 2 | linux, macos, windows | validated only |
 | `docker-vm/proxmox` | 2 | linux, macos, windows | validated only |
-| `cloud-docker/aws` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
+| `cloud-docker/aws` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
 | `cloud-docker/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/digitalocean` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
@@ -38,14 +38,14 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `vagrant/vmware_esxi` | 2 | linux, macos, windows | real runs: macos (mac, esxi-lab, 2026-10-16); tier 1 pending: linux, windows |
 | `proxmox` | 2 | linux, macos, windows | real runs: macos (mac, pve-lab, 2026-10-15); tier 1 pending: linux, windows |
 | `esxi` | 2 | linux, macos, windows | real runs: macos (mac, esxi-lab, 2026-10-15) |
-| `cloud-vm/aws` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
+| `cloud-vm/aws` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
 | `cloud-vm/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/digitalocean` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/linode` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/oci` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `external` | 2 | linux, macos | validated only |
-| `cloud-services/aws` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
+| `cloud-services/aws` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
 | `cloud-services/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-services/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 
