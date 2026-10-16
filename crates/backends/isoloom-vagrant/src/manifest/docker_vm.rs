@@ -157,6 +157,9 @@ fn lifecycle(env: &Environment, guest: &GuestCompose, way_in: &dyn Fn(&Template)
         }),
         resume: back_up(&[])?,
         provision: None,
+        // internet:false is sealed inside the VM by the containers' route sidecars (the docker
+        // target's), as on this machine: no network-level seal step.
+        seal: None,
         status: status()?,
     })
 }
