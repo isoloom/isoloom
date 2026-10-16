@@ -72,7 +72,9 @@ fn vars(step: &Provision) -> String {
 /// Ansible's settings. Performance: facts gathered once and cached (the WinRM `setup` module is
 /// slow and the environment's playbooks re-run across many imported plays), a fan-out across
 /// hosts (the default 5 forks are too few for a multi-DC range), SSH steps pipelined (a no-op
-/// over WinRM).
+/// over WinRM). `ANSIBLE_HOST_KEY_CHECKING=False` is a deliberate trade-off (reviewed, security
+/// finding S5): the lab's hosts are freshly created and ephemeral, with no stable `known_hosts`
+/// for the controller to trust, so host-key checking inside the lab network is off.
 const ENVIRONMENT: &str = "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False \
 ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
 ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200";
