@@ -78,3 +78,19 @@ impl fmt::Display for Finding {
 fn list(findings: &[Finding]) -> String {
     findings.iter().map(|f| format!("- {f}")).collect::<Vec<_>>().join("\n")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_reads_as_every_finding_on_its_own_line() {
+        let e = Error::Invalid(vec![
+            Finding::new("nginx/entry.yml: recipe.install[0]", "bad"),
+            Finding::new("mini/lock.yml", "stale"),
+        ]);
+        let text = e.to_string();
+        assert!(text.contains("- catalogue/nginx/entry.yml: recipe.install[0]: bad"), "{text}");
+        assert!(text.contains("- catalogue/mini/lock.yml: stale"), "{text}");
+    }
+}

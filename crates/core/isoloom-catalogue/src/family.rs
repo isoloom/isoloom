@@ -127,4 +127,12 @@ mod tests {
             assert_eq!(serde_yaml_ng::from_str::<Family>(f.id()).ok(), Some(f));
         }
     }
+
+    #[test]
+    fn each_family_names_itself_as_a_refusal_reads_it() {
+        assert_eq!(Family::Debian.name(), "Debian");
+        assert_eq!(Family::RedHat.name(), "Red Hat");
+        assert_eq!(Family::Alpine.name(), "Alpine");
+        assert_eq!(Family::Windows.name(), "Windows");
+    }
 }

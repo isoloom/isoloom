@@ -257,6 +257,15 @@ mod tests {
     }
 
     #[test]
+    fn a_name_debugs_as_its_text_and_orders_by_it() {
+        let a: EntryName = "alpha".parse().unwrap();
+        let b: EntryName = "beta".parse().unwrap();
+        assert_eq!(format!("{a:?}"), "\"alpha\"");
+        assert!(a < b, "a name orders by its text");
+        assert_eq!(a.partial_cmp(&b), Some(std::cmp::Ordering::Less));
+    }
+
+    #[test]
     fn a_name_reads_from_yaml_with_its_rule() {
         let wrong = serde_yaml_ng::from_str::<EntryName>("Nginx").unwrap_err().to_string();
         assert!(wrong.contains("an entry is named in kebab case"), "{wrong}");

@@ -191,6 +191,15 @@ mod tests {
     }
 
     #[test]
+    fn two_patterns_are_equal_exactly_when_their_text_is() {
+        let a = Pattern::try_from("[a-z]+".to_owned()).unwrap();
+        let same = Pattern::try_from("[a-z]+".to_owned()).unwrap();
+        let other = Pattern::try_from("[0-9]+".to_owned()).unwrap();
+        assert_eq!(a, same);
+        assert_ne!(a, other);
+    }
+
+    #[test]
     fn a_pattern_matches_the_whole_value() {
         let p = Pattern::try_from("[a-z]+".to_owned()).unwrap();
         assert!(p.matches("abc") && !p.matches("abc1") && !p.matches("1abc"));

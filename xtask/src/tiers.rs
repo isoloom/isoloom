@@ -86,7 +86,15 @@ fn record_run(r: &Record) -> Res<ExitCode> {
         Some(d) => d.clone(),
         None => civil_date(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()),
     };
-    record(&mut doc, r, &date)?;
+    if !record(&mut doc, r, &date)? {
+        println!(
+            "tiers: {} on {} ({date}): {} already recorded; nothing to do",
+            r.entry,
+            r.host,
+            result_id(r.result)
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
     std::fs::write(&path, written(&doc)?)?;
     println!("tiers: {} on {} ({date}): {}, in {TIERS}", r.entry, r.host, result_id(r.result));
     regenerate_matrix(&root)
@@ -121,8 +129,10 @@ fn result_id(r: RunResult) -> &'static str {
 }
 
 /// `r` added to `doc`'s entry, dated `date`: the host known (or added with its OS), the date a
-/// day, and the host's OS one the entry exists on.
-fn record(doc: &mut Value, r: &Record, date: &str) -> Res<()> {
+/// day, and the host's OS one the entry exists on. Idempotent: an identical run already in the
+/// entry is left as it is, and `false` is returned (nothing changed); `true` when the run was
+/// added.
+fn record(doc: &mut Value, r: &Record, date: &str) -> Res<bool> {
     if !is_date(date) {
         return Err(format!("`{date}` isn't a date (YYYY-MM-DD)").into());
     }
@@ -136,6 +146,20 @@ fn record(doc: &mut Value, r: &Record, date: &str) -> Res<()> {
     if !exists_on.iter().any(|o| o.as_str() == Some(os.as_str())) {
         return Err(format!("`{}` doesn't exist on {os} (it exists on {})", r.entry, Value::Array(exists_on)).into());
     }
+    let run = Value::Object(run_object(r, date));
+    let runs = entry
+        .get_mut("runs")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| format!("`{}` has no `runs` list", r.entry))?;
+    if runs.contains(&run) {
+        return Ok(false);
+    }
+    runs.push(run);
+    Ok(true)
+}
+
+/// The run as the list writes it: the host, date and result, and the server and note when set.
+fn run_object(r: &Record, date: &str) -> Map<String, Value> {
     let mut run = Map::new();
     run.insert("host".to_owned(), json!(r.host));
     run.insert("date".to_owned(), json!(date));
@@ -145,12 +169,7 @@ fn record(doc: &mut Value, r: &Record, date: &str) -> Res<()> {
             run.insert(key.to_owned(), json!(v));
         }
     }
-    let runs = entry
-        .get_mut("runs")
-        .and_then(Value::as_array_mut)
-        .ok_or_else(|| format!("`{}` has no `runs` list", r.entry))?;
-    runs.push(Value::Object(run));
-    Ok(())
+    run
 }
 
 /// The OS of `host`: the list's, or `os` for a host it doesn't name yet (then added to it).
@@ -226,12 +245,46 @@ mod tests {
     #[test]
     fn a_run_is_added_to_its_entry_with_its_date_and_server() {
         let mut doc = list();
-        record(&mut doc, &asked("proxmox", "mac", None), "2026-10-15").unwrap();
+        assert!(record(&mut doc, &asked("proxmox", "mac", None), "2026-10-15").unwrap(), "added");
         assert_eq!(
             doc["entries"][1]["runs"],
             json!([{ "host": "mac", "date": "2026-10-15", "result": "pass", "server": "pve-lab" }])
         );
         assert_eq!(doc["entries"][0]["runs"], json!([]));
+    }
+
+    #[test]
+    fn recording_the_same_run_twice_is_a_no_op() {
+        let mut doc = list();
+        assert!(record(&mut doc, &asked("proxmox", "mac", None), "2026-10-15").unwrap(), "the first is added");
+        let after_first = doc.clone();
+        assert!(
+            !record(&mut doc, &asked("proxmox", "mac", None), "2026-10-15").unwrap(),
+            "the second is a no-op"
+        );
+        assert_eq!(doc, after_first, "the list is unchanged by the duplicate");
+        assert_eq!(doc["entries"][1]["runs"].as_array().map(Vec::len), Some(1), "one run, not two");
+        // A run that differs (a different day) is a new run, not a duplicate.
+        assert!(
+            record(&mut doc, &asked("proxmox", "mac", None), "2026-10-16").unwrap(),
+            "a different date is added"
+        );
+        assert_eq!(doc["entries"][1]["runs"].as_array().map(Vec::len), Some(2));
+    }
+
+    #[test]
+    fn an_unknown_entry_or_host_is_rejected_and_the_matrix_regenerates_deterministically() {
+        let mut doc = list();
+        assert!(record(&mut doc, &asked("no-such-target", "mac", None), "2026-10-15").is_err(), "unknown entry");
+        assert!(
+            record(&mut doc, &asked("proxmox", "nessie", None), "2026-10-15").is_err(),
+            "unknown host, no --os"
+        );
+        assert_eq!(doc, list(), "a rejected record changes nothing");
+        // `docs/matrix.md` is generated from the matrix, a pure function of the code and the
+        // tiers: regenerating it twice gives the very same bytes.
+        let page = || isoloom_targets::matrix::matrix().expect("the matrix builds").markdown();
+        assert_eq!(page(), page(), "the matrix page is deterministic");
     }
 
     #[test]

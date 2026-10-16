@@ -345,3 +345,17 @@ fn item_fields(
     }
     if problems.is_empty() { Ok(values) } else { Err(problems) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{FieldPath, unknown};
+
+    #[test]
+    fn an_unknown_setting_fix_depends_on_whether_the_entry_has_any() {
+        let at = FieldPath::new("machines").key("web").key("with");
+        let none = unknown("demo", "nope", &[], &at);
+        assert_eq!(none.fix.as_deref(), Some("demo takes no settings: leave `with` out"));
+        let some = unknown("demo", "zzzzz", &["port", "greeting"], &at);
+        assert_eq!(some.fix.as_deref(), Some("its settings: `port`, `greeting`"));
+    }
+}

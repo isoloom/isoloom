@@ -13,6 +13,8 @@
 //! - `msrv` and `features`: every crate checked with its declared minimum Rust, and with every
 //!   combination of its features (cargo-hack);
 //! - `fuzz`: the fuzz targets of `fuzz/` (cargo-fuzz), each for a while;
+//! - `fuzz-combos`: many thousands of random but valid specs generated for every target, with the
+//!   pipeline's invariants asserted;
 //! - `conformance`: the configuration renderers' resource conformance, each step kind applied
 //!   twice in each Linux family's container image;
 //! - `mutants`: mutation testing of the core crates (cargo-mutants);
@@ -39,6 +41,7 @@ mod conformance;
 mod deps;
 mod dev_link;
 mod fuzz;
+mod fuzz_combos;
 mod generate_all;
 mod hack;
 mod host_setup;
@@ -98,6 +101,10 @@ enum Task {
     /// The fuzz targets of fuzz/ (cargo-fuzz, nightly), each for a while; exits 1 when one
     /// crashes.
     Fuzz(fuzz::Args),
+    /// Combination fuzzing: many thousands of random but valid specs generated for every target,
+    /// with the pipeline's invariants asserted; exits 1 when one breaks. `--deep` runs the big
+    /// run, the normal gate a fast one.
+    FuzzCombos(fuzz_combos::Args),
     /// The configuration renderers' resource conformance: each step kind, rendered by the shell
     /// library and the Dockerfile, applied twice in each Linux family's container image; the
     /// second apply must change nothing.
@@ -138,6 +145,7 @@ fn run(cli: Cli) -> Res<ExitCode> {
         Task::Msrv => hack::msrv(),
         Task::Features => hack::features(),
         Task::Fuzz(a) => fuzz::run(&a),
+        Task::FuzzCombos(a) => fuzz_combos::run(&a),
         Task::Conformance(a) => Ok(conformance::run(&a)),
         Task::Mutants(a) => mutants::run(&a),
         Task::Bench(a) => bench::run(&a),

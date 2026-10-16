@@ -204,4 +204,23 @@ mod tests {
         assert_eq!(c.checks[0].check, serde_json::json!({ "name": "a", "http": "http://{{ machine }}/" }));
         assert_eq!(c.checks[1].name(), "b");
     }
+
+    #[test]
+    fn fill_substitutes_the_known_placeholders_and_refuses_the_rest() {
+        let version: Version = "1.2.3".parse().unwrap();
+        let with: IndexMap<String, String> = IndexMap::from([("root".to_owned(), "site/".to_owned())]);
+        let values = CheckValues {
+            machine: "web",
+            version: &version,
+            with: &with,
+        };
+        assert_eq!(
+            fill("http://{{ machine }}:{{ version }}/{{ with.root }}", &values).unwrap(),
+            "http://web:1.2.3/site/"
+        );
+        // A bare placeholder that is neither `machine` nor `version` is refused.
+        assert!(fill("{{ nope }}", &values).is_err());
+        // A `with.<setting>` the case leaves without a value is refused.
+        assert!(fill("{{ with.missing }}", &values).is_err());
+    }
 }

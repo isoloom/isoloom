@@ -49,9 +49,11 @@ pub(super) fn isoloom(profile: Profile) -> Vec<Gate> {
     };
     let after_tests = gates.iter().position(|g| g.name == "test").map_or(gates.len(), |i| i + 1);
     gates.insert(after_tests, gate("tf-test", &[&ISOLOOM_XTASK[..], tf_test].concat()));
-    // The configuration renderers' resource conformance, in Docker with the network: deep only.
+    // The configuration renderers' resource conformance, in Docker with the network, and the
+    // combination fuzz (the "10k random specs" item): deep only.
     if profile == Profile::Deep {
         gates.push(gate("conformance", &[&ISOLOOM_XTASK[..], &["conformance"]].concat()));
+        gates.push(gate("fuzz-combos", &[&ISOLOOM_XTASK[..], &["fuzz-combos"]].concat()));
     }
     gates
 }
@@ -291,7 +293,7 @@ mod tests {
         let platform: Vec<&str> = isoloom(Profile::Platform).iter().map(|g| g.name).collect();
         assert_eq!(platform, ["test"]);
         let deep: Vec<&str> = isoloom(Profile::Deep).iter().map(|g| g.name).skip(full.len()).collect();
-        assert_eq!(deep, ["fuzz", "mutants", "conformance"]);
+        assert_eq!(deep, ["fuzz", "mutants", "conformance", "fuzz-combos"]);
     }
 
     #[test]
@@ -309,7 +311,7 @@ mod tests {
             gates
                 .iter()
                 .map(|g| g.name)
-                .filter(|n| !["tf-test", "conformance"].contains(n))
+                .filter(|n| !["tf-test", "conformance", "fuzz-combos"].contains(n))
                 .collect::<Vec<_>>()
         };
         for profile in [Profile::Full, Profile::Platform, Profile::Deep] {

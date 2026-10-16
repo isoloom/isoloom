@@ -1753,6 +1753,7 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
+ "isoloom-targets",
  "proptest",
  "serde_json",
  "serde_yaml_ng",

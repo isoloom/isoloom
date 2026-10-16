@@ -1,5 +1,6 @@
 //! `cargo xtask mutants [CRATE...]`: mutation testing (cargo-mutants, PLAN 3d) on the core crates
-//! (by default isoloom-spec, isoloom-plan, isoloom-render and isoloom-manifest). Each mutant is a
+//! (by default isoloom-spec, isoloom-catalogue, isoloom-plan, isoloom-render and
+//! isoloom-manifest). Each mutant is a
 //! small change to the code (an operator swapped, a condition negated, a function returning a
 //! default) and must make a test of its crate fail. A mutant no test catches ("missed") fails the
 //! run, until a test catches it or `.cargo/mutants.toml` lists it, with its reason, as one no test
@@ -15,7 +16,7 @@ use std::process::ExitCode;
 use crate::{Res, process, repo};
 
 /// The crates mutated by default: the core.
-pub(crate) const CORE: [&str; 4] = ["isoloom-spec", "isoloom-plan", "isoloom-render", "isoloom-manifest"];
+pub(crate) const CORE: [&str; 5] = ["isoloom-spec", "isoloom-catalogue", "isoloom-plan", "isoloom-render", "isoloom-manifest"];
 
 /// The arguments of `cargo xtask mutants`.
 #[derive(clap::Args)]
@@ -23,7 +24,8 @@ pub(crate) struct Args {
     /// How many mutants are built and tested at once.
     #[arg(long, short, default_value_t = 1)]
     jobs: u8,
-    /// The crates (default: isoloom-spec, isoloom-plan, isoloom-render, isoloom-manifest).
+    /// The crates (default: isoloom-spec, isoloom-catalogue, isoloom-plan, isoloom-render,
+    /// isoloom-manifest).
     crates: Vec<String>,
 }
 

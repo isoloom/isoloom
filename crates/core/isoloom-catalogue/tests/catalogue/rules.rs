@@ -250,3 +250,53 @@ fn what_the_tools_write_beside_the_entries_isnt_catalogue_data() {
     files.insert("entry.schema.json".into(), "{ \"title\": \"entry.yml\" }\n".into());
     assert_eq!(findings(&files), "");
 }
+
+/// Inserts `steps` into the demo entry's `configure`, before its `service` step.
+fn demo_with_steps(steps: &str) -> BTreeMap<String, String> {
+    edited("demo/entry.yml", |t| t.replace("    - service: demo", &format!("{steps}    - service: demo")))
+}
+
+#[test]
+fn a_recipe_key_whose_fingerprint_lock_yml_doesnt_pin_fails() {
+    let files = edited("demo/lock.yml", |t| {
+        t.replace("0123456789ABCDEF0123456789ABCDEF01234567", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+    });
+    breaks(&files, "lock.yml pins no key");
+}
+
+#[test]
+fn a_vendor_package_with_no_pinned_version_is_left_as_written() {
+    // `extra` has no version and isn't in lock.yml: a vendor release leaves it for the OS.
+    let files = edited("demo/entry.yml", |t| {
+        t.replace(
+            r#"packages: [{ name: demo, version: "{{ version }}" }]"#,
+            r#"packages: [{ name: demo, version: "{{ version }}" }, extra]"#,
+        )
+    });
+    assert_eq!(findings(&files), "");
+}
+
+#[test]
+fn a_list_setting_in_a_text_is_read_item_by_item() {
+    let files = demo_with_steps("    - command: \"echo {{ with.users }}\"\n      when: { set: users }\n");
+    breaks(&files, "a list is read item by item");
+}
+
+#[test]
+fn an_item_fields_file_path_is_read_from_the_named_field() {
+    let files = demo_with_steps("    - command: \"cat {{ item.password.path }}\"\n      creates: /etc/demo/pw\n      for_each: users\n");
+    assert_eq!(findings(&files), "");
+}
+
+#[test]
+fn a_lab_machine_reference_is_refused_outside_a_template() {
+    let files = demo_with_steps("    - command: \"echo {{ machine.name }}\"\n");
+    breaks(&files, "`{{ machine.name }}`: the lab's machines are named in a template");
+}
+
+#[test]
+fn a_whole_placeholder_of_a_number_setting_keeps_its_type() {
+    // `uid` is an integer; `{{ with.port }}` alone fills in the number, not the string "8080".
+    let files = demo_with_steps("    - user: { name: svc, uid: \"{{ with.port }}\" }\n");
+    assert_eq!(findings(&files), "");
+}

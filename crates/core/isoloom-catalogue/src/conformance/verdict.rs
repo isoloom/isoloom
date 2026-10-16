@@ -176,6 +176,15 @@ mod tests {
     }
 
     #[test]
+    fn a_check_that_passes_in_one_form_but_fails_in_the_other_fails_the_case() {
+        let container = run(&[("answers", true, ""), ("version", true, ""), ("fact: os", false, "debian 12")]);
+        let vm = run(&[("answers", true, ""), ("version", false, "nginx/1.30.5"), ("fact: os", false, "debian 12")]);
+        let v = verdict(&lab(), Some(&container), Some(&vm));
+        assert!(v.facts[0].equal(), "the facts agree, so only the failed check can fail the case");
+        assert!(!v.passed(), "a check must pass in both forms, not just one");
+    }
+
+    #[test]
     fn one_form_run_proves_its_own_checks_but_never_parity() {
         let container = run(&[("answers", true, ""), ("version", true, ""), ("fact: os", false, "debian 12")]);
         let v = verdict(&lab(), Some(&container), None);

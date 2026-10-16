@@ -160,6 +160,10 @@ fn several_services_each_read_their_own_settings() {
     let both = crate::testing::lab("debian@12", "[demo, mini]", "{ port: 81, size: 2 }").unwrap();
     let resolved = catalogue.resolve(&both, "web").unwrap();
     assert_eq!(resolved.iter().map(|r| r.entry.as_str()).collect::<Vec<_>>(), ["demo", "mini"]);
+    // Each service keeps the `with:` keys that are its own: demo reads `port`, mini reads `size`.
+    let web = resolved[0].ports.iter().find(|(n, _)| n.as_str() == "web").map(|(_, p)| p.port.get());
+    assert_eq!(web, Some(81), "demo's web port comes from its `port` setting");
+    assert!(format!("{:?}", resolved[1].configure).contains("--size 2"), "mini applies its `size`: {:?}", resolved[1].configure);
     let nope = crate::testing::lab("debian@12", "[demo, mini]", "{ port: 81, nope: 1 }").unwrap();
     let p = catalogue.resolve(&nope, "web").unwrap_err();
     assert_eq!(p.len(), 1, "{p:?}");
@@ -170,6 +174,39 @@ fn several_services_each_read_their_own_settings() {
     let typo = crate::testing::lab("debian@12", "[demo, mnii]", "{}").unwrap();
     let unknown = catalogue.resolve(&typo, "web").unwrap_err();
     assert_eq!(unknown[0].path.as_str(), "machines.web.service[1]", "each service at its index");
+}
+
+#[test]
+fn passwords_in_a_list_get_value_files_each_with_its_own_setting_owner() {
+    let r = resolve(
+        &demo().unwrap(),
+        "debian@12",
+        "demo",
+        "{ admin: { secret: admin }, users: [{ name: ann, password: { secret: admin } }] }",
+    )
+    .unwrap();
+    let admin = r.value_files.iter().find(|f| f.path.contains("admin")).expect("admin's value file");
+    assert_eq!(admin.owner.as_ref().map(ToString::to_string).as_deref(), Some("demo"));
+    // The list item's password is collected too, with no owner (the `users` setting has none).
+    let listed = r
+        .value_files
+        .iter()
+        .find(|f| !f.path.contains("admin"))
+        .expect("the list item's password value file");
+    assert!(listed.owner.is_none(), "the `users` setting has no owner of its own");
+}
+
+#[test]
+fn an_integer_setting_accepts_a_value_at_its_maximum() {
+    let mut files = crate::testing::fixture_files().unwrap();
+    let mini = files.get("mini/entry.yml").cloned().unwrap();
+    files.insert(
+        "mini/entry.yml".into(),
+        mini.replace("minimum: 1, default: 1", "minimum: 1, maximum: 5, default: 1"),
+    );
+    let catalogue = crate::testing::load(&files).unwrap();
+    let lab = crate::testing::lab("debian@12", "mini", "{ size: 5 }").unwrap();
+    assert!(catalogue.resolve(&lab, "web").is_ok(), "5 is within 1..=5");
 }
 
 #[test]
