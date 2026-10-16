@@ -242,3 +242,11 @@ fn a_setting_a_step_reads_is_used_and_a_string_outside_templates_needs_no_patter
     });
     assert_eq!(findings(&files), "");
 }
+
+#[test]
+fn what_the_tools_write_beside_the_entries_isnt_catalogue_data() {
+    let mut files = fixture_files().unwrap();
+    files.insert("conformance.json".into(), "{ \"runs\": [] }\n".into());
+    files.insert("entry.schema.json".into(), "{ \"title\": \"entry.yml\" }\n".into());
+    assert_eq!(findings(&files), "");
+}

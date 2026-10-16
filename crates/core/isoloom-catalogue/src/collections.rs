@@ -44,3 +44,19 @@ impl Collections {
         self.collections.iter().find(|c| c.name == name)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_pinned_collection_is_found_by_its_name() {
+        let c: Collections = serde_yaml_ng::from_str(&format!(
+            "collections:\n  - {{ name: ansible.posix, version: 2.2.2, url: 'https://galaxy.ansible.com/a.tar.gz', sha256: {}, licence: GPL-3.0-or-later }}\n",
+            "a".repeat(64)
+        ))
+        .unwrap();
+        assert_eq!(c.get("ansible.posix").map(|p| p.version.as_str()), Some("2.2.2"));
+        assert_eq!(c.get("ansible.windows"), None);
+    }
+}
