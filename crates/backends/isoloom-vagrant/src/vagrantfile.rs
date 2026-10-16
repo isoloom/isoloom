@@ -62,11 +62,16 @@ pub(crate) fn forwarded_port(var: &str, guest: u16, host: u16, protocol: Protoco
     }
 }
 
+/// The constraints' provisioner.
+pub(crate) const CONSTRAINTS: &str = "constraints";
+/// The Docker install's provisioner.
+pub(crate) const DOCKER: &str = "docker";
+
 /// The spec's constraints (proxy, mirrors, NTP) as the VM's first provisioner, rendered by the
 /// plan's [`Step::Prelude`]. Nothing when the spec has none.
 pub(crate) fn prelude(r: &mut Ruby, env: &Environment, var: &str) {
     if let Some(sh) = steps::linux(env, "", &Step::Prelude) {
-        r.call(shell(var, "constraints").kw("inline", Value::str(&sh)));
+        r.call(shell(var, CONSTRAINTS).kw("inline", Value::str(&sh)));
     }
 }
 
@@ -82,7 +87,7 @@ pub(crate) fn esxi_host(r: &mut Ruby) {
 
 /// Docker from Docker's own install script, unless the box has it.
 pub(crate) fn install_docker(r: &mut Ruby, var: &str) {
-    r.call(shell(var, "docker").kw("inline", Value::str(steps::INSTALL_DOCKER)));
+    r.call(shell(var, DOCKER).kw("inline", Value::str(steps::INSTALL_DOCKER)));
 }
 
 #[cfg(test)]

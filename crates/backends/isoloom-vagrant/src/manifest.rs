@@ -6,6 +6,7 @@
 //! (`identity.vagrant.dotfile`), not next to the Vagrantfile.
 
 mod checks;
+pub(crate) mod docker_vm;
 mod lifecycle;
 mod machines;
 mod providers;

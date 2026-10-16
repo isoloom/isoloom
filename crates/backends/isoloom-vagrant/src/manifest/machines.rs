@@ -111,17 +111,23 @@ fn on_every_network(env: &Environment, at: impl Fn(Cidr) -> std::net::Ipv4Addr) 
 /// The define name, and the VM's name under each provider that names it: the display name on
 /// the desktop hypervisors, `<env>-<what>` on Hyper-V and ESXi, the domain on libvirt (its
 /// prefix is the environment's). QEMU names none.
-fn native(env: &Environment, d: &Define) -> Result<Native> {
-    let (shown, plain) = (label(env, &d.what), vm_name(env, &d.what));
-    let vm_names = BTreeMap::from([
+/// A VM's name under each provider that names one: the display name on the desktop hypervisors,
+/// `plain` on Hyper-V and ESXi, `libvirt` on libvirt. QEMU names none.
+pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMap<Provider, String> {
+    BTreeMap::from([
         (Provider::Virtualbox, shown.clone()),
         (Provider::VmwareDesktop, shown.clone()),
         (Provider::Parallels, shown.clone()),
         (Provider::Utm, shown),
         (Provider::Hyperv, plain.clone()),
         (Provider::VmwareEsxi, plain),
-        (Provider::Libvirt, format!("{}_{}", env.name, d.name)),
-    ]);
+        (Provider::Libvirt, libvirt),
+    ])
+}
+
+fn native(env: &Environment, d: &Define) -> Result<Native> {
+    let (shown, plain) = (label(env, &d.what), vm_name(env, &d.what));
+    let vm_names = vm_names(shown, plain, format!("{}_{}", env.name, d.name));
     Ok(Native::Vagrant {
         vagrant: Name::parse(&d.name)?,
         vm_names,

@@ -17,6 +17,7 @@ mod constraints;
 mod defaults;
 mod determinism;
 mod disk;
+mod docker_vm_manifest;
 mod every_example;
 mod external;
 mod generate;

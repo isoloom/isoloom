@@ -243,6 +243,48 @@ pub fn port(label: &str, p: &model::Port, published: &[PublishedPort], address: 
     })
 }
 
+/// A bare machine with the given `name` and `role`, every other field empty: a caller fills its
+/// resources, addresses, native name and ports.
+///
+/// # Errors
+///
+/// Fails on a name the manifest refuses.
+pub fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
+    Ok(Machine {
+        name: Name::parse(name)?,
+        role,
+        of: None,
+        os: None,
+        windows: false,
+        arch: None,
+        resources: None,
+        addresses: std::collections::BTreeMap::new(),
+        keep_running: false,
+        native: None,
+        volumes: Vec::new(),
+        ports: Vec::new(),
+    })
+}
+
+/// A Terraform state output `name` (role `role`), read by the runner as `${outputs.<name>}`.
+///
+/// # Errors
+///
+/// Fails on a name the manifest refuses.
+pub fn terraform_output(name: &str, role: OutputRole, description: &str) -> Result<Output, ManifestError> {
+    Ok(Output {
+        name: SnakeName::parse(name)?,
+        description: Some(description.to_owned()),
+        role,
+        sensitive: false,
+        format: None,
+        from: OutputSource::TerraformOutput {
+            name: isoloom_manifest::Identifier::parse(name)?,
+            default: None,
+        },
+    })
+}
+
 /// An output per published port of the lab's machines and tools: an HTTP port is an entry (the
 /// Open button), the others information; each shown at the host's loopback.
 ///

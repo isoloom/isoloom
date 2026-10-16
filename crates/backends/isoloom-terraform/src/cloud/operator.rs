@@ -30,15 +30,6 @@ pub(crate) fn variables(env: &Environment) -> Vec<Block> {
     v
 }
 
-/// The variables of the Docker host on a Proxmox server, which the operator reaches over SSH:
-/// the SSH key and the auto-stop, then the inputs. Off the clouds, its firewall is the
-/// operator's network and nothing reaps it by its tags: no `allowed_cidr`, no `expires_at`.
-pub(crate) fn host_variables(env: &Environment) -> Vec<Block> {
-    let mut v = access();
-    v.extend(inputs::variable(env));
-    v
-}
-
 /// The operator's SSH key, and the auto-stop.
 fn access() -> Vec<Block> {
     vec![

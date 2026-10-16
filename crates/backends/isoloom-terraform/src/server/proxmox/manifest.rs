@@ -13,6 +13,7 @@
 //! - **Tools:** Terraform, run from its pinned image on macOS (Local Network Privacy keeps a host
 //!   binary's provider off the LAN), and `ssh`.
 
+pub(super) mod docker_vm;
 mod machines;
 mod slots;
 mod steps;
@@ -55,14 +56,10 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
         target: isoloom_manifest::Target::Proxmox,
         cloud: None,
         driver: Driver::Terraform,
-        hosts: BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows]),
+        hosts: every_host(),
         tools: tools()?,
-        identity: Identity::Terraform(TerraformIdentity {
-            module: RelPath::parse(".")?,
-            state: StateOwner::Runner,
-            var_files: Vec::new(),
-        }),
-        params: slots::params(env, &runners)?,
+        identity: runner_identity()?,
+        params: slots::params(&super::base::variables(env), &runners)?,
         secrets: slots::secrets(env)?,
         networks: machines::networks(env)?,
         outputs: machines::outputs(&machines)?,
@@ -81,8 +78,22 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
     })
 }
 
+/// Every host a Terraform target runs from.
+pub(super) fn every_host() -> BTreeSet<HostOs> {
+    BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows])
+}
+
+/// The module in place, its state the runner's.
+pub(super) fn runner_identity() -> Result<Identity, ManifestError> {
+    Ok(Identity::Terraform(TerraformIdentity {
+        module: RelPath::parse(".")?,
+        state: StateOwner::Runner,
+        var_files: Vec::new(),
+    }))
+}
+
 /// Terraform (from its image on macOS) and `ssh`.
-fn tools() -> Result<Vec<Tool>, ManifestError> {
+pub(super) fn tools() -> Result<Vec<Tool>, ManifestError> {
     let mut terraform = tool("terraform", argv("terraform", &["version"])?)?;
     terraform.min_version = Some(Version::parse(TERRAFORM_MIN)?);
     terraform.container = Some(PinnedImage::parse(TERRAFORM_IMAGE)?);

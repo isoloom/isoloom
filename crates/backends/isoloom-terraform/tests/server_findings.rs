@@ -7,6 +7,7 @@ pub mod testing;
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
+use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 use isoloom_spec::model::Target;
 use isoloom_terraform::{EsxiBackend, ProxmoxBackend};
 use testing::{Outcome, example, file, planned};
@@ -14,6 +15,40 @@ use testing::{Outcome, example, file, planned};
 fn proxmox(name: &str) -> Outcome<String> {
     let env: Environment = planned(&example(name)?, Target::Proxmox);
     Ok(file(&ProxmoxBackend.render(&env)?, "proxmox/main.tf")?.to_owned())
+}
+
+/// An empty guest, for a docker-vm module test that reads only the module (not what runs in the VM).
+///
+/// # Errors
+///
+/// When the status step's id isn't one (it is fixed, so this never fails).
+fn no_guest() -> Outcome<GuestCompose> {
+    Ok(GuestCompose {
+        machines: Vec::new(),
+        networks: Vec::new(),
+        slots: Vec::new(),
+        params: Vec::new(),
+        start: Vec::new(),
+        ready: Vec::new(),
+        check_setup: Vec::new(),
+        runners: Vec::new(),
+        status: GuestCommand {
+            id: isoloom_manifest::StepId::parse("ps")?,
+            note: None,
+            command: isoloom_manifest::Template::text("true"),
+            timeout_s: 60,
+        },
+    })
+}
+
+/// The docker-vm Proxmox module's `main.tf` for `env`.
+///
+/// # Errors
+///
+/// When the module can't be rendered, or has no `main.tf`.
+fn docker_vm_main_tf(env: &Environment) -> Outcome<String> {
+    let files = isoloom_terraform::docker_vm_module(env, &no_guest()?)?;
+    Ok(files.into_iter().find(|f| f.path.ends_with("main.tf")).ok_or("no main.tf")?.contents)
 }
 
 fn esxi(name: &str) -> Outcome<String> {
@@ -71,17 +106,17 @@ fn a_router_that_cant_report_its_address_fails_within_minutes_and_says_why() -> 
 }
 
 #[test]
-fn a_router_that_never_reported_an_address_can_still_be_destroyed() {
+fn a_router_that_never_reported_an_address_can_still_be_destroyed() -> Outcome {
     // Found on the real server: after the postcondition failed, `destroy` stopped on "Invalid
     // index" (the router's address list is empty in the state), leaving the lab behind.
-    let tf = proxmox("hello-stack").unwrap();
+    let tf = proxmox("hello-stack")?;
     assert!(tf.contains("router_address = try(["), "{tf}");
     let lab =
-        testing::spec("version: 1\nname: d\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n")
-            .unwrap();
+        testing::spec("version: 1\nname: d\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n")?;
     let env = planned(&lab, Target::DockerVm);
-    let host = isoloom_terraform::docker_vm_module(&env).unwrap().contents;
-    assert!(host.contains("ip   = try(["), "{host}");
+    let host = docker_vm_main_tf(&env)?;
+    assert!(host.contains("ip = try(["), "{host}");
+    Ok(())
 }
 
 #[test]

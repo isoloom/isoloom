@@ -1,7 +1,7 @@
 //! The run manifests the targets write (`.isoloom/<target>/run.json`): the design's flag-portal
-//! spec and the solo-web example write the shared docker and proxmox fixtures the runner tests
-//! against, check runners get the time their waits need, and only `docker`, `vagrant` and
-//! `proxmox` write one. Every example's manifest, on each, parses and matches the schema, and
+//! spec and the solo-web example write the shared docker, docker-vm and proxmox fixtures the
+//! runner tests against, check runners get the time their waits need, and only `docker`,
+//! `vagrant`, `proxmox` and `docker-vm` (two: Vagrant's and Proxmox's) write one. Every example's manifest, on each, parses and matches the schema, and
 //! leaves the runner no slot it may skip.
 
 use std::path::{Path, PathBuf};
@@ -66,6 +66,13 @@ fn the_flag_portal_spec_writes_the_shared_docker_fixture() -> Outcome {
 }
 
 #[test]
+fn the_flag_portal_spec_writes_the_shared_docker_vm_fixtures() -> Outcome {
+    let files = generate(&lab(FLAG_PORTAL)?, Target::DockerVm)?;
+    is_the_fixture(run_json(&files, ".isoloom/docker-vm/run.json")?, "docker-vm.run.json")?;
+    is_the_fixture(run_json(&files, ".isoloom/docker-vm/proxmox/run.json")?, "docker-vm-proxmox.run.json")
+}
+
+#[test]
 fn the_solo_web_example_writes_the_shared_proxmox_fixture() -> Outcome {
     let solo_web = examples(Target::Proxmox)?
         .into_iter()
@@ -110,10 +117,12 @@ fn the_message_leaves_published_ports_to_the_runner() -> Outcome {
 
 /// The targets that write a run manifest, where they write it, and how many examples each
 /// generates at least.
-const WRITERS: [(Target, &str, usize); 3] = [
+const WRITERS: [(Target, &str, usize); 5] = [
     (Target::Docker, ".isoloom/docker/run.json", 15),
     (Target::Vagrant, ".isoloom/vagrant/run.json", 10),
     (Target::Proxmox, ".isoloom/proxmox/run.json", 10),
+    (Target::DockerVm, ".isoloom/docker-vm/run.json", 10),
+    (Target::DockerVm, ".isoloom/docker-vm/proxmox/run.json", 10),
 ];
 
 /// Every example `target` generates.
@@ -202,9 +211,9 @@ fn every_examples_manifest_parses_and_matches_the_schema() -> Outcome {
 }
 
 #[test]
-fn only_docker_vagrant_and_proxmox_write_a_run_manifest_for_now() -> Outcome {
+fn only_docker_vagrant_proxmox_and_docker_vm_write_a_run_manifest_for_now() -> Outcome {
     let spec = lab(FLAG_PORTAL)?;
-    for target in [Target::Hosted, Target::DockerVm, Target::Kubernetes] {
+    for target in [Target::Hosted, Target::Kubernetes] {
         let files = generate(&spec, target).unwrap_or_default();
         assert!(!files.iter().any(|f| f.path.ends_with("run.json")), "{}", target.id());
     }

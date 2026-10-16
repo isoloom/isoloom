@@ -1,113 +1,124 @@
-//! The Docker host on a Proxmox server, for `docker-vm` (`.isoloom/docker-vm/proxmox/main.tf`):
-//! one Debian VM on the uplink bridge (DHCP), its address from the guest agent, then the same
-//! set-up over SSH as the clouds (`crate::docker_host`). Its cloud-init document is the VM
-//! core's, with the plan's `Prelude` step as `bootcmd` (the packages it installs may need the
-//! proxy).
+//! The Docker host on a Proxmox server, for `docker-vm` (`.isoloom/docker-vm/proxmox/`): one
+//! Debian VM on the uplink bridge (DHCP), its address from the guest agent. Terraform makes only
+//! the VM. Its cloud-init document lets the `isoloom` user in with the runner's key, installs the
+//! guest agent (it reports the address), runs the constraints' prelude at every boot (the packages
+//! may need the proxy), and has SSH accept the values given at launch. Everything inside the VM is
+//! the run manifest's ([`manifest`]): `setup.sh` (Docker) piped over SSH, the project's archive,
+//! then the Compose file started as Compose's backend says, all through the runner, so the same
+//! steps run from macOS, Windows and Linux and Terraform never reaches the guest.
+
+pub use super::manifest::docker_vm::docker_vm as manifest;
 
 use isoloom_plan::Environment;
-use isoloom_render::GeneratedFile;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Structure, Template, binary, boolean, call, conditional, list, null, number, reference, string,
-};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, boolean, list, number, reference, string};
+use isoloom_render::run_manifest::guest::{self, GuestCompose};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::Target;
 
-use super::base::{connection, download, is_set, is_unset, provider};
+use super::base::{connection, download, provider};
 use super::machine::snippet;
 use crate::Result;
-use crate::cloud::operator;
-use crate::docker_host::{self, Access, AutoStop};
 use crate::machine::cloud_init::{self, CloudConfig};
 use crate::module::providers::{self, terraform};
 use crate::module::variable::Variable;
-use crate::module::{self, ProjectCopy, Usage, resource};
+use crate::module::{self, ProjectCopy, Usage, output, resource};
 use crate::server::{slotted, user};
 
-/// The module.
+/// The module's folder under `.isoloom/`.
+pub(super) fn folder() -> String {
+    format!("{}/proxmox", Target::DockerVm.id())
+}
+
+/// The Docker host's set-up, beside the module: the run manifest pipes it into `sudo sh -s`.
+pub(super) const SETUP: &str = "setup.sh";
+
+/// Where SSH learns which variables it accepts from a session (the values given at launch).
+const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
+
+/// The module and the set-up script, for Compose running in the VM as `guest` says.
 ///
 /// # Errors
 ///
 /// [`crate::Error::Module`] when the module can't be written.
-pub fn module(env: &Environment) -> Result<GeneratedFile> {
-    let folder = format!("{}/proxmox", Target::DockerVm.id());
-    let mut m = module::start(&Usage::with_key(
-        &folder,
-        "-var proxmox_endpoint=https://<server>:8006/ -var proxmox_api_token=… ",
-    ));
-    m.block(terraform(&[providers::PROXMOX, providers::LOCAL]));
-    m.blocks(variables());
-    m.blocks(operator::host_variables(env));
+pub fn module(env: &Environment, guest: &GuestCompose) -> Result<Vec<GeneratedFile>> {
+    let folder = folder();
+    let mut m = module::start(&Usage {
+        apply: " -var proxmox_endpoint=https://<server>:8006/ -var proxmox_api_token=<user@realm!name=secret> -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\"",
+        key: None,
+        after: "# Then:   setup.sh piped into `sudo sh -s` over SSH, the project in /opt/isoloom, and Compose (run.json)\n",
+        ..Usage::with_key(&folder, "")
+    });
+    m.block(terraform(&[providers::PROXMOX]));
+    m.blocks(variables().into_iter().map(Variable::block));
     m.block(provider());
     m.commented("The VM's address on the uplink, from the guest agent (not the loopback).", locals());
     m.block(download("debian", DEBIAN, "-docker-debian-12.img"));
-    m.block(snippet("env", "docker", cloud_config(env).document()));
+    m.block(snippet("env", "docker", cloud_config(env, guest).document()));
     m.block(vm(env));
-    let access = Access {
-        host: reference("local.ip"),
-        user: "isoloom",
-        replace_on: reference("proxmox_virtual_environment_vm.env.id"),
-        auto_stop: AutoStop::SetUp,
-    };
-    let mut setup = docker_host::setup(env, &access);
-    through_node(&mut setup);
-    m.commented("The environment, over SSH: the project, Docker, then the Compose file.", setup);
-    m.blocks(docker_host::outputs(&access));
-    module::file(Target::DockerVm, &folder, m, ProjectCopy::Archive)
+    m.blocks(vec![output("ip", reference("local.ip")), output("ssh_user", string(USER))]);
+    let main = module::file(Target::DockerVm, &folder, m, ProjectCopy::Runner)?;
+    Ok(vec![main, setup(env)])
+}
+
+/// The SSH user the runner's key lets in (it has `sudo`).
+pub(super) const USER: &str = "isoloom";
+
+/// `setup.sh`: the Docker host's set-up ([`guest::setup_script`]).
+fn setup(env: &Environment) -> GeneratedFile {
+    GeneratedFile {
+        path: format!("{OUTPUT_DIR}/{}/{SETUP}", folder()),
+        contents: guest::setup_script(env),
+    }
 }
 
 /// Debian 12's cloud image.
 const DEBIAN: &str = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2";
 
-fn variables() -> Vec<Block> {
+/// The module's variables: the server, where the VM goes, its slot on the server, and the key the
+/// `isoloom` user takes.
+pub(super) fn variables() -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
-    let mut v: Vec<Block> = connection("Uploading the cloud-init snippet goes over SSH to the node")
-        .into_iter()
-        .map(Variable::block)
-        .collect();
+    let mut v = connection("Uploading the cloud-init snippet goes over SSH to the node");
     v.extend([
-        Variable::new("ssh_via_node", "bool")
-            .default(boolean(false))
-            .describe("Reach the lab VM over SSH through the node (its bridge isn't routable from here)")
-            .block(),
-        super::base::node().block(),
-        s("datastore").default(string("local-lvm")).describe("Where the VM's disk goes").block(),
+        super::base::node(),
+        s("datastore").default(string("local-lvm")).describe("Where the VM's disk goes"),
         s("image_datastore")
             .default(string("local"))
-            .describe("A datastore with 'iso' content, for the cloud image")
-            .block(),
+            .describe("A datastore with 'iso' content, for the cloud image"),
         s("snippets_datastore")
             .default(string("local"))
-            .describe("A datastore with 'snippets' content, for cloud-init")
-            .block(),
+            .describe("A datastore with 'snippets' content, for cloud-init"),
         s("uplink_bridge")
             .default(string("vmbr0"))
-            .describe("The bridge the VM gets its address (DHCP) and the internet from")
-            .block(),
+            .describe("The bridge the VM gets its address (DHCP) and the internet from"),
         Variable::new("slot", "number")
             .default(number(1))
-            .describe("1 to 99, unique per environment on this server")
-            .block(),
+            .describe("1 to 99, unique per environment on this server"),
+        s("ssh_public_key").default(string("")).describe("Installed for the user `isoloom`"),
     ]);
     v
 }
 
-/// The project's root, and the VM's address on the uplink: the guest agent's that isn't the
-/// loopback.
+/// The VM's address on the uplink: the guest agent's that isn't the loopback.
 fn locals() -> Block {
     let address = super::uplink::first_address("proxmox_virtual_environment_vm.env", &[]);
-    let root = call(
-        "abspath",
-        [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
-    );
-    Block::builder("locals").add_attribute(("root", root)).add_attribute(("ip", address)).build()
+    Block::builder("locals").add_attribute(("ip", address)).build()
 }
 
-/// The cloud-init document: the `isoloom` user with the operator's key, the guest agent (it
-/// reports the address), and the constraints' prelude at every boot.
-fn cloud_config(env: &Environment) -> CloudConfig {
+/// The cloud-init document: the `isoloom` user with the runner's key, the guest agent (it reports
+/// the address), the constraints' prelude at every boot, and SSH accepting the values `guest`
+/// forwards (written before `sshd` starts, and reloaded once more after).
+fn cloud_config(env: &Environment, guest: &GuestCompose) -> CloudConfig {
     let mut config = CloudConfig::new(&env.name, list([user(list([reference("var.ssh_public_key")]))]));
     config.packages = vec!["qemu-guest-agent".to_owned(), "curl".to_owned()];
     config.bootcmd.extend(cloud_init::prelude(env));
+    let forwarded = guest.forwarded();
+    if !forwarded.is_empty() {
+        let accept = format!("AcceptEnv {}\n", forwarded.join(" "));
+        config.files.push(cloud_init::file(ACCEPT_ENV_FILE, Some("0644"), string(accept)));
+        config.runcmd.push("systemctl reload ssh || systemctl reload sshd || true".to_owned());
+    }
     config.runcmd.push("systemctl enable --now qemu-guest-agent".to_owned());
     config
 }
@@ -153,56 +164,4 @@ fn vm(env: &Environment) -> Block {
         .add_block(Block::builder("serial_device").build())
         .add_block(super::uplink::checked("The Docker host", &[]))
         .build()
-}
-
-/// `var.ssh_via_node && <cond> ? <yes> : null`.
-fn via_node(cond: Option<Expression>, yes: Expression) -> Expression {
-    let via = reference("var.ssh_via_node");
-    let cond = cond.map_or(via.clone(), |c| binary(via, BinaryOperator::And, c));
-    conditional(cond, yes, null())
-}
-
-/// The VM's bridge may not be routable from where Terraform runs (a host-internal NAT bridge,
-/// an isolated network): with `ssh_via_node`, the set-up's connection goes through the node,
-/// logged in as the snippet's upload is.
-fn through_node(setup: &mut Block) {
-    let node = conditional(
-        is_set("proxmox_ssh_address"),
-        reference("var.proxmox_ssh_address"),
-        call(
-            "join",
-            [
-                string(""),
-                call(
-                    "compact",
-                    [call(
-                        "regex",
-                        [string(r"^https?://(?:\[([^]]+)\]|([^/:]+))"), reference("var.proxmox_endpoint")],
-                    )],
-                ),
-            ],
-        ),
-    );
-    let key = || is_set("proxmox_ssh_private_key_file");
-    let bastion = [
-        ("bastion_host", via_node(None, Expression::Parenthesis(Box::new(node)))),
-        ("bastion_user", via_node(None, reference("var.proxmox_ssh_username"))),
-        (
-            "bastion_password",
-            via_node(Some(is_unset("proxmox_ssh_private_key_file")), reference("var.proxmox_password")),
-        ),
-        (
-            "bastion_private_key",
-            via_node(Some(key()), call("file", [reference("var.proxmox_ssh_private_key_file")])),
-        ),
-    ];
-    for s in &mut setup.body.0 {
-        if let Structure::Block(b) = s
-            && b.identifier() == "connection"
-        {
-            for (k, v) in bastion.clone() {
-                b.body.0.push(Structure::Attribute((k, v).into()));
-            }
-        }
-    }
 }

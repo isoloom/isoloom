@@ -26,7 +26,10 @@ fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
     // has no environment-level playbooks. Isoloom's outputs stay out.
     assert!(vagrant.contains("    m.vm.provision \"isoloom_project\", name: \"project\"\n"), "{vagrant}");
     // docker-vm runs the generated Compose file: Isoloom's outputs go in.
-    assert!(docker_vm.contains("  config.vm.provision \"isoloom_project\", name: \"project\", generated: true\n"));
+    assert!(
+        docker_vm.contains("  config.vm.provision \"project\", type: \"isoloom_project\", generated: true\n"),
+        "{docker_vm}"
+    );
     // hybrid's Docker host gets its Compose file, and nothing else of the outputs.
     assert!(hybrid.contains("m.vm.provision \"isoloom_project\", name: \"project\", extra: [\".isoloom/hybrid/compose.yml\"]\n"));
     Ok(())
@@ -205,7 +208,6 @@ fn terraform_outputs_read_isoloomignore() -> Outcome {
         (Target::CloudVm, "cloud-vm/gcp/main.tf"),
         (Target::CloudDocker, "cloud-docker/aws/main.tf"),
         (Target::CloudDocker, "cloud-docker/azure/main.tf"),
-        (Target::DockerVm, "docker-vm/proxmox/main.tf"),
     ] {
         let tf = file(&spec, target, path)?;
         assert!(tf.contains("resource \"local_file\" \"isoloom_project\""), "{path}");

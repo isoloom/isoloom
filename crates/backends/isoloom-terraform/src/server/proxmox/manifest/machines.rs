@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use isoloom_manifest::{
-    Error as ManifestError, Machine, Name, Network, OsName, Output, OutputRole, OutputSource, Part, Placeholder, PublishMode, Role, RunVar, SnakeName, Template,
+    Error as ManifestError, Machine, Name, Network, OsName, Output, OutputRole, Part, Placeholder, PublishMode, Role, RunVar, SnakeName, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_render::router;
@@ -101,19 +101,7 @@ fn by_network(env: &Environment, at: impl Fn(&str) -> IpAddr) -> Result<BTreeMap
 /// The router's address (`ip`), the SSH user, the ready file, then each published port at the
 /// router's address.
 pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
-    let state = |name: &str, role: OutputRole, what: &str| -> Result<Output, ManifestError> {
-        Ok(Output {
-            name: SnakeName::parse(name)?,
-            description: Some(what.into()),
-            role,
-            sensitive: false,
-            format: None,
-            from: OutputSource::TerraformOutput {
-                name: isoloom_manifest::Identifier::parse(name)?,
-                default: None,
-            },
-        })
-    };
+    let state = isoloom_render::run_manifest::terraform_output;
     let mut out = vec![
         state(
             IP,

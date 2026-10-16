@@ -1,13 +1,12 @@
-//! The cloud-docker modules of hello-stack on every cloud, docker-vm's Proxmox module, and the
-//! cloud-services scripts of cloud-bucket, rendered from their plan, as snapshots; and their
-//! determinism.
+//! The cloud-docker modules of hello-stack on every cloud, and the cloud-services scripts of
+//! cloud-bucket, rendered from their plan, as snapshots; and their determinism.
 
 pub mod testing;
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_terraform::{CloudServicesBackend, cloud_docker_modules as modules, docker_vm_module};
+use isoloom_terraform::{CloudServicesBackend, cloud_docker_modules as modules};
 use testing::{Outcome, example, file};
 
 /// Example `name`'s plan for `target`.
@@ -54,13 +53,6 @@ fn cloud_docker_linode_hello_stack() -> Outcome {
 #[test]
 fn cloud_docker_oci_hello_stack() -> Outcome {
     insta::assert_snapshot!(cloud("oci")?);
-    Ok(())
-}
-
-#[test]
-fn docker_vm_proxmox_hello_stack() -> Outcome {
-    let tf = docker_vm_module(&env("hello-stack", Target::DockerVm)?)?;
-    insta::assert_snapshot!(tf.contents);
     Ok(())
 }
 

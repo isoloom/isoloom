@@ -1,0 +1,726 @@
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "flag-portal",
+    "instance": null,
+    "message": "The portal answers at http://localhost:${published.web.portal}/.\n"
+  },
+  "target": "docker-vm",
+  "driver": "terraform",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "terraform",
+      "probe": [
+        "terraform",
+        "version"
+      ],
+      "min_version": "1.6.0",
+      "container": "hashicorp/terraform:1.9.8@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd",
+      "container_hosts": [
+        "macos"
+      ]
+    },
+    {
+      "name": "ssh",
+      "probe": [
+        "ssh",
+        "-V"
+      ]
+    }
+  ],
+  "identity": {
+    "terraform": {
+      "module": ".",
+      "state": "runner"
+    }
+  },
+  "params": [
+    {
+      "name": "proxmox_endpoint",
+      "description": "https://<server>:8006/.",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_endpoint"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_username",
+      "description": "The module's `proxmox_username`.",
+      "default": "root@pam",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_username"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_insecure",
+      "description": "Accept the server's self-signed certificate.",
+      "default": "true",
+      "values": [
+        "true",
+        "false"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_insecure"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_ssh_username",
+      "description": "Uploading the cloud-init snippet goes over SSH to the node.",
+      "default": "root",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_ssh_username"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_ssh_address",
+      "description": "The node's SSH address, when the API reports one this machine can't reach.",
+      "default": "",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_ssh_address"
+        }
+      ]
+    },
+    {
+      "name": "node",
+      "description": "The Proxmox node the VMs go on (`pvesh get /nodes` lists them).",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "node"
+        }
+      ]
+    },
+    {
+      "name": "datastore",
+      "description": "Where the VM's disk goes.",
+      "default": "local-lvm",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "datastore"
+        }
+      ]
+    },
+    {
+      "name": "image_datastore",
+      "description": "A datastore with 'iso' content, for the cloud image.",
+      "default": "local",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "image_datastore"
+        }
+      ]
+    },
+    {
+      "name": "snippets_datastore",
+      "description": "A datastore with 'snippets' content, for cloud-init.",
+      "default": "local",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "snippets_datastore"
+        }
+      ]
+    },
+    {
+      "name": "uplink_bridge",
+      "description": "The bridge the VM gets its address (DHCP) and the internet from.",
+      "default": "vmbr0",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "uplink_bridge"
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-networks",
+            "check-db",
+            "check-web"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "name": "proxmox_api_token",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_api_token"
+        }
+      ]
+    },
+    {
+      "name": "proxmox_password",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "proxmox_password"
+        }
+      ]
+    },
+    {
+      "name": "CTF_FLAG_MAIN",
+      "kind": "input",
+      "required": false,
+      "sensitive": true,
+      "machines": [
+        "web",
+        "web-init-1"
+      ],
+      "default": "",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "CTF_FLAG_MAIN",
+          "steps": [
+            "start",
+            "job-web-init-1"
+          ]
+        }
+      ]
+    }
+  ],
+  "networks": [
+    {
+      "name": "lab",
+      "cidr": "10.30.0.0/24",
+      "internet": false,
+      "native": "flag-portal_lab"
+    }
+  ],
+  "machines": [
+    {
+      "name": "docker",
+      "role": "infra",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 2048
+      },
+      "addresses": {}
+    },
+    {
+      "name": "db",
+      "role": "target",
+      "arch": "amd64",
+      "addresses": {
+        "lab": "10.30.0.20"
+      },
+      "native": {
+        "service": "db"
+      },
+      "ports": [
+        {
+          "name": "mysql",
+          "port": 3306,
+          "protocol": "tcp",
+          "http": false
+        }
+      ]
+    },
+    {
+      "name": "db-routes",
+      "role": "infra",
+      "of": "db",
+      "addresses": {},
+      "native": {
+        "service": "db-routes"
+      }
+    },
+    {
+      "name": "web",
+      "role": "target",
+      "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
+      "addresses": {
+        "lab": "10.30.0.10"
+      },
+      "native": {
+        "service": "web"
+      },
+      "volumes": [
+        {
+          "name": "ctf",
+          "path": "/srv/ctf",
+          "native": "flag-portal_web-ctf"
+        }
+      ],
+      "ports": [
+        {
+          "name": "portal",
+          "port": 80,
+          "protocol": "tcp",
+          "http": true,
+          "publish": {
+            "mode": "fixed",
+            "preferred": 8080,
+            "address": "${outputs.ip}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "web-routes",
+      "role": "infra",
+      "of": "web",
+      "addresses": {},
+      "native": {
+        "service": "web-routes"
+      }
+    },
+    {
+      "name": "web-init-1",
+      "role": "job",
+      "of": "web",
+      "addresses": {},
+      "native": {
+        "service": "web-init-1"
+      }
+    },
+    {
+      "name": "isoloom-check",
+      "role": "check",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check"
+      }
+    },
+    {
+      "name": "isoloom-check-db",
+      "role": "check",
+      "of": "db",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-db"
+      }
+    },
+    {
+      "name": "isoloom-check-web",
+      "role": "check",
+      "of": "web",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-check-web"
+      }
+    },
+    {
+      "name": "isoloom-probe-amd64",
+      "role": "infra",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-probe-amd64"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 600
+      },
+      {
+        "id": "apply",
+        "note": "Creating the lab's VMs on the server…",
+        "argv": [
+          "terraform",
+          "apply",
+          "-auto-approve",
+          "-input=false",
+          "-no-color"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 3600
+      },
+      {
+        "id": "docker",
+        "note": "Installing Docker in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo sh -s",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "stdin": "setup.sh",
+        "timeout_s": 1800
+      },
+      {
+        "id": "archive",
+        "note": "Archiving the project…",
+        "action": "project.archive",
+        "with": {
+          "root": "../../.."
+        }
+      },
+      {
+        "id": "project",
+        "note": "Copying the project into the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "stdin": "${run.state_dir}/project.tgz",
+        "timeout_s": 600
+      },
+      {
+        "id": "start",
+        "note": "Starting the lab's containers in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 1800
+      },
+      {
+        "id": "job-web-init-1",
+        "note": "Running web's set-up script…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --no-deps --exit-code-from web-init-1 web-init-1",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 600
+      }
+    ],
+    "down": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 600
+      },
+      {
+        "id": "destroy",
+        "note": "Removing the lab from the server…",
+        "argv": [
+          "terraform",
+          "destroy",
+          "-auto-approve",
+          "-input=false",
+          "-no-color",
+          "-refresh=false"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 1800
+      }
+    ],
+    "status": {
+      "id": "state",
+      "action": "terraform.read_state"
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "apply",
+      "means": "the Docker host VM exists and booted"
+    },
+    {
+      "kind": "step_ok",
+      "step": "start",
+      "means": "every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)"
+    },
+    {
+      "kind": "step_ok",
+      "step": "job-web-init-1",
+      "means": "web's set-up script (web-init-1) exited 0"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ip",
+      "description": "The Docker host's address: SSH reaches it there, and the published ports answer there.",
+      "role": "address",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ip"
+      }
+    },
+    {
+      "name": "ssh_user",
+      "description": "The user the runner's key lets in on the Docker host.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user"
+      }
+    },
+    {
+      "name": "web_portal",
+      "description": "web's portal (port 80).",
+      "role": "entry",
+      "sensitive": false,
+      "format": "http://${host.web}:${value}/",
+      "from": {
+        "kind": "published_port",
+        "machine": "web",
+        "port": "portal"
+      }
+    }
+  ],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "isoloom-check",
+        "from": "from the environment's networks",
+        "checks": [
+          {
+            "name": "http://web/",
+            "kind": "http",
+            "wait_s": 60,
+            "derived": false
+          },
+          {
+            "name": "db:3306",
+            "kind": "tcp",
+            "wait_s": 120,
+            "derived": false
+          },
+          {
+            "name": "build/check/check.sh",
+            "kind": "script",
+            "wait_s": 180,
+            "derived": false
+          }
+        ],
+        "step": {
+          "id": "check-networks",
+          "action": "ssh.run",
+          "with": {
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "host": "${outputs.ip}",
+            "user": "isoloom"
+          },
+          "timeout_s": 465
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-networks",
+            "action": "ssh.run",
+            "with": {
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "host": "${outputs.ip}",
+              "user": "isoloom"
+            },
+            "timeout_s": 60
+          }
+        ]
+      },
+      {
+        "id": "isoloom-check-db",
+        "from": "from db",
+        "checks": [
+          {
+            "name": "web:80 from db",
+            "kind": "http",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "no internet from db",
+            "kind": "http",
+            "wait_s": 0,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-db",
+          "action": "ssh.run",
+          "with": {
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "host": "${outputs.ip}",
+            "user": "isoloom"
+          },
+          "timeout_s": 120
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-db",
+            "action": "ssh.run",
+            "with": {
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "host": "${outputs.ip}",
+              "user": "isoloom"
+            },
+            "timeout_s": 60
+          }
+        ]
+      },
+      {
+        "id": "isoloom-check-web",
+        "from": "from web",
+        "checks": [
+          {
+            "name": "db:3306 from web",
+            "kind": "tcp",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "no internet from web",
+            "kind": "http",
+            "wait_s": 0,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-web",
+          "action": "ssh.run",
+          "with": {
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-web",
+            "host": "${outputs.ip}",
+            "user": "isoloom"
+          },
+          "timeout_s": 120
+        },
+        "on_timeout": [
+          {
+            "id": "rm-check-web",
+            "action": "ssh.run",
+            "with": {
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check-web --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "host": "${outputs.ip}",
+              "user": "isoloom"
+            },
+            "timeout_s": 60
+          }
+        ]
+      }
+    ],
+    "teardown": []
+  },
+  "guest": {
+    "machine": "docker",
+    "host": "${outputs.ip}",
+    "status": {
+      "id": "ps",
+      "action": "ssh.run",
+      "with": {
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name flag-portal ps --all --format json; fi",
+        "host": "${outputs.ip}",
+        "user": "isoloom"
+      },
+      "timeout_s": 60
+    }
+  }
+}

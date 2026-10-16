@@ -65,7 +65,7 @@ pub(super) fn lifecycle(env: &Environment, shape: &Shape) -> Result<Lifecycle> {
         up_step(shape)?,
     ];
     up.extend(park_controller(env, shape, false)?);
-    let resume = resume(env, shape, virtualbox)?;
+    let resume = resume(env, shape)?;
     let park = |verb: &str, vms: &[&str]| -> Result<Option<Vec<Step>>> {
         let args: Vec<&str> = std::iter::once(verb).chain(vms.iter().copied()).collect();
         Ok(Some(vec![run(verb, vagrant_argv(&args)?, PARK_TIMEOUT_S)?]))
@@ -97,6 +97,26 @@ fn status(shape: &Shape) -> Result<Step> {
     Ok(s)
 }
 
+/// The steps that bring parked VMs `vms` back (none: every VM): a suspended one resumes, a halted
+/// one boots. A saved state the hypervisor can't restore (VirtualBox 7.2 refuses its own VMSVGA
+/// saved states: `Failed to load unit 'vga'`) leaves the VM `aborted-saved`: its cut-off state is
+/// discarded and the VM boots from its disk instead, so it comes back without its memory rather
+/// than not at all. A second `up` of running VMs is a no-op.
+pub(super) fn back_up(vms: &[&str]) -> Result<Vec<Step>> {
+    let virtualbox = |id: &str| -> Result<Step> {
+        let mut s = tolerated(act(id, Action::VagrantDiscardAbortedSaved)?);
+        s.providers.insert(Provider::Virtualbox);
+        Ok(s)
+    };
+    let up = |id: &str| -> Result<Step> { Ok(run(id, on_provider(&["up", "--no-provision"], vms)?, 3600)?) };
+    Ok(vec![
+        virtualbox("discard-saved")?,
+        tolerated(up("resume")?),
+        virtualbox("discard-cut-off")?,
+        up("boot")?,
+    ])
+}
+
 /// `vagrant up --provider ${run.provider}`, whose success means every VM booted and ran its
 /// provisioners, the controller's playbooks included.
 fn up_step(shape: &Shape) -> Result<Step> {
@@ -108,16 +128,9 @@ fn up_step(shape: &Shape) -> Result<Step> {
     Ok(s)
 }
 
-/// The parked VMs back: a suspended one resumes, a halted one boots, the controller stays off.
-/// A saved state the hypervisor can't restore (VirtualBox 7.2 refuses its own VMSVGA saved
-/// states: `Failed to load unit 'vga'`) leaves the VM `aborted-saved`: its cut-off state is
-/// discarded and the VM boots from its disk instead, so the lab comes back without its memory
-/// rather than not at all. A second `up` of running VMs is a no-op.
-fn resume(env: &Environment, shape: &Shape, virtualbox: impl Fn() -> Result<Step>) -> Result<Vec<Step>> {
-    let up = |id: &str| -> Result<Step> { Ok(run(id, on_provider(&["up", "--no-provision"], &running(env, shape))?, 3600)?) };
-    let mut cut_off = virtualbox()?;
-    cut_off.id = StepId::parse("discard-cut-off")?;
-    Ok(vec![virtualbox()?, tolerated(up("resume")?), cut_off, up("boot")?])
+/// The parked VMs back ([`back_up`]), the controller staying off.
+fn resume(env: &Environment, shape: &Shape) -> Result<Vec<Step>> {
+    back_up(&running(env, shape))
 }
 
 /// Every VM that runs while the lab does, which a resume brings back (`vagrant up
@@ -159,7 +172,7 @@ pub(super) fn park_controller(env: &Environment, shape: &Shape, always: bool) ->
 
 /// Destroy every VM, then this run's VMs Vagrant lost track of, then Vagrant's state (only once
 /// the VMs are gone: a failed destroy keeps it for the next try).
-fn down() -> Result<Vec<Step>> {
+pub(super) fn down() -> Result<Vec<Step>> {
     let mut destroy = run("destroy", vagrant_argv(&["destroy", "--force"])?, 1800)?;
     destroy.when = isoloom_manifest::When::Always;
     Ok(vec![destroy, orphans()?, act("reset", Action::VagrantResetState)?])

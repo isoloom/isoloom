@@ -8,7 +8,7 @@
 //!   the project's own module applied into the user's account.
 //! - **The Terraform halves of the composite targets** `isoloom-targets` puts together: the
 //!   Docker host on each cloud for `cloud-docker` ([`cloud_docker_modules`]), and on a Proxmox
-//!   server for `docker-vm` ([`docker_vm_module`]).
+//!   server for `docker-vm` ([`docker_vm_module`], its run manifest [`docker_vm_manifest`]).
 //!
 //! Every VM target sets its machines up through one core (cloud-init, `remote-exec` over SSH,
 //! WinRM, cloudbase-init, the Ansible controller), so a step of the plan is written once for
@@ -49,4 +49,4 @@ pub use cloud::vm::{CloudVmBackend, CloudVmModule};
 pub use error::{Error, Result};
 pub use server::esxi::EsxiBackend;
 pub use server::proxmox::ProxmoxBackend;
-pub use server::proxmox::docker_host::module as docker_vm_module;
+pub use server::proxmox::docker_host::{manifest as docker_vm_manifest, module as docker_vm_module};

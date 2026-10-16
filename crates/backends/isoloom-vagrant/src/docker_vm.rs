@@ -2,13 +2,17 @@
 //! `.isoloom/docker-vm/Vagrantfile` (a VM on this machine, or on an ESXi host).
 //!
 //! - One Debian VM, sized for every container together (and Docker itself).
-//! - Docker from Docker's own repository; the project copied to /opt/isoloom; then
-//!   `docker compose up --wait` with `.isoloom/docker/compose.yml`, the `docker` target's Compose
-//!   file, rendered with it by the Compose backend.
+//! - Docker from Docker's own repository; the project copied to /opt/isoloom; then the lab started
+//!   with `.isoloom/docker/compose.yml`, the `docker` target's Compose file, rendered with it by
+//!   the Compose backend: the commands Compose's backend gives ([`GuestCompose`]).
 //! - When everything answers: /var/lib/isoloom/ready, for runners to poll.
 //! - Checks on demand: `vagrant provision --provision-with checks` (every runner of the Compose
-//!   `check` profile), or `isoloom test docker-vm`.
+//!   `check` profile).
 //! - Published ports: the VM forwards them from the host's loopback.
+//! - The run manifest (`docker-vm/run.json`, [`manifest`]): the Isothrum runner brings the VM up
+//!   with every provisioner but the lab's start (`prepares`), then runs the same commands
+//!   through `vagrant ssh`, the values given at launch forwarded into the VM (SSH's `SendEnv`,
+//!   accepted by the VM's `sshd`), never written in it.
 //! - On a Proxmox server: `.isoloom/docker-vm/proxmox/main.tf` (Terraform, bpg/proxmox), one
 //!   VM on the uplink bridge, the same set-up over SSH as `cloud-docker`'s Docker host.
 //! - ESXi: the vagrant-vmware-esxi provider reads the host from `ESXI_HOSTNAME`,
@@ -18,29 +22,70 @@
 //! `docker` target's Compose file (first) and the Proxmox module, and refuses what the Compose
 //! file can't run: its capabilities are Compose's.
 
+use isoloom_manifest::Manifest;
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container as docker;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
+use isoloom_render::run_manifest::guest::GuestCompose;
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
 const DIR: &str = "docker-vm";
+/// Vagrant's name for the file's one machine.
+pub(crate) const DEFINE: &str = "default";
+/// The VM, as the run manifest names it.
+pub(crate) const VM: &str = "docker";
+/// The provisioner letting SSH carry the values given at launch into the VM.
+const ACCEPT_ENV: &str = "accept-env";
+/// Where that provisioner tells `sshd` which variables to accept.
+const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
+
+/// The run manifest of `env` on a VM Vagrant makes, Compose running in it as `guest` says (the
+/// Compose backend's, [`isoloom_compose::guest`](https://docs.rs/isoloom-compose)); its message is
+/// left to the caller.
+///
+/// # Errors
+///
+/// [`crate::Error::Manifest`] for a value the manifest's types refuse (a bug of this backend).
+pub fn manifest(env: &Environment, guest: &GuestCompose) -> crate::Result<Manifest> {
+    crate::manifest::docker_vm::manifest(env, guest)
+}
+
+/// The VM's own provisioners, in order: everything `vagrant up` runs but the lab's start (the
+/// constraints, when the spec has some; Docker; SSH accepting the forwarded values, when there
+/// are some; the project).
+pub(crate) fn prepares(env: &Environment, guest: &GuestCompose) -> Vec<&'static str> {
+    let constraints = steps::linux(env, "", &isoloom_plan::Step::Prelude).map(|_| vagrantfile::CONSTRAINTS);
+    let accept = (!guest.forwarded().is_empty()).then_some(ACCEPT_ENV);
+    constraints.into_iter().chain([vagrantfile::DOCKER]).chain(accept).chain([PROJECT]).collect()
+}
+
+/// The project provisioner.
+const PROJECT: &str = "project";
+
+/// `config.vm.provision "<name>", type: "<kind>"`: a provisioner named at the top level, which
+/// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
+/// provisioner's own `name:` option, and the project provisioner has no such option).
+fn named(name: &str, kind: &str) -> Call {
+    Call::new("config.vm.provision").arg(Value::str(name)).kw("type", Value::str(kind))
+}
 /// The Compose file the VM runs, from the project's copy.
 const COMPOSE: &str = ".isoloom/docker/compose.yml";
 /// The derived-checks switch, read from the host's environment when Vagrant runs.
 const DERIVED: &str = "ENV.fetch(\"ISOLOOM_DERIVED\", \"1\")";
 
 /// The CPUs and memory (MB) of the VM: the containers' host's, at least 2 GB.
-fn host_size(env: &Environment) -> (u32, u32) {
+pub(crate) fn host_size(env: &Environment) -> (u32, u32) {
     let size = docker::HostSize::of(env);
     (size.cpus, size.memory_mb.max(2048))
 }
 
-/// `.isoloom/docker-vm/Vagrantfile`: the VM, Docker, then the Compose file up and its checks.
+/// `.isoloom/docker-vm/Vagrantfile`: the VM, Docker, then the Compose file up as `guest` starts it,
+/// and its checks.
 #[must_use]
-pub fn vagrantfile(env: &Environment) -> GeneratedFile {
+pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
     let mut r = Ruby::new();
     r.text(&header("#"));
     r.comment(&format!(
@@ -51,16 +96,16 @@ pub fn vagrantfile(env: &Environment) -> GeneratedFile {
     r.text(&crate::vms::project_rb());
     vagrantfile::inputs(&mut r, &env.spec().inputs, false);
     r.blank();
-    r.block("Vagrant.configure(\"2\")", "config", |r| configure(r, env));
+    r.block("Vagrant.configure(\"2\")", "config", |r| configure(r, env, guest));
     GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
         contents: r.finish(),
     }
 }
 
-/// The VM: its box and name, the published ports, its size on every provider, then Docker and
-/// the environment.
-fn configure(r: &mut Ruby, env: &Environment) {
+/// The VM: its box and name, the published ports, its size on every provider, then Docker, SSH
+/// accepting the values given at launch, the project and the environment.
+fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
     r.assign("config.vm.box", Value::str("bento/debian-12"));
     r.assign("config.vm.hostname", Value::str(&env.name));
     r.call(
@@ -71,6 +116,11 @@ fn configure(r: &mut Ruby, env: &Environment) {
     );
     r.assign("config.vm.boot_timeout", 600u32);
     vagrantfile::ssh_proxy(r, "config");
+    let forwarded = guest.forwarded();
+    if !forwarded.is_empty() {
+        r.comment("`vagrant ssh` carries the values given at launch into the VM (SSH's SendEnv).");
+        r.assign("config.ssh.forward_env", Value::array(forwarded.iter().map(|v| Value::str(v))));
+    }
     vagrantfile::libvirt_prefix(r, "config", &env.name);
     let containers = env.machines.values().filter(|m| m.shape == MachineShape::Container);
     for p in containers.flat_map(|m| &m.ports) {
@@ -80,16 +130,21 @@ fn configure(r: &mut Ruby, env: &Environment) {
     let label = format!("{} · docker", env.name);
     desktop_providers(r, &label, size);
     esxi(r, &format!("{}-docker", env.name), size);
-    vagrantfile::prelude(r, env, "config");
-    vagrantfile::install_docker(r, "config");
+    if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
+        r.call(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
+    }
+    let docker = format!("{}\n{}", steps::INSTALL_DOCKER, steps::PUBLISHED_FROM_OUTSIDE);
+    r.call(named(vagrantfile::DOCKER, "shell").kw("inline", Value::str(&docker)));
+    if !forwarded.is_empty() {
+        let accept = format!(
+            "mkdir -p /etc/ssh/sshd_config.d && echo {} > {ACCEPT_ENV_FILE} && (systemctl reload ssh || systemctl reload sshd)",
+            isoloom_spec::shell::quote(&format!("AcceptEnv {}", forwarded.join(" ")))
+        );
+        r.call(named(ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
+    }
     // The project, its generated Compose file included.
-    r.call(
-        Call::new("config.vm.provision")
-            .arg(Value::str("isoloom_project"))
-            .kw("name", Value::str("project"))
-            .kw("generated", true),
-    );
-    environment(r, env);
+    r.call(named(PROJECT, "isoloom_project").kw("generated", true));
+    environment(r, env, guest);
     checks(r, env);
 }
 
@@ -102,7 +157,15 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
         v.assign("v.cpus", cpus);
         v.assign("v.memory", mem);
     };
-    r.block(provider("virtualbox"), "v", named);
+    r.block(provider("virtualbox"), "v", |r| {
+        // VirtualBox 7.2 can't restore its own VMSVGA saved state (`Failed to load unit 'vga'`),
+        // so a suspended VM would come back cold, its containers' memory lost: this headless VM
+        // has the older VBoxVGA, whose saved state it restores.
+        r.call(Call::new("v.customize").arg(Value::array(
+            ["modifyvm", ":id", "--graphicscontroller", "vboxvga"].map(|w| if w == ":id" { Value::raw(w) } else { Value::str(w) }),
+        )));
+        named(r);
+    });
     r.block(provider("vmware_desktop"), "v", |r| {
         r.assign(&format!("v.vmx[{}]", Value::str("displayName")), Value::str(label));
         r.assign(&format!("v.vmx[{}]", Value::str("numvcpus")), Value::str(&cpus.to_string()));
@@ -136,15 +199,16 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
     });
 }
 
-/// The Compose file up (published on every address of the VM, at the fixed host ports Vagrant
-/// forwards), with the containers' secrets once `isoloom run` delivered them and the project
-/// files Compose reads from its environment, then the ready mark.
-fn environment(r: &mut Ruby, env: &Environment) {
-    let compose = format!("ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f {COMPOSE}");
-    let start = docker::start_commands(&compose, &docker::leaf_jobs(env.spec()), Some(900));
+/// The Compose file up as `guest` starts it (published on every address of the VM, at the fixed
+/// host ports Vagrant forwards), with the containers' secrets once they were delivered and the
+/// values given at launch, then the ready mark.
+fn environment(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
+    let start: Vec<String> = guest.start.iter().map(|c| c.command.to_string()).collect();
     let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
-    let files = docker::host_environment(env);
-    let script = format!("{secrets}cd /opt/isoloom && {files}{start} && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready");
+    let script = format!(
+        "{secrets}{} && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready",
+        start.join(" && ")
+    );
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
     r.call(shell("config", "environment").kw("inline", Value::str(&script)).kw_opt("env", inputs));
 }

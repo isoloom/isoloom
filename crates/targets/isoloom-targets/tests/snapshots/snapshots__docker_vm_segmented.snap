@@ -325,6 +325,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "segmented_"
   end
   config.vm.provider "virtualbox" do |v|
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
     v.name = "segmented · docker"
     v.cpus = 3
     v.memory = 3072
@@ -364,8 +365,25 @@ Vagrant.configure("2") do |config|
     v.guest_numvcpus = 3
     v.guest_memsize = 3072
   end
-  config.vm.provision "shell", name: "docker", inline: "command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }"
-  config.vm.provision "isoloom_project", name: "project", generated: true
-  config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
+  config.vm.provision "docker", type: "shell", inline: "command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }
+cat > /etc/systemd/system/isoloom-published.service <<'UNIT'
+[Unit]
+Description=Isoloom: published ports reach containers of networks without a default route
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -t nat -C POSTROUTING -m conntrack --ctstate DNAT -o br-+ -j MASQUERADE 2>/dev/null || iptables -t nat -I POSTROUTING -m conntrack --ctstate DNAT -o br-+ -j MASQUERADE'
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now isoloom-published.service
+"
+  config.vm.provision "project", type: "isoloom_project", generated: true
+  config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name segmented --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up -d --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit \"$failed\"", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
 end

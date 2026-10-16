@@ -30,9 +30,9 @@ fn tf_var(name: &str, shape: TfVarShape) -> Result<NonEmpty<Delivery>, ManifestE
     }))
 }
 
-/// The module's variables an embedder sets, then the checks' switch when the lab has checks.
-pub(super) fn params(env: &Environment, runners: &[CheckRunner]) -> Result<Vec<Param>, ManifestError> {
-    let variables = super::super::base::variables(env);
+/// The module's variables an embedder sets (of `variables`), then the checks' switch when the lab
+/// has checks.
+pub(super) fn params(variables: &[Variable], runners: &[CheckRunner]) -> Result<Vec<Param>, ManifestError> {
     let mut out: Vec<Param> = variables
         .iter()
         .filter(|v| !v.is_sensitive() && v.name() != INPUTS && !RUNNER_SET.contains(&v.name()))
@@ -58,12 +58,18 @@ fn param(v: &Variable) -> Result<Param, ManifestError> {
     })
 }
 
+/// The connection's secrets: the sensitive ones of the module's `variables`.
+pub(super) fn connection(variables: &[Variable]) -> Result<Vec<SecretSlot>, ManifestError> {
+    variables
+        .iter()
+        .filter(|v| v.is_sensitive() && v.name() != INPUTS)
+        .map(|v| slot(v.name(), SlotKind::Connection, true, Vec::new(), tf_var(v.name(), TfVarShape::String)?))
+        .collect()
+}
+
 /// The connection's secrets (the module's sensitive variables), then each input a machine reads.
 pub(super) fn secrets(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
-    let mut out = Vec::new();
-    for v in super::super::base::variables(env).iter().filter(|v| v.is_sensitive() && v.name() != INPUTS) {
-        out.push(slot(v.name(), SlotKind::Connection, true, Vec::new(), tf_var(v.name(), TfVarShape::String)?)?);
-    }
+    let mut out = connection(&super::super::base::variables(env))?;
     for input in &env.spec().inputs {
         let readers: Vec<Name> = vms(env)
             .filter(|(_, mp)| mp.inputs.contains(input))

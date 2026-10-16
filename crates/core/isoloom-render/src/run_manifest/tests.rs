@@ -175,20 +175,9 @@ fn a_published_port_is_fixed_or_ephemeral_at_the_host_address() {
 }
 
 fn machine(name: &str, role: Role, ports: Vec<Port>) -> Machine {
-    Machine {
-        name: Name::parse(name).unwrap(),
-        role,
-        of: None,
-        os: None,
-        windows: false,
-        arch: None,
-        resources: None,
-        addresses: std::collections::BTreeMap::new(),
-        keep_running: false,
-        native: None,
-        volumes: Vec::new(),
-        ports,
-    }
+    let mut m = super::machine(name, role).unwrap();
+    m.ports = ports;
+    m
 }
 
 fn lab_port(name: &str, number: u16, kind: PortKind, published: bool) -> Port {

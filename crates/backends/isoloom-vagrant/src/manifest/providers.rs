@@ -74,22 +74,42 @@ const PROVIDERS: [Known; 8] = [
     },
 ];
 
+/// Known provider `k` as a manifest provider, with `elevation` and this lab's `refusal` on it.
+fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<VagrantProvider> {
+    Ok(VagrantProvider {
+        id: k.id,
+        hosts: k.hosts.iter().copied().collect(),
+        plugin: k.plugin.map(ToolName::parse).transpose()?,
+        elevation,
+        remote: k.id == Provider::VmwareEsxi,
+        refusal,
+    })
+}
+
 /// The providers, with this lab's refusal on each, and Vagrant's state folder for the run.
 pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
     let spec = env.spec();
     let providers = PROVIDERS
         .iter()
         .map(|k| {
-            Ok(VagrantProvider {
-                id: k.id,
-                hosts: k.hosts.iter().copied().collect(),
-                plugin: k.plugin.map(ToolName::parse).transpose()?,
-                // Hyper-V takes management commands from an administrator only.
-                elevation: if k.id == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None },
-                remote: k.id == Provider::VmwareEsxi,
-                refusal: provider_refusal(spec, k.name).or_else(|| disk_refusal(spec, k.name)),
-            })
+            // Hyper-V takes management commands from an administrator only.
+            let elevation = if k.id == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None };
+            provider(k, elevation, provider_refusal(spec, k.name).or_else(|| disk_refusal(spec, k.name)))
         })
+        .collect::<Result<_>>()?;
+    Ok(Identity::Vagrant(VagrantIdentity {
+        providers,
+        dotfile: Some(dotfile.clone()),
+    }))
+}
+
+/// The providers `docker-vm`'s Vagrantfile has a block for (all but Hyper-V), its one VM a plain
+/// Debian one, so nothing of the lab rules a provider out; and Vagrant's state folder for the run.
+pub(super) fn docker_vm_identity(dotfile: &PathTemplate) -> Result<Identity> {
+    let providers = PROVIDERS
+        .iter()
+        .filter(|k| k.id != Provider::Hyperv)
+        .map(|k| provider(k, Elevation::None, None))
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {
         providers,

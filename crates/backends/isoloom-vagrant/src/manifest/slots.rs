@@ -12,6 +12,8 @@ use isoloom_manifest::{
 use isoloom_plan::{Environment, ValueSource};
 use isoloom_spec::model::{SecretSource as SpecSource, secret_variable};
 
+use isoloom_render::run_manifest::derived_switch;
+
 use super::lifecycle::{PROVISION, PROVISION_MACHINE, UP};
 use crate::error::Result;
 
@@ -66,35 +68,45 @@ const ESXI: [(&str, &str, Option<&str>, bool); 5] = [
 /// The params the Vagrantfile reads, every step getting them; `ISOLOOM_DERIVED` only the check
 /// runners'.
 pub(super) fn params(runners: &[CheckRunner]) -> Result<Vec<Param>> {
-    let every = || StepSelection::Every;
-    let mut out = vec![
-        param(
-            &Wanted {
-                name: "ISOLOOM_HYPERV_SWITCH",
-                description: "The Hyper-V virtual switch each VM's first adapter (Vagrant's connection, and the internet) goes on.",
-                default: Some("Default Switch"),
-                values: &[],
-                required: false,
-                hosts: &[HostOs::Windows],
-                providers: &[Provider::Hyperv],
-                set_by: SetBy::Embedder,
-            },
-            every(),
-        )?,
-        param(
-            &Wanted {
-                name: "ISOLOOM_SSH_PROXY_COMMAND",
-                description: "The command Vagrant's SSH to the VMs goes through when this host can't reach them directly (an ESXi host through the runner's relay on macOS).",
-                default: None,
-                values: &[],
-                required: false,
-                hosts: &[],
-                providers: &[Provider::VmwareEsxi],
-                set_by: SetBy::Runner,
-            },
-            every(),
-        )?,
-    ];
+    let mut out = vec![hyperv_switch()?];
+    out.extend(remote_params()?);
+    out.extend(derived_switch(runners.iter().map(|r| r.step.id.clone()).collect())?);
+    Ok(out)
+}
+
+/// The Hyper-V switch the VMs' first adapter goes on.
+fn hyperv_switch() -> Result<Param> {
+    param(
+        &Wanted {
+            name: "ISOLOOM_HYPERV_SWITCH",
+            description: "The Hyper-V virtual switch each VM's first adapter (Vagrant's connection, and the internet) goes on.",
+            default: Some("Default Switch"),
+            values: &[],
+            required: false,
+            hosts: &[HostOs::Windows],
+            providers: &[Provider::Hyperv],
+            set_by: SetBy::Embedder,
+        },
+        StepSelection::Every,
+    )
+}
+
+/// What a VM on a remote host needs: the SSH proxy through the runner's relay, and the ESXi
+/// host's settings (its password is a slot, [`esxi_password`]).
+pub(super) fn remote_params() -> Result<Vec<Param>> {
+    let mut out = vec![param(
+        &Wanted {
+            name: "ISOLOOM_SSH_PROXY_COMMAND",
+            description: "The command Vagrant's SSH to the VMs goes through when this host can't reach them directly (an ESXi host through the runner's relay on macOS).",
+            default: None,
+            values: &[],
+            required: false,
+            hosts: &[],
+            providers: &[Provider::VmwareEsxi],
+            set_by: SetBy::Runner,
+        },
+        StepSelection::Every,
+    )?];
     for (name, description, default, required) in ESXI {
         let spec = Wanted {
             name,
@@ -106,21 +118,7 @@ pub(super) fn params(runners: &[CheckRunner]) -> Result<Vec<Param>> {
             providers: &[Provider::VmwareEsxi],
             set_by: SetBy::Embedder,
         };
-        out.push(param(&spec, every())?);
-    }
-    let steps: Vec<StepId> = runners.iter().map(|r| r.step.id.clone()).collect();
-    if let Ok(steps) = NonEmpty::new(steps, "the check steps") {
-        let spec = Wanted {
-            name: "ISOLOOM_DERIVED",
-            description: "0: the checks derived from the spec (reachability, no internet) are skipped.",
-            default: Some("1"),
-            values: &["0", "1"],
-            required: false,
-            hosts: &[],
-            providers: &[],
-            set_by: SetBy::Embedder,
-        };
-        out.push(param(&spec, StepSelection::Only(steps))?);
+        out.push(param(&spec, StepSelection::Every)?);
     }
     Ok(out)
 }
@@ -178,10 +176,15 @@ pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<Secr
         });
         out.push(s);
     }
+    out.push(esxi_password()?);
+    Ok(out)
+}
+
+/// The ESXi host's password, given to every step on `vmware_esxi`.
+pub(super) fn esxi_password() -> Result<SecretSlot> {
     let mut password = slot("ESXI_PASSWORD", SlotKind::Connection, &[], env_var("ESXI_PASSWORD", StepSelection::Every)?)?;
     password.providers = BTreeSet::from([Provider::VmwareEsxi]);
-    out.push(password);
-    Ok(out)
+    Ok(password)
 }
 
 /// A secret's store; an input's file has none (the input's slot carries it).
