@@ -17,6 +17,14 @@ use super::resources::Resource;
 pub enum ContainerProcess {
     /// The official image's own entrypoint and command (a catalogue entry's image form).
     Image,
+    /// A catalogue entry's official image whose `start` steps Isoloom's runner runs at each
+    /// start (`image.start: run`), then `exec`s the image's own entrypoint with its command.
+    Started {
+        /// The image's entrypoint (empty: its command alone).
+        entrypoint: Vec<String>,
+        /// The command it runs (the image's `CMD`, or the entry's).
+        command: Vec<String>,
+    },
     /// Nothing of its own: the container is kept running idle, a machine to work from.
     Idle,
     /// The machine's `command`, as the container's command.
@@ -88,7 +96,10 @@ impl ContainerProcess {
     /// the engine's init (Compose's `init: true`, a pod sharing its process namespace).
     #[must_use]
     pub fn is_runner(&self) -> bool {
-        matches!(self, ContainerProcess::One(_) | ContainerProcess::Supervised { .. })
+        matches!(
+            self,
+            ContainerProcess::One(_) | ContainerProcess::Supervised { .. } | ContainerProcess::Started { .. }
+        )
     }
 }
 

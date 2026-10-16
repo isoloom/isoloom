@@ -12,7 +12,7 @@
 //!
 //! The machine's command reaches it as its arguments (Compose's `command:`, a pod's `args:`).
 
-use isoloom_plan::configure::{ContainerProcess, Daemon, Resource, ServiceSource, Stream};
+use isoloom_plan::configure::{ContainerProcess, Daemon, Resource, RunPlan, ServiceSource, Stream};
 use isoloom_spec::shell::quote;
 use isoloom_spec::syntax::{AbsPath, UserName};
 
@@ -100,6 +100,7 @@ pub fn script(c: &Configured<'_>, process: &ContainerProcess) -> Option<String> 
     let (daemons, command) = match process {
         ContainerProcess::One(d) => (std::slice::from_ref(d), false),
         ContainerProcess::Supervised { daemons, command } => (daemons.as_slice(), command.is_some()),
+        ContainerProcess::Started { entrypoint, .. } => return Some(started(c, entrypoint)),
         _ => return None,
     };
     let start = start(c);
@@ -122,14 +123,34 @@ pub fn script(c: &Configured<'_>, process: &ContainerProcess) -> Option<String> 
     ))
 }
 
-/// The recipe's `start` steps, run at each start before the services, through the shell
-/// library (an entry's; an app has none in 1.0).
+/// The runner of an official image whose entry's `start` steps it runs: them, then the image's
+/// own `entrypoint`, with the container's command as its arguments (the image's `CMD`, or the
+/// machine's).
+fn started(c: &Configured<'_>, entrypoint: &[String]) -> String {
+    let exec: Vec<String> = entrypoint.iter().map(|a| quote(a)).collect();
+    let exec = if exec.is_empty() { String::new() } else { format!("{} ", exec.join(" ")) };
+    format!(
+        "#!/bin/sh\n{}# The process of machine `{}`'s container: its entry's start steps, run by Isoloom's runner, then the image's own.\nset -eu\n{}exec {exec}\"$@\"\n",
+        header("#"),
+        c.machine(),
+        start(c)
+    )
+}
+
+/// The recipe's `start` steps, run at each start before the services, from the project folder:
+/// scripts behind their `creates`, the other steps through the shell library (an entry's; an app
+/// has none in 1.0).
 fn start(c: &Configured<'_>) -> String {
-    let calls: String = c
-        .recipe()
-        .start
+    let steps = &c.recipe().start;
+    if steps.is_empty() {
+        return String::new();
+    }
+    let calls: String = steps
         .iter()
-        .filter_map(|r| shell::call(c, r))
+        .filter_map(|r| match r {
+            Resource::Run(run) => Some(start_script(run)),
+            other => shell::call(c, other),
+        })
         .map(|line| {
             if shell::literal_dollar(&line) {
                 format!("# shellcheck disable=SC2016\n{line}")
@@ -138,10 +159,21 @@ fn start(c: &Configured<'_>) -> String {
             }
         })
         .collect();
-    if calls.is_empty() {
-        return String::new();
+    let library = if steps.iter().any(|r| !matches!(r, Resource::Run(_))) {
+        ". /usr/local/lib/isoloom/configure.sh\n"
+    } else {
+        ""
+    };
+    format!("{library}cd /opt/isoloom\n{calls}")
+}
+
+/// A project script of the `start` phase, behind its `creates` (the Dockerfile copies it in).
+fn start_script(run: &RunPlan) -> String {
+    let line = format!("sh {}", quote(&format!("/opt/isoloom/{}", run.script)));
+    match &run.creates {
+        Some(done) => format!("[ -e {} ] || {line}\n", quote(done.as_str())),
+        None => format!("{line}\n"),
     }
-    format!(". /usr/local/lib/isoloom/configure.sh\ncd /opt/isoloom\n{calls}")
 }
 
 /// Links each of the daemon's log files to the container's output (a fresh link at each start).

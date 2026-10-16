@@ -201,6 +201,7 @@ fn a_generated_image_needs_no_image_or_build() {
             os: "debian-12".into(),
             base: "debian@sha256:0".into(),
             from: crate::model::BaseImage::Os,
+            after_start: None,
         });
     }
     assert_eq!(crate::validate(&spec), Vec::new());

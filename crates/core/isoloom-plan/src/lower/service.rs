@@ -7,7 +7,7 @@
 use std::borrow::Cow;
 
 use indexmap::IndexMap;
-use isoloom_catalogue::{Catalogue, Password, Resolved};
+use isoloom_catalogue::{Catalogue, ImageStart, Password, Resolved};
 use isoloom_spec::model::{self, Mount};
 use isoloom_spec::syntax::{self, Code, FieldPath, File, FileSource, Kind, Mode, Problem, Problems};
 
@@ -195,7 +195,9 @@ pub(super) fn image_configuration(resolved: &[Resolved]) -> Option<model::Config
         })
     }));
     let files = r.files.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-    Some(model::Configuration::entry(r.os, Vec::new(), configure, Vec::new(), files))
+    // The image's own entrypoint prepares each start, unless the entry asks Isoloom's runner to.
+    let start = if image.start == ImageStart::Run { r.start.clone() } else { Vec::new() };
+    Some(model::Configuration::entry(r.os, Vec::new(), configure, start, files))
 }
 
 /// The variables the official image reads, when the container runs it.

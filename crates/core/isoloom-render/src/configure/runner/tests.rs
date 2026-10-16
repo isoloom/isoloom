@@ -77,3 +77,45 @@ fn the_runner_parses_as_sh() {
         assert!(status.success(), "{r}");
     }
 }
+
+/// A machine whose recipe's steps are all `start` (an entry's, over its official image), and
+/// the process of an image whose start Isoloom's runner runs.
+fn started() -> (isoloom_plan::Environment, ContainerProcess) {
+    let mut env = testing::machine(
+        "os: debian@12, app: { steps: [{ command: [touch, /run/started], creates: /run/started }, { run: prepare.sh }] }",
+        Target::Docker,
+        &[],
+    );
+    if let Some(r) = env.machines.get_mut("m").and_then(|m| m.recipe.as_mut()) {
+        r.start = std::mem::take(&mut r.install);
+    }
+    let process = ContainerProcess::Started {
+        entrypoint: vec!["/docker-entrypoint.sh".into()],
+        command: vec!["nginx".into(), "-g".into(), "daemon off;".into()],
+    };
+    (env, process)
+}
+
+#[test]
+fn an_images_start_steps_run_then_its_own_process() {
+    let (env, process) = started();
+    let c = Configured::of(&env, "m").unwrap();
+    let r = script(&c, &process).expect("a runner");
+    assert!(r.contains(". /usr/local/lib/isoloom/configure.sh\ncd /opt/isoloom\nisoloom_command 'creates' '1' '/run/started' 'touch' '/run/started'\nsh '/opt/isoloom/prepare.sh'\n"), "{r}");
+    assert!(r.ends_with("exec '/docker-entrypoint.sh' \"$@\"\n"), "{r}");
+    let d = super::super::dockerfile::render(&c, "nginx@sha256:0", &process);
+    assert!(!d.contains("RUN"), "start runs at each start, not at build: {d}");
+    assert!(
+        d.ends_with("COPY prepare.sh prepare.sh\nCOPY --chmod=0755 .isoloom/configure/m/run /usr/local/bin/isoloom-run\nENTRYPOINT [\"/usr/local/bin/isoloom-run\"]\nCMD [\"nginx\",\"-g\",\"daemon off;\"]\n"),
+        "{d}"
+    );
+}
+
+/// The started runner reads as POSIX sh.
+#[cfg(unix)]
+#[test]
+fn the_started_runner_parses_as_sh() {
+    let (env, process) = started();
+    let r = script(&Configured::of(&env, "m").unwrap(), &process).unwrap();
+    assert!(std::process::Command::new("sh").args(["-n", "-c", &r]).status().unwrap().success(), "{r}");
+}

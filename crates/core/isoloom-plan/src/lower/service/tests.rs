@@ -176,3 +176,60 @@ fn a_setting_naming_a_project_folder_it_lacks_is_a_problem_with_files() {
         .collect();
     assert!(found.contains(&"machines.web.with.root".to_owned()), "{found:?}");
 }
+
+/// nginx's entry, its `start` a guarded command that Isoloom's runner runs before the official
+/// image's own process (`image.start: run`).
+fn started_catalogue() -> isoloom_catalogue::Catalogue {
+    let nginx = isoloom_catalogue::Catalogue::embedded().unwrap().entry("nginx").unwrap();
+    let files: Vec<(String, String)> = nginx
+        .files()
+        .iter()
+        .map(|(path, text)| {
+            let text = if path == "entry.yml" {
+                text.replace(
+                    "  start: []",
+                    "  start:\n    - command: [touch, /run/isoloom-started]\n      creates: /run/isoloom-started",
+                ) + "\nimage: { start: run }\n"
+            } else {
+                text.clone()
+            };
+            (format!("nginx/{path}"), text)
+        })
+        .collect();
+    isoloom_catalogue::Catalogue::from_files(files.iter().map(|(p, t)| (p.as_str(), t.as_str()))).unwrap()
+}
+
+#[test]
+fn an_image_whose_start_the_runner_runs_runs_it_then_its_own_process() {
+    let source = isoloom_spec::syntax::parse(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@13, service: nginx, networks: { lab: 10 } }\n",
+    )
+    .unwrap();
+    let catalogue = started_catalogue();
+    let lowered = crate::lower::lower(&source, &catalogue, crate::lower::Scope::Target(Target::Docker));
+    assert_eq!(lowered.refusals, [], "the runner renders the start steps");
+    let env = crate::Environment::build(&lowered.spec, Target::Docker, None);
+    let web = &env.machines["web"];
+    let Some(Image::Container {
+        build: Some(Build::Generated { process, .. }),
+        ..
+    }) = &web.image
+    else {
+        panic!("a generated build over the image")
+    };
+    let ContainerProcess::Started { entrypoint, command } = process else {
+        panic!("{process:?}")
+    };
+    assert_eq!(
+        (entrypoint.as_slice(), command.as_slice()),
+        (
+            ["/docker-entrypoint.sh".to_owned()].as_slice(),
+            ["nginx".to_owned(), "-g".to_owned(), "daemon off;".to_owned()].as_slice()
+        )
+    );
+    let recipe = web.recipe.as_ref().unwrap();
+    assert!(
+        recipe.install.is_empty() && recipe.start.len() == 1,
+        "the image is install; its start is the runner's"
+    );
+}

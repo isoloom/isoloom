@@ -6,7 +6,7 @@
 //! machine a target lowers without its form is always a refusal at that field, never a silent
 //! stand-in.
 
-use isoloom_catalogue::{ImageStart, Resolved};
+use isoloom_catalogue::{ImageStart, OfficialImage, Resolved};
 use isoloom_spec::syntax::{self, Form, NoForm, OsRef, Problems, Recipe, Step};
 
 use crate::configure::{self, ContainerProcess, DaemonTable, NoProcess, Recipe as Resolution};
@@ -34,12 +34,16 @@ pub(super) enum Container<'a> {
         image: &'static str,
     },
     /// A catalogue entry's official image, its OS the machine's: a thin build of the entry's
-    /// `configure` over it, and the image's own process.
+    /// `configure` over it, and the image's own process (after the entry's `start` steps, run by
+    /// Isoloom's runner, when the entry asks for them: `image.start: run`).
     Entry {
         /// The OS.
         os: OsRef,
-        /// The image, pinned by digest.
-        image: &'a str,
+        /// The image.
+        image: &'a OfficialImage,
+        /// The `start` steps Isoloom's runner runs before the image's own process (empty: the
+        /// image's own entrypoint prepares each start).
+        start: &'a [Step],
     },
 }
 
@@ -160,16 +164,6 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved]) -> Resul
         });
     }
     if let Some(image) = &r.image {
-        if image.start == ImageStart::Run && !r.start.is_empty() {
-            return Err(NoForm {
-                field: "service".to_owned(),
-                reason: format!(
-                    "{}'s image runs its `start` steps through Isoloom's runner (`image.start: run`), which no container renders yet",
-                    r.entry
-                ),
-                fix: "a VM target".to_owned(),
-            });
-        }
         if !image.platforms.contains(&m.hardware.arch) {
             return Err(NoForm {
                 field: "hardware.arch".to_owned(),
@@ -177,10 +171,8 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved]) -> Resul
                 fix: format!("another release, or `{}`", arch(isoloom_spec::model::Arch::Amd64)),
             });
         }
-        return Ok(Container::Entry {
-            os: r.os,
-            image: &image.reference,
-        });
+        let start = if image.start == ImageStart::Run { r.start.as_slice() } else { &[] };
+        return Ok(Container::Entry { os: r.os, image, start });
     }
     let (os, base) = official_image(m)?;
     let config = super::service::configuration(resolved).ok_or_else(|| no_os("a catalogue service runs on an OS"))?;

@@ -337,6 +337,7 @@ fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_
                 os: os.name().to_owned(),
                 base: base.to_owned(),
                 from: BaseImage::Os,
+                after_start: None,
             });
             // Isoloom's runner is the process of a container that runs services.
             d.idle = idle && !serves(l, m, service);
@@ -345,11 +346,15 @@ fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_
             d.image = Some(image.to_owned());
             d.idle = idle;
         }
-        Container::Entry { os, image } => {
+        Container::Entry { os, image, start } => {
             d.generated = Some(Generated {
                 os: os.name().to_owned(),
-                base: image.to_owned(),
+                base: image.reference.clone(),
                 from: BaseImage::Entry,
+                after_start: (!start.is_empty()).then(|| model::OwnProcess {
+                    entrypoint: image.entrypoint.clone(),
+                    command: image.command_override.clone().unwrap_or_else(|| image.command.clone()),
+                }),
             });
         }
     }

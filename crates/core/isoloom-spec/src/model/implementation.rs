@@ -71,6 +71,18 @@ pub struct Generated {
     pub base: String,
     /// What that image is.
     pub from: BaseImage,
+    /// An entry's official image whose `start` steps Isoloom's runner runs (`image.start:
+    /// run`): the image's own process, which the runner `exec`s after them.
+    pub after_start: Option<OwnProcess>,
+}
+
+/// An official image's own process: its entrypoint, and the command it runs.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct OwnProcess {
+    /// Its entrypoint (empty: the command alone).
+    pub entrypoint: Vec<String>,
+    /// Its command (the entry's, when it gives one; else the image's own).
+    pub command: Vec<String>,
 }
 
 /// What a generated image starts from.

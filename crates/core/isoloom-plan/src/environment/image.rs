@@ -76,9 +76,14 @@ pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, reci
             let generated = d.generated.as_ref().map(|g| Build::Generated {
                 dockerfile: generated_dockerfile(name),
                 base: g.base.clone(),
-                process: match g.from {
-                    // An entry's official image keeps its own entrypoint and command.
-                    BaseImage::Entry => ContainerProcess::Image,
+                process: match (g.from, &g.after_start) {
+                    // An entry's official image keeps its own entrypoint and command, after the
+                    // entry's `start` steps when Isoloom's runner runs them.
+                    (BaseImage::Entry, Some(image)) => ContainerProcess::Started {
+                        entrypoint: image.entrypoint.clone(),
+                        command: image.command.clone(),
+                    },
+                    (BaseImage::Entry, None) => ContainerProcess::Image,
                     // Lowering refuses a container whose services it can't run, so this resolves.
                     _ => recipe
                         .and_then(|r| ContainerProcess::resolve(r, m.command.as_ref(), !m.ports.is_empty()).ok())

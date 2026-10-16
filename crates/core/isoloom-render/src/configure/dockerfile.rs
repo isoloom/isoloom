@@ -59,9 +59,20 @@ pub fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> Str
     } else {
         String::new()
     };
-    let steps: String = c.recipe().resources().filter_map(|r| instructions(c, r)).collect();
+    // `start` is the runner's, at each start; the build installs and configures.
+    let recipe = c.recipe();
+    let steps: String = recipe.install.iter().chain(&recipe.configure).filter_map(|r| instructions(c, r)).collect();
     let entrypoint = if process.is_runner() {
-        format!("COPY --chmod=0755 {} {RUNNER}\nENTRYPOINT [\"{RUNNER}\"]\nCMD []\n", runner::path(c.machine()))
+        // The image's own command stays its arguments, which the runner hands its entrypoint.
+        let command = match process {
+            ContainerProcess::Started { command, .. } => serde_json::to_string(command).unwrap_or_else(|_| "[]".to_owned()),
+            _ => "[]".to_owned(),
+        };
+        format!(
+            "{}COPY --chmod=0755 {} {RUNNER}\nENTRYPOINT [\"{RUNNER}\"]\nCMD {command}\n",
+            start_files(c),
+            runner::path(c.machine())
+        )
     } else {
         String::new()
     };
@@ -70,6 +81,22 @@ pub fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> Str
         header("#"),
         c.machine()
     )
+}
+
+/// The project files the recipe's `start` steps read when the runner runs them at each start
+/// (their scripts, their copies' sources), copied into the image's project folder.
+fn start_files(c: &Configured<'_>) -> String {
+    c.recipe()
+        .start
+        .iter()
+        .filter_map(|r| match r {
+            Resource::Run(run) => Some(run.script.as_str()),
+            Resource::Copy(cp) => Some(cp.from.as_str()),
+            _ => None,
+        })
+        .map(|path| format!("COPY {path} {path}\n"))
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 /// One step's instructions; `None` for a step a container doesn't run at build (a service, which
