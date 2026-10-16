@@ -14,7 +14,7 @@ use super::guest::{Guest, Nic};
 use super::machines;
 use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::module::ident;
-use crate::server::router::{forwarding, outputs as lab_outputs, ruleset};
+use crate::server::router::{forwarding, outputs as lab_outputs, ruleset_content};
 
 /// The router's place among the VMs (the controller is next, then the machines).
 pub(super) const INDEX: u64 = 0;
@@ -28,7 +28,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     config.packages = vec!["nftables".to_owned()];
     config.bootcmd.extend(cloud_init::prelude(env));
     config.files = vec![
-        file("/etc/nftables.conf", None, string(ruleset(env))),
+        file("/etc/nftables.conf", None, ruleset_content(env)),
         file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
     ];
     config.runcmd = [

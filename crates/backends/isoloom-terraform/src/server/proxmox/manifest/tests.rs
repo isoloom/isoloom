@@ -26,6 +26,58 @@ checks:
   - { http: http://web/, expect: 200, wait: 120 }
 ";
 
+/// A lab with an `internet: false` network, so the run is sealed: `cache` is on `back` alone.
+const SEALED_LAB: &str = "version: 1
+name: seg
+networks:
+  front: { cidr: 10.61.10.0/24 }
+  back: { cidr: 10.61.20.0/24, internet: false }
+machines:
+  web: { networks: { front: 10 }, os: debian@12, app: { steps: [{ run: web.sh }] } }
+  cache: { networks: { back: 20 }, os: debian@12, app: { steps: [{ run: cache.sh }] } }
+";
+
+#[test]
+fn an_unsealed_run_has_no_seal_step_and_no_sealed_param() {
+    let m = manifest(&env(LAB)).unwrap();
+    assert!(m.lifecycle.seal.is_none(), "nothing to seal");
+    assert!(m.params.iter().all(|p| p.name.as_str() != "isoloom_sealed"));
+}
+
+#[test]
+fn the_seal_applies_the_sealed_ruleset_live_on_the_router() {
+    let m = manifest(&env(SEALED_LAB)).unwrap();
+    m.validate().unwrap();
+    // The runner sets the seal param once the machines are ready; it reaches the module's
+    // `isoloom_sealed` variable (later boots are sealed through its conditional snippet).
+    let seal = m.lifecycle.seal.as_ref().expect("a run with an internet:false network seals");
+    assert_eq!(seal.param.as_str(), "isoloom_sealed");
+    assert!(m.params.iter().any(|p| p.name.as_str() == "isoloom_sealed" && p.set_by == SetBy::Runner));
+    // Two steps: the second apply (keeps the snippet in sync for later boots), then an ssh.run
+    // that applies the sealed ruleset live to the already-booted router (the snippet change
+    // alone never reaches a running guest).
+    let ids: Vec<&str> = seal.steps.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids, ["seal", "seal-reload"]);
+    let reload = &seal.steps.as_slice()[1];
+    let Run::Action { action: Action::SshRun, with } = &reload.run else {
+        panic!("{:?}", reload.run)
+    };
+    let arg = |k: &str| with.iter().find(|(n, _)| n.as_str() == k).map(|(_, v)| v.to_string());
+    assert_eq!(
+        arg("host").as_deref(),
+        Some("${outputs.ip}"),
+        "reached at the router's uplink, the lab's way in"
+    );
+    assert_eq!(arg("user").as_deref(), Some("isoloom"));
+    assert!(arg("via").is_none(), "the router is reached directly, not through itself");
+    let command = arg("command").unwrap();
+    assert!(command.contains("nft -f /etc/nftables.sealed.nft"), "{command}");
+    assert!(
+        command.contains("cp /etc/nftables.sealed.nft /etc/nftables.conf"),
+        "kept for later boots: {command}"
+    );
+}
+
 #[test]
 fn the_module_is_applied_with_the_runners_state_and_values() {
     let m = manifest(&env(LAB)).unwrap();

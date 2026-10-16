@@ -54,17 +54,9 @@ pub(crate) fn params(variables: &[Variable], cloud: Cloud) -> Result<Vec<Param>,
     if !sealed {
         return Ok(out);
     }
-    out.push(Param {
-        name: EnvName::parse(SEALED)?,
-        description: "true once the machines are set up: the internet is closed to the `internet: false` networks, at the network.".into(),
-        default: Some("false".into()),
-        values: vec!["true".into(), "false".into()],
-        required: false,
-        hosts: BTreeSet::new(),
-        providers: BTreeSet::new(),
-        set_by: SetBy::Runner,
-        deliver: tf_var(SEALED)?,
-    });
+    // The runner sets it once the machines are ready; on a cloud the internet is closed at the
+    // network (its security groups and routes).
+    out.push(crate::module::manifest::seal_param(SEALED, "network")?);
     Ok(out)
 }
 

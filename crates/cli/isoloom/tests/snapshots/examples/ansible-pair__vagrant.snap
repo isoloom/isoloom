@@ -878,7 +878,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.20 cache' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -1024,7 +1024,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.10 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/cache.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end

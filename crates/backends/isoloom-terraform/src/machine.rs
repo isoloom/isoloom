@@ -122,4 +122,16 @@ impl Shell {
     pub(crate) fn step(self, env: &Environment, machine: &str, step: &Step) -> Option<String> {
         steps::linux(env, machine, step).map(|sh| self.command(&sh))
     }
+
+    /// A step's Linux script as one command, with its progress written to the ready file
+    /// (`isoloom-ready/1`): `running: <label>` before it, and `failed: <label>` with the set-up
+    /// stopped when it fails, as cloud-init does on the other VM targets. The marks are written as
+    /// root (the same shell), so a set-up over `remote-exec` (ESXi) reports its progress too.
+    pub(crate) fn tracked_step(self, env: &Environment, machine: &str, step: &Step) -> Option<String> {
+        let label = cloud_init::label(step);
+        steps::linux(env, machine, step).map(|sh| {
+            let mark = |word: &str| self.command(&format!("echo {} > {}", quote(&format!("{word}: {label}")), cloud_init::READY_FILE));
+            format!("{}; {} || {{ {}; exit 1; }}", mark("running"), self.command(&sh), mark("failed"))
+        })
+    }
 }

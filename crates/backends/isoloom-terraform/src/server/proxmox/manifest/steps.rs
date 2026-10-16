@@ -5,12 +5,13 @@
 
 use isoloom_manifest::{
     Action, Argv, CheckRunner, Condition, EnvName, Error as ManifestError, HostArgv, Lifecycle, Name, NonEmpty, Part, PathTemplate, Placeholder, Program,
-    ReadyGrammar, RelPath, RunVar, SnakeName, Step, Template,
+    ReadyGrammar, RelPath, RunVar, Seal, SnakeName, Step, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_plan::checks::by_position;
 use isoloom_render::run_manifest::{action_with, check, noted, run, timeout_s};
 
+use super::slots::SEALED;
 use crate::machine::{controller, vms};
 use crate::module::manifest::{id, output, run_var, secs, terraform_env, words};
 use crate::server::router::check_host;
@@ -42,20 +43,35 @@ fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &str) -> Resul
     Ok(s)
 }
 
-/// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`).
-pub(super) fn lifecycle() -> Result<Lifecycle, ManifestError> {
+/// The seal reload over SSH: once the second apply has put the sealed snippet in place (for
+/// later boots), the runner reloads nftables on the already-booted router from its `SEALED_NFT`
+/// file, so the seal takes effect live — the host-side snippet change alone never reaches a
+/// running guest (`crate::server::router::sealed_reload`). Reached directly at the router's
+/// uplink address (`${outputs.ip}`), the lab's way in, as `isoloom`.
+fn seal_reload() -> Result<Step, ManifestError> {
+    let with = [
+        ("host", output("ip")?),
+        ("user", Template::text(USER)),
+        ("command", Template::text(&crate::server::router::sealed_reload())),
+    ];
+    let mut step = Step::action(id("seal-reload")?, Action::SshRun);
+    step.run = action_with(Action::SshRun, with)?;
+    step.timeout_s = secs(UNREACHABLE_S);
+    Ok(step)
+}
+
+/// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`); when the run
+/// has an `internet: false` network to seal (`sealed`), the seal: a second apply with
+/// `isoloom_sealed` on (so later boots are sealed), then an `ssh.run` reload applying the sealed
+/// ruleset live to the running router, once the machines are ready (`crate::server::router`).
+pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
     let lock = || Ok::<Step, ManifestError>(Step::action(id("clear-lock")?, Action::TerraformClearLock));
     let init = || {
         let mut args = words(&["init", "-input=false", "-no-color"]);
         args.push(run_var("-backend-config=path=", RunVar::StateDir, "/terraform.tfstate"));
         terraform("init", args, 600, "Preparing Terraform and its providers…")
     };
-    let apply = terraform(
-        "apply",
-        words(&["apply", "-auto-approve", "-input=false", "-no-color"]),
-        3600,
-        "Creating the lab's VMs on the server…",
-    )?;
+    let apply = |step, note| terraform(step, words(&["apply", "-auto-approve", "-input=false", "-no-color"]), 3600, note);
     // No refresh: the state names everything to remove, and a router whose guest agent never
     // ran would hold a refresh for the agent's whole wait.
     let destroy = terraform(
@@ -64,13 +80,24 @@ pub(super) fn lifecycle() -> Result<Lifecycle, ManifestError> {
         1800,
         "Removing the lab from the server…",
     )?;
+    let seal = sealed
+        .then(|| {
+            Ok::<Seal, ManifestError>(Seal {
+                param: EnvName::parse(SEALED)?,
+                steps: NonEmpty::new(
+                    vec![apply("seal", "Closing the internet to the networks without it…")?, seal_reload()?],
+                    "lifecycle.seal.steps",
+                )?,
+            })
+        })
+        .transpose()?;
     Ok(Lifecycle {
-        up: NonEmpty::new(vec![lock()?, init()?, apply], "lifecycle.up")?,
+        up: NonEmpty::new(vec![lock()?, init()?, apply("apply", "Creating the lab's VMs on the server…")?], "lifecycle.up")?,
         down: NonEmpty::new(vec![lock()?, init()?, destroy], "lifecycle.down")?,
         park: None,
         resume: Vec::new(),
         provision: None,
-        seal: None,
+        seal,
         status: Step::action(id("state")?, Action::TerraformReadState),
     })
 }

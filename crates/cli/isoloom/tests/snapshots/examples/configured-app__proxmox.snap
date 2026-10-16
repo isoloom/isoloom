@@ -597,7 +597,7 @@ resource "proxmox_virtual_environment_file" "web" {
       ])
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.0.20 api'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.0.10 web'\\'' '\\''10.66.0.20 api'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: its configuration' > /var/lib/isoloom/ready; sh /var/lib/isoloom/configure/configure-0.sh || { echo 'failed: its configuration' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
@@ -696,7 +696,7 @@ resource "proxmox_virtual_environment_file" "api" {
       ])
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.0.10 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.0.10 web'\\'' '\\''10.66.0.20 api'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: its configuration' > /var/lib/isoloom/ready; sh /var/lib/isoloom/configure/configure-0.sh || { echo 'failed: its configuration' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]

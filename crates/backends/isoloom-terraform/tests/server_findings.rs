@@ -154,3 +154,30 @@ fn each_set_up_step_says_it_runs_and_a_failure_stops_the_rest() -> Outcome {
     assert!(web.contains("echo ready > /var/lib/isoloom/ready"), "{web}");
     Ok(())
 }
+
+#[test]
+fn an_esxi_machine_reports_its_set_up_progress_in_its_ready_file() -> Outcome {
+    // Regression (finding 5): the ESXi `remote-exec` set-up wrote only `ready` (no
+    // `running:`/`failed:` progress), unlike the other targets, so the runner had no progress to
+    // report. Each step now marks the ready file first, and stops the set-up when it fails.
+    let tf = esxi("hello-stack")?;
+    let web = block(&tf, "resource \"terraform_data\" \"web\"");
+    assert!(web.contains("running: provision/web.sh"), "{web}");
+    assert!(web.contains("failed: provision/web.sh"), "{web}");
+    assert!(web.contains("running: health check"), "the final ready step is marked too: {web}");
+    assert!(web.contains("echo ready > /var/lib/isoloom/ready"), "{web}");
+    Ok(())
+}
+
+#[test]
+fn a_vms_hosts_file_names_itself_in_the_zone() -> Outcome {
+    // Regression (finding 4): a VM's /etc/hosts left its own names in the private zone out, so on
+    // web `www.corp.internal` (its own alias) did not resolve, unlike the clouds' zones. A machine
+    // now names itself and its aliases in the zone, as it does the others.
+    let tf = proxmox("private-names")?;
+    let web = block(&tf, "resource \"proxmox_virtual_environment_file\" \"web\"");
+    assert!(web.contains("10.84.0.10 web www web.corp.internal www.corp.internal"), "{web}");
+    let client = block(&tf, "resource \"proxmox_virtual_environment_file\" \"client\"");
+    assert!(client.contains("10.84.0.20 client client.corp.internal"), "{client}");
+    Ok(())
+}

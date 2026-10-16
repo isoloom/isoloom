@@ -64,7 +64,7 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
         networks: machines::networks(env)?,
         outputs: machines::outputs(&machines)?,
         machines,
-        lifecycle: steps::lifecycle()?,
+        lifecycle: steps::lifecycle(crate::cloud::vm::seal::any(env))?,
         ready: steps::ready(env)?,
         checks: Checks {
             protocol: isoloom_manifest::CheckProtocol::V1,

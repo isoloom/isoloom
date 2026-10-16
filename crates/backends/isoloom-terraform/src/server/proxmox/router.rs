@@ -13,7 +13,7 @@ use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::machine::controller;
 use crate::module::ident;
-use crate::server::router::{forwarding, ruleset};
+use crate::server::router::{forwarding, ruleset_content};
 
 /// The router's snippet and VM.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
@@ -90,9 +90,11 @@ fn files(env: &Environment) -> Vec<Expression> {
     };
     let mut out = vec![
         file("/etc/systemd/network/10-wan.network", None, network(mac(None), &["DHCP=yes"])),
-        file("/etc/nftables.conf", None, string(ruleset(env))),
+        file("/etc/nftables.conf", None, ruleset_content(env)),
         file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
     ];
+    // The sealed ruleset as a second file, applied live by the runner's seal step.
+    out.extend(crate::server::router::sealed_file(env));
     for (i, (net, plan)) in (0..).zip(&env.networks) {
         let len = Cidr::parse(&plan.cidr).map_or(32, |c| c.len);
         let address = format!("Address={}/{len}", router::address(env.spec(), net));

@@ -12,6 +12,7 @@ use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::checks::{Invocation, Runner, output_block};
+use crate::cloud::vm::seal;
 use crate::machine::{controller, vms};
 use crate::module::output;
 
@@ -24,11 +25,55 @@ pub(crate) fn forwarding(env: &Environment) -> &'static str {
     }
 }
 
-/// The ruleset: the `reach` rules (the router's shared forward rules), the published ports
-/// forwarded from the uplink address (anything not from the environment), and the internet for
-/// every network (machines install their software; offline machines block it themselves once
-/// set up).
-pub(crate) fn ruleset(env: &Environment) -> String {
+/// The nftables.conf content: the unsealed ruleset (the `reach` rules, the published ports
+/// forwarded from the uplink address, and the internet for every network), or, when the run has
+/// an `internet: false` network to seal, a conditional on `var.isoloom_sealed` so the runner's
+/// seal (a second apply with the variable on) switches the router to the sealed ruleset, as on
+/// the clouds. A later apply keeps it, and root in a guest can't undo it.
+pub(crate) fn ruleset_content(env: &Environment) -> Expression {
+    if seal::any(env) {
+        seal::when_sealed(string(rules(env, true)), string(rules(env, false)))
+    } else {
+        string(rules(env, false))
+    }
+}
+
+/// Where the router keeps the sealed ruleset as a second file. The runner's seal step applies it
+/// live to the already-booted (unsealed) router: updating the host-side cloud-init snippet alone
+/// never reaches a running guest, unlike the clouds' control-plane seal.
+pub(crate) const SEALED_NFT: &str = "/etc/nftables.sealed.nft";
+
+/// The sealed ruleset as the router's `SEALED_NFT` file, when the run has something to seal (left
+/// out otherwise, so an unsealed lab's router is unchanged).
+pub(crate) fn sealed_file(env: &Environment) -> Option<Expression> {
+    seal::any(env).then(|| crate::machine::cloud_init::file(SEALED_NFT, None, string(rules(env, true))))
+}
+
+/// The command the seal step runs on the router over SSH: apply the sealed ruleset (fail-closed —
+/// an invalid ruleset isn't kept), then keep it as `/etc/nftables.conf` so a reboot stays sealed.
+#[must_use]
+pub(crate) fn sealed_reload() -> String {
+    format!("sudo sh -c 'nft -f {SEALED_NFT} && cp {SEALED_NFT} /etc/nftables.conf'")
+}
+
+/// The networks the router forwards and masquerades to the internet: every one, or, once
+/// `sealed`, only those with internet (`internet: false` networks lose their egress and NAT at
+/// the router). `None` leaves the forward and masquerade rules out (every network is offline).
+fn forwarded(env: &Environment, sealed: bool) -> Option<String> {
+    let cidrs: Vec<&str> = env
+        .networks
+        .iter()
+        .filter(|(n, _)| !(sealed && seal::closed(env, n)))
+        .map(|(_, p)| p.cidr.as_str())
+        .collect();
+    (!cidrs.is_empty()).then(|| format!("{{ {} }}", cidrs.join(", ")))
+}
+
+/// The ruleset, sealed or not (see [`ruleset_content`]). The lab's whole set is
+/// the DNAT's source exclusion (published ports reach a machine whatever its network); once
+/// sealed, traffic to an `internet: false` network from elsewhere is dropped (so it keeps only
+/// its `reach` rules), and that network is dropped from the internet forward and masquerade.
+fn rules(env: &Environment, sealed: bool) -> String {
     let lab = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", "));
     let mut forward: Vec<String> = router::forward_rules(env.spec());
     let mut dnat = Vec::new();
@@ -42,11 +87,26 @@ pub(crate) fn ruleset(env: &Environment) -> String {
             dnat.push(format!("    ip saddr != {lab} {proto} dport {host} dnat ip to {addr}:{port}\n"));
         }
     }
-    forward.push(format!("ip saddr {lab} ip daddr != {lab} accept"));
+    if sealed {
+        let closed: Vec<&str> = env
+            .networks
+            .iter()
+            .filter(|(n, _)| seal::closed(env, n))
+            .map(|(_, p)| p.cidr.as_str())
+            .collect();
+        if !closed.is_empty() {
+            forward.push(format!("ip daddr {{ {} }} drop", closed.join(", ")));
+        }
+    }
+    let out = forwarded(env, sealed);
+    if let Some(out) = &out {
+        forward.push(format!("ip saddr {out} ip daddr != {out} accept"));
+    }
     let forward = forward.iter().map(|r| format!("    {r}\n")).collect::<Vec<_>>().concat();
     let dnat = dnat.concat();
+    let masquerade = out.map(|out| format!("    ip saddr {out} ip daddr != {out} masquerade\n")).unwrap_or_default();
     format!(
-        "flush ruleset\ntable inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{forward}  }}\n  chain prerouting {{\n    type nat hook prerouting priority -100;\n{dnat}  }}\n  chain postrouting {{\n    type nat hook postrouting priority 100;\n    ip saddr {lab} ip daddr != {lab} masquerade\n  }}\n}}\n"
+        "flush ruleset\ntable inet isoloom {{\n  chain forward {{\n    type filter hook forward priority 0; policy drop;\n{forward}  }}\n  chain prerouting {{\n    type nat hook prerouting priority -100;\n{dnat}  }}\n  chain postrouting {{\n    type nat hook postrouting priority 100;\n{masquerade}  }}\n}}\n"
     )
 }
 

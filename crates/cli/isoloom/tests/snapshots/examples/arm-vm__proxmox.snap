@@ -405,6 +405,7 @@ resource "proxmox_virtual_environment_file" "box" {
       write_files = local.project_files
       runcmd = [
         "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.70.0.10 box'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: provision/setup.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/setup.sh'\\''' || { echo 'failed: provision/setup.sh' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]

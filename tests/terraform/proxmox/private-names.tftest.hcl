@@ -44,32 +44,23 @@ run "each_vm_s_search_domain_is_the_zone_s" {
   }
 }
 
-run "each_vm_s_hosts_file_names_the_others_in_the_zone" {
+# The spec (`dns.private`): where the platform has no private DNS, the hosts file every VM gets
+# carries the same names as the zone — every machine's name and aliases under the domain — its own
+# among them, so on web `www.corp.internal` (its own alias in the zone) resolves, as it does on the
+# clouds' zones.
+run "each_vm_s_hosts_file_names_itself_and_the_others_in_the_zone" {
   command = plan
 
   assert {
-    condition     = tolist(flatten(regexall("'\\\\''([0-9.]+ [^']*)'\\\\''", element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1)))) == tolist(["10.84.0.20 client client.corp.internal"])
-    error_message = "web's hosts file must give client by its name and its name in the zone"
+    condition     = tolist(flatten(regexall("'\\\\''([0-9.]+ [^']*)'\\\\''", element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1)))) == tolist(["10.84.0.10 web www web.corp.internal www.corp.internal", "10.84.0.20 client client.corp.internal"])
+    error_message = "web's hosts file must give its own names in the zone (web.corp.internal, www.corp.internal) and client's too"
   }
   assert {
-    condition     = tolist(flatten(regexall("'\\\\''([0-9.]+ [^']*)'\\\\''", element(yamldecode(trimprefix(proxmox_virtual_environment_file.client.source_raw[0].data, "#cloud-config\n")).runcmd, 1)))) == tolist(["10.84.0.10 web www web.corp.internal www.corp.internal"])
-    error_message = "client's hosts file must give web by its name, its alias www, and both in the zone"
+    condition     = tolist(flatten(regexall("'\\\\''([0-9.]+ [^']*)'\\\\''", element(yamldecode(trimprefix(proxmox_virtual_environment_file.client.source_raw[0].data, "#cloud-config\n")).runcmd, 1)))) == tolist(["10.84.0.10 web www web.corp.internal www.corp.internal", "10.84.0.20 client client.corp.internal"])
+    error_message = "client's hosts file must give web by its name and alias, its own name, and all in the zone"
   }
   assert {
     condition     = startswith(element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1), "echo 'running: hosts file' > /var/lib/isoloom/ready; ")
     error_message = "the hosts file must be a set-up step that says so in the ready file"
-  }
-}
-
-# The spec (`dns.private`): where the platform has no private DNS, the hosts file every VM gets
-# carries the same names as the zone: every machine's name and aliases under the domain. Each
-# VM's hosts file leaves its own names out, so on web `www.corp.internal` (its own alias in the
-# zone) doesn't resolve, as it does on the clouds' zones.
-run "known_bug_a_vm_s_hosts_file_leaves_its_own_names_in_the_zone_out" {
-  command = plan
-
-  assert {
-    condition     = contains(flatten(regexall("'\\\\''([0-9.]+ [^']*)'\\\\''", element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1))), "10.84.0.10 web www web.corp.internal www.corp.internal")
-    error_message = "web's hosts file must give its own names in the zone too (web.corp.internal, www.corp.internal)"
   }
 }

@@ -535,7 +535,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-mixed-office-office"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('192.168.58.20 intranet')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
+    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('192.168.58.10 files01', '192.168.58.20 intranet')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
     m.vm.provision "shell", name: "provision/share.ps1", inline: "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/share.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
     m.vm.provision "shell", name: "ready", inline: "New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"
   end

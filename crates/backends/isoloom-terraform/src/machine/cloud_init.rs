@@ -111,7 +111,7 @@ impl CloudConfig {
 }
 
 /// The ready file's folder.
-const READY_DIR: &str = "/var/lib/isoloom";
+pub(crate) const READY_DIR: &str = "/var/lib/isoloom";
 
 /// `command` as the set-up step `label`: its name in [`READY_FILE`] first; when it fails,
 /// `failed: <label>` there and the end of the set-up (cloud-init runs `runcmd` as one script

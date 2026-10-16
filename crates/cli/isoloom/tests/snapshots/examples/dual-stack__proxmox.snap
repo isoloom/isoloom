@@ -291,6 +291,12 @@ variable "ssh_public_key" {
   description = "Installed for the user `isoloom` on every VM"
 }
 
+variable "isoloom_sealed" {
+  type        = bool
+  default     = false
+  description = "Close the internet to the machines of every `internet: false` network, at the network: the runner sets it once the machines are set up"
+}
+
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
   api_token = var.proxmox_api_token != "" ? var.proxmox_api_token : null
@@ -408,11 +414,15 @@ resource "proxmox_virtual_environment_file" "router" {
         },
         {
           path    = "/etc/nftables.conf"
-          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 icmp type echo-request accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 icmpv6 type echo-request accept\n    ip saddr { 10.67.10.0/24, 10.67.20.0/24 } ip daddr != { 10.67.10.0/24, 10.67.20.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.67.10.0/24, 10.67.20.0/24 } ip daddr != { 10.67.10.0/24, 10.67.20.0/24 } masquerade\n  }\n}\n"
+          content = var.isoloom_sealed ? "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 icmp type echo-request accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 icmpv6 type echo-request accept\n    ip daddr { 10.67.20.0/24 } drop\n    ip saddr { 10.67.10.0/24 } ip daddr != { 10.67.10.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.67.10.0/24 } ip daddr != { 10.67.10.0/24 } masquerade\n  }\n}\n" : "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 icmp type echo-request accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 icmpv6 type echo-request accept\n    ip saddr { 10.67.10.0/24, 10.67.20.0/24 } ip daddr != { 10.67.10.0/24, 10.67.20.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.67.10.0/24, 10.67.20.0/24 } ip daddr != { 10.67.10.0/24, 10.67.20.0/24 } masquerade\n  }\n}\n"
         },
         {
           path    = "/etc/sysctl.d/90-isoloom.conf"
           content = "net.ipv4.ip_forward=1\nnet.ipv6.conf.all.forwarding=1\n"
+        },
+        {
+          path    = "/etc/nftables.sealed.nft"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip saddr 10.67.10.0/24 ip daddr 10.67.20.0/24 icmp type echo-request accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 icmpv6 type echo-request accept\n    ip daddr { 10.67.20.0/24 } drop\n    ip saddr { 10.67.10.0/24 } ip daddr != { 10.67.10.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.67.10.0/24 } ip daddr != { 10.67.10.0/24 } masquerade\n  }\n}\n"
         },
         {
           path = "/etc/systemd/network/20-front.network"
@@ -527,7 +537,7 @@ resource "proxmox_virtual_environment_file" "web" {
       write_files = local.project_files
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.67.10.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.67.20.10 web'\\'' '\\''10.67.10.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.67.10.0/24 via 10.67.20.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: IPv6' > /var/lib/isoloom/ready; sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.67.20.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace fd00:67:20::10/64 dev \"$dev\" nodad\nip -6 route replace fd00:67:10::/64 via fd00:67:20::254' || { echo 'failed: IPv6' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: provision/web.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
@@ -640,7 +650,7 @@ resource "proxmox_virtual_environment_file" "user" {
       packages = ["nftables", "curl", "netcat-openbsd"]
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.67.20.10 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.67.20.10 web'\\'' '\\''10.67.10.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.67.20.0/24 via 10.67.10.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: IPv6' > /var/lib/isoloom/ready; sh -c 'dev=$(ip -o -4 addr show | grep -F '\\'' inet 10.67.10.10/'\\'' | awk '\\''{print $2; exit}'\\'')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace fd00:67:10::10/64 dev \"$dev\" nodad\nip -6 route replace fd00:67:20::/64 via fd00:67:10::254' || { echo 'failed: IPv6' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
@@ -966,6 +976,22 @@ locals {
           ]
         }
       ]
+    },
+    {
+      "name": "isoloom_sealed",
+      "description": "true once the machines are set up: the internet is closed to the `internet: false` networks, at the router.",
+      "default": "false",
+      "values": [
+        "true",
+        "false"
+      ],
+      "set_by": "runner",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "isoloom_sealed"
+        }
+      ]
     }
   ],
   "secrets": [
@@ -1138,6 +1164,41 @@ locals {
         "timeout_s": 1800
       }
     ],
+    "seal": {
+      "param": "isoloom_sealed",
+      "steps": [
+        {
+          "id": "seal",
+          "note": "Closing the internet to the networks without it…",
+          "argv": [
+            "terraform",
+            "apply",
+            "-auto-approve",
+            "-input=false",
+            "-no-color"
+          ],
+          "env": {
+            "TF_DATA_DIR": "${run.state_dir}/.terraform",
+            "TF_INPUT": "0",
+            "TF_IN_AUTOMATION": "1",
+            "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+            "TF_VAR_slot": "${run.slot}",
+            "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+          },
+          "timeout_s": 3600
+        },
+        {
+          "id": "seal-reload",
+          "action": "ssh.run",
+          "with": {
+            "command": "sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'",
+            "host": "${outputs.ip}",
+            "user": "isoloom"
+          },
+          "timeout_s": 600
+        }
+      ]
+    },
     "status": {
       "id": "state",
       "action": "terraform.read_state"

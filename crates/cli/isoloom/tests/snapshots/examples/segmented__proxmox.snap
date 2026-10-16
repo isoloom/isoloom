@@ -392,6 +392,12 @@ variable "ssh_public_key" {
   description = "Installed for the user `isoloom` on every VM"
 }
 
+variable "isoloom_sealed" {
+  type        = bool
+  default     = false
+  description = "Close the internet to the machines of every `internet: false` network, at the network: the runner sets it once the machines are set up"
+}
+
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
   api_token = var.proxmox_api_token != "" ? var.proxmox_api_token : null
@@ -523,9 +529,13 @@ resource "proxmox_virtual_environment_file" "router" {
         },
         {
           path    = "/etc/nftables.conf"
-          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.61.99.0/24 ip daddr 10.61.10.0/24 accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 meta l4proto { tcp, udp } th dport { 6379 } accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 icmp type echo-request accept\n    ip saddr { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } masquerade\n  }\n}\n"
+          content = var.isoloom_sealed ? "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.61.99.0/24 ip daddr 10.61.10.0/24 accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 meta l4proto { tcp, udp } th dport { 6379 } accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 icmp type echo-request accept\n    ip daddr { 10.61.20.0/24 } drop\n    ip saddr { 10.61.10.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.99.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.61.10.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.99.0/24 } masquerade\n  }\n}\n" : "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.61.99.0/24 ip daddr 10.61.10.0/24 accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 meta l4proto { tcp, udp } th dport { 6379 } accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 icmp type echo-request accept\n    ip saddr { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.20.0/24, 10.61.99.0/24 } masquerade\n  }\n}\n"
         },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
+        {
+          path    = "/etc/nftables.sealed.nft"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.61.99.0/24 ip daddr 10.61.10.0/24 accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 meta l4proto { tcp, udp } th dport { 6379 } accept\n    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 icmp type echo-request accept\n    ip daddr { 10.61.20.0/24 } drop\n    ip saddr { 10.61.10.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.99.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.61.10.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.99.0/24 } masquerade\n  }\n}\n"
+        },
         {
           path = "/etc/systemd/network/20-front.network"
           content = join("\n", [
@@ -653,7 +663,7 @@ resource "proxmox_virtual_environment_file" "cache" {
       runcmd = [
         "mkdir -p /var/lib/isoloom",
         "echo 'running: growing the disk' > /var/lib/isoloom/ready; sh -c 'set -e\npart_grow() {\n  dev=$(readlink -f \"$1\")\n  disk=/dev/$(lsblk -no PKNAME \"$dev\" | head -n1)\n  num=$(cat \"/sys/class/block/$(basename \"$dev\")/partition\")\n  if command -v growpart >/dev/null; then growpart \"$disk\" \"$num\" >/dev/null || true\n  else echo \", +\" | sfdisk --no-reread -N \"$num\" \"$disk\" >/dev/null 2>&1 && partx -u \"$disk\" || true; fi\n}\nfs_grow() { resize2fs \"$1\" >/dev/null 2>&1 || xfs_growfs / >/dev/null 2>&1 || true; }\nsrc=$(findmnt -n -o SOURCE /)\ncase \"$(lsblk -no TYPE \"$src\" | head -n1)\" in\n  lvm)\n    vg=$(lvs --noheadings -o vg_name \"$src\" | tr -d '\\'' '\\'')\n    for pv in $(pvs --noheadings -o pv_name -S vg_name=\"$vg\" | tr -d '\\'' '\\''); do part_grow \"$pv\"; pvresize \"$pv\" >/dev/null; done\n    lvextend -l +100%FREE \"$src\" >/dev/null 2>&1 || true\n    fs_grow \"$src\" ;;\n  part) part_grow \"$src\"; fs_grow \"$src\" ;;\nesac' || { echo 'failed: growing the disk' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.10.10 web'\\'' '\\''10.61.99.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.20.20 cache'\\'' '\\''10.61.10.10 web'\\'' '\\''10.61.99.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.61.10.0/24 via 10.61.20.254\nip route replace 10.61.99.0/24 via 10.61.20.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: volume folders' > /var/lib/isoloom/ready; sh -c 'mkdir -p '\\''/data'\\''' || { echo 'failed: volume folders' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: provision/cache.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/cache.sh'\\''' || { echo 'failed: provision/cache.sh' > /var/lib/isoloom/ready; exit 1; }",
@@ -767,7 +777,7 @@ resource "proxmox_virtual_environment_file" "web" {
       write_files = local.project_files
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.20.20 cache'\\'' '\\''10.61.99.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.20.20 cache'\\'' '\\''10.61.10.10 web'\\'' '\\''10.61.99.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.61.20.0/24 via 10.61.10.254\nip route replace 10.61.99.0/24 via 10.61.10.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for cache' > /var/lib/isoloom/ready; sh -c 'i=0; until (bash -c '\\''</dev/tcp/cache/6379'\\'' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\"' || { echo 'failed: waiting for cache' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: provision/web.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }",
@@ -860,7 +870,7 @@ resource "proxmox_virtual_environment_file" "user" {
       packages = ["nftables", "curl", "netcat-openbsd"]
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.20.20 cache'\\'' '\\''10.61.10.10 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.61.20.20 cache'\\'' '\\''10.61.10.10 web'\\'' '\\''10.61.99.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.61.10.0/24 via 10.61.99.254\nip route replace 10.61.20.0/24 via 10.61.99.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
@@ -1193,6 +1203,22 @@ locals {
           ]
         }
       ]
+    },
+    {
+      "name": "isoloom_sealed",
+      "description": "true once the machines are set up: the internet is closed to the `internet: false` networks, at the router.",
+      "default": "false",
+      "values": [
+        "true",
+        "false"
+      ],
+      "set_by": "runner",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "isoloom_sealed"
+        }
+      ]
     }
   ],
   "secrets": [
@@ -1395,6 +1421,41 @@ locals {
         "timeout_s": 1800
       }
     ],
+    "seal": {
+      "param": "isoloom_sealed",
+      "steps": [
+        {
+          "id": "seal",
+          "note": "Closing the internet to the networks without it…",
+          "argv": [
+            "terraform",
+            "apply",
+            "-auto-approve",
+            "-input=false",
+            "-no-color"
+          ],
+          "env": {
+            "TF_DATA_DIR": "${run.state_dir}/.terraform",
+            "TF_INPUT": "0",
+            "TF_IN_AUTOMATION": "1",
+            "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+            "TF_VAR_slot": "${run.slot}",
+            "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+          },
+          "timeout_s": 3600
+        },
+        {
+          "id": "seal-reload",
+          "action": "ssh.run",
+          "with": {
+            "command": "sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'",
+            "host": "${outputs.ip}",
+            "user": "isoloom"
+          },
+          "timeout_s": 600
+        }
+      ]
+    },
     "status": {
       "id": "state",
       "action": "terraform.read_state"

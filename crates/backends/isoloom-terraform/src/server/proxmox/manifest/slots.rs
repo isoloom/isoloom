@@ -13,8 +13,11 @@ use isoloom_render::run_manifest::derived_switch;
 
 use crate::module::variable::Variable;
 
-/// The module's variables the runner sets itself (`steps`): never params.
-pub(super) const RUNNER_SET: [&str; 3] = ["slot", "ssh_public_key", "proxmox_ssh_private_key_file"];
+/// The run's seal switch, set by the runner once the machines are ready (`crate::server::router`).
+pub(super) const SEALED: &str = crate::cloud::vm::seal::SEALED;
+
+/// The module's variables the runner sets itself (`steps`): never params an embedder gives.
+pub(super) const RUNNER_SET: [&str; 4] = ["slot", "ssh_public_key", "proxmox_ssh_private_key_file", SEALED];
 
 /// The module's variable the inputs go in, one entry each.
 const INPUTS: &str = "inputs";
@@ -36,6 +39,11 @@ pub(super) fn params(variables: &[Variable], runners: &[CheckRunner]) -> Result<
         .map(param)
         .collect::<Result<_, _>>()?;
     out.extend(derived_switch(runners.iter().map(|r| r.step.id.clone()).collect())?);
+    if variables.iter().any(|v| v.name() == SEALED) {
+        // The runner sets it once the machines are ready; on a server the internet is closed at
+        // the router (`crate::server::router`).
+        out.push(crate::module::manifest::seal_param(SEALED, "router")?);
+    }
     Ok(out)
 }
 

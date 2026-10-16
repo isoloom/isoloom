@@ -41,14 +41,22 @@ fn hosts_of(machine: &str) -> Vec<(Ipv4Addr, Vec<String>)> {
 }
 
 #[test]
-fn a_linux_machine_names_the_others_but_windows_ones_and_those_on_no_network() {
+fn a_machine_names_itself_and_the_others_but_windows_ones_and_those_on_no_network() {
+    // Each machine resolves its own names in the zone too (`dns.private`), as the clouds do.
     let web = hosts_of("web");
-    assert_eq!(web, [(Ipv4Addr::new(10, 8, 0, 30), vec!["sql".to_owned()])]);
+    assert_eq!(
+        web,
+        [
+            (Ipv4Addr::new(10, 9, 0, 10), vec!["web".to_owned(), "www".to_owned()]),
+            (Ipv4Addr::new(10, 8, 0, 30), vec!["sql".to_owned()])
+        ]
+    );
     let files = hosts_of("files");
     assert_eq!(
         files,
         [
             (Ipv4Addr::new(10, 9, 0, 10), vec!["web".to_owned(), "www".to_owned()]),
+            (Ipv4Addr::new(10, 9, 0, 20), vec!["files".to_owned()]),
             (Ipv4Addr::new(10, 8, 0, 30), vec!["sql".to_owned()])
         ]
     );
@@ -149,8 +157,13 @@ fn a_machines_further_addresses_are_named_after_it_in_the_others_hosts() {
             .unwrap_or_default()
     };
     let a = |o: u8| (Ipv4Addr::new(10, 8, 0, o), vec!["a".to_owned()]);
-    assert_eq!(entries("c"), [a(10), a(11), a(12)], "a Linux machine leaves the Windows one out");
+    let c = (Ipv4Addr::new(10, 8, 0, 20), vec!["c".to_owned()]);
+    assert_eq!(
+        entries("c"),
+        [a(10), c.clone(), a(11), a(12)],
+        "a Linux machine names itself and leaves the Windows one out"
+    );
     let w = entries("w");
-    assert!(w.contains(&a(11)) && w.contains(&(Ipv4Addr::new(10, 8, 0, 20), vec!["c".to_owned()])), "{w:?}");
-    assert!(!entries("a").iter().any(|(_, names)| names == &["a".to_owned()]), "never itself");
+    assert!(w.contains(&a(11)) && w.contains(&c), "{w:?}");
+    assert!(entries("a").contains(&a(10)), "a machine names itself in the zone");
 }

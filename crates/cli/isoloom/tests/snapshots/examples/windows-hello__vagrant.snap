@@ -695,6 +695,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.unports([[80, 8082]]); IsoloomHyperV.prune(["isoloom-windows-hello-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
+    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('192.168.57.10 web01')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
     m.vm.provision "shell", name: "provision/iis.ps1", inline: "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/iis.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
     m.vm.provision "shell", name: "ready", inline: "New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"
   end

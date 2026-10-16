@@ -674,7 +674,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-supplier-portal-api-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "secrets", env: { "ISOLOOM_SECRET_INPUT_LAUNCH_TOKEN" => isoloom_b64(INPUTS["LAUNCH_TOKEN"]) }, inline: <<~'SH'
       set -e
       umask 077
@@ -879,7 +879,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.unports([[3206, 3206]]); IsoloomHyperV.prune(["isoloom-supplier-portal-api-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
+    m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "wait for database", inline: "i=0; until (bash -c '</dev/tcp/database/3207' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\""
     m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/web.sh'"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"

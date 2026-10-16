@@ -786,7 +786,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "disk", inline: "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }"
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.40.20.21 ws-01', '10.40.20.22 ws-02', '10.40.20.10 web01', '10.40.99.10 user')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
+    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.40.20.5 dc01', '10.40.20.21 ws-01', '10.40.20.22 ws-02', '10.40.20.10 web01', '10.40.99.10 user')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
     m.vm.provision "shell", name: "routes", inline: "route -p add 10.40.10.0 MASK 255.255.255.0 10.40.20.254; route -p add 10.40.99.0 MASK 255.255.255.0 10.40.20.254"
     m.vm.provision "shell", name: "ready", inline: "New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"
   end
@@ -910,7 +910,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "disk", inline: "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }"
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.40.20.5 dc01', '10.40.20.22 ws-02', '10.40.20.10 web01', '10.40.99.10 user')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
+    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.40.20.5 dc01', '10.40.20.21 ws-01', '10.40.20.22 ws-02', '10.40.20.10 web01', '10.40.99.10 user')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
     m.vm.provision "shell", name: "routes", inline: "route -p add 10.40.10.0 MASK 255.255.255.0 10.40.20.254; route -p add 10.40.99.0 MASK 255.255.255.0 10.40.20.254"
     m.vm.provision "shell", name: "wait for dc01", inline: "$t = (Get-Date).AddSeconds(900); foreach ($p in @(53, 88, 389, 445)) { while (-not (Test-NetConnection 'dc01' -Port $p -WarningAction SilentlyContinue).TcpTestSucceeded) { if ((Get-Date) -gt $t) { throw ('dc01 didn''t answer on port ' + $p) }; Start-Sleep 5 } }; 'dc01 answers'"
     m.vm.provision "shell", name: "ready", inline: "New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"
@@ -1035,7 +1035,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "shell", name: "disk", inline: "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }"
     m.vm.provision "isoloom_project", name: "project"
-    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.40.20.5 dc01', '10.40.20.21 ws-01', '10.40.20.10 web01', '10.40.99.10 user')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
+    m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.40.20.5 dc01', '10.40.20.21 ws-01', '10.40.20.22 ws-02', '10.40.20.10 web01', '10.40.99.10 user')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
     m.vm.provision "shell", name: "routes", inline: "route -p add 10.40.10.0 MASK 255.255.255.0 10.40.20.254; route -p add 10.40.99.0 MASK 255.255.255.0 10.40.20.254"
     m.vm.provision "shell", name: "wait for dc01", inline: "$t = (Get-Date).AddSeconds(900); foreach ($p in @(53, 88, 389, 445)) { while (-not (Test-NetConnection 'dc01' -Port $p -WarningAction SilentlyContinue).TcpTestSucceeded) { if ((Get-Date) -gt $t) { throw ('dc01 didn''t answer on port ' + $p) }; Start-Sleep 5 } }; 'dc01 answers'"
     m.vm.provision "shell", name: "ready", inline: "New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"

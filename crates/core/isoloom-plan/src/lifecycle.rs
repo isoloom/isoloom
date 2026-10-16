@@ -240,15 +240,17 @@ fn ipv6_step(spec: &Spec, m: &Machine) -> Option<Step> {
     (!addresses.is_empty() || !routes.is_empty()).then_some(Step::Ipv6 { addresses, routes })
 }
 
-/// The other machines by name (and under the private zone's domain, with `dns.private`). A Linux machine leaves the Windows ones out: in a domain they are
-/// reached through AD DNS, and a short name in /etc/hosts shadows it (a realm join then fails
-/// the Kerberos SPN lookup, "Server not found").
+/// This machine and the others by name (and under the private zone's domain, with `dns.private`),
+/// so a machine resolves its own names in the zone too, as the clouds' private DNS does. A Linux
+/// machine leaves the Windows ones out: in a domain they are reached through AD DNS, and a short
+/// name in /etc/hosts shadows it (a realm join then fails the Kerberos SPN lookup, "Server not
+/// found").
 fn hosts(spec: &Spec, name: &str) -> Step {
     let linux = !spec.machines.get(name).is_some_and(windows);
     let entries = spec
         .machines
         .iter()
-        .filter(|(o, om)| o.as_str() != name && !om.networks.is_empty() && !(linux && windows(om)))
+        .filter(|(_, om)| !(om.networks.is_empty() || linux && windows(om)))
         .map(|(o, om)| {
             let names = std::iter::once(o.clone()).chain(om.aliases.iter().cloned()).collect();
             (address_for(spec, name, o), crate::private_dns::with_domain(spec, names))

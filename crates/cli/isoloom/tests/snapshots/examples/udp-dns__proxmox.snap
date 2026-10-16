@@ -296,6 +296,12 @@ variable "ssh_public_key" {
   description = "Installed for the user `isoloom` on every VM"
 }
 
+variable "isoloom_sealed" {
+  type        = bool
+  default     = false
+  description = "Close the internet to the machines of every `internet: false` network, at the network: the runner sets it once the machines are set up"
+}
+
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
   api_token = var.proxmox_api_token != "" ? var.proxmox_api_token : null
@@ -407,9 +413,13 @@ resource "proxmox_virtual_environment_file" "router" {
         },
         {
           path    = "/etc/nftables.conf"
-          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 meta l4proto { tcp, udp } th dport { 53 } accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 icmp type echo-request accept\n    ip daddr 10.66.10.53 udp dport 53 ct status dnat accept\n    ip saddr { 10.66.10.0/24, 10.66.20.0/24 } ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.66.10.0/24, 10.66.20.0/24 } udp dport 10053 dnat ip to 10.66.10.53:53\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.66.10.0/24, 10.66.20.0/24 } ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } masquerade\n  }\n}\n"
+          content = var.isoloom_sealed ? "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 meta l4proto { tcp, udp } th dport { 53 } accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 icmp type echo-request accept\n    ip daddr 10.66.10.53 udp dport 53 ct status dnat accept\n    ip daddr { 10.66.10.0/24, 10.66.20.0/24 } drop\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.66.10.0/24, 10.66.20.0/24 } udp dport 10053 dnat ip to 10.66.10.53:53\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n  }\n}\n" : "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 meta l4proto { tcp, udp } th dport { 53 } accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 icmp type echo-request accept\n    ip daddr 10.66.10.53 udp dport 53 ct status dnat accept\n    ip saddr { 10.66.10.0/24, 10.66.20.0/24 } ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.66.10.0/24, 10.66.20.0/24 } udp dport 10053 dnat ip to 10.66.10.53:53\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.66.10.0/24, 10.66.20.0/24 } ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } masquerade\n  }\n}\n"
         },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
+        {
+          path    = "/etc/nftables.sealed.nft"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 meta l4proto { tcp, udp } th dport { 53 } accept\n    ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 icmp type echo-request accept\n    ip daddr 10.66.10.53 udp dport 53 ct status dnat accept\n    ip daddr { 10.66.10.0/24, 10.66.20.0/24 } drop\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.66.10.0/24, 10.66.20.0/24 } udp dport 10053 dnat ip to 10.66.10.53:53\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n  }\n}\n"
+        },
         {
           path = "/etc/systemd/network/20-servers.network"
           content = join("\n", [
@@ -521,7 +531,7 @@ resource "proxmox_virtual_environment_file" "dns" {
       write_files = local.project_files
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.66.20.0/24 via 10.66.10.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: provision/dns.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/dns.sh'\\''' || { echo 'failed: provision/dns.sh' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: closing the internet' > /var/lib/isoloom/ready; sh -c 'pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\nprintf '\\''%s\\n'\\'' '\\''table inet isoloom-egress'\\'' '\\''delete table inet isoloom-egress'\\'' '\\''table inet isoloom-egress {'\\'' '\\''  chain output {'\\'' '\\''    type filter hook output priority 0; policy accept;'\\'' '\\''    oifname \"lo\" accept'\\'' '\\''    ip daddr != { 10.66.10.0/24, 10.66.20.0/24 } ct state new drop'\\'' '\\''  }'\\'' '\\''}'\\'' > /etc/isoloom-egress.nft\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/egress.sh <<'\\''EGRESS'\\''\n#!/bin/sh\n# No new connection leaves the isoloom networks\nnft -f /etc/isoloom-egress.nft\nexit 0\nEGRESS\nchmod +x /etc/isoloom/egress.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-egress.service <<'\\''UNIT'\\''\n[Unit]\nDescription=No new connection leaves the isoloom networks\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/egress.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-egress.service\nsystemctl restart isoloom-egress.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/egress.sh /etc/local.d/isoloom-egress.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/egress.sh || true\nfi' || { echo 'failed: closing the internet' > /var/lib/isoloom/ready; exit 1; }",
@@ -641,7 +651,7 @@ resource "proxmox_virtual_environment_file" "client" {
       write_files = local.project_files
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.66.10.53 dns'\\'' '\\''10.66.20.10 client'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.66.10.0/24 via 10.66.20.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for dns' > /var/lib/isoloom/ready; sh -c 'i=0; until (bash -c '\\''</dev/tcp/dns/53'\\'' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\"' || { echo 'failed: waiting for dns' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: provision/client.sh' > /var/lib/isoloom/ready; sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/client.sh'\\''' || { echo 'failed: provision/client.sh' > /var/lib/isoloom/ready; exit 1; }",
@@ -974,6 +984,22 @@ locals {
           ]
         }
       ]
+    },
+    {
+      "name": "isoloom_sealed",
+      "description": "true once the machines are set up: the internet is closed to the `internet: false` networks, at the router.",
+      "default": "false",
+      "values": [
+        "true",
+        "false"
+      ],
+      "set_by": "runner",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "isoloom_sealed"
+        }
+      ]
     }
   ],
   "secrets": [
@@ -1157,6 +1183,41 @@ locals {
         "timeout_s": 1800
       }
     ],
+    "seal": {
+      "param": "isoloom_sealed",
+      "steps": [
+        {
+          "id": "seal",
+          "note": "Closing the internet to the networks without it…",
+          "argv": [
+            "terraform",
+            "apply",
+            "-auto-approve",
+            "-input=false",
+            "-no-color"
+          ],
+          "env": {
+            "TF_DATA_DIR": "${run.state_dir}/.terraform",
+            "TF_INPUT": "0",
+            "TF_IN_AUTOMATION": "1",
+            "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
+            "TF_VAR_slot": "${run.slot}",
+            "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+          },
+          "timeout_s": 3600
+        },
+        {
+          "id": "seal-reload",
+          "action": "ssh.run",
+          "with": {
+            "command": "sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'",
+            "host": "${outputs.ip}",
+            "user": "isoloom"
+          },
+          "timeout_s": 600
+        }
+      ]
+    },
     "status": {
       "id": "state",
       "action": "terraform.read_state"

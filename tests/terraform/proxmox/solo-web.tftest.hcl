@@ -127,15 +127,15 @@ run "web_reports_its_set_up_in_the_ready_file" {
   command = plan
 
   assert {
-    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 3) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready; ", l)[0]] == ["provision/web.sh", "health check"]
-    error_message = "web's steps must each say `running: <step>` in the ready file first"
+    condition     = [for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 4) : regex("^echo 'running: ([^']*)' > /var/lib/isoloom/ready; ", l)[0]] == ["hosts file", "provision/web.sh", "health check"]
+    error_message = "web's steps must each say `running: <step>` in the ready file first (its own name in the zone among them)"
   }
   assert {
-    condition     = alltrue([for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 3) : regex("^echo 'running: ([^']*)'", l)[0] == regex("\\|\\| \\{ echo 'failed: ([^']*)' > /var/lib/isoloom/ready; exit 1; \\}$", l)[0]])
+    condition     = alltrue([for l in slice(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 1, 4) : regex("^echo 'running: ([^']*)'", l)[0] == regex("\\|\\| \\{ echo 'failed: ([^']*)' > /var/lib/isoloom/ready; exit 1; \\}$", l)[0]])
     error_message = "each of web's steps must write `failed: <step>` and stop when it fails"
   }
   assert {
-    condition     = strcontains(element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 2), "echo ready > /var/lib/isoloom/ready")
+    condition     = strcontains(element(yamldecode(trimprefix(proxmox_virtual_environment_file.web.source_raw[0].data, "#cloud-config\n")).runcmd, 3), "echo ready > /var/lib/isoloom/ready")
     error_message = "web's set-up must end by writing `ready`"
   }
 }

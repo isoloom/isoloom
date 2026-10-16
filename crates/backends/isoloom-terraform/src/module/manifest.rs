@@ -113,6 +113,24 @@ pub(crate) fn param(v: &Variable, required: bool) -> Result<Param, ManifestError
     })
 }
 
+/// The seal's run-manifest param (`crate::cloud::vm::seal`): the runner sets it `true` once the
+/// machines are set up (its default is `false`), delivered to the module's `isoloom_sealed`
+/// Terraform variable. `closed_at` names where the internet is closed for the description (the
+/// clouds' "network", a server's "router").
+pub(crate) fn seal_param(name: &str, closed_at: &str) -> Result<Param, ManifestError> {
+    Ok(Param {
+        name: EnvName::parse(name)?,
+        description: format!("true once the machines are set up: the internet is closed to the `internet: false` networks, at the {closed_at}."),
+        default: Some("false".into()),
+        values: vec!["true".into(), "false".into()],
+        required: false,
+        hosts: BTreeSet::new(),
+        providers: BTreeSet::new(),
+        set_by: SetBy::Runner,
+        deliver: tf_var_string(name)?,
+    })
+}
+
 /// The VMs that read the launch-time input `name`, in start order (empty: none do).
 pub(crate) fn input_readers(env: &Environment, name: &str) -> Result<Vec<Name>, ManifestError> {
     vms(env)

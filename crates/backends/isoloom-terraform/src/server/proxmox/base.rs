@@ -74,6 +74,9 @@ fn applier(vnets: Vec<Expression>) -> Block {
 pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     [
         own_variables(),
+        // The seal, as on the clouds: set once the machines are set up, it closes the internet to
+        // the `internet: false` networks at the router (`crate::server::router`).
+        crate::cloud::vm::seal::variable(env).into_iter().collect(),
         super::windows::variables(env),
         super::lxc::variables(env),
         super::virtiofs::variables(env),

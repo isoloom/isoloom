@@ -94,6 +94,8 @@ pub(crate) fn depends_on(env: &Environment, mp: &MachinePlan) -> Vec<Expression>
 fn parts(m: &Machine) -> Vec<Vec<Expression>> {
     let (Remote { env, name, plan, .. }, hooks) = (&m.remote, &m.hooks);
     let mut first: Vec<Template> = vec!["set -e".into(), CLOUD_INIT_WAIT.into()];
+    // The ready file's folder, before the first step's progress mark (`tracked_step`).
+    first.push(Shell::Sudo.command(&format!("mkdir -p {}", cloud_init::READY_DIR)).into());
     if controller::needed(env) {
         first.push(controller::authorize());
     }
@@ -112,9 +114,12 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
             next.extend(hooks.after_reboot.iter().chain(&hooks.at_boot).cloned());
             next.extend(again.iter().cloned());
             done.push(std::mem::replace(&mut part, next));
-        } else if let Some(c) = Shell::Sudo.step(env, name, step) {
-            if at_every_boot(step) {
-                again.push(c.clone().into());
+        } else if let Some(c) = Shell::Sudo.tracked_step(env, name, step) {
+            if at_every_boot(step)
+                && let Some(raw) = Shell::Sudo.step(env, name, step)
+            {
+                // Re-run after a reboot (the interfaces), without a repeated progress mark.
+                again.push(raw.into());
             }
             part.push(c.into());
         }

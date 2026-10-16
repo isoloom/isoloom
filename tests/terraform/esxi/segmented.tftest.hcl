@@ -185,15 +185,46 @@ run "a_slot_beyond_vmware_s_static_macs_is_refused" {
   expect_failures = [var.slot]
 }
 
-# The spec: `back` has `internet: false`, so its machines may not reach the internet. The router
-# forwards and masquerades every network to the internet (machines install their software, and
-# an offline machine is meant to block the internet itself once set up), so nothing outside cache
-# stops it.
-run "known_bug_the_router_forwards_a_network_without_internet_to_it" {
+# The spec: `back` has `internet: false`. During set-up the router forwards and masquerades every
+# network to the internet (machines install their software); once the run is sealed
+# (`isoloom_sealed`, the runner's second apply after ready, as on the clouds), the router's
+# ruleset drops back from the internet forward and NAT, and drops what crosses into back from
+# elsewhere, so back keeps only its `reach` rules and has no way out. ESXi has no per-VM firewall,
+# so the router is the only thing between the networks: the drop is what isolates back when sealed.
+run "the_router_seals_an_internet_false_network_at_the_network_once_set_up" {
   command = plan
 
+  variables {
+    isoloom_sealed = true
+  }
+
+  assert {
+    condition = split("\n", one([for f in yamldecode(trimprefix(base64decode(esxi_guest.isoloom_router.guestinfo["userdata"]), "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) == tolist([
+      "flush ruleset",
+      "table inet isoloom {",
+      "  chain forward {",
+      "    type filter hook forward priority 0; policy drop;",
+      "    ct state established,related accept",
+      "    ip saddr 10.61.99.0/24 ip daddr 10.61.10.0/24 accept",
+      "    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 meta l4proto { tcp, udp } th dport { 6379 } accept",
+      "    ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 icmp type echo-request accept",
+      "    ip daddr { 10.61.20.0/24 } drop",
+      "    ip saddr { 10.61.10.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.99.0/24 } accept",
+      "  }",
+      "  chain prerouting {",
+      "    type nat hook prerouting priority -100;",
+      "  }",
+      "  chain postrouting {",
+      "    type nat hook postrouting priority 100;",
+      "    ip saddr { 10.61.10.0/24, 10.61.99.0/24 } ip daddr != { 10.61.10.0/24, 10.61.99.0/24 } masquerade",
+      "  }",
+      "}",
+      "",
+    ])
+    error_message = "once sealed, the router must keep the reach rules but drop back (internet: false) from the internet forward and NAT, and drop what crosses into it"
+  }
   assert {
     condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(base64decode(esxi_guest.isoloom_router.guestinfo["userdata"]), "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0
-    error_message = "the router must not forward nor masquerade back (internet: false) to the internet"
+    error_message = "once sealed, the router must not forward nor masquerade back (internet: false) to the internet"
   }
 }

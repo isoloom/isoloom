@@ -91,7 +91,9 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
 /// Terraform makes the VM (`init`, `apply`), then it is readied over SSH ([`into_vm`]) and Compose
 /// starts in it (`guest.start`).
 fn lifecycle(guest: &GuestCompose, way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Lifecycle, ManifestError> {
-    let mut lifecycle = steps::lifecycle()?;
+    // docker-vm is a single Docker host VM with no router to seal; the internet seal is the
+    // Compose layer's (the guest), not a second apply here.
+    let mut lifecycle = steps::lifecycle(false)?;
     let mut up = lifecycle.up.as_slice().to_vec();
     up.extend(into_vm(way_in, &RelPath::parse(SETUP)?, "../../..")?);
     up.extend(steps_of(&guest.start, way_in)?);
