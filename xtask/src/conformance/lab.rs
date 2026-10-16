@@ -163,7 +163,11 @@ pub(super) fn cloud_config(family: Family) -> Res<String> {
         let Step::Configure { resources, fresh } = step else { continue };
         let carried = cloud_init::configure(&c, resources, *fresh, index);
         let f = &carried.file;
-        writeln!(files, "  - path: {}\n    encoding: gz+b64\n    permissions: \"{}\"\n    content: {}", f.path, f.permissions, f.content)?;
+        writeln!(
+            files,
+            "  - path: {}\n    encoding: gz+b64\n    permissions: \"{}\"\n    content: {}",
+            f.path, f.permissions, f.content
+        )?;
         writeln!(runcmd, "  - [sh, {}]", f.path)?;
     }
     if files.is_empty() {
@@ -174,7 +178,9 @@ pub(super) fn cloud_config(family: Family) -> Res<String> {
     // which breaks apt before the recipe's `runcmd` runs. A real VM resolves its mirror, so the
     // production renderer leaves this out; here it keeps the carrier (write_files + runcmd) the
     // thing under test.
-    Ok(format!("#cloud-config\napt:\n  preserve_sources_list: true\nwrite_files:\n{files}runcmd:\n{runcmd}"))
+    Ok(format!(
+        "#cloud-config\napt:\n  preserve_sources_list: true\nwrite_files:\n{files}runcmd:\n{runcmd}"
+    ))
 }
 
 /// The Dockerfile rendering: the container's Dockerfile and the files it builds with.
