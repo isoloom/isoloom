@@ -2,12 +2,12 @@
 //! static public address, a security group, and a Debian VM.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list, number, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, number, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{provider, variables};
-use crate::cloud::docker::{Driver, SizeVariable};
-use crate::docker_host::{Access, AutoStop, port_strings, published, tcp_ports};
+use crate::cloud::docker::{Driver, Host, SizeVariable};
+use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
@@ -20,20 +20,19 @@ pub(crate) const DRIVER: Driver = Driver {
     }),
     provider,
     resources,
+    user: "isoloom",
 };
 
-/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
-/// it.
-fn resources(env: &Environment, m: &mut Module) -> Access {
+/// The cloud's resources, after the module's head, `custom_data` in the VM (read by
+/// cloud-init); the host they make.
+fn resources(env: &Environment, m: &mut Module, custom_data: Expression) -> Host {
     m.blocks(network());
     m.block(security_group(env));
     m.blocks(interface());
-    m.block(vm());
-    Access {
-        host: reference("azurerm_public_ip.env.ip_address"),
+    m.block(vm(custom_data));
+    Host {
+        address: reference("azurerm_public_ip.env.ip_address"),
         user: "isoloom",
-        replace_on: reference("azurerm_linux_virtual_machine.env.id"),
-        auto_stop: AutoStop::SetUp,
     }
 }
 
@@ -120,10 +119,11 @@ fn interface() -> Vec<Block> {
     ]
 }
 
-/// Debian 12, the `isoloom` user with the operator's key.
-fn vm() -> Block {
+/// Debian 12, the `isoloom` user with the runner's key, set up from its custom data.
+fn vm(custom_data: Expression) -> Block {
     placed("azurerm_linux_virtual_machine")
         .add_attribute(("size", reference("var.size")))
+        .add_attribute(("custom_data", call("base64encode", [custom_data])))
         .add_attribute(("admin_username", string("isoloom")))
         .add_attribute(("network_interface_ids", list([reference("azurerm_network_interface.env.id")])))
         .add_block(

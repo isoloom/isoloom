@@ -9,19 +9,30 @@ use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, index, reference, string};
 
 use crate::cloud::instance;
+use crate::module::variable::Variable;
 
 /// The shape every instance has: AMD, sized by its configuration.
 pub(crate) const SHAPE: &str = "VM.Standard.E4.Flex";
 
-/// The provider, in the region, and the free-form tags every resource carries (`local.tags`).
+/// The provider, in the region, signing in with the OCI CLI configuration's profile, and the
+/// free-form tags every resource carries (`local.tags`).
 pub(crate) fn provider(env: &Environment, m: &mut Module) -> Vec<(&'static str, Expression)> {
     m.block(
         Block::builder("provider")
             .add_label("oci")
             .add_attribute(("region", reference("var.region")))
+            .add_attribute(("config_file_profile", reference("var.config_file_profile")))
             .build(),
     );
     vec![("tags", instance::tags_when_set(env))]
+}
+
+/// The OCI CLI configuration's profile the provider reads (`~/.oci/config`), a variable so a run
+/// records it and its destroy uses the same.
+pub(crate) fn profile() -> Variable {
+    Variable::new("config_file_profile", "string")
+        .default(string("DEFAULT"))
+        .describe("The profile of the OCI CLI's configuration (~/.oci/config) the provider signs in with")
 }
 
 /// A resource or data source in the compartment.

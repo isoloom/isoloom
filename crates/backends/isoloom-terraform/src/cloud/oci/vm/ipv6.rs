@@ -3,16 +3,13 @@
 //! - `static` (the default): the VNIC takes the address derived from the machine's octet in the
 //!   subnet's prefix, and the plan's IPv6 step puts it on the interface, as on every VM target.
 //! - `auto`: Oracle Cloud picks a free address in the subnet's prefix. The machine's set-up reads
-//!   it back from Terraform (the primary VNIC's, which the provider derives from the VNIC when the
-//!   module names none; a secondary VNIC's, from its `oci_core_vnic`) and puts it on the
-//!   interface holding the machine's IPv4 address there, at every boot.
+//!   it from the instance's metadata service (`super::metadata`) and puts it on the interface
+//!   holding the machine's IPv4 address there, at every boot.
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Template, attr, boolean, index, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Template, boolean, string};
 use isoloom_spec::model::Ipv6Addresses;
 use isoloom_spec::validate::IPV6_PREFIX;
-
-use crate::module::ident;
 
 /// Whether `net` is dual-stack and leaves its machines' addresses to Oracle Cloud.
 fn auto(env: &Environment, net: &str) -> bool {
@@ -41,34 +38,22 @@ pub(super) fn vnic(env: &Environment, mp: &MachinePlan, net: &str, b: BlockBuild
 }
 
 /// The commands putting each address Oracle Cloud picked (`auto` networks) on its interface,
-/// found by the machine's IPv4 address there: run after the extra interfaces are up.
-pub(super) fn at_boot(env: &Environment, name: &str, mp: &MachinePlan) -> Vec<Template> {
-    let id = ident(name);
+/// found by the machine's IPv4 address there, the address read from the instance's metadata
+/// service: run after the extra interfaces are up.
+pub(super) fn at_boot(env: &Environment, mp: &MachinePlan) -> Vec<Template> {
     mp.addresses
         .iter()
-        .enumerate()
-        .filter(|(_, (net, _))| auto(env, net))
-        .map(|(i, (net, v4))| {
-            let address = if i == 0 {
-                let details = index(reference(&format!("oci_core_instance.{id}.create_vnic_details")), 0);
-                attr(index(attr(details, "ipv6address_ipv6subnet_cidr_pair_details"), 0), "ipv6address")
-            } else {
-                index(reference(&format!("data.oci_core_vnic.{id}_{}.ipv6addresses", ident(net))), 0)
-            };
-            put(&v4.to_string(), address)
-        })
+        .filter(|(net, _)| auto(env, net))
+        .map(|(_, v4)| put(&v4.to_string(), &super::metadata::ipv6(*v4)))
         .collect()
 }
 
-/// `address` on the interface holding `v4`, IPv6 on there first.
-fn put(v4: &str, address: Expression) -> Template {
+/// `address` (shell text printing it) on the interface holding `v4`, IPv6 on there first.
+fn put(v4: &str, address: &str) -> Template {
     Template::text(format!(
-        "IF=$(ip -o -4 addr show | grep -F ' inet {v4}/' | awk '{{print $2; exit}}'); sudo sysctl -q -w \"net.ipv6.conf.$IF.disable_ipv6=0\" && sudo ip -6 addr replace "
+        "IF=$(ip -o -4 addr show | grep -F ' inet {v4}/' | awk '{{print $2; exit}}'); sudo sysctl -q -w \"net.ipv6.conf.$IF.disable_ipv6=0\" && sudo ip -6 addr replace {address}/{IPV6_PREFIX} dev \"$IF\" nodad"
     ))
-    .with_expr(address)
-    .with_text(format!("/{IPV6_PREFIX} dev \"$IF\" nodad"))
 }
-
 /// Why a machine's derived address can't be had, if one can't: Oracle Cloud keeps the first four
 /// addresses of a subnet's prefix (and its last four, which no octet reaches).
 pub(super) fn refusal(env: &Environment) -> Option<String> {

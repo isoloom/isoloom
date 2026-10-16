@@ -6,15 +6,16 @@ expression: "module(Cloud::DigitalOcean, \"solo-web\")?"
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
 # Auth:   export DIGITALOCEAN_TOKEN=<token>
 # Start:  terraform -chdir=.isoloom/cloud-vm/digitalocean init && terraform -chdir=.isoloom/cloud-vm/digitalocean apply \
-#           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)" -var ssh_private_key_file=~/.ssh/id_ed25519
+#           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-vm/digitalocean destroy (same variables)
+# Then:   the machines wait for the project: run the lab through the Isothrum runner (run.json
+#         beside this file), which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
   required_version = ">= 1.6"
   backend "local" {}
   required_providers {
     digitalocean = { source = "digitalocean/digitalocean", version = "~> 2.103.0" }
-    local        = { source = "hashicorp/local", version = "~> 2.9.1" }
   }
 }
 
@@ -29,24 +30,14 @@ variable "allowed_cidr" {
 }
 
 variable "ssh_public_key" {
-  type = string
-}
-
-variable "ssh_private_key_file" {
   type        = string
-  description = "The private key of ssh_public_key: Terraform sets the machines up over SSH"
-}
-
-variable "auto_stop_minutes" {
-  type        = number
-  default     = 0
-  description = "Shut the machines down after this many minutes (0: never)"
+  description = "The key the machines let in: the Isothrum runner's (it delivers the project and runs the checks over SSH)"
 }
 
 variable "expires_at" {
   type        = string
   default     = ""
-  description = "When the environment should end, in Unix seconds (empty: no end), as a tag on every resource so a reaper can find what to destroy"
+  description = "When the environment should end, in Unix seconds (empty: no end): a tag on every resource, so a reaper finds what to destroy, and the time the machines shut themselves down"
 }
 
 provider "digitalocean" {}
@@ -60,7 +51,6 @@ resource "terraform_data" "id" {
 
 locals {
   name = "isoloom-solo-web-${terraform_data.id.output}"
-  root = abspath("${path.module}/../../..")
 }
 
 # The environment's network: a VPC with the lab network's range. DigitalOcean assigns the
@@ -83,7 +73,7 @@ resource "digitalocean_droplet" "web" {
   image     = "debian-12-x64"
   vpc_uuid  = digitalocean_vpc.env.id
   ssh_keys  = [digitalocean_ssh_key.env.fingerprint]
-  user_data = var.auto_stop_minutes > 0 ? "#!/bin/sh\nshutdown -h +${var.auto_stop_minutes}\n" : null
+  user_data = "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in /var/lib/isoloom/ready (isoloom-ready/1), its output in /var/log/isoloom-setup.log. The Isothrum runner delivers the project over SSH.\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/setup.sh.new <<'ISOLOOM_SETUP'\n#!/bin/sh\numask 022\ncase \"$(head -n1 /var/lib/isoloom/ready 2>/dev/null)\" in ready|failed:*) exit 0 ;; esac\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\npart=$(cat /var/lib/isoloom/part 2>/dev/null || echo 1)\nif [ \"$part\" = 1 ]; then\necho 'running: waiting for the project (the runner delivers it over SSH)' > /var/lib/isoloom/ready; { i=0; until [ -f /var/lib/isoloom/project-delivered ]; do i=$((i+5)); if [ $i -gt 2400 ]; then echo 'the project never came: start the lab through the Isothrum runner (run.json), which delivers it over SSH' >&2; exit 1; fi; sleep 5; done; } || { echo 'failed: waiting for the project (the runner delivers it over SSH)' > /var/lib/isoloom/ready; exit 1; }\necho 'running: provision/web.sh' > /var/lib/isoloom/ready; { sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''; } || { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }\necho 'running: published ports' > /var/lib/isoloom/ready; { command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables); } || { echo 'failed: published ports' > /var/lib/isoloom/ready; exit 1; }\necho 'running: published ports' > /var/lib/isoloom/ready; { sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting tcp dport 8080 redirect to :80; } || { echo 'failed: published ports' > /var/lib/isoloom/ready; exit 1; }\necho 'running: health check' > /var/lib/isoloom/ready; { sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'; } || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }\nfi\necho ready > /var/lib/isoloom/ready\nrm -f /var/lib/isoloom/part\ncommand -v systemctl >/dev/null && systemctl disable isoloom-setup.service >/dev/null 2>&1\nexit 0\nISOLOOM_SETUP\nmv -f /var/lib/isoloom/setup.sh.new /var/lib/isoloom/setup.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-setup.service <<'ISOLOOM_UNIT'\n[Unit]\nDescription=Isoloom: the machine's set-up\nWants=network-online.target\nAfter=network-online.target cloud-final.service google-startup-scripts.service\n\n[Service]\nType=oneshot\nExecStart=/bin/sh /var/lib/isoloom/setup.sh\nStandardOutput=append:/var/log/isoloom-setup.log\nStandardError=append:/var/log/isoloom-setup.log\nTimeoutStartSec=0\n\n[Install]\nWantedBy=multi-user.target\nISOLOOM_UNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-setup.service >/dev/null 2>&1\nsystemctl start --no-block isoloom-setup.service\nelse\nnohup sh /var/lib/isoloom/setup.sh >> /var/log/isoloom-setup.log 2>&1 &\nfi\n"
   tags      = concat(["isoloom", "solo-web", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
 }
 
@@ -131,37 +121,12 @@ resource "digitalocean_firewall" "web" {
   }
 }
 
-resource "terraform_data" "web" {
-  triggers_replace = [digitalocean_droplet.web.id]
-  connection {
-    type        = "ssh"
-    host        = digitalocean_droplet.web.ipv4_address
-    user        = "root"
-    private_key = file(pathexpand(var.ssh_private_key_file))
-    timeout     = "10m"
-  }
-  provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project-web.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
-  }
-  provisioner "file" {
-    source      = "${path.module}/.isoloom-project-web.tgz"
-    destination = "/tmp/isoloom-project.tgz"
-  }
-  provisioner "remote-exec" {
-    inline = [
-      "set -e",
-      "cloud-init status --wait >/dev/null 2>&1 || true",
-      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\'''",
-      "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
-      "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting { type nat hook prerouting priority -100; }' && sudo nft add rule ip isoloom-publish prerouting tcp dport 8080 redirect to :80",
-      "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
-    ]
-  }
-}
-
 output "machines" {
   value = { web = digitalocean_droplet.web.ipv4_address }
+}
+
+output "address_web" {
+  value = digitalocean_droplet.web.ipv4_address
 }
 
 output "ssh_users" {
@@ -178,31 +143,4 @@ output "ready_file" {
 
 output "published" {
   value = { "web/web" = "${digitalocean_droplet.web.ipv4_address}:8080" }
-}
-
-# The project's files the machines don't get: version control and the tools' state, and what
-# .isoloomignore at the project's root lists (gitignore-style: one pattern per line, `#` comments,
-# `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the middle
-# anchors the pattern at the root; `*`, `?`, `[abc]`, `**`; the last pattern matching a path, or
-# a folder it is in, decides). Read as regular expressions, as the Vagrantfiles do.
-locals {
-  project_ignore_lines = [for l in split("\n", replace(try(file("${local.root}/.isoloomignore"), ""), "\r", "")) : trimspace(l)]
-  project_ignore_pats  = [for l in local.project_ignore_lines : { keep = startswith(l, "!"), pat = trimprefix(l, "!") } if l != "" && !startswith(l, "#")]
-  project_ignore_globs = [for r in local.project_ignore_pats : merge(r, { glob = trimsuffix(trimsuffix(trimsuffix(r.pat, "/"), "/**"), "/") })]
-  project_ignore = [for r in local.project_ignore_globs : {
-    keep = r.keep
-    re = format(r.glob == r.pat ? "^%s(/|$)" : "^%s/", replace(replace(replace(replace(replace(replace(replace(replace(
-      length(split("/", r.glob)) > 1 ? trimprefix(r.glob, "/") : "**/${r.glob}",
-    "/[.+^$(){}|\\\\]/", "\\$0"), "[!", "[^"), "**/", "\u0001"), "**", "\u0002"), "*", "[^/]*"), "?", "[^/]"), "\u0001", "(.*/)?"), "\u0002", ".*"))
-  } if r.glob != ""]
-  # Each file: whether it goes (the last matching pattern decides; none: it goes).
-  project_keep    = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
-  project_ignored = [for f, keep in local.project_keep : f if !keep]
-}
-
-# What `tar` leaves out of the project's archive: .isoloomignore's files, from the archive's top
-# folder, their wildcard characters escaped.
-resource "local_file" "isoloom_project" {
-  filename = "${path.module}/.isoloom-project-ignored.txt"
-  content  = join("", [for f in local.project_ignored : "${replace("${basename(local.root)}/${f}", "/[\\\\*?\\[]/", "\\$0")}\n"])
 }

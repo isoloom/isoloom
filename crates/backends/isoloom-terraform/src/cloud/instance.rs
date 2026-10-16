@@ -33,20 +33,23 @@ fn named(env: &Environment) -> Vec<(&'static str, Expression)> {
 }
 
 /// The environment's random id (`terraform_data.id`) and the locals: its `name`, the project's
-/// `root`, then `extra`.
-pub(crate) fn id_and_locals(env: &Environment, extra: Vec<(&str, Expression)>) -> Vec<Block> {
+/// `root` when the module reads it (only when Terraform copies the project, `with_root`; the
+/// runner-delivered modules never read it, and a declared-but-unused local is a lint failure),
+/// then `extra`.
+pub(crate) fn id_and_locals(env: &Environment, extra: Vec<(&str, Expression)>, with_root: bool) -> Vec<Block> {
     let id = call("substr", [call("replace", [call("uuid", []), string("-"), string("")]), number(0), number(8)]);
     let name = Template::text(format!("isoloom-{}-", env.name))
         .with_expr(reference("terraform_data.id.output"))
         .into_expression();
-    let root = call(
-        "abspath",
-        [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
-    );
-    let locals = extra.into_iter().fold(
-        Block::builder("locals").add_attribute(("name", name)).add_attribute(("root", root)),
-        BlockBuilder::add_attribute,
-    );
+    let mut locals = Block::builder("locals").add_attribute(("name", name));
+    if with_root {
+        let root = call(
+            "abspath",
+            [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],
+        );
+        locals = locals.add_attribute(("root", root));
+    }
+    let locals = extra.into_iter().fold(locals, BlockBuilder::add_attribute);
     vec![
         Block::builder("resource")
             .add_label("terraform_data")

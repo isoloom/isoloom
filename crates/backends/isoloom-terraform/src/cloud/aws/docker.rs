@@ -1,15 +1,14 @@
 //! AWS's `cloud-docker` module: a VPC with one public subnet, a security group, and a Debian
-//! instance whose user data schedules the auto-stop (it terminates on shutdown).
+//! instance set up from its user data (it terminates on shutdown, so its expiry ends it).
 
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, null, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, call, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{ami, egress, first_zone, ingress, instance_type, key_pair, provider, region, route_out, zones};
-use crate::cloud::auto_stop;
-use crate::cloud::docker::{Driver, SizeVariable};
-use crate::docker_host::{Access, AutoStop, published};
+use crate::cloud::docker::{Driver, Host, SizeVariable};
+use crate::docker_host::published;
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
@@ -26,22 +25,21 @@ pub(crate) const DRIVER: Driver = Driver {
         Vec::new()
     },
     resources,
+    user: "admin",
 };
 
-/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
-/// it.
-fn resources(env: &Environment, m: &mut Module) -> Access {
+/// The cloud's resources, after the module's head, `user_data` in the instance; the host they
+/// make.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
     let size = HostSize::of(env);
     m.block(zones());
     m.block(ami("debian", "136693071363", "debian-12-amd64-*").build());
     m.blocks(network());
     m.block(security_group(env));
-    m.block(vm(size));
-    Access {
-        host: reference("aws_instance.env.public_ip"),
+    m.block(vm(size, user_data));
+    Host {
+        address: reference("aws_instance.env.public_ip"),
         user: "admin",
-        replace_on: reference("aws_instance.env.id"),
-        auto_stop: AutoStop::UserData,
     }
 }
 
@@ -111,8 +109,9 @@ fn security_group(env: &Environment) -> Block {
     b.add_block(egress()).build()
 }
 
-/// The instance: the auto-stop in its user data, terminated when it shuts down.
-fn vm(size: HostSize) -> Block {
+/// The instance: its set-up in its user data (gzipped: AWS takes 16 KB), terminated when it
+/// shuts down.
+fn vm(size: HostSize, user_data: Expression) -> Block {
     resource("aws_instance")
         .add_attribute(("ami", reference("data.aws_ami.debian.id")))
         .add_attribute(("instance_type", reference("var.instance_type")))
@@ -120,7 +119,7 @@ fn vm(size: HostSize) -> Block {
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
         .add_attribute(("vpc_security_group_ids", list([reference("aws_security_group.env.id")])))
         .add_attribute(("instance_initiated_shutdown_behavior", string("terminate")))
-        .add_attribute(("user_data", auto_stop::if_set(auto_stop::script(), null())))
+        .add_attribute(("user_data_base64", call("base64gzip", [user_data])))
         .add_block(
             Block::builder("root_block_device")
                 .add_attribute(("volume_size", number(size.disk_gb.into())))

@@ -4,13 +4,21 @@
 pub(crate) mod docker;
 pub(crate) mod vm;
 
-use isoloom_render::hcl_builder::{Block, Expression, string};
+use isoloom_render::hcl_builder::{Block, Expression, call, string};
 
 use crate::module::variable::Variable;
 
 /// The `region` variable: Paris by default.
-pub(crate) fn region() -> Block {
-    Variable::new("region", "string").default(string("fr-par")).block()
+pub(crate) fn region() -> Variable {
+    Variable::new("region", "string").default(string("fr-par"))
+}
+
+/// An instance's `metadata` block: its user data (base64), which cloud-init reads from Linode's
+/// metadata service.
+pub(crate) fn metadata(user_data: Expression) -> Block {
+    Block::builder("metadata")
+        .add_attribute(("user_data", call("base64encode", [user_data])))
+        .build()
 }
 
 /// Which way a firewall rule applies.

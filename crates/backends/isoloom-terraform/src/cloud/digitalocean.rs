@@ -10,8 +10,8 @@ use crate::module::resource;
 use crate::module::variable::Variable;
 
 /// The `region` variable: Frankfurt by default.
-pub(crate) fn region() -> Block {
-    Variable::new("region", "string").default(string("fra1")).block()
+pub(crate) fn region() -> Variable {
+    Variable::new("region", "string").default(string("fra1"))
 }
 
 /// The VPC, `digitalocean_vpc.env`, with the range `ip_range`.

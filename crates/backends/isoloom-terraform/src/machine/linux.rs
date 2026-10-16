@@ -1,14 +1,19 @@
-//! A Linux machine set up over SSH by Terraform (`remote-exec`): the project's archive and the
-//! inputs file uploaded, then the machine's steps from the plan, each as a root command. A
-//! `reboot` step ends a provisioner; Terraform restarts the machine and the next one checks
-//! that it did before going on.
+//! A Linux machine's steps from the plan, each as a root command, in one of two transports:
+//!
+//! - **Over SSH by Terraform** ([`provisioner`], `remote-exec`): the project's archive and the
+//!   inputs file uploaded, then the steps. A `reboot` step ends a provisioner; Terraform restarts
+//!   the machine and the next one checks that it did before going on (ESXi).
+//! - **From its own user data** ([`set_up`], the clouds): the machine waits for the project the
+//!   Isothrum runner delivers, then runs the same steps itself (`super::user_data`), a `reboot`
+//!   step ending a part.
 
 use isoloom_plan::{Environment, MachinePlan, MachineShape, Step};
 use isoloom_render::hcl_builder::{Expression, Template, reference};
 use isoloom_render::steps;
 
 use super::provisioner::{Connection, Provisioner, Upload};
-use super::{Remote, Shell, at_every_boot, controller};
+use super::user_data::{SetUp, Tracked, expiry_shutdown, project_wait};
+use super::{Remote, Shell, at_every_boot, cloud_init, controller};
 use crate::module::{ident, inputs};
 
 pub(crate) use isoloom_render::steps::CLOUD_INIT_WAIT;
@@ -116,4 +121,51 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
     }
     done.push(part);
     done.into_iter().map(|p| p.into_iter().map(Template::into_expression).collect()).collect()
+}
+
+/// Machine `name`'s set-up from its own user data, logging in as `user`: the project the runner
+/// delivers, the controller's key, the launch inputs, `hooks.at_boot`, then the steps the
+/// platform doesn't do itself (`hooks.skip`), `hooks.before_egress` before the machine closes
+/// itself off. A `reboot` step ends a part; the next one starts with what a restart undid.
+pub(crate) fn set_up(env: &Environment, (name, mp): (&str, &MachinePlan), user: &str, hooks: &Hooks) -> SetUp {
+    let mut first = vec![project_wait()];
+    if controller::needed(env) {
+        first.push(Tracked::new("the controller's key", controller::authorize_as(user)));
+    }
+    let inputs: Vec<String> = mp.inputs.clone();
+    let mut again: Vec<Template> = Vec::new();
+    if !inputs.is_empty() {
+        let in_place = Template::text(format!("install -m 600 {} {}", steps::KEPT_INPUTS_FILE, steps::INPUTS_FILE));
+        first.push(Tracked::new("inputs", inputs::written(&inputs)));
+        first.push(Tracked::new("inputs in place", in_place.clone()));
+        again.push(in_place);
+    }
+    first.extend(hooks.at_boot.iter().map(|c| Tracked::new("the machine's interfaces", c.clone())));
+    again.extend(hooks.at_boot.iter().cloned());
+    let (mut parts, mut part) = (Vec::new(), first);
+    let mut closing = false;
+    for step in mp
+        .lifecycle
+        .iter()
+        .filter(|s| !(hooks.skip)(s) && !matches!(s, Step::Project | Step::Inputs { .. }))
+    {
+        if !closing && matches!(step, Step::Egress | Step::Tc | Step::Ready) {
+            part.extend(hooks.before_egress.iter().map(|c| Tracked::new("published ports", c.clone())));
+            closing = true;
+        }
+        if *step == Step::Reboot {
+            parts.push(std::mem::take(&mut part));
+        } else if let Some(c) = Shell::Root.step(env, name, step) {
+            if at_every_boot(step) {
+                again.push(c.clone().into());
+            }
+            part.push(Tracked::new(cloud_init::label(step), c));
+        }
+    }
+    parts.push(part);
+    SetUp {
+        each_boot: vec![expiry_shutdown()],
+        parts,
+        again,
+    }
 }

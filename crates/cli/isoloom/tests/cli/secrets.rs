@@ -169,14 +169,17 @@ fn no_secret_value_reaches_a_generated_file() -> Outcome {
     let pods = find(&generated, "kubernetes/environment.yaml")?;
     assert!(pods.contains("secretName: isoloom-secrets"), "{pods}");
     find(&generated, "resolved.json")?;
-    // A Docker host waits for the secrets the runner delivers, then hands them to Compose.
-    for host in ["docker-vm/Vagrantfile", "cloud-docker/aws/main.tf"] {
-        let text = find(&generated, host)?;
-        assert!(
-            text.contains("/var/lib/isoloom/secrets/.delivered") && text.contains("ISOLOOM_SECRET_DB_PASSWORD"),
-            "{host}"
-        );
-    }
+    // The docker-vm host waits for the secrets the runner delivers, then hands them to Compose.
+    let dvm = find(&generated, "docker-vm/Vagrantfile")?;
+    assert!(
+        dvm.contains("/var/lib/isoloom/secrets/.delivered") && dvm.contains("ISOLOOM_SECRET_DB_PASSWORD"),
+        "{dvm}"
+    );
+    // On cloud-docker, Terraform makes the VM only; the run manifest starts Compose over SSH with
+    // the containers' secrets forwarded to it (SendEnv), the value in no generated file.
+    let run = find(&generated, "cloud-docker/aws/run.json")?;
+    assert!(run.contains("ISOLOOM_SECRET_DB_PASSWORD") && run.contains("\"via\": \"env\""), "{run}");
+    assert!(!run.contains("/var/lib/isoloom/secrets/.delivered"), "{run}");
     Ok(())
 }
 

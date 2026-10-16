@@ -9,7 +9,7 @@ use isoloom_render::steps;
 use isoloom_spec::validate::Cidr;
 
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
-use crate::machine::cloud_init::{self, CloudConfig, READY_FILE, file};
+use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::machine::{Shell, controller, vms};
 use crate::module::ident;
 
@@ -32,7 +32,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         config.track("hosts file", &Shell::Root.command(&hosts));
     }
     config.track("installing Ansible", &Shell::Root.command(controller::ANSIBLE));
-    for (name, wait) in waits(env) {
+    for (name, wait) in controller::linux_waits(env, &|_| "isoloom".to_owned()) {
         config.track(&format!("waiting for {name}"), &wait);
     }
     for wait in controller::windows_waits(env) {
@@ -76,20 +76,4 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         folders: Vec::new(),
     };
     m.block(vm.block(env));
-}
-
-/// Each Linux machine's own set-up must be done (its ready file says `ready`) before the playbooks
-/// run: its name, and the wait.
-fn waits(env: &Environment) -> Vec<(String, String)> {
-    vms(env)
-        .filter(|(_, mp)| !mp.is_windows())
-        .filter_map(|(name, mp)| {
-            let a = mp.addresses.values().next()?;
-            // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
-            let wait = format!(
-                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@{a} head -n 1 {READY_FILE} 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
-            );
-            Some((name.to_owned(), Shell::Root.command(&wait)))
-        })
-        .collect()
 }

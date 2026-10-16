@@ -3,18 +3,16 @@
 //! ready file, read through the router); and its check runners, each piped to its machine over
 //! SSH through the router.
 
-use std::collections::BTreeMap;
-use std::num::NonZeroU32;
-
 use isoloom_manifest::{
     Action, Argv, CheckRunner, Condition, EnvName, Error as ManifestError, HostArgv, Lifecycle, Name, NonEmpty, Part, PathTemplate, Placeholder, Program,
-    ReadyGrammar, RelPath, RunVar, SnakeName, Step, StepId, Template,
+    ReadyGrammar, RelPath, RunVar, SnakeName, Step, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_plan::checks::by_position;
 use isoloom_render::run_manifest::{action_with, check, noted, run, timeout_s};
 
 use crate::machine::{controller, vms};
+use crate::module::manifest::{id, output, run_var, secs, terraform_env, words};
 use crate::server::router::check_host;
 
 /// The user every Linux VM and the router let in with the runner's key.
@@ -30,47 +28,18 @@ const PLAYBOOKS_S: u32 = 7200;
 /// How long a machine may stay out of reach over SSH before the run fails.
 const UNREACHABLE_S: u32 = 600;
 
-fn id(text: &str) -> Result<StepId, ManifestError> {
-    StepId::parse(text)
-}
-
-fn secs(n: u32) -> Option<NonZeroU32> {
-    NonZeroU32::new(n)
-}
-
-/// `${run.<var>}` and `${outputs.<name>}` within text.
-fn run_var(before: &str, var: RunVar, after: &str) -> Template {
-    Template::from_parts([Part::Text(before.into()), Part::Placeholder(Placeholder::Run(var)), Part::Text(after.into())])
-}
-
-fn output(name: &str) -> Result<Template, ManifestError> {
-    Ok(Template::from(Placeholder::Output(SnakeName::parse(name)?)))
-}
-
 /// A `terraform` step running `args` (`init`'s last one names the runner's state): its data
 /// folder in the run's state folder, no prompt, and the values the runner gives the module (its
 /// slot on the server, its key).
 fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &str) -> Result<Step, ManifestError> {
     let command = HostArgv::Every(Argv::new(Program::parse("terraform")?, args));
     let mut s = noted(run(step, command, timeout)?, note);
-    let env: [(&str, Template); 6] = [
-        ("TF_DATA_DIR", run_var("", RunVar::StateDir, "/.terraform")),
-        ("TF_IN_AUTOMATION", Template::text("1")),
-        ("TF_INPUT", Template::text("0")),
+    s.env = terraform_env(vec![
         ("TF_VAR_slot", Template::from(Placeholder::Run(RunVar::Slot))),
         ("TF_VAR_ssh_public_key", Template::from(Placeholder::Run(RunVar::SshPublicKey))),
         ("TF_VAR_proxmox_ssh_private_key_file", Template::from(Placeholder::Run(RunVar::SshKey))),
-    ];
-    s.env = env
-        .into_iter()
-        .map(|(k, v)| Ok((EnvName::parse(k)?, v)))
-        .collect::<Result<BTreeMap<_, _>, ManifestError>>()?;
+    ])?;
     Ok(s)
-}
-
-/// `words` as templates, each plain text.
-fn words(words: &[&str]) -> Vec<Template> {
-    words.iter().map(|w| Template::text(w)).collect()
 }
 
 /// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`).

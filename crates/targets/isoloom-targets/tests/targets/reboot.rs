@@ -120,31 +120,24 @@ fn proxmox_without_a_reboot_is_unchanged() -> Outcome {
 }
 
 #[test]
-fn the_clouds_reconnect_after_each_reboot() -> Outcome {
+fn the_clouds_resume_the_set_up_after_each_reboot() -> Outcome {
     for cloud in ["aws", "azure"] {
         let tf = file(Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
-        let box_ = from(&tf, "resource \"terraform_data\" \"box\"")?;
-        let box_ = before(box_, "\n}\n")?;
-        // Two restarts: each a provisioner whose dropped connection is expected.
-        assert_eq!(box_.matches("on_failure = continue").count(), 2, "{cloud}");
-        assert_eq!(box_.matches("sudo systemctl --no-block reboot").count(), 2, "{cloud}");
-        assert!(box_.contains("\"sudo touch /run/nologin\""), "{cloud}: no new login while it goes down");
-        // Each part after a restart checks the boot changed, brings its second interface up
-        // again and schedules the auto-stop again.
-        assert_eq!(box_.matches("the machine did not restart").count(), 2, "{cloud}");
-        assert_eq!(box_.matches("sudo ip addr add 10.70.1.10/24").count(), 3, "{cloud}");
-        assert_eq!(box_.matches("sudo shutdown -h +${var.auto_stop_minutes}").count(), 2, "{cloud}");
-        // The inputs leave /tmp (emptied at boot) before the first restart.
-        let kernel = at(box_, "sh kernel.sh")?;
-        assert!(
-            at(box_, "install -m 600 /tmp/isoloom-inputs.env /var/lib/isoloom/inputs.env")? < kernel,
-            "{cloud}"
-        );
-        assert!(!box_.contains(". /tmp/isoloom-inputs.env"), "{cloud}");
+        // The machine sets itself up from its user data: no Terraform connection to it.
+        assert!(!tf.contains("resource \"terraform_data\" \"box\""), "{cloud}");
+        assert!(tf.contains("isoloom-setup.service"), "{cloud}");
+        // Two restarts, each the end of a part its unit runs after the next boot.
+        assert_eq!(tf.matches("systemctl reboot").count(), 2, "{cloud}");
+        assert_eq!(tf.matches("if [ \\\"$part\\\" = ").count(), 3, "{cloud}");
+        // Each part after a restart brings its second interface up again (the first part brings
+        // it up too); the expiry is scheduled again at every boot, before any part.
+        assert_eq!(tf.matches("sudo ip addr add 10.70.1.10/24").count(), 3, "{cloud}");
+        assert!(at(&tf, "shutdown -h")? < at(&tf, "part=$(cat")?, "{cloud}");
         // Steps in order, each after its restart; the ready marker last.
-        let reboots: Vec<usize> = box_.match_indices("on_failure = continue").map(|(i, _)| i).collect();
-        assert!(kernel < reboots[0] && reboots[0] < at(box_, "sh middle.sh")? && at(box_, "sh middle.sh")? < reboots[1]);
-        assert!(reboots[1] < at(box_, "sh last.sh")? && at(box_, "sh last.sh")? < at(box_, "/var/lib/isoloom/ready")?);
+        let reboots: Vec<usize> = tf.match_indices("systemctl reboot").map(|(i, _)| i).collect();
+        let kernel = at(&tf, "sh kernel.sh")?;
+        assert!(kernel < reboots[0] && reboots[0] < at(&tf, "sh middle.sh")? && at(&tf, "sh middle.sh")? < reboots[1]);
+        assert!(reboots[1] < at(&tf, "sh last.sh")? && at(&tf, "sh last.sh")? < at(&tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?);
     }
     Ok(())
 }
@@ -162,10 +155,10 @@ fn every_cloud_driver_splits_the_set_up_at_a_reboot() -> Outcome {
             .find(|f| f.path.ends_with(&format!("cloud-vm/{cloud}/main.tf")))
             .unwrap_or_else(|| panic!("{cloud}"))
             .contents;
-        assert_eq!(tf.matches("on_failure = continue").count(), 1, "{cloud}");
-        let reboot = at(tf, "on_failure = continue")?;
+        assert_eq!(tf.matches("systemctl reboot").count(), 1, "{cloud}");
+        let reboot = at(tf, "systemctl reboot")?;
         assert!(at(tf, "sh kernel.sh")? < reboot && reboot < at(tf, "sh last.sh")?, "{cloud}");
-        assert!(at(tf, "sh last.sh")? < at(tf, "/var/lib/isoloom/ready")?, "{cloud}");
+        assert!(at(tf, "sh last.sh")? < at(tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?, "{cloud}");
     }
     Ok(())
 }

@@ -1,20 +1,19 @@
-//! Each machine's firewall rules, its instance and its set-up through the VM core; the
-//! controller's.
+//! Each machine's firewall rules and its instance, set up by its startup script through the VM
+//! core; the controller's.
 
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, null, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::vpc;
-use super::{NESTING, RULES, for_nics, image, machine_type, public_ip, user};
-use crate::cloud::auto_stop;
+use super::{NESTING, RULES, for_nics, image, machine_type, user};
 use crate::cloud::instance::{name_with, tags};
-use crate::cloud::vm::{disks, gateways, hooks, interfaces, nested, own_image, reach};
-use crate::machine::{Remote, controller, linux};
+use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, nested, own_image, reach, seal};
+use crate::machine::{controller, user_data};
 use crate::module::{ident, resource};
 
 /// A machine's machine type: its GPUs', else a nesting one, else by its memory, with room for an
@@ -39,7 +38,7 @@ fn at_boot(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>, gateway: O
     out
 }
 
-/// A Linux machine: what may reach it, its instance, its set-up over SSH.
+/// A Linux machine: what may reach it, its instance, set up by its startup script.
 pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
     if mp.addresses.is_empty() {
@@ -52,6 +51,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     }
     let os = mp.os.as_deref().unwrap_or_default();
     m.blocks(disks::gcp(name, &mp.disks));
+    let setup = hooks::user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses, Some(mp)));
     let mut vm = instance(&Instance {
         env,
         id: &id,
@@ -65,22 +65,10 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         on: (&mp.addresses, mp.is_gateway || mp.addresses.len() > 1),
         more: &mp.more_addresses,
         tpm: mp.tpm.is_some(),
+        setup,
     });
     vm.body.extend(disks::gcp_attached(name, &mp.disks));
     m.block(vm);
-    let hooks = hooks::of(mp, at_boot(env, &mp.addresses, Some(mp)));
-    let machine = linux::Machine {
-        remote: Remote {
-            env,
-            name,
-            plan: mp,
-            replace_on: reference(&format!("google_compute_instance.{id}.id")),
-            host: public_ip(&id),
-        },
-        user: user(os).to_owned(),
-        hooks,
-    };
-    m.block(linux::provisioner(machine).block());
 }
 
 /// Who may reach a machine, a rule per source (Google Cloud's firewall rules are a VPC's and
@@ -116,7 +104,36 @@ fn firewalls(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Vec<Block> 
     if !allows.is_empty() {
         out.push(firewall((&id, name), ("published", first), allowed(), allows));
     }
+    if seal::sealed(env, mp) {
+        for net in mp.addresses.keys() {
+            out.extend(sealed((&id, name), env, net));
+        }
+    }
     out
+}
+
+/// Once the run is sealed, a machine with no internet goes out to the lab's blocks only, in
+/// network `net`'s VPC: everything out denied, the lab's blocks allowed before it. A machine's
+/// replies to what came in are let out regardless (Google Cloud's firewall is stateful).
+fn sealed((id, who): (&str, &str), env: &Environment, net: &str) -> [Block; 2] {
+    let rule = |what: &str, priority: u64, to: Expression, verdict: Block| {
+        resource("google_compute_firewall", &format!("{id}_{what}_{}", ident(net)))
+            .add_attribute(("count", seal::when_sealed(number(1), number(0))))
+            .add_attribute(("project", reference("local.project")))
+            .add_attribute(("name", name_with(&format!("-{who}-{what}-{net}"))))
+            .add_attribute(("network", vpc(net)))
+            .add_attribute(("direction", string("EGRESS")))
+            .add_attribute(("priority", number(priority)))
+            .add_attribute(("destination_ranges", to))
+            .add_attribute(("target_tags", list([name_with(&format!("-{who}"))])))
+            .add_block(verdict)
+            .build()
+    };
+    let all = |verdict: &str| Block::builder(verdict).add_attribute(("protocol", string("all"))).build();
+    [
+        rule("lab", 900, seal::lab_blocks(env), all("allow")),
+        rule("sealed", 1000, list([string("0.0.0.0/0")]), all("deny")),
+    ]
 }
 
 /// A firewall rule in network `net`'s VPC letting `sources` in to the instances tagged
@@ -171,6 +188,8 @@ struct Instance<'a> {
     more: &'a IndexMap<String, Vec<Ipv4Addr>>,
     /// A shielded VM with a virtual TPM and secure boot (`vm.tpm`).
     tpm: bool,
+    /// Its set-up, as its startup script (run at every boot: the set-up stops once it ended).
+    setup: Expression,
 }
 
 /// A further address of the instance on its network: an alias range of one address, from the
@@ -182,8 +201,8 @@ fn alias(address: Ipv4Addr) -> Block {
         .build()
 }
 
-/// An instance at its address with a public one; its user from the `ssh-keys` metadata; the
-/// auto-stop scheduled at first boot.
+/// An instance at its address with a public one; its user from the `ssh-keys` metadata; its
+/// set-up as its startup script.
 fn instance(i: &Instance) -> Block {
     let (image, _) = image(i.os).unwrap_or_default();
     let user = user(i.os);
@@ -213,7 +232,7 @@ fn instance(i: &Instance) -> Block {
         .add_block(Block::builder("boot_disk").add_block(params.build()).build())
         .add_blocks(nics)
         .add_attribute(("metadata", object([("ssh-keys", key.into_expression())])))
-        .add_attribute(("metadata_startup_script", auto_stop::if_set(auto_stop::script(), null())))
+        .add_attribute(("metadata_startup_script", i.setup.clone()))
         .add_attribute(("labels", tags(i.env)));
     let b = if i.on.1 { b.add_attribute(("can_ip_forward", boolean(true))) } else { b };
     hardware(b, i).build()
@@ -242,8 +261,8 @@ fn hardware(mut b: BlockBuilder, i: &Instance) -> BlockBuilder {
 }
 
 /// The controller: what may reach it (every network, SSH from `allowed_cidr`), its instance
-/// with an interface on every network at the controller address, its set-up over SSH once every
-/// machine is set up.
+/// with an interface on every network at the controller address, set up by its startup script
+/// (it waits for every machine's own set-up before the playbooks).
 pub(super) fn controller(env: &Environment, m: &mut Module) {
     let id = "isoloom_controller";
     let Some(first) = env.networks.keys().next() else { return };
@@ -259,6 +278,9 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
     m.blocks(rules);
     m.block(firewall(who, ("ssh", first), list([reference("var.allowed_cidr")]), vec![allow("tcp", &[22])]));
     let (_, memory, disk) = controller::size(env);
+    let inventory = controller::cloud_inventory(env, |os| user(os).to_owned(), WinrmAuth::Basic);
+    let who_logs_in = |mp: &MachinePlan| user(mp.os.as_deref().unwrap_or_default()).to_owned();
+    let setup = controller_setup::set_up(env, &who_logs_in, inventory, &at_boot(env, &addresses, None));
     m.block(instance(&Instance {
         env,
         id,
@@ -272,14 +294,6 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
         on: (&addresses, addresses.len() > 1),
         more: &IndexMap::new(),
         tpm: false,
+        setup: user_data::expression(&setup),
     }));
-    let ssh = controller::Ssh {
-        env,
-        replace_on: reference(&format!("google_compute_instance.{id}.id")),
-        host: public_ip(id),
-        user: user(controller::OS).to_owned(),
-        at_boot: at_boot(env, &addresses, None),
-        inventory: controller::cloud_inventory(env, |os| user(os).to_owned(), WinrmAuth::Basic),
-    };
-    m.block(controller::provisioner(ssh).block());
 }

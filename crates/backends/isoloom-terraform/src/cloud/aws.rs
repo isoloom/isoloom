@@ -11,8 +11,8 @@ use crate::module::resource;
 use crate::module::variable::Variable;
 
 /// The `region` variable: Paris by default.
-pub(crate) fn region() -> Block {
-    Variable::new("region", "string").default(string("eu-west-3")).block()
+pub(crate) fn region() -> Variable {
+    Variable::new("region", "string").default(string("eu-west-3"))
 }
 
 /// The provider in the region, every resource tagged with `tags`.
@@ -85,11 +85,27 @@ pub(crate) fn ingress(description: &str, (from, to): (u16, u16), protocol: &str,
 
 /// A security group's way out: everything.
 pub(crate) fn egress() -> Block {
+    egress_to(list([string("0.0.0.0/0")]))
+}
+
+/// A security group's `egress` rule to `cidrs`, every protocol (a sealed machine's: the lab's
+/// own blocks).
+pub(crate) fn egress_to(cidrs: Expression) -> Block {
     Block::builder("egress")
         .add_attribute(("from_port", number(0)))
         .add_attribute(("to_port", number(0)))
         .add_attribute(("protocol", string("-1")))
-        .add_attribute(("cidr_blocks", list([string("0.0.0.0/0")])))
+        .add_attribute(("cidr_blocks", cidrs))
+        .build()
+}
+
+/// The route out of an `internet: false` network's subnet: the internet until the run is sealed,
+/// then `allowed_cidr` alone (the runner's SSH and the published ports' replies).
+pub(crate) fn sealed_route_out() -> Block {
+    let cidr = crate::cloud::vm::seal::when_sealed(reference("var.allowed_cidr"), string("0.0.0.0/0"));
+    Block::builder("route")
+        .add_attribute(("cidr_block", cidr))
+        .add_attribute(("gateway_id", reference("aws_internet_gateway.env.id")))
         .build()
 }
 

@@ -1,27 +1,19 @@
-//! The auto-stop (`auto_stop_minutes`): a cloud VM shuts itself down after that long, so a
-//! forgotten environment stops costing.
+//! A machine's end. On the clouds, the run's (`expires_at`): a Windows machine's scheduled task
+//! shuts it down then, so a forgotten environment stops costing even when the runner is gone (a
+//! Linux machine's own set-up schedules it itself, at every boot:
+//! `crate::machine::user_data::expiry_shutdown`). The Docker host on a Proxmox server keeps its
+//! `auto_stop_minutes`.
 
-use isoloom_render::hcl_builder::{BinaryOperator, Expression, Template, binary, conditional, number, reference, string};
+use isoloom_render::hcl_builder::{BinaryOperator, Expression, Template, binary, conditional, reference, string};
 
-/// `var.auto_stop_minutes > 0 ? <yes> : <no>`.
-pub(crate) fn if_set(yes: Expression, no: Expression) -> Expression {
-    conditional(binary(reference("var.auto_stop_minutes"), BinaryOperator::Greater, number(0)), yes, no)
+/// `var.expires_at != "" ? <yes> : <no>`: whether the run has an end.
+pub(crate) fn if_expires(yes: Expression, no: Expression) -> Expression {
+    conditional(binary(reference("var.expires_at"), BinaryOperator::NotEq, string("")), yes, no)
 }
 
-/// The auto-stop as a first-boot script: `#!/bin/sh` then `shutdown -h +<minutes>`.
-pub(crate) fn script() -> Expression {
-    Template::text("#!/bin/sh\nshutdown -h +")
-        .with_expr(reference("var.auto_stop_minutes"))
-        .with_text("\n")
-        .into_expression()
-}
-
-/// The auto-stop scheduled again after a restart (an `after_reboot` hook).
-pub(crate) fn rescheduled() -> Template {
-    Template::new().with_expr(if_set(
-        Template::text("sudo shutdown -h +")
-            .with_expr(reference("var.auto_stop_minutes"))
-            .into_expression(),
-        string("true"),
-    ))
+/// The PowerShell registering the shutdown at the run's end (`var.expires_at`, Unix seconds).
+pub(crate) fn windows_task() -> Template {
+    Template::text("Register-ScheduledTask -TaskName isoloom-expiry -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At ([DateTimeOffset]::FromUnixTimeSeconds(")
+        .with_expr(reference("var.expires_at"))
+        .with_text(").LocalDateTime)) -User SYSTEM -RunLevel Highest -Force | Out-Null")
 }

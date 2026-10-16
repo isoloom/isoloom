@@ -73,6 +73,16 @@ pub(crate) fn authorize() -> Template {
         .with_text("' >> ~/.ssh/authorized_keys")
 }
 
+/// Run as root by a machine's own set-up: the controller may log in as `user` (made by the
+/// cloud's first boot, waited for).
+pub(crate) fn authorize_as(user: &str) -> Template {
+    Template::text(format!(
+        "u='{user}'; i=0; until id \"$u\" >/dev/null 2>&1; do i=$((i+2)); [ $i -lt 600 ] || exit 1; sleep 2; done; h=$(getent passwd \"$u\" | cut -d: -f6); install -d -m 700 -o \"$u\" -g \"$(id -gn \"$u\")\" \"$h/.ssh\" && echo '"
+    ))
+    .with_expr(public_key())
+    .with_text("' >> \"$h/.ssh/authorized_keys\" && chown \"$u\" \"$h/.ssh/authorized_keys\" && chmod 600 \"$h/.ssh/authorized_keys\"")
+}
+
 /// The controller's `/etc/hosts` lines: every machine at its first address.
 pub(crate) fn hosts(env: &Environment) -> Option<String> {
     let spec = env.spec();
@@ -129,14 +139,9 @@ pub(crate) struct Ssh<'a> {
 }
 
 /// Its set-up over SSH (`terraform_data.isoloom_controller`), once every VM is set up: the
-/// project, its key and the inventory uploaded, Ansible installed, the playbooks run.
-pub(crate) fn provisioner(c: Ssh) -> Provisioner {
-    provisioner_waiting(c, &[])
-}
-
-/// [`provisioner`], with `waits` run (as root) once Ansible is installed and before the
-/// playbooks: what the machines Terraform doesn't set up need (a Windows machine's ready
-/// marker, over WinRM).
+/// project, its key and the inventory uploaded, Ansible installed, `waits` run (as root) before
+/// the playbooks (what the machines Terraform doesn't set up need: a Windows machine's ready
+/// marker, over WinRM), the playbooks run (ESXi).
 pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     let env = c.env;
     let mut cmds: Vec<Template> = vec!["set -e".into(), linux::CLOUD_INIT_WAIT.into()];
@@ -177,6 +182,25 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
         depends_on: vms(env).map(|(n, _)| reference(&format!("terraform_data.{}", ident(n)))).collect(),
         announce: None,
     }
+}
+
+/// Each Linux machine's own set-up must be done (its ready file says `ready`) before the
+/// playbooks run: its name, and the wait, over SSH with the controller's key as `user(mp)` at the
+/// machine's first address.
+pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&isoloom_plan::MachinePlan) -> String) -> Vec<(String, String)> {
+    vms(env)
+        .filter(|(_, mp)| !mp.is_windows())
+        .filter_map(|(name, mp)| {
+            let a = mp.addresses.values().next()?;
+            let u = user(mp);
+            let ready = super::cloud_init::READY_FILE;
+            // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
+            let wait = format!(
+                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 {u}@{a} head -n 1 {ready} 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
+            );
+            Some((name.to_owned(), Shell::Root.command(&wait)))
+        })
+        .collect()
 }
 
 /// The controller's wait for each Windows machine's ready marker, through Ansible over WinRM

@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use isoloom_manifest::{Manifest, Part, Placeholder, Version};
+use isoloom_manifest::{Manifest, OutputSource, Part, Placeholder, Version};
 use isoloom_spec::{Target, load};
 use isoloom_targets::{GeneratedFile, Lab, generate, generate_instance};
 
@@ -41,6 +41,29 @@ message: \"The portal answers at http://localhost:{{ machines.web.ports.portal.p
 /// The run manifest at `path` among `files`, parsed.
 fn run_json(files: &[GeneratedFile], path: &str) -> Outcome<Manifest> {
     Ok(isoloom_manifest::parse(file(files, path)?)?)
+}
+
+/// cloud-docker writes no `published` output in its module (Terraform makes only the host VM);
+/// each container's published port is a `published_port` output of the run manifest instead, so
+/// the runner reads it back at the host's address.
+#[test]
+fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
+    let files = generate(&lab(FLAG_PORTAL)?, Target::CloudDocker)?;
+    let m = run_json(&files, ".isoloom/cloud-docker/aws/run.json")?;
+    let published: Vec<(&str, &str)> = m
+        .outputs
+        .iter()
+        .filter_map(|o| match &o.from {
+            OutputSource::PublishedPort { machine, port } => Some((machine.as_str(), port.as_str())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(published, [("web", "portal")], "web's portal is the lab's one published port");
+    assert!(
+        !file(&files, ".isoloom/cloud-docker/aws/main.tf")?.contains("output \"published\""),
+        "the module writes none"
+    );
+    Ok(())
 }
 
 /// The shared run-manifest fixture `name`.

@@ -12,64 +12,50 @@ fn spec(fields: &str) -> Outcome<Lab> {
     lab(&format!("version: 1\nname: t\ncloud:\n  provider: aws\n  terraform: tf\n{fields}"))
 }
 
-/// The cloud-services script `name`.
+/// The cloud-services file `name`.
 fn script(spec: &Lab, name: &str) -> Outcome<String> {
     generated(spec, Target::CloudServices, &format!(".isoloom/cloud-services/{name}"))
 }
 
+/// The cloud-services run manifest, parsed.
+fn manifest(spec: &Lab) -> Outcome<isoloom_manifest::Manifest> {
+    Ok(isoloom_manifest::parse(&script(spec, "run.json")?)?)
+}
+
 #[test]
-fn terraform_runs_on_a_copy_of_the_module() -> Outcome {
+fn the_runner_runs_terraform_on_a_copy_of_the_module() -> Outcome {
     let s = spec("")?;
-    let up = script(&s, "up.sh")?;
-    assert!(up.contains("src='../../tf'\nmodule=\"$here/module\"\n"), "{up}");
-    assert!(up.contains("tar -C \"$src\" -cf - --exclude=.terraform"), "{up}");
-    // The old copy's Terraform files go before the new ones land.
-    let (clean, tar) = (up.find("find \"$module\" -type f").unwrap(), up.find("tar -C").unwrap());
-    assert!(clean < tar, "{up}");
-    assert!(
-        up.contains("-name '*.tf' -o -name '*.tf.json' -o -name '*.tfvars' -o -name '*.tfvars.json'"),
-        "{up}"
-    );
-    assert!(up.contains("terraform -chdir=\"$module\" init"), "{up}");
-    assert!(up.contains("terraform -chdir=\"$module\" apply -auto-approve"), "{up}");
-    assert!(!up.contains("tries="), "no retries by default: {up}");
-    // The deployment's name, for the module's tags.
-    for f in ["up.sh", "down.sh", "outputs.sh"] {
-        let text = script(&s, f)?;
-        assert!(
-            text.contains("  TF_VAR_isoloom_instance=\"$(cat \"$here/isoloom-instance\")\"\n  export TF_VAR_isoloom_instance\n"),
-            "{f}: {text}"
-        );
+    let m = manifest(&s)?;
+    let json = script(&s, "run.json")?;
+    assert!(json.contains("\"action\": \"terraform.copy_module\""), "{json}");
+    assert!(json.contains("\"from\": \"../../tf\""), "{json}");
+    assert!(json.contains("\"-chdir=${run.state_dir}/module\""), "{json}");
+    assert!(json.contains("\"-state=${run.state_dir}/terraform.tfstate\""), "{json}");
+    // Destroy copies the module only when its copy is gone (what the module wrote there stays).
+    assert!(json.contains("\"when\": \"missing\""), "{json}");
+    // The deployment's name, for the module's tags; no retry by default.
+    assert!(json.contains("\"TF_VAR_isoloom_instance\": \"${run.name}\""), "{json}");
+    assert_eq!(m.recovery.and_then(|r| r.apply_retries).map(u8::from), Some(0));
+    // No script: nothing sh-only is generated.
+    for gone in ["up.sh", "down.sh", "outputs.sh"] {
+        assert!(script(&s, gone).is_err(), "{gone}");
     }
-    // The apply's marker, for `status`.
-    assert!(up.contains("echo $$ > \"$here/deploying\"\ntrap 'rm -f \"$here/deploying\"' EXIT\n"), "{up}");
-    // Destroy copies the module only when its copy is gone (what the steps wrote there stays).
-    let down = script(&s, "down.sh")?;
-    assert!(down.contains("if [ ! -d \"$module\" ]; then\n  mkdir -p \"$module\"\n"), "{down}");
-    assert!(down.contains("terraform -chdir=\"$module\" destroy"), "{down}");
-    let outputs = script(&s, "outputs.sh")?;
-    assert!(outputs.contains("[ -d \"$module\" ] || module=\"$src\"\n"), "{outputs}");
     Ok(())
 }
 
 #[test]
-fn before_steps_env_and_retries_reach_the_scripts() -> Outcome {
-    let s = spec("  before: [keys.sh, 'scripts/my build.sh']\n  env: { AWS_REGION: us-east-1, QUOTED: \"it's\" }\n  apply_retries: 2\n")?;
-    let up = script(&s, "up.sh")?;
-    assert!(up.contains("export AWS_REGION='us-east-1'\n"), "{up}");
-    assert!(up.contains("export QUOTED='it'\\''s'\n"), "{up}");
-    assert!(up.contains("step 'keys.sh'\nstep 'scripts/my build.sh'\n"), "{up}");
-    // The steps come after the copy and before init.
-    let (copy, step, init) = (up.find("tar -C").unwrap(), up.find("step 'keys.sh'").unwrap(), up.find(" init ").unwrap());
-    assert!(copy < step && step < init, "{up}");
-    assert!(
-        up.contains("  terraform -chdir=\"$module\" apply -auto-approve -input=false -state=\"$here/terraform.tfstate\" \"$@\" || rc=$?\n"),
-        "{up}"
-    );
-    assert!(up.contains("[ \"$tries\" -le 2 ] || exit \"$rc\""), "{up}");
-    for f in ["down.sh", "outputs.sh"] {
-        assert!(script(&s, f)?.contains("export AWS_REGION='us-east-1'\n"), "{f}");
-    }
+fn env_and_retries_reach_the_terraform_steps_and_before_steps_leave_no_manifest() -> Outcome {
+    let s = spec("  env: { AWS_REGION: us-east-1, QUOTED: \"it's\" }\n  apply_retries: 2\n")?;
+    let m = manifest(&s)?;
+    let apply = m.lifecycle.up.iter().find(|x| x.id.as_str() == "apply").ok_or("apply")?;
+    let env: Vec<(String, String)> = apply.env.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+    assert!(env.contains(&("AWS_REGION".into(), "us-east-1".into())), "{env:?}");
+    assert!(env.contains(&("QUOTED".into(), "it's".into())), "{env:?}");
+    assert_eq!(m.recovery.and_then(|r| r.apply_retries).map(u8::from), Some(2));
+    // Host scripts can't be held by a manifest: the lab is converted, not run.
+    let with_steps = spec("  before: [keys.sh, 'scripts/my build.sh']\n")?;
+    assert!(script(&with_steps, "run.json").is_err());
+    assert!(script(&with_steps, "terraform.tfvars.json").is_ok());
     assert!(problems(&s).is_empty(), "{:?}", problems(&s));
     Ok(())
 }

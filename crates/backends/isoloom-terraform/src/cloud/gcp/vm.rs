@@ -202,8 +202,8 @@ fn mtu(n: &NetworkPlan) -> u16 {
 
 /// Its `cloud-vm` driver: its module takes the billing account its project goes on.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage::with_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
-    requires: (&[providers::GOOGLE, providers::LOCAL], &[]),
+    usage: |folder| Usage::with_runner_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
+    requires: (&[providers::GOOGLE], &[]),
     variables: || variables().into(),
     provider: |env, m| {
         let mut locals = provider_and_project(env, m);
@@ -212,6 +212,7 @@ pub(crate) const DRIVER: Driver = Driver {
     },
     refusal,
     write,
+    user,
 };
 
 /// The module's blocks after the providers, from the plan.

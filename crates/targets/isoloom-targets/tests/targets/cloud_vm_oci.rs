@@ -49,9 +49,11 @@ fn a_machine_on_two_networks_gets_a_vnic_on_each() -> Outcome {
         assert!(tf.contains(&format!("resource \"oci_core_subnet\" \"{net}\"")), "{tf}");
         assert!(tf.contains(&format!("resource \"oci_core_security_list\" \"{net}\"")));
     }
-    // The first network on the instance, the second on an attached VNIC found by MAC at boot.
+    // The first network on the instance, the second on an attached VNIC, found at boot by its
+    // MAC, which the instance reads from its metadata service (the VNIC is attached once the
+    // instance exists, so Terraform can't hand it over).
     assert!(tf.contains("resource \"oci_core_vnic_attachment\" \"web_back\""));
-    assert!(tf.contains("data.oci_core_vnic.web_back.mac_address"));
+    assert!(tf.contains("http://169.254.169.254/opc/v2/vnics/"), "{tf}");
     assert!(tf.contains("skip_source_dest_check = true"));
     Ok(())
 }

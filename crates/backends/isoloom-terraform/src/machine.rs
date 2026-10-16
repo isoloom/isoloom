@@ -24,6 +24,7 @@ pub(crate) mod cloudbase_init;
 pub(crate) mod controller;
 pub(crate) mod linux;
 pub(crate) mod provisioner;
+pub(crate) mod user_data;
 pub(crate) mod windows;
 
 #[cfg(test)]

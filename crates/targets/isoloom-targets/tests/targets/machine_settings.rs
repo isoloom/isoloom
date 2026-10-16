@@ -56,7 +56,7 @@ fn every_vm_target_runs_the_same_settings_before_the_steps() -> Outcome {
     // Linode gives no TPM, which the machine asks for: its module is left out.
     for cloud in ["aws", "azure", "gcp", "oci"] {
         let tf = file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
-        assert!(tf.contains("sudo sh -c") && tf.contains("APP_MODE=production"), "{cloud}");
+        assert!(tf.contains("{ sh -c 'set -e") && tf.contains("APP_MODE=production"), "{cloud}");
     }
     Ok(())
 }

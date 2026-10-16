@@ -15,18 +15,16 @@ use crate::module::variable::Variable;
 
 /// The `project`, `billing_account`, `org_id` and `region` variables: an existing project, or a
 /// billing account for a project of its own; Paris by default.
-pub(crate) fn variables() -> [Block; 4] {
+pub(crate) fn variables() -> [Variable; 4] {
     [
         Variable::new("project", "string")
             .default(string(""))
-            .describe("An existing project; or leave empty and give billing_account for a project of its own")
-            .block(),
+            .describe("An existing project; or leave empty and give billing_account for a project of its own"),
         Variable::new("billing_account", "string")
             .default(string(""))
-            .describe("With no project: create one for this environment, billed here, deleted with it")
-            .block(),
-        Variable::new("org_id", "string").default(string("")).block(),
-        Variable::new("region", "string").default(string("europe-west9")).block(),
+            .describe("With no project: create one for this environment, billed here, deleted with it"),
+        Variable::new("org_id", "string").default(string("")),
+        Variable::new("region", "string").default(string("europe-west9")),
     ]
 }
 

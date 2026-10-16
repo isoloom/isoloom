@@ -55,12 +55,18 @@ pub(super) fn placed(kind: &str, name: &str, cloud_name: Expression) -> BlockBui
         .add_attribute(("tags", reference("local.tags")))
 }
 
-/// A network security group: inbound rules numbered from 100 in the order given, then
-/// everything out.
+/// A network security group: inbound rules numbered from 100 in the order given, then the rest
+/// of the virtual network denied (Azure's own `AllowVnetInBound` would let every subnet reach
+/// every port, `reach` notwithstanding), then everything out, or only the virtual network once
+/// the run is sealed for a machine that has no internet.
 pub(super) struct Nsg {
     block: BlockBuilder,
     priority: u64,
+    sealed: bool,
 }
+
+/// Where the rest of the virtual network is denied inbound: after every allow rule.
+const DENY_VNET: u64 = 4000;
 
 impl Nsg {
     /// The group `id` (its name in the cloud: `<env>-<who>`).
@@ -68,7 +74,15 @@ impl Nsg {
         Nsg {
             block: placed("azurerm_network_security_group", id, name_with(&format!("-{who}"))),
             priority: 100,
+            sealed: false,
         }
+    }
+
+    /// The group of a machine the seal closes off (`crate::cloud::vm::seal`).
+    #[must_use]
+    pub(super) fn sealed(mut self, sealed: bool) -> Nsg {
+        self.sealed = sealed;
+        self
     }
 
     /// An inbound allow rule (`protocol`: `*`, `Tcp` or `Udp`; `port`: a port or `*`).
@@ -79,9 +93,57 @@ impl Nsg {
         self
     }
 
-    /// The group, everything out allowed (Azure's default, made explicit as on AWS).
+    /// The group: the rest of the virtual network denied inbound, then everything out allowed
+    /// (Azure's default, made explicit as on AWS), or the internet denied once sealed (the
+    /// virtual network stays allowed out: Azure's `AllowVnetOutBound`).
     pub(super) fn build(self) -> Block {
-        self.block.add_block(rule("outbound", 100, ("Outbound", "*", "*"), string("*"))).build()
+        let deny_vnet = security_rule(("deny-rest-of-vnet", DENY_VNET), ("Inbound", "Deny"), string("VirtualNetwork"), string("*"));
+        let out = if self.sealed {
+            let when = |yes: &str, no: &str| crate::cloud::vm::seal::when_sealed(string(yes), string(no));
+            security_rule(("outbound", 100), ("Outbound", "Allow"), string("*"), when("Internet", "*")).with_access(when("Deny", "Allow"))
+        } else {
+            security_rule(("outbound", 100), ("Outbound", "Allow"), string("*"), string("*")).into_block()
+        };
+        self.block.add_block(deny_vnet.into_block()).add_block(out).build()
+    }
+}
+
+/// A `security_rule` on every protocol and port, being built: its access may still change.
+struct SecurityRule {
+    head: BlockBuilder,
+    access: Expression,
+    tail: [(&'static str, Expression); 2],
+}
+
+impl SecurityRule {
+    /// The rule with `access` (an expression: the seal switches it).
+    fn with_access(self, access: Expression) -> Block {
+        SecurityRule { access, ..self }.into_block()
+    }
+
+    fn into_block(self) -> Block {
+        let [source, destination] = self.tail;
+        self.head
+            .add_attribute(("access", self.access))
+            .add_attribute(("protocol", string("*")))
+            .add_attribute(("source_port_range", string("*")))
+            .add_attribute(("destination_port_range", string("*")))
+            .add_attribute(source)
+            .add_attribute(destination)
+            .build()
+    }
+}
+
+/// A rule `(name, priority)`, `(direction, access)`, from `source` to `destination`, on every
+/// protocol and port.
+fn security_rule((name, priority): (&str, u64), (direction, access): (&str, &str), source: Expression, destination: Expression) -> SecurityRule {
+    SecurityRule {
+        head: Block::builder("security_rule")
+            .add_attribute(("name", string(name)))
+            .add_attribute(("priority", number(priority)))
+            .add_attribute(("direction", string(direction))),
+        access: string(access),
+        tail: [("source_address_prefix", source), ("destination_address_prefix", destination)],
     }
 }
 

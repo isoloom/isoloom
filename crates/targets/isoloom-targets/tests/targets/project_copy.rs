@@ -201,8 +201,8 @@ fn terraform_outputs_read_isoloomignore() -> Outcome {
     let proxmox = file(&spec, Target::Proxmox, "proxmox/main.tf")?;
     assert!(proxmox.contains("project_files = [for f in local.project_paths : {"), "{proxmox}");
     assert!(proxmox.contains("file(\"${local.root}/.isoloomignore\")"), "{proxmox}");
-    // The cloud modules' tar walks the project itself and leaves out the ignored files, from the
-    // archive's top folder (stripped when unpacked).
+    // The cloud modules never read the project: the runner archives it (by the same rules) and
+    // delivers it over SSH.
     for (target, path) in [
         (Target::CloudVm, "cloud-vm/aws/main.tf"),
         (Target::CloudVm, "cloud-vm/gcp/main.tf"),
@@ -210,14 +210,12 @@ fn terraform_outputs_read_isoloomignore() -> Outcome {
         (Target::CloudDocker, "cloud-docker/azure/main.tf"),
     ] {
         let tf = file(&spec, target, path)?;
-        assert!(tf.contains("resource \"local_file\" \"isoloom_project\""), "{path}");
-        assert!(
-            tf.contains(r#"-X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""#),
-            "{path}"
-        );
-        assert!(!tf.contains("-C /opt/isoloom &&"), "{path}: unpacked without stripping the top folder");
-        assert!(tf.contains("--strip-components=1"), "{path}");
+        assert!(!tf.contains("isoloomignore") && !tf.contains("local_file"), "{path}");
     }
+    // The Docker host on a Proxmox server also takes the project from the runner, over SSH
+    // (the docker-vm run manifest's `terraform.copy_module`), never a Terraform `local_file`.
+    let pve_docker = file(&spec, Target::DockerVm, "docker-vm/proxmox/main.tf")?;
+    assert!(!pve_docker.contains("local_file") && !pve_docker.contains("isoloomignore"), "{pve_docker}");
     Ok(())
 }
 

@@ -49,13 +49,22 @@ impl Backend for CloudDockerBackend {
         isoloom_compose::capabilities_on_a_vm()
     }
 
-    /// The `docker` target's Compose file (and the files it mounts), then a module per cloud.
+    /// The `docker` target's Compose file (and the files it mounts), a module per cloud, and the
+    /// host's set-up script the runner pipes into each VM.
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::CloudDocker, env, &self.capabilities())?;
-        let modules = isoloom_terraform::cloud_docker_modules(env)?;
         let mut files = docker_files(env)?;
-        files.extend(modules);
+        files.extend(isoloom_terraform::cloud_docker_modules(env)?);
+        files.extend(isoloom_terraform::cloud_docker_setup(env)?);
         Ok(files)
+    }
+
+    /// A run manifest per cloud that can host the containers, built on the Compose-in-a-VM plan
+    /// (`isoloom_compose::guest`, from the `docker` target's environment).
+    fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
+        let docker = Environment::build(env.spec(), Target::Docker, env.instance);
+        let guest = isoloom_compose::guest(&docker)?;
+        Ok(isoloom_terraform::cloud_docker_manifests(env, &guest)?)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {

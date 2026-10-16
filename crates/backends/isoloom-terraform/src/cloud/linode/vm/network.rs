@@ -6,13 +6,13 @@
 //! networks; the rest (its own network, the internet) is accepted. Replies come back either way.
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Module, Template, list, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
 use isoloom_spec::validate::Cidr;
 
 use crate::cloud::instance::name_with;
 use crate::cloud::linode::{Action, Way, rule};
-use crate::cloud::vm::published;
 use crate::cloud::vm::reach::{self, Rule};
+use crate::cloud::vm::{published, seal};
 use crate::machine::vms;
 use crate::module::{ident, resource};
 
@@ -74,13 +74,24 @@ fn reach_rules(way: Way, rules: &[Rule<'_>]) -> Vec<Block> {
     out
 }
 
+/// What goes out when no rule says: everything, or nothing once the run is sealed for a
+/// machine with no internet (its own network and its `reach` rules still allowed). The
+/// firewall is stateful: replies to what came in still leave.
+fn outbound_policy(env: &Environment, mp: &MachinePlan) -> Expression {
+    if seal::sealed(env, mp) {
+        seal::when_sealed(string("DROP"), string("ACCEPT"))
+    } else {
+        string("ACCEPT")
+    }
+}
+
 /// Machine `name`'s firewall, on network `net` (its block, `cidr`).
 fn firewall(env: &Environment, (name, mp): (&str, &MachinePlan), (net, cidr): (&str, &str)) -> Block {
     let allowed = || list([reference("var.allowed_cidr")]);
     let mut b = resource("linode_firewall", &ident(name))
         .add_attribute(("label", name_with(&format!("-{name}"))))
         .add_attribute(("inbound_policy", string("DROP")))
-        .add_attribute(("outbound_policy", string("ACCEPT")))
+        .add_attribute(("outbound_policy", outbound_policy(env, mp)))
         .add_block(rule((Way::In, Action::Accept), "ssh", "TCP", Some("22".to_owned()), allowed()));
     let published = published::ports(mp);
     for (udp, label, protocol) in [(false, "published", "TCP"), (true, "published-udp", "UDP")] {
@@ -93,6 +104,9 @@ fn firewall(env: &Environment, (name, mp): (&str, &MachinePlan), (net, cidr): (&
         .add_blocks(everything((Way::In, Action::Accept), "vpc", cidr))
         .add_blocks(reach_rules(Way::In, &reach::into(env, net)))
         .add_blocks(reach_rules(Way::Out, &reach::out_of(env, net)));
+    if seal::sealed(env, mp) {
+        b = b.add_blocks(everything((Way::Out, Action::Accept), "vpc-out", cidr));
+    }
     for (other, p) in env.networks.iter().filter(|(n, _)| n.as_str() != net) {
         b = b.add_blocks(everything((Way::Out, Action::Drop), &format!("no-{other}"), &p.cidr));
     }

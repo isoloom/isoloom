@@ -17,6 +17,7 @@
 
 mod addresses;
 mod ipv6;
+mod metadata;
 mod network;
 mod private_dns;
 mod published;
@@ -28,12 +29,12 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr,
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::{SHAPE, availability_domain, availability_domains, owned, provider, ubuntu_images};
+use crate::cloud::Cloud;
 use crate::cloud::instance::name_with;
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
-use crate::cloud::{Cloud, auto_stop};
 use crate::limits::Limits;
-use crate::machine::{Remote, linux, vms};
+use crate::machine::vms;
 use crate::module::variable::Variable;
 use crate::module::{Usage, ident, providers, resource};
 
@@ -107,23 +108,22 @@ fn sizing(memory_mb: u32) -> (u32, u32) {
 pub(crate) const DRIVER: Driver = Driver {
     usage: |folder| Usage {
         after: "# Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.\n",
-        ..Usage::with_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
+        ..Usage::with_runner_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
     },
-    requires: (&[providers::OCI, providers::LOCAL], &[]),
+    requires: (&[providers::OCI], &[]),
     variables: || {
         vec![
-            Variable::new("compartment_id", "string")
-                .describe("The compartment the environment goes in")
-                .block(),
+            Variable::new("compartment_id", "string").describe("The compartment the environment goes in"),
             Variable::new("region", "string")
                 .default(string("eu-paris-1"))
-                .describe("The OCI region to launch in")
-                .block(),
+                .describe("The OCI region to launch in"),
+            super::profile(),
         ]
     },
     provider,
     refusal,
     write,
+    user: |_| USER,
 };
 
 /// The module after its providers: the images, the VCN, its security list and subnet, each machine, the outputs.
@@ -164,38 +164,25 @@ fn images(env: &Environment, m: &mut Module) {
     }
 }
 
-/// Machine `name`'s instance at its fixed address, its VNICs and further addresses, and its
-/// set-up over SSH.
+/// Machine `name`'s instance at its fixed address, set up from its user data (its other VNICs
+/// found at boot through the metadata service), its VNICs and further addresses.
 fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) {
-    let id = ident(name);
     let group = published::group(name, mp, m);
+    let mut at_boot = interfaces::up_found(env, &mp.addresses, &|_, a| metadata::mac(a));
+    at_boot.extend(ipv6::at_boot(env, mp));
+    at_boot.extend(gateways::at_boot(mp));
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot);
     m.commented(
         &format!("Machine `{name}`, at its fixed address {address}."),
-        instance(env, (name, mp), (net, &address.to_string()), group),
+        instance(env, (name, mp), (net, &address.to_string()), (group, setup)),
     );
     vnics(env, (name, mp), m);
     addresses::blocks((name, mp), m);
-    let mac = |n: &str| call("lower", [reference(&format!("data.oci_core_vnic.{id}_{}.mac_address", ident(n)))]);
-    let mut at_boot = interfaces::up(env, &mp.addresses, &mac);
-    at_boot.extend(ipv6::at_boot(env, name, mp));
-    at_boot.extend(gateways::at_boot(mp));
-    let machine = linux::Machine {
-        remote: Remote {
-            env,
-            name,
-            plan: mp,
-            replace_on: reference(&format!("oci_core_instance.{id}.id")),
-            host: public_ip(name),
-        },
-        user: USER.to_owned(),
-        hooks: hooks::of(mp, at_boot),
-    };
-    m.block(linux::provisioner(machine).block());
 }
 
 /// Machine `name`'s instance, its first VNIC on network `net` at `address` (with its published
-/// ports' `group`).
-fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, &str), group: Option<Expression>) -> Block {
+/// ports' `group`), set up by `setup` (its user data, which cloud-init runs).
+fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, &str), (group, setup): (Option<Expression>, Expression)) -> Block {
     // A gateway forwards traffic that isn't its own; a machine on several networks answers from
     // the interface its default route leaves by.
     let forwards = mp.is_gateway || mp.addresses.len() > 1;
@@ -221,10 +208,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
     let vnic = ipv6::vnic(env, mp, net, primary_vnic(name, net, address, forwards, group)).build();
     let metadata = object([
         ("ssh_authorized_keys", reference("var.ssh_public_key")),
-        (
-            "user_data",
-            call("base64encode", [auto_stop::if_set(auto_stop::script(), string("#!/bin/sh\n"))]),
-        ),
+        ("user_data", call("base64encode", [setup])),
     ]);
     owned(resource("oci_core_instance", &ident(name)))
         .add_attribute(("availability_domain", availability_domain()))
@@ -271,13 +255,6 @@ fn vnics(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
                 .add_attribute(("instance_id", reference(&format!("oci_core_instance.{id}.id"))))
                 .add_attribute(("display_name", name_with(&format!("-{name}-{net}"))))
                 .add_block(details)
-                .build(),
-        );
-        m.block(
-            Block::builder("data")
-                .add_label("oci_core_vnic")
-                .add_label(&nic)
-                .add_attribute(("vnic_id", reference(&format!("oci_core_vnic_attachment.{nic}.vnic_id"))))
                 .build(),
         );
     }

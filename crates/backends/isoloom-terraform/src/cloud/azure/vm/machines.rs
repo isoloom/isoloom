@@ -1,11 +1,11 @@
-//! Each machine's security group, public IP, interfaces and VM, and its set-up through the VM
-//! core; the Windows machines' and the controller's.
+//! Each machine's security group, public IP, interfaces and VM, set up from its own custom data
+//! through the VM core; the Windows machines' and the controller's.
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, null, number, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, reference, string};
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
@@ -13,11 +13,11 @@ use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{USER, image, machine_size, public_ip as address_of, size};
 use crate::cloud::auto_stop;
 use crate::cloud::instance::name_with;
-use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image, reach};
-use crate::machine::{Remote, controller, linux, windows};
+use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, own_image, reach};
+use crate::machine::{Remote, controller, user_data, windows};
 use crate::module::ident;
 
-/// A Linux machine: its security group, public IP, interfaces and VM, its set-up over SSH.
+/// A Linux machine: its security group, public IP, interfaces and VM, set up from its custom data.
 pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
@@ -30,28 +30,17 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         .keys()
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
     let own = own_image::of(mp, own_image::azure);
+    let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
+    at_boot.extend(gateways::at_boot(mp));
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot);
     m.block(linux_vm(
         &id,
         name,
         (mp.os.as_deref().unwrap_or_default(), own),
         (machine_size(mp, memory), disk, mp.tpm.is_some()),
-        list(ids),
+        (list(ids), setup),
     ));
     m.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
-    let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
-    at_boot.extend(gateways::at_boot(mp));
-    let machine = linux::Machine {
-        remote: Remote {
-            env,
-            name,
-            plan: mp,
-            replace_on: reference(&format!("azurerm_linux_virtual_machine.{id}.id")),
-            host: address_of(&id),
-        },
-        user: USER.to_owned(),
-        hooks: hooks::of(mp, at_boot),
-    };
-    m.block(linux::provisioner(machine).block());
 }
 
 /// The MAC address of an Azure interface (uppercase, dash-separated), as `ip link` writes it.
@@ -95,9 +84,9 @@ fn controller_nics(id: &str, who: &str, (addresses, addresses6, more): Addresses
 }
 
 /// A Linux VM (its size, its disk in GB, and whether it has a virtual TPM), as `isoloom` with
-/// the operator's key; the auto-stop scheduled at first boot.
-fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk, tpm): (&str, u32, bool), nics: Expression) -> Block {
-    let custom_data = auto_stop::if_set(call("base64encode", [auto_stop::script()]), null());
+/// the runner's key, on `nics`, set up by `setup` (its custom data, which cloud-init runs).
+fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk, tpm): (&str, u32, bool), (nics, setup): (Expression, Expression)) -> Block {
+    let custom_data = call("base64encode", [setup]);
     let vm = trusted_launch(placed("azurerm_linux_virtual_machine", id, name_with(&format!("-{who}"))), tpm)
         .add_attribute(("size", string(vm_size)))
         .add_attribute(("admin_username", string(USER)))
@@ -156,7 +145,7 @@ fn source_image(os: &str, tpm: bool) -> Block {
 /// ports from `allowed_cidr`.
 fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Block {
     let allowed = || reference("var.allowed_cidr");
-    let mut g = Nsg::new(&ident(name), name);
+    let mut g = Nsg::new(&ident(name), name).sealed(crate::cloud::vm::seal::sealed(env, mp));
     let Some(m) = env.spec().machines.get(name) else { return g.build() };
     for (n, p) in reach::own(env, m) {
         g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
@@ -245,10 +234,10 @@ fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
 /// The auto-stop on Windows, a scheduled task registered over WinRM (Azure runs no user data
 /// there).
 fn windows_auto_stop() -> Expression {
-    let task = Template::text("powershell -NoProfile -Command \"Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(")
-        .with_expr(reference("var.auto_stop_minutes"))
-        .with_text(")) -User SYSTEM -RunLevel Highest -Force\"");
-    auto_stop::if_set(task.into_expression(), string("cmd /c ver"))
+    let mut task = Template::text("powershell -NoProfile -Command \"");
+    task.append(auto_stop::windows_task());
+    task.push_text("\"");
+    auto_stop::if_expires(task.into_expression(), string("cmd /c ver"))
 }
 
 /// The rules a `reach` rule opens from `block`: every port, or each port in TCP and UDP.
@@ -264,8 +253,8 @@ fn reach_rules(mut g: Nsg, rule: &str, ports: &[u16], block: &str) -> Nsg {
 }
 
 /// The controller: its security group (every network may reach it, and SSH from
-/// `allowed_cidr`), an interface on every network at the controller address, its VM, its set-up
-/// over SSH once every machine is set up.
+/// `allowed_cidr`), an interface on every network at the controller address, its VM, set up from
+/// its custom data (it waits for every machine's own set-up before the playbooks).
 pub(super) fn controller(env: &Environment, m: &mut Module) {
     let id = "isoloom_controller";
     let mut g = Nsg::new(id, "controller");
@@ -282,20 +271,14 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
     let disk = disk.unwrap_or(30).max(30);
+    let inventory = controller::cloud_inventory(env, |_| USER.to_owned(), WinrmAuth::Ntlm);
+    let at_boot = interfaces::up(env, &addresses, &|n| mac(&nic_id(id, n)));
+    let setup = controller_setup::set_up(env, &|_| USER.to_owned(), inventory, &at_boot);
     m.block(linux_vm(
         id,
         "controller",
         (controller::OS, None),
         (size(memory, addresses.len()), disk, false),
-        list(ids),
+        (list(ids), user_data::expression(&setup)),
     ));
-    let ssh = controller::Ssh {
-        env,
-        replace_on: reference(&format!("azurerm_linux_virtual_machine.{id}.id")),
-        host: address_of(id),
-        user: USER.to_owned(),
-        at_boot: interfaces::up(env, &addresses, &|n| mac(&nic_id(id, n))),
-        inventory: controller::cloud_inventory(env, |_| USER.to_owned(), WinrmAuth::Ntlm),
-    };
-    m.block(controller::provisioner(ssh).block());
 }

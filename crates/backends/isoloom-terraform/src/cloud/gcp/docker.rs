@@ -2,13 +2,13 @@
 //! and subnet, a firewall, and a Debian instance.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, Template, boolean, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{provider_and_project, public_ip, variables};
-use crate::cloud::docker::{Driver, SizeVariable};
+use crate::cloud::docker::{Driver, Host, SizeVariable};
 use crate::cloud::instance;
-use crate::docker_host::{Access, AutoStop, port_strings, published, tcp_ports};
+use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
@@ -21,18 +21,17 @@ pub(crate) const DRIVER: Driver = Driver {
     }),
     provider: provider_and_project,
     resources,
+    user: "isoloom",
 };
 
-/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
-/// it.
-fn resources(env: &Environment, m: &mut Module) -> Access {
+/// The cloud's resources, after the module's head, `setup` as the instance's startup script;
+/// the host they make.
+fn resources(env: &Environment, m: &mut Module, setup: Expression) -> Host {
     m.blocks(network(env));
-    m.block(vm(env));
-    Access {
-        host: public_ip("env"),
+    m.block(vm(env, setup));
+    Host {
+        address: public_ip("env"),
         user: "isoloom",
-        replace_on: reference("google_compute_instance.env.id"),
-        auto_stop: AutoStop::SetUp,
     }
 }
 
@@ -77,8 +76,9 @@ fn network(env: &Environment) -> Vec<Block> {
     ]
 }
 
-/// Debian 12 in the region's first zone, the `isoloom` user with the operator's key.
-fn vm(env: &Environment) -> Block {
+/// Debian 12 in the region's first zone, the `isoloom` user with the runner's key, set up by its
+/// startup script (Google's Debian images have no cloud-init; the script runs at every boot).
+fn vm(env: &Environment, setup: Expression) -> Block {
     let ssh_keys = Template::text("isoloom:").with_expr(reference("var.ssh_public_key"));
     resource("google_compute_instance")
         .add_attribute(("machine_type", reference("var.machine_type")))
@@ -100,6 +100,6 @@ fn vm(env: &Environment) -> Block {
                 .add_block(Block::builder("access_config").build())
                 .build(),
         )
-        .add_attribute(("metadata", object([("ssh-keys", ssh_keys.into_expression())])))
+        .add_attribute(("metadata", object([("ssh-keys", ssh_keys.into_expression()), ("startup-script", setup)])))
         .build()
 }

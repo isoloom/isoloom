@@ -43,7 +43,7 @@ mod target;
 mod testing;
 
 pub use cloud::Cloud;
-pub use cloud::docker::{modules as cloud_docker_modules, refusal as cloud_docker_refusal};
+pub use cloud::docker::{manifests as cloud_docker_manifests, modules as cloud_docker_modules, refusal as cloud_docker_refusal, setup as cloud_docker_setup};
 pub use cloud::services::CloudServicesBackend;
 pub use cloud::vm::{CloudVmBackend, CloudVmModule};
 pub use error::{Error, Result};

@@ -5,15 +5,14 @@
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 
-use isoloom_manifest::{
-    Error as ManifestError, Machine, Name, Network, OsName, Output, OutputRole, Part, Placeholder, PublishMode, Role, RunVar, SnakeName, Template,
-};
+use isoloom_manifest::{Error as ManifestError, Machine, Name, Network, Output, OutputRole, Part, Placeholder, Role, RunVar, SnakeName, Template};
 use isoloom_plan::Environment;
 use isoloom_render::router;
-use isoloom_render::run_manifest::{addresses, arch, outputs_at, port};
+use isoloom_render::run_manifest::outputs_at;
 use isoloom_spec::validate::Cidr as SpecCidr;
 
 use crate::machine::controller;
+use crate::module::manifest;
 
 /// The router, as the manifest names it.
 const ROUTER: &str = "isoloom-router";
@@ -51,46 +50,18 @@ pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError>
         let (Some(mp), Some(spec)) = (env.machines.get(name), env.spec().machines.get(name)) else {
             continue;
         };
-        let mut m = machine(name, Role::Target, addresses(mp)?)?;
-        m.os = mp.os.as_deref().map(OsName::parse).transpose()?;
-        m.windows = mp.is_windows();
-        m.arch = Some(arch(mp.arch));
-        for p in &spec.ports {
-            let mut port = port(&spec.port_label(p), p, &mp.ports, &at)?;
-            if let Some(publish) = port.publish.as_mut() {
-                publish.mode = PublishMode::Fixed;
-            }
-            m.ports.push(port);
-        }
-        out.push(m);
+        out.push(manifest::target_machine(name, mp, spec, &at)?);
     }
     let router_at = |net: &str| IpAddr::V4(router::address(env.spec(), net));
-    out.push(machine(ROUTER, Role::Infra, by_network(env, router_at)?)?);
+    out.push(manifest::machine(ROUTER, Role::Infra, by_network(env, router_at)?)?);
     if controller::needed(env) {
         let controller_at = |net: &str| {
             let c = env.networks.get(net).and_then(|n| SpecCidr::parse(&n.cidr));
             c.map_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), |c| IpAddr::V4(c.controller()))
         };
-        out.push(machine(CONTROLLER, Role::Infra, by_network(env, controller_at)?)?);
+        out.push(manifest::machine(CONTROLLER, Role::Infra, by_network(env, controller_at)?)?);
     }
     Ok(out)
-}
-
-fn machine(name: &str, role: Role, addresses: BTreeMap<Name, IpAddr>) -> Result<Machine, ManifestError> {
-    Ok(Machine {
-        name: Name::parse(name)?,
-        role,
-        of: None,
-        os: None,
-        windows: false,
-        arch: None,
-        resources: None,
-        addresses,
-        keep_running: false,
-        native: None,
-        volumes: Vec::new(),
-        ports: Vec::new(),
-    })
 }
 
 /// `at` on each network of the lab.

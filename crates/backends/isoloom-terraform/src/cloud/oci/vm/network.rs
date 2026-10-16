@@ -24,6 +24,7 @@ use crate::cloud::instance::name_with;
 use crate::cloud::oci::{owned, route_out};
 use crate::cloud::vm::gateways::{Hop, routed, through, toward};
 use crate::cloud::vm::reach::{self, Rule};
+use crate::cloud::vm::seal;
 use crate::module::{ident, resource};
 
 /// A VCN holds five blocks at most.
@@ -167,8 +168,12 @@ fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
         .add_block(fragmentation(inbound, false))
         .add_block(rule(outbound, "its own network", string(cidr), "all", None))
         .add_blocks(reach_rules(outbound, &reach::out_of(env, net), "to"));
-    for block in reach::public_blocks() {
-        b = b.add_block(rule(outbound, "the internet", string(block), "all", None));
+    if seal::any(env) && seal::closed(env, net) {
+        b = b.add_block(internet_until_sealed());
+    } else {
+        for block in reach::public_blocks() {
+            b = b.add_block(rule(outbound, "the internet", string(block), "all", None));
+        }
     }
     b = b.add_block(fragmentation(outbound, false));
     if let Some(v6) = p.ipv6.as_ref().map(|v| v.cidr.as_str()) {
@@ -181,6 +186,23 @@ fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
             .add_block(fragmentation(outbound, true));
     }
     b.build()
+}
+
+/// The rules out to the internet of a network that has none: until the run is sealed (the
+/// machines set themselves up), then none.
+fn internet_until_sealed() -> Block {
+    let blocks = list(reach::public_blocks().into_iter().map(string));
+    Block::builder("dynamic")
+        .add_label("egress_security_rules")
+        .add_attribute(("for_each", seal::when_sealed(list([]), blocks)))
+        .add_block(
+            Block::builder("content")
+                .add_attribute(("description", string("the internet, until the run is sealed")))
+                .add_attribute(("destination", reference("egress_security_rules.value")))
+                .add_attribute(("protocol", string("all")))
+                .build(),
+        )
+        .build()
 }
 
 /// The `reach` rules whose other network is dual-stack too, on its IPv6 block.

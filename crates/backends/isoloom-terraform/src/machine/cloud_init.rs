@@ -126,7 +126,7 @@ pub(crate) fn tracked(label: &str, command: &str) -> String {
 }
 
 /// What the ready file calls a step of `machine`'s set-up.
-fn label(step: &Step) -> String {
+pub(crate) fn label(step: &Step) -> String {
     match step {
         Step::Run { path, .. } => path.clone(),
         Step::Configure { .. } => "its configuration".into(),
@@ -149,6 +149,7 @@ fn label(step: &Step) -> String {
         Step::Egress => "closing the internet".into(),
         Step::Tc => "link impairment".into(),
         Step::Ready => "health check".into(),
+        Step::Prelude => "system constraints".into(),
         _ => "set-up".into(),
     }
 }

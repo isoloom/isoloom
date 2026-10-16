@@ -4,6 +4,7 @@
 //! the project's lists at its end.
 
 pub(crate) mod inputs;
+pub(crate) mod manifest;
 pub(crate) mod providers;
 mod usage;
 pub(crate) mod variable;

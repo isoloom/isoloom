@@ -1,9 +1,9 @@
-//! Each machine's instance (its interfaces and Elastic IP on several networks) and its set-up
-//! through the VM core; the Windows machines' and the controller's.
+//! Each machine's instance (its interfaces and Elastic IP on several networks), set up from its
+//! own user data through the VM core; the Windows machines' and the controller's.
 
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, null, number, object, reference, string,
+    BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string,
 };
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
@@ -13,13 +13,14 @@ use super::{addresses, image_user, machine_type, nesting};
 use crate::cloud::auto_stop;
 use crate::cloud::aws::instance_type;
 use crate::cloud::instance::name_with;
+use crate::cloud::vm::controller_setup;
 use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image};
-use crate::machine::{Remote, controller, linux, windows};
+use crate::machine::{Remote, controller, user_data, windows};
 use crate::module::{ident, resource};
 
-/// An instance's user data on Linux: the auto-stop, scheduled at first boot.
-fn linux_user_data() -> Expression {
-    auto_stop::if_set(auto_stop::script(), null())
+/// An instance's user data: `script`, gzipped (AWS takes 16 KB).
+fn user_data(script: Expression) -> (&'static str, Expression) {
+    ("user_data_base64", call("base64gzip", [script]))
 }
 
 /// The address Terraform reaches a machine at: its instance's own public address on one
@@ -41,7 +42,7 @@ fn ami(mp: &MachinePlan) -> Expression {
     )
 }
 
-/// A Linux machine: its security group, its instance, its set-up over SSH.
+/// A Linux machine: its security group, its instance, set up from its user data.
 pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
@@ -54,26 +55,15 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     if mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none() {
         instance = instance.add_block(nitro_tpm(&ident(mp.os.as_deref().unwrap_or_default())));
     }
-    let instance = nesting(instance, mp);
+    let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
+    at_boot.extend(gateways::at_boot(mp));
+    let user = image_user(mp.os.as_deref().unwrap_or_default());
+    let instance = nesting(instance, mp).add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot)));
     if addresses::needs_interfaces(mp) {
         m.blocks(several_networks((name, mp), instance));
     } else {
         m.block(one_network((name, mp), instance));
     }
-    let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
-    at_boot.extend(gateways::at_boot(mp));
-    let machine = linux::Machine {
-        remote: Remote {
-            env,
-            name,
-            plan: mp,
-            replace_on: reference(&format!("aws_instance.{id}.id")),
-            host: public_ip(env, name),
-        },
-        user: image_user(mp.os.as_deref().unwrap_or_default()).to_owned(),
-        hooks: hooks::of(mp, at_boot),
-    };
-    m.block(linux::provisioner(machine).block());
 }
 
 /// A TPM on AWS is NitroTPM, which the AMI enables (`tpm_support`): the plan stops when the
@@ -107,7 +97,6 @@ fn one_network((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Bloc
         .add_attribute(("associate_public_ip_address", boolean(true)))
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
-        .add_attribute(("user_data", linux_user_data()))
         .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
         .build()
@@ -132,7 +121,6 @@ fn several_networks((name, mp): (&str, &MachinePlan), instance: BlockBuilder) ->
     out.push(
         instance
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
-            .add_attribute(("user_data", linux_user_data()))
             .add_block(primary(&first))
             .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)))
             .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
@@ -235,19 +223,18 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
 /// First boot on Windows: the `isoloom` administrator with the generated password, WinRM over
 /// HTTP, and the auto-stop.
 fn windows_user_data() -> Expression {
-    let stop = Template::text("Register-ScheduledTask -TaskName isoloom-auto-stop -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(")
-        .with_expr(reference("var.auto_stop_minutes"))
-        .with_text(")) -User SYSTEM -RunLevel Highest -Force | Out-Null");
+    let stop = auto_stop::windows_task();
     Template::text("<powershell>\n$p = ConvertTo-SecureString '")
         .with_expr(reference(windows::PASSWORD))
         .with_text("' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n")
-        .with_expr(auto_stop::if_set(stop.into_expression(), string("")))
+        .with_expr(auto_stop::if_expires(stop.into_expression(), string("")))
         .with_text("\n</powershell>\n")
         .into_expression()
 }
 
 /// The controller: its security group, an interface on every network at the controller
-/// address, its instance and Elastic IP, its set-up over SSH once every machine is set up.
+/// address, its instance and Elastic IP, set up from its user data (it waits for every machine's
+/// own set-up before the playbooks).
 pub(super) fn controller(env: &Environment, m: &mut Module) {
     m.commented(
         "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
@@ -260,28 +247,22 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
     }
     let first = env.networks.keys().next().map(|n| nic(n)).unwrap_or_default();
     let (_, mem, _) = controller::size(env);
+    let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Basic);
+    let at_boot = interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n))));
+    let user = |mp: &MachinePlan| image_user(mp.os.as_deref().unwrap_or_default()).to_owned();
+    let setup = controller_setup::set_up(env, &user, inventory, &at_boot);
     m.block(
         resource("aws_instance", "isoloom_controller")
             .add_attribute(("ami", reference(&format!("data.aws_ami.{}.id", ident(controller::OS)))))
             .add_attribute(("instance_type", string(instance_type(mem))))
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
-            .add_attribute(("user_data", linux_user_data()))
+            .add_attribute(user_data(user_data::expression(&setup)))
             .add_block(primary(&first))
             .add_attribute(("tags", object([("Name", name_with("-controller"))])))
             .build(),
     );
     m.block(eip("isoloom_controller", &first));
     m.blocks(attachments("isoloom_controller", env.networks.keys().map(|n| nic(n))));
-    let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Basic);
-    let ssh = controller::Ssh {
-        env,
-        replace_on: reference("aws_instance.isoloom_controller.id"),
-        host: reference("aws_eip.isoloom_controller.public_ip"),
-        user: "admin".to_owned(),
-        at_boot: interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n)))),
-        inventory,
-    };
-    m.block(controller::provisioner(ssh).block());
 }
 
 /// The address to stand at for the checks and a session when no Linux machine can.

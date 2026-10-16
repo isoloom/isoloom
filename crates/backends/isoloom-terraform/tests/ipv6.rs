@@ -94,13 +94,12 @@ fn oracle_cloud_reads_back_the_addresses_it_picks() -> Outcome {
     let oci = CloudVmModule::new(Cloud::Oci);
     assert_eq!(oci.refusal(&e), None);
     let tf = &oci.render(&e)?.contents;
-    // No address named on `back`: Oracle Cloud picks it, and the set-up reads it back.
+    // No address named on `back`: Oracle Cloud picks it, and each machine's own set-up reads it
+    // from its metadata service, by its VNIC's IPv4 address there.
     assert!(!tf.contains("fd00:67:20::10"), "{tf}");
-    assert!(
-        tf.contains("oci_core_instance.web.create_vnic_details[0].ipv6address_ipv6subnet_cidr_pair_details[0].ipv6address"),
-        "{tf}"
-    );
-    assert!(tf.contains("data.oci_core_vnic.user_back.ipv6addresses[0]"), "{tf}");
+    assert!(tf.contains("v.get(\\\"privateIp\\\") == \\\"10.67.20.10\\\""), "{tf}");
+    assert!(tf.contains("v.get(\\\"privateIp\\\") == \\\"10.67.20.20\\\""), "{tf}");
+    assert!(tf.contains("ipv6Addresses"), "{tf}");
     assert!(tf.contains("inet 10.67.20.20/"), "{tf}");
     // Azure gives each interface its derived address, so it refuses.
     let azure = CloudVmModule::new(Cloud::Azure).refusal(&e).unwrap();

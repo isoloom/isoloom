@@ -17,9 +17,8 @@ use super::region;
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
-use crate::cloud::{Cloud, auto_stop, operator};
+use crate::cloud::{Cloud, operator};
 use crate::limits::Limits;
-use crate::machine::{Remote, linux};
 use crate::module::{self, Usage, ident, providers, resource};
 
 /// What Linode takes.
@@ -96,9 +95,9 @@ fn plan(memory_mb: u32) -> &'static str {
 pub(crate) const DRIVER: Driver = Driver {
     usage: |folder| Usage {
         before: "# Auth:   export LINODE_TOKEN=<token> (the provider reads it).\n",
-        ..Usage::with_key(folder, operator::ALLOWED)
+        ..Usage::with_runner_key(folder, operator::ALLOWED)
     },
-    requires: (&[providers::LINODE, providers::RANDOM, providers::LOCAL], &[]),
+    requires: (&[providers::LINODE, providers::RANDOM], &[]),
     variables: || vec![region()],
     provider: |_, m| {
         m.block(Block::builder("provider").add_label("linode").build());
@@ -106,6 +105,7 @@ pub(crate) const DRIVER: Driver = Driver {
     },
     refusal,
     write,
+    user: |_| USER,
 };
 
 /// The module after its providers: the VPC and its subnets, the firewalls, each machine, the outputs.
@@ -123,11 +123,12 @@ fn public_ip(name: &str) -> Expression {
 }
 
 /// Machine `name`'s root password (for the console: SSH logs in with the key), its instance (a
-/// public interface, and a VPC interface pinned to its address), its set-up over SSH.
+/// public interface, and a VPC interface pinned to its address), set up from its user data.
 fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) {
     let id = ident(name);
     m.block(module::password(&id));
-    let user_data = call("base64encode", [auto_stop::if_set(auto_stop::script(), string(""))]);
+    let at_boot = std::iter::once(Template::text(SUDO)).chain(network::routes(env, net)).collect();
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot);
     let mut vpc = Block::builder("interface")
         .add_attribute(("purpose", string("vpc")))
         .add_attribute(("subnet_id", reference(&format!("linode_vpc_subnet.{}.id", ident(net)))))
@@ -154,26 +155,10 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
             .add_attribute(("root_pass", reference(&format!("random_password.{id}.result"))))
             .add_attribute(("booted", boolean(true)))
             .add_attribute(("tags", tag_list(env)))
-            .add_block(Block::builder("metadata").add_attribute(("user_data", user_data)).build())
+            .add_block(super::metadata(setup))
             .add_block(Block::builder("interface").add_attribute(("purpose", string("public"))).build())
             .add_block(vpc.build())
             .build(),
     );
-    let at_boot = std::iter::once(Template::text(SUDO)).chain(network::routes(env, net)).collect();
-    let machine = linux::Machine {
-        remote: Remote {
-            env,
-            name,
-            plan: mp,
-            replace_on: reference(&format!("linode_instance.{id}.id")),
-            host: public_ip(name),
-        },
-        user: USER.to_owned(),
-        hooks: hooks::of(mp, at_boot),
-    };
     m.blocks(disks::linode(name, &mp.disks));
-    let mut setup = linux::provisioner(machine);
-    // The firewall first: the set-up's downloads go through it.
-    setup.depends_on.insert(0, reference(&format!("linode_firewall.{id}")));
-    m.block(setup.block());
 }

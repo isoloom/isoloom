@@ -6,14 +6,11 @@
 
 use std::collections::BTreeSet;
 
-use isoloom_manifest::{
-    CheckRunner, Delivery, EnvName, Error as ManifestError, Identifier, Name, NonEmpty, Param, SecretSlot, SetBy, SlotKind, SnakeName, TfVarShape,
-};
+use isoloom_manifest::{CheckRunner, Delivery, Error as ManifestError, Identifier, Name, NonEmpty, Param, SecretSlot, SlotKind, SnakeName, TfVarShape};
 use isoloom_plan::Environment;
 
 use isoloom_render::run_manifest::derived_switch;
 
-use crate::machine::vms;
 use crate::module::variable::Variable;
 
 /// The module's variables the runner sets itself (`steps`): never params.
@@ -45,17 +42,7 @@ pub(super) fn params(variables: &[Variable], runners: &[CheckRunner]) -> Result<
 /// Variable `v` as a param the embedder sets: required when it has no default; a `bool` takes
 /// `true` or `false`.
 fn param(v: &Variable) -> Result<Param, ManifestError> {
-    Ok(Param {
-        name: EnvName::parse(v.name())?,
-        description: v.description().map_or_else(|| format!("The module's `{}`.", v.name()), |d| format!("{d}.")),
-        default: v.default_text(),
-        values: if v.is_bool() { vec!["true".into(), "false".into()] } else { Vec::new() },
-        required: !v.has_default(),
-        hosts: BTreeSet::new(),
-        providers: BTreeSet::new(),
-        set_by: SetBy::Embedder,
-        deliver: tf_var(v.name(), TfVarShape::String)?,
-    })
+    crate::module::manifest::param(v, false)
 }
 
 /// The connection's secrets: the sensitive ones of the module's `variables`.
@@ -71,10 +58,7 @@ pub(super) fn connection(variables: &[Variable]) -> Result<Vec<SecretSlot>, Mani
 pub(super) fn secrets(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
     let mut out = connection(&super::super::base::variables(env))?;
     for input in &env.spec().inputs {
-        let readers: Vec<Name> = vms(env)
-            .filter(|(_, mp)| mp.inputs.contains(input))
-            .map(|(n, _)| Name::parse(n))
-            .collect::<Result<_, _>>()?;
+        let readers = crate::module::manifest::input_readers(env, input)?;
         if readers.is_empty() {
             continue;
         }

@@ -4,9 +4,9 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, boolean, list, object, reference, string};
 
 use super::routing;
-use crate::cloud::aws::{egress, first_zone, ingress, key_pair, route_out};
+use crate::cloud::aws::{egress, egress_to, first_zone, ingress, key_pair, route_out, sealed_route_out};
 use crate::cloud::instance::name_with;
-use crate::cloud::vm::reach;
+use crate::cloud::vm::{reach, seal};
 use crate::module::{ident, resource};
 
 /// The networks: one VPC, a subnet per network with its exact range (the first network's block
@@ -41,6 +41,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .build(),
     );
     let own_tables = routing::blocks(env, m);
+    let closed = |net: &str| seal::any(env) && seal::closed(env, net);
     if !own_tables {
         m.block(
             resource("aws_route_table", "env")
@@ -48,9 +49,22 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                 .add_block(route_out())
                 .build(),
         );
+        if nets.iter().any(|(n, _)| closed(n)) {
+            m.commented(
+                "The networks without internet: theirs until the run is sealed, then allowed_cidr's replies only.",
+                resource("aws_route_table", "sealed")
+                    .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
+                    .add_block(sealed_route_out())
+                    .build(),
+            );
+        }
     }
     for (i, (net, cidr)) in nets.iter().enumerate() {
-        let table = if own_tables { ident(net) } else { "env".to_owned() };
+        let table = match (own_tables, closed(net)) {
+            (true, _) => ident(net),
+            (false, true) => "sealed".to_owned(),
+            (false, false) => "env".to_owned(),
+        };
         m.blocks(subnet(net, cidr, i > 0 && whole.is_none(), &table));
     }
     m.block(key_pair());
@@ -120,7 +134,7 @@ pub(super) fn security_group(env: &Environment, (name, mp): (&str, &MachinePlan)
     for p in &mp.ports {
         b = b.add_block(ingress("published", (p.publish, p.publish), p.protocol.id(), allowed()));
     }
-    b.add_block(egress()).build()
+    b.add_block(egress_to(seal::destinations(env, mp))).build()
 }
 
 /// The controller's: every network may reach it, and SSH from `allowed_cidr`.

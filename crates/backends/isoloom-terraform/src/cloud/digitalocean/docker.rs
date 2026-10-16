@@ -2,13 +2,13 @@
 //! firewall.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, list, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{Way, region, rule, ssh_key, vpc};
-use crate::cloud::docker::{Driver, SizeVariable};
+use crate::cloud::docker::{Driver, Host, SizeVariable};
 use crate::cloud::instance::tag_list;
-use crate::docker_host::{Access, AutoStop, published};
+use crate::docker_host::published;
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
@@ -22,20 +22,19 @@ pub(crate) const DRIVER: Driver = Driver {
     // No provider block: the provider reads its token from the environment.
     provider: |_, _| Vec::new(),
     resources,
+    user: "root",
 };
 
-/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
-/// it.
-fn resources(env: &Environment, m: &mut Module) -> Access {
+/// The cloud's resources, after the module's head, `user_data` in the droplet; the host they
+/// make.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
     m.block(vpc("10.42.1.0/24"));
     m.block(ssh_key());
-    m.block(droplet(env));
+    m.block(droplet(env, user_data));
     m.block(firewall(env));
-    Access {
-        host: reference("digitalocean_droplet.env.ipv4_address"),
+    Host {
+        address: reference("digitalocean_droplet.env.ipv4_address"),
         user: "root",
-        replace_on: reference("digitalocean_droplet.env.id"),
-        auto_stop: AutoStop::SetUp,
     }
 }
 
@@ -44,14 +43,15 @@ fn resource(kind: &str) -> BlockBuilder {
     crate::module::resource(kind, "env").add_attribute(("name", reference("local.name")))
 }
 
-/// Debian 12 with the operator's key.
-fn droplet(env: &Environment) -> Block {
+/// Debian 12 with the runner's key, set up from its user data.
+fn droplet(env: &Environment, user_data: Expression) -> Block {
     resource("digitalocean_droplet")
         .add_attribute(("region", reference("var.region")))
         .add_attribute(("size", reference("var.size")))
         .add_attribute(("image", string("debian-12-x64")))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))
+        .add_attribute(("user_data", user_data))
         .add_attribute(("tags", tag_list(env)))
         .build()
 }

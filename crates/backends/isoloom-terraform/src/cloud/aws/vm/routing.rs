@@ -11,7 +11,7 @@
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, Expression, Module, reference, string};
 
-use crate::cloud::aws::route_out;
+use crate::cloud::aws::{route_out, sealed_route_out};
 use crate::cloud::vm::gateways::{Hop, covering, routed, through, toward};
 use crate::module::{ident, resource};
 
@@ -56,9 +56,10 @@ fn route(cidr: &str, target: (&str, Expression)) -> Block {
 /// gateway routes it to (all of them, on a routed network) through that gateway, and each
 /// routed network through its own.
 fn table(env: &Environment, net: &str) -> Block {
+    let closed = crate::cloud::vm::seal::any(env) && crate::cloud::vm::seal::closed(env, net);
     let b = resource("aws_route_table", &ident(net))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
-        .add_block(route_out());
+        .add_block(if closed { sealed_route_out() } else { route_out() });
     through(env, net)
         .iter()
         .fold(b, |b, hop| b.add_block(route(&hop.plan.cidr, ("network_interface_id", interface(hop, net)))))

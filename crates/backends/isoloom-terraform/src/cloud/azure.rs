@@ -13,13 +13,12 @@ use crate::module::variable::Variable;
 
 /// The `subscription_id` and `region` variables: the operator's default subscription, Sweden
 /// by default.
-pub(crate) fn variables() -> [Block; 2] {
+pub(crate) fn variables() -> [Variable; 2] {
     [
         Variable::new("subscription_id", "string")
             .default(null())
-            .describe("Default: ARM_SUBSCRIPTION_ID from the environment")
-            .block(),
-        Variable::new("region", "string").default(string("swedencentral")).block(),
+            .describe("Default: ARM_SUBSCRIPTION_ID from the environment"),
+        Variable::new("region", "string").default(string("swedencentral")),
     ]
 }
 

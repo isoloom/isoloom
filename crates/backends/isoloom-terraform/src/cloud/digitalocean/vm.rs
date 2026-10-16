@@ -5,16 +5,16 @@
 //! single-Linux-VM labs and refuses the rest.
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Expression, Module, list, null, reference, string};
+use isoloom_render::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_spec::DEFAULT_MEMORY_MB;
 
 use super::{Way, region, rule, ssh_key, vpc};
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
-use crate::cloud::{Cloud, auto_stop, operator};
+use crate::cloud::{Cloud, operator};
 use crate::limits::Limits;
-use crate::machine::{Remote, linux, vms};
+use crate::machine::vms;
 use crate::module::{Usage, ident, providers, resource};
 
 /// What DigitalOcean takes.
@@ -94,9 +94,9 @@ fn size(memory_mb: u32) -> &'static str {
 pub(crate) const DRIVER: Driver = Driver {
     usage: |folder| Usage {
         before: "# Auth:   export DIGITALOCEAN_TOKEN=<token>\n",
-        ..Usage::with_key(folder, operator::ALLOWED)
+        ..Usage::with_runner_key(folder, operator::ALLOWED)
     },
-    requires: (&[providers::DIGITALOCEAN, providers::LOCAL], &[]),
+    requires: (&[providers::DIGITALOCEAN], &[]),
     variables: || vec![region()],
     provider: |_, m| {
         m.block(Block::builder("provider").add_label("digitalocean").build());
@@ -104,6 +104,7 @@ pub(crate) const DRIVER: Driver = Driver {
     },
     refusal,
     write,
+    user: |_| USER,
 };
 
 /// The module after its providers: the VPC, the droplet, its firewall and set-up, the outputs.
@@ -130,7 +131,7 @@ fn network(env: &Environment, m: &mut Module) {
     m.block(ssh_key());
 }
 
-/// Machine `name`'s droplet, its firewall, its set-up over SSH.
+/// Machine `name`'s droplet, set up from its user data, and its firewall.
 fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
     let id = ident(name);
     let os = mp.os.as_deref().unwrap_or_default();
@@ -146,7 +147,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         .add_attribute(("image", string(slug)))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))
-        .add_attribute(("user_data", auto_stop::if_set(auto_stop::script(), null())))
+        .add_attribute(("user_data", hooks::user_data(env, (name, mp), USER, Vec::new())))
         .add_attribute(("tags", tag_list(env)));
     if !mp.disks.is_empty() {
         droplet = droplet.add_attribute(("volume_ids", disks::digitalocean_ids(name, &mp.disks)));
@@ -154,28 +155,23 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
     m.block(droplet.build());
     m.commented(
         "What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.",
-        firewall(mp, &id),
+        firewall(mp, &id, crate::cloud::vm::seal::sealed(env, mp)),
     );
-    let machine = linux::Machine {
-        remote: Remote {
-            env,
-            name,
-            plan: mp,
-            replace_on: reference(&format!("digitalocean_droplet.{id}.id")),
-            host: public_ip(name),
-        },
-        user: USER.to_owned(),
-        hooks: hooks::of(mp, Vec::new()),
-    };
-    m.block(linux::provisioner(machine).block());
 }
 
 /// SSH and the droplet's own published ports from `allowed_cidr`, everything from the VPC,
-/// everything out.
-fn firewall(mp: &MachinePlan, id: &str) -> Block {
+/// everything out; the VPC only once the run is sealed, for a `sealed` droplet (no internet).
+fn firewall(mp: &MachinePlan, id: &str, sealed: bool) -> Block {
     let allowed = || list([reference("var.allowed_cidr")]);
     let vpc = || list([reference("digitalocean_vpc.env.ip_range")]);
-    let anywhere = || list([string("0.0.0.0/0"), string("::/0")]);
+    let everywhere = || list([string("0.0.0.0/0"), string("::/0")]);
+    let anywhere = || {
+        if sealed {
+            crate::cloud::vm::seal::when_sealed(vpc(), everywhere())
+        } else {
+            everywhere()
+        }
+    };
     let mut b = resource("digitalocean_firewall", id)
         .add_attribute(("name", reference("local.name")))
         .add_attribute(("droplet_ids", list([reference(&format!("digitalocean_droplet.{id}.id"))])))

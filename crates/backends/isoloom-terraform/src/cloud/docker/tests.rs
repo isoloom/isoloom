@@ -47,16 +47,52 @@ fn every_cloud_opens_ssh_and_the_published_ports() {
 }
 
 #[test]
-fn the_set_up_waits_for_cloud_init_then_starts_compose_with_the_inputs() {
-    let tf = module(Cloud::Linode);
-    let at = |s: &str| tf.find(s).unwrap_or_else(|| panic!("{s} in {tf}"));
-    assert!(at("cloud-init status --wait") < at("sudo shutdown -h +"));
-    assert!(at("sudo shutdown -h +") < at("tar -xzf /tmp/isoloom-project.tgz"));
-    assert!(at("get.docker.com") < at("set -a; . /tmp/isoloom-inputs.env; set +a;"));
-    assert!(at("docker compose -f .isoloom/docker/compose.yml up -d --build --wait") < at("echo ready > /var/lib/isoloom/ready"));
-    assert!(tf.contains("destination = \"/tmp/isoloom-inputs.env\""), "{tf}");
-    // AWS schedules the auto-stop in its user data instead.
-    assert!(!module(Cloud::Aws).contains("sudo shutdown"));
+fn the_module_is_infrastructure_only_and_the_host_installs_docker_from_its_setup_script() {
+    // Terraform makes only the VM: the runner pipes the shared setup.sh into the host over SSH to
+    // install Docker, then delivers the project and starts the Compose file (the run manifest's
+    // own steps). Nothing in the module reaches the guest.
+    let files = super::setup(&env(SPEC)).unwrap();
+    let setup = &files
+        .iter()
+        .find(|f| f.path.ends_with("cloud-docker/aws/setup.sh"))
+        .expect("a setup.sh")
+        .contents;
+    assert!(setup.contains("get.docker.com") && setup.contains("docker-compose-plugin"), "{setup}");
+    for cloud in Cloud::ALL {
+        let tf = module(cloud);
+        for gone in [
+            "terraform_data\" \"environment\"",
+            "remote-exec",
+            "local-exec",
+            "ssh_private_key_file",
+            "local_file",
+        ] {
+            assert!(!tf.contains(gone), "{cloud:?} still has {gone}");
+        }
+    }
+    // The secret input never travels in the user data; the module takes none in a file either.
+    let tf = module(Cloud::Aws);
+    assert!(!tf.contains("lookup(var.inputs, \"TOKEN\""), "{tf}");
+}
+
+#[test]
+fn each_cloud_hands_the_set_up_to_its_own_first_boot() {
+    let cases = [
+        (Cloud::Aws, "user_data_base64", "base64gzip("),
+        (Cloud::Azure, "custom_data", "base64encode("),
+        (Cloud::Gcp, "startup-script", ""),
+        (Cloud::DigitalOcean, "user_data", ""),
+        (Cloud::Linode, "user_data", "base64encode("),
+        (Cloud::Oci, "user_data", "base64encode("),
+    ];
+    for (cloud, key, wrap) in cases {
+        let tf = module(cloud);
+        let line = tf
+            .lines()
+            .find(|l| l.trim_start().starts_with(&format!("{key} ")))
+            .unwrap_or_else(|| panic!("no {key} in {cloud:?}: {tf}"));
+        assert!(line.contains(&format!("= {wrap}\"#!/bin/sh\\n")), "{cloud:?}: {line}");
+    }
 }
 
 #[test]

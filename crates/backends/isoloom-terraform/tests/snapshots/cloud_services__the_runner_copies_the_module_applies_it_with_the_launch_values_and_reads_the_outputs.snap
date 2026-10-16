@@ -1,0 +1,339 @@
+---
+source: crates/backends/isoloom-terraform/tests/cloud_services.rs
+expression: json
+---
+{
+  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "manifest_version": 0,
+  "generator": {
+    "name": "isoloom",
+    "version": "0.10.1"
+  },
+  "lab": {
+    "name": "goat",
+    "instance": null,
+    "message": null
+  },
+  "target": "cloud-services",
+  "cloud": "aws",
+  "driver": "terraform",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "terraform",
+      "probe": [
+        "terraform",
+        "version"
+      ]
+    },
+    {
+      "name": "jq",
+      "probe": [
+        "jq",
+        "--version"
+      ]
+    },
+    {
+      "name": "aws",
+      "probe": [
+        "aws",
+        "--version"
+      ]
+    }
+  ],
+  "identity": {
+    "terraform": {
+      "module": ".",
+      "state": "runner",
+      "var_files": [
+        "terraform.tfvars.json"
+      ]
+    }
+  },
+  "params": [
+    {
+      "name": "AWS_PROFILE",
+      "description": "The AWS CLI profile the provider signs in with (its credentials and settings), when no keys are given.",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "AWS_PROFILE",
+          "steps": [
+            "init",
+            "apply",
+            "destroy"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "name": "AWS_ACCESS_KEY_ID",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "source": {
+        "store": "env",
+        "reference": "AWS_ACCESS_KEY_ID"
+      },
+      "deliver": [
+        {
+          "via": "env",
+          "var": "AWS_ACCESS_KEY_ID",
+          "steps": [
+            "init",
+            "apply",
+            "destroy"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AWS_SECRET_ACCESS_KEY",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "source": {
+        "store": "env",
+        "reference": "AWS_SECRET_ACCESS_KEY"
+      },
+      "deliver": [
+        {
+          "via": "env",
+          "var": "AWS_SECRET_ACCESS_KEY",
+          "steps": [
+            "init",
+            "apply",
+            "destroy"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AWS_SESSION_TOKEN",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "source": {
+        "store": "env",
+        "reference": "AWS_SESSION_TOKEN"
+      },
+      "deliver": [
+        {
+          "via": "env",
+          "var": "AWS_SESSION_TOKEN",
+          "steps": [
+            "init",
+            "apply",
+            "destroy"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PLAYER_CIDR",
+      "kind": "input",
+      "required": true,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "state_file",
+          "path": "inputs.tfvars.json",
+          "format": "tfvars_json",
+          "key": "cg_whitelist"
+        }
+      ]
+    },
+    {
+      "name": "TOKEN",
+      "kind": "input",
+      "required": true,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "state_file",
+          "path": "inputs.tfvars.json",
+          "format": "tfvars_json",
+          "key": "token"
+        },
+        {
+          "via": "state_file",
+          "path": "inputs.tfvars.json",
+          "format": "tfvars_json",
+          "key": "api_token"
+        }
+      ]
+    }
+  ],
+  "networks": [],
+  "machines": [],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "copy-module",
+        "note": "Copying the lab's Terraform module…",
+        "action": "terraform.copy_module",
+        "with": {
+          "from": "../../terraform"
+        }
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "-chdir=${run.state_dir}/module",
+          "init",
+          "-input=false",
+          "-no-color"
+        ],
+        "env": {
+          "AWS_REGION": "us-east-1",
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_isoloom_instance": "${run.name}"
+        },
+        "timeout_s": 3600
+      },
+      {
+        "id": "apply",
+        "note": "Creating the lab's services…",
+        "argv": [
+          "terraform",
+          "-chdir=${run.state_dir}/module",
+          "apply",
+          "-auto-approve",
+          "-input=false",
+          "-no-color",
+          "-state=${run.state_dir}/terraform.tfstate",
+          "-var-file=${run.dir}/terraform.tfvars.json",
+          "-var-file=${run.state_dir}/inputs.tfvars.json"
+        ],
+        "env": {
+          "AWS_REGION": "us-east-1",
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_isoloom_instance": "${run.name}"
+        },
+        "timeout_s": 3600
+      }
+    ],
+    "down": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "copy-module",
+        "note": "Copying the lab's Terraform module…",
+        "action": "terraform.copy_module",
+        "with": {
+          "from": "../../terraform",
+          "when": "missing"
+        }
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "-chdir=${run.state_dir}/module",
+          "init",
+          "-input=false",
+          "-no-color"
+        ],
+        "env": {
+          "AWS_REGION": "us-east-1",
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_isoloom_instance": "${run.name}"
+        },
+        "timeout_s": 3600
+      },
+      {
+        "id": "destroy",
+        "note": "Removing the lab's services…",
+        "argv": [
+          "terraform",
+          "-chdir=${run.state_dir}/module",
+          "destroy",
+          "-auto-approve",
+          "-input=false",
+          "-no-color",
+          "-state=${run.state_dir}/terraform.tfstate",
+          "-var-file=${run.dir}/terraform.tfvars.json",
+          "-var-file=${run.state_dir}/inputs.tfvars.json"
+        ],
+        "env": {
+          "AWS_REGION": "us-east-1",
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_isoloom_instance": "${run.name}"
+        },
+        "timeout_s": 3600
+      }
+    ],
+    "status": {
+      "id": "state",
+      "action": "terraform.read_state"
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "apply",
+      "means": "the module's services exist"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "site",
+      "description": "The module's `url` (the spec's `cloud.outputs.site`).",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "url"
+      }
+    },
+    {
+      "name": "admin_password",
+      "description": "The module's `admin_password` (the spec's `cloud.outputs.admin-password`).",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "admin_password"
+      }
+    }
+  ],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [],
+    "teardown": []
+  },
+  "recovery": {
+    "retries": 0,
+    "apply_retries": 3
+  },
+  "expiry": {
+    "tf_var": "expires_at",
+    "unit": "unix_seconds",
+    "default_minutes": 240
+  }
+}

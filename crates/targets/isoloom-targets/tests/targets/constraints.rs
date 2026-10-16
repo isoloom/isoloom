@@ -103,20 +103,23 @@ fn every_linux_vm_runs_the_preamble_first() -> Outcome {
         "every cloud-config"
     );
 
-    // On the clouds from the plan, the `Prelude` step comes first, right after cloud-init is
-    // done, on every VM.
+    // On the clouds, the `Prelude` step is the first of every VM's own set-up (its user data),
+    // once the project is in.
     for cloud in ["aws", "azure", "gcp"] {
         let tf = file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
-        assert_eq!(
-            tf.matches("\"cloud-init status --wait >/dev/null 2>&1 || true\",\n      \"sudo sh -c 'set -e\\n# The proxy")
-                .count(),
-            tf.matches("cloud-init status --wait").count(),
-            "{cloud}: {tf}"
-        );
+        let set_ups = tf.matches("<<'ISOLOOM_SETUP'").count();
+        assert!(set_ups > 0, "{cloud}: {tf}");
+        assert_eq!(tf.matches("running: system constraints").count(), set_ups, "{cloud}: {tf}");
+        assert_eq!(tf.matches("{ sh -c 'set -e\\n# The proxy").count(), set_ups, "{cloud}: {tf}");
     }
+    // The cloud Docker host sets itself up from its shared setup.sh (over SSH, the run manifest),
+    // not from Terraform: the prelude leads it.
     for cloud in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
-        let tf = file(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?;
-        assert_eq!(tf.matches("sudo sh -c 'set -e").count(), 1, "the Docker host on {cloud}");
+        let setup = file(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/setup.sh"))?;
+        assert!(
+            setup.contains("# The proxy") && setup.contains("mirror.corp/debian"),
+            "the Docker host on {cloud}: {setup}"
+        );
     }
     // On Proxmox, before cloud-init installs the guest agent (through the proxy); Docker and the
     // rest run from setup.sh over SSH, where the prelude leads too.

@@ -4,12 +4,12 @@
 
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, attr, boolean, index, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, index, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{SHAPE, availability_domain, availability_domains, owned, provider, route_out, ubuntu_images};
-use crate::cloud::docker::Driver;
-use crate::docker_host::{Access, AutoStop, published};
+use crate::cloud::docker::{Driver, Host};
+use crate::docker_host::published;
 use crate::module::providers;
 use crate::module::variable::Variable;
 
@@ -18,27 +18,27 @@ pub(crate) const DRIVER: Driver = Driver {
     requires: providers::OCI,
     variables: || {
         vec![
-            Variable::new("compartment_id", "string").block(),
-            Variable::new("region", "string").default(string("eu-paris-1")).block(),
+            Variable::new("compartment_id", "string"),
+            Variable::new("region", "string").default(string("eu-paris-1")),
+            super::profile(),
         ]
     },
     size: None,
     provider,
     resources,
+    user: "ubuntu",
 };
 
-/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
-/// it.
-fn resources(env: &Environment, m: &mut Module) -> Access {
+/// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
+/// by cloud-init); the host they make.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
     m.block(availability_domains());
     m.block(ubuntu_images("ubuntu", "24.04"));
     m.blocks(network(env));
-    m.block(vm(env));
-    Access {
-        host: reference("oci_core_instance.env.public_ip"),
+    m.block(vm(env, user_data));
+    Host {
+        address: reference("oci_core_instance.env.public_ip"),
         user: "ubuntu",
-        replace_on: reference("oci_core_instance.env.id"),
-        auto_stop: AutoStop::SetUp,
     }
 }
 
@@ -107,7 +107,9 @@ fn network(env: &Environment) -> Vec<Block> {
     ]
 }
 
-fn vm(env: &Environment) -> Block {
+/// The instance: Ubuntu on the flexible shape, sized for the containers, its set-up in its user
+/// data.
+fn vm(env: &Environment, user_data: Expression) -> Block {
     let (ocpus, memory) = HostSize::of(env).pick([(1, 4), (2, 8), (4, 16)]);
     resource("oci_core_instance")
         .add_attribute(("availability_domain", availability_domain()))
@@ -131,6 +133,12 @@ fn vm(env: &Environment) -> Block {
                 .add_attribute(("assign_public_ip", boolean(true)))
                 .build(),
         )
-        .add_attribute(("metadata", object([("ssh_authorized_keys", reference("var.ssh_public_key"))])))
+        .add_attribute((
+            "metadata",
+            object([
+                ("ssh_authorized_keys", reference("var.ssh_public_key")),
+                ("user_data", call("base64encode", [user_data])),
+            ]),
+        ))
         .build()
 }

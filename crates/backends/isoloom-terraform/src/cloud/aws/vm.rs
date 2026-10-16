@@ -170,8 +170,8 @@ fn machines_refusal(env: &Environment) -> Option<String> {
 
 /// Its `cloud-vm` driver.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage::with_key(folder, operator::ALLOWED),
-    requires: (&[providers::AWS, providers::LOCAL], &[providers::RANDOM, providers::TIME]),
+    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    requires: (&[providers::AWS], &[providers::RANDOM, providers::TIME, providers::LOCAL]),
     variables: || vec![region()],
     provider: |env, m| {
         m.block(provider(instance::tags(env)));
@@ -179,6 +179,7 @@ pub(crate) const DRIVER: Driver = Driver {
     },
     refusal,
     write,
+    user: image_user,
 };
 
 /// The module's blocks after the providers, from the plan.

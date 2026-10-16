@@ -42,8 +42,8 @@ fn cloud_vm_runs_windows_over_winrm_with_its_name() -> Outcome {
     // Renamed and restarted before its set-up, which checks the name.
     assert!(tf.contains("resource \"time_sleep\" \"web01_restart\""));
     assert!(tf.contains("still named"));
-    // Auto-stop as a scheduled task (a pending shutdown would block the rename's restart).
-    assert!(tf.contains("isoloom-auto-stop"));
+    // The run's end as a scheduled task (a pending shutdown would block the rename's restart).
+    assert!(tf.contains("isoloom-expiry"));
     // A Windows-only environment: the controller runs the checks.
     assert!(tf.contains("host     = aws_eip.isoloom_controller.public_ip"), "{tf}");
     Ok(())

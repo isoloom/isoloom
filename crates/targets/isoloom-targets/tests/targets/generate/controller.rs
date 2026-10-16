@@ -31,9 +31,16 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() -> Outcome {
     assert!(tf.contains("resource \"tls_private_key\" \"controller\""));
     assert!(tf.contains("${trimspace(tls_private_key.controller.public_key_openssh)}"), "{tf}");
     assert!(tf.contains("private_ips       = [\"10.63.0.253\"]"));
-    // After every machine is set up, it runs the playbook with the groups and vars.
-    assert!(tf.contains("depends_on = [terraform_data.web, terraform_data.cache]") || tf.contains("depends_on = [terraform_data.cache, terraform_data.web]"));
-    assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini"));
+    // Once every machine's own set-up is done (its ready file, over SSH with the controller's
+    // key), it runs the playbook with the groups and vars.
+    let (web, cache) = (
+        tf.find("running: waiting for web").ok_or("web")?,
+        tf.find("running: waiting for cache").ok_or("cache")?,
+    );
+    let playbook = tf
+        .find("ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini")
+        .ok_or("playbook")?;
+    assert!(web < playbook && cache < playbook, "{tf}");
     assert!(tf.contains("[webservers]"));
     Ok(())
 }
@@ -74,10 +81,8 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() -> Outcome {
     assert!(small_ctl.contains("v.cpus = 1\n      v.memory = 512"), "{small_ctl}");
     assert!(small_ctl.contains("v.guest_memsize = 512"));
     let aws = generated(&small_lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    assert!(
-        aws.contains("instance_type = \"t3.micro\"\n  key_name      = aws_key_pair.env.key_name\n  user_data"),
-        "{aws}"
-    );
+    let controller = from(&aws, "resource \"aws_instance\" \"isoloom_controller\"")?;
+    assert!(controller.contains("instance_type    = \"t3.micro\""), "{controller}");
     let proxmox = generated(&small_lab, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
     assert!(proxmox.contains("dedicated = 512"));
     // A box of one's own, pinned.

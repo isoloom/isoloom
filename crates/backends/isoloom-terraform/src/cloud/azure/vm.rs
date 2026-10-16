@@ -173,12 +173,13 @@ fn interfaces(env: &Environment) -> Option<String> {
 
 /// Its `cloud-vm` driver.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage::with_key(folder, operator::ALLOWED),
-    requires: (&[providers::AZURERM, providers::LOCAL], &[providers::RANDOM]),
+    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    requires: (&[providers::AZURERM], &[providers::RANDOM, providers::LOCAL]),
     variables: || variables().into(),
     provider,
     refusal,
     write,
+    user: |_| USER,
 };
 
 /// The module's blocks after the providers, from the plan.

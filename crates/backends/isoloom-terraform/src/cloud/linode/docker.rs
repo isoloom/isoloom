@@ -2,13 +2,13 @@
 //! firewall.
 
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, call, list, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{Action, Way, region, rule};
-use crate::cloud::docker::{Driver, SizeVariable};
+use crate::cloud::docker::{Driver, Host, SizeVariable};
 use crate::cloud::instance::tag_list;
-use crate::docker_host::{Access, AutoStop, published, tcp_ports};
+use crate::docker_host::{published, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
@@ -22,26 +22,26 @@ pub(crate) const DRIVER: Driver = Driver {
     // No provider block: the provider reads its token from the environment.
     provider: |_, _| Vec::new(),
     resources,
+    user: "root",
 };
 
-/// The cloud's resources, after the module's head; the host they make, as its set-up reaches
-/// it.
-fn resources(env: &Environment, m: &mut Module) -> Access {
+/// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
+/// by cloud-init); the host they make.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
     m.block(
         resource("linode_instance")
             .add_attribute(("region", reference("var.region")))
             .add_attribute(("type", reference("var.type")))
             .add_attribute(("image", string("linode/debian12")))
             .add_attribute(("authorized_keys", list([call("trimspace", [reference("var.ssh_public_key")])])))
+            .add_block(super::metadata(user_data))
             .add_attribute(("tags", tag_list(env)))
             .build(),
     );
     m.block(firewall(env));
-    Access {
-        host: call("one", [reference("linode_instance.env.ipv4")]),
+    Host {
+        address: call("one", [reference("linode_instance.env.ipv4")]),
         user: "root",
-        replace_on: reference("linode_instance.env.id"),
-        auto_stop: AutoStop::SetUp,
     }
 }
 

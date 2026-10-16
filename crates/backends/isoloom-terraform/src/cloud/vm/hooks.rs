@@ -1,22 +1,30 @@
-//! What a cloud adds to a Linux machine's set-up ([`Hooks`]): the auto-stop scheduled again
-//! after a restart, the published ports redirected before the machine closes itself off, and
-//! the steps the cloud's network does itself left out.
+//! What a cloud adds to a Linux machine's set-up ([`Hooks`]): the published ports redirected
+//! before the machine closes itself off, and the steps the cloud's network does itself left out;
+//! and the machine's user data, the set-up it runs itself (`crate::machine::user_data`).
 
-use isoloom_plan::{MachinePlan, Step};
-use isoloom_render::hcl_builder::Template;
+use isoloom_plan::{Environment, MachinePlan, Step};
+use isoloom_render::hcl_builder::{Expression, Template};
 
-use crate::cloud::auto_stop;
-use crate::machine::linux::Hooks;
+use crate::machine::linux::{self, Hooks};
+use crate::machine::user_data;
 
-/// A Linux machine's set-up hooks on a cloud: `at_boot` first, the auto-stop again after a
-/// restart, the published-port redirects before the machine closes itself off.
+/// A Linux machine's set-up hooks on a cloud: `at_boot` first (its interfaces after the first,
+/// a gateway's forwarding), the published-port redirects before the machine closes itself off.
+/// Its expiry needs no hook: the set-up schedules it at every boot.
 pub(crate) fn of(mp: &MachinePlan, at_boot: Vec<Template>) -> Hooks {
     Hooks {
         at_boot,
-        after_reboot: vec![auto_stop::rescheduled()],
+        after_reboot: Vec::new(),
         before_egress: redirects(mp),
         skip: network_does,
     }
+}
+
+/// A Linux machine's user data on a cloud: its whole set-up, logging in as `user`, `at_boot`
+/// run first at every boot.
+pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>) -> Expression {
+    let hooks = of(machine.1, at_boot);
+    user_data::expression(&linux::set_up(env, machine, user, &hooks))
 }
 
 /// The steps a cloud's network does itself: it routes between its subnets, each VLAN its own.

@@ -315,8 +315,12 @@ pub fn outputs_on_their_hosts(machines: &[Machine]) -> Result<Vec<Output>, Manif
     outputs_with(machines, |m| Template::from(Placeholder::Host(m.name.clone())))
 }
 
-/// [`outputs`], machine `m`'s shown at `host(m)`.
-fn outputs_with(machines: &[Machine], host: impl Fn(&Machine) -> Template) -> Result<Vec<Output>, ManifestError> {
+/// [`outputs`], machine `m`'s shown at `host(m)` (a cloud machine's own public address).
+///
+/// # Errors
+///
+/// Fails on an output name the manifest refuses.
+pub fn outputs_with(machines: &[Machine], host: impl Fn(&Machine) -> Template) -> Result<Vec<Output>, ManifestError> {
     let shown = machines.iter().filter(|m| matches!(m.role, Role::Target | Role::Access | Role::Tool));
     shown
         .flat_map(|m| m.ports.iter().filter(|p| p.publish.is_some()).map(move |p| (m, p)))
