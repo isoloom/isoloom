@@ -17,7 +17,7 @@ use isoloom_spec::model;
 
 use isoloom_render::container::init_names;
 
-use super::in_project;
+use super::Project;
 use crate::error::{Error, Result};
 use crate::file::ComposeFile;
 use crate::names::{STAND_IN, check_runner_service, probe_service, routes_service, tool_service};
@@ -103,11 +103,12 @@ fn runner(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, Op
 
 /// Each member as a machine: the lab's own with their architecture, size, addresses, volumes
 /// and ports; Isoloom's with what they have of those.
-pub(super) fn machines(env: &Environment, file: &ComposeFile, members: &[Member]) -> Result<Vec<Machine>> {
-    members.iter().map(|m| machine(env, file, m)).collect()
+/// Volumes are named as `project` names them.
+pub(super) fn machines(env: &Environment, file: &ComposeFile, members: &[Member], project: &Project) -> Result<Vec<Machine>> {
+    members.iter().map(|m| machine(env, file, m, project)).collect()
 }
 
-fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Machine> {
+fn machine(env: &Environment, file: &ComposeFile, member: &Member, project: &Project) -> Result<Machine> {
     let name = Name::parse(&member.name)?;
     let mut out = Machine {
         name: name.clone(),
@@ -131,7 +132,7 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Mac
             memory_mb: mp.size.memory_mb,
         });
         out.addresses = addresses(mp)?;
-        out.volumes = volumes(mp)?;
+        out.volumes = volumes(mp, project)?;
         let address = publish_address()?;
         out.ports = m
             .ports
@@ -154,15 +155,18 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member) -> Result<Mac
 }
 
 /// Its named volumes and data disks, by their names in the spec.
-fn volumes(mp: &MachinePlan) -> Result<Vec<Volume>> {
+fn volumes(mp: &MachinePlan, project: &Project) -> Result<Vec<Volume>> {
     let named = mp.volumes.iter().map(|v| {
         let native = match &v.lifetime {
             Lifetime::External { name } => Template::text(name),
-            Lifetime::Environment | Lifetime::Persistent => in_project(&v.key),
+            Lifetime::Environment | Lifetime::Persistent => project.prefixed(&v.key),
         };
         (v.name.as_str(), v.path.as_str(), native)
     });
-    let disks = mp.disks.iter().filter_map(|d| Some((d.name.as_str(), d.mount.as_deref()?, in_project(&d.key))));
+    let disks = mp
+        .disks
+        .iter()
+        .filter_map(|d| Some((d.name.as_str(), d.mount.as_deref()?, project.prefixed(&d.key))));
     named
         .chain(disks)
         .map(|(name, path, native)| {

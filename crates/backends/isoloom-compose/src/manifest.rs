@@ -5,9 +5,12 @@
 //! message is left to the caller, who fills it from the resolved snapshot.
 
 mod checks;
+mod guest;
 mod lifecycle;
 mod machines;
 mod slots;
+
+pub(crate) use guest::guest;
 
 use std::collections::BTreeSet;
 
@@ -33,7 +36,7 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
     let members = machines::classify(env, file)?;
     let plan = StartPlan::of(file);
     let runners = checks::runners(env)?;
-    let machines = machines::machines(env, file, &members)?;
+    let machines = machines::machines(env, file, &members, &Project::Run)?;
     Ok(Manifest {
         schema: Some(SCHEMA_URL.to_owned()),
         manifest_version: ManifestVersion,
@@ -46,12 +49,12 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
         tools: tools()?,
         identity: identity()?,
         params: slots::params(&machines, &runners.derived)?,
-        secrets: slots::slots(env, &members, &plan)?,
-        networks: run_manifest::networks(env, in_project)?,
+        secrets: slots::slots(env, &members, &plan, slots::Starts::Host)?,
+        networks: run_manifest::networks(env, |n| Project::Run.prefixed(n))?,
         outputs: run_manifest::outputs(&machines)?,
         machines,
         lifecycle: lifecycle::lifecycle(env, &plan, &members)?,
-        ready: lifecycle::ready(&plan, &members)?,
+        ready: lifecycle::ready(&plan, &members, "up")?,
         checks: Checks {
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup: checks::setup(file)?,
@@ -89,12 +92,26 @@ fn pinned_ports() -> Result<PathTemplate> {
     Ok(PathTemplate::in_state_dir(&RelPath::parse(PORTS_FILE)?))
 }
 
-/// `${run.name}_<name>`: what Compose calls a project's network or volume.
-fn in_project(name: &str) -> Template {
-    Template::from_parts([
-        isoloom_manifest::Part::Placeholder(Placeholder::Run(RunVar::Name)),
-        isoloom_manifest::Part::Text(format!("_{name}")),
-    ])
+/// The Compose project a manifest's commands run under.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Project {
+    /// The run's (`${run.name}`): Compose on this computer's Docker, run by the runner.
+    Run,
+    /// The Compose file's own name: Compose inside a VM, one lab per VM.
+    Named(String),
+}
+
+impl Project {
+    /// `<project>_<name>`: what Compose calls the project's network or volume `name`.
+    fn prefixed(&self, name: &str) -> Template {
+        match self {
+            Project::Run => Template::from_parts([
+                isoloom_manifest::Part::Placeholder(Placeholder::Run(RunVar::Name)),
+                isoloom_manifest::Part::Text(format!("_{name}")),
+            ]),
+            Project::Named(project) => Template::text(&format!("{project}_{name}")),
+        }
+    }
 }
 
 /// The project `${run.name}`, the Compose file, then the pinned ports over it.

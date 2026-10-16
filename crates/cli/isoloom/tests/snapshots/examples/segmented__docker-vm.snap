@@ -376,7 +376,7 @@ Vagrant.configure("2") do |config|
     v.guest_numvcpus = 3
     v.guest_memsize = 3072
   end
-  config.vm.provision "shell", name: "docker", inline: "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh"
+  config.vm.provision "shell", name: "docker", inline: "command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }"
   config.vm.provision "isoloom_project", name: "project", generated: true
   config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up -d --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; exit \"$failed\"", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
@@ -639,7 +639,7 @@ resource "terraform_data" "environment" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
+      "sudo sh -c 'command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }'",
       "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]

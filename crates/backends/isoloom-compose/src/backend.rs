@@ -5,6 +5,7 @@ use isoloom_manifest::Manifest;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
+use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_spec::model::Target;
 
 use crate::render;
@@ -35,6 +36,19 @@ impl Backend for ComposeBackend {
         let file = render::compose_file(self.0, env)?.file;
         Ok(Some(crate::manifest::docker(env, &file)?))
     }
+}
+
+/// What runs inside `docker-vm`'s VM for `env` (planned for the `docker` target): the `docker`
+/// target's Compose file, its containers, and the commands that start, check and read them there
+/// (the backend that makes the VM runs them through its own way in).
+///
+/// # Errors
+///
+/// [`crate::Error::Refused`] when `env` needs what Compose can't do; a manifest error for a name
+/// the run manifest refuses (a bug: the spec checks them).
+pub fn guest(env: &Environment) -> crate::Result<GuestCompose> {
+    let file = render::compose_file(Target::Docker, env)?.file;
+    crate::manifest::guest(env, &file)
 }
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,

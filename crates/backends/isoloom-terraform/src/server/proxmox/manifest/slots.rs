@@ -7,10 +7,11 @@
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    CheckRunner, Delivery, EnvName, Error as ManifestError, Identifier, Name, NonEmpty, Param, SecretSlot, SetBy, SlotKind, SnakeName, StepId, StepSelection,
-    TfVarShape,
+    CheckRunner, Delivery, EnvName, Error as ManifestError, Identifier, Name, NonEmpty, Param, SecretSlot, SetBy, SlotKind, SnakeName, TfVarShape,
 };
 use isoloom_plan::Environment;
+
+use isoloom_render::run_manifest::derived_switch;
 
 use crate::machine::vms;
 use crate::module::variable::Variable;
@@ -20,9 +21,6 @@ pub(super) const RUNNER_SET: [&str; 3] = ["slot", "ssh_public_key", "proxmox_ssh
 
 /// The module's variable the inputs go in, one entry each.
 const INPUTS: &str = "inputs";
-
-/// `0`: the checks derived from the spec are skipped.
-const DERIVED: &str = "ISOLOOM_DERIVED";
 
 /// The Terraform variable `name`.
 fn tf_var(name: &str, shape: TfVarShape) -> Result<NonEmpty<Delivery>, ManifestError> {
@@ -40,23 +38,7 @@ pub(super) fn params(env: &Environment, runners: &[CheckRunner]) -> Result<Vec<P
         .filter(|v| !v.is_sensitive() && v.name() != INPUTS && !RUNNER_SET.contains(&v.name()))
         .map(param)
         .collect::<Result<_, _>>()?;
-    let steps: Vec<StepId> = runners.iter().map(|r| r.step.id.clone()).collect();
-    if let Ok(steps) = NonEmpty::new(steps, "the check steps") {
-        out.push(Param {
-            name: EnvName::parse(DERIVED)?,
-            description: "0: the checks derived from the spec (reachability, no internet) are skipped.".into(),
-            default: Some("1".into()),
-            values: vec!["0".into(), "1".into()],
-            required: false,
-            hosts: BTreeSet::new(),
-            providers: BTreeSet::new(),
-            set_by: SetBy::Embedder,
-            deliver: NonEmpty::one(Delivery::Env {
-                var: EnvName::parse(DERIVED)?,
-                steps: StepSelection::Only(steps),
-            }),
-        });
-    }
+    out.extend(derived_switch(runners.iter().map(|r| r.step.id.clone()).collect())?);
     Ok(out)
 }
 

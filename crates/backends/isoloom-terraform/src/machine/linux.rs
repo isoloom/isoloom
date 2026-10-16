@@ -11,8 +11,7 @@ use super::provisioner::{Connection, Provisioner, Upload};
 use super::{Remote, Shell, at_every_boot, controller};
 use crate::module::{ident, inputs};
 
-/// Waits for cloud-init to finish its first boot (it may still be installing packages).
-pub(crate) const CLOUD_INIT_WAIT: &str = "cloud-init status --wait >/dev/null 2>&1 || true";
+pub(crate) use isoloom_render::steps::CLOUD_INIT_WAIT;
 
 /// What a target adds to the steps on its platform.
 #[derive(Debug, Clone)]

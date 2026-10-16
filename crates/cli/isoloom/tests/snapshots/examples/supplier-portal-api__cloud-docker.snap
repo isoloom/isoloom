@@ -226,7 +226,7 @@ resource "terraform_data" "environment" {
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
+      "sudo sh -c 'command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }'",
       "sudo sh -c 'n=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''the Docker host: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''the Docker host: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nLAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/input-launch-token; printf x)\"; LAUNCH_TOKEN=\"$${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN\ncd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -480,7 +480,7 @@ resource "terraform_data" "environment" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
+      "sudo sh -c 'command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }'",
       "sudo sh -c 'n=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''the Docker host: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''the Docker host: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nLAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/input-launch-token; printf x)\"; LAUNCH_TOKEN=\"$${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN\ncd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -676,7 +676,7 @@ resource "terraform_data" "environment" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
+      "sudo sh -c 'command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }'",
       "sudo sh -c 'n=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''the Docker host: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''the Docker host: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nLAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/input-launch-token; printf x)\"; LAUNCH_TOKEN=\"$${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN\ncd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -915,7 +915,7 @@ resource "terraform_data" "environment" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
+      "sudo sh -c 'command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }'",
       "sudo sh -c 'n=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''the Docker host: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''the Docker host: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nLAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/input-launch-token; printf x)\"; LAUNCH_TOKEN=\"$${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN\ncd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -1088,7 +1088,7 @@ resource "terraform_data" "environment" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
+      "sudo sh -c 'command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }'",
       "sudo sh -c 'n=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''the Docker host: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''the Docker host: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nLAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/input-launch-token; printf x)\"; LAUNCH_TOKEN=\"$${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN\ncd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
@@ -1337,7 +1337,7 @@ resource "terraform_data" "environment" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       var.auto_stop_minutes > 0 ? "sudo shutdown -h +${var.auto_stop_minutes} >/dev/null 2>&1" : "true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
-      "sudo sh -c 'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'",
+      "sudo sh -c 'command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }'",
       "sudo sh -c 'n=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$n\" -gt 0 ] || echo '\\''the Docker host: waiting for its secrets, which the runner (isothrum up) delivers'\\''; n=$((n+1)); if [ \"$n\" -gt 360 ]; then echo '\\''the Docker host: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them'\\'' >&2; exit 1; fi; sleep 5; done\nLAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/input-launch-token; printf x)\"; LAUNCH_TOKEN=\"$${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN\ncd /opt/isoloom && set -a; . /tmp/isoloom-inputs.env; set +a; sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose -f .isoloom/docker/compose.yml up -d --build --wait --wait-timeout 900'",
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]

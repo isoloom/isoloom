@@ -77,9 +77,30 @@ pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Par
     Ok(out)
 }
 
-/// The slots: each input a container reads, each secret a container gets, each project file
-/// Compose takes from its environment.
-pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan) -> Result<Vec<SecretSlot>> {
+/// Where Compose runs, and so which steps create or start the containers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Starts {
+    /// On this computer's Docker: `up`, `start` (a resume) and the leaf jobs; the runner reads the
+    /// project files Compose takes from its environment.
+    Host,
+    /// Inside a VM: its `start` and the leaf jobs (a resume brings the VM back as it was); the
+    /// project files are read in the VM, from its copy of the project.
+    Guest,
+}
+
+impl Starts {
+    /// The steps that create or start containers, before the leaf jobs.
+    fn steps(self) -> &'static [&'static str] {
+        match self {
+            Starts::Host => &["up", "start"],
+            Starts::Guest => &["start"],
+        }
+    }
+}
+
+/// The slots: each input a container reads, each secret a container gets, and on the host each
+/// project file Compose takes from its environment.
+pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, starts: Starts) -> Result<Vec<SecretSlot>> {
     let containers: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container).collect();
     let mut out = Vec::new();
     for input in &env.spec().inputs {
@@ -91,7 +112,7 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan) -> 
             .map(|(n, _)| n.as_str())
             .collect();
         if !readers.is_empty() {
-            let mut s = slot(input, SlotKind::Input, None, input, reach(&readers, members, plan)?)?;
+            let mut s = slot(input, SlotKind::Input, None, input, reach(&readers, members, plan, starts)?)?;
             // The spec's own word on it; an input it says nothing of is masked.
             s.sensitive = !env.spec().plain_inputs.contains(input);
             // An input may be left out, but Compose won't create or start a container whose
@@ -110,15 +131,18 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan) -> 
             .collect();
         if !holders.is_empty() {
             let var = secret_variable(name);
-            out.push(slot(name, SlotKind::Secret, Some(source), &var, reach(&holders, members, plan)?)?);
+            out.push(slot(name, SlotKind::Secret, Some(source), &var, reach(&holders, members, plan, starts)?)?);
         }
+    }
+    if starts == Starts::Guest {
+        return Ok(out);
     }
     for (var, path) in project_variables(env) {
         let source = SecretSource {
             store: Store::File,
             reference: path,
         };
-        out.push(slot(&var, SlotKind::Secret, Some(source), &var, reach(&[], members, plan)?)?);
+        out.push(slot(&var, SlotKind::Secret, Some(source), &var, reach(&[], members, plan, starts)?)?);
     }
     Ok(out)
 }
@@ -140,21 +164,21 @@ fn spec_source(s: &SpecSource) -> Option<SecretSource> {
 }
 
 /// Who gets a value: some machines and their `init:` jobs, through the steps that create or
-/// start them: `up`, `start` (resume: Compose writes a secret's file again from its variable
-/// each time it starts the container, and refuses to start without it; Compose 5.5.1), and the
-/// leaf jobs run on their own.
+/// start them ([`Starts`]): on the host `up` and `start` (resume: Compose writes a secret's file
+/// again from its variable each time it starts the container, and refuses to start without it;
+/// Compose 5.5.1), and the leaf jobs run on their own.
 struct Reach {
     machines: Vec<Name>,
     steps: StepSelection,
 }
 
-fn reach(machines: &[&str], members: &[Member], plan: &StartPlan) -> Result<Reach> {
+fn reach(machines: &[&str], members: &[Member], plan: &StartPlan, starts: Starts) -> Result<Reach> {
     let jobs = members
         .iter()
         .filter(|m| m.role == Role::Job && m.of.as_deref().is_some_and(|o| machines.contains(&o)));
     let names = machines.iter().copied().chain(jobs.map(|j| j.name.as_str()));
     let leaf_jobs = plan.jobs.iter().filter(|j| machines.contains(&owner(members, j))).map(|j| job_step(j));
-    let steps = ["up", "start"].into_iter().map(str::to_owned).chain(leaf_jobs);
+    let steps = starts.steps().iter().map(|s| (*s).to_owned()).chain(leaf_jobs);
     Ok(Reach {
         machines: names.map(Name::parse).collect::<Result<_, _>>()?,
         steps: StepSelection::Only(NonEmpty::new(steps.map(|s| StepId::parse(&s)).collect::<Result<_, _>>()?, "the steps")?),

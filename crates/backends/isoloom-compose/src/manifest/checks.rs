@@ -25,21 +25,53 @@ pub(super) struct Runners {
     pub(super) derived: Vec<StepId>,
 }
 
-/// Every position's runners, in the order `isoloom test` runs them.
-pub(super) fn runners(env: &Environment) -> Result<Runners> {
+/// A position's checks as Compose runs them: the `check` profile's service running them, and a
+/// machine's own `exec` checks, piped into the machine.
+pub(super) struct Planned<'a> {
+    /// Where they run from.
+    pub(super) pos: Position,
+    /// The runner's service.
+    pub(super) service: String,
+    /// The checks it runs.
+    pub(super) checks: Vec<&'a Resolved>,
+    /// The machine whose `exec` checks are piped into it, and those checks.
+    pub(super) execs: Option<(String, Vec<&'a Resolved>)>,
+}
+
+/// Every position's checks, in the order `isoloom test` runs them.
+pub(super) fn planned(env: &Environment) -> Vec<Planned<'_>> {
     let spec = env.spec();
     let default = checks::default_position(spec);
+    checks::by_position(spec, &env.checks)
+        .into_iter()
+        .map(|(pos, group)| {
+            let (execs, others): (Vec<&Resolved>, Vec<&Resolved>) = group.into_iter().partition(|c| matches!(c.probe, Probe::Exec { .. }));
+            let execs = match &pos {
+                Position::Machine(m) if !execs.is_empty() => Some((m.clone(), execs)),
+                _ => None,
+            };
+            Planned {
+                service: check_runner_service(&pos, &default),
+                pos,
+                checks: others,
+                execs,
+            }
+        })
+        .collect()
+}
+
+/// Every position's runners, in the order `isoloom test` runs them.
+pub(super) fn runners(env: &Environment) -> Result<Runners> {
     let mut out = Runners {
         runners: Vec::new(),
         derived: Vec::new(),
     };
-    for (pos, group) in checks::by_position(spec, &env.checks) {
-        let (execs, others): (Vec<&Resolved>, Vec<&Resolved>) = group.into_iter().partition(|c| matches!(c.probe, Probe::Exec { .. }));
-        let runner = compose_runner(&pos, &check_runner_service(&pos, &default), &others)?;
+    for p in planned(env) {
+        let runner = compose_runner(&p.pos, &p.service, &p.checks)?;
         out.derived.push(runner.step.id.clone());
         out.runners.push(runner);
-        if let (Position::Machine(m), false) = (&pos, execs.is_empty()) {
-            out.runners.push(exec_runner_of(&pos, m, &execs)?);
+        if let Some((m, execs)) = &p.execs {
+            out.runners.push(exec_runner_of(&p.pos, m, execs)?);
         }
     }
     Ok(out)
@@ -83,16 +115,25 @@ fn arg(name: &str) -> Result<SnakeName> {
     Ok(SnakeName::parse(name)?)
 }
 
-/// Before the runners: the stand-in for a supplied access machine, and its routes, when the
-/// file has them (only the check profile starts them).
-pub(super) fn setup(file: &ComposeFile) -> Result<Vec<Step>> {
+/// The stand-in for a supplied access machine, and its routes, when the file has them (only the
+/// check profile starts them).
+pub(super) fn stand_ins(file: &ComposeFile) -> Vec<String> {
     let routes = routes_service(STAND_IN);
-    let stand_ins: Vec<&str> = [STAND_IN, routes.as_str()].into_iter().filter(|s| file.services.contains_key(*s)).collect();
+    [STAND_IN, routes.as_str()]
+        .into_iter()
+        .filter(|s| file.services.contains_key(*s))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Before the runners: the stand-ins started.
+pub(super) fn setup(file: &ComposeFile) -> Result<Vec<Step>> {
+    let stand_ins = stand_ins(file);
     if stand_ins.is_empty() {
         return Ok(Vec::new());
     }
     let mut args = vec!["--profile", "check", "up", "--detach", "--wait", "--no-deps"];
-    args.extend(stand_ins);
+    args.extend(stand_ins.iter().map(String::as_str));
     let mut step = Step::argv(StepId::parse("stand-ins")?, compose(&args)?);
     step.note = Some("Starting the access machine's stand-in…".into());
     step.timeout_s = NonZeroU32::new(600);

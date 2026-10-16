@@ -362,3 +362,14 @@ mod hosts_in_a_real_shell {
         }
     }
 }
+
+#[test]
+fn a_docker_host_gets_the_engine_and_compose_at_their_pinned_versions() {
+    use super::{COMPOSE_VERSION, DOCKER_VERSION, INSTALL_DOCKER};
+    assert!(INSTALL_DOCKER.contains(&format!("VERSION={DOCKER_VERSION} sh")), "{INSTALL_DOCKER}");
+    assert!(
+        INSTALL_DOCKER.contains(&format!("\"docker-compose-plugin={COMPOSE_VERSION}-*\"")),
+        "{INSTALL_DOCKER}"
+    );
+    assert!(INSTALL_DOCKER.starts_with("command -v docker >/dev/null || "), "an installed Docker is kept");
+}

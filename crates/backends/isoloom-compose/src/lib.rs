@@ -86,7 +86,7 @@ mod storage;
 #[cfg(test)]
 mod testing;
 
-pub use backend::{ComposeBackend, capabilities_on_a_vm};
+pub use backend::{ComposeBackend, capabilities_on_a_vm, guest};
 pub use error::{Error, Result};
 pub use labels::{ENVIRONMENT_LABEL, MANAGED_LABEL};
 pub use render::render;

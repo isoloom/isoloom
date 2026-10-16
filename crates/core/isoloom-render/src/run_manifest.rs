@@ -2,15 +2,18 @@
 //! driver action, with their policies), tools, the lab's networks, a machine's addresses and
 //! ports, the outputs of its published ports, and the checks a runner reports with the time
 //! its step may take. Pure functions over the plan, shared so each target says them once.
+//! Compose inside a VM is [`guest`]: what both backends of `docker-vm` share.
+
+pub mod guest;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::IpAddr;
 use std::num::{NonZeroU16, NonZeroU32};
 
 use isoloom_manifest::{
-    Action, Arch, Argv, Check, CheckKind, Cidr, Error as ManifestError, Generator, GeneratorName, HostArgv, Lab, LabName, Machine, Name, Network, Output,
-    OutputRole, OutputSource, Part, Placeholder, Port, PortKind, PortName, Program, Protocol, Publish, PublishMode, Role, SnakeName, Step, StepId, Template,
-    Tool, ToolName, Version, When,
+    Action, Arch, Argv, Check, CheckKind, Cidr, Delivery, EnvName, Error as ManifestError, Generator, GeneratorName, HostArgv, Lab, LabName, Machine, Name,
+    Network, NonEmpty, Output, OutputRole, OutputSource, Param, Part, Placeholder, Port, PortKind, PortName, Program, Protocol, Publish, PublishMode, Role,
+    Run, SetBy, SnakeName, Step, StepId, StepSelection, Template, Tool, ToolName, Version, When,
 };
 use isoloom_plan::checks::{Probe, Resolved};
 use isoloom_plan::{Environment, MachinePlan, PublishedPort};
@@ -84,6 +87,50 @@ pub fn run(id: &str, argv: HostArgv, timeout_s: u32) -> Result<Step, ManifestErr
 pub fn act(id: &str, action: Action) -> Result<Step, ManifestError> {
     Ok(Step::action(StepId::parse(id)?, action))
 }
+
+/// Driver action `action` with its arguments `with` (names, then templates).
+///
+/// # Errors
+///
+/// Fails when a name isn't one an argument can have.
+pub fn action_with<'a>(action: Action, with: impl IntoIterator<Item = (&'a str, Template)>) -> Result<Run, ManifestError> {
+    Ok(Run::Action {
+        action,
+        with: with
+            .into_iter()
+            .map(|(k, v)| Ok((SnakeName::parse(k)?, v)))
+            .collect::<Result<BTreeMap<_, _>, ManifestError>>()?,
+    })
+}
+
+/// `ISOLOOM_DERIVED`, the switch of the checks derived from the spec (`0` skips them), delivered
+/// to the check runners' `steps`; `None` when there is none.
+///
+/// # Errors
+///
+/// Fails on a name the manifest refuses (a bug: it is fixed).
+pub fn derived_switch(steps: Vec<StepId>) -> Result<Option<Param>, ManifestError> {
+    let Ok(steps) = NonEmpty::new(steps, "the check steps") else {
+        return Ok(None);
+    };
+    Ok(Some(Param {
+        name: EnvName::parse(DERIVED)?,
+        description: "0: the checks derived from the spec (reachability, no internet) are skipped.".into(),
+        default: Some("1".into()),
+        values: vec!["0".into(), "1".into()],
+        required: false,
+        hosts: BTreeSet::new(),
+        providers: BTreeSet::new(),
+        set_by: SetBy::Embedder,
+        deliver: NonEmpty::one(Delivery::Env {
+            var: EnvName::parse(DERIVED)?,
+            steps: StepSelection::Only(steps),
+        }),
+    }))
+}
+
+/// The derived checks' switch, as a runner reads it.
+pub const DERIVED: &str = "ISOLOOM_DERIVED";
 
 /// `s` as a clean-up: it runs whatever happened before it, and its failure is only logged.
 #[must_use]

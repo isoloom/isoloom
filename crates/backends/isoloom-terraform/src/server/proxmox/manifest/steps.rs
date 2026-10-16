@@ -8,11 +8,11 @@ use std::num::NonZeroU32;
 
 use isoloom_manifest::{
     Action, Argv, CheckRunner, Condition, EnvName, Error as ManifestError, HostArgv, Lifecycle, Name, NonEmpty, Part, PathTemplate, Placeholder, Program,
-    ReadyGrammar, RelPath, Run, RunVar, SnakeName, Step, StepId, Template,
+    ReadyGrammar, RelPath, RunVar, SnakeName, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_plan::checks::by_position;
-use isoloom_render::run_manifest::{check, noted, run, timeout_s};
+use isoloom_render::run_manifest::{action_with, check, noted, run, timeout_s};
 
 use crate::machine::{controller, vms};
 use crate::server::router::check_host;
@@ -172,13 +172,7 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
             ("command", derived),
         ];
         let mut step = Step::action(id(&format!("check-{}", pos.id()))?, Action::SshRun);
-        step.run = Run::Action {
-            action: Action::SshRun,
-            with: with
-                .into_iter()
-                .map(|(k, v)| Ok((SnakeName::parse(k)?, v)))
-                .collect::<Result<_, ManifestError>>()?,
-        };
+        step.run = action_with(Action::SshRun, with)?;
         step.stdin = Some(PathTemplate::relative(&RelPath::parse(&format!("checks/{}.sh", pos.id()))?));
         step.timeout_s = secs(timeout_s(&group));
         out.push(CheckRunner {

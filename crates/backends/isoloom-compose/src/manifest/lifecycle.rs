@@ -6,7 +6,7 @@ use isoloom_plan::{Environment, Lifetime, MachineShape};
 use isoloom_render::run_manifest::{cleanup, noted, tolerated};
 
 use super::machines::Member;
-use super::{compose, in_project, program};
+use super::{Project, compose, program};
 use crate::error::Result;
 use crate::start::StartPlan;
 
@@ -89,7 +89,7 @@ fn down(env: &Environment) -> Result<Vec<Step>> {
     let mut steps = vec![down];
     if kept && !removable.is_empty() {
         let mut rm: Vec<Template> = ["volume", "rm", "--force"].map(Template::text).into();
-        rm.extend(dedup(removable).into_iter().map(in_project));
+        rm.extend(dedup(removable).into_iter().map(|v| Project::Run.prefixed(v)));
         steps.push(cleanup(run("volumes", HostArgv::Every(Argv::new(program("docker")?, rm)), 120)?));
     }
     steps.push(cleanup(act("containers", Action::ComposeRemoveContainers)?));
@@ -103,10 +103,11 @@ fn dedup(mut keys: Vec<&str>) -> Vec<&str> {
     keys
 }
 
-/// `up` succeeded (every long-running service answers), then each leaf job exited 0.
-pub(super) fn ready(plan: &StartPlan, members: &[Member]) -> Result<Vec<Condition>> {
+/// The start step `up` succeeded (every long-running service answers), then each leaf job
+/// exited 0.
+pub(super) fn ready(plan: &StartPlan, members: &[Member], up: &str) -> Result<Vec<Condition>> {
     let up = Condition::StepOk {
-        step: StepId::parse("up")?,
+        step: StepId::parse(up)?,
         means: Some("every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)".into()),
     };
     let jobs = plan.jobs.iter().map(|job| {

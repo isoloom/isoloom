@@ -27,9 +27,50 @@ pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
 pub const INPUTS_FILE: &str = "/tmp/isoloom-inputs.env";
 /// Where the inputs are kept when a reboot comes (`/tmp` is emptied at boot).
 pub const KEPT_INPUTS_FILE: &str = "/var/lib/isoloom/inputs.env";
-/// Installs Docker from Docker's own script, unless it is there (a root script): the Docker
-/// hosts of `docker-vm` and `cloud-docker`.
-pub const INSTALL_DOCKER: &str = "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh";
+/// Waits for cloud-init to be done (its packages in, `apt` free): the first command of a set-up
+/// run over SSH on a VM cloud-init boots. Its failure doesn't stop the set-up.
+pub const CLOUD_INIT_WAIT: &str = "cloud-init status --wait >/dev/null 2>&1 || true";
+
+/// On a Docker host VM, published ports reach containers whatever their routes: what arrives from
+/// outside the VM (a forward to this computer, a client of the server's address) is DNAT'ed by
+/// Docker with its source kept, and a container of an `internet: false` network, its default route
+/// removed, can't answer it. Masquerading that traffic into the lab's bridges makes it come from
+/// the bridge's own address, which every container reaches. A unit keeps the rule across reboots,
+/// after Docker's own. Run as root; running it again changes nothing.
+pub const PUBLISHED_FROM_OUTSIDE: &str = r"cat > /etc/systemd/system/isoloom-published.service <<'UNIT'
+[Unit]
+Description=Isoloom: published ports reach containers of networks without a default route
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -t nat -C POSTROUTING -m conntrack --ctstate DNAT -o br-+ -j MASQUERADE 2>/dev/null || iptables -t nat -I POSTROUTING -m conntrack --ctstate DNAT -o br-+ -j MASQUERADE'
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now isoloom-published.service
+";
+
+/// The Docker Engine a Docker host gets (`docker-vm`, `cloud-docker`, `hybrid`), exactly: the
+/// version Isoloom's Compose files are proven with, so two runs of one lab get the same engine.
+pub const DOCKER_VERSION: &str = "29.9.0";
+
+/// The Compose plugin a Docker host gets, exactly (on hosts with `apt`: Debian and Ubuntu).
+pub const COMPOSE_VERSION: &str = "5.6.0";
+
+/// Installs Docker from Docker's own script, unless it is there (a root script): the engine at
+/// [`DOCKER_VERSION`] (the script's `VERSION`), then, where `apt` installs packages, the Compose
+/// plugin at [`COMPOSE_VERSION`] (the script installs the newest). TODO(4.7): from Docker's own
+/// repository with exact versions and its key pinned, through the configuration model's
+/// `repository` step, once the catalogue refresh keeps those pins.
+pub const INSTALL_DOCKER: &str = concat!(
+    "command -v docker >/dev/null || { curl -fsSL https://get.docker.com | VERSION=29.9.0 sh && ",
+    "if command -v apt-get >/dev/null; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades \"docker-compose-plugin=5.6.0-*\"; fi; }"
+);
 
 /// Where the project is unpacked on a Windows VM, and the machine's own scripts with it.
 const WINDOWS_PROJECT_DIR: &str = "C:\\isoloom";

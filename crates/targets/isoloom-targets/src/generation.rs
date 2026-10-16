@@ -4,6 +4,7 @@
 use std::path::Path;
 
 use isoloom_plan::{Environment, Lab};
+use isoloom_render::backend::Placed;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::{Spec, Target};
 
@@ -113,28 +114,25 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
             files.push(f);
         }
     }
-    if let Some(manifest) = backend.run_manifest(&env)? {
-        files.push(run_manifest(lab, instance, target, manifest)?);
+    for placed in backend.run_manifests(&env)? {
+        files.push(run_manifest(lab, instance, target, placed)?);
     }
     Ok(files)
 }
 
-/// A backend's run manifest as the file it is written to (`.isoloom/<target>/run.json`), its
-/// message filled from the resolved snapshot, checked across its fields.
-fn run_manifest(
-    lab: &Lab,
-    instance: Option<u8>,
-    target: Target,
-    mut manifest: isoloom_manifest::Manifest,
-) -> std::result::Result<GeneratedFile, GenerateError> {
+/// A backend's run manifest as the file it is written to (`.isoloom/<target>/[<sub>/]run.json`),
+/// its message filled from the resolved snapshot, checked across its fields.
+fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, placed: Placed) -> std::result::Result<GeneratedFile, GenerateError> {
     let refused = |e: isoloom_manifest::Error| GenerateError::Unsupported {
         target,
         what: format!("the run manifest: {e}"),
     };
+    let mut manifest = placed.manifest;
     manifest.lab.message = resolved::manifest_message(lab, instance, target);
     manifest.validate().map_err(refused)?;
+    let folder = placed.sub.map_or_else(|| target.id().to_owned(), |sub| format!("{}/{sub}", target.id()));
     Ok(GeneratedFile {
-        path: format!("{OUTPUT_DIR}/{}/run.json", target.id()),
+        path: format!("{OUTPUT_DIR}/{folder}/run.json"),
         contents: isoloom_manifest::to_json(&manifest).map_err(refused)?,
     })
 }
