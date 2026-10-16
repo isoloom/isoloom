@@ -396,6 +396,24 @@ These go beyond lints. Each one names the tool or review that enforces it.
   - **Suspected so far:** the capstone `lab` block in `course.json` still uses the old single-evidence model (`evidenceKind`, `evidenceParams`), not objectives, and its `commit` is a placeholder.
   - **Where tests go:** cyber-course-sync gets the standard and typed schema tests; cyber-courses-web gets one opt-in e2e after consolidation.
   - **Proposed only, not edited:** changes to CyberBackend, the content repositories and the launcher.
+- **Course content contract, audit findings (2026-10-16).** Every GraphQL document matches production's schema, so the mismatches are semantic.
+  1. **The sync clobbers labs.** A course's `lab` block re-publishes the lab, which archives its objectives (the CTF per-objective flags break) and overwrites its runtime. Fix: a course references its lab by slug only; the sync never calls publishLab.
+  2. **A placeholder lab is in production.** `invoice-portal-sqli` points at a repository that doesn't exist, at a placeholder commit, as a DRAFT the course contains.
+  3. **The lesson and the graph point at different labs.** The SQLi lesson embeds `invoice-portal-api`, an API-reading lab, while the graph's capstone is `invoice-portal-sqli`.
+  4. **No grading from a course.** cyber-courses-web has no flag or objective submission at all.
+  5. **The launcher drops flags.** The `launch_env` bug hits course capstones too; the CTF fix covers it.
+  6. **Security, live in production:**
+     - **The flaw:** the lesson fetch builds a GitHub API URL from unvalidated `contentRepo`/`contentPath`, so a publisher credential can make the public site render private repositories.
+     - **Fix:** an owner allow-list, strict path and commit-ref rules, and installation tokens scoped to one repository.
+     - **Delivery:** prepared as an unpushed hotfix branch plus `main`.
+  7. **Authorization.** One `publisher` role covers lab and content repositories, with no per-repository scope.
+  8. **Refs can float.** Outside CI, refs default to `main`. Fix: require a commit SHA in the sync and the web.
+  9. **Progress is fakeable.** It rests on client-reported `correct`, with no dedupe, so mastery can be farmed. `teachesSkills` is unused, and `useProgress` calls a missing route.
+  10. **Small drift** in the web.
+- **Owners:**
+  - the sync (1, 8, plus the cross-checks): its worker;
+  - the web (6, 8, 10): the cyber-courses-web worker;
+  - **waiting on the maintainer:** 2 and 3 (content, plus a production admin action), 4 (embed or link out), 7 and 9 (CyberBackend and Cyber Auth), and the backend halves of 6 and 8. The proposals are written in the scratch file `ccontract-proposals.md`.
 - **Later:** GitHub cleanup of Cyber-Courses-Web (PR #6 and the remote branches) once consolidated; cyber-course-sync is never pushed without the maintainer, because content repos run it from GitHub. The iOS app (`cyber-courses-ios`, a SwiftUI scaffold on sample data) is not in scope yet.
 - **Later:** a sync that shows each launcher mode's real tiers (from Isoloom's `tiers.json` and `docs/matrix.md`), and where each lab runs, after the lab rewrite. The launcher page and docs copy come at the docs gate.
 
