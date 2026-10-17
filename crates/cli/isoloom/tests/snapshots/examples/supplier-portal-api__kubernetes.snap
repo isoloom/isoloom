@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ kubernetes
@@ -365,6 +364,10 @@ spec:
           periodSeconds: 5
           failureThreshold: 60
         env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: '1'
+        - name: MYSQL_TCP_PORT
+          value: '3207'
         - name: API_URL
           valueFrom:
             secretKeyRef:
@@ -391,6 +394,10 @@ spec:
         - -c
         - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207; do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
         env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: '1'
+        - name: MYSQL_TCP_PORT
+          value: '3207'
         - name: API_URL
           valueFrom:
             secretKeyRef:
@@ -1186,6 +1193,10 @@ spec:
           periodSeconds: 5
           failureThreshold: 60
         env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: '1'
+        - name: MYSQL_TCP_PORT
+          value: '3207'
         - name: API_URL
           valueFrom:
             secretKeyRef:
@@ -1212,6 +1223,10 @@ spec:
         - -c
         - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207; do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
         env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: '1'
+        - name: MYSQL_TCP_PORT
+          value: '3207'
         - name: API_URL
           valueFrom:
             secretKeyRef:

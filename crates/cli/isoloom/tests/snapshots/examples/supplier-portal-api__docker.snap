@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ docker
@@ -288,6 +287,8 @@ services:
       lab:
         ipv4_address: 10.20.0.32
     environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: '1'
+      MYSQL_TCP_PORT: '3207'
       API_URL: ${API_URL:-}
     volumes:
     - isoloom-probe-amd64:/.isoloom-probe:ro
@@ -327,6 +328,8 @@ services:
     - /isoloom/init/seed.sh
     network_mode: service:database
     environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: '1'
+      MYSQL_TCP_PORT: '3207'
       API_URL: ${API_URL:-}
     volumes:
     - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro

@@ -1,6 +1,5 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 62
 expression: example(&name).unwrap().spec()
 ---
 version: 1
@@ -31,6 +30,9 @@ machines:
     tmpfs: []
     shm_size: ~
     dns: ~
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "1"
+      MYSQL_TCP_PORT: "3207"
     ports:
       - port: 3207
         name: mysql
