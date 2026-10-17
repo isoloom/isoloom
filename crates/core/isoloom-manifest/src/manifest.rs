@@ -27,7 +27,8 @@ pub struct Manifest {
     pub manifest_version: ManifestVersion,
     /// The program that wrote it.
     pub generator: Generator,
-    /// The lab.
+    /// The environment the files were generated from (serialized as `environment`).
+    #[serde(rename = "environment")]
     pub lab: Lab,
     /// The target whose files it sits next to.
     pub target: Target,

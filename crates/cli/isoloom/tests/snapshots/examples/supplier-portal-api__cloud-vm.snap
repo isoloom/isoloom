@@ -286,7 +286,7 @@ output "published" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "supplier-portal-api",
     "instance": null,
     "message": null
@@ -1199,7 +1199,7 @@ output "published" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "supplier-portal-api",
     "instance": null,
     "message": null
@@ -2283,7 +2283,7 @@ output "published" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "supplier-portal-api",
     "instance": null,
     "message": null
@@ -3090,7 +3090,7 @@ output "published" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "supplier-portal-api",
     "instance": null,
     "message": null
@@ -4035,7 +4035,7 @@ output "published" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "supplier-portal-api",
     "instance": null,
     "message": null

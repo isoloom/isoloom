@@ -20,9 +20,9 @@
       "$ref": "#/$defs/Generator",
       "description": "The program that wrote it."
     },
-    "lab": {
+    "environment": {
       "$ref": "#/$defs/Lab",
-      "description": "The lab."
+      "description": "The environment the files were generated from (serialized as `environment`)."
     },
     "target": {
       "$ref": "#/$defs/Target",
@@ -150,7 +150,7 @@
   "required": [
     "manifest_version",
     "generator",
-    "lab",
+    "environment",
     "target",
     "driver",
     "hosts",

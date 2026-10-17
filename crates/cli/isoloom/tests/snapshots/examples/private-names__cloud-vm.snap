@@ -301,7 +301,7 @@ output "checks" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "private-names",
     "instance": null,
     "message": null
@@ -1184,7 +1184,7 @@ output "checks" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "private-names",
     "instance": null,
     "message": null
@@ -2129,7 +2129,7 @@ output "checks" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "private-names",
     "instance": null,
     "message": null
@@ -2842,7 +2842,7 @@ output "checks" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "private-names",
     "instance": null,
     "message": null
@@ -3741,7 +3741,7 @@ output "checks" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "private-names",
     "instance": null,
     "message": null

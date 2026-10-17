@@ -492,7 +492,7 @@ volumes:
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "cisco-dynamips",
     "instance": null,
     "message": null

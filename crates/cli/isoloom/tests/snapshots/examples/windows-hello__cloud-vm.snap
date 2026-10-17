@@ -383,7 +383,7 @@ resource "local_file" "isoloom_project" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "windows-hello",
     "instance": null,
     "message": null
@@ -1250,7 +1250,7 @@ resource "local_file" "isoloom_project" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "windows-hello",
     "instance": null,
     "message": null

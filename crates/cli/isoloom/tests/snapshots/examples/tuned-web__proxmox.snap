@@ -553,7 +553,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "tuned-web",
     "instance": null,
     "message": null

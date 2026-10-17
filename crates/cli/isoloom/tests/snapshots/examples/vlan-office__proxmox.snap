@@ -1186,7 +1186,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "vlan-office",
     "instance": null,
     "message": null

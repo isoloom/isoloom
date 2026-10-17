@@ -726,7 +726,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "air-gapped",
     "instance": null,
     "message": null

@@ -879,7 +879,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "arm-vm",
     "instance": null,
     "message": null

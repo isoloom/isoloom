@@ -820,7 +820,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "several-addresses",
     "instance": null,
     "message": null

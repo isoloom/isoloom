@@ -117,7 +117,7 @@ fn a_host_placeholder_names_a_machine() {
         matches!(&err, Error::UnknownMachine { at, machine } if at == "outputs[0].format" && machine == "db"),
         "{err}"
     );
-    assert_eq!(refused(|d| d["lab"]["message"] = json!("at ${host.db}")), "unknown_machine");
+    assert_eq!(refused(|d| d["environment"]["message"] = json!("at ${host.db}")), "unknown_machine");
 }
 
 #[test]
@@ -135,13 +135,13 @@ fn an_output_reads_a_published_port() {
 fn a_param_or_output_placeholder_names_a_declared_one() {
     let message = |text: &str| {
         let text = text.to_owned();
-        move |d: &mut Value| d["lab"]["message"] = json!(text)
+        move |d: &mut Value| d["environment"]["message"] = json!(text)
     };
     assert_eq!(refused(message("${params.REGION}")), "unknown_param");
     assert_eq!(
         read(|d| {
             d["params"] = param(&json!({ "via": "env", "var": "REGION", "steps": ["up"] }));
-            d["lab"]["message"] = json!("in ${params.REGION}");
+            d["environment"]["message"] = json!("in ${params.REGION}");
         }),
         Ok(())
     );
@@ -151,8 +151,8 @@ fn a_param_or_output_placeholder_names_a_declared_one() {
 
 #[test]
 fn value_and_machine_are_bound_only_where_they_are_given() {
-    assert_eq!(refused(|d| d["lab"]["message"] = json!("${value}")), "placeholder_out_of_place");
-    assert_eq!(refused(|d| d["lab"]["message"] = json!("${machine}")), "placeholder_out_of_place");
+    assert_eq!(refused(|d| d["environment"]["message"] = json!("${value}")), "placeholder_out_of_place");
+    assert_eq!(refused(|d| d["environment"]["message"] = json!("${machine}")), "placeholder_out_of_place");
     let provision = json!({ "machine": [{ "id": "again", "argv": ["docker", "compose", "restart", "${machine}"] }] });
     assert_eq!(read(|d| d["lifecycle"]["provision"] = provision), Ok(()));
     let all = json!({ "all": [{ "id": "again", "argv": ["docker", "compose", "restart", "${machine}"] }] });

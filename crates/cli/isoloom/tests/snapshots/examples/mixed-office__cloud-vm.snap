@@ -448,7 +448,7 @@ resource "local_file" "isoloom_project" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "mixed-office",
     "instance": null,
     "message": null

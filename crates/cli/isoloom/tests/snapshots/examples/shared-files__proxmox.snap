@@ -720,7 +720,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "shared-files",
     "instance": null,
     "message": null

@@ -847,7 +847,7 @@ volumes:
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "pivot-dmz",
     "instance": null,
     "message": null

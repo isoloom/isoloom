@@ -342,7 +342,7 @@ volumes:
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "slow-link",
     "instance": null,
     "message": null

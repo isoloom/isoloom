@@ -1,7 +1,7 @@
 {
   "manifest_version": 0,
   "generator": { "name": "isoloom", "version": "0.10.1" },
-  "lab": { "name": "minimal", "instance": null },
+  "environment": { "name": "minimal", "instance": null },
   "target": "docker",
   "driver": "compose",
   "hosts": ["linux", "macos", "windows"],

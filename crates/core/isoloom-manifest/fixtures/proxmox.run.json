@@ -5,7 +5,7 @@
     "name": "isoloom",
     "version": "0.10.1"
   },
-  "lab": {
+  "environment": {
     "name": "solo-web",
     "instance": null,
     "message": null

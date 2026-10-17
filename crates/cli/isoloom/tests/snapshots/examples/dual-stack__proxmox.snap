@@ -787,7 +787,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "dual-stack",
     "instance": null,
     "message": null

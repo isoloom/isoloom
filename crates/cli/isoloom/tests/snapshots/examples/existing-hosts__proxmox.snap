@@ -734,7 +734,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "existing-hosts",
     "instance": null,
     "message": null

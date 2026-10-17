@@ -543,7 +543,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "solo-web",
     "instance": null,
     "message": null

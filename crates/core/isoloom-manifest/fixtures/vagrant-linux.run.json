@@ -5,7 +5,7 @@
     "name": "isoloom",
     "version": "0.10.1"
   },
-  "lab": {
+  "environment": {
     "name": "flag-vm",
     "instance": null,
     "message": "The page answers at http://localhost:${published.web.web}/."

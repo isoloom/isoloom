@@ -795,7 +795,7 @@ locals {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "udp-dns",
     "instance": null,
     "message": "The DNS server answers at 10.66.10.53:53 (UDP and TCP), and on\n127.0.0.1:${published.dns.dns-udp}/udp from this machine:\ndig @127.0.0.1 -p ${published.dns.dns-udp} www.lab.test\n"

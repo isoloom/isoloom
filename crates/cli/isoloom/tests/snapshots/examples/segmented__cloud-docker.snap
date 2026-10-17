@@ -194,7 +194,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "segmented",
     "instance": null,
     "message": null
@@ -1077,7 +1077,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "segmented",
     "instance": null,
     "message": null
@@ -1893,7 +1893,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "segmented",
     "instance": null,
     "message": null
@@ -2705,7 +2705,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "segmented",
     "instance": null,
     "message": null
@@ -3508,7 +3508,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "segmented",
     "instance": null,
     "message": null
@@ -4329,7 +4329,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "segmented",
     "instance": null,
     "message": null

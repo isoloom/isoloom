@@ -206,7 +206,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "hello-stack",
     "instance": null,
     "message": "The page answers at http://127.0.0.1:${published.web.web}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
@@ -1112,7 +1112,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "hello-stack",
     "instance": null,
     "message": "The page answers at http://127.0.0.1:${published.web.web}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
@@ -1956,7 +1956,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "hello-stack",
     "instance": null,
     "message": "The page answers at http://127.0.0.1:${published.web.web}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
@@ -2791,7 +2791,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "hello-stack",
     "instance": null,
     "message": "The page answers at http://127.0.0.1:${published.web.web}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
@@ -3617,7 +3617,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "hello-stack",
     "instance": null,
     "message": "The page answers at http://127.0.0.1:${published.web.web}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"
@@ -4469,7 +4469,7 @@ output "ssh_user" {
     "name": "isoloom",
     "version": "0.11.1"
   },
-  "lab": {
+  "environment": {
     "name": "hello-stack",
     "instance": null,
     "message": "The page answers at http://127.0.0.1:${published.web.web}/ (and at\nhttp://web/ from inside). The cache at 10.60.0.20:6379 holds the\ngreeting seeded at start; nothing here reaches the internet.\n"

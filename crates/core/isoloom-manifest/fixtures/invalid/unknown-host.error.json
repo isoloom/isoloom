@@ -1,5 +1,5 @@
 {
   "code": "unknown_machine",
-  "message": "lab.message: no machine `db` in this manifest",
+  "message": "environment.message: no machine `db` in this manifest",
   "schema": false
 }

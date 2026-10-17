@@ -48,7 +48,7 @@ impl Manifest {
     pub fn templates(&self) -> Vec<(String, &Template)> {
         let mut out: Vec<(String, &Template)> = Vec::new();
         if let Some(m) = &self.lab.message {
-            out.push(("lab.message".into(), m));
+            out.push(("environment.message".into(), m));
         }
         if let crate::Identity::Compose(c) = &self.identity {
             out.push(("identity.compose.project".into(), &c.project));

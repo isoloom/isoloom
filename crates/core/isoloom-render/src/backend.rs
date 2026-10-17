@@ -34,7 +34,7 @@ pub trait Backend: Sync {
     }
 
     /// The run manifest the Isothrum runner executes (`.isoloom/<target>/run.json`), for a target
-    /// that has one; its `lab.message` is left to the caller, who fills it from the resolved
+    /// that has one; its `environment.message` is left to the caller, who fills it from the resolved
     /// snapshot. `None` for the targets that have none yet.
     ///
     /// # Errors
