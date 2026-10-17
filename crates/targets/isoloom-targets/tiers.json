@@ -372,6 +372,13 @@
           "result": "partial",
           "server": "pve-lab",
           "note": "pve-lab VE9.2: /etc/hosts self-name PASS and full segmentation verified on real VMs (back internet:false egress cut, front->back:6379 reach kept, user->back blocked); but seal recreated the router VM (isoloom_sealed makes the nftables.conf snippet/user_data force replacement), so seal-reload raced the router reboot (banner timeout) -> run ended not_sealed and the router uplink IP changed"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "seal live-reload, no router recreate, verified ad45f56d"
         }
       ]
     },
