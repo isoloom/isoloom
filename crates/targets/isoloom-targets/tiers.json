@@ -280,6 +280,12 @@
           "date": "2026-10-17",
           "result": "pass",
           "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up (Hyper-V relay 127.0.0.1:8080->guest:80), http 200, checks pass, pause+resume, shutdown+resume, provision, down; Get-VM clean, no VM left. Elevated-Vagrant path OK via the already-elevated branch (UAC off, so no prompt raised). Vagrant 2.4.9, solo-web, Windows 11"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "runner-only launcher 00425c6 re-validation: full cycle via launch::start_vm_run -> Isothrum runner (up/check/pause+resume/shutdown+resume/provision/down), Hyper-V relay 127.0.0.1:8080->guest:80, http 200, Get-VM clean, no VM left (already-elevated branch, UAC off). Vagrant 2.4.9, solo-web, Windows 11. Built with dev-link isothrum 34244d6."
         }
       ]
     },
@@ -309,6 +315,12 @@
           "date": "2026-10-17",
           "result": "pass",
           "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up, http 200, checks pass, pause+resume, shutdown+resume, provision, down; virsh clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13"
+        },
+        {
+          "host": "friday",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "runner-only launcher 00425c6 re-validation: full cycle via launch::start_vm_run -> Isothrum runner (up/check/pause+resume/shutdown+resume/provision/down), http 200, virsh + vagrant global-status clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13. Built with dev-link isothrum 34244d6."
         }
       ]
     },
@@ -397,6 +409,13 @@
           "result": "pass",
           "server": "pve-lab",
           "note": "seal live-reload, no router recreate, verified ad45f56d"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "runner-only launcher 00425c6 re-validation: up/status/check/down full cycle via Isothrum runner; web+isoloom-router on vmbr1/SDN, http 200, check ok, Terraform destroyed 13 resources, node clean. Built with dev-link isothrum 34244d6 (published 0.11.1 lacks the API)."
         }
       ]
     },
