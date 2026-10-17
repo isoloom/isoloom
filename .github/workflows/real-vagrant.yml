@@ -1,14 +1,24 @@
-# Isoloom on local VMs for real (#145): examples brought up with `isoloom run vagrant`, tested and
-# torn down on a self-hosted runner per Vagrant provider (labels `virtualbox`, `libvirt`). A
-# provider without a runner is skipped, not failed: the repository variable
-# REAL_VAGRANT_PROVIDERS names the providers that have one, because a job waiting for a runner
-# that doesn't exist would sit queued for a day. Setting a runner up: docs/real-targets.md.
-name: Real targets (Vagrant)
+# Real-host certification: Isoloom's generated Vagrant trees brought up on real local VMs, their
+# checks run, and torn down, on a self-hosted runner per Vagrant provider (labels `virtualbox`,
+# `libvirt`). The outcome is recorded as tier evidence (`cargo xtask tiers record`, which also
+# regenerates docs/matrix.md) and uploaded; the maintainer commits the updated tier files.
+#
+# Isoloom converts, Isothrum runs: each job generates with `isoloom generate` and executes with the
+# Isothrum runner (`isothrum up/check/down`). There is no `isoloom run`.
+#
+# Manual only. `workflow_dispatch` is the sole trigger, matching the "manual-only cross-platform
+# check" decision: no push, pull_request or schedule. A provider without a self-hosted runner is
+# skipped, not failed: the repository variable REAL_VAGRANT_PROVIDERS names the providers that have
+# one, so a job never sits queued for a runner that does not exist. Enabling this: docs/ci-real-hosts.md.
+name: Cert — real local VMs (Vagrant)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "31 2 * * 3" # weekly
+    inputs:
+      examples:
+        description: "Examples to certify, comma-separated (default: solo-web,segmented)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -24,10 +34,12 @@ defaults:
 
 env:
   TARGET: vagrant
+  # The Isothrum runner is a separate repository; this ref is built to get the `isothrum` binary.
+  ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
 
 jobs:
-  # Which (provider, example) pairs run: solo-web and segmented on every provider named in
-  # REAL_VAGRANT_PROVIDERS, windows-hello also on those named in REAL_VAGRANT_WINDOWS (the
+  # Which (provider, example) pairs run: the chosen examples on every provider named in
+  # REAL_VAGRANT_PROVIDERS, plus windows-hello on those also named in REAL_VAGRANT_WINDOWS (the
   # runners whose provider and licence allow Windows boxes). Forks never get here.
   gate:
     if: ${{ !github.event.repository.fork }}
@@ -41,19 +53,21 @@ jobs:
         env:
           PROVIDERS: ${{ vars.REAL_VAGRANT_PROVIDERS }}
           WINDOWS: ${{ vars.REAL_VAGRANT_WINDOWS }}
+          EXAMPLES: ${{ inputs.examples }}
         run: |
+          examples=${EXAMPLES:-solo-web,segmented}
           pairs=()
           for p in ${PROVIDERS//,/ }; do
             case "$p" in
               virtualbox | libvirt)
-                pairs+=("$p solo-web" "$p segmented")
+                for ex in ${examples//,/ }; do pairs+=("$p $ex"); done
                 if [[ " ${WINDOWS//,/ } " == *" $p "* ]]; then pairs+=("$p windows-hello"); fi
                 ;;
               *) echo "::warning title=REAL_VAGRANT_PROVIDERS::unknown provider $p (virtualbox, libvirt)" ;;
             esac
           done
           if [ "${#pairs[@]}" -eq 0 ]; then
-            echo "::notice title=Vagrant skipped::no runner declared (REAL_VAGRANT_PROVIDERS; docs/real-targets.md)"
+            echo "::notice title=Vagrant skipped::no runner declared (REAL_VAGRANT_PROVIDERS; docs/ci-real-hosts.md)"
           fi
           echo "matrix=$(printf '%s\n' "${pairs[@]}" | jq -Rsc 'split("\n") | map(select(. != "") | split(" ") | {provider: .[0], example: .[1]})')" >> "$GITHUB_OUTPUT"
           if [ "${#pairs[@]}" -gt 0 ]; then echo any=true; else echo any=false; fi >> "$GITHUB_OUTPUT"
@@ -70,52 +84,100 @@ jobs:
         include: ${{ fromJSON(needs.gate.outputs.matrix) }}
     env:
       EXAMPLE: ${{ matrix.example }}
-      # The defaults' `vagrant.provider`: `isoloom run vagrant` passes it as --provider.
-      ISOLOOM_VAGRANT__PROVIDER: ${{ matrix.provider }}
+      PROVIDER: ${{ matrix.provider }}
+      ENTRY: vagrant/${{ matrix.provider }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Check out Isoloom
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Check out Isothrum (the runner)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: isoloom/isothrum
+          ref: ${{ env.ISOTHRUM_REF }}
+          path: .isothrum-src
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
           toolchain: stable
-      - name: Build
+
+      - name: Build Isoloom and the Isothrum runner
         id: build
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
           cargo build -q -p isoloom
+          cargo build -q -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
           echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
-          echo "RECORD=$RUNNER_TEMP/record" >> "$GITHUB_ENV"
-          rm -rf "$RUNNER_TEMP/record" && mkdir -p "$RUNNER_TEMP/record"
-      - name: Run
+          echo "$GITHUB_WORKSPACE/.isothrum-src/target/debug" >> "$GITHUB_PATH"
+          RECORD="$RUNNER_TEMP/record"
+          rm -rf "$RECORD" && mkdir -p "$RECORD"
+          echo "RECORD=$RECORD" >> "$GITHUB_ENV"
+          # The runner records runs under its own home, inside this run's temp.
+          echo "ISOTHRUM_HOME=$RUNNER_TEMP/isothrum-home" >> "$GITHUB_ENV"
+
+      - name: Generate the Vagrant tree
+        timeout-minutes: 10
+        run: isoloom generate --target "$TARGET" "examples/$EXAMPLE"
+
+      - name: Up
+        id: up
         timeout-minutes: 60
-        run: isoloom run "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/run.jsonl"
-      - name: Test
-        timeout-minutes: 15
-        run: isoloom test "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/test.jsonl"
+        run: isothrum up "examples/$EXAMPLE" --target "$TARGET" --provider "$PROVIDER" --json | tee "$RECORD/up.jsonl"
+      - name: Check
+        id: check
+        if: steps.up.outcome == 'success'
+        timeout-minutes: 20
+        run: isothrum check "examples/$EXAMPLE" --target "$TARGET" --json | tee "$RECORD/check.jsonl"
       - name: Down
         id: down
         if: always() && steps.build.outcome == 'success'
-        timeout-minutes: 20
-        run: isoloom down "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/down.jsonl"
+        timeout-minutes: 25
+        run: isothrum down "examples/$EXAMPLE" --target "$TARGET" --json | tee "$RECORD/down.jsonl"
       # `down` failed or never ran: Vagrant itself destroys what this checkout started, so the
       # runner's next job starts clean.
       - name: Destroy what is left
         if: always() && steps.build.outcome == 'success' && steps.down.outcome != 'success'
-        timeout-minutes: 15
+        timeout-minutes: 20
         working-directory: examples/${{ matrix.example }}/.isoloom/vagrant
         run: |
           vagrant destroy -f || true
-          vagrant global-status --prune
+          vagrant global-status --prune || true
 
-      - name: Record
+      # The tier record: `pass` only when the whole cycle (up, checks, down) passed, else `partial`
+      # (with a note) or `fail`. The record and the regenerated matrix are uploaded; the maintainer
+      # commits tiers.json + docs/matrix.md. The host is the runner as tiers.json names it
+      # (REAL_TIERS_HOST); a host the list does not know yet is added with its OS (REAL_TIERS_OS).
+      - name: Record tier evidence
         if: always() && steps.build.outcome == 'success'
         env:
-          RECORD_TARGET: ${{ env.TARGET }}
-          RECORD_EXAMPLE: ${{ matrix.example }}
-          RECORD_PROVIDER: ${{ matrix.provider }}
-        run: scripts/real-targets/record.sh "$RECORD" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+          HOST: ${{ vars.REAL_TIERS_HOST }}
+          HOST_OS: ${{ vars.REAL_TIERS_OS }}
+          UP: ${{ steps.up.outcome }}
+          CHECK: ${{ steps.check.outcome }}
+          DOWN: ${{ steps.down.outcome }}
+        run: |
+          if [ -z "$HOST" ]; then
+            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/ci-real-hosts.md)"
+            exit 0
+          fi
+          if [ "$UP" = success ] && [ "$CHECK" = success ] && [ "$DOWN" = success ]; then
+            result=pass; note="up, checks and down on $PROVIDER in CI"
+          elif [ "$UP" != success ]; then
+            result=fail; note="up failed on $PROVIDER in CI"
+          else
+            result=partial; note="up=$UP, check=$CHECK, down=$DOWN on $PROVIDER in CI"
+          fi
+          os_flag=()
+          if [ -n "$HOST_OS" ]; then os_flag=(--os "$HOST_OS"); fi
+          cargo xtask tiers record "$ENTRY" "$HOST" "$result" --note "$note" "${os_flag[@]}"
+          cp crates/targets/isoloom-targets/tiers.json docs/matrix.md "$RECORD/"
+          {
+            echo "## $ENTRY on $HOST: $result"
+            echo "$note"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the record and the regenerated tier files
         if: always() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: record-${{ env.TARGET }}-${{ matrix.provider }}-${{ matrix.example }}
-          path: ${{ runner.temp }}/record/record.json
+          name: cert-vagrant-${{ matrix.provider }}-${{ matrix.example }}
+          path: ${{ runner.temp }}/record
           if-no-files-found: warn

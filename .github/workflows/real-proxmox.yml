@@ -1,15 +1,22 @@
-# Isoloom on Proxmox VE for real (#145): hello-stack and segmented brought up with
-# `isoloom run proxmox` (VMs, cloud-init, provisioning), tested and torn down, from a
-# self-hosted runner labelled `proxmox` that reaches the cluster's API, its node over SSH and
-# the environment's router. Skipped, not failed, without the PROXMOX_* secrets or without
-# REAL_PROXMOX_RUNNER (a job waiting for a runner that doesn't exist would sit queued for a day).
-# Setting it up: docs/real-targets.md.
-name: Real targets (Proxmox)
+# Real-host certification: Isoloom's generated Proxmox trees (server mode) brought up on a real
+# Proxmox VE cluster, their checks run, and torn down, from a self-hosted runner labelled `proxmox`
+# that reaches the cluster's API, its node over SSH and the environment's router. The outcome is
+# recorded as tier evidence and uploaded; the maintainer commits the updated tier files.
+#
+# Isoloom converts, Isothrum runs: `isoloom generate` then `isothrum up/check/down`.
+#
+# Manual only (`workflow_dispatch`): no push, pull_request or schedule. Skipped, not failed, without
+# the PROXMOX_* secrets or without REAL_PROXMOX_RUNNER, so a job never sits queued for a runner that
+# does not exist. Enabling this: docs/ci-real-hosts.md.
+name: Cert — real server (Proxmox)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "11 3 * * 4" # weekly
+    inputs:
+      examples:
+        description: "Examples to certify, comma-separated (default: hello-stack,segmented)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -24,30 +31,36 @@ defaults:
 
 env:
   TARGET: proxmox
+  ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
 
 jobs:
-  # Whether the runner and the secrets are there. Forks never get here.
+  # Whether the runner and the secrets are there, and which examples to run. Secrets cannot appear
+  # in a job's `if`, so this job reads them. Forks never get here.
   gate:
     if: ${{ !github.event.repository.fork }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
+      examples: ${{ steps.check.outputs.examples }}
     steps:
       - id: check
         env:
           RUNNER: ${{ vars.REAL_PROXMOX_RUNNER }}
           SECRETS: ${{ secrets.PROXMOX_VE_ENDPOINT != '' && secrets.PROXMOX_VE_API_TOKEN != '' && secrets.PROXMOX_SSH_PRIVATE_KEY != '' }}
+          EXAMPLES: ${{ inputs.examples }}
         run: |
           enabled=false
           if [ "$RUNNER" != true ]; then
-            echo "::notice title=Proxmox skipped::no runner declared (REAL_PROXMOX_RUNNER; docs/real-targets.md)"
+            echo "::notice title=Proxmox skipped::no runner declared (REAL_PROXMOX_RUNNER; docs/ci-real-hosts.md)"
           elif [ "$SECRETS" != true ]; then
-            echo "::notice title=Proxmox skipped::PROXMOX_VE_ENDPOINT, PROXMOX_VE_API_TOKEN or PROXMOX_SSH_PRIVATE_KEY missing (docs/real-targets.md)"
+            echo "::notice title=Proxmox skipped::PROXMOX_VE_ENDPOINT, PROXMOX_VE_API_TOKEN or PROXMOX_SSH_PRIVATE_KEY missing (docs/ci-real-hosts.md)"
           else
             enabled=true
           fi
           echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
+          examples=${EXAMPLES:-hello-stack,segmented}
+          echo "examples=$(printf '%s' "$examples" | jq -Rsc 'rtrimstr("\n") | split(",")')" >> "$GITHUB_OUTPUT"
 
   proxmox:
     needs: gate
@@ -58,33 +71,46 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        example: [hello-stack, segmented]
+        example: ${{ fromJSON(needs.gate.outputs.examples) }}
     env:
       EXAMPLE: ${{ matrix.example }}
+      ENTRY: proxmox
       PROXMOX_VE_ENDPOINT: ${{ secrets.PROXMOX_VE_ENDPOINT }}
       PROXMOX_VE_API_TOKEN: ${{ secrets.PROXMOX_VE_API_TOKEN }}
       TF_VAR_proxmox_endpoint: ${{ secrets.PROXMOX_VE_ENDPOINT }}
       TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_VE_API_TOKEN }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Check out Isoloom
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Check out Isothrum (the runner)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: isoloom/isothrum
+          ref: ${{ env.ISOTHRUM_REF }}
+          path: .isothrum-src
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_wrapper: false
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
           toolchain: stable
-      - name: Build
+
+      - name: Build Isoloom and the Isothrum runner
         id: build
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
           cargo build -q -p isoloom
+          cargo build -q -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
           echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
-          echo "RECORD=$RUNNER_TEMP/record" >> "$GITHUB_ENV"
-          rm -rf "$RUNNER_TEMP/record" && mkdir -p "$RUNNER_TEMP/record"
+          echo "$GITHUB_WORKSPACE/.isothrum-src/target/debug" >> "$GITHUB_PATH"
+          RECORD="$RUNNER_TEMP/record"
+          rm -rf "$RECORD" && mkdir -p "$RECORD"
+          echo "RECORD=$RECORD" >> "$GITHUB_ENV"
+          echo "ISOTHRUM_HOME=$RUNNER_TEMP/isothrum-home" >> "$GITHUB_ENV"
 
       # The node's SSH key (cloud-init snippets are uploaded over SSH), a key for this run's VMs,
-      # and the cluster's layout from repository variables; an unset one keeps the module's
-      # default (node `pve`, `local-lvm`, `local`, `vmbr0`).
+      # and the cluster's layout from repository variables; an unset one keeps the module's default
+      # (node `pve`, `local-lvm`, `local`, `vmbr0`).
       - name: Cluster
         env:
           SSH_KEY: ${{ secrets.PROXMOX_SSH_PRIVATE_KEY }}
@@ -111,42 +137,73 @@ jobs:
             done
           } >> "$GITHUB_ENV"
 
-      - name: Run
+      - name: Generate the Proxmox tree
+        timeout-minutes: 10
+        run: isoloom generate --target "$TARGET" "examples/$EXAMPLE"
+
+      - name: Up
+        id: up
         timeout-minutes: 60
-        run: isoloom run "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/run.jsonl"
-      - name: Test
-        timeout-minutes: 15
-        run: isoloom test "$TARGET" "examples/$EXAMPLE" --ssh-key "$RUNNER_TEMP/id_ed25519" --json | tee "$RECORD/test.jsonl"
+        run: isothrum up "examples/$EXAMPLE" --target "$TARGET" --json | tee "$RECORD/up.jsonl"
+      - name: Check
+        id: check
+        if: steps.up.outcome == 'success'
+        timeout-minutes: 20
+        run: isothrum check "examples/$EXAMPLE" --target "$TARGET" --json | tee "$RECORD/check.jsonl"
       - name: Down
         id: down
         if: always() && steps.build.outcome == 'success'
-        timeout-minutes: 20
-        run: isoloom down "$TARGET" "examples/$EXAMPLE" --json | tee "$RECORD/down.jsonl"
-      # `down` failed: once more (a VM still locked by a task often is the reason), before the
-      # next checkout cleans the Terraform state away. Still failing, the run says so loudly.
+        timeout-minutes: 25
+        run: isothrum down "examples/$EXAMPLE" --target "$TARGET" --json | tee "$RECORD/down.jsonl"
+      # `down` failed: once more (a VM still locked by a task is often the reason) before the next
+      # checkout cleans the Terraform state away. Still failing, the run says so loudly.
       - name: Down, again
         if: always() && steps.build.outcome == 'success' && steps.down.outcome != 'success'
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
           sleep 30
-          if ! isoloom down "$TARGET" "examples/$EXAMPLE"; then
+          if ! isothrum down "examples/$EXAMPLE" --target "$TARGET"; then
             echo "::error title=Proxmox leftovers::$EXAMPLE may still have VMs on the cluster: check it by hand"
             exit 1
           fi
 
-      - name: Record
+      - name: Record tier evidence
         if: always() && steps.build.outcome == 'success'
         env:
-          RECORD_TARGET: ${{ env.TARGET }}
-          RECORD_EXAMPLE: ${{ matrix.example }}
+          HOST: ${{ vars.REAL_TIERS_HOST }}
+          HOST_OS: ${{ vars.REAL_TIERS_OS }}
+          SERVER: ${{ vars.REAL_PROXMOX_SERVER || 'pve-lab' }}
+          UP: ${{ steps.up.outcome }}
+          CHECK: ${{ steps.check.outcome }}
+          DOWN: ${{ steps.down.outcome }}
         run: |
-          RECORD_MODULE="examples/$EXAMPLE/.isoloom/proxmox" scripts/real-targets/record.sh "$RECORD" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$HOST" ]; then
+            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/ci-real-hosts.md)"
+            exit 0
+          fi
+          if [ "$UP" = success ] && [ "$CHECK" = success ] && [ "$DOWN" = success ]; then
+            result=pass; note="$EXAMPLE: up, checks and down on Proxmox in CI"
+          elif [ "$UP" != success ]; then
+            result=fail; note="$EXAMPLE: up failed on Proxmox in CI"
+          else
+            result=partial; note="$EXAMPLE: up=$UP, check=$CHECK, down=$DOWN on Proxmox in CI"
+          fi
+          os_flag=()
+          if [ -n "$HOST_OS" ]; then os_flag=(--os "$HOST_OS"); fi
+          cargo xtask tiers record "$ENTRY" "$HOST" "$result" --server "$SERVER" --note "$note" "${os_flag[@]}"
+          cp crates/targets/isoloom-targets/tiers.json docs/matrix.md "$RECORD/"
+          {
+            echo "## $ENTRY on $HOST ($SERVER): $result"
+            echo "$note"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Forget the keys
         if: always()
         run: rm -f "$RUNNER_TEMP/proxmox_node_key" "$RUNNER_TEMP"/id_ed25519*
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: Upload the record and the regenerated tier files
         if: always() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: record-${{ env.TARGET }}-${{ matrix.example }}
-          path: ${{ runner.temp }}/record/record.json
+          name: cert-proxmox-${{ matrix.example }}
+          path: ${{ runner.temp }}/record
           if-no-files-found: warn
