@@ -657,7 +657,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "cisco-iol",
@@ -1300,7 +1300,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "cisco-iol",

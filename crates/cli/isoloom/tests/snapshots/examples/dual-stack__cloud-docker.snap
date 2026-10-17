@@ -195,7 +195,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "dual-stack",
@@ -964,7 +964,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "dual-stack",
@@ -1666,7 +1666,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "dual-stack",
@@ -2364,7 +2364,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "dual-stack",
@@ -3053,7 +3053,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "dual-stack",
@@ -3760,7 +3760,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "lab": {
     "name": "dual-stack",
