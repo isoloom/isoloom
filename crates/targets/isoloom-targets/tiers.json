@@ -397,6 +397,13 @@
           "result": "pass",
           "server": "esxi-lab",
           "note": "ESXi 8.0U3e: the module serves and passes its check, finished from a container"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "partial",
+          "server": "esxi-lab",
+          "note": "static only 2026-10-17: generated hosts self-name+aliases, set-up progress ready-file and router sealed.nft all correct; NO live cycle - josenk/esxi provider is password-only but esxi-lab sshd is key-only (PasswordAuthentication no), and the esxi target emits no runner/launcher run.json; live seal reload owed"
         }
       ]
     },
