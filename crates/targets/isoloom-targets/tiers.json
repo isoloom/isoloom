@@ -237,6 +237,12 @@
           "date": "2026-10-16",
           "result": "pass",
           "note": "configured-app (Phase 4.2's configuration renderers): every step kind through the shell library on Debian 12 and Ubuntu 24.04 (nginx from packages with a template, a user and group, files, a guarded command, the firewall, two services Isoloom defines as systemd units): up, 5/5 checks, a second and third provision changing nothing, down, through the Isothrum runner (VirtualBox 7.2)"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "bridged LAN VM on 10.0.0.101+ (public_network) through the launcher's runner path (real_vm_labs): web boots a fixed 10.0.0.101 on en0, reachable from the host (ping + curl the page), full cycle up/checks/pause+resume/shutdown+resume/provision/down, no VM left; VirtualBox 7.2.20, bento/debian-12"
         }
       ]
     },
