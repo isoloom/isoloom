@@ -688,6 +688,262 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^juice-shop(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "juice-shop's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^mariadb(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "mariadb's settings.",
+                "properties": {
+                  "password": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "secret": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "input"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "description": "The root password (a literal, or a secret or input reference)."
+                  },
+                  "database": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9_]{1,64})$",
+                    "description": "The application database the image creates at first start.",
+                    "default": "app"
+                  },
+                  "user": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9_]{1,32})$",
+                    "description": "The application user the image creates at first start.",
+                    "default": "app"
+                  },
+                  "user_password": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "secret": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "input"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "description": "The application user's password (a literal, or a secret or input reference)."
+                  }
+                },
+                "required": [
+                  "password",
+                  "user_password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^mongodb(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "mongodb's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^mysql(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "mysql's settings.",
+                "properties": {
+                  "password": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "secret": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "input"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "description": "The root password (a literal, or a secret or input reference)."
+                  },
+                  "database": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9_]{1,64})$",
+                    "description": "The application database the image creates at first start.",
+                    "default": "app"
+                  },
+                  "user": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z0-9_]{1,32})$",
+                    "description": "The application user the image creates at first start.",
+                    "default": "app"
+                  },
+                  "user_password": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "secret": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "input"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "description": "The application user's password (a literal, or a secret or input reference)."
+                  }
+                },
+                "required": [
+                  "password",
+                  "user_password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^nginx(@.+)?$"
               }
             },
@@ -735,6 +991,69 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^openssh(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "openssh's settings.",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "pattern": "^(?:[a-z_][a-z0-9_-]{0,31})$",
+                    "description": "The login account the entry creates (`ctf`).",
+                    "default": "ctf"
+                  },
+                  "password": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "secret": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "input"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "description": "The login account's password, as a literal, `{ secret: <name> }` or `{ input: <NAME> }`. Without it, the account is created with no password set (key access only)."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^php-fpm(@.+)?$"
               }
             },
@@ -762,6 +1081,77 @@
                   }
                 },
                 "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^postgres(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "postgres's settings.",
+                "properties": {
+                  "database": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
+                    "description": "The application database the image creates at first start.",
+                    "default": "app"
+                  },
+                  "user": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
+                    "description": "The superuser the image creates at first start.",
+                    "default": "app"
+                  },
+                  "password": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "secret": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "input"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "description": "The superuser's password (a literal, or a secret or input reference)."
+                  }
+                },
+                "required": [
+                  "password"
+                ],
                 "additionalProperties": false
               }
             }

@@ -105,5 +105,11 @@ fn a_best_effort_seal_is_an_advisory_warning() {
     let yaml = "version: 1\nname: t\nnetworks: { sealed: { cidr: 10.9.0.0/24, internet: false } }\nmachines:\n  pwn: { networks: { sealed: 10 }, app: { image: x }, privileged: true, seal: best-effort }\n";
     let warnings = testing::lab(yaml).warnings();
     assert_eq!(warnings.iter().map(|w| w.path.as_str()).collect::<Vec<_>>(), ["machines.pwn.seal"]);
-    assert!(warnings[0].reason.starts_with("`seal: best-effort` makes this machine's `internet: false` seal advisory"), "{}", warnings[0].reason);
+    assert!(
+        warnings[0]
+            .reason
+            .starts_with("`seal: best-effort` makes this machine's `internet: false` seal advisory"),
+        "{}",
+        warnings[0].reason
+    );
 }

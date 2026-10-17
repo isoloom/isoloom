@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The mariadb entry: MariaDB, from its official image. The image initialises the data directory at
+# first start from the settings below (its own entrypoint): the root password, an application
+# database, and an application user. There is no VM form in this unit; a VM form from MariaDB's
+# own repository is a follow-up. lock.yml beside it is written only by
+# `cargo xtask catalogue refresh mariadb`, which pins the image's digest.
+name: mariadb
+description: >-
+  MariaDB, from its official image: it serves an application database, with a root password and an
+  application user whose passwords come from secrets.
+upstream: https://mariadb.org/
+licence:
+  software: GPL-2.0-only
+  notes: The official image bundles its base distribution's packages under those packages' own licences.
+
+# MariaDB's maintained LTS series; the image tag is the series (`11.4`).
+releases:
+  - version: "11.4"
+    channel: lts
+    source: distro
+    os: [debian@12]
+default: "11.4"
+
+images:
+  debian@12: docker.io/library/mariadb:{{ version }}
+
+settings:
+  password:
+    type: password
+    required: true
+    description: The root password (a literal, or a secret or input reference).
+  database:
+    type: string
+    default: app
+    pattern: "[A-Za-z0-9_]{1,64}"
+    description: The application database the image creates at first start.
+  user:
+    type: string
+    default: app
+    pattern: "[A-Za-z0-9_]{1,32}"
+    description: The application user the image creates at first start.
+  user_password:
+    type: password
+    required: true
+    description: The application user's password (a literal, or a secret or input reference).
+
+image:
+  environment:
+    MARIADB_ROOT_PASSWORD_FILE: "{{ with.password.path }}"
+    MARIADB_DATABASE: "{{ with.database }}"
+    MARIADB_USER: "{{ with.user }}"
+    MARIADB_PASSWORD_FILE: "{{ with.user_password.path }}"
+
+ports:
+  mysql: { port: 3306, protocol: tcp }
+
+data:
+  data: /var/lib/mysql
+
+recipe: {}

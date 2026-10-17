@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The juice-shop entry: OWASP Juice Shop, a deliberately insecure web application for CTF and
+# training, delivered as its maintainer's own prebuilt image (there is no package or VM install
+# form). lock.yml beside it is written only by `cargo xtask catalogue refresh juice-shop`, which
+# pins the image's digest.
+name: juice-shop
+description: >-
+  OWASP Juice Shop, a deliberately insecure web application for security training and CTF labs,
+  run from its maintainer's official prebuilt image.
+upstream: https://owasp.org/www-project-juice-shop/
+licence:
+  software: MIT
+  notes: The image bundles its Node.js runtime and dependencies under their own licences.
+
+# Juice Shop ships only as a prebuilt image; the release names the image tag (`v17.1.0`).
+releases:
+  - version: 17.1.0
+    source: download
+    os: [debian@12]
+default: 17.1.0
+
+# The maintainer's image on Docker Hub, pinned by digest in lock.yml. It is OS-agnostic (a Node
+# app); the machine's `os:` is nominal.
+images:
+  debian@12: docker.io/bkimminich/juice-shop:v{{ version }}
+
+ports:
+  http: { port: 3000, protocol: http }
+
+recipe: {}

@@ -129,6 +129,21 @@ fn each_container_built_from_steps_gets_its_dockerfile_and_a_vm_none() {
 }
 
 #[test]
+fn a_bare_official_image_keeps_its_own_working_folder() {
+    // A catalogue entry that is only an official image, with no install or configure steps and
+    // the image's own entrypoint, must not have its working folder overridden: an app may rely on
+    // it to find its files (OWASP Juice Shop reads `encryptionkeys/` from its image's WORKDIR).
+    let d = built("os: debian@12, service: juice-shop", &[])
+        .into_iter()
+        .next()
+        .expect("a Dockerfile")
+        .contents;
+    assert!(d.contains("FROM docker.io/bkimminich/juice-shop"), "{d}");
+    assert!(!d.contains("WORKDIR"), "a bare image keeps its own working folder: {d}");
+    assert!(!d.contains("ENTRYPOINT"), "the image's own entrypoint runs: {d}");
+}
+
+#[test]
 fn each_family_installs_with_its_library_call() {
     for os in ["alpine@3.19", "rocky@9", "centos@7", "ubuntu@24.04"] {
         assert!(dockerfile(os, "[{ packages: [curl] }]").contains("&& isoloom_packages 'curl'\n"), "{os}");

@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The postgres entry: PostgreSQL, from its official image. The image initialises the cluster at
+# first start from the settings below (its own entrypoint, `image.start: image`): the superuser
+# and its password, and an application database. There is no VM form in this unit; a VM form that
+# installs PGDG's packages and matches the image is a follow-up. lock.yml beside it is written
+# only by `cargo xtask catalogue refresh postgres`, which pins the image's digest.
+name: postgres
+description: >-
+  PostgreSQL, from its official image: it serves an application database, with a superuser whose
+  password comes from a secret.
+upstream: https://www.postgresql.org/
+licence:
+  software: PostgreSQL
+  notes: The official image bundles its Debian base's packages under those packages' own licences.
+
+# PostgreSQL's major series; the image tag is `<version>-bookworm` (a Debian 12 base).
+releases:
+  - version: "16"
+    source: distro
+    os: [debian@12]
+default: "16"
+
+images:
+  debian@12: docker.io/library/postgres:{{ version }}-bookworm
+
+settings:
+  database:
+    type: string
+    default: app
+    pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
+    description: The application database the image creates at first start.
+  user:
+    type: string
+    default: app
+    pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
+    description: The superuser the image creates at first start.
+  password:
+    type: password
+    required: true
+    description: The superuser's password (a literal, or a secret or input reference).
+
+# How the settings reach the official image: its own entrypoint reads these variables and the
+# password's value file at first start.
+image:
+  environment:
+    POSTGRES_DB: "{{ with.database }}"
+    POSTGRES_USER: "{{ with.user }}"
+    POSTGRES_PASSWORD_FILE: "{{ with.password.path }}"
+
+ports:
+  postgres: { port: 5432, protocol: tcp }
+
+data:
+  data: /var/lib/postgresql/data
+
+recipe: {}

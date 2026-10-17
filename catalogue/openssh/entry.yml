@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The openssh entry: the OpenSSH server, from the OS's own packages, the same in every form (a
+# Dockerfile from the Debian image, or a VM's apt install). It gives a machine SSH access with a
+# login account whose password comes from a secret. lock.yml beside it is written only by
+# `cargo xtask catalogue refresh openssh`.
+name: openssh
+description: >-
+  The OpenSSH server (sshd), from the OS's own packages: it gives a machine SSH access, with a
+  login account whose password comes from a secret.
+upstream: https://www.openssh.com/
+licence:
+  software: BSD-2-Clause
+  notes: The OS's OpenSSH packages bundle their dependencies under those packages' own licences.
+
+# The OS's own OpenSSH: Debian 12 ships the 9.2 series, which the recipe installs and the VM gets.
+releases:
+  - version: "9.2"
+    source: distro
+    os: [debian@12]
+default: "9.2"
+
+settings:
+  username:
+    type: string
+    default: ctf
+    pattern: "[a-z_][a-z0-9_-]{0,31}"
+    description: The login account the entry creates (`ctf`).
+  password:
+    type: password
+    description: >-
+      The login account's password, as a literal, `{ secret: <name> }` or `{ input: <NAME> }`.
+      Without it, the account is created with no password set (key access only).
+
+ports:
+  ssh: { port: 22, protocol: tcp }
+
+recipe:
+  # Skipped on an official image's form; openssh has none, so this always runs.
+  install:
+    # The client gives `ssh -V` for the version check; the server is sshd itself.
+    - packages: [openssh-client, openssh-server]
+
+  configure:
+    # sshd's privilege-separation directory, which the OS's tmpfiles would make on a VM.
+    - file: { path: /run/sshd, state: directory, mode: "0755" }
+    # Password logins, for the account the start phase sets up.
+    - template: { from: files/isoloom.conf, to: /etc/ssh/sshd_config.d/isoloom.conf, mode: "0644" }
+    # Host keys, generated once; a VM's package postinst does this, a built container needs it done.
+    - command: ssh-keygen -A
+      creates: /etc/ssh/ssh_host_ed25519_key
+    # On a VM: enabled and started, restarted when a step above changed something. In a built
+    # container: the runner's one foreground process (the shared `ssh` daemon).
+    - service: ssh
+
+  start:
+    # The login account, created once (idempotent through `unless`).
+    - command: "useradd --create-home --shell /bin/bash {{ with.username }}"
+      unless: "id {{ with.username }}"
+    # Its password, from the secret's value file (never the value itself in the step), set once.
+    - command: "sh -c 'mkdir -p /var/lib/isoloom && echo \"{{ with.username }}:$(cat {{ with.password.path }})\" | chpasswd && touch /var/lib/isoloom/openssh-password-set'"
+      creates: /var/lib/isoloom/openssh-password-set
+      when: { set: password }

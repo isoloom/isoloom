@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What juice-shop does, proven on the container form (it has no VM form). `cargo xtask catalogue
+# check juice-shop` builds a small lab (`web`, an access machine `probe`) and runs it on `docker`
+# through the Isothrum CLI.
+cases:
+  default: {}
+
+checks:
+  - name: the port answers
+    http: "http://{{ machine }}:3000/"
+    expect: any
+    wait: 2m
+  - name: the application serves its front page
+    http: "http://{{ machine }}:3000/"
+    contains: "OWASP Juice Shop"

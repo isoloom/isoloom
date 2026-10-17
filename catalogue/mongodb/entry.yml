@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The mongodb entry: MongoDB, from its official image. It runs without authentication, as a lab
+# database on a trusted network. A root-credential form (MONGO_INITDB_ROOT_*) is a follow-up: the
+# official image reads the password file as its non-root `mongodb` user, which Isoloom's root-only
+# secret mount denies (postgres/mysql/mariadb read it as root). There is no VM form in this unit.
+# lock.yml beside it is written only by `cargo xtask catalogue refresh mongodb`, which pins the
+# image's digest.
+name: mongodb
+description: >-
+  MongoDB, from its official image: it serves a database on a trusted lab network, without
+  authentication.
+upstream: https://www.mongodb.com/
+licence:
+  software: SSPL-1.0
+  notes: The official image bundles its base distribution's packages under those packages' own licences.
+
+# MongoDB's major series; the image tag is the series (`7`).
+releases:
+  - version: "7"
+    source: distro
+    os: [debian@12]
+default: "7"
+
+images:
+  debian@12: docker.io/library/mongo:{{ version }}
+
+ports:
+  mongodb: { port: 27017, protocol: tcp }
+
+data:
+  data: /data/db
+
+recipe: {}

@@ -76,8 +76,16 @@ pub fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> Str
     } else {
         String::new()
     };
+    // The project folder is the working folder only when the build or the runner uses it; a bare
+    // passthrough of an official image (no steps, the image's own entrypoint) keeps the image's
+    // own working folder, which an app may rely on to find its files.
+    let workdir = if process.is_runner() || !steps.is_empty() {
+        format!("WORKDIR {PROJECT_DIR}\n")
+    } else {
+        String::new()
+    };
     format!(
-        "{}# The container form of machine `{}`: its OS's image and its steps.\nFROM {base}\nWORKDIR {PROJECT_DIR}\n{library}{steps}{entrypoint}",
+        "{}# The container form of machine `{}`: its OS's image and its steps.\nFROM {base}\n{workdir}{library}{steps}{entrypoint}",
         header("#"),
         c.machine()
     )
