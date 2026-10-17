@@ -376,12 +376,6 @@ variable "ssh_private_key_file" {
   description = "The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router"
 }
 
-variable "isoloom_sealed" {
-  type        = bool
-  default     = false
-  description = "Close the internet to the machines of every `internet: false` network, at the network: the runner sets it once the machines are set up"
-}
-
 provider "esxi" {
   esxi_hostname = var.esxi_hostname
   esxi_hostport = var.esxi_hostport
@@ -458,9 +452,13 @@ resource "esxi_guest" "isoloom_router" {
       write_files = [
         {
           path    = "/etc/nftables.conf"
-          content = var.isoloom_sealed ? "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.60.0.10 tcp dport 80 ct status dnat accept\n    ip daddr { 10.60.0.0/24 } drop\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.60.0.0/24 } tcp dport 8080 dnat ip to 10.60.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n  }\n}\n" : "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.60.0.10 tcp dport 80 ct status dnat accept\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.60.0.0/24 } tcp dport 8080 dnat ip to 10.60.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } masquerade\n  }\n}\n"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.60.0.10 tcp dport 80 ct status dnat accept\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.60.0.0/24 } tcp dport 8080 dnat ip to 10.60.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } masquerade\n  }\n}\n"
         },
-        { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" }
+        { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
+        {
+          path    = "/etc/nftables.sealed.nft"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.60.0.10 tcp dport 80 ct status dnat accept\n    ip daddr { 10.60.0.0/24 } drop\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.60.0.0/24 } tcp dport 8080 dnat ip to 10.60.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n  }\n}\n"
+        }
       ]
       runcmd = [
         "sysctl -p /etc/sysctl.d/90-isoloom.conf",

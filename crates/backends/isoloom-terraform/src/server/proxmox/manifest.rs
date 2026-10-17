@@ -59,7 +59,7 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
         hosts: every_host(),
         tools: tools()?,
         identity: runner_identity()?,
-        params: slots::params(&super::base::variables(env), &runners)?,
+        params: slots::params(&super::base::variables(env), &runners, crate::cloud::vm::seal::any(env))?,
         secrets: slots::secrets(env)?,
         networks: machines::networks(env)?,
         outputs: machines::outputs(&machines)?,

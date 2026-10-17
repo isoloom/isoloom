@@ -44,7 +44,8 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
     let mut machines = vec![vm(env)?];
     machines.extend(guest.machines_at(&ip));
     let vars = variables();
-    let mut params = slots::params(&vars, &[])?;
+    // docker-vm is a single Docker host VM with no router to seal.
+    let mut params = slots::params(&vars, &[], false)?;
     params.extend(guest.params.iter().cloned());
     let mut secrets = slots::connection(&vars)?;
     secrets.extend(guest.slots.iter().cloned());

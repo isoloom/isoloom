@@ -107,12 +107,6 @@ variable "ssh_public_key" {
   description = "Installed for the user `isoloom` on every VM"
 }
 
-variable "isoloom_sealed" {
-  type        = bool
-  default     = false
-  description = "Close the internet to the machines of every `internet: false` network, at the network: the runner sets it once the machines are set up"
-}
-
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
   api_token = var.proxmox_api_token != "" ? var.proxmox_api_token : null
@@ -209,7 +203,7 @@ resource "proxmox_virtual_environment_file" "router" {
         },
         {
           path    = "/etc/nftables.conf"
-          content = var.isoloom_sealed ? "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.60.0.10 tcp dport 80 ct status dnat accept\n    ip daddr { 10.60.0.0/24 } drop\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.60.0.0/24 } tcp dport 8080 dnat ip to 10.60.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n  }\n}\n" : "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.60.0.10 tcp dport 80 ct status dnat accept\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.60.0.0/24 } tcp dport 8080 dnat ip to 10.60.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } masquerade\n  }\n}\n"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.60.0.10 tcp dport 80 ct status dnat accept\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.60.0.0/24 } tcp dport 8080 dnat ip to 10.60.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.60.0.0/24 } ip daddr != { 10.60.0.0/24 } masquerade\n  }\n}\n"
         },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
         {

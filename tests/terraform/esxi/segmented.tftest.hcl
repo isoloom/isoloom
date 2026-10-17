@@ -185,21 +185,18 @@ run "a_slot_beyond_vmware_s_static_macs_is_refused" {
   expect_failures = [var.slot]
 }
 
-# The spec: `back` has `internet: false`. During set-up the router forwards and masquerades every
-# network to the internet (machines install their software); once the run is sealed
-# (`isoloom_sealed`, the runner's second apply after ready, as on the clouds), the router's
-# ruleset drops back from the internet forward and NAT, and drops what crosses into back from
-# elsewhere, so back keeps only its `reach` rules and has no way out. ESXi has no per-VM firewall,
-# so the router is the only thing between the networks: the drop is what isolates back when sealed.
-run "the_router_seals_an_internet_false_network_at_the_network_once_set_up" {
+# The spec: `back` has `internet: false`. The router's base /etc/nftables.conf is always the
+# unsealed ruleset (asserted above: back is forwarded for set-up) and never depends on
+# `isoloom_sealed`, so sealing never changes the snippet (no VM recreate). The sealed ruleset is a
+# second file, /etc/nftables.sealed.nft, which the seal-reload step applies live: it keeps the
+# reach rules but drops back from the internet forward and NAT, and drops what crosses into back.
+# ESXi has no per-VM firewall, so the router's drop is what isolates back once sealed. (ESXi's
+# Terraform target has no run manifest yet, so its live reload is owed with that integration.)
+run "the_router_carries_the_sealed_ruleset_for_the_live_seal_step" {
   command = plan
 
-  variables {
-    isoloom_sealed = true
-  }
-
   assert {
-    condition = split("\n", one([for f in yamldecode(trimprefix(base64decode(esxi_guest.isoloom_router.guestinfo["userdata"]), "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) == tolist([
+    condition = split("\n", one([for f in yamldecode(trimprefix(base64decode(esxi_guest.isoloom_router.guestinfo["userdata"]), "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) == tolist([
       "flush ruleset",
       "table inet isoloom {",
       "  chain forward {",
@@ -221,10 +218,15 @@ run "the_router_seals_an_internet_false_network_at_the_network_once_set_up" {
       "}",
       "",
     ])
-    error_message = "once sealed, the router must keep the reach rules but drop back (internet: false) from the internet forward and NAT, and drop what crosses into it"
+    error_message = "the sealed ruleset (/etc/nftables.sealed.nft) must keep the reach rules but drop back (internet: false) from the internet forward and NAT, and drop what crosses into it"
   }
   assert {
-    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(base64decode(esxi_guest.isoloom_router.guestinfo["userdata"]), "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0
-    error_message = "once sealed, the router must not forward nor masquerade back (internet: false) to the internet"
+    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(base64decode(esxi_guest.isoloom_router.guestinfo["userdata"]), "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0
+    error_message = "the sealed ruleset must not forward nor masquerade back (internet: false) to the internet"
+  }
+  # The base /etc/nftables.conf must stay unsealed (back still forwarded), inert under the seal.
+  assert {
+    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(base64decode(esxi_guest.isoloom_router.guestinfo["userdata"]), "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 2
+    error_message = "the base /etc/nftables.conf must stay unsealed (back still forwarded and masqueraded), carrying no isoloom_sealed conditional"
   }
 }

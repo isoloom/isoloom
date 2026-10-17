@@ -1,8 +1,8 @@
 //! What a Proxmox run is given at run time: the module's variables as params (the API, the node,
 //! the datastores, the uplink bridge, each Windows OS's template), its sensitive ones (the
 //! password, the API token) as connection slots, the lab's inputs as entries of the module's
-//! `inputs` map, and the check runners' switch. The runner sets three variables itself, through
-//! the steps' environment ([`RUNNER_SET`]).
+//! `inputs` map, the check runners' switch, and the seal switch when the run seals. The runner
+//! sets three variables itself, through the steps' environment ([`RUNNER_SET`]).
 
 use std::collections::BTreeSet;
 
@@ -13,11 +13,13 @@ use isoloom_render::run_manifest::derived_switch;
 
 use crate::module::variable::Variable;
 
-/// The run's seal switch, set by the runner once the machines are ready (`crate::server::router`).
+/// The run's seal switch, the runner's recorded `sealed` flag (`crate::server::router`). The
+/// router has no `isoloom_sealed` Terraform variable (its snippet is inert), so the second apply
+/// ignores it; the live seal is the seal-reload step.
 pub(super) const SEALED: &str = crate::cloud::vm::seal::SEALED;
 
 /// The module's variables the runner sets itself (`steps`): never params an embedder gives.
-pub(super) const RUNNER_SET: [&str; 4] = ["slot", "ssh_public_key", "proxmox_ssh_private_key_file", SEALED];
+pub(super) const RUNNER_SET: [&str; 3] = ["slot", "ssh_public_key", "proxmox_ssh_private_key_file"];
 
 /// The module's variable the inputs go in, one entry each.
 const INPUTS: &str = "inputs";
@@ -30,18 +32,18 @@ fn tf_var(name: &str, shape: TfVarShape) -> Result<NonEmpty<Delivery>, ManifestE
     }))
 }
 
-/// The module's variables an embedder sets (of `variables`), then the checks' switch when the lab
-/// has checks.
-pub(super) fn params(variables: &[Variable], runners: &[CheckRunner]) -> Result<Vec<Param>, ManifestError> {
+/// The module's variables an embedder sets (of `variables`), the checks' switch when the lab has
+/// checks, and the seal switch when the run has an `internet: false` network to seal (`sealed`).
+pub(super) fn params(variables: &[Variable], runners: &[CheckRunner], sealed: bool) -> Result<Vec<Param>, ManifestError> {
     let mut out: Vec<Param> = variables
         .iter()
         .filter(|v| !v.is_sensitive() && v.name() != INPUTS && !RUNNER_SET.contains(&v.name()))
         .map(param)
         .collect::<Result<_, _>>()?;
     out.extend(derived_switch(runners.iter().map(|r| r.step.id.clone()).collect())?);
-    if variables.iter().any(|v| v.name() == SEALED) {
-        // The runner sets it once the machines are ready; on a server the internet is closed at
-        // the router (`crate::server::router`).
+    if sealed {
+        // The runner records it and replays it on every later op; the seal takes effect live
+        // through the seal-reload step on the router (`crate::server::router`).
         out.push(crate::module::manifest::seal_param(SEALED, "router")?);
     }
     Ok(out)

@@ -72,11 +72,11 @@ fn applier(vnets: Vec<Expression>) -> Block {
 
 /// The module's variables, the run manifest's params and slots among them.
 pub(super) fn variables(env: &Environment) -> Vec<Variable> {
+    // No `isoloom_sealed` variable: the router's snippet never depends on it (a changed snippet
+    // would recreate the router VM), so the seal is applied live by the manifest's seal-reload
+    // step instead (`crate::server::router`).
     [
         own_variables(),
-        // The seal, as on the clouds: set once the machines are set up, it closes the internet to
-        // the `internet: false` networks at the router (`crate::server::router`).
-        crate::cloud::vm::seal::variable(env).into_iter().collect(),
         super::windows::variables(env),
         super::lxc::variables(env),
         super::virtiofs::variables(env),

@@ -25,26 +25,23 @@ pub(crate) fn forwarding(env: &Environment) -> &'static str {
     }
 }
 
-/// The nftables.conf content: the unsealed ruleset (the `reach` rules, the published ports
-/// forwarded from the uplink address, and the internet for every network), or, when the run has
-/// an `internet: false` network to seal, a conditional on `var.isoloom_sealed` so the runner's
-/// seal (a second apply with the variable on) switches the router to the sealed ruleset, as on
-/// the clouds. A later apply keeps it, and root in a guest can't undo it.
+/// The `/etc/nftables.conf` content: always the unsealed ruleset (the `reach` rules, the
+/// published ports forwarded from the uplink address, and the internet for every network). It
+/// never depends on `isoloom_sealed`, so the seal's second apply leaves the router's cloud-init
+/// snippet untouched (a changed snippet forces the VM to be recreated). The seal is applied live
+/// instead, from [`SEALED_NFT`], by the runner's seal-reload step ([`sealed_reload`]).
 pub(crate) fn ruleset_content(env: &Environment) -> Expression {
-    if seal::any(env) {
-        seal::when_sealed(string(rules(env, true)), string(rules(env, false)))
-    } else {
-        string(rules(env, false))
-    }
+    string(rules(env, false))
 }
 
-/// Where the router keeps the sealed ruleset as a second file. The runner's seal step applies it
-/// live to the already-booted (unsealed) router: updating the host-side cloud-init snippet alone
-/// never reaches a running guest, unlike the clouds' control-plane seal.
+/// Where the router keeps the sealed ruleset as a second, inert file. The runner's seal step
+/// applies it live to the already-booted (unsealed) router: updating the host-side cloud-init
+/// snippet alone never reaches a running guest, unlike the clouds' control-plane seal.
 pub(crate) const SEALED_NFT: &str = "/etc/nftables.sealed.nft";
 
 /// The sealed ruleset as the router's `SEALED_NFT` file, when the run has something to seal (left
-/// out otherwise, so an unsealed lab's router is unchanged).
+/// out otherwise, so an unsealed lab's router is unchanged). Written unconditionally so the seal's
+/// second apply never changes it (and so never recreates the router).
 pub(crate) fn sealed_file(env: &Environment) -> Option<Expression> {
     seal::any(env).then(|| crate::machine::cloud_init::file(SEALED_NFT, None, string(rules(env, true))))
 }

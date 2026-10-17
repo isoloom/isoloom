@@ -319,21 +319,18 @@ run "an_empty_node_is_refused" {
   expect_failures = [var.node]
 }
 
-# The spec: `back` has `internet: false`. During set-up the router forwards and masquerades every
-# network to the internet (its machines install their software); once the run is sealed
-# (`isoloom_sealed`, the runner's second apply after ready, as on the clouds), the router's
-# ruleset drops back from the internet forward and NAT, and drops what crosses into back from
-# elsewhere, so back keeps only its `reach` rules and has no way out — where root on a guest can't
-# undo it (`crate::server::router`).
-run "the_router_seals_an_internet_false_network_at_the_network_once_set_up" {
+# The spec: `back` has `internet: false`. The router's base /etc/nftables.conf is always the
+# unsealed ruleset (asserted above: back is forwarded for set-up), and never depends on
+# `isoloom_sealed` — so the seal's second apply leaves the router's snippet untouched and does not
+# recreate the VM. The sealed ruleset lives in a second file, /etc/nftables.sealed.nft, which the
+# runner's seal-reload step applies live after the machines are ready: it keeps the reach rules
+# but drops back from the internet forward and NAT, and drops what crosses into back, so back has
+# no way out — where root on a guest can't undo it (`crate::server::router`).
+run "the_router_carries_the_sealed_ruleset_for_the_live_seal_step" {
   command = plan
 
-  variables {
-    isoloom_sealed = true
-  }
-
   assert {
-    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) == tolist([
+    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) == tolist([
       "flush ruleset",
       "table inet isoloom {",
       "  chain forward {",
@@ -355,17 +352,16 @@ run "the_router_seals_an_internet_false_network_at_the_network_once_set_up" {
       "}",
       "",
     ])
-    error_message = "once sealed, the router must keep the reach rules but drop back (internet: false) from the internet forward and NAT, and drop what crosses into it"
+    error_message = "the sealed ruleset (/etc/nftables.sealed.nft) must keep the reach rules but drop back (internet: false) from the internet forward and NAT, and drop what crosses into it"
   }
   assert {
-    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0
-    error_message = "once sealed, the router must not forward nor masquerade back (internet: false) to the internet"
+    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0
+    error_message = "the sealed ruleset must not forward nor masquerade back (internet: false) to the internet"
   }
-  # The sealed ruleset is also a second file the runner's seal step applies live over SSH (the
-  # snippet change alone never reaches the already-booted router): it drops back from the
-  # internet forward and NAT, the same as /etc/nftables.conf once sealed.
+  # The base /etc/nftables.conf must stay the unsealed ruleset (it forwards back) and carry no
+  # `isoloom_sealed` conditional, so flipping the seal never changes the snippet (no VM recreate).
   assert {
-    condition     = length([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f if f.path == "/etc/nftables.sealed.nft" && length([for l in split("\n", f.content) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0]) == 1
-    error_message = "the router must carry the sealed ruleset as /etc/nftables.sealed.nft for the seal step to apply live"
+    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 2
+    error_message = "the base /etc/nftables.conf must stay unsealed (back still forwarded and masqueraded), inert under the seal"
   }
 }

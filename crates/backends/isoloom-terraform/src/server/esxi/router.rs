@@ -31,6 +31,9 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         file("/etc/nftables.conf", None, ruleset_content(env)),
         file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
     ];
+    // The sealed ruleset as a second file (the live reload applies it; owed on ESXi until its
+    // runner integration lands — the Terraform `esxi` target has no run manifest yet).
+    config.files.extend(crate::server::router::sealed_file(env));
     config.runcmd = [
         "sysctl -p /etc/sysctl.d/90-isoloom.conf",
         "systemctl enable --now nftables",

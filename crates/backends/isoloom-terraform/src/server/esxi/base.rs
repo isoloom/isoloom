@@ -64,9 +64,6 @@ fn variables(env: &Environment) -> Vec<Block> {
                 .block(),
         );
     }
-    // The seal, as on the clouds: set once the machines are set up, it closes the internet to the
-    // `internet: false` networks at the router (`crate::server::router`).
-    out.extend(crate::cloud::vm::seal::variable(env).map(Variable::block));
     out
 }
 
