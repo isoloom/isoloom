@@ -213,10 +213,10 @@ overrides:
     #[test]
     fn hybrid_refuses_only_a_machine_with_neither_form_and_runs_a_vm_only_where_it_must() {
         let l = testing::lab(
-            "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: postgres }\n",
+            "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: no-such-service }\n",
         );
         let found: Vec<String> = on(&l, Target::Hybrid).iter().map(|p| p.path.to_string()).collect();
-        assert_eq!(found, ["machines.svc.service"], "a Windows feature is the PowerShell library's");
+        assert_eq!(found, ["machines.svc.service"], "a service with no catalogue entry is refused at its `service`");
         assert_eq!(
             refused_on(Target::Hybrid),
             Vec::<String>::new(),

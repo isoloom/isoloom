@@ -145,11 +145,11 @@ fn the_design_examples_validate_but_for_what_waits_on_later_phases() {
     assert_eq!(problems("legacy-intranet"), []);
     // `windows` is a group name Isoloom fills itself (the inventory's).
     assert_eq!(problems("forest-mini"), [(Code::InvalidValue, "groups.windows".to_owned())]);
-    // The catalogue arrives in Phase 4.
-    assert_eq!(problems("branch-office"), [(Code::UnknownReference, "machines.db.service".to_owned())]);
-    let bookshelf = problems("bookshelf");
-    assert!(bookshelf.contains(&(Code::UnknownReference, "machines.db.service".to_owned())), "{bookshelf:?}");
-    assert!(bookshelf.iter().all(|(c, _)| *c == Code::UnknownReference), "{bookshelf:?}");
+    // The catalogue's nginx and postgres entries landed in Phase 4, so the examples' services
+    // resolve now. bookshelf's message still references a published port's runtime value, which
+    // validation can't resolve (a later-phase concern, not the catalogue).
+    assert_eq!(problems("branch-office"), []);
+    assert_eq!(problems("bookshelf"), [(Code::UnknownReference, "message".to_owned())]);
 }
 
 #[test]
@@ -167,8 +167,13 @@ fn a_lab_lists_the_targets_its_machines_have_forms_for() {
 
 #[test]
 fn a_catalogue_service_is_refused_at_its_service_until_its_entry_exists() {
+    // A service the catalogue does not have (the Phase-4 entries resolve now, so this uses a name
+    // no entry owns) is refused at its `service`, with neither form, on every target.
+    let lab = crate::testing::lab(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db:\n    os: debian@12\n    service: no-such-service\n    networks: { lan: 10 }\n",
+    );
     for target in [Target::Docker, Target::Vagrant, Target::Hybrid] {
-        let l = on("branch-office", target);
+        let l = lower(lab.source(), built_in(), Scope::Target(target));
         let db: Vec<&str> = l
             .refusals
             .iter()
@@ -179,7 +184,7 @@ fn a_catalogue_service_is_refused_at_its_service_until_its_entry_exists() {
         let machine = &l.spec.machines["db"];
         assert!(machine.docker.is_none() && machine.vm.is_none(), "{target:?}");
     }
-    assert_eq!(crate::Lab::new(example("branch-office")).possible(), []);
+    assert_eq!(lab.possible(), []);
 }
 
 #[test]
