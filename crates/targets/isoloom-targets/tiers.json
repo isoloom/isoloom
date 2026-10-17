@@ -274,6 +274,12 @@
           "date": "2026-10-15",
           "result": "pass",
           "note": "the full cycle through the runner (up, checks, pause and shutdown with their resumes, provision, down), Vagrant 2.4.9 on Windows 11"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up (Hyper-V relay 127.0.0.1:8080->guest:80), http 200, checks pass, pause+resume, shutdown+resume, provision, down; Get-VM clean, no VM left. Elevated-Vagrant path OK via the already-elevated branch (UAC off, so no prompt raised). Vagrant 2.4.9, solo-web, Windows 11"
         }
       ]
     },
@@ -297,6 +303,12 @@
           "date": "2026-10-15",
           "result": "pass",
           "note": "the full cycle, with Vagrant 2.4.9 and vagrant-libvirt 0.12.2 on Debian 13"
+        },
+        {
+          "host": "friday",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up, http 200, checks pass, pause+resume, shutdown+resume, provision, down; virsh clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13"
         }
       ]
     },
