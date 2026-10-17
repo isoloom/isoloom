@@ -136,13 +136,7 @@ const WAIT_TIMEOUT: &str = "2.17.0";
 
 /// The lowest Compose the run needs: the later of [`ENVIRONMENT_SECRETS`] and [`WAIT_TIMEOUT`].
 fn compose_min_version() -> Result<Version> {
-    let numeric = |v: &str| v.split('.').filter_map(|p| p.parse::<u32>().ok()).collect::<Vec<_>>();
-    let later = if numeric(ENVIRONMENT_SECRETS) > numeric(WAIT_TIMEOUT) {
-        ENVIRONMENT_SECRETS
-    } else {
-        WAIT_TIMEOUT
-    };
-    Ok(Version::parse(later)?)
+    Ok(Version::parse(ENVIRONMENT_SECRETS)?.max(Version::parse(WAIT_TIMEOUT)?))
 }
 
 /// Docker's engine and Compose v2, at the version the run needs ([`compose_min_version`]).
@@ -167,8 +161,7 @@ mod tests {
     fn compose_is_new_enough_to_copy_environment_secrets_with_their_owner_and_mode() {
         let min = compose_min_version().unwrap();
         assert_eq!(min.as_str(), WAIT_TIMEOUT);
-        let numeric = |v: &str| v.split('.').map(|p| p.parse::<u32>().unwrap()).collect::<Vec<_>>();
-        assert!(numeric(min.as_str()) >= numeric(ENVIRONMENT_SECRETS));
+        assert!(min >= Version::parse(ENVIRONMENT_SECRETS).unwrap());
         let compose = tools().unwrap().into_iter().find(|t| t.name.as_str() == "docker-compose").unwrap();
         assert_eq!(compose.min_version, Some(min));
     }

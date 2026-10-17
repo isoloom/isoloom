@@ -13,6 +13,10 @@ use crate::{Error, Result};
 
 /// A newtype over `String` that holds only values `$check` accepts; `$pattern` is the same rule
 /// as a JSON Schema pattern, `$rule` as a reader would fix the value.
+///
+/// The default form derives a lexicographic [`Ord`], right for names. Prefix the invocation with
+/// `custom_ord` for a type whose order isn't its text order (a [`Version`] sorts by its numbers,
+/// not its characters); the caller then writes the [`Ord`]/[`PartialOrd`] impls.
 macro_rules! pattern_type {
     ($(#[$doc:meta])* $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
         $(#[$doc])*
@@ -20,6 +24,17 @@ macro_rules! pattern_type {
         #[serde(transparent)]
         pub struct $ty(String);
 
+        pattern_type!(@shared $ty, $what, $pattern, $rule, $check);
+    };
+    (custom_ord $(#[$doc:meta])* $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
+        $(#[$doc])*
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+        #[serde(transparent)]
+        pub struct $ty(String);
+
+        pattern_type!(@shared $ty, $what, $pattern, $rule, $check);
+    };
+    (@shared $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
         impl $ty {
             /// The value, when it matches the pattern.
             ///
@@ -172,13 +187,31 @@ pattern_type!(
 );
 
 pattern_type!(
-    /// A version: `major.minor.patch`, with an optional pre-release (`0.10.1`, `2.17.0`).
+    custom_ord
+    /// A version: `major.minor.patch`, with an optional pre-release (`0.10.1`, `2.17.0`). Its
+    /// order is semantic, not textual: it sorts by the numbers (`2.9.0 < 2.14.0`), and a
+    /// pre-release sorts before the release it leads to (`1.0.0-rc.1 < 1.0.0`).
     Version,
     "version",
     "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$",
     "three numbers joined by dots, optionally `-` and a pre-release (`2.17.0`, `1.0.0-rc.1`)",
     is_version
 );
+
+impl Ord for Version {
+    /// Semver precedence: the three numbers compared as numbers, then a pre-release before the
+    /// release (semver §11). A value only ever holds a string that matched the version pattern, so
+    /// the three numeric parts are present and all digits.
+    fn cmp(&self, other: &Version) -> std::cmp::Ordering {
+        version_cmp(&self.0, &other.0)
+    }
+}
+
+impl PartialOrd for Version {
+    fn partial_cmp(&self, other: &Version) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 pattern_type!(
     /// A container image pinned by its digest (`hashicorp/terraform:1.9.8@sha256:…`).
@@ -206,6 +239,71 @@ fn is_version(v: &str) -> bool {
         && pre.is_none_or(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-')))
 }
 
+/// Two valid version strings in semver precedence: numbers as numbers, then pre-release before
+/// release. Both are strings [`is_version`] accepts, so each has three all-digit core parts.
+fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (a_core, a_pre) = a.split_once('-').map_or((a, None), |(c, p)| (c, Some(p)));
+    let (b_core, b_pre) = b.split_once('-').map_or((b, None), |(c, p)| (c, Some(p)));
+    let core = a_core
+        .split('.')
+        .zip(b_core.split('.'))
+        .map(|(x, y)| numeric_cmp(x, y))
+        .find(|o| *o != Ordering::Equal)
+        .unwrap_or(Ordering::Equal);
+    core.then_with(|| pre_release_cmp(a_pre, b_pre))
+}
+
+/// A pre-release sorts before the release (`None`), and two pre-releases by their dot-identifiers.
+fn pre_release_cmp(a: Option<&str>, b: Option<&str>) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Greater,
+        (Some(_), None) => Ordering::Less,
+        (Some(x), Some(y)) => identifiers_cmp(x, y),
+    }
+}
+
+/// Dot-separated pre-release identifiers (semver §11.4): field by field, a shorter run losing
+/// when its fields tie.
+fn identifiers_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let mut xs = a.split('.');
+    let mut ys = b.split('.');
+    loop {
+        match (xs.next(), ys.next()) {
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(x), Some(y)) => match identifier_cmp(x, y) {
+                Ordering::Equal => {}
+                order => return order,
+            },
+        }
+    }
+}
+
+/// One pre-release identifier: numbers as numbers, text as text (ASCII), a number before text.
+fn identifier_cmp(x: &str, y: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let digits = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+    match (digits(x), digits(y)) {
+        (true, true) => numeric_cmp(x, y),
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+        (false, false) => x.cmp(y),
+    }
+}
+
+/// Two all-digit strings by their value, without parsing (so any length is safe): the shorter run
+/// of significant digits is smaller, then the digits themselves settle equal lengths.
+fn numeric_cmp(x: &str, y: &str) -> std::cmp::Ordering {
+    let xs = x.trim_start_matches('0');
+    let ys = y.trim_start_matches('0');
+    xs.len().cmp(&ys.len()).then_with(|| xs.cmp(ys))
+}
+
 fn is_pinned(v: &str) -> bool {
     v.split_once("@sha256:").is_some_and(|(image, digest)| {
         !image.is_empty()
@@ -217,6 +315,8 @@ fn is_pinned(v: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
 
     #[test]
@@ -256,6 +356,64 @@ mod tests {
         }
         for bad in ["1.0", "1.0.0-", "v1.0.0", "1..0"] {
             assert!(Version::parse(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_version_sorts_by_its_numbers_not_its_characters() {
+        let v = |s: &str| Version::parse(s).unwrap();
+        // The lexicographic trap: as strings `2.9.0 > 2.14.0`, as versions it is less.
+        assert!(v("2.9.0") < v("2.14.0"));
+        assert!(v("1.2.0") < v("1.10.0"));
+        assert!(v("2.14.1") > v("2.14.0"));
+        assert!(v("10.0.0") > v("9.0.0"));
+        assert_eq!(
+            v("2.14.0").cmp(&v("02.014.00")),
+            std::cmp::Ordering::Equal,
+            "leading zeros don't change the value"
+        );
+    }
+
+    #[test]
+    fn a_pre_release_sorts_before_the_release_and_by_its_identifiers() {
+        let v = |s: &str| Version::parse(s).unwrap();
+        // SemVer §11: a pre-release is older than the release it leads to.
+        assert!(v("1.0.0-rc.1") < v("1.0.0"));
+        assert!(v("1.0.0-alpha") < v("1.0.0-alpha.1"), "fewer fields lose when they tie");
+        assert!(v("1.0.0-alpha.1") < v("1.0.0-alpha.2"), "numeric fields compare as numbers");
+        assert!(v("1.0.0-alpha.9") < v("1.0.0-alpha.11"));
+        assert!(v("1.0.0-1") < v("1.0.0-alpha"), "a numeric field is older than a text one");
+        assert!(v("1.0.0-alpha") < v("1.0.0-beta"));
+    }
+
+    fn version_text() -> impl Strategy<Value = String> {
+        let core = "[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}";
+        prop_oneof![
+            core,
+            (core, "[0-9A-Za-z]{1,3}(\\.[0-9A-Za-z]{1,3}){0,2}").prop_map(|(c, pre)| format!("{c}-{pre}")),
+        ]
+    }
+
+    proptest! {
+        /// Whatever `version_text` emits parses, and ordering is total and matches equality.
+        #[test]
+        fn the_version_order_is_total_and_agrees_with_equality(a in version_text(), b in version_text()) {
+            let (a, b) = (Version::parse(&a).unwrap(), Version::parse(&b).unwrap());
+            prop_assert_eq!(a.cmp(&b), b.cmp(&a).reverse());
+            prop_assert_eq!(a.cmp(&b) == std::cmp::Ordering::Equal, a == b);
+        }
+
+        /// Bumping any one of the three numbers makes a strictly newer version.
+        #[test]
+        fn a_higher_number_is_a_newer_version(major in 0u16..500, minor in 0u16..500, patch in 0u16..500) {
+            let v = |s: String| Version::parse(&s).unwrap();
+            let lower = v(format!("{major}.{minor}.{patch}"));
+            let bumped_major = v(format!("{}.{minor}.{patch}", major + 1));
+            let bumped_minor = v(format!("{major}.{}.{patch}", minor + 1));
+            let bumped_patch = v(format!("{major}.{minor}.{}", patch + 1));
+            prop_assert!(lower < bumped_major);
+            prop_assert!(lower < bumped_minor);
+            prop_assert!(lower < bumped_patch);
         }
     }
 
