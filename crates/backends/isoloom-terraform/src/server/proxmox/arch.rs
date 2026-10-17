@@ -10,16 +10,36 @@ use isoloom_spec::model::Arch;
 
 use crate::machine::vms;
 use crate::module::ident;
+use crate::server::PinnedImage;
 
-/// The arm64 cloud image of an OS, where one is published.
-pub(super) fn image_url(os: &str) -> Option<&'static str> {
+/// The arm64 cloud image of an OS, where one is published: pinned to a dated release with its
+/// publisher's checksum (resolved 2026-10-17; see [`PinnedImage`]).
+pub(super) fn pinned(os: &str) -> Option<PinnedImage> {
     Some(match os {
-        "debian-11" => "https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-genericcloud-arm64.qcow2",
-        "debian-12" => "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-arm64.qcow2",
-        "debian-13" => "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-arm64.qcow2",
-        "ubuntu-20.04" => "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-arm64.img",
-        "ubuntu-22.04" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-arm64.img",
-        "ubuntu-24.04" => "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-arm64.img",
+        "debian-11" => PinnedImage::sha512(
+            "https://cloud.debian.org/images/cloud/bullseye/20260821-2577/debian-11-genericcloud-arm64-20260821-2577.qcow2",
+            "7163c13dbaed4d941a815ba09f28f347f47c519c79d03c634a72a5fc5d7656a18093461e914e3bc4d060f9a679b44f57bbe5377695b474383687a9aebc3d1831",
+        ),
+        "debian-12" => PinnedImage::sha512(
+            "https://cloud.debian.org/images/cloud/bookworm/20261015-2632/debian-12-genericcloud-arm64-20261015-2632.qcow2",
+            "e69fe6ec73d73af4de0523b661078774d87c270e72ba99f5e262a54d2de8fff065b5dde145b1671e4c304be333c25e21e20a997742a4b389b7a36c09272131f4",
+        ),
+        "debian-13" => PinnedImage::sha512(
+            "https://cloud.debian.org/images/cloud/trixie/20261015-2632/debian-13-genericcloud-arm64-20261015-2632.qcow2",
+            "cebe84e4dda9c86ace62eda0763a479e7367f78a64caa219190e572269589387c9245240c26f2cda954e7ada69618fe027783b74a880f2b163acf47b116e7f49",
+        ),
+        "ubuntu-20.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/focal/20250624/focal-server-cloudimg-arm64.img",
+            "d4603cd783e2578f838c63f7c3a8dae6b554bd6358870f2c8eb182aa51ade465",
+        ),
+        "ubuntu-22.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/jammy/20261004/jammy-server-cloudimg-arm64.img",
+            "86e13258765945ad792dac75fac7f02f4db9fa73a4a535ffa472266e7041fa19",
+        ),
+        "ubuntu-24.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-arm64.img",
+            "1d6bffe64b848468ac97f821d369a4846d983de1800ccf6b5ec8853e85cefc55",
+        ),
         _ => return None,
     })
 }
@@ -40,7 +60,7 @@ pub(super) fn image_res(mp: &MachinePlan) -> String {
 pub(super) fn refusal(env: &Environment) -> Option<String> {
     vms(env).filter(|(_, mp)| is_arm(mp)).find_map(|(name, mp)| {
         let o = mp.os.as_deref().unwrap_or_default();
-        (mp.is_windows() || (image_url(o).is_none() && !super::image::has_own(mp))).then(|| {
+        (mp.is_windows() || (pinned(o).is_none() && !super::image::has_own(mp))).then(|| {
             format!("machine `{name}`: no arm64 Proxmox image for `{o}` (Debian 11 to 13, Ubuntu 20.04 to 24.04, or `overrides.proxmox.machines.{name}.image`)")
         })
     })

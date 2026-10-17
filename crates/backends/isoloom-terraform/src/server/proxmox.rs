@@ -47,7 +47,7 @@ use isoloom_render::backend::{Backend, Files};
 use isoloom_render::hcl_builder::Module;
 use isoloom_spec::model::Target;
 
-use super::Parts;
+use super::{Parts, PinnedImage};
 use crate::limits::Limits;
 use crate::machine::{cloudbase_init, controller as core_controller, vms};
 use crate::module::{ProjectCopy, Usage};
@@ -62,21 +62,58 @@ const LIMITS: Limits = Limits {
     ipv6: None,
 };
 
-/// Cloud images by OS name (Linux for now).
-fn image_url(os: &str) -> Option<&'static str> {
+/// Debian 12's amd64 cloud image, pinned. Shared with the Docker-host target ([`docker_host`]).
+pub(super) const DEBIAN_12_AMD64: PinnedImage = PinnedImage::sha512(
+    "https://cloud.debian.org/images/cloud/bookworm/20261015-2632/debian-12-genericcloud-amd64-20261015-2632.qcow2",
+    "56c0bd55b6623f2739f377e983d2872e7b208d0cb9c3ba4e93d3f72929026da03637c598b3bd472b29998c31c8a4c17d8e6ae1c556852a8b83a66a09bf5c2b37",
+);
+
+/// Pinned amd64 cloud images by OS name (Linux for now), each at a dated release with the
+/// checksum its publisher lists (resolved 2026-10-17; see [`PinnedImage`]).
+fn pinned(os: &str) -> Option<PinnedImage> {
     Some(match os {
-        "debian-11" => "https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-genericcloud-amd64.qcow2",
-        "debian-12" => "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2",
-        "debian-13" => "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2",
+        "debian-11" => PinnedImage::sha512(
+            "https://cloud.debian.org/images/cloud/bullseye/20260821-2577/debian-11-genericcloud-amd64-20260821-2577.qcow2",
+            "eca21286cadc03444eba75c35c30869707c39867b7cd4a78fa315a021243e21898d2675f5de2c5d8bd1e33753d01a7364cd1f479dbcbd7ea83d72612219ffda5",
+        ),
+        "debian-12" => DEBIAN_12_AMD64,
+        "debian-13" => PinnedImage::sha512(
+            "https://cloud.debian.org/images/cloud/trixie/20261015-2632/debian-13-genericcloud-amd64-20261015-2632.qcow2",
+            "7f1d06b629fa01241ec5817735777d0554554ff8c8d9dc27f9eac65ba3c3a6f859deb6079ebc9c65795d1955abd00a77aa3ff9cb84ae6307dfbbd8b2e398dab2",
+        ),
         // End of life, still published. 14.04's cloud-init (0.7.5) is too old for the snippet.
-        "ubuntu-16.04" => "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img",
-        "ubuntu-18.04" => "https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img",
-        "ubuntu-20.04" => "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img",
-        "ubuntu-22.04" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
-        "ubuntu-24.04" => "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img",
-        "rocky-9" => "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2",
-        "almalinux-9" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2",
-        "centos-7" => "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2",
+        "ubuntu-16.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/xenial/20211001/xenial-server-cloudimg-amd64-disk1.img",
+            "fff2494a70bcaffb59f26f71ec49e137dd87d319341c35832dbe0ea65ff15140",
+        ),
+        "ubuntu-18.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/bionic/20230607/bionic-server-cloudimg-amd64.img",
+            "8dd2e6b5e5aad20c3f836123b300cba9861249408cbb07c359145a65d6bab6b6",
+        ),
+        "ubuntu-20.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/focal/20250624/focal-server-cloudimg-amd64.img",
+            "18f2977d77dfea1b74aee14533bd21c34f789139e949c57023b7364894b7e5e9",
+        ),
+        "ubuntu-22.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/jammy/20261004/jammy-server-cloudimg-amd64.img",
+            "012d81fade7e8ff4428fc35dfeee711d66d1f47d5ea9c5c8ced96a85b959835c",
+        ),
+        "ubuntu-24.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.img",
+            "6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2",
+        ),
+        "rocky-9" => PinnedImage::sha256(
+            "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2",
+            "92c206cc6f790c61583247eefe87890f8828420662c17cacf247cec78ab4eec8",
+        ),
+        "almalinux-9" => PinnedImage::sha256(
+            "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.8-20261005.x86_64.qcow2",
+            "25942b554efaac077e2f60d6bb27bd3332c171454cc21bbd33e5f79244d7570f",
+        ),
+        "centos-7" => PinnedImage::sha256(
+            "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2",
+            "284aab2b23d91318f169ff464bce4d53404a15a0618ceb34562838c59af4adea",
+        ),
         _ => return None,
     })
 }
@@ -86,7 +123,7 @@ fn image_url(os: &str) -> Option<&'static str> {
 /// have here yet, then a boot of its own Proxmox has no setting for.
 fn refusal(env: &Environment) -> Option<String> {
     LIMITS.refusal(env).or_else(|| gpus::refusal(env)).or_else(|| {
-        super::without_image(env, |os, mp| image_url(os).is_some() || image::has_own(mp))
+        super::without_image(env, |os, mp| pinned(os).is_some() || image::has_own(mp))
             .map(|(name, os)| {
                 format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)")
             })

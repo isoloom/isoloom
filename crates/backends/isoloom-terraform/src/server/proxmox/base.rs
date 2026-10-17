@@ -7,12 +7,12 @@ use isoloom_render::hcl_builder::{
     BinaryOperator, Block, Expression, Module, Template, binary, boolean, call, conditional, for_list, list, null, number, object, reference, string,
 };
 
-use super::image_url;
+use super::pinned;
 use crate::machine::{controller, vms};
 use crate::module::providers;
 use crate::module::variable::Variable;
 use crate::module::{ident, resource};
-use crate::server::{self, credentials, slotted, user};
+use crate::server::{self, PinnedImage, credentials, slotted, user};
 
 /// The environment's pool, as a VM or a container names it.
 pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
@@ -155,16 +155,23 @@ pub(super) fn is_unset(name: &str) -> Expression {
 }
 
 /// A cloud image downloaded to the node's image datastore, `proxmox_download_file.<id>`, as
-/// `iso<slot><suffix>`.
-pub(super) fn download(id: &str, url: &str, suffix: &str) -> Block {
-    resource("proxmox_download_file", id)
+/// `iso<slot><suffix>`. A `pin` (Isoloom's own pinned images) adds the checksum the provider
+/// verifies the download against; a machine's own image (`overrides.proxmox`) has none, so the
+/// user vouches for its URL.
+pub(super) fn download(id: &str, url: &str, suffix: &str, pin: Option<PinnedImage>) -> Block {
+    let mut b = resource("proxmox_download_file", id)
         .add_attribute(("node_name", reference("var.node")))
         .add_attribute(("datastore_id", reference("var.image_datastore")))
         .add_attribute(("content_type", string("iso")))
         .add_attribute(("url", string(url)))
         .add_attribute(("file_name", slotted(suffix)))
-        .add_attribute(("overwrite_unmanaged", boolean(true)))
-        .build()
+        .add_attribute(("overwrite_unmanaged", boolean(true)));
+    if let Some(pin) = pin {
+        b = b
+            .add_attribute(("checksum", string(pin.checksum)))
+            .add_attribute(("checksum_algorithm", string(pin.algorithm)));
+    }
+    b.build()
 }
 
 /// The connection: an API token, else a user and password; SSH to the node for the snippets.
@@ -249,14 +256,14 @@ fn images(env: &Environment, m: &mut Module) {
     oses.sort_unstable();
     oses.dedup();
     for (o, arm) in oses {
-        let url = if arm { super::arch::image_url(o) } else { image_url(o) };
-        let Some(url) = url else { continue };
+        let pin = if arm { super::arch::pinned(o) } else { pinned(o) };
+        let Some(pin) = pin else { continue };
         let (id, file) = if arm {
             (format!("{}_arm64", ident(o)), format!("{o}-arm64"))
         } else {
             (ident(o), o.to_owned())
         };
-        let block = download(&id, url, &format!("-{file}.img"));
+        let block = download(&id, pin.url, &format!("-{file}.img"), Some(pin));
         m.commented(
             &format!("The `{o}` cloud image, per environment: a shared file would go with whichever environment is destroyed first."),
             block,

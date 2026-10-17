@@ -349,9 +349,11 @@ resource "proxmox_download_file" "debian_12" {
   node_name           = var.node
   datastore_id        = var.image_datastore
   content_type        = "iso"
-  url                 = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+  url                 = "https://cloud.debian.org/images/cloud/bookworm/20261015-2632/debian-12-genericcloud-amd64-20261015-2632.qcow2"
   file_name           = "iso${var.slot}-debian-12.img"
   overwrite_unmanaged = true
+  checksum            = "56c0bd55b6623f2739f377e983d2872e7b208d0cb9c3ba4e93d3f72929026da03637c598b3bd472b29998c31c8a4c17d8e6ae1c556852a8b83a66a09bf5c2b37"
+  checksum_algorithm  = "sha512"
 }
 
 # Network `app`, for the machines' firewall rules.

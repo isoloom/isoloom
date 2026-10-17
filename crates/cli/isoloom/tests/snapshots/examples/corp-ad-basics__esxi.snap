@@ -284,8 +284,10 @@ variable "slot" {
 }
 
 variable "images" {
-  type        = map(string)
-  default     = { "ubuntu-24.04" = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.ova" }
+  type = map(string)
+  default = {
+    "ubuntu-24.04" = "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova"
+  }
   description = "An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default; for another OS, an OVA with cloud-init and open-vm-tools; for Windows, an OVA with VMware Tools and cloudbase-init (its VMware guestinfo service), sysprepped"
   validation {
     condition     = alltrue([for os in ["debian-12", "ubuntu-24.04", "windows-11", "windows-server-2022"] : contains(keys(var.images), os)])

@@ -62,12 +62,21 @@ const LIMITS: Limits = Limits {
     ipv6: None,
 };
 
-/// Ubuntu's own cloud OVAs: the default `images`.
+/// Ubuntu's own cloud OVAs: the default `images`, pinned to a dated release (never the floating
+/// `current`) so a generated lab keeps booting the same OS build (the C4 security finding).
+///
+/// The `josenk/esxi` provider deploys an OVA from `ovf_source` with no checksum slot, so the
+/// pin here is the dated URL; the OVAs' published SHA-256 sums (resolved 2026-10-17) are
+/// recorded for a future verify step or a refresh tool, and the launcher's own ESXi path
+/// (`vagrant/vmware_esxi`) pins its boxes through Vagrant instead:
+///   focal  (20.04): 1d4521b2df38914965064537e31f7fbb1c3fabeaca789e3350b79a0b1a0838fc
+///   jammy  (22.04): ea42c32ec5e7ca343f0a5da30f242364adc75f564cbc8b9e61ab3e9c68337df7
+///   noble  (24.04): 513a22ebe3982b9387b038f8a2a6dad1af980d4623dca03511312e55ba620b1a
 fn default_image(os: &str) -> Option<&'static str> {
     Some(match os {
-        "ubuntu-20.04" => "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.ova",
-        "ubuntu-22.04" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.ova",
-        "ubuntu-24.04" => "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.ova",
+        "ubuntu-20.04" => "https://cloud-images.ubuntu.com/focal/20250624/focal-server-cloudimg-amd64.ova",
+        "ubuntu-22.04" => "https://cloud-images.ubuntu.com/jammy/20261004/jammy-server-cloudimg-amd64.ova",
+        "ubuntu-24.04" => "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova",
         _ => return None,
     })
 }

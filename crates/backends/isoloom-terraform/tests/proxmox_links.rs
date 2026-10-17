@@ -74,7 +74,15 @@ fn an_arm64_machine_is_an_emulated_aarch64_vm() -> Outcome {
     let tf = proxmox(
         "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, hardware: { arch: arm64 }, os: debian@12, app: { steps: [{ run: s.sh }] } }\n",
     )?;
-    assert!(tf.contains("debian-12-genericcloud-arm64.qcow2"), "{tf}");
+    // Pinned to a dated release (no floating `latest`), with the publisher's SHA-512 checksum.
+    assert!(tf.contains("debian-12-genericcloud-arm64-20261015-2632.qcow2"), "{tf}");
+    assert!(
+        tf.contains("e69fe6ec73d73af4de0523b661078774d87c270e72ba99f5e262a54d2de8fff065b5dde145b1671e4c304be333c25e21e20a997742a4b389b7a36c09272131f4"),
+        "{tf}"
+    );
+    assert!(tf.contains("checksum_algorithm"), "{tf}");
+    assert!(tf.contains("\"sha512\""), "{tf}");
+    assert!(!tf.contains("/latest/"), "arm64 image must be pinned, not `latest`: {tf}");
     assert!(tf.contains("architecture = \"aarch64\""), "{tf}");
     assert!(tf.contains("bios"), "{tf}");
     assert!(tf.contains("\"serial0\""), "{tf}");
@@ -82,6 +90,26 @@ fn an_arm64_machine_is_an_emulated_aarch64_vm() -> Outcome {
         "version: 1\nname: arm\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w: { networks: { lab: 10 }, hardware: { arch: arm64 }, os: rocky@9, app: { steps: [{ run: s.sh }] } }\n",
     )?.expect("refused");
     assert!(why.contains("no arm64 Proxmox image for `rocky-9`"), "{why}");
+    Ok(())
+}
+
+#[test]
+fn a_base_image_is_pinned_to_a_dated_release_with_its_checksum() -> Outcome {
+    // A whole-number amd64 image (Debian 12) and an RPM one (Rocky 9): each downloaded from a
+    // dated URL, never a floating `latest`/`current`, and verified by the publisher's checksum.
+    let tf = proxmox(
+        "version: 1\nname: pin\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  d: { networks: { lab: 10 }, os: debian@12, app: { steps: [{ run: s.sh }] } }\n  r: { networks: { lab: 11 }, os: rocky@9, app: { steps: [{ run: s.sh }] } }\n",
+    )?;
+    assert!(tf.contains("debian-12-genericcloud-amd64-20261015-2632.qcow2"), "{tf}");
+    assert!(
+        tf.contains("56c0bd55b6623f2739f377e983d2872e7b208d0cb9c3ba4e93d3f72929026da03637c598b3bd472b29998c31c8a4c17d8e6ae1c556852a8b83a66a09bf5c2b37"),
+        "{tf}"
+    );
+    assert!(tf.contains("Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2"), "{tf}");
+    assert!(tf.contains("92c206cc6f790c61583247eefe87890f8828420662c17cacf247cec78ab4eec8"), "{tf}");
+    assert!(tf.contains("\"sha512\"") && tf.contains("\"sha256\""), "both algorithms wired: {tf}");
+    assert!(!tf.contains("/latest/") && !tf.contains(".latest."), "no floating image URL: {tf}");
+    assert!(!tf.contains("/current/"), "no floating image URL: {tf}");
     Ok(())
 }
 

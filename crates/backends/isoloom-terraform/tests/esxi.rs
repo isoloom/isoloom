@@ -165,3 +165,15 @@ fn more_disks_than_slots_are_refused() -> Outcome {
     assert!(why.contains("at most 14 data disks"), "{why}");
     Ok(())
 }
+
+#[test]
+fn the_default_ova_is_pinned_to_a_dated_release() -> Outcome {
+    // The `images` default must point at a dated OVA, never the floating `current` (C4).
+    let tf = esxi("hello-stack")?;
+    assert!(
+        tf.contains("https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova"),
+        "{tf}"
+    );
+    assert!(!tf.contains("/current/"), "the default OVA must be pinned, not `current`: {tf}");
+    Ok(())
+}

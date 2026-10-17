@@ -105,6 +105,42 @@ pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variable
     m.block(provider);
 }
 
+/// A base OS image pinned to a dated release, with the checksum that verifies the download.
+///
+/// The server targets never emit a floating `latest`/`current` URL: an image is pinned to a
+/// dated snapshot so a lab generated today keeps booting the same OS build (reproducibility and
+/// supply-chain integrity, the C3/C4 security finding). A refresh changes the URL and its
+/// checksum together. Debian publishes SHA-512 sums, Ubuntu and the RPM families SHA-256.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PinnedImage {
+    /// The download URL, at a dated release (never `latest`/`current`).
+    pub(crate) url: &'static str,
+    /// The checksum algorithm the published sums use (`sha256` or `sha512`).
+    pub(crate) algorithm: &'static str,
+    /// The image's checksum, lowercase hex, as the published sums give it.
+    pub(crate) checksum: &'static str,
+}
+
+impl PinnedImage {
+    /// An image published with SHA-256 sums (Ubuntu, Rocky, AlmaLinux, CentOS).
+    pub(crate) const fn sha256(url: &'static str, checksum: &'static str) -> Self {
+        Self {
+            url,
+            algorithm: "sha256",
+            checksum,
+        }
+    }
+
+    /// An image published with SHA-512 sums (Debian).
+    pub(crate) const fn sha512(url: &'static str, checksum: &'static str) -> Self {
+        Self {
+            url,
+            algorithm: "sha512",
+            checksum,
+        }
+    }
+}
+
 /// The first Linux VM whose OS has no image on the server (`has`: whether the server has one for
 /// that OS and machine), with its OS.
 pub(crate) fn without_image(env: &Environment, has: impl Fn(&str, &MachinePlan) -> bool) -> Option<(&str, &str)> {

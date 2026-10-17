@@ -53,7 +53,12 @@ pub fn module(env: &Environment, guest: &GuestCompose) -> Result<Vec<GeneratedFi
     m.blocks(variables().into_iter().map(Variable::block));
     m.block(provider());
     m.commented("The VM's address on the uplink, from the guest agent (not the loopback).", locals());
-    m.block(download("debian", DEBIAN, "-docker-debian-12.img"));
+    m.block(download(
+        "debian",
+        super::DEBIAN_12_AMD64.url,
+        "-docker-debian-12.img",
+        Some(super::DEBIAN_12_AMD64),
+    ));
     m.block(snippet("env", "docker", cloud_config(env, guest).document()));
     m.block(vm(env));
     m.blocks(vec![output("ip", reference("local.ip")), output("ssh_user", string(USER))]);
@@ -71,9 +76,6 @@ fn setup(env: &Environment) -> GeneratedFile {
         contents: guest::setup_script(env),
     }
 }
-
-/// Debian 12's cloud image.
-const DEBIAN: &str = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2";
 
 /// The module's variables: the server, where the VM goes, its slot on the server, and the key the
 /// `isoloom` user takes.

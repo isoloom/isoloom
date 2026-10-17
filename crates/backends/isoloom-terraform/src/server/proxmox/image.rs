@@ -64,7 +64,7 @@ pub(super) fn downloads(env: &Environment, m: &mut Module) {
         let Some(Own::Url(url)) = own(mp) else { continue };
         m.commented(
             &format!("Machine `{name}`'s own cloud image (`overrides.proxmox`)."),
-            super::base::download(&own_res(name), url, &format!("-{name}.img")),
+            super::base::download(&own_res(name), url, &format!("-{name}.img"), None),
         );
     }
 }
