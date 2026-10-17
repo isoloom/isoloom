@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What dvwa does, proven on the container form (the prebuilt image). `cargo xtask catalogue check
+# dvwa` builds a small lab (`web`, an access machine `probe`) and runs it on `docker` through the
+# Isothrum CLI.
+cases:
+  default: {}
+
+checks:
+  - name: the port answers
+    http: "http://{{ machine }}:80/"
+    expect: any
+    wait: 2m
+  - name: the application serves its setup page
+    http: "http://{{ machine }}:80/setup.php"
+    contains: DVWA

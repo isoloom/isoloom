@@ -688,6 +688,30 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^dvwa(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "dvwa's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^juice-shop(@.+)?$"
               }
             },
