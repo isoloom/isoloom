@@ -36,7 +36,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `vagrant/qemu` | 2 | linux, macos | validated only; tier 1 pending: linux, macos |
 | `vagrant/utm` | 2 | macos | validated only; tier 1 pending: macos |
 | `vagrant/vmware_esxi` | 2 | linux, macos, windows | real runs: macos (mac, esxi-lab, 2026-10-16); tier 1 pending: linux, windows |
-| `proxmox` | 2 | linux, macos, windows | real runs: macos (mac, pve-lab, 2026-10-15); tier 1 pending: linux, windows |
+| `proxmox` | 2 | linux, macos, windows | real runs: partial macos (mac, pve-lab, 2026-10-17); tier 1 pending: linux, macos, windows |
 | `esxi` | 2 | linux, macos, windows | real runs: macos (mac, esxi-lab, 2026-10-15) |
 | `cloud-vm/aws` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
 | `cloud-vm/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
