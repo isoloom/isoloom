@@ -229,6 +229,52 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: segmented
     restart: unless-stopped
+  isoloom-access:
+    image: alpine:3.20
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - sleep
+    - infinity
+    hostname: user
+    networks:
+      access:
+        ipv4_address: 10.61.99.10
+    extra_hosts:
+    - cache:10.61.20.20
+    - web:10.61.10.10
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: segmented
+  isoloom-access-routes:
+    image: alpine:3.20
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - /bin/sh
+    - -c
+    - ip route replace 10.61.10.0/24 via 10.61.99.254 && ip route replace 10.61.20.0/24 via 10.61.99.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:isoloom-access
+    cap_add:
+    - NET_ADMIN
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip route show 10.61.10.0/24 | grep -q via
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      isoloom-access:
+        condition: service_started
+      isoloom-router:
+        condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: segmented
+    restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -236,7 +282,7 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
-    network_mode: service:user
+    network_mode: service:isoloom-access
     volumes:
     - ./checks/user.sh:/isoloom/run.sh:ro
     depends_on:
@@ -248,10 +294,10 @@ services:
         condition: service_healthy
       web-routes:
         condition: service_healthy
-      user-routes:
-        condition: service_healthy
-      user:
+      isoloom-access:
         condition: service_started
+      isoloom-access-routes:
+        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: segmented
@@ -274,8 +320,6 @@ services:
         condition: service_healthy
       web-routes:
         condition: service_healthy
-      user-routes:
-        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: segmented
@@ -297,8 +341,6 @@ services:
       web:
         condition: service_healthy
       web-routes:
-        condition: service_healthy
-      user-routes:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'

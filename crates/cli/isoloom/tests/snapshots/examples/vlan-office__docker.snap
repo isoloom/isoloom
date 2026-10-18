@@ -642,6 +642,53 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
+  isoloom-access:
+    image: alpine:3.20
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - sleep
+    - infinity
+    hostname: staff
+    networks:
+      office-vlan10:
+        ipv4_address: 10.70.10.10
+    extra_hosts:
+    - intranet:10.70.99.10
+    - guest:10.70.20.10
+    - admin:10.70.10.50
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
+  isoloom-access-routes:
+    image: alpine:3.20
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - /bin/sh
+    - -c
+    - ip route replace 10.70.20.0/24 via 10.70.10.254 && ip route replace 10.70.99.0/24 via 10.70.10.254 && (ip route del default 2>/dev/null || true) && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:isoloom-access
+    cap_add:
+    - NET_ADMIN
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip route show 10.70.20.0/24 | grep -q via && ! ip route | grep -q '^default'
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      isoloom-access:
+        condition: service_started
+      isoloom-router:
+        condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: vlan-office
+    restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -649,7 +696,7 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
-    network_mode: service:staff
+    network_mode: service:isoloom-access
     volumes:
     - ./checks/staff.sh:/isoloom/run.sh:ro
     depends_on:
@@ -657,14 +704,14 @@ services:
         condition: service_healthy
       intranet-routes:
         condition: service_healthy
-      staff-routes:
-        condition: service_healthy
       guest-routes:
         condition: service_healthy
       admin-routes:
         condition: service_healthy
-      staff:
+      isoloom-access:
         condition: service_started
+      isoloom-access-routes:
+        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
@@ -682,8 +729,6 @@ services:
       intranet:
         condition: service_healthy
       intranet-routes:
-        condition: service_healthy
-      staff-routes:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
@@ -706,8 +751,6 @@ services:
       intranet:
         condition: service_healthy
       intranet-routes:
-        condition: service_healthy
-      staff-routes:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
@@ -732,8 +775,6 @@ services:
       intranet:
         condition: service_healthy
       intranet-routes:
-        condition: service_healthy
-      staff-routes:
         condition: service_healthy
       guest-routes:
         condition: service_healthy
@@ -1002,6 +1043,25 @@ volumes:
       }
     },
     {
+      "name": "isoloom-access",
+      "role": "access",
+      "addresses": {
+        "office-vlan10": "10.70.10.10"
+      },
+      "native": {
+        "service": "isoloom-access"
+      }
+    },
+    {
+      "name": "isoloom-access-routes",
+      "role": "infra",
+      "of": "isoloom-access",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-access-routes"
+      }
+    },
+    {
       "name": "isoloom-check",
       "role": "check",
       "of": "staff",
@@ -1202,7 +1262,31 @@ volumes:
   "outputs": [],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [],
+    "setup": [
+      {
+        "id": "stand-ins",
+        "note": "Starting the access machine's stand-in…",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "--profile",
+          "check",
+          "up",
+          "--detach",
+          "--wait",
+          "--no-deps",
+          "isoloom-access",
+          "isoloom-access-routes"
+        ],
+        "timeout_s": 600
+      }
+    ],
     "runners": [
       {
         "id": "isoloom-check",

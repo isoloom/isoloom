@@ -244,6 +244,51 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
+  isoloom-access:
+    image: alpine:3.20
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - sleep
+    - infinity
+    hostname: user
+    networks:
+      outside:
+        ipv4_address: 10.70.0.10
+    extra_hosts:
+    - web:10.70.10.10
+    - www.edge.test:10.70.10.10
+    - cache:10.70.20.20
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
+  isoloom-access-routes:
+    image: alpine:3.20
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - /bin/sh
+    - -c
+    - ip route replace 10.70.10.0/24 via 10.70.0.5 && ip route replace 10.70.20.0/24 via 10.70.0.5 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:isoloom-access
+    cap_add:
+    - NET_ADMIN
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip route show 10.70.10.0/24 | grep -q via
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      isoloom-access:
+        condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: edge-firewall
+    restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
     profiles:
@@ -251,7 +296,7 @@ services:
     entrypoint:
     - /bin/sh
     - /isoloom/run.sh
-    network_mode: service:user
+    network_mode: service:isoloom-access
     volumes:
     - ./checks/user.sh:/isoloom/run.sh:ro
     - ../..:/isoloom/project:ro
@@ -268,10 +313,10 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
-      user-routes:
-        condition: service_healthy
-      user:
+      isoloom-access:
         condition: service_started
+      isoloom-access-routes:
+        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
@@ -297,8 +342,6 @@ services:
       cache:
         condition: service_healthy
       cache-routes:
-        condition: service_healthy
-      user-routes:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -326,8 +369,6 @@ services:
         condition: service_healthy
       cache-routes:
         condition: service_healthy
-      user-routes:
-        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
@@ -353,8 +394,6 @@ services:
       cache:
         condition: service_healthy
       cache-routes:
-        condition: service_healthy
-      user-routes:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
