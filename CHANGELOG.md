@@ -8,6 +8,18 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
+## [1.0.1] — 2026-10-18
+
+### Fixed
+
+- **A lab with an access machine now passes `isothrum check` on Docker.** The Compose check
+  runners wrongly depended on the access box (and its routes), which live in the on-demand
+  `access` profile; running the checks with just the `check` profile made `docker compose`
+  reject the project ("depends on undefined service"). Check runners no longer wait on the
+  access box, and a check that runs *from* the access position uses the `check`-profile stand-in
+  (an idle container at the box's addresses) rather than the box itself. Affects every target
+  that renders Compose (docker, docker-vm, cloud-docker).
+
 ## [1.0.0] — 2026-10-18
 
 The first stable release. It is a ground-up rebuild of the 0.x preview: a single,
