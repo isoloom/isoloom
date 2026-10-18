@@ -603,7 +603,7 @@ checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
 name = "isoloom"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "clap",
  "insta",
@@ -618,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-ansible"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "isoloom-catalogue",
  "isoloom-plan",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-catalogue"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "indexmap",
  "insta",
@@ -647,7 +647,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-compose"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "indexmap",
  "insta",
@@ -663,7 +663,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-import"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "hcl-rs",
  "indexmap",
@@ -678,7 +678,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-kubernetes"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "indexmap",
  "insta",
@@ -694,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-manifest"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "jsonschema",
  "proptest",
@@ -707,7 +707,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-plan"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "indexmap",
  "insta",
@@ -721,7 +721,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-render"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "flate2",
  "hcl-rs",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-spec"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "indexmap",
  "insta",
@@ -756,7 +756,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-targets"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "criterion",
  "insta",
@@ -779,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-terraform"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "indexmap",
  "insta",
@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-vagrant"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "indexmap",
  "insta",
@@ -1743,7 +1743,7 @@ checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 
 [[package]]
 name = "xtask"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "clap",
  "flate2",
@@ -1766,7 +1766,7 @@ dependencies = [
 
 [[package]]
 name = "xtask-quality"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "clap",
  "serde_json",
