@@ -1,0 +1,40 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✓ hosted
+
+# isoloom generate --target hosted (exit 0)
+✓ .isoloom/docker/compose.yml
+✓ .isoloom/docker/checks/networks.sh
+✓ .isoloom/docker/checks/web.sh
+✓ .isoloom/docker/checks/api.sh
+✓ .isoloom/docker/build/web/Dockerfile
+✓ .isoloom/configure/lib/configure.sh
+✓ .isoloom/configure/web/run
+✓ .isoloom/configure/web/rendered/conf/site.conf
+✓ .isoloom/docker/build/api/Dockerfile
+✓ .isoloom/configure/api/run
+✓ .isoloom/resolved.json
+
+## .isoloom/configure/api/run: identical in the `docker` snapshot
+
+## .isoloom/configure/lib/configure.sh: identical in the `docker` snapshot
+
+## .isoloom/configure/web/rendered/conf/site.conf: identical in the `docker` snapshot
+
+## .isoloom/configure/web/run: identical in the `docker` snapshot
+
+## .isoloom/docker/build/api/Dockerfile: identical in the `docker` snapshot
+
+## .isoloom/docker/build/web/Dockerfile: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/api.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/networks.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/web.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/compose.yml: identical in the `docker` snapshot
+
+## .isoloom/resolved.json: identical in the `docker` snapshot

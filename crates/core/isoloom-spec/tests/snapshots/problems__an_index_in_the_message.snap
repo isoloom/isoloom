@@ -1,0 +1,7 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"machines:\\n  web:\\n    os: debian@12\\n    networks: { lab: 10 }\\n    ports: { web: { port: 80, protocol: http, publish: 8080 } }\\nmessage: \\\"Open {{ machines.web.services.0.publish }}\\\"\\n\"))"
+---
+error[unknown-reference] message  (isoloom.yml:10:1)
+  `{{ machines.web.services.0.publish }}` isn't a placeholder Isoloom knows: a machine's paths are `ports.<name>.port`, `.published`, `.url` and `addresses.<network>`
+  fix: `{{ machines.web.ports.web.published }}`

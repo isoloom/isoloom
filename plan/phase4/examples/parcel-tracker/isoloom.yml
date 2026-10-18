@@ -1,0 +1,109 @@
+# A parcel-tracking API and its worker on one machine, beside PostgreSQL, Redis and RabbitMQ from
+# the catalogue. Made up for the Phase 4 design (plan/phase4/design.md); the project files it
+# names aren't included. `api` shows the configuration model in an app's own steps, and two
+# services in one container (design §3).
+#
+# Forms: every machine has both.
+# - On `docker`:
+#   - `db` is PostgreSQL's official Debian 12 image.
+#   - `cache` is Redis's official Debian 12 image, behind Isoloom's runner, which writes the
+#     password into an include file at start.
+#   - `queue` is built from Debian 12 with Team RabbitMQ's packages: the official image is Ubuntu.
+#   - `api` is built from Debian 12 with its steps. Its two services run under the engine's init
+#     (tini) and Isoloom's generated runner; if one exits, the container restarts.
+# - On VMs, each service is a systemd unit, and `api`'s two are units Isoloom generates from `run`.
+version: 1
+name: parcel-tracker
+
+networks:
+  lab: { cidr: 10.63.0.0/24, internet: false }
+
+secrets:
+  db-password: { env: PARCELS_DB_PASSWORD }
+  cache-password: { env: PARCELS_CACHE_PASSWORD }
+  queue-password: { env: PARCELS_QUEUE_PASSWORD }
+
+inputs: [FLAG]
+
+machines:
+  db:
+    os: debian@12
+    service: postgres@17
+    with:
+      database: parcels
+      user: parcels
+      password: { secret: db-password }
+      init: db/init/                 # tables and seed parcels, run once at the first start
+    networks: { lab: 10 }
+
+  cache:
+    os: debian@12
+    service: redis
+    with:
+      password: { secret: cache-password }
+      appendonly: true
+    networks: { lab: 11 }
+
+  queue:
+    os: debian@12
+    service: rabbitmq
+    with:
+      user: parcels
+      password: { secret: queue-password }
+      vhost: parcels
+      management: true               # adds the `management` port (http, 15672)
+    networks: { lab: 12 }
+    ports:
+      management: { publish: 15672 }
+
+  api:
+    os: debian@12
+    app:
+      steps:
+        - packages: [python3, python3-venv, ca-certificates]
+        - group: { name: parcels, gid: 1500, system: true }
+        - user: { name: parcels, uid: 1500, group: parcels, system: true, home: /srv/parcels, shell: /usr/sbin/nologin }
+        - copy: { from: api/, to: /srv/parcels/app/, owner: parcels }
+        # Wheels ship in the project, so the build needs no package index.
+        - command: >-
+            python3 -m venv /srv/parcels/venv &&
+            /srv/parcels/venv/bin/pip install --no-index --find-links /srv/parcels/app/wheels
+            -r /srv/parcels/app/requirements.txt
+          creates: /srv/parcels/venv/bin/gunicorn
+        # Rendered by Isoloom: the other machines' addresses and ports, and the password files'
+        # paths, never their values.
+        - template: { from: api/settings.toml, to: /etc/parcels/settings.toml, owner: parcels, mode: "0640" }
+        - file: { path: /var/lib/parcels, state: directory, owner: parcels, mode: "0750" }
+        - firewall: { allow: [api] }
+        - service:
+            name: parcels-api
+            run: [/srv/parcels/venv/bin/gunicorn, --bind, "0.0.0.0:8000", "parcels.wsgi:app"]
+            user: parcels
+            cwd: /srv/parcels/app
+        - service:
+            name: parcels-worker
+            run: [/srv/parcels/venv/bin/python, -m, parcels.worker]
+            user: parcels
+            cwd: /srv/parcels/app
+    networks: { lab: 20 }
+    ports:
+      api: { port: 8000, protocol: http, publish: 8000 }
+    files:
+      - { path: /run/parcels/db-password, secret: db-password, uid: 1500 }
+      - { path: /run/parcels/cache-password, secret: cache-password, uid: 1500 }
+      - { path: /run/parcels/queue-password, secret: queue-password, uid: 1500 }
+      - { path: /run/parcels/flag, input: FLAG, uid: 1500 }
+    healthcheck: { http: { port: api, path: /health } }
+    depends_on: [db, cache, queue]
+
+checks:
+  - name: the API answers
+    http: http://api:8000/health
+    wait: 3m
+  - name: a parcel posted to the API is picked up by the worker
+    script: checks/track-parcel.sh
+    wait: 1m
+
+message: |
+  The tracking API is at {{ machines.api.ports.api.url }}.
+  RabbitMQ's console is at http://localhost:{{ machines.queue.ports.management.published }}/.

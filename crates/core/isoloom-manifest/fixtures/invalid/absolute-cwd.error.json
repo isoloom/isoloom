@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "lifecycle.up[0].cwd: `/tmp` is absolute: paths are relative to the manifest's folder (or start at `${run.state_dir}`)",
+  "schema": true
+}

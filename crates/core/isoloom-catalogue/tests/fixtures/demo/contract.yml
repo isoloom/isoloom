@@ -1,0 +1,15 @@
+cases:
+  default: {}
+  greeting: { with: { greeting: hello there } }
+  peer:
+    with: { peer: "client:7000" }
+    machines:
+      client: { app: { image: "docker.io/library/alpine:3.24" } }
+  missing:
+    machines:
+      helper: { service: no-such-service }
+checks:
+  - { name: the port answers, http: "http://{{ machine }}:{{ with.port }}/", expect: any }
+  - { name: the greeting, case: greeting, exec: cat /etc/demo/greeting, expect: "{{ with.greeting }}" }
+facts:
+  - { name: the version, exec: demo --version }

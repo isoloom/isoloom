@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A segmented network: a gateway in the DMZ, an app and a database behind it, and the
+# user's machine that only sees the DMZ.
+version: 1
+name: pivot-dmz
+
+networks:
+  dmz: { cidr: 10.30.10.0/24 }
+  internal: { cidr: 10.30.20.0/24, internet: false }
+  access: { cidr: 10.30.99.0/24 }
+
+reach:
+  - { from: access, to: dmz }
+  - { from: dmz, to: internal, ports: [8080, 5432] }
+
+machines:
+  gateway:
+    os: debian@12
+    networks: { dmz: 10, internal: 10 }
+    ports: { web: 80, ssh: 22 }
+    app:
+      build: build/gateway                          # the container form: its own Dockerfile
+      steps: [{ playbook: provision/gateway.yml }]  # the VM form: its playbook
+
+  app:
+    os: debian@12
+    networks: { internal: 20 }
+    ports: { api: 8080 }
+    app:
+      build: build/app
+      steps: [{ playbook: provision/app.yml }]
+
+  # A published image on containers, a Debian VM its playbook sets up (`service: postgres@16`
+  # in Phase 4).
+  db:
+    os: debian@12
+    networks: { internal: 30 }
+    ports: { postgres: 5432 }
+    app:
+      image: "postgres:16"
+      steps: [{ playbook: provision/db.yml }]
+
+  user:
+    os: kali
+    access: true
+    networks: { access: 10 }
+
+checks:
+  - checks/dmz-reachable.sh
+  - checks/internal-not-reachable-from-access.sh

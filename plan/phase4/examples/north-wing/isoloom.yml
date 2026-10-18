@@ -1,0 +1,90 @@
+# A small Windows office: a domain controller, an intranet on IIS, and a Linux jump host the player
+# starts from. Made up for the Phase 4 design (plan/phase4/design.md); the project files it names
+# aren't included.
+#
+# Forms: VMs only. `dc01` and `intranet` run Windows, which has no container form in 1.0, so the
+# container targets refuse the lab. `jump` has a container form, but it runs here beside them.
+# The entries' recipes run in PowerShell (Windows) and shell (Linux) by default, or all from the
+# controller with `isoloom generate --configure ansible`.
+#
+# Joining `intranet` to the domain isn't part of the configuration model: the environment's own
+# playbook does it from the controller, once every machine's recipe has run.
+version: 1
+name: north-wing
+
+networks:
+  corp: { cidr: 10.62.0.0/24, internet: false }
+
+secrets:
+  dsrm: { env: NORTH_WING_DSRM }
+
+inputs:
+  HELPDESK_PASSWORD:
+    description: The help-desk account's password, handed to the player
+  FLAG: {}
+
+machines:
+  dc01:
+    os: windows-server@2022
+    service: ad-ds
+    with:
+      domain: north.test
+      netbios: NORTH
+      dsrm_password: { secret: dsrm }
+      users:
+        - { name: helpdesk, password: { input: HELPDESK_PASSWORD }, groups: [Remote Desktop Users] }
+        # Weak on purpose: a literal password is lab content and shows in the generated files.
+        - { name: svc-backup, password: Autumn2026!, groups: [Backup Operators] }
+    networks: { corp: 10 }
+    resources: { cpus: 2, memory_mb: 4096 }
+
+  intranet:
+    os: windows-server@2022
+    service: iis
+    with:
+      root: intranet/                # replaces C:\inetpub\wwwroot
+      features: [asp-net-45, windows-auth]
+    networks: { corp: 20 }
+    dns: { servers: [dc01], search: [north.test] }
+    files:
+      - { path: 'C:\Shares\IT\flag.txt', input: FLAG }
+    depends_on: [dc01]
+
+  jump:
+    os: debian@12
+    service: openssh                 # Debian 12's own OpenSSH (a `distro` release)
+    with:
+      password_authentication: true
+      users:
+        - { name: helpdesk, password: { input: HELPDESK_PASSWORD }, shell: /bin/bash }
+    networks: { corp: 5 }
+    ports:
+      ssh: { publish: 2222 }         # the entry's port is named `ssh`
+    dns: { servers: [dc01], search: [north.test] }
+    depends_on: [dc01]
+
+provision:
+  - ansible: ansible/join.yml        # joins `intranet` to north.test, from Isoloom's Linux controller
+    requirements: ansible/requirements.yml
+    groups:
+      dcs: [dc01]
+      members: [intranet]
+    vars:
+      domain: north.test
+
+checks:
+  - name: the domain controller answers LDAP
+    tcp: dc01:389
+    wait: 20m
+  - name: the help-desk account logs into the jump host
+    script: checks/helpdesk-ssh.sh
+    wait: 5m
+  - name: the intranet answers
+    http: http://intranet/
+    expect: any
+    wait: 20m
+  - checks/intranet-joined.yml       # a playbook check, run from the controller
+
+message: |
+  Your foothold is the jump host: ssh helpdesk@localhost -p {{ machines.jump.ports.ssh.published }}
+  with the password you were given. The office's domain is north.test.

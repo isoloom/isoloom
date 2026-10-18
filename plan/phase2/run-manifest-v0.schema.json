@@ -1,0 +1,756 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.isoloom.com/schema/run-manifest/v0.json",
+  "title": "Isoloom run manifest, version 0",
+  "description": "What Isoloom writes next to one target's generated files (`.isoloom[-<n>]/<target>[/<cloud>]/run.json`) and the Isothrum runner executes. Declarative and deterministic: no secret values, no absolute paths, no timestamps, no host shell. Version 0 is unstable: Isoloom and the runner move together until 1.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "patternProperties": {
+    "^x-": { "description": "Extensions, ignored by the runner." }
+  },
+  "required": [
+    "manifest_version",
+    "generator",
+    "lab",
+    "target",
+    "driver",
+    "hosts",
+    "tools",
+    "identity",
+    "params",
+    "secrets",
+    "networks",
+    "machines",
+    "lifecycle",
+    "ready",
+    "outputs",
+    "checks"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "manifest_version": {
+      "description": "The contract's version. 0: unstable, read only by a runner built for exactly 0.",
+      "const": 0
+    },
+    "generator": {
+      "description": "Provenance: a name and a version, nothing that changes between two runs of one Isoloom on one spec.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "isoloom" },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$" }
+      }
+    },
+    "lab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "instance"],
+      "properties": {
+        "name": {
+          "description": "The spec's `name:`, with the instance suffix when there is one (`shop-2`): the default run name.",
+          "$ref": "#/$defs/kebab"
+        },
+        "instance": {
+          "description": "The Isoloom instance the files were generated for (moved Docker blocks, `.isoloom-<n>/`), or null.",
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 99
+        },
+        "message": {
+          "description": "The spec's `message:`, its placeholders rewritten to manifest ones (`{{ machines.web.ports.0.publish }}` becomes `${published.web.80}`). The runner fills it once the run is ready; a sensitive output is never substituted.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "target": {
+      "type": "string",
+      "enum": ["docker", "docker-vm", "vagrant", "proxmox", "esxi", "cloud-docker", "cloud-vm", "cloud-services"]
+    },
+    "cloud": {
+      "description": "The cloud of a cloud target's module; absent elsewhere.",
+      "type": "string",
+      "enum": ["aws", "azure", "gcp", "digitalocean", "linode", "oci"]
+    },
+    "driver": {
+      "description": "The runner driver that implements this manifest's actions, reads its status and clears its leftovers. The native commands themselves are in `lifecycle`.",
+      "type": "string",
+      "enum": ["compose", "vagrant", "terraform"]
+    },
+    "hosts": {
+      "description": "Host operating systems this target runs from. A provider that exists on fewer (Hyper-V) narrows it in `identity.vagrant.providers`.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/host_os" }
+    },
+    "tools": {
+      "description": "The native tools the steps run, probed before `up`: a missing one fails with its name, not a raw spawn error.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/tool" }
+    },
+    "identity": { "$ref": "#/$defs/identity" },
+    "params": {
+      "description": "Non-secret values set at run time that the generated files read (ISOLOOM_PUBLISH_ADDRESS, ISOLOOM_HYPERV_SWITCH, Terraform variables such as `region`).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/param" }
+    },
+    "secrets": {
+      "description": "Secret and input slots: names, sources and destinations, never values.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/secret_slot" }
+    },
+    "networks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/network" }
+    },
+    "machines": {
+      "description": "Every machine the target creates, Isoloom's own included (`role` tells them apart): the runner never infers a role from a name, a label or an image.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/machine" }
+    },
+    "lifecycle": { "$ref": "#/$defs/lifecycle" },
+    "ready": {
+      "description": "Conditions that must all hold, in order, once `lifecycle.up` succeeded, before the run counts as ready.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/condition" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/output" }
+    },
+    "checks": { "$ref": "#/$defs/checks" },
+    "recovery": { "$ref": "#/$defs/recovery" },
+    "expiry": {
+      "description": "Runs that stop themselves (cloud auto-stop): the runner computes the expiry when it applies, passes it to the module, records it, and lists the run as expired after it (the reaper's input).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tf_var", "unit"],
+      "properties": {
+        "tf_var": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "unit": { "enum": ["unix_seconds", "minutes_from_now"] },
+        "default_minutes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "kebab": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$" },
+    "env_name": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+    "host_os": { "type": "string", "enum": ["linux", "macos", "windows"] },
+    "rel_path": {
+      "description": "Relative to the manifest's folder (or, where said, to the run's state folder), `/`-separated, never absolute, never escaping the lab. The runner converts separators for the host.",
+      "type": "string",
+      "pattern": "^(?![/\\\\])(?![A-Za-z]:)(?!.*\\\\)[^\\u0000]+$"
+    },
+    "template": {
+      "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>[.udp]`, `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
+      "type": "string",
+      "not": { "pattern": "\\$\\{\\s*secrets\\." }
+    },
+    "argv": {
+      "description": "A program and its arguments, run without a shell. The program is a bare tool name resolved on PATH (with its Windows wrapper when it has one). A shell is refused as the program: the manifest never holds shell code for the host.",
+      "type": "array",
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$",
+          "not": { "enum": ["sh", "bash", "zsh", "dash", "ash", "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "env", "sudo", "python", "python3"] }
+        }
+      ],
+      "items": { "$ref": "#/$defs/template" }
+    },
+    "host_argv": {
+      "description": "One argv for every host, or one per host OS (`default` covers the hosts not named). Only where a host truly differs.",
+      "oneOf": [
+        { "$ref": "#/$defs/argv" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "default": { "$ref": "#/$defs/argv" },
+            "linux": { "$ref": "#/$defs/argv" },
+            "macos": { "$ref": "#/$defs/argv" },
+            "windows": { "$ref": "#/$defs/argv" }
+          }
+        }
+      ]
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "probe"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+        "probe": {
+          "description": "A read-only command that succeeds when the tool (and its daemon, for Docker) is usable. Time-bounded by the runner.",
+          "$ref": "#/$defs/host_argv"
+        },
+        "min_version": { "type": "string" },
+        "container": {
+          "description": "An image the runner may run the tool from instead of the host binary (Terraform for a LAN server from a macOS app). Pinned by digest.",
+          "type": "string",
+          "pattern": "@sha256:[0-9a-f]{64}$"
+        },
+        "container_hosts": { "type": "array", "items": { "$ref": "#/$defs/host_os" }, "uniqueItems": true },
+        "hosts": { "type": "array", "items": { "$ref": "#/$defs/host_os" }, "uniqueItems": true },
+        "providers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "identity": {
+      "description": "How the runner finds what this run created, without reading the generated files: the Compose project, the Vagrant folder and VM names, the Terraform module and state.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "compose": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["project", "files"],
+          "properties": {
+            "project": {
+              "description": "The project name: `${run.name}`, which the embedder may set (the launcher's `cyberctf-<lab id>`).",
+              "$ref": "#/$defs/template"
+            },
+            "files": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/template" } },
+            "pinned_ports_file": {
+              "description": "The runner's override file of host ports pinned at the first start (in the run's state folder), named in every Compose argv. Always written, `services: {}` when nothing is pinned.",
+              "$ref": "#/$defs/template"
+            }
+          }
+        },
+        "vagrant": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["providers"],
+          "properties": {
+            "providers": {
+              "description": "The providers the Vagrantfile supports, each with the hosts it exists on, its plugin, and whether its commands need elevation.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "hosts"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "enum": ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "utm", "vmware_esxi"]
+                  },
+                  "hosts": { "type": "array", "items": { "$ref": "#/$defs/host_os" }, "uniqueItems": true },
+                  "plugin": { "type": "string" },
+                  "elevation": {
+                    "description": "`hyperv`: on Windows, management commands run elevated (one prompt per operation) when the runner may not manage Hyper-V itself. Status reads never are.",
+                    "enum": ["none", "hyperv"]
+                  },
+                  "remote": { "description": "The VMs run on a server (ESXi): its connection slots apply.", "type": "boolean" },
+                  "refusal": {
+                    "description": "Why this lab can't run on this provider, in Isoloom's words (`refusal_on`), or null.",
+                    "type": ["string", "null"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "terraform": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["module", "state"],
+          "properties": {
+            "module": { "$ref": "#/$defs/rel_path" },
+            "state": {
+              "description": "`runner`: local state in the run's state folder, outside the lab's files (a reinstalled lab must not orphan what it created).",
+              "const": "runner"
+            },
+            "var_files": {
+              "description": "Variable files Isoloom generated, in order (`terraform.tfvars.json`).",
+              "type": "array",
+              "items": { "$ref": "#/$defs/rel_path" }
+            }
+          }
+        }
+      }
+    },
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "deliver"],
+      "properties": {
+        "name": { "$ref": "#/$defs/env_name" },
+        "description": { "type": "string" },
+        "default": { "type": ["string", "null"] },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "required": { "type": "boolean" },
+        "hosts": { "type": "array", "items": { "$ref": "#/$defs/host_os" }, "uniqueItems": true },
+        "providers": { "type": "array", "items": { "type": "string" } },
+        "set_by": {
+          "description": "`runner`: the runner decides it (a relay's proxy command, the player's public IP). `embedder`: the app driving the runner passes it.",
+          "enum": ["runner", "embedder"]
+        },
+        "deliver": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/delivery" } }
+      }
+    },
+    "secret_slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "required", "sensitive", "deliver"],
+      "properties": {
+        "name": { "$ref": "#/$defs/env_name" },
+        "kind": {
+          "description": "`input`: a launch-time value of the lab (`inputs:`: a flag, a launch token). `secret`: the spec's `secrets:`. `connection`: what reaches the server or cloud account (a password, a token, keys). `generated`: made once per run by the runner and kept in its state.",
+          "enum": ["input", "secret", "connection", "generated"]
+        },
+        "required": { "type": "boolean" },
+        "sensitive": {
+          "description": "Masked in every event and log line. A flag, a token and a password always are.",
+          "type": "boolean"
+        },
+        "machines": {
+          "description": "The machines (and their init jobs) that receive it.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/name" }
+        },
+        "providers": { "type": "array", "items": { "type": "string" } },
+        "source": {
+          "description": "Where the runner reads the value when the embedder passes none: one of Isoloom's secret stores, by reference.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["store", "reference"],
+          "properties": {
+            "store": { "enum": ["env", "file", "vault", "sops"] },
+            "reference": { "type": "string" }
+          }
+        },
+        "deliver": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/delivery" } }
+      }
+    },
+    "delivery": {
+      "description": "Where a value goes. Never a command-line argument.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["via", "var", "steps"],
+          "properties": {
+            "via": { "const": "env" },
+            "var": { "$ref": "#/$defs/env_name" },
+            "steps": {
+              "description": "The ids of the steps whose process gets it; `*` for every step of every operation.",
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["via", "var"],
+          "properties": {
+            "via": { "const": "tf_var" },
+            "var": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+            "shape": {
+              "description": "`string` (default): TF_VAR_<var>. `map_entry`: one key of a JSON-object variable (`inputs`), the runner writing the whole object.",
+              "enum": ["string", "map_entry"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["via", "path", "format"],
+          "properties": {
+            "via": { "const": "state_file" },
+            "path": {
+              "description": "Relative to the run's state folder; written owner-only, kept until `down` succeeded (a destroy needs the same values), named by `${run.state_dir}` in the steps that read it.",
+              "$ref": "#/$defs/rel_path"
+            },
+            "format": { "enum": ["tfvars_json", "dotenv"] },
+            "key": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["via", "machine", "transport"],
+          "properties": {
+            "via": { "const": "guest" },
+            "machine": { "$ref": "#/$defs/name" },
+            "transport": {
+              "description": "Isoloom's guest delivery (`/var/lib/isoloom/secrets`, then `.delivered`): over SSH, `vagrant ssh`, or WinRM.",
+              "enum": ["ssh", "vagrant_ssh", "winrm"]
+            },
+            "during_step": {
+              "description": "Delivered while this step runs (the guest waits for it), retried until it lands.",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "cidr", "internet"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "cidr": { "type": "string" },
+        "internet": {
+          "description": "false: no route out. On container targets Isoloom enforces it with `<machine>-routes` sidecars (role `infra`), not an `internal:` network, so published ports still work.",
+          "type": "boolean"
+        },
+        "native": {
+          "description": "The network's name where the target creates it: the Docker network (`${run.name}_lab`), the hypervisor's internal network (`isoloom-<lab>-lab`).",
+          "$ref": "#/$defs/template"
+        }
+      }
+    },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "addresses"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "role": {
+          "description": "`target`: part of the lab. `job`: a one-shot that must exit 0 (an `init:` script). `infra`: Isoloom's plumbing (the controller, probes, route keepers), never shown, never counted as down. `access`: the user's seat or its stand-in. `tool`: an observer (`tools:`). `check`: a check runner (Compose profile `check`).",
+          "enum": ["target", "job", "infra", "access", "tool", "check"]
+        },
+        "of": { "description": "The machine a job, route keeper or check runner belongs to.", "$ref": "#/$defs/name" },
+        "os": { "type": ["string", "null"] },
+        "windows": { "type": "boolean" },
+        "arch": { "enum": ["amd64", "arm64"] },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpus": { "type": "number", "minimum": 0 },
+            "memory_mb": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "addresses": {
+          "description": "Its static address on each lab network, by the lab's network name (what the status shows: no `docker inspect` needed).",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "native": {
+          "description": "Its name where the target creates it: the Compose service, or the VM name per provider (what orphan clean-up matches, exactly).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "service": { "type": "string" },
+            "vagrant": { "type": "string" },
+            "vm_names": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "volumes": {
+          "description": "Named volumes, by the spec's name and mount path. `down` removes them; `park` and `resume` keep them (a flag written once by an init job lives in one).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "path"],
+            "properties": {
+              "name": { "type": "string" },
+              "path": { "type": "string" },
+              "native": { "$ref": "#/$defs/template" }
+            }
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["port", "protocol"],
+            "properties": {
+              "name": { "type": ["string", "null"] },
+              "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "protocol": { "enum": ["tcp", "udp"] },
+              "http": { "type": "boolean" },
+              "tls": { "type": "boolean" },
+              "publish": {
+                "description": "Published on the host. `ephemeral` (what the labs use): Docker picks the port unless ISOLOOM_PUBLISH_FIXED is set, and the runner pins it at the first start. `fixed`: always `preferred`.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["mode"],
+                "properties": {
+                  "mode": { "enum": ["fixed", "ephemeral"] },
+                  "preferred": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 },
+                  "address": { "$ref": "#/$defs/template" }
+                }
+              }
+            }
+          }
+        },
+        "keep_running": { "description": "Infra that stays on once the lab is built (a controller with `keep_running`).", "type": "boolean" }
+      }
+    },
+    "action": {
+      "description": "A driver primitive: a read-then-act sequence one argv can't express (list, then remove what was listed). The manifest's documentation fixes each action's native commands.",
+      "type": "string",
+      "enum": [
+        "compose.pin_ports",
+        "compose.check_ports_free",
+        "compose.remove_stale_networks",
+        "compose.remove_containers",
+        "compose.remove_networks",
+        "vagrant.reconcile_provider",
+        "vagrant.discard_aborted_saved",
+        "vagrant.remove_orphans",
+        "vagrant.reset_state",
+        "vagrant.wake_controller",
+        "terraform.clear_lock",
+        "terraform.read_state",
+        "ssh.run",
+        "project.archive"
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "oneOf": [
+        { "required": ["argv"], "not": { "required": ["action"] } },
+        { "required": ["action"], "not": { "required": ["argv"] } }
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "note": { "description": "A line the runner emits when the step starts.", "type": "string" },
+        "argv": { "$ref": "#/$defs/host_argv" },
+        "action": { "$ref": "#/$defs/action" },
+        "with": { "description": "An action's arguments (strings are templates).", "type": "object" },
+        "cwd": { "$ref": "#/$defs/rel_path" },
+        "env": {
+          "description": "Non-secret environment of this step, values as templates (TF_DATA_DIR, TF_IN_AUTOMATION). Secrets and params come through their slots.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/env_name" },
+          "additionalProperties": { "$ref": "#/$defs/template" }
+        },
+        "stdin": {
+          "description": "A generated file piped into the program (a check script into `docker compose exec -T <m> sh -s` or `ssh … sh -s`): the shell runs in the guest, never on the host.",
+          "$ref": "#/$defs/rel_path"
+        },
+        "timeout_s": { "type": "integer", "minimum": 1 },
+        "when": { "description": "`if_ok` (default): skipped once a step of the operation failed. `always`: a clean-up that runs anyway.", "enum": ["if_ok", "always"] },
+        "failure": { "description": "`fail` (default) fails the operation; `tolerate` logs and goes on.", "enum": ["fail", "tolerate"] },
+        "hosts": { "type": "array", "items": { "$ref": "#/$defs/host_os" }, "uniqueItems": true },
+        "providers": { "description": "Run only on these Vagrant providers (`${run.provider}`).", "type": "array", "items": { "type": "string" } },
+        "verdict": { "description": "A regular expression over the step's lines; the last match leads the step's error (Ansible's `fatal: [host]: …`).", "type": "string" }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["up", "down", "status"],
+      "properties": {
+        "up": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } },
+        "down": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } },
+        "park": {
+          "description": "Absent: the run can't be parked (Terraform runs are created or destroyed). A mode absent inside it is refused.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pause": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+            "shutdown": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+          }
+        },
+        "resume": {
+          "description": "Brings parked machines back as they were. Never re-creates a container nor re-provisions a VM, so it needs no input again.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/step" }
+        },
+        "provision": {
+          "description": "Set-up again on running machines: `all`, or `machine` with `${machine}` bound.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "all": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+            "machine": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+          }
+        },
+        "status": {
+          "description": "The read-only probe the driver parses into machine states (an argv) or reads from files (an action). Never elevated, always time-bounded.",
+          "$ref": "#/$defs/step"
+        }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "step"],
+          "properties": {
+            "kind": { "const": "step_ok" },
+            "step": { "type": "string" },
+            "means": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "machines"],
+          "properties": {
+            "kind": { "const": "machines_running" },
+            "machines": { "type": "array", "items": { "$ref": "#/$defs/name" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "host", "user", "path", "grammar", "timeout_s", "interval_s"],
+          "properties": {
+            "kind": { "const": "ready_file" },
+            "host": { "$ref": "#/$defs/template" },
+            "user": { "$ref": "#/$defs/template" },
+            "path": { "$ref": "#/$defs/template" },
+            "log": { "description": "The bootstrap's log, whose tail explains a failure.", "$ref": "#/$defs/template" },
+            "grammar": {
+              "description": "The file's first line: `ready`, `failed: <step>`, or `running: <step>`; anything else (or no file) means still booting.",
+              "const": "isoloom-ready/1"
+            },
+            "via": { "description": "A jump host (`user@host`), when the lab host sits behind one (a Proxmox node's internal bridge).", "$ref": "#/$defs/template" },
+            "timeout_s": { "type": "integer", "minimum": 1 },
+            "unreachable_timeout_s": { "type": "integer", "minimum": 1 },
+            "interval_s": { "type": "integer", "minimum": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "address", "port", "timeout_s"],
+          "properties": {
+            "kind": { "const": "tcp" },
+            "address": { "$ref": "#/$defs/template" },
+            "port": { "$ref": "#/$defs/template" },
+            "timeout_s": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "from"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "description": { "type": "string" },
+        "role": {
+          "description": "What the embedder does with it: `entry` (where to start: the Open button), `ssh` (the lab host's login), `address`, `credential`, `info`.",
+          "enum": ["entry", "ssh", "address", "credential", "info"]
+        },
+        "sensitive": { "type": "boolean" },
+        "format": {
+          "description": "How the value is shown, `${value}` being the raw one (`http://127.0.0.1:${value}/`).",
+          "$ref": "#/$defs/template"
+        },
+        "from": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "machine", "port", "protocol"],
+              "properties": {
+                "kind": { "const": "published_port" },
+                "machine": { "$ref": "#/$defs/name" },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "protocol": { "enum": ["tcp", "udp"] }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "name"],
+              "properties": {
+                "kind": { "const": "terraform_output" },
+                "name": { "type": "string" },
+                "default": { "type": ["string", "null"] }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "value"],
+              "properties": {
+                "kind": { "const": "static" },
+                "value": { "type": "string" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "wait_s"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": { "enum": ["http", "tcp", "script", "exec"] },
+        "wait_s": { "description": "How long the runner retries it before it fails (the spec's `wait`).", "type": "integer", "minimum": 0 },
+        "derived": { "description": "Derived from the spec (reachability, no internet); skipped with ISOLOOM_DERIVED=0.", "type": "boolean" }
+      }
+    },
+    "checks": {
+      "description": "The lab's checks, run by the runners Isoloom generated. Each runner prints `isoloom-check/1` lines; a check its runner never reported counts as failed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "runners"],
+      "properties": {
+        "protocol": {
+          "description": "`isoloom-check: PASS <name>`, `isoloom-check: FAIL <name>: <reason>`, `isoloom-check: END <p> passed, <f> failed`, matched anywhere in a line (a Vagrant or Compose prefix before it); the runner exits 0 only without a failure.",
+          "const": "isoloom-check/1"
+        },
+        "setup": {
+          "description": "Run before the runners (the access stand-ins; waking the controller).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/step" }
+        },
+        "runners": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "from", "step", "checks"],
+            "properties": {
+              "id": { "type": "string" },
+              "from": { "description": "Where it runs, for the report: `from the environment's networks`, `from web`, `inside web`.", "type": "string" },
+              "step": {
+                "description": "Its `timeout_s` covers every check's `wait_s` plus a margin: a runner never stops before its slowest check could pass.",
+                "$ref": "#/$defs/step"
+              },
+              "checks": { "description": "What it reports, in order.", "type": "array", "items": { "$ref": "#/$defs/check" } },
+              "on_timeout": {
+                "description": "Clean-up after the runner ran out of time (its one-off container outlives the killed CLI).",
+                "type": "array",
+                "items": { "$ref": "#/$defs/step" }
+              }
+            }
+          }
+        },
+        "teardown": { "description": "Run after the runners, whatever happened.", "type": "array", "items": { "$ref": "#/$defs/step" } }
+      }
+    },
+    "recovery": {
+      "description": "A failed `up` that tripped over a previous run's leftovers, and how to clear them before one more try. A genuine failure is never retried.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stale_markers": {
+          "description": "Case-insensitive substrings of the failed step's output that mean leftovers, not a lab failure.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "retries": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "apply_retries": {
+          "description": "Terraform only: more applies after a failed one (a module that converges on a second apply, `cloud.apply_retries`).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        }
+      }
+    }
+  }
+}

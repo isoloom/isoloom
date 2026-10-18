@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ hybrid (machine `decoy` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app))
+
+# isoloom generate --target hybrid (exit 1)
+· hybrid: machine `decoy` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)

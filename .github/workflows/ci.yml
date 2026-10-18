@@ -1,0 +1,332 @@
+name: CI
+
+# Manual only for now: CI is re-enabled at the squash, so the push/pull_request triggers stay off
+# until the maintainer turns them on. `workflow_dispatch` lets a run be started by hand meanwhile.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - name: Examples validate
+        run: |
+          for e in examples/*/; do cargo run -q -- validate "$e" --skip-files; cargo run -q -- targets "$e"; done
+      - name: Generated files are up to date
+        run: |
+          # Every example with committed outputs (a stale one fails here, not in someone's run).
+          for e in examples/*/; do
+            if [ -d "$e.isoloom" ]; then cargo run -q -- check "$e"; fi
+          done
+
+  # The declared rust-version (Cargo.toml) builds and passes, so it can't drift again.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: "1.88"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test --workspace --locked
+
+  # macOS and Windows binaries are released (release.yml), and host.rs has Windows-only code.
+  platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test --workspace --locked
+
+  # The locked dependencies (deny.toml): known vulnerabilities (RustSec), licenses on the
+  # allow-list, banned crates, and crates.io as the only source.
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+
+  # The API docs build without a warning (broken intra-doc links, bare URLs).
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -Dwarnings
+
+  # Every declared dependency is used.
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-machete
+      - run: cargo machete
+
+  # Spelling, in code and docs (_typos.toml lists the words that are right here).
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: typos
+      - run: typos
+
+  # Generation is deterministic: every example rendered twice in one process (the test), then
+  # generated twice by the command line in the same folder, gives the same files.
+  determinism:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test -p isoloom-targets --test determinism
+      - name: The command line, twice
+        run: |
+          cargo build -q -p isoloom
+          for e in examples/*/; do
+            n=$(basename "$e")
+            for run in 1 2; do
+              rm -rf "$e.isoloom"
+              target/debug/isoloom generate "$e" > /dev/null 2>&1 || true
+              mkdir -p "$RUNNER_TEMP/$run/$n" && cp -R "$e.isoloom" "$RUNNER_TEMP/$run/$n/" 2>/dev/null || true
+            done
+          done
+          git checkout -- examples
+          diff -r "$RUNNER_TEMP/1" "$RUNNER_TEMP/2"
+
+  # The public API of the crates tools embed (isoloom-spec, isoloom-plan, isoloom-targets,
+  # isoloom-runtime: README, "Using the library"), compared by cargo-semver-checks: with the pull
+  # request's base (what this change does to the API) and with the last release tag (what the
+  # next release must bump for), when the crate exists there. Reported in the job summary, with a
+  # warning annotation; not enforced: the model's structs mirror the spec and are public with
+  # public fields, so every new spec key reads as a breaking change, and only the supported
+  # modules are a promise. A reviewer decides whether a change needs a "Breaking (library)" line
+  # and a minor bump.
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-semver-checks@0.51.0
+      - name: API changes (reported, not enforced)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v*')
+          compare() { # $1: crate, $2: baseline rev, $3: its label
+            if ! git cat-file -e "$2:crates/$1/Cargo.toml" 2>/dev/null; then
+              echo "### $1: not in $3, nothing to compare" >> "$GITHUB_STEP_SUMMARY"
+              return
+            fi
+            echo "### $1 since $3" >> "$GITHUB_STEP_SUMMARY"
+            if cargo semver-checks check-release -p "$1" --baseline-rev "$2" --color never > "$RUNNER_TEMP/semver.txt" 2>&1; then
+              echo "No breaking change." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning title=$1 API::breaking changes since $3; see the job summary. Supported surface changed? Add a \"Breaking (library)\" line to the CHANGELOG."
+              { echo '```'; grep -vE '^ *(Building|Built|Parsing|Parsed|Checking|Checked|Finished|Compiling) ' "$RUNNER_TEMP/semver.txt" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            cat "$RUNNER_TEMP/semver.txt"
+          }
+          for crate in isoloom-spec isoloom-plan isoloom-targets isoloom-runtime; do
+            if [ -n "$BASE" ]; then compare "$crate" "$BASE" "the pull request's base"; fi
+            compare "$crate" "$tag" "$tag"
+          done
+
+  # The generated Compose files, run for real through the Isothrum runner: Isoloom generates the
+  # files, `isothrum up` brings the example up, `isothrum check` passes (the spec's checks and the
+  # ones derived from its services and reach rules), and `isothrum down` leaves nothing behind.
+  # Isoloom converts, Isothrum runs — there is no `isoloom run`.
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, tuned-web, shared-files]
+    env:
+      # The Isothrum runner is a separate repository; this ref is built to get the `isothrum` binary.
+      ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Check out Isothrum (the runner)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: isoloom/isothrum
+          ref: ${{ env.ISOTHRUM_REF }}
+          path: .isothrum-src
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Build Isoloom and the Isothrum runner
+        working-directory: .
+        run: |
+          cargo build -q -p isoloom
+          cargo build -q -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
+          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
+          echo "$GITHUB_WORKSPACE/.isothrum-src/target/debug" >> "$GITHUB_PATH"
+      - name: Generate the Compose files
+        run: isoloom generate --target docker .
+      - name: Up
+        id: up
+        run: isothrum up . --target docker
+      - name: Checks (the spec's and the derived ones, from every machine)
+        if: steps.up.outcome == 'success'
+        run: isothrum check . --target docker
+      - name: Logs
+        if: failure()
+        run: docker compose -f .isoloom/docker/compose.yml --profile check logs --no-color
+      - name: Down (nothing left)
+        id: down
+        if: always() && steps.up.outcome == 'success'
+        run: |
+          isothrum down . --target docker
+          test -z "$(docker ps -aq --filter label=isoloom.managed=true)"
+      - name: Stop
+        if: always() && steps.down.outcome != 'success'
+        run: docker compose -f .isoloom/docker/compose.yml --profile check down -v || true
+
+  # A Compose file, imported, generated and started: the draft runs.
+  # The Kubernetes output on a real (throwaway) cluster: built images loaded, the environment
+  # applied and Available, then its checks as a Job (segmented's "cache is blocked" proves the
+  # network policies are enforced).
+  kubernetes:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [hello-stack, segmented, shared-files]
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          cluster_name: isoloom
+          config: .github/kind-calico.yaml
+          wait: 0s
+      - name: Calico (enforces NetworkPolicies, egress included)
+        working-directory: .
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml
+          kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      - name: Build and load the project's images
+        run: |
+          grep -E '^#   docker build -t ' .isoloom/kubernetes/environment.yaml | sed 's/^#   //' | while read -r cmd; do
+            $cmd
+            kind load docker-image --name isoloom "$(echo "$cmd" | awk '{print $4}')"
+          done
+      - name: Start
+        run: |
+          kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -
+          ns=$(awk '/^kind: Namespace/{getline; getline; print $2; exit}' .isoloom/kubernetes/environment.yaml)
+          echo "NS=$ns" >> "$GITHUB_ENV"
+          kubectl -n "$ns" wait --for=condition=Available deployment --all --timeout=600s
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Checks (the spec's and the derived ones, from every machine)
+        run: cargo run -q -- test kubernetes .
+      # The Helm chart of the same environment, in a namespace of its own beside it: linted,
+      # installed, Available, and its checks as `helm test`. (No `helm --wait`: it would wait
+      # for the published LoadBalancer's address, which kind never gives.)
+      - name: Helm chart (lint, install, helm test)
+        run: |
+          helm lint .isoloom/kubernetes/chart
+          helm install env .isoloom/kubernetes/chart -n "helm-$NS" --create-namespace
+          kubectl -n "helm-$NS" wait --for=condition=Available deployment --all --timeout=600s
+          helm test env -n "helm-$NS" --logs --timeout 5m
+      - name: Package the chart
+        run: |
+          cargo run -q -- chart . --version 1.2.3 -o "$RUNNER_TEMP"
+          ls "$RUNNER_TEMP"/*-1.2.3.tgz
+      - name: State
+        if: failure()
+        run: |
+          kubectl -n "helm-$NS" get all,networkpolicy,pvc,job -o wide || true
+          kubectl -n "$NS" get all,networkpolicy,pvc -o wide || true
+          kubectl -n "$NS" describe pods || true
+          kubectl -n "$NS" logs --all-containers --prefix -l isoloom.com/machine --tail=50 || true
+
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Import, generate
+        run: |
+          mkdir -p /tmp/shop && cp crates/isoloom-import/tests/fixtures/compose-shop/docker-compose.yml /tmp/shop/
+          cargo run -q -- import compose /tmp/shop/docker-compose.yml
+          cargo run -q -- generate /tmp/shop --target docker
+      - name: Start
+        working-directory: /tmp/shop
+        run: API_TOKEN=t0k docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 180
+      - name: Behaves like the original
+        working-directory: /tmp/shop
+        run: |
+          docker compose -f .isoloom/docker/compose.yml exec -T cache wget -qO- http://web/ | grep -q "Welcome to nginx"
+          test "$(docker compose -f .isoloom/docker/compose.yml exec -T web printenv API_TOKEN)" = t0k
+      - name: Stop
+        if: always()
+        working-directory: /tmp/shop
+        run: docker compose -f .isoloom/docker/compose.yml down -v
+
+  # The generated Terraform (Proxmox, docker-vm on Proxmox, cloud-docker) is valid for its providers.
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - name: Validate
+        run: |
+          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
+            echo "== $d"
+            terraform -chdir="$d" init -backend=false -input=false >/dev/null
+            terraform -chdir="$d" validate
+          done

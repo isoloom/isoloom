@@ -1,0 +1,49 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+expression: example(&name).unwrap().spec()
+---
+version: 1
+name: configured-windows
+networks:
+  lab:
+    cidr: 10.67.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  iis:
+    networks:
+      lab: 10
+    os: windows-server@2022
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: http
+        http: true
+        publish: 8087
+    inputs: []
+    resources:
+      cpus: 2
+      memory_mb: 3072
+      disk_gb: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: windows-server-2022
+      provision: []
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - checks/iis-answers.sh
+targets: ~

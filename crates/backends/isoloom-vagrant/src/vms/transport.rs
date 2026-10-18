@@ -1,0 +1,207 @@
+//! The Vagrant transport of a VM's set-up: each planned [`Step`], rendered once by
+//! `isoloom_render::steps` (shell on Linux, PowerShell on Windows), becomes a `vm.provision`
+//! that runs it as root. What only Vagrant can do is done the Vagrant way:
+//!
+//! - the project goes in through Isoloom's own `isoloom_project` provisioner (a tar.gz built
+//!   in Vagrant's Ruby when the step runs);
+//! - the inputs are read from the host's environment when Vagrant runs, written to the file
+//!   the steps read (on Windows, given to each step as its environment);
+//! - a reboot is Vagrant's own (`reboot: true`, which waits until the machine is back);
+//! - routes, trunks and link impairment are re-applied at every boot (`isoloom_render::boot`,
+//!   which the egress step uses itself): a reboot step and `vagrant reload` would otherwise drop them;
+//! - the default route through a gateway comes once the machine is provisioned: until then it
+//!   installs through Vagrant's NAT interface (a gateway may not let it out).
+
+use std::net::Ipv4Addr;
+
+use isoloom_plan::lifecycle::Step;
+use isoloom_plan::{Environment, MachinePlan, Route};
+use isoloom_render::boot::{self, Trigger};
+use isoloom_render::steps;
+
+use super::values;
+use crate::ruby::{Call, Ruby, Value};
+use crate::vagrantfile;
+
+/// The operating system family of a VM: which rendering of a step it runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Os {
+    /// Shell, as root, over SSH.
+    Linux,
+    /// PowerShell, over WinRM.
+    Windows,
+}
+
+impl Os {
+    /// The family of a planned machine.
+    pub(crate) fn of(plan: &MachinePlan) -> Os {
+        if plan.is_windows() { Os::Windows } else { Os::Linux }
+    }
+}
+
+/// The `vm.provision` lines of lab machine `machine`, from its planned steps.
+pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: Os) {
+    let Some(mp) = env.machines.get(machine) else { return };
+    let mut default: Option<(Vec<Route>, Ipv4Addr)> = None;
+    for step in &mp.lifecycle {
+        if matches!(step, Step::Egress | Step::Tc | Step::Ready)
+            && let Some((routes, via)) = default.take()
+        {
+            default_route(r, env, machine, routes, via);
+        }
+        step_provisioners(r, env, machine, step, os);
+        if let Step::Routes { routes, default: Some(via) } = step
+            && os == Os::Linux
+        {
+            default = Some((routes.clone(), *via));
+        }
+        if matches!(step, Step::Routes { .. }) && mp.is_gateway && os == Os::Linux {
+            shell(r, "forwarding", FORWARDING);
+        }
+    }
+}
+
+/// A gateway forwards between its networks; its own provisioning sets the rules. (The plan has
+/// no step for it yet.)
+const FORWARDING: &str = "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom-forwarding.conf && sysctl -q -p /etc/sysctl.d/90-isoloom-forwarding.conf";
+
+/// The provisioners of one step, `machine` being a lab machine or one of Isoloom's own VMs.
+pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &Step, os: Os) {
+    match (os, step) {
+        (_, Step::Project) => {
+            r.call(Call::new("m.vm.provision").arg(Value::str("isoloom_project")).kw("name", Value::str("project")));
+        }
+        (Os::Linux, Step::Prelude) => vagrantfile::prelude(r, env, "m"),
+        (Os::Linux, Step::Inputs { .. }) => values::linux_inputs(r, env, machine, step),
+        (Os::Windows, Step::Inputs { .. }) => values::windows_inputs(r, env, machine),
+        (_, Step::Secrets) => values::secret_files(r, env, machine, os),
+        (Os::Linux, Step::Reboot) => reboot(r),
+        (Os::Linux, Step::Routes { routes, .. }) => {
+            let early = Step::Routes {
+                routes: routes.clone(),
+                default: None,
+            };
+            persisted(r, env, machine, &early);
+        }
+        (Os::Linux, Step::Trunks | Step::Tc | Step::Ipv6 { .. } | Step::MoreAddresses { .. }) => persisted(r, env, machine, step),
+        (Os::Linux, Step::WaitFor { machine: dep, ports }) => wait_for(r, env, machine, dep, ports),
+        (Os::Windows, Step::Run { .. } | Step::Setup { .. }) => {
+            if let Some(script) = steps::windows(env, machine, step) {
+                let call = vagrantfile::shell("m", &label(step)).kw_opt("env", values::inputs_env(env, machine));
+                r.script(call, "inline", &format!("{}{script}", values::windows_decode(env, machine)));
+            }
+        }
+        _ => {
+            if let Some(script) = rendered(env, machine, step, os) {
+                shell(r, &label(step), &script);
+            }
+        }
+    }
+}
+
+/// The step's script for the machine's OS, if it has one there.
+fn rendered(env: &Environment, machine: &str, step: &Step, os: Os) -> Option<String> {
+    match os {
+        Os::Linux => steps::linux(env, machine, step),
+        Os::Windows => steps::windows(env, machine, step),
+    }
+}
+
+/// The provisioner's name: what `vagrant provision --provision-with` and Vagrant's output show.
+fn label(step: &Step) -> String {
+    match step {
+        Step::Prelude => "constraints".into(),
+        Step::DiskGrow => "disk".into(),
+        Step::Disks { .. } => "data disks".into(),
+        Step::Settings => "settings".into(),
+        Step::Hosts { .. } => "hosts".into(),
+        Step::Routes { .. } => "routes".into(),
+        Step::Ipv6 { .. } => "ipv6".into(),
+        Step::MoreAddresses { .. } => "addresses".into(),
+        Step::Trunks => "trunks".into(),
+        Step::Volumes { .. } => "volumes".into(),
+        Step::SharedVolume { volume, .. } => format!("volume {volume}"),
+        Step::Project => "project".into(),
+        Step::Files { .. } => "files".into(),
+        Step::Secrets => "secrets".into(),
+        Step::Inputs { .. } => "inputs".into(),
+        Step::WaitFor { machine, .. } => format!("wait for {machine}"),
+        Step::Run { path, .. } => path.clone(),
+        Step::Configure { .. } => "configure".into(),
+        Step::Reboot => "reboot".into(),
+        Step::Command => "command".into(),
+        Step::Setup { .. } => "setup".into(),
+        Step::Egress => "no internet".into(),
+        Step::Tc => "tc".into(),
+        Step::Ready => "ready".into(),
+    }
+}
+
+/// `m.vm.provision "shell", name: ..., inline: ...`.
+pub(crate) fn shell(r: &mut Ruby, name: &str, script: &str) {
+    r.script(vagrantfile::shell("m", name), "inline", script);
+}
+
+/// Vagrant restarts the machine and waits until it answers; the boot is recorded before and
+/// checked after, so a machine that didn't restart fails the step.
+fn reboot(r: &mut Ruby) {
+    shell(r, "before reboot", &steps::record_boot());
+    r.call(vagrantfile::shell("m", "reboot").kw("reboot", true));
+    shell(r, "after reboot", &steps::reboot_check());
+}
+
+/// A step whose effect a reboot forgets, applied now and at every boot.
+fn persisted(r: &mut Ruby, env: &Environment, machine: &str, step: &Step) {
+    let Some(script) = steps::linux(env, machine, step) else { return };
+    // Its boot unit: name, what it does, whether it waits for the links, what it comes after.
+    let (name, what, trigger, after): (&str, &str, Trigger, &[&str]) = match step {
+        Step::Routes { .. } => ("routes", ROUTES, Trigger::BootAndLinkUp, &["trunks"]),
+        Step::Trunks => ("trunks", "802.1Q interfaces of the isoloom trunks", Trigger::BootAndLinkUp, &[]),
+        Step::Ipv6 { .. } => ("ipv6", "IPv6 addresses and routes on the isoloom networks", Trigger::BootAndLinkUp, &["routes"]),
+        Step::MoreAddresses { .. } => (
+            "addresses",
+            "The machine's further addresses on the isoloom networks",
+            Trigger::BootAndLinkUp,
+            &["trunks"],
+        ),
+        _ => ("tc", "Link impairment (networks.*.tc) on this machine's interfaces", Trigger::Boot, &[]),
+    };
+    shell(r, &label(step), &boot::at_boot(name, what, &script, trigger, after));
+}
+
+/// What the routes' boot unit does.
+const ROUTES: &str = "Routes to the other isoloom networks";
+
+/// Once provisioned, the routes again with the default route through the gateway.
+fn default_route(r: &mut Ruby, env: &Environment, machine: &str, routes: Vec<Route>, via: Ipv4Addr) {
+    let step = Step::Routes { routes, default: Some(via) };
+    if let Some(script) = steps::linux(env, machine, &step) {
+        shell(
+            r,
+            "default route",
+            &boot::at_boot("routes", ROUTES, &script, Trigger::BootAndLinkUp, &["trunks"]),
+        );
+    }
+}
+
+/// Waits for a dependency by name, or by address when it is a Windows machine (left out of a
+/// Linux machine's /etc/hosts, see the plan's hosts step).
+fn wait_for(r: &mut Ruby, env: &Environment, machine: &str, dep: &str, ports: &[u16]) {
+    let windows = env
+        .spec()
+        .machines
+        .get(dep)
+        .and_then(|m| m.vm.as_ref())
+        .is_some_and(|vm| isoloom_spec::images::is_windows(&vm.os));
+    let target = if windows { env.address_for(machine, dep).to_string() } else { dep.to_owned() };
+    let step = Step::WaitFor {
+        machine: target,
+        ports: ports.to_vec(),
+    };
+    if let Some(script) = steps::linux(env, machine, &step) {
+        shell(r, &format!("wait for {dep}"), &script);
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "lifecycle.up[0]: step `up`: it has both `argv` and `action`: keep one",
+  "schema": true
+}

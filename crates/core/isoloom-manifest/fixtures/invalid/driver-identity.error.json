@@ -1,0 +1,5 @@
+{
+  "code": "driver_identity",
+  "message": "driver `vagrant` with an identity for `compose`: write the identity of the driver that runs the manifest",
+  "schema": false
+}

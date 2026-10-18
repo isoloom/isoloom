@@ -1,0 +1,6 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"inputs: [FLAG]\\nmachines:\\n  web:\\n    os: debian@12\\n    networks: { lab: 10 }\\n    files: [{ path: /ctf/flag, source: flag.txt, input: FLAG }]\\n\"))"
+---
+error[conflict] machines.web.files[0]  (isoloom.yml:10:13)
+  `source` and `input` are both given: keep one source

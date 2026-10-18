@@ -1,0 +1,25 @@
+# A classic multi-machine Vagrantfile, written by hand with a loop.
+NODES = [
+  { name: "web", ip: "192.168.33.10", mem: 1024, script: "provision/web.sh" },
+  { name: "db",  ip: "192.168.33.20", mem: 2048, script: "provision/db.sh" },
+]
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.synced_folder ".", "/vagrant"
+  NODES.each do |n|
+    config.vm.define n[:name] do |node|
+      node.vm.hostname = n[:name]
+      node.vm.network "private_network", ip: n[:ip]
+      node.vm.network "forwarded_port", guest: 80, host: 8080 if n[:name] == "web"
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = n[:mem]
+        vb.cpus = 2
+      end
+      node.vm.provision "shell", path: n[:script]
+      node.vm.provision "shell", inline: "echo done"
+    end
+  end
+  config.vm.provision "ansible_local" do |a|
+    a.playbook = "site.yml"
+  end
+end

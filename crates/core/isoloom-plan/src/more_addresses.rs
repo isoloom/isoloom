@@ -1,0 +1,152 @@
+//! A machine's several addresses on one network (`networks: { lan: [10, 11, 12] }`): the
+//! addresses after its primary one, where a VM's set-up puts them (on the interface that holds
+//! the primary one), and why a target that can't give them refuses.
+//!
+//! A VM gets them from its own set-up on every VM target: the hypervisor or the cloud gives an
+//! interface its primary address, and the guest adds the others. A cloud that filters traffic
+//! by address also learns them (AWS's secondary private addresses, Azure's further IP
+//! configurations, Google Cloud's alias ranges, Oracle Cloud's secondary private IPs, Linode's
+//! routed ranges). A container has one address per network, and an existing host keeps its own.
+
+use std::fmt;
+use std::net::Ipv4Addr;
+
+use indexmap::IndexMap;
+use isoloom_spec::model::{Machine, Spec};
+
+use crate::addressing::{address, cidr};
+use crate::environment::MachineShape;
+use crate::lifecycle::Step;
+use crate::requirements::Requirement;
+
+/// The further addresses of a machine on one network, as its set-up adds them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MoreAddresses {
+    /// Its primary address there: it finds the interface.
+    pub primary: Ipv4Addr,
+    /// The network's prefix length.
+    pub prefix: u8,
+    /// The addresses after the primary one, in spec order.
+    pub more: Vec<Ipv4Addr>,
+}
+
+/// Machine `m`'s addresses after its primary one, by network (in its networks' order).
+#[must_use]
+pub fn of(spec: &Spec, m: &Machine) -> IndexMap<String, Vec<Ipv4Addr>> {
+    m.networks
+        .keys()
+        .filter_map(|n| {
+            let octets = m.more_addresses.get(n).filter(|o| !o.is_empty())?;
+            Some((n.clone(), octets.iter().map(|o| address(spec, n, *o)).collect()))
+        })
+        .collect()
+}
+
+/// The set-up step that adds them, when the machine has any.
+#[must_use]
+pub fn step(spec: &Spec, m: &Machine) -> Option<Step> {
+    let addresses: Vec<MoreAddresses> = of(spec, m)
+        .into_iter()
+        .filter_map(|(n, more)| {
+            Some(MoreAddresses {
+                primary: address(spec, &n, *m.networks.get(&n)?),
+                prefix: cidr(spec, &n).len,
+                more,
+            })
+        })
+        .collect();
+    (!addresses.is_empty()).then_some(Step::MoreAddresses { addresses })
+}
+
+/// What they ask of the backend: for each shape the target gives such machines, the first
+/// machine with several addresses on a network. A VM's and a container's ask for different
+/// things, so a target running both (`hybrid`) is asked about each.
+pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+    let mut out: Vec<Requirement> = Vec::new();
+    for (name, m) in &spec.machines {
+        let network = m.more_addresses.iter().find(|(_, o)| !o.is_empty()).map(|(n, _)| n.clone());
+        let (Some(network), Some(shape)) = (network, shape(name)) else {
+            continue;
+        };
+        if !out.iter().any(|r| matches!(r, Requirement::MoreAddresses { shape: s, .. } if *s == shape)) {
+            out.push(Requirement::MoreAddresses {
+                machine: name.clone(),
+                network,
+                shape,
+            });
+        }
+    }
+    out
+}
+
+/// Why a target refuses a machine's several addresses on `network`.
+pub(crate) fn refused(f: &mut fmt::Formatter<'_>, machine: &str, network: &str, shape: MachineShape) -> fmt::Result {
+    let at = format!("machine `{machine}` has several addresses on `{network}`");
+    match shape {
+        MachineShape::Vm => write!(f, "{at}, which this target doesn't give a VM yet"),
+        MachineShape::Container => write!(
+            f,
+            "{at}: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)"
+        ),
+        MachineShape::Supplied | MachineShape::External => {
+            write!(f, "{at}: an existing host keeps the addresses it has, which Isoloom doesn't change")
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_spec::model::Target;
+
+    use super::*;
+    use crate::testing;
+
+    const SPEC: &str = "
+version: 1
+name: t
+networks: { lan: { cidr: 10.0.0.0/24 }, dmz: { cidr: 10.0.1.0/24 } }
+machines:
+  web: { networks: { lan: [10, 11, 12], dmz: 10 }, os: debian@12, app: { image: nginx, steps: [{ run: s.sh }] } }
+";
+
+    #[test]
+    fn a_vm_adds_them_on_the_interface_of_its_primary_address() {
+        let lab = testing::lab(SPEC);
+        let build = |t| testing::planned(&lab, t);
+        let env = build(Target::Vagrant);
+        let web = &env.machines["web"];
+        assert_eq!(
+            web.more_addresses["lan"],
+            ["10.0.0.11".parse::<Ipv4Addr>().unwrap(), "10.0.0.12".parse().unwrap()]
+        );
+        assert!(!web.more_addresses.contains_key("dmz"));
+        let step = web.lifecycle.iter().find(|s| matches!(s, Step::MoreAddresses { .. })).unwrap();
+        let Step::MoreAddresses { addresses } = step else { unreachable!() };
+        assert_eq!(addresses[0].primary, "10.0.0.10".parse::<Ipv4Addr>().unwrap());
+        assert_eq!(addresses[0].prefix, 24);
+        let need = |t| build(t).requirements.into_iter().find(|r| matches!(r, Requirement::MoreAddresses { .. }));
+        let vm = need(Target::Vagrant).unwrap();
+        assert!(matches!(vm, Requirement::MoreAddresses { shape: MachineShape::Vm, .. }));
+        let container = need(Target::Docker).unwrap();
+        assert!(container.to_string().contains("a container has one address per network"), "{container}");
+    }
+
+    /// The `several-addresses` example's shape on `hybrid`: a VM with several addresses first,
+    /// then a container. Only the VM's used to be asked about, so the container's reached the
+    /// renderer before it was refused.
+    #[test]
+    fn a_target_running_vms_and_containers_is_asked_about_the_first_of_each() {
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: [10, 11] }, ports: { web: 80 }, app: { steps: [{ run: w.sh }] } }\n  decoy: { os: debian@12, networks: { lan: [40, 41] }, app: { steps: [{ run: d.sh }] } }\n  more: { os: debian@12, networks: { lan: [50, 51] }, app: { steps: [{ run: m.sh }] } }\n",
+        );
+        let asked: Vec<(String, MachineShape)> = testing::planned(&lab, Target::Hybrid)
+            .requirements
+            .into_iter()
+            .filter_map(|r| match r {
+                Requirement::MoreAddresses { machine, shape, .. } => Some((machine, shape)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(asked, [("web".to_owned(), MachineShape::Vm), ("decoy".to_owned(), MachineShape::Container)]);
+    }
+}

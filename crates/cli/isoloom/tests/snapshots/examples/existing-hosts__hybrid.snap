@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ hybrid (only when some machines are containers and others are VMs)
+
+# isoloom generate --target hybrid (exit 1)
+· hybrid: not possible for this spec (see `isoloom targets`)

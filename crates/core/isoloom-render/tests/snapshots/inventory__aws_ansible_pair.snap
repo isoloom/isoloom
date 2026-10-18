@@ -1,0 +1,23 @@
+---
+source: crates/isoloom-render/tests/inventory.rs
+expression: "inventory::render(&env(\"ansible-pair\", Target::CloudVm), &aws())"
+---
+[linux]
+web ansible_host=10.63.0.10 ansible_user=admin
+cache ansible_host=10.63.0.20 ansible_user=admin maxmemory='"64mb"'
+
+[windows]
+
+[linux:vars]
+ansible_ssh_private_key_file=/etc/isoloom/id_ed25519
+ansible_become=true
+
+[webservers]
+web
+
+[caches]
+cache
+
+[pair]
+web
+cache

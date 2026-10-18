@@ -1,0 +1,7 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"machines:\\n  web:\\n    networks: { lab: 10 }\\n    app: { steps: [{ run: provision/web.sh }] }\\n\"))"
+---
+error[missing-field] machines.web.os  (isoloom.yml:6:3)
+  steps install onto an OS
+  fix: `os: debian@12`

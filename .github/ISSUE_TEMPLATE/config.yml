@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/isoloom/isoloom/discussions
+    about: Ask how to do something, or share an idea before it becomes a feature request.
+  - name: Security vulnerability
+    url: https://github.com/isoloom/isoloom/security/advisories/new
+    about: Report it privately, never in a public issue. See SECURITY.md.

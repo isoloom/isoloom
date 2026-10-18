@@ -1,0 +1,21 @@
+# Shape limits from .github/CONTRIBUTING.md (functions at most 60 lines, at most 5 parameters).
+too-many-lines-threshold = 60
+cognitive-complexity-threshold = 15
+too-many-arguments-threshold = 5
+
+# Tests may unwrap, expect, panic, print and index: a failing test is the report.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = false
+allow-indexing-slicing-in-tests = true
+
+# Product names written as their makers write them, not code (`doc_markdown` would want them in
+# backticks); `..` keeps clippy's own list.
+doc-valid-idents = [
+    "AlmaLinux", "BitLocker", "CentOS", "ConfigMap", "CSR1000v", "DigitalOcean", "ESXi", "HashiCorp",
+    "ICMPv6", "IOSv", "IOSvL2", "NetBIOS", "NetworkManager", "NitroTPM", "NVMe", "OpenRC", "OpenTofu",
+    "OrbStack", "PCIe", "SeaBIOS", "SELinux", "StefanScherer", "VirtIO", "VirtualBox", "VMware", "VNet",
+    "WinFsp", "WinRM", "..",
+]

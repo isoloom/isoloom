@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "lifecycle.up[0].argv[0]: `sh` is a shell or an interpreter, refused as a program: a step runs one tool without a shell; name the tool (`docker`), and pipe a guest script through `stdin`",
+  "schema": true
+}

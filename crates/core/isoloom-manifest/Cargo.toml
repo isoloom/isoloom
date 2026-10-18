@@ -1,0 +1,29 @@
+[package]
+name = "isoloom-manifest"
+description = "The run manifest, version 0: the types Isoloom writes next to a target's files and the Isothrum runner reads, their JSON Schema and the shared fixtures."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-manifest"
+keywords = ["isoloom", "manifest", "runner", "iac"]
+categories = ["config"]
+# fixtures/ ships (the crate's shared run-manifest fixtures); only tests/ is dropped.
+exclude = ["tests/"]
+publish = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+thiserror.workspace = true
+serde_path_to_error.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+jsonschema.workspace = true
+
+[lints]
+workspace = true

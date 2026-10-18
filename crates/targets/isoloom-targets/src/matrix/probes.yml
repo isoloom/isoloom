@@ -1,0 +1,419 @@
+# The rows of the capability matrix (`isoloom matrix`), beside the OS rows the matrix adds from
+# the spec's own OS table. Each row is a spec field (a value of it, or fields together) and the
+# change to a one-machine lab that uses it: every target decides on the changed lab exactly as it
+# decides on any spec, and the matrix shows what it decided. Nothing here says what a target
+# supports.
+#
+# - `patch` is merged into the lab: a mapping into a mapping, anything else replaces, `null`
+#   removes the key.
+# - `features`: the plan's features the change asks for (a test holds every feature to a row, and
+#   each row to its features).
+# - How a spec uses the row (what the example tests read): `field` written in it, with `value`
+#   (exact, or `<family>@*` for an OS family), `count` (at least that many entries), `also` and
+#   `without` (fields the same machine, network or check has or lacks); or, with
+#   `uses: features`, its features among the spec's requirements on the target.
+#   With `uses: refusal`, lowering refusing the spec at the row's field (a field the spec lacks).
+# - `only`: the targets the field means something on; the others show it as not applicable.
+# - `hosts: false`: `external`'s lab gives its machines no existing host.
+# - `cloud: true`: a row of the cloud-services lab (`cloud:`), not applicable to machines.
+
+# The lab every row changes: one machine with both forms (a published image for containers, a
+# step for VMs) on one network.
+base:
+  version: 1
+  name: probe
+  networks:
+    lan: { cidr: 10.9.0.0/24 }
+  machines:
+    m:
+      os: debian@12
+      networks: { lan: 10 }
+      app: { image: "redis:7", steps: [{ run: setup.sh }] }
+
+# On `hybrid`, beside `m`: a machine only a container runs, and one only a VM runs.
+hybrid:
+  c: { networks: { lan: 20 }, app: { image: "nginx:1.27" } }
+  v: { os: debian@12, networks: { lan: 30 }, ports: { web: 80 }, app: { steps: [{ run: v.sh }] } }
+
+# The lab of cloud services.
+cloud:
+  version: 1
+  name: probe
+  cloud: { provider: aws, terraform: infra }
+
+rows:
+  # What a machine is made of.
+  - field: machines.*.app.image
+    about: a published image, the machine's only recipe
+    without: [app.steps]
+    patch: { machines: { m: { app: { steps: null } } } }
+  - field: machines.*.app.build
+    about: the project's own Dockerfile, the machine's only recipe
+    without: [app.steps]
+    patch: { machines: { m: { app: { image: null, steps: null, build: build/m } } } }
+  - field: machines.*.app.appliance
+    about: a network appliance (a router or switch OS in a container)
+    features: [network-appliances]
+    patch: { machines: { m: { os: null, app: { image: "vrnetlab/cisco_iol:17.12.01", steps: null, appliance: cisco-iol } } } }
+  - field: machines.*.app.steps
+    about: portable steps, the machine's only recipe (a Dockerfile from the OS's image, or a VM's set-up)
+    without: [app.image, app.build, app.appliance]
+    patch: { machines: { m: { app: { image: null } } } }
+  - field: machines.*.command
+    about: steps that install a service, with no `command` to keep it in the foreground
+    also: [app.steps, ports]
+    without: [command, app.image, app.build, app.appliance]
+    patch: { machines: { m: { ports: { web: 80 }, app: { image: null } } } }
+  - field: machines.*.app.steps[].copy
+    about: a step copying a project file into the machine
+    patch: { machines: { m: { app: { steps: [{ copy: { from: files/motd, to: /etc/motd } }] } } } }
+  - field: machines.*.app.steps[].packages
+    about: a step installing packages with the OS's installer
+    patch: { machines: { m: { app: { steps: [{ packages: [curl] }] } } } }
+  - field: machines.*.app.steps[].playbook
+    about: a step running an Ansible playbook in the machine
+    patch: { machines: { m: { app: { steps: [{ playbook: setup.yml }] } } } }
+  - field: machines.*.app.steps[]
+    value: reboot
+    about: a step restarting the machine
+    patch: { machines: { m: { app: { steps: [{ run: setup.sh }, reboot] } } } }
+
+  # How a machine runs.
+  - field: machines.*.command
+    about: its own command
+    features: [machine-process]
+    patch: { machines: { m: { command: [redis-server] } } }
+  - field: machines.*.healthcheck
+    about: when it counts as healthy, beyond its ports answering
+    features: [machine-process]
+    patch: { machines: { m: { healthcheck: { test: "redis-cli ping" } } } }
+  - field: machines.*.setup
+    about: project scripts run once the machine is up
+    patch: { machines: { m: { setup: [seed.sh] } } }
+  - field: machines.*.environment
+    about: environment variables
+    patch: { machines: { m: { environment: { MODE: lab } } } }
+  - field: machines.*.environment.*.input
+    about: an environment variable from a non-sensitive input
+    patch: { inputs: { MODE: { sensitive: false } }, machines: { m: { environment: { MODE: { input: MODE } } } } }
+  - field: machines.*.depends_on
+    about: a machine waiting for another
+    patch:
+      machines:
+        m: { depends_on: [w] }
+        w: { os: debian@12, networks: { lan: 11 }, ports: { redis: 6379 }, app: { image: "redis:7", steps: [{ run: setup.sh }] } }
+  - field: machines.*.depends_on
+    about: a VM waiting for a container
+    features: [vm-after-container]
+    uses: features
+    only: [hybrid]
+    patch: { machines: { c: { ports: { web: 80 } }, v: { depends_on: [c] } } }
+  - field: machines.*.resources
+    about: CPUs and memory
+    patch: { machines: { m: { resources: { cpus: 2, memory_mb: 2048 } } } }
+  - field: machines.*.privileged
+    about: kernel-level access
+    patch: { machines: { m: { privileged: true } } }
+  - field: machines.*.sysctls
+    about: kernel parameters
+    patch: { machines: { m: { sysctls: { net.core.somaxconn: 4096 } } } }
+  - field: machines.*.ulimits
+    about: process limits
+    features: [ulimits]
+    patch: { machines: { m: { ulimits: { nofile: 65536 } } } }
+  - field: machines.*.dns
+    about: its own resolver settings
+    patch: { machines: { m: { dns: { servers: [10.9.0.53], search: [probe.test] } } } }
+
+  # What a machine is on.
+  - field: machines
+    count: 2
+    about: several machines
+    patch: { machines: { w: { os: debian@12, networks: { lan: 11 }, app: { image: "redis:7", steps: [{ run: setup.sh }] } } } }
+  - field: machines.*.count
+    about: clones of one machine
+    patch: { machines: { m: { count: 2 } } }
+  - field: machines.*.access
+    about: the machine the user lands on, supplied by the runner (no OS)
+    also: [access]
+    without: [os]
+    patch: { machines: { user: { access: true, networks: { lan: 99 } } } }
+  - field: machines.*.networks
+    count: 2
+    about: a machine on several networks
+    patch: { networks: { wan: { cidr: 10.9.1.0/24 } }, machines: { m: { networks: { wan: 10 } } } }
+  - field: machines.*.networks.*
+    count: 2
+    about: several addresses on one network
+    features: [vm-more-addresses, container-more-addresses]
+    patch: { machines: { m: { networks: { lan: [10, 11] } } } }
+  - field: machines.*.networks.*
+    count: 2
+    about: several addresses on one network, for a machine only a VM runs
+    also: [app.steps, ports]
+    without: [command, app.image, app.build, app.appliance]
+    features: [vm-more-addresses]
+    patch: { machines: { m: { ports: { web: 80 }, networks: { lan: [10, 11] }, app: { image: null } } } }
+  - field: machines.*.aliases
+    about: more DNS names a machine answers to
+    features: [machine-aliases]
+    patch: { machines: { m: { aliases: [www.probe.test] } } }
+  - field: machines.*.ports.*.publish
+    about: a port reachable from the user's machine
+    patch: { machines: { m: { ports: { web: { port: 80, protocol: http, publish: 8080 } } } } }
+  - field: machines.*.ports.*.protocol
+    value: udp
+    about: a UDP port
+    patch: { machines: { m: { ports: { dns: { port: 53, protocol: udp } } } } }
+  - field: machines.*.rate_limit
+    about: a bandwidth cap on a machine's links
+    features: [rate-limit]
+    patch: { machines: { m: { rate_limit: 10mbit } } }
+
+  # The hardware a machine asks for.
+  - field: machines.*.hardware.arch
+    value: arm64
+    about: a 64-bit ARM machine
+    patch: { machines: { m: { hardware: { arch: arm64 } } } }
+  - field: machines.*.hardware.tpm
+    value: required
+    about: a virtual TPM 2.0 it can't run without
+    features: [tpm]
+    patch: { machines: { m: { hardware: { tpm: required } } } }
+  - field: machines.*.hardware.tpm
+    value: required
+    about: a virtual TPM 2.0 a Windows machine can't run without
+    also: ["os=windows*"]
+    features: [tpm]
+    patch: { machines: { m: { os: windows-server@2022, app: null, hardware: { tpm: required } } } }
+  - field: machines.*.hardware.gpus
+    about: GPUs, by count
+    features: [container-gpus, vm-gpus]
+    patch: { machines: { m: { hardware: { gpus: 1 } } } }
+  - field: machines.*.hardware.gpus.ids
+    about: GPUs, by the host's ids
+    features: [container-gpus, vm-gpus]
+    patch: { machines: { m: { hardware: { gpus: { ids: ["0000:01:00.0"] } } } } }
+  - field: machines.*.hardware.devices
+    about: the host's devices
+    features: [container-devices, vm-devices]
+    patch: { machines: { m: { hardware: { devices: [/dev/fuse] } } } }
+  - field: machines.*.hardware.nested_virtualization
+    about: VMs inside the machine
+    features: [nested-virtualization, container-nested-virtualization]
+    patch: { machines: { m: { hardware: { nested_virtualization: true } } } }
+  - field: machines.*.hardware.boot
+    about: its own kernel, firmware, boot order or network boot
+    features: [own-boot]
+    patch: { machines: { m: { hardware: { boot: { kernel: /srv/boot/vmlinuz, initrd: /srv/boot/initrd, cmdline: "console=ttyS0" } } } } }
+
+  # Files and secrets.
+  - field: machines.*.hardware.boot.firmware
+    value: uefi
+    about: a VM booting through UEFI
+    features: [own-boot]
+    patch: { machines: { m: { hardware: { boot: { firmware: uefi } } } } }
+  - field: machines.*.files[].source
+    about: a project file placed on the machine
+    patch: { machines: { m: { files: [{ path: /etc/probe.conf, source: files/probe.conf }] } } }
+  - field: machines.*.files[].content
+    about: a file written in the spec
+    features: [existing-host-files]
+    patch: { machines: { m: { files: [{ path: /etc/probe.conf, content: "probe\n" }] } } }
+  - field: machines.*.files[].mode
+    about: a project file with its own owner or mode
+    also: ["files[].source"]
+    features: [owned-project-files]
+    patch: { machines: { m: { files: [{ path: /etc/probe.conf, source: files/probe.conf, uid: 101, mode: "0400" }] } } }
+  - field: machines.*.files[].input
+    about: an input's value as a file (a flag)
+    patch: { inputs: [FLAG], machines: { m: { files: [{ path: /flag.txt, input: FLAG }] } } }
+  - field: machines.*.files[].secret
+    about: a secret's value as a file
+    features: [secrets]
+    patch: { secrets: { token: { env: PROBE_TOKEN } }, machines: { m: { files: [{ path: /run/token, secret: token }] } } }
+  - field: machines.*.files[].uid
+    about: a secret's file with its own owner
+    also: ["files[].secret"]
+    features: [secret-owners]
+    patch: { secrets: { token: { env: PROBE_TOKEN } }, machines: { m: { files: [{ path: /run/token, secret: token, uid: 101 }] } } }
+
+  # Storage.
+  - field: machines.*.volumes
+    about: data kept until the environment is destroyed
+    patch: { machines: { m: { volumes: { data: /data } } } }
+  - field: volumes
+    about: a volume two machines share
+    patch:
+      volumes: { shared: { owner: m } }
+      machines:
+        m: { volumes: { shared: /srv } }
+        w: { os: debian@12, networks: { lan: 11 }, volumes: { shared: /srv }, app: { image: "redis:7", steps: [{ run: setup.sh }] } }
+  - field: volumes
+    about: a volume a container and a VM share
+    features: [volumes-across-shapes]
+    uses: features
+    only: [hybrid]
+    patch: { volumes: { shared: { owner: v } }, machines: { c: { volumes: { shared: /srv } }, v: { volumes: { shared: /srv } } } }
+  - field: volumes.*.persistent
+    value: true
+    about: a volume kept past `down`
+    features: [persistent-volumes]
+    patch: { volumes: { data: { persistent: true } }, machines: { m: { volumes: { data: /data } } } }
+  - field: overrides.*.volumes.*.external
+    about: a volume that exists already, mounted by name
+    features: [external-volumes]
+    patch:
+      volumes: { data: {} }
+      machines: { m: { volumes: { data: /data } } }
+      overrides: { docker: { volumes: { data: { external: probe-data } } }, kubernetes: { volumes: { data: { external: probe-data } } } }
+  - field: machines.*.disks
+    about: a data disk beside the machine's own
+    features: [data-disks]
+    patch: { machines: { m: { disks: { data: { size_gb: 50, mount: /data } } } } }
+  - field: machines.*.disks.*.fs
+    value: raw
+    about: a data disk left unformatted
+    features: [raw-disks]
+    patch: { machines: { m: { disks: { raw: { size_gb: 50, fs: raw } } } } }
+  - field: machines.*.tmpfs
+    about: a memory-backed mount
+    patch: { machines: { m: { tmpfs: [/run/cache] } } }
+  - field: machines.*.tmpfs[].mode
+    about: a memory-backed mount with its own mode
+    features: [tmpfs-modes]
+    patch: { machines: { m: { tmpfs: [{ path: /run/cache, mode: "1777" }] } } }
+
+  # Networks.
+  - field: networks.*.internet
+    value: false
+    about: a network with no way out
+    patch: { networks: { lan: { internet: false } } }
+  - field: reach
+    about: traffic allowed between two networks, the rest blocked
+    patch:
+      networks: { wan: { cidr: 10.9.1.0/24 } }
+      machines: { w: { os: debian@12, networks: { wan: 10 }, app: { image: "redis:7", steps: [{ run: setup.sh }] } } }
+      reach: [{ from: wan, to: lan, ports: [6379] }]
+  - field: networks.*.gateway
+    about: a network routed by one of the machines
+    features: [gateways]
+    patch: { networks: { lan: { gateway: m } }, machines: { m: { networks: { lan: 1 } } } }
+  - field: networks.*.vlans
+    about: a LAN split into VLANs
+    patch:
+      networks: { office: { cidr: 10.20.0.0/16, vlans: { 10: { cidr: 10.20.10.0/24 } } } }
+      machines: { m: { networks: { lan: null, office.vlan10: 10 } } }
+  - field: networks.*.tc
+    about: link impairment (delay, loss, rate) on the way into a network
+    features: [traffic-control]
+    patch:
+      networks: { wan: { cidr: 10.9.1.0/24 }, lan: { tc: { delay: 50ms } } }
+      reach: [{ from: wan, to: lan }]
+  - field: networks.*.mtu
+    about: a network's own MTU
+    features: [network-mtu]
+    patch: { networks: { lan: { mtu: 1400 } } }
+  - field: networks.*.ipv6
+    about: an IPv6 block beside the IPv4 one (dual stack)
+    features: [ipv6]
+    patch: { networks: { lan: { ipv6: { cidr: "fd00:9::/64" } } } }
+  - field: networks.*.ipv6.only
+    value: true
+    about: an IPv6-only network
+    features: [ipv6-only]
+    patch: { networks: { lan: { internet: false, ipv6: { cidr: "fd00:9::/64", only: true } } } }
+  - field: networks.*.ipv6.addresses
+    value: auto
+    about: IPv6 addresses the target hands out
+    features: [ipv6-auto]
+    patch: { networks: { lan: { ipv6: { cidr: "fd00:9::/64", addresses: auto } } } }
+  - field: networks.*.bridged
+    about: a network bridged to an interface of the host
+    features: [bridged-networks]
+    patch: { networks: { home: { cidr: 192.168.1.0/24, bridged: { interface: en0 } } }, machines: { m: { networks: { home: 50 } } } }
+  - field: overrides.*.networks.*.external
+    about: a network that exists already, joined by name
+    features: [external-networks]
+    patch:
+      networks: { shared: { cidr: 10.9.2.0/24 } }
+      machines: { m: { networks: { shared: 10 } } }
+      overrides:
+        docker: { networks: { shared: { external: probe-net } } }
+        proxmox: { networks: { shared: { external: vmbr9 } } }
+        esxi: { networks: { shared: { external: probe-pg } } }
+  - field: dns.private
+    value: true
+    about: the machines' names served under a private DNS zone
+    features: [private-dns]
+    patch: { dns: { private: true } }
+
+  # The environment around the machines.
+  - field: provision
+    about: the environment's own Ansible, run from a controller
+    features: [environment-provisioning]
+    patch: { provision: [{ ansible: site.yml }] }
+  - field: checks[].http
+    about: an HTTP check
+    patch: { machines: { m: { ports: { web: { port: 80, protocol: http } } } }, checks: [{ http: "http://m/" }] }
+  - field: checks[].tcp
+    about: a TCP check
+    patch: { checks: [{ tcp: "m:6379" }] }
+  - field: checks[].exec
+    about: a command run inside a machine
+    patch: { checks: [{ from: m, exec: "redis-cli ping", expect: PONG }] }
+  - field: checks[].exec
+    about: a command run inside an access machine the runner supplies
+    features: [exec-without-container]
+    uses: features
+    patch:
+      machines: { user: { access: true, networks: { lan: 99 } } }
+      checks: [{ from: user, exec: "true" }]
+  - field: checks[]
+    value: "*.yml"
+    about: a check that is an Ansible playbook
+    features: [playbook-checks]
+    uses: features
+    patch: { checks: [check.yml] }
+  - field: checks[]
+    value: "*.sh"
+    about: a check that is a project script
+    patch: { checks: [check.sh] }
+  - field: tools
+    about: a toolbox beside the environment, on every network
+    patch: { tools: { shell: {} } }
+  - field: constraints.proxy
+    about: an HTTP proxy every machine goes through
+    patch: { constraints: { proxy: { http: "http://proxy.probe.test:3128" } } }
+  - field: constraints.registries
+    about: a registry mirror every image is pulled through
+    patch: { constraints: { registries: { docker.io: registry.probe.test/dockerhub } } }
+
+  # One target's own settings.
+  - field: overrides.external.machines.*
+    about: a machine with no existing host to reach, on `external`
+    only: [external]
+    hosts: false
+    uses: refusal
+    patch: {}
+  - field: overrides.proxmox.machines.*.lxc
+    about: a container image as an LXC container on Proxmox
+    only: [proxmox]
+    patch: { machines: { m: { app: { steps: null } } }, overrides: { proxmox: { machines: { m: { lxc: true } } } } }
+  - field: overrides.proxmox.volumes.*.virtiofs
+    about: a volume as a folder of the Proxmox server
+    only: [proxmox]
+    patch:
+      volumes: { data: {} }
+      machines: { m: { volumes: { data: /data } } }
+      overrides: { proxmox: { volumes: { data: { virtiofs: {} } } } }
+  - field: overrides.vagrant.machines.*.box
+    about: a Vagrant box of one's own
+    only: [vagrant, hybrid]
+    patch: { overrides: { vagrant: { machines: { m: { box: generic/debian12 } } } } }
+
+  # Cloud services.
+  - field: cloud
+    about: cloud services instead of machines (the spec's Terraform module, applied as is)
+    cloud: true
+    patch: {}

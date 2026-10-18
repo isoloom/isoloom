@@ -1,0 +1,284 @@
+//! Each machine's security group, public IP, interfaces and VM, set up from its own custom data
+//! through the VM core; the Windows machines' and the controller's.
+
+use std::net::{Ipv4Addr, Ipv6Addr};
+
+use indexmap::IndexMap;
+use isoloom_plan::{Environment, MachinePlan};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, reference, string};
+use isoloom_render::inventory::WinrmAuth;
+use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
+
+use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
+use super::{USER, image, machine_size, public_ip as address_of, size};
+use crate::cloud::auto_stop;
+use crate::cloud::instance::name_with;
+use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, own_image, reach};
+use crate::machine::{Remote, controller, user_data, windows};
+use crate::module::ident;
+
+/// A Linux machine: its security group, public IP, interfaces and VM, set up from its custom data.
+pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+    let id = ident(name);
+    m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
+    m.block(public_ip(&id, name));
+    m.blocks(nics(&id, name, mp));
+    let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
+    let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(30);
+    let ids = mp
+        .addresses
+        .keys()
+        .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
+    let own = own_image::of(mp, own_image::azure);
+    let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
+    at_boot.extend(gateways::at_boot(mp));
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot);
+    m.block(linux_vm(
+        &id,
+        name,
+        (mp.os.as_deref().unwrap_or_default(), own),
+        (machine_size(mp, memory), disk, mp.tpm.is_some()),
+        (list(ids), setup),
+    ));
+    m.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
+}
+
+/// The MAC address of an Azure interface (uppercase, dash-separated), as `ip link` writes it.
+fn mac(nic: &str) -> Expression {
+    let raw = reference(&format!("azurerm_network_interface.{nic}.mac_address"));
+    call("lower", [call("replace", [raw, string("-"), string(":")])])
+}
+
+/// An interface per network (the first carries the public IP; forwarding on for a machine on
+/// several, and for a gateway), each with its association to the machine's security group.
+fn nics(id: &str, who: &str, mp: &MachinePlan) -> Vec<Block> {
+    controller_nics(id, who, (&mp.addresses, &mp.addresses6, &mp.more_addresses), mp.is_gateway)
+}
+
+/// A machine's addresses by network: its IPv4 ones, its IPv6 ones, its further IPv4 ones.
+type Addresses<'a> = (
+    &'a IndexMap<String, Ipv4Addr>,
+    &'a IndexMap<String, Ipv6Addr>,
+    &'a IndexMap<String, Vec<Ipv4Addr>>,
+);
+
+/// The same from the addresses themselves (each IPv6 one beside its network's IPv4 one).
+fn controller_nics(id: &str, who: &str, (addresses, addresses6, more): Addresses<'_>, gateway: bool) -> Vec<Block> {
+    let forwarding = gateway || addresses.len() > 1;
+    addresses
+        .iter()
+        .enumerate()
+        .flat_map(|(i, (net, address))| {
+            nic(&Nic {
+                id,
+                who,
+                net,
+                address: *address,
+                address6: addresses6.get(net).copied(),
+                more: more.get(net).map_or(&[], Vec::as_slice),
+                primary: i == 0,
+                forwarding,
+            })
+        })
+        .collect()
+}
+
+/// A Linux VM (its size, its disk in GB, and whether it has a virtual TPM), as `isoloom` with
+/// the runner's key, on `nics`, set up by `setup` (its custom data, which cloud-init runs).
+fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk, tpm): (&str, u32, bool), (nics, setup): (Expression, Expression)) -> Block {
+    let custom_data = call("base64encode", [setup]);
+    let vm = trusted_launch(placed("azurerm_linux_virtual_machine", id, name_with(&format!("-{who}"))), tpm)
+        .add_attribute(("size", string(vm_size)))
+        .add_attribute(("admin_username", string(USER)))
+        .add_attribute(("network_interface_ids", nics))
+        .add_attribute(("custom_data", custom_data))
+        .add_block(
+            Block::builder("admin_ssh_key")
+                .add_attribute(("username", string(USER)))
+                .add_attribute(("public_key", reference("var.ssh_public_key")))
+                .build(),
+        )
+        .add_block(os_disk(disk));
+    with_image(vm, (os, own), tpm).build()
+}
+
+/// Trusted launch, when the VM has a TPM: a virtual TPM and secure boot (on a generation 2 image).
+fn trusted_launch(b: BlockBuilder, tpm: bool) -> BlockBuilder {
+    if tpm {
+        b.add_attribute(("secure_boot_enabled", boolean(true)))
+            .add_attribute(("vtpm_enabled", boolean(true)))
+    } else {
+        b
+    }
+}
+
+fn os_disk(gb: u32) -> Block {
+    Block::builder("os_disk")
+        .add_attribute(("caching", string("ReadWrite")))
+        .add_attribute(("storage_account_type", string("StandardSSD_LRS")))
+        .add_attribute(("disk_size_gb", number(u64::from(gb))))
+        .build()
+}
+
+/// The VM's image: its own (`vm.image.azure`, by resource id), else the Marketplace's for its OS.
+fn with_image(vm: BlockBuilder, (os, own): (&str, Option<&str>), tpm: bool) -> BlockBuilder {
+    match own {
+        Some(id) => vm.add_attribute(("source_image_id", string(id))),
+        None => vm.add_block(source_image(os, tpm)),
+    }
+}
+
+/// An OS's Marketplace image; with a TPM, its generation 2 build (trusted launch needs one).
+fn source_image(os: &str, tpm: bool) -> Block {
+    let (publisher, offer, sku) = image(os).unwrap_or_default();
+    let sku = if tpm { sku.strip_suffix("-gen1").unwrap_or(sku) } else { sku };
+    Block::builder("source_image_reference")
+        .add_attribute(("publisher", string(publisher)))
+        .add_attribute(("offer", string(offer)))
+        .add_attribute(("sku", string(sku)))
+        .add_attribute(("version", string("latest")))
+        .build()
+}
+
+/// Who may reach a machine: its own networks, its set-up from `allowed_cidr` (SSH, or WinRM on
+/// Windows), the networks `reach` opens to it (on their ports, TCP and UDP), and its published
+/// ports from `allowed_cidr`.
+fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Block {
+    let allowed = || reference("var.allowed_cidr");
+    let mut g = Nsg::new(&ident(name), name).sealed(crate::cloud::vm::seal::sealed(env, mp));
+    let Some(m) = env.spec().machines.get(name) else { return g.build() };
+    for (n, p) in reach::own(env, m) {
+        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
+        if let Some(v6) = &p.ipv6 {
+            g = g.allow(&format!("net-{n}-ipv6"), "*", "*", string(v6.cidr.as_str()));
+        }
+    }
+    g = if windows {
+        g.allow("winrm", "Tcp", "5985", allowed())
+    } else {
+        g.allow("ssh", "Tcp", "22", allowed())
+    };
+    for (i, (reach, from)) in reach::opening(env, m).enumerate() {
+        // Each block of the network the rule opens from: its IPv4 one, and its IPv6 one when
+        // both ends are IPv6.
+        let both6 = from.ipv6.is_some() && env.networks.get(&reach.to).is_some_and(|to| to.ipv6.is_some());
+        let v6 = from.ipv6.as_ref().filter(|_| both6).map(|v| (v.cidr.as_str(), "-ipv6"));
+        for (block, suffix) in std::iter::once((from.cidr.as_str(), "")).chain(v6) {
+            let rule = format!("reach-{i}-{}{suffix}", reach.from);
+            g = reach_rules(g, &rule, &reach.ports, block);
+        }
+    }
+    for p in &mp.ports {
+        let (rule, protocol) = if p.protocol.is_tcp() {
+            (format!("published-{}", p.publish), "Tcp")
+        } else {
+            (format!("published-{}-udp", p.publish), "Udp")
+        };
+        g = g.allow(&rule, protocol, &p.publish.to_string(), allowed());
+    }
+    g.build()
+}
+
+/// A Windows machine: its security group, public IP, interface and VM (its name, the
+/// administrator and a WinRM listener set at creation), its set-up over WinRM.
+pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+    let id = ident(name);
+    m.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, (name, mp), true));
+    m.block(public_ip(&id, name));
+    m.blocks(nics(&id, name, mp));
+    m.block(windows_vm(name, mp));
+    m.blocks(disks::azure(name, "azurerm_windows_virtual_machine", &mp.disks));
+    m.blocks(windows::blocks(windows::Machine {
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("azurerm_windows_virtual_machine.{id}.id")),
+            host: address_of(&id),
+        },
+        password: reference(windows::PASSWORD),
+        skip: hooks::network_does,
+        platform: windows::Platform {
+            named: true,
+            ntlm: true,
+            before: vec![windows_auto_stop()],
+        },
+    }));
+}
+
+fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
+    let id = ident(name);
+    // Windows wants 2 GB and more, and Azure's images a 127 GB disk.
+    let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).max(2048);
+    let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(127);
+    let ids = mp
+        .addresses
+        .keys()
+        .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
+    let vm = trusted_launch(placed("azurerm_windows_virtual_machine", &id, name_with(&format!("-{name}"))), mp.tpm.is_some())
+        .add_attribute(("computer_name", string(windows::computer_name(name))))
+        .add_attribute(("size", string(machine_size(mp, memory))))
+        .add_attribute(("admin_username", string(USER)))
+        .add_attribute(("admin_password", reference(windows::PASSWORD)))
+        .add_attribute(("network_interface_ids", list(ids)))
+        .add_block(Block::builder("winrm_listener").add_attribute(("protocol", string("Http"))).build())
+        .add_block(os_disk(disk));
+    with_image(
+        vm,
+        (mp.os.as_deref().unwrap_or_default(), own_image::of(mp, own_image::azure)),
+        mp.tpm.is_some(),
+    )
+    .build()
+}
+
+/// The auto-stop on Windows, a scheduled task registered over WinRM (Azure runs no user data
+/// there).
+fn windows_auto_stop() -> Expression {
+    let mut task = Template::text("powershell -NoProfile -Command \"");
+    task.append(auto_stop::windows_task());
+    task.push_text("\"");
+    auto_stop::if_expires(task.into_expression(), string("cmd /c ver"))
+}
+
+/// The rules a `reach` rule opens from `block`: every port, or each port in TCP and UDP.
+fn reach_rules(mut g: Nsg, rule: &str, ports: &[u16], block: &str) -> Nsg {
+    if ports.is_empty() {
+        return g.allow(rule, "*", "*", string(block));
+    }
+    for p in ports {
+        g = g.allow(&format!("{rule}-{p}-tcp"), "Tcp", &p.to_string(), string(block));
+        g = g.allow(&format!("{rule}-{p}-udp"), "Udp", &p.to_string(), string(block));
+    }
+    g
+}
+
+/// The controller: its security group (every network may reach it, and SSH from
+/// `allowed_cidr`), an interface on every network at the controller address, its VM, set up from
+/// its custom data (it waits for every machine's own set-up before the playbooks).
+pub(super) fn controller(env: &Environment, m: &mut Module) {
+    let id = "isoloom_controller";
+    let mut g = Nsg::new(id, "controller");
+    for (n, p) in &env.networks {
+        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
+    }
+    m.commented(
+        "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
+        g.allow("ssh", "Tcp", "22", reference("var.allowed_cidr")).build(),
+    );
+    m.block(public_ip(id, "controller"));
+    let addresses = controller::addresses(env);
+    m.blocks(controller_nics(id, "controller", (&addresses, &IndexMap::new(), &IndexMap::new()), false));
+    let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
+    let (_, memory, disk) = controller::size(env);
+    let disk = disk.unwrap_or(30).max(30);
+    let inventory = controller::cloud_inventory(env, |_| USER.to_owned(), WinrmAuth::Ntlm);
+    let at_boot = interfaces::up(env, &addresses, &|n| mac(&nic_id(id, n)));
+    let setup = controller_setup::set_up(env, &|_| USER.to_owned(), inventory, &at_boot);
+    m.block(linux_vm(
+        id,
+        "controller",
+        (controller::OS, None),
+        (size(memory, addresses.len()), disk, false),
+        (list(ids), user_data::expression(&setup)),
+    ));
+}

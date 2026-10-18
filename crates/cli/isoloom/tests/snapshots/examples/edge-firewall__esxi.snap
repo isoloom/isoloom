@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ esxi (networks with a `gateway` machine on ESXi come later)
+
+# isoloom generate --target esxi (exit 1)
+· esxi: networks with a `gateway` machine on ESXi come later

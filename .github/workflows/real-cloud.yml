@@ -1,0 +1,215 @@
+# Real-host certification: Isoloom's generated AWS tree brought up on AWS at the smallest size,
+# checked, and torn down, on the standard GitHub-hosted Ubuntu runner, then reaped. The outcome is
+# recorded as tier evidence and uploaded; the maintainer commits the updated tier files.
+#
+# AWS only. Per the finish-line mandate, AWS is the one cloud with real runs for 1.0; the other
+# clouds ship generate+validate (Tier 2) and get real runs at 1.1.
+#
+# Isoloom converts, Isothrum runs: `isoloom generate` then `isothrum up/check/down`, and the
+# runner's own reaper (`isothrum reap aws`) so an abandoned run cannot keep billing.
+#
+# Budget guard: the smallest instance that runs the example (overridable), an expiry tag the reaper
+# reads, a machine that stops itself after the job's time cap, SSH open to this runner only, and a
+# key for this run only. Every step has its own timeout and they add up to less than the job cap, so
+# `down` and the reaper still run inside the budget.
+#
+# Manual only (`workflow_dispatch`): no push, pull_request or schedule. Skipped, not failed, without
+# the AWS credentials. Enabling this, the OIDC/role option and the budget cap: docs/ci-real-hosts.md.
+name: Cert — real cloud (AWS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      example:
+        description: "Example to certify (default: solo-web)"
+        type: string
+        default: solo-web
+      reap_only:
+        description: Only reap leftovers; bring nothing up
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # For the OIDC role option (REAL_AWS_ROLE_ARN); unused when static keys are the credentials.
+  id-token: write
+
+# One run at a time: a reap must never meet another run's environment.
+concurrency:
+  group: real-cloud-aws
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TARGET: cloud-vm
+  CLOUD: aws
+  ENTRY: cloud-vm/aws
+  EXAMPLE: ${{ inputs.example || 'solo-web' }}
+  REAP_ONLY: ${{ inputs.reap_only || 'false' }}
+  MAX_HOURS: ${{ vars.REAL_CLOUD_MAX_HOURS || '3' }}
+  AWS_REGION: ${{ vars.REAL_AWS_REGION || 'eu-west-3' }}
+  ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
+
+jobs:
+  # Whether AWS has credentials: either static keys or an OIDC role. Secrets cannot appear in a
+  # job's `if`, so this job reads them. Forks never get here.
+  gate:
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          KEYS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' }}
+          ROLE: ${{ vars.REAL_AWS_ROLE_ARN }}
+        run: |
+          if [ "$KEYS" = true ] || [ -n "$ROLE" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=AWS skipped::no credentials: set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY, or REAL_AWS_ROLE_ARN for OIDC (docs/ci-real-hosts.md)"
+          fi
+
+  aws:
+    needs: gate
+    if: ${{ needs.gate.outputs.enabled == 'true' }}
+    runs-on: ubuntu-latest
+    # The budget's time cap.
+    timeout-minutes: 130
+    env:
+      # Static keys, when set; empty under OIDC (the role is assumed below instead).
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Check out Isoloom
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Check out Isothrum (the runner)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: isoloom/isothrum
+          ref: ${{ env.ISOTHRUM_REF }}
+          path: .isothrum-src
+
+      # The OIDC role option: short-lived credentials from AWS STS, no static keys. Skipped when
+      # REAL_AWS_ROLE_ARN is unset (static keys are then the credentials, from the env above).
+      - name: Assume the AWS role (OIDC)
+        if: ${{ vars.REAL_AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.REAL_AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_wrapper: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Build Isoloom and the Isothrum runner
+        id: build
+        timeout-minutes: 20
+        run: |
+          cargo build -q -p isoloom
+          cargo build -q -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
+          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
+          echo "$GITHUB_WORKSPACE/.isothrum-src/target/debug" >> "$GITHUB_PATH"
+          RECORD="$RUNNER_TEMP/record"
+          rm -rf "$RECORD" && mkdir -p "$RECORD"
+          echo "RECORD=$RECORD" >> "$GITHUB_ENV"
+          echo "ISOTHRUM_HOME=$RUNNER_TEMP/isothrum-home" >> "$GITHUB_ENV"
+
+      - name: Reap what earlier runs left (expired only)
+        timeout-minutes: 15
+        continue-on-error: ${{ env.REAP_ONLY != 'true' }}
+        run: isothrum reap "$CLOUD" --region "$AWS_REGION" --json | tee "$RECORD/reap-pre.jsonl"
+
+      - name: Generate the AWS tree
+        if: env.REAP_ONLY != 'true'
+        timeout-minutes: 10
+        run: isoloom generate --target "$TARGET" -s "defaults.cloud.aws.region=$AWS_REGION" "examples/$EXAMPLE"
+
+      # The budget guard as Terraform variables: the smallest instance that runs the example
+      # (overridable), the expiry tag the reaper reads, a machine that stops itself, SSH open to this
+      # runner only, and a key for this run only.
+      - name: Budget guard
+        if: env.REAP_ONLY != 'true'
+        env:
+          AWS_SIZE: ${{ vars.REAL_AWS_SIZE || 't3.small' }}
+        run: |
+          ssh-keygen -q -t ed25519 -N '' -C "isoloom-ci-$GITHUB_RUN_ID" -f "$RUNNER_TEMP/id_ed25519"
+          {
+            echo "TF_VAR_instance_type=$AWS_SIZE"
+            echo "TF_VAR_region=$AWS_REGION"
+            echo "TF_VAR_expires_at=$(( $(date +%s) + MAX_HOURS * 3600 ))"
+            echo "TF_VAR_auto_stop_minutes=100"
+            echo "TF_VAR_allowed_cidr=$(curl -fsS --retry 3 https://checkip.amazonaws.com)/32"
+            echo "TF_VAR_ssh_public_key=$(cat "$RUNNER_TEMP/id_ed25519.pub")"
+            echo "TF_VAR_ssh_private_key_file=$RUNNER_TEMP/id_ed25519"
+          } >> "$GITHUB_ENV"
+
+      - name: Up
+        id: up
+        if: env.REAP_ONLY != 'true'
+        timeout-minutes: 35
+        run: isothrum up "examples/$EXAMPLE" --target "$TARGET" --lifetime $((MAX_HOURS * 60)) --json | tee "$RECORD/up.jsonl"
+      - name: Check
+        id: check
+        if: env.REAP_ONLY != 'true' && steps.up.outcome == 'success'
+        timeout-minutes: 15
+        run: isothrum check "examples/$EXAMPLE" --target "$TARGET" --json | tee "$RECORD/check.jsonl"
+      - name: Down
+        id: down
+        if: always() && env.REAP_ONLY != 'true' && steps.build.outcome == 'success'
+        timeout-minutes: 20
+        run: isothrum down "examples/$EXAMPLE" --target "$TARGET" --json | tee "$RECORD/down.jsonl"
+      # `down` failed or never ran (cancelled): the reaper destroys this AWS account's expired
+      # runs, and fails loudly if anything untracked is left.
+      - name: Reap after a failed teardown
+        if: always() && env.REAP_ONLY != 'true' && steps.build.outcome == 'success' && steps.down.outcome != 'success'
+        timeout-minutes: 15
+        run: isothrum reap "$CLOUD" --region "$AWS_REGION" --json | tee "$RECORD/reap-post.jsonl"
+
+      - name: Record tier evidence
+        if: always() && env.REAP_ONLY != 'true' && steps.build.outcome == 'success'
+        env:
+          HOST: ${{ vars.REAL_TIERS_HOST }}
+          HOST_OS: ${{ vars.REAL_TIERS_OS || 'linux' }}
+          UP: ${{ steps.up.outcome }}
+          CHECK: ${{ steps.check.outcome }}
+          DOWN: ${{ steps.down.outcome }}
+        run: |
+          if [ -z "$HOST" ]; then
+            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/ci-real-hosts.md)"
+            exit 0
+          fi
+          if [ "$UP" = success ] && [ "$CHECK" = success ] && [ "$DOWN" = success ]; then
+            result=pass; note="$EXAMPLE on AWS ($AWS_REGION): up, checks and down in CI"
+          elif [ "$UP" != success ]; then
+            result=fail; note="$EXAMPLE on AWS: up failed in CI"
+          else
+            result=partial; note="$EXAMPLE on AWS: up=$UP, check=$CHECK, down=$DOWN in CI"
+          fi
+          cargo xtask tiers record "$ENTRY" "$HOST" "$result" --os "$HOST_OS" --note "$note"
+          cp crates/targets/isoloom-targets/tiers.json docs/matrix.md "$RECORD/"
+          {
+            echo "## $ENTRY on $HOST: $result"
+            echo "$note"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Forget the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/id_ed25519*
+      - name: Upload the record and the regenerated tier files
+        if: always() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cert-cloud-aws-${{ env.EXAMPLE }}
+          path: ${{ runner.temp }}/record
+          if-no-files-found: warn

@@ -1,0 +1,25 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✓ hosted
+
+# isoloom generate --target hosted (exit 0)
+✓ .isoloom/docker/compose.yml
+✓ .isoloom/docker/checks/exec-writer.sh
+✓ .isoloom/docker/checks/writer.sh
+✓ .isoloom/docker/checks/exec-reader.sh
+✓ .isoloom/docker/checks/reader.sh
+✓ .isoloom/resolved.json
+
+## .isoloom/docker/checks/exec-reader.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/exec-writer.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/reader.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/writer.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/compose.yml: identical in the `docker` snapshot
+
+## .isoloom/resolved.json: identical in the `docker` snapshot

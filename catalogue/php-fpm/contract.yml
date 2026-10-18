@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What php-fpm does the same as a container and as a VM. `cargo xtask catalogue check php-fpm`
+# builds one small lab per case: this machine (`web`), the case's helper machines, and an access
+# machine (`probe`) running the checks, on `docker` and on `vagrant` through the Isothrum CLI. A
+# case passes when every check passes in both forms and every fact reads the same in both.
+cases:
+  default: {}
+  serve:
+    with: { root: site/ }
+    project:
+      site/index.php: "<?php echo 6 * 7;\n"
+
+checks:
+  - name: the fastcgi port answers
+    tcp: "{{ machine }}:{{ with.port }}"
+    wait: 2m
+  - name: php-fpm reports the release asked for
+    exec: php-fpm8.2 -v 2>&1
+    expect: "PHP {{ version }}"
+  - name: php evaluates code
+    exec: php -r 'echo 6 * 7;'
+    expect: "42"
+  - name: the served folder's script is in place
+    case: serve
+    exec: php /var/www/html/index.php
+    expect: "42"
+
+# Equal in both forms, or the case fails: the claim behind `os:` and the build behind the version.
+facts:
+  - name: the OS
+    exec: . /etc/os-release && echo "$ID $VERSION_ID"
+  - name: php's build
+    exec: php -v 2>&1 | head -n 1

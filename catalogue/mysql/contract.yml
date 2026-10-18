@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What mysql does, proven on the container form (the official image). `cargo xtask catalogue check
+# mysql` builds a small lab (`web`, an access machine `probe`) and runs it on `docker` through the
+# Isothrum CLI.
+cases:
+  default:
+    with: { password: "root-secret", user_password: "app-secret" }
+
+checks:
+  - name: the port answers
+    tcp: "{{ machine }}:3306"
+    wait: 2m
+  - name: mysql reports the release asked for
+    exec: mysqld --version
+    expect: "{{ version }}"
+  - name: the server answers a ping
+    exec: mysqladmin -uroot -p"{{ with.password }}" ping 2>&1
+    expect: "mysqld is alive"
+
+facts:
+  - name: the server version
+    exec: mysqld --version

@@ -1,0 +1,111 @@
+crates/core/isoloom-render/src/lib.rs:75:5: replace router_name -> &'static str with ""
+crates/core/isoloom-render/src/lib.rs:75:5: replace router_name -> &'static str with "xyzzy"
+crates/core/isoloom-render/src/lib.rs:118:45: replace || with && in arm64_machine
+crates/core/isoloom-render/src/lib.rs:119:31: replace == with != in arm64_machine
+crates/core/isoloom-render/src/lib.rs:141:33: replace && with || in common_unsupported
+crates/core/isoloom-render/src/lib.rs:141:15: replace == with != in common_unsupported
+crates/core/isoloom-render/src/lib.rs:141:36: delete ! in common_unsupported
+crates/core/isoloom-render/src/lib.rs:147:15: replace == with != in common_unsupported
+crates/core/isoloom-render/src/constraints.rs:23:90: replace || with && in of
+crates/core/isoloom-render/src/constraints.rs:23:67: replace || with && in of
+crates/core/isoloom-render/src/constraints.rs:23:39: replace || with && in of
+crates/core/isoloom-render/src/constraints.rs:23:42: delete ! in of
+crates/core/isoloom-render/src/constraints.rs:23:93: delete ! in of
+crates/core/isoloom-render/src/constraints.rs:31:21: replace || with && in proxies
+crates/core/isoloom-render/src/constraints.rs:129:8: delete ! in linux_prelude
+crates/core/isoloom-render/src/constraints.rs:204:69: replace || with && in package_proxies
+crates/core/isoloom-render/src/constraints.rs:204:75: replace == with != in package_proxies
+crates/core/isoloom-render/src/container.rs:42:39: delete ! in ready_test
+crates/core/isoloom-render/src/container.rs:63:48: replace && with || in leaf_jobs
+crates/core/isoloom-render/src/container.rs:63:51: delete ! in leaf_jobs
+crates/core/isoloom-render/src/container.rs:63:102: replace && with || in leaf_jobs
+crates/core/isoloom-render/src/container.rs:63:135: replace == with != in leaf_jobs
+crates/core/isoloom-render/src/container.rs:98:24: replace && with || in copied_from_project
+crates/core/isoloom-render/src/container.rs:107:36: replace == with != in project_variables
+crates/core/isoloom-render/src/dockerfile.rs:21:36: replace == with != in files
+crates/core/isoloom-render/src/dockerfile.rs:80:9: delete match arm "centos" in install
+crates/core/isoloom-render/src/ignore.rs:115:9: replace Rules::brings_back -> bool with true
+crates/core/isoloom-render/src/ignore.rs:115:9: replace Rules::brings_back -> bool with false
+crates/core/isoloom-render/src/ignore.rs:120:9: replace Rules::is_empty -> bool with true
+crates/core/isoloom-render/src/ignore.rs:136:23: replace += with -= in tokens
+crates/core/isoloom-render/src/ignore.rs:136:23: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:148:23: replace += with -= in tokens
+crates/core/isoloom-render/src/ignore.rs:148:23: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:151:29: replace == with != in tokens
+crates/core/isoloom-render/src/ignore.rs:152:23: replace += with -= in tokens
+crates/core/isoloom-render/src/ignore.rs:152:23: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:154:25: replace < with <= in tokens
+crates/core/isoloom-render/src/ignore.rs:157:22: replace < with <= in tokens
+crates/core/isoloom-render/src/ignore.rs:162:50: replace && with || in tokens
+crates/core/isoloom-render/src/ignore.rs:162:34: replace < with <= in tokens
+crates/core/isoloom-render/src/ignore.rs:162:30: replace + with * in tokens
+crates/core/isoloom-render/src/ignore.rs:167:31: replace += with -= in tokens
+crates/core/isoloom-render/src/ignore.rs:167:31: replace += with *= in tokens
+crates/core/isoloom-render/src/ignore.rs:267:16: delete ! in walk
+crates/core/isoloom-render/src/ignore.rs:270:25: replace || with && in walk
+crates/core/isoloom-render/src/ignore.rs:270:16: delete ! in walk
+crates/core/isoloom-render/src/ignore.rs:273:19: delete ! in walk
+crates/core/isoloom-render/src/ipv6.rs:57:6: delete ! in router_linux
+crates/core/isoloom-render/src/machine_setup.rs:23:57: replace && with || in linux
+crates/core/isoloom-render/src/machine_setup.rs:23:33: replace && with || in linux
+crates/core/isoloom-render/src/project.rs:54:17: replace && with || in terraform
+crates/core/isoloom-render/src/project.rs:54:8: delete ! in terraform
+crates/core/isoloom-render/src/project.rs:54:20: delete ! in terraform
+crates/core/isoloom-render/src/router.rs:37:64: replace && with || in forward_rules
+crates/core/isoloom-render/src/router.rs:79:6: delete ! in netem_script
+crates/core/isoloom-render/src/secrets.rs:78:34: replace / with % in wait
+crates/core/isoloom-render/src/secrets.rs:78:34: replace / with * in wait
+crates/core/isoloom-render/src/secrets.rs:114:61: replace && with || in of_containers
+crates/core/isoloom-render/src/secrets.rs:114:34: replace == with != in of_containers
+crates/core/isoloom-render/src/secrets.rs:114:97: replace == with != in of_containers
+crates/core/isoloom-render/src/steps.rs:51:37: delete ! in linux
+crates/core/isoloom-render/src/steps.rs:80:9: delete match arm Step::Settings in windows
+crates/core/isoloom-render/src/steps.rs:99:9: delete match arm Step::Ipv6{addresses, routes} in windows
+crates/core/isoloom-render/src/steps.rs:100:9: delete match arm Step::MoreAddresses{addresses} in windows
+crates/core/isoloom-render/src/steps.rs:101:9: delete match arm Step::Project in windows
+crates/core/isoloom-render/src/steps.rs:105:9: delete match arm Step::Files{files} in windows
+crates/core/isoloom-render/src/steps.rs:106:9: delete match arm Step::Secrets in windows
+crates/core/isoloom-render/src/steps.rs:92:40: replace match guard !routes.is_empty() with true in windows
+crates/core/isoloom-render/src/steps.rs:92:40: replace match guard !routes.is_empty() with false in windows
+crates/core/isoloom-render/src/steps.rs:123:50: replace match guard !ports.is_empty() with true in windows
+crates/core/isoloom-render/src/steps.rs:123:50: replace match guard !ports.is_empty() with false in windows
+crates/core/isoloom-render/src/steps.rs:92:40: delete ! in windows
+crates/core/isoloom-render/src/steps.rs:123:50: delete ! in windows
+crates/core/isoloom-render/src/steps.rs:202:31: replace == with != in trunk_commands
+crates/core/isoloom-render/src/steps.rs:285:5: replace reboot -> String with String::new()
+crates/core/isoloom-render/src/steps.rs:285:5: replace reboot -> String with "xyzzy".into()
+crates/core/isoloom-render/src/steps.rs:291:5: replace record_boot -> String with String::new()
+crates/core/isoloom-render/src/steps.rs:291:5: replace record_boot -> String with "xyzzy".into()
+crates/core/isoloom-render/src/steps.rs:296:5: replace reboot_check -> String with "xyzzy".into()
+crates/core/isoloom-render/src/trunks.rs:38:62: replace && with || in trunks
+crates/core/isoloom-render/src/trunks.rs:38:54: replace == with != in trunks
+crates/core/isoloom-render/src/trunks.rs:38:72: replace == with != in trunks
+crates/core/isoloom-render/src/trunks.rs:48:34: replace >= with < in trunks
+crates/core/isoloom-render/src/trunks.rs:54:45: replace == with != in of
+crates/core/isoloom-render/src/trunks.rs:59:66: replace == with != in carried
+crates/core/isoloom-render/src/trunks.rs:83:16: replace ^ with | in mac
+crates/core/isoloom-render/src/trunks.rs:83:16: replace ^ with & in mac
+crates/core/isoloom-render/src/trunks.rs:112:16: delete ! in switch_script
+crates/core/isoloom-render/src/trunks.rs:112:43: replace == with != in switch_script
+crates/core/isoloom-render/src/trunks.rs:171:91: replace && with || in machine_commands
+crates/core/isoloom-render/src/trunks.rs:171:51: delete ! in machine_commands
+crates/core/isoloom-render/src/trunks.rs:171:85: replace == with != in machine_commands
+crates/core/isoloom-render/src/trunks.rs:172:8: delete ! in machine_commands
+crates/core/isoloom-render/src/trunks.rs:204:62: replace && with || in vm_trunks
+crates/core/isoloom-render/src/trunks.rs:204:54: replace == with != in vm_trunks
+crates/core/isoloom-render/src/trunks.rs:204:72: replace == with != in vm_trunks
+crates/core/isoloom-render/src/trunks.rs:214:34: replace >= with < in vm_trunks
+crates/core/isoloom-render/src/hcl_builder/template.rs:62:13: delete match arm Some(Part::Text(t)) in Template::push_text
+crates/core/isoloom-render/src/hcl_builder/template.rs:63:18: replace match guard text.is_empty() with false in Template::push_text
+crates/core/isoloom-render/src/hcl_builder/template.rs:85:9: replace Template::pieces -> impl Iterator<Item = Piece<'_>> with ::std::iter::empty()
+crates/core/isoloom-render/src/hcl_builder/write.rs:73:18: replace > with < in Module::render
+crates/core/isoloom-render/src/hcl_builder/write.rs:174:37: replace match guard !items.is_empty() with true in value
+crates/core/isoloom-render/src/hcl_builder/write.rs:175:34: replace match guard !o.is_empty() with true in value
+crates/core/isoloom-render/src/hcl_builder/write.rs:176:36: replace match guard !c.args.is_empty() with true in value
+crates/core/isoloom-render/src/hcl_builder/write.rs:186:42: replace + with * in array
+crates/core/isoloom-render/src/hcl_builder/write.rs:186:42: replace + with - in array
+crates/core/isoloom-render/src/hcl_builder/write.rs:207:42: replace + with * in object
+crates/core/isoloom-render/src/playbooks/tests.rs:102:43: delete - in play
+crates/core/isoloom-render/src/secrets/windows.rs:139:5: replace command_line -> String with String::new()
+crates/core/isoloom-render/src/secrets/windows.rs:139:5: replace command_line -> String with "xyzzy".into()
+crates/core/isoloom-render/src/steps/host_folder.rs:23:25: replace == with != in linux

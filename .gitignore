@@ -1,0 +1,21 @@
+/target
+.vagrant/
+
+# Terraform working dirs (provider binaries), created by running the generated modules
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+.claude/
+
+# What `isoloom generate` and `isoloom run` write in a project folder, the examples included:
+# outputs are generated, never committed (the characterization snapshots hold the examples').
+.isoloom/
+.isoloom-*/
+
+# Python bytecode (tools/verify/runner, when run outside its image).
+__pycache__/
+
+# A `cargo mutants` report written in the tree (`cargo xtask mutants` writes under target/).
+mutants.out/
+mutants.out.old/

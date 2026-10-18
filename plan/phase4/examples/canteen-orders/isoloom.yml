@@ -1,0 +1,78 @@
+# A canteen's ordering site: nginx serves the pages and passes PHP to php-fpm, and MariaDB keeps
+# the orders. Made up for the Phase 4 design (plan/phase4/design.md); the project files it names
+# aren't included.
+#
+# Forms: every machine has both.
+# - On `docker`, `web` is nginx's official Debian 13 image with the entry's configuration on top
+#   (a thin generated build). `app` and `db` are built from Debian 13 with the same recipe their VMs
+#   run: PHP 8.4 and MariaDB 11.8 are Debian 13's own (`distro` releases).
+# - On `vagrant`, each one is a Debian 13 VM set up by its entry's recipe: in shell by default, in
+#   Ansible from the controller with `isoloom generate --configure ansible`.
+version: 1
+name: canteen-orders
+
+networks:
+  lab: { cidr: 10.61.0.0/24, internet: false }
+
+secrets:
+  db-root: { env: CANTEEN_DB_ROOT }
+  db-password: { env: CANTEEN_DB_PASSWORD }
+
+inputs: [FLAG]
+
+machines:
+  web:
+    os: debian@13
+    service: nginx@1.30            # the newest 1.30.x this Isoloom lists; resolved.json records which
+    with:
+      root: site/                  # the pages and the PHP sources: nginx checks a .php exists first
+      php_fpm: app:9000            # a machine and a port, validated and resolved to app's address
+    networks: { lab: 10 }
+    ports:
+      http: { publish: 8080 }      # the entry names its port `http`; publishing is the lab's choice
+    depends_on: [app]
+
+  app:
+    os: debian@13
+    service: php-fpm               # Debian 13's PHP: 8.4
+    with:
+      root: site/                  # the same folder, at /var/www/html, where nginx's PHP passes point
+      extensions: [mysqli, mbstring]
+      ini: php/canteen.ini         # display_errors on: part of the exercise
+      clients: [web]
+    networks: { lab: 20 }
+    files:
+      # The order form's database login. Owned by www-data (33 on Debian), the pool's user.
+      - { path: /etc/canteen/db-password, secret: db-password, uid: 33 }
+    depends_on: [db]
+
+  db:
+    os: debian@13
+    service: mariadb@11.8
+    with:
+      root_password: { secret: db-root }
+      database: canteen
+      user: canteen
+      password: { secret: db-password }   # a file at /run/isoloom/with/password, never a variable
+      init: db/schema/                    # schema.sql, then menu.sql: run once, at the first start
+    networks: { lab: 30 }
+    files:
+      - { path: /run/lab/flag, input: FLAG }   # 0400, root: only the setup script reads it
+    setup:
+      - db/store-flag.sh                  # puts /run/lab/flag into a staff-only table
+
+checks:
+  - name: the menu page answers
+    http: http://web/
+    contains: Today's menu
+    wait: 2m
+  - name: an order goes through to the database
+    script: checks/place-order.sh
+  - name: the application tier reaches the database
+    from: app
+    exec: php -r 'echo (int) (bool) @fsockopen("db", 3306);'
+    expect: "1"
+
+message: |
+  The canteen takes orders at {{ machines.web.ports.http.url }}.
+  Staff-only data lives somewhere behind it.

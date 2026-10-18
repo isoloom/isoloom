@@ -1,0 +1,84 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+expression: example(&name).unwrap().spec()
+---
+version: 1
+name: configured-app
+networks:
+  lab:
+    cidr: 10.66.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  web:
+    networks:
+      lab: 10
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: http
+        http: true
+        publish: 8086
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+  api:
+    networks:
+      lab: 20
+    os: ubuntu@24.04
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 8080
+        name: status
+        http: true
+        publish: ~
+      - port: 8081
+        name: health
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: ubuntu-24.04
+      provision: []
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - checks/web-answers.sh
+  - checks/api-answers.sh
+targets: ~

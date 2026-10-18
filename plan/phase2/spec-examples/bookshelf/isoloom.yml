@@ -1,0 +1,59 @@
+# A web front and a database, both from the catalogue: nginx serves a documentation site that
+# leaks a read-only database login, and the flag sits in a table. Made up for the syntax design
+# (plan/phase2/spec.md). It validates once the nginx and postgres entries exist (Phase 4); until
+# then `service:` is refused with "no catalogue entry yet".
+#
+# Targets: every machine target. The catalogue gives each service a container form (the official
+# image, or a build from the OS image) and a VM form (a fresh Debian VM plus the entry's role).
+version: 1
+name: bookshelf
+
+networks:
+  lab: { cidr: 10.45.0.0/24, internet: false }
+
+secrets:
+  db-password: { env: BOOKSHELF_DB_PASSWORD }
+
+inputs: [FLAG]
+
+machines:
+  docs:
+    os: debian@12
+    service: nginx                   # the entry's pinned default version
+    with:
+      root: site/                    # a project folder served at /
+    networks: { lab: 10 }
+    ports:
+      http: { publish: 8080 }        # the entry names its port `http`; publishing is the lab's choice
+    depends_on: [db]
+
+  db:
+    os: debian@12
+    service: postgres@16
+    with:
+      database: books
+      user: books
+      password: { secret: db-password }   # reaches the server as a file, never as a variable
+    networks: { lab: 20 }
+    ports:
+      postgres: { publish: true }    # a free host port, 5432 when it is free
+    files:
+      - { path: /run/lab/flag, input: FLAG }   # 0400, root: only the seed script reads it
+    setup:
+      - db/seed.sh                   # loads the books, then stores the flag from /run/lab/flag
+
+checks:
+  - name: the documentation answers
+    http: http://docs/
+    wait: 1m
+  - name: the database accepts connections
+    from: db
+    exec: pg_isready -h 127.0.0.1 -U books -d books
+    expect: accepting connections
+    wait: 2m
+  - name: the leaked login reads the books but not the users
+    script: checks/read-only-login.sh
+
+message: |
+  The documentation is at {{ machines.docs.ports.http.url }}.
+  The database listens on localhost:{{ machines.db.ports.postgres.published }}.

@@ -1,0 +1,31 @@
+crates/core/isoloom-manifest/src/lib.rs:124:9: replace Instance::get -> u8 with 0
+crates/core/isoloom-manifest/src/lib.rs:124:9: replace Instance::get -> u8 with 1
+crates/core/isoloom-manifest/src/argv.rs:145:60: replace + with * in <impl Serialize for Argv>::serialize
+crates/core/isoloom-manifest/src/lifecycle.rs:146:9: replace Retries::get -> u8 with 0
+crates/core/isoloom-manifest/src/lifecycle.rs:146:9: replace Retries::get -> u8 with 1
+crates/core/isoloom-manifest/src/list.rs:48:9: replace <impl IntoIterator for &'a NonEmpty<T>>::into_iter -> Self::IntoIter with Default::default()
+crates/core/isoloom-manifest/src/list.rs:70:9: replace <impl JsonSchema for NonEmpty<T>>::schema_name -> Cow<'static, str> with Cow::Borrowed("")
+crates/core/isoloom-manifest/src/list.rs:70:9: replace <impl JsonSchema for NonEmpty<T>>::schema_name -> Cow<'static, str> with Cow::Owned("".to_owned())
+crates/core/isoloom-manifest/src/list.rs:70:9: replace <impl JsonSchema for NonEmpty<T>>::schema_name -> Cow<'static, str> with Cow::Borrowed("xyzzy")
+crates/core/isoloom-manifest/src/list.rs:70:9: replace <impl JsonSchema for NonEmpty<T>>::schema_name -> Cow<'static, str> with Cow::Owned("xyzzy".to_owned())
+crates/core/isoloom-manifest/src/machine.rs:73:19: replace > with >= in Cidr::parse
+crates/core/isoloom-manifest/src/names.rs:180:48: replace || with && in is_pinned
+crates/core/isoloom-manifest/src/path.rs:58:9: replace RelPath::as_str -> &str with ""
+crates/core/isoloom-manifest/src/path.rs:58:9: replace RelPath::as_str -> &str with "xyzzy"
+crates/core/isoloom-manifest/src/path.rs:131:9: replace PathTemplate::template -> &Template with Box::leak(Box::new(Default::default()))
+crates/core/isoloom-manifest/src/path.rs:184:9: replace GuestPath::as_str -> &str with ""
+crates/core/isoloom-manifest/src/path.rs:184:9: replace GuestPath::as_str -> &str with "xyzzy"
+crates/core/isoloom-manifest/src/template.rs:114:9: replace Placeholder::root -> &'static str with ""
+crates/core/isoloom-manifest/src/template.rs:114:9: replace Placeholder::root -> &'static str with "xyzzy"
+crates/core/isoloom-manifest/src/template.rs:132:50: replace || with && in published
+crates/core/isoloom-manifest/src/validate.rs:64:21: delete match arm Delivery::Guest{machine, ..} in Manifest::deliveries
+crates/core/isoloom-manifest/src/validate.rs:56:21: delete match arm Delivery::Guest{during_step:Some(step), machine, ..} in Manifest::deliveries
+crates/core/isoloom-manifest/src/validate.rs:84:17: delete match arm Condition::MachinesRunning{machines} in Manifest::ready_conditions
+crates/core/isoloom-manifest/src/validate.rs:123:49: replace match guard !self.params.iter().any(|x| &x.name == name) with false in Manifest::placeholders
+crates/core/isoloom-manifest/src/validate.rs:126:50: replace match guard !self.outputs.iter().any(|x| &x.name == name) with true in Manifest::placeholders
+crates/core/isoloom-manifest/src/validate.rs:126:50: replace match guard !self.outputs.iter().any(|x| &x.name == name) with false in Manifest::placeholders
+crates/core/isoloom-manifest/src/validate.rs:132:45: replace match guard !at.starts_with("lifecycle.provision.machine[") with false in Manifest::placeholders
+crates/core/isoloom-manifest/src/validate.rs:123:85: replace == with != in Manifest::placeholders
+crates/core/isoloom-manifest/src/validate.rs:126:50: delete ! in Manifest::placeholders
+crates/core/isoloom-manifest/src/validate.rs:126:87: replace == with != in Manifest::placeholders
+crates/core/isoloom-manifest/src/validate.rs:129:72: replace && with || in Manifest::placeholders

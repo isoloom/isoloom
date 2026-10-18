@@ -1,0 +1,16 @@
+# Written by `cargo xtask catalogue refresh juice-shop` (plan/phase4/design.md §4.8), never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
+# when upstream has moved under a pin.
+refreshed: 2026-10-16
+releases:
+  17.1.0:
+    images:
+      debian@12:
+        digest: sha256:57170ba190744b9e22469d9ab5934946cd3e53e2e66b12e4c0c1019e1bea7a6b
+        platforms:
+        - amd64
+        - arm64
+        entrypoint:
+        - /nodejs/bin/node
+        command:
+        - /juice-shop/build/app.js

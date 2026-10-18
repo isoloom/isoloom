@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The php-fpm entry: PHP's FastCGI process manager, from the OS's own packages, the same in every
+# form (a Dockerfile from the Debian image, or a VM's apt install). A web machine (nginx, apache)
+# passes `.php` to it; it runs them from its own copy of the site at /var/www/html. There is no
+# official image form: the PHP image keeps its config under /usr/local/etc, the Debian package
+# under /etc/php, so building from the OS keeps the paths the same in both forms, and parity holds
+# by construction. lock.yml beside it is written only by `cargo xtask catalogue refresh php-fpm`.
+name: php-fpm
+description: >-
+  PHP's FastCGI process manager (php-fpm), from the OS's own packages: a web machine passes the
+  `.php` files of a folder to it, and it runs them.
+upstream: https://www.php.net/
+licence:
+  software: PHP-3.01
+  notes: The OS's PHP packages bundle their dependencies under those packages' own licences.
+
+# The OS's own PHP: Debian 12 ships the 8.2 series, which the recipe installs and the VM gets.
+releases:
+  - version: "8.2"
+    channel: lts
+    source: distro
+    os: [debian@12]
+default: "8.2"
+
+settings:
+  port:
+    type: port
+    default: 9000
+    description: The TCP port php-fpm listens on for FastCGI, and the number of the machine's `fastcgi` port.
+  root:
+    type: folder
+    description: >-
+      A folder of the project php-fpm runs the `.php` files of (`site/`), placed at /var/www/html,
+      where the web machine's `SCRIPT_FILENAME` points. Without it, an empty document root.
+
+ports:
+  fastcgi: { setting: port, protocol: tcp }
+
+# php-fpm's daemon: the systemd unit a VM enables, the package that ships it, and the foreground
+# form a built container's runner runs it in (the PHP image's own entrypoint is not used here).
+daemons:
+  php-fpm:
+    unit: { debian: php8.2-fpm }
+    package: { debian: php8.2-fpm }
+    # The master runs as root (it opens the log and binds the port); the pool's `user`
+    # (files/www.conf) drops the workers to www-data. `--nodaemonize` keeps it in the foreground,
+    # its access and error messages going to the container's output through the pool's logging.
+    foreground: { debian: [php-fpm8.2, --nodaemonize, --fpm-config, /etc/php/8.2/fpm/php-fpm.conf] }
+
+recipe:
+  # Skipped on an official image's form; php-fpm has none, so this always runs.
+  install:
+    # php8.2-cli gives the `php` binary the contract's probe runs; php8.2-fpm the process manager.
+    - packages: [php8.2-cli, php8.2-fpm]
+
+  configure:
+    # php-fpm's pid and socket directory, which the OS's tmpfiles would make on a VM.
+    - file: { path: /run/php, state: directory, owner: www-data, group: www-data, mode: "0755" }
+    # The default pool, listening on the TCP port in place of its Unix socket, so a web machine
+    # on the lab network can reach it.
+    - template: { from: files/www.conf, to: /etc/php/8.2/fpm/pool.d/www.conf, mode: "0644" }
+    # A folder replaces what is at /var/www/html, as a container's mount of it would.
+    - file: { path: /var/www/html, state: directory, owner: www-data, group: www-data, mode: "0755" }
+      when: { set: root }
+    - copy: { from: "{{ with.root }}/", to: /var/www/html/ }
+      when: { set: root }
+    # On a VM: enabled and started, restarted when a step above changed something. In a built
+    # container: the runner's one foreground process.
+    - service: php-fpm
+
+  # Nothing to prepare at start: php-fpm needs no secret and no first-start initialisation.
+  start: []

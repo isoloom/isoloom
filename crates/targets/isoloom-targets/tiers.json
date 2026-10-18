@@ -1,0 +1,561 @@
+{
+  "hosts": {
+    "friday": "linux",
+    "jarvis": "linux",
+    "karen": "windows",
+    "mac": "macos"
+  },
+  "entries": [
+    {
+      "entry": "docker",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "hello-stack, segmented and invoice-portal-api: up, checks, park, resume and down, through the launcher and the Isothrum runner (Docker Desktop 29.8.1)"
+        },
+        {
+          "host": "jarvis",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the Isothrum runner (Debian 13, Docker 29.9.0, Compose 5.6.0). Flag proof: each file holds the input with its owner and mode (0:0 0400 by default, 999:1000 0440 as asked), after up and after resume; the flag is in no env, container config, generated file or run state"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the Isothrum runner over SSH (Windows 11, Docker Desktop 29.8.2 on WSL 2, Compose 5.6.0; the session's Docker CLI without Docker Desktop's credential helper, which fails without a logon session). Flag proof: as on jarvis, after up and after resume"
+        }
+      ]
+    },
+    {
+      "entry": "hosted",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/virtualbox",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-16",
+          "result": "pass",
+          "note": "hello-stack up, 12 checks, down through the Isothrum runner on VirtualBox 7.2 (bento/debian-12, Docker inside); no VM or container left behind"
+        }
+      ]
+    },
+    {
+      "entry": "docker-vm/vmware_desktop",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/parallels",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/utm",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/qemu",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/libvirt",
+      "goal": 1,
+      "exists_on": [
+        "linux"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/vmware_esxi",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "docker-vm/proxmox",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/aws",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "solo-web through the Isothrum runner: up (Docker in the VM over SSH, Compose), web check, down, reap; zero AWS leftovers"
+        }
+      ]
+    },
+    {
+      "entry": "cloud-docker/azure",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/gcp",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/digitalocean",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/linode",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-docker/oci",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "kubernetes",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "hybrid",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/virtualbox",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "the full cycle through the launcher's runner path (real_vm_labs), VirtualBox 7.2.20"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-16",
+          "result": "pass",
+          "note": "configured-app (Phase 4.2's configuration renderers): every step kind through the shell library on Debian 12 and Ubuntu 24.04 (nginx from packages with a template, a user and group, files, a guarded command, the firewall, two services Isoloom defines as systemd units): up, 5/5 checks, a second and third provision changing nothing, down, through the Isothrum runner (VirtualBox 7.2)"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "bridged LAN VM on 10.0.0.101+ (public_network) through the launcher's runner path (real_vm_labs): web boots a fixed 10.0.0.101 on en0, reachable from the host (ping + curl the page), full cycle up/checks/pause+resume/shutdown+resume/provision/down, no VM left; VirtualBox 7.2.20, bento/debian-12"
+        }
+      ]
+    },
+    {
+      "entry": "vagrant/vmware_desktop",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/hyperv",
+      "goal": 1,
+      "exists_on": [
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "karen",
+          "date": "2026-10-15",
+          "result": "partial",
+          "note": "up, status and checks; park, resume and down pending"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "the full cycle through the runner (up, checks, pause and shutdown with their resumes, provision, down), Vagrant 2.4.9 on Windows 11"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up (Hyper-V relay 127.0.0.1:8080->guest:80), http 200, checks pass, pause+resume, shutdown+resume, provision, down; Get-VM clean, no VM left. Elevated-Vagrant path OK via the already-elevated branch (UAC off, so no prompt raised). Vagrant 2.4.9, solo-web, Windows 11"
+        },
+        {
+          "host": "karen",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "runner-only launcher 00425c6 re-validation: full cycle via launch::start_vm_run -> Isothrum runner (up/check/pause+resume/shutdown+resume/provision/down), Hyper-V relay 127.0.0.1:8080->guest:80, http 200, Get-VM clean, no VM left (already-elevated branch, UAC off). Vagrant 2.4.9, solo-web, Windows 11. Built with dev-link isothrum 34244d6."
+        }
+      ]
+    },
+    {
+      "entry": "vagrant/parallels",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/libvirt",
+      "goal": 1,
+      "exists_on": [
+        "linux"
+      ],
+      "runs": [
+        {
+          "host": "friday",
+          "date": "2026-10-15",
+          "result": "pass",
+          "note": "the full cycle, with Vagrant 2.4.9 and vagrant-libvirt 0.12.2 on Debian 13"
+        },
+        {
+          "host": "friday",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up, http 200, checks pass, pause+resume, shutdown+resume, provision, down; virsh clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13"
+        },
+        {
+          "host": "friday",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "runner-only launcher 00425c6 re-validation: full cycle via launch::start_vm_run -> Isothrum runner (up/check/pause+resume/shutdown+resume/provision/down), http 200, virsh + vagrant global-status clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13. Built with dev-link isothrum 34244d6."
+        }
+      ]
+    },
+    {
+      "entry": "vagrant/qemu",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/utm",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "vagrant/vmware_esxi",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "ESXi 8.0U3e with promiscuous mode on: nested DHCP and the launcher's Vagrant self-test"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "up, status, checks, park, resume and down through the Isothrum runner"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-16",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "up, status, checks, provisioning and down through the launcher (the Isothrum runner)"
+        }
+      ]
+    },
+    {
+      "entry": "proxmox",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "Proxmox VE 9.2: a generated lab applied, served, passed its check and was destroyed (Terraform in a container)"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "up, status, checks and down through the Isothrum runner and the launcher"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "partial",
+          "server": "pve-lab",
+          "note": "pve-lab VE9.2: /etc/hosts self-name PASS and full segmentation verified on real VMs (back internet:false egress cut, front->back:6379 reach kept, user->back blocked); but seal recreated the router VM (isoloom_sealed makes the nftables.conf snippet/user_data force replacement), so seal-reload raced the router reboot (banner timeout) -> run ended not_sealed and the router uplink IP changed"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "seal live-reload, no router recreate, verified ad45f56d"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "server": "pve-lab",
+          "note": "runner-only launcher 00425c6 re-validation: up/status/check/down full cycle via Isothrum runner; web+isoloom-router on vmbr1/SDN, http 200, check ok, Terraform destroyed 13 resources, node clean. Built with dev-link isothrum 34244d6 (published 0.11.1 lacks the API)."
+        }
+      ]
+    },
+    {
+      "entry": "esxi",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-15",
+          "result": "pass",
+          "server": "esxi-lab",
+          "note": "ESXi 8.0U3e: the module serves and passes its check, finished from a container"
+        },
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "partial",
+          "server": "esxi-lab",
+          "note": "static only 2026-10-17: generated hosts self-name+aliases, set-up progress ready-file and router sealed.nft all correct; NO live cycle - josenk/esxi provider is password-only but esxi-lab sshd is key-only (PasswordAuthentication no), and the esxi target emits no runner/launcher run.json; live seal reload owed"
+        }
+      ]
+    },
+    {
+      "entry": "cloud-vm/aws",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "solo-web and segmented through the Isothrum runner: up, seal, checks (segmented: no-internet-from-cache plus reachability), down, reap; zero AWS leftovers"
+        }
+      ]
+    },
+    {
+      "entry": "cloud-vm/azure",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/gcp",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/digitalocean",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/linode",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-vm/oci",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "external",
+      "goal": 2,
+      "exists_on": [
+        "linux",
+        "macos"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-services/aws",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": [
+        {
+          "host": "mac",
+          "date": "2026-10-17",
+          "result": "pass",
+          "note": "cloud-bucket (S3 site) through the Isothrum CLI: up, the site answers 200 'hello from isoloom', down; no bucket left"
+        }
+      ]
+    },
+    {
+      "entry": "cloud-services/azure",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    },
+    {
+      "entry": "cloud-services/gcp",
+      "goal": 1,
+      "exists_on": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "runs": []
+    }
+  ]
+}

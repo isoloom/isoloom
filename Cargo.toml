@@ -1,0 +1,118 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/core/*",
+  "crates/backends/*",
+  "crates/tools/*",
+  "crates/targets/*",
+  "crates/cli/*",
+  "xtask",
+]
+# The fuzz targets are a workspace of their own (nightly, libFuzzer): `cargo xtask fuzz`.
+exclude = ["fuzz"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.88"
+repository = "https://github.com/isoloom/isoloom"
+homepage = "https://www.isoloom.com"
+license = "Apache-2.0"
+# Default-deny: a crate opts in with `publish = true`. xtask and the fuzz targets stay unpublished.
+publish = false
+
+[workspace.dependencies]
+isoloom-spec = { path = "crates/core/isoloom-spec", version = "1.0.0" }
+isoloom-catalogue = { path = "crates/core/isoloom-catalogue", version = "1.0.0" }
+isoloom-plan = { path = "crates/core/isoloom-plan", version = "1.0.0" }
+isoloom-render = { path = "crates/core/isoloom-render", version = "1.0.0" }
+isoloom-compose = { path = "crates/backends/isoloom-compose", version = "1.0.0" }
+isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes", version = "1.0.0" }
+isoloom-terraform = { path = "crates/backends/isoloom-terraform", version = "1.0.0" }
+isoloom-vagrant = { path = "crates/backends/isoloom-vagrant", version = "1.0.0" }
+isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "1.0.0" }
+isoloom-targets = { path = "crates/targets/isoloom-targets", version = "1.0.0" }
+isoloom-import = { path = "crates/tools/isoloom-import", version = "1.0.0" }
+isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "1.0.0" }
+xtask-quality = { path = "crates/tools/xtask-quality" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+indexmap = { version = "2", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+schemars = { version = "1", features = ["indexmap2"] }
+# The `hcl-rs` package, by the name of its library, so `cargo machete` matches its uses.
+hcl = { package = "hcl-rs", version = "0.19" }
+thiserror = "2"
+insta = { version = "1", features = ["yaml"] }
+proptest = { version = "1", default-features = false, features = ["std"] }
+serde_path_to_error = "0.1"
+# Benchmarks (`cargo xtask bench`): the statistics only, no plots and no thread pool.
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+saphyr-parser = "0.2"
+jsonschema = { version = "0.58", default-features = false }
+# A catalogue setting's `pattern`.
+regex = "1"
+# The development tasks (xtask) only.
+toml = "1"
+tar = { version = "0.4", default-features = false }
+sha2 = "0.11"
+# The catalogue's refresh (xtask): a GPG key's fingerprint, and the gzip of package indexes.
+sha1 = "0.11"
+flate2 = "1"
+
+# Every crate inherits these (`[lints] workspace = true`): the strictest set (PLAN 1c). A lint is at
+# "deny" once its count is zero; while it isn't, it is at "warn", and `cargo xtask quality` counts
+# its warnings per crate against quality-baseline.json, where a count can only go down. An
+# exception is a local `#[expect(lint, reason = "...")]`, which the ratchet counts too; never an
+# entry here.
+[workspace.lints.rust]
+# No exception: a profile's inputs reach the tools through `Command::envs`, not `set_var`.
+unsafe_code = "forbid"
+unused = { level = "deny", priority = -1 }
+missing_docs = "deny"
+unreachable_pub = "warn"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "deny"
+missing_crate_level_docs = "deny"
+bare_urls = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -2 }
+pedantic = { level = "deny", priority = -1 }
+# Pedantic, counted until they reach zero.
+doc_markdown = "warn"
+missing_errors_doc = "warn"
+must_use_candidate = "warn"
+similar_names = "warn"
+# Limits (pedantic or nursery; thresholds in clippy.toml): functions 60 lines, 5 parameters,
+# cognitive complexity 15.
+too_many_lines = "deny"
+too_many_arguments = "deny"
+cognitive_complexity = "deny"
+fn_params_excessive_bools = "deny"
+struct_excessive_bools = "deny"
+# Exceptions carry a reason and fail once unneeded: `#[expect(lint, reason = "...")]`.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# Restriction lints (tests may unwrap, expect, panic, print and index: see clippy.toml).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "warn"
+indexing_slicing = "warn"
+string_slice = "warn"
+as_conversions = "warn"
+wildcard_imports = "deny"
+shadow_unrelated = "warn"
+let_underscore_must_use = "warn"
+clone_on_ref_ptr = "deny"
+rc_buffer = "deny"
+str_to_string = "warn"
+get_unwrap = "deny"

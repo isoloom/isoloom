@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ cloud-vm (no cloud can run it (aws: machine `ws-01`: no AWS image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); azure: machine `ws-01`: no Azure image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); gcp: machine `dc01`: Windows on GCP comes later; digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode: machine `web01` is on several networks: a Linode instance has one VPC interface; oci: Oracle Cloud cloud-vm is Linux only so far))
+
+# isoloom generate --target cloud-vm (exit 1)
+· cloud-vm: no cloud can run it (aws: machine `ws-01`: no AWS image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); azure: machine `ws-01`: no Azure image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); gcp: machine `dc01`: Windows on GCP comes later; digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode: machine `web01` is on several networks: a Linode instance has one VPC interface; oci: Oracle Cloud cloud-vm is Linux only so far)

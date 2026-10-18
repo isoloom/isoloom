@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ external (overrides.external.machines.fw: the external target reaches machines that exist already, and `fw` names no host)
+
+# isoloom generate --target external (exit 1)
+· external: overrides.external.machines.fw: the external target reaches machines that exist already, and `fw` names no host

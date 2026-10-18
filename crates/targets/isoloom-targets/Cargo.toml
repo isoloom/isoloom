@@ -1,0 +1,44 @@
+[package]
+name = "isoloom-targets"
+description = "Isoloom's targets: the registry of backends, the targets made of two, refusals, the resolved snapshot and its reports, the tiers and the capability matrix."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-targets"
+keywords = ["isoloom", "targets", "iac", "matrix"]
+categories = ["config"]
+# tiers.json and src/matrix/probes.yml are embedded, so they stay; tests/ and benches/ go.
+exclude = ["tests/", "benches/"]
+publish = true
+
+[dependencies]
+isoloom-spec.workspace = true
+isoloom-plan.workspace = true
+isoloom-render.workspace = true
+isoloom-compose.workspace = true
+isoloom-kubernetes.workspace = true
+isoloom-terraform.workspace = true
+isoloom-vagrant.workspace = true
+isoloom-ansible.workspace = true
+isoloom-manifest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
+jsonschema.workspace = true
+criterion.workspace = true
+
+# The hot paths of generation, measured by `cargo xtask bench` (criterion, its own main).
+[[bench]]
+name = "pipeline"
+harness = false
+
+[lints]
+workspace = true

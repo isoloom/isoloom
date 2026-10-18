@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Two machines on a network with no internet and nothing published: on Docker, an internal
+# network; on VMs, outbound connections blocked once the machines are provisioned. VMs use
+# 192.168.62.0/24 as written; Docker uses the block `overrides.docker` names for it.
+version: 1
+name: air-gapped
+
+networks:
+  lab: { cidr: 192.168.62.0/24, internet: false }
+
+machines:
+  # Each machine is a published image on containers, and a Debian VM its steps set up the same
+  # way (the catalogue's `service: redis` and `service: nginx` replace both in Phase 4).
+  store:
+    os: debian@12
+    networks: { lab: 20 }
+    ports: { redis: 6379 }
+    app:
+      image: "redis:7-alpine"
+      steps: [{ run: provision/store.sh }]
+
+  app:
+    os: debian@12
+    networks: { lab: 10 }
+    ports: { web: { port: 80, protocol: http } }
+    depends_on: [store]
+    app:
+      image: "nginx:1.27-alpine"
+      steps: [{ run: provision/app.sh }]
+
+overrides:
+  docker:
+    networks:
+      lab: { cidr: 10.62.0.0/24 }   # Docker keeps out of 192.168.0.0/16

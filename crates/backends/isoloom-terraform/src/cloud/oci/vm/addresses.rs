@@ -1,0 +1,60 @@
+//! A machine's several addresses on one network (`lan: [10, 11]`) on Oracle Cloud: each further
+//! address is a secondary private IP (`oci_core_private_ip`) of the machine's VNIC on that
+//! network, which the VCN then delivers to it; the instance's own set-up puts it on the
+//! interface. The first VNIC is created with the instance, so its id is looked up by its
+//! primary address; a VNIC attached after has its id from the attachment.
+
+use std::net::Ipv4Addr;
+
+use isoloom_plan::MachinePlan;
+use isoloom_render::hcl_builder::{Block, Expression, Module, attr, index, list, reference, string};
+
+use crate::cloud::instance::name_with;
+use crate::module::ident;
+
+/// The secondary private IPs of machine `name`, and the lookup of its first VNIC when they are on
+/// it.
+pub(super) fn blocks((name, mp): (&str, &MachinePlan), m: &mut Module) {
+    let id = ident(name);
+    let first = mp.addresses.first();
+    for (net, more) in &mp.more_addresses {
+        let nic = format!("{id}_{}", ident(net));
+        let vnic = if let Some((_, address)) = first.filter(|(n, _)| *n == net) {
+            m.block(first_vnic(name, (net, *address), &nic));
+            attr(index(reference(&format!("data.oci_core_private_ips.{nic}_first.private_ips")), 0), "vnic_id")
+        } else {
+            reference(&format!("oci_core_vnic_attachment.{nic}.vnic_id"))
+        };
+        for address in more {
+            m.block(private_ip(
+                &format!("{nic}_{}", address.octets()[3]),
+                vnic.clone(),
+                &address.to_string(),
+                &format!("-{name}-{net}"),
+            ));
+        }
+    }
+}
+
+/// The lookup of the instance's first VNIC, by its address there (on `net`), once the instance
+/// exists.
+fn first_vnic(name: &str, (net, address): (&str, Ipv4Addr), nic: &str) -> Block {
+    Block::builder("data")
+        .add_label("oci_core_private_ips")
+        .add_label(format!("{nic}_first"))
+        .add_attribute(("ip_address", string(address.to_string())))
+        .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", ident(net)))))
+        .add_attribute(("depends_on", list([reference(&format!("oci_core_instance.{}", ident(name)))])))
+        .build()
+}
+
+/// One secondary private IP on `vnic`, at `address`.
+fn private_ip(id: &str, vnic: Expression, address: &str, display: &str) -> Block {
+    Block::builder("resource")
+        .add_label("oci_core_private_ip")
+        .add_label(id)
+        .add_attribute(("vnic_id", vnic))
+        .add_attribute(("ip_address", string(address)))
+        .add_attribute(("display_name", name_with(display)))
+        .build()
+}

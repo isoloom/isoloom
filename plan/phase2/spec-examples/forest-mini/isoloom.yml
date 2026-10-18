@@ -1,0 +1,92 @@
+# A small Windows domain, GOAD-style: bare Windows VMs that the environment's own Ansible playbook
+# turns into a forest, run from Isoloom's Linux controller, plus a Linux station the user works
+# from. Made up for the syntax design (plan/phase2/spec.md); the playbooks and scripts it names
+# aren't part of the example.
+#
+# Targets: the VM ones (vagrant, proxmox, esxi, cloud-vm). Windows has no container form in 1.0,
+# so the container targets refuse the lab.
+version: 1
+name: forest-mini
+
+networks:
+  corp: { cidr: 10.56.10.0/24, internet: false }
+
+inputs: [FLAG_USER, FLAG_ADMIN]
+
+groups:
+  windows:
+    members: [dc01, srv01, ws01]
+    resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
+  servers:
+    members: [dc01, srv01]
+
+machines:
+  dc01:
+    os: windows-server@2019          # a bare VM: the playbook makes it the domain controller
+    networks: { corp: 10 }
+    ports: { dns: 53, kerberos: 88, ldap: 389, smb: 445, winrm: 5985 }
+    files:
+      - { path: 'C:\Users\Administrator\Desktop\flag.txt', input: FLAG_ADMIN }
+
+  srv01:
+    os: windows-server@2019
+    networks: { corp: 20 }
+    ports:
+      intranet: { port: 80, protocol: http }
+      mssql: 1433
+    depends_on: [dc01]
+    app:
+      steps:
+        - run: provision/iis.ps1     # installs IIS and the intranet site
+
+  ws01:
+    os: windows@10
+    networks: { corp: 30 }
+    depends_on: [dc01]
+    files:
+      - { path: 'C:\Users\Public\flag.txt', input: FLAG_USER }   # the playbook lets domain users read it
+
+  station:
+    os: ubuntu@24.04
+    access: true                     # where the user lands
+    networks: { corp: 100 }
+    dns: { servers: [dc01], search: [forest.test] }
+    app:
+      steps:
+        - packages: [smbclient, ldap-utils, krb5-user]
+
+provision:
+  - ansible: ansible/site.yml        # run from Isoloom's Linux controller once every machine is up
+    requirements: ansible/requirements.yml
+    inventory: [ansible/lab.ini]
+    groups:
+      dcs: [dc01]
+      members: [srv01, ws01]
+    vars:
+      domain: forest.test
+      netbios: FOREST
+
+controller:
+  resources: { memory_mb: 1024 }
+
+checks:
+  - name: the domain controller answers LDAP
+    tcp: dc01:389
+    wait: 15m
+  - name: the intranet answers
+    http: http://srv01/
+    expect: any
+    wait: 20m
+  - checks/members-joined.yml        # a playbook check, run from the controller
+  - name: the station resolves the domain controller
+    from: station
+    exec: getent hosts dc01.forest.test
+    expect: 10.56.10.10
+
+overrides:
+  vagrant:
+    machines:
+      servers:                       # the group: both Windows Server machines boot this box
+        box: example/windows-server-2019-eval
+        box_version: "1.2.0"
+        winrm: ssl                   # this box answers WinRM over HTTPS only

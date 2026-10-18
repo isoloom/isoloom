@@ -1,0 +1,40 @@
+# cargo-mutants (`cargo xtask mutants`, PLAN 3d): mutation testing of the core crates.
+#
+# Every mutant that survives is killed by a new test, unless no test can tell it apart from the
+# original (an equivalent mutant): then it is listed here, matched by the name `cargo mutants
+# --list` shows, with the reason it is equivalent. Nothing else goes here.
+exclude_re = [
+    # A machine's address is its block's network part with the octet in the last byte, which the
+    # mask leaves zero: `|` and `^` give the same address for every block and octet.
+    'isoloom-plan/src/addressing\.rs:\d+:\d+: replace \| with \^ in address$',
+    # A non-empty list's schema is inlined (`inline_schema` is true), so its name is never written
+    # into the schema: any name gives the same schema.
+    'isoloom-manifest/src/list\.rs:\d+:\d+: replace <impl JsonSchema for NonEmpty<T>>::schema_name ',
+    # A file mode's and the spec version's schemas are inlined too: their names are never written.
+    'isoloom-spec/src/syntax/(files|names)\.rs:\d+:\d+: replace <impl JsonSchema for (Mode|Version)>::schema_name ',
+    # The catalogue's names, versions and patterns are inlined the same way.
+    'isoloom-catalogue/src/(names|version|entry/setting)\.rs:\d+:\d+: replace <impl JsonSchema for (Name<K>|Version|Pattern)>::schema_name ',
+    # `common: ~` reads as no shared fields: the body already is `Ok(Group::default())`.
+    'isoloom-spec/src/syntax/shared\.rs:\d+:\d+: replace <impl Visitor<.de> for Fields>::visit_unit -> Result<Group, E> with Ok\(Default::default\(\)\)$',
+    # Bits put together where they can't overlap, so `|` and `^` agree: base64's sextets (each
+    # term masked or shifted clear of the other), an IPv4 host (the block's low byte is cleared
+    # first), an IPv6 host and gateway (a parsed /64 has no host bits) and the interface id (each
+    # decimal digit in its own nibble).
+    'isoloom-spec/src/shell\.rs:\d+:\d+: replace \| with \^ in base64$',
+    'isoloom-spec/src/validate/cidr\.rs:\d+:\d+: replace \| with \^ in Cidr::host$',
+    'isoloom-spec/src/validate/cidr6\.rs:\d+:\d+: replace \| with \^ in (Cidr6::host|Cidr6::gateway|interface_id)$',
+]
+
+# Lints capped while mutants build: the workspace denies `unused`, so a mutant that replaces a
+# function's body (its arguments then unused) wouldn't compile and would count as unviable, never
+# tested. Capped, it builds and its tests must catch it.
+cap_lints = true
+
+# A test run slower than this is a timeout (a loop the mutant made endless), however fast the
+# unmutated run was: a busy machine (each mutant recompiles its doctests) doesn't turn a slow
+# run into a false timeout.
+minimum_test_timeout = 300
+
+# The copies each mutant is built in leave out what git ignores: build folders, and the fuzz
+# corpora a running `cargo xtask fuzz` is still writing.
+gitignore = true

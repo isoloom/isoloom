@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ cloud-docker (environment-level provisioning (`provision:`) runs on VM targets for now)
+
+# isoloom generate --target cloud-docker (exit 1)
+· cloud-docker: environment-level provisioning (`provision:`) runs on VM targets for now

@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "lifecycle.up[0].argv[0]: `/usr/local/bin/docker` isn't a bare tool name: write the tool's name alone (`docker`); the runner finds it on PATH",
+  "schema": true
+}

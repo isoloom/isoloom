@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A hybrid environment: a Windows file server (a VM, it has no container form) next to an
+# intranet web app (a container), on one network. The `hybrid` target runs each the light way;
+# `vagrant` and the other VM targets run both as VMs. The checks reach both from the inside.
+# The file server has a TPM: on `cloud-vm`, AWS refuses it and Azure runs it (trusted launch).
+version: 1
+name: mixed-office
+
+networks:
+  office: { cidr: 192.168.58.0/24 }
+
+machines:
+  files01:
+    os: windows-server@2019
+    networks: { office: 10 }
+    ports: { smb: 445 }
+    resources: { cpus: 2, memory_mb: 3072 }
+    hardware:
+      tpm: required   # a TPM 2.0 (for BitLocker): AWS has no Windows image for it yet, Azure does
+    app:
+      steps: [{ run: provision/share.ps1 }]
+
+  intranet:
+    os: debian@12
+    networks: { office: 20 }
+    ports: { web: { port: 80, protocol: http, publish: 8083 } }
+    app:
+      image: nginx:1.27
+      steps: [{ run: provision/intranet.sh }]
+
+checks:
+  - checks/both-answer.sh

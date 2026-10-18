@@ -1,0 +1,22 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✓ hosted
+
+# isoloom generate --target hosted (exit 0)
+✓ .isoloom/docker/compose.yml
+✓ .isoloom/docker/checks/host-a.sh
+✓ .isoloom/docker/appliances/vios/base.cfg
+✓ .isoloom/docker/appliances/csr/base.cfg
+✓ .isoloom/resolved.json
+
+## .isoloom/docker/appliances/csr/base.cfg: identical in the `docker` snapshot
+
+## .isoloom/docker/appliances/vios/base.cfg: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/host-a.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/compose.yml: identical in the `docker` snapshot
+
+## .isoloom/resolved.json: identical in the `docker` snapshot
