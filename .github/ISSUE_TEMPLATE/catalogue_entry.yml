@@ -1,0 +1,53 @@
+name: Catalogue entry request
+description: A service you'd like Isoloom to know how to set up.
+labels: [catalogue]
+body:
+  - type: input
+    id: service
+    attributes:
+      label: Service
+      description: Its name and home page.
+      placeholder: PostgreSQL, https://www.postgresql.org
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: The versions worth supporting, and which one first.
+      placeholder: 16 and 17, 17 first
+    validations:
+      required: true
+  - type: checkboxes
+    id: families
+    attributes:
+      label: OS families
+      description: Where it should run as a VM. As a container it uses the image below.
+      options:
+        - label: Debian and Ubuntu
+        - label: RHEL family (Rocky, AlmaLinux, CentOS)
+        - label: Fedora
+        - label: Windows
+  - type: input
+    id: image
+    attributes:
+      label: Container image
+      description: The official image, if there is one.
+      placeholder: docker.io/library/postgres
+  - type: textarea
+    id: ansible
+    attributes:
+      label: Official Ansible content
+      description: A collection or role published by the project or its vendor, if any, with a link.
+      placeholder: community.postgresql (https://galaxy.ansible.com/ui/repo/published/community/postgresql/)
+  - type: textarea
+    id: ports
+    attributes:
+      label: Ports and checks
+      description: The ports it listens on, and how to tell that it works (a TCP port, an HTTP answer, a command).
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to write this entry myself.

@@ -1,0 +1,20 @@
+refreshed: 2026-10-16
+keys:
+  https://example.org/key.asc:
+    fingerprint: 0123456789ABCDEF0123456789ABCDEF01234567
+    sha256: "2222222222222222222222222222222222222222222222222222222222222222"
+releases:
+  2.4.1:
+    images:
+      debian@13:
+        digest: sha256:3333333333333333333333333333333333333333333333333333333333333333
+        platforms: [amd64]
+        entrypoint: [/entry.sh]
+        command: [demo]
+    packages:
+      debian@12: { demo: 2.4.1-1~bookworm }
+      debian@13: { demo: 2.4.1-1~trixie }
+      rocky@9: { demo: 2.4.1-1.el9 }
+  2.5.0:
+    packages:
+      debian@12: { demo: 2.5.0-1~bookworm }

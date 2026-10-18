@@ -1,0 +1,5 @@
+{
+  "code": "unknown_machine",
+  "message": "machines[1].of: no machine `db` in this manifest",
+  "schema": false
+}

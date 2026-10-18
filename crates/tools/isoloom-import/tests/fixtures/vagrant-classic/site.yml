@@ -1,0 +1,3 @@
+# The playbook the fixture Vagrantfile runs on every machine.
+- hosts: all
+  tasks: []

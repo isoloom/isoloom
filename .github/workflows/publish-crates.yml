@@ -1,0 +1,73 @@
+name: Publish crates
+
+# Publishes the Isoloom crates to crates.io with crates.io Trusted Publishing: the job mints a
+# short-lived token over OIDC at run time (no long-lived secret is stored). Triggered by a release
+# tag `vX.Y.Z` (the same tag release.yml uses for the CLI binaries) or run by hand. It publishes
+# in dependency order and skips any crate whose version is already on crates.io, so re-running
+# after a partial failure is safe.
+#
+# Setup (per crate, done once by the maintainer): add a Trusted Publisher on crates.io for the
+# crate, pointing at repository `isoloom/isoloom`, this workflow file (`publish-crates.yml`) and
+# the `crates-io` environment. A brand-new crate name must be created by one manual `cargo publish`
+# first (trusted publishing cannot create a crate that does not exist). See PUBLISHING.md.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      # Required for crates.io Trusted Publishing (OIDC); no CARGO_REGISTRY_TOKEN secret is used.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+
+      # Mints a short-lived crates.io token over OIDC and exports it for the publish step.
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - name: Publish in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Leaf crates first: every crate's dependencies are published before it.
+          crates=(
+            isoloom-spec
+            isoloom-manifest
+            isoloom-catalogue
+            isoloom-plan
+            isoloom-render
+            isoloom-compose
+            isoloom-kubernetes
+            isoloom-terraform
+            isoloom-vagrant
+            isoloom-ansible
+            isoloom-targets
+            isoloom-import
+            isoloom
+          )
+          version="$(cargo metadata --format-version 1 --no-deps \
+            | jq -r '.packages[] | select(.name=="isoloom-spec") | .version')"
+          echo "Publishing Isoloom crates at version ${version}"
+          for crate in "${crates[@]}"; do
+            if curl -sf -A "isoloom-publish-workflow" \
+                "https://crates.io/api/v1/crates/${crate}/${version}" >/dev/null; then
+              echo "::notice::${crate} ${version} is already on crates.io, skipping"
+              continue
+            fi
+            echo "::group::Publishing ${crate} ${version}"
+            cargo publish -p "${crate}"
+            echo "::endgroup::"
+          done

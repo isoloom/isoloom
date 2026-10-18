@@ -1,0 +1,31 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✓ hosted
+
+# isoloom generate --target hosted (exit 0)
+✓ .isoloom/docker/compose.yml
+✓ .isoloom/docker/checks/files.sh
+✓ .isoloom/docker/checks/staff.sh
+✓ .isoloom/docker/checks/guest.sh
+✓ .isoloom/docker/appliances/sw1/base.txt
+✓ .isoloom/docker/appliances/sw1/NETMAP
+✓ .isoloom/docker/appliances/sw1/iouyap.ini
+✓ .isoloom/resolved.json
+
+## .isoloom/docker/appliances/sw1/NETMAP: identical in the `docker` snapshot
+
+## .isoloom/docker/appliances/sw1/base.txt: identical in the `docker` snapshot
+
+## .isoloom/docker/appliances/sw1/iouyap.ini: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/files.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/guest.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/staff.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/compose.yml: identical in the `docker` snapshot
+
+## .isoloom/resolved.json: identical in the `docker` snapshot

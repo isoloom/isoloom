@@ -1,0 +1,22 @@
+# The internal app as a VM: the same small API as the container, on port 8080.
+- hosts: all
+  become: true
+  tasks:
+    - name: The API's files
+      ansible.builtin.copy: { src: "{{ playbook_dir }}/../build/app/www/", dest: /srv/app/, mode: "0644" }
+    - name: Its service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/pivot-app.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=The pivot-dmz app
+          After=network-online.target
+
+          [Service]
+          ExecStart=/usr/bin/python3 -m http.server 8080 --directory /srv/app
+
+          [Install]
+          WantedBy=multi-user.target
+    - name: Started at boot
+      ansible.builtin.systemd: { name: pivot-app, state: started, enabled: true, daemon_reload: true }

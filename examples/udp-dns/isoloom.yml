@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A DNS server on its own network, as a container or a VM: it answers over UDP (queries) and
+# TCP (large answers, zone transfers). The client's network may reach it on port 53 only, and
+# `reach` opens that port for both protocols. Nothing waits on UDP (it has no handshake) and no
+# derived check probes it: the client's own check resolves a name through it.
+version: 1
+name: udp-dns
+
+networks:
+  servers: { cidr: 10.66.10.0/24, internet: false }
+  users:   { cidr: 10.66.20.0/24, internet: false }
+
+reach:
+  - { from: users, to: servers, ports: [53] }
+
+machines:
+  dns:
+    os: debian@12
+    networks: { servers: 53 }
+    # One port number over both protocols: two ports, each with its own name.
+    ports:
+      dns-udp: { port: 53, protocol: udp, publish: 10053 }
+      dns: 53
+    app:
+      build: build/dns
+      steps: [{ run: provision/dns.sh }]
+
+  # Where the user stands: Debian with nslookup and dig, built the same way as a container or
+  # a VM.
+  client:
+    os: debian@12
+    access: true
+    networks: { users: 10 }
+    depends_on: [dns]
+    app:
+      steps: [{ run: provision/client.sh }]
+
+checks:
+  - checks/resolve.sh
+
+message: |
+  The DNS server answers at {{ machines.dns.addresses.servers }}:53 (UDP and TCP), and on
+  127.0.0.1:{{ machines.dns.ports.dns-udp.published }}/udp from this machine:
+  dig @127.0.0.1 -p {{ machines.dns.ports.dns-udp.published }} www.lab.test

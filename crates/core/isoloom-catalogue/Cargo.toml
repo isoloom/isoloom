@@ -1,0 +1,34 @@
+[package]
+name = "isoloom-catalogue"
+description = "Isoloom's service catalogue: the entries of catalogue/, embedded, checked, and resolved for a machine's service and settings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-catalogue"
+keywords = ["isoloom", "catalogue", "services", "iac"]
+categories = ["config"]
+# tests/ only: the `catalogue` symlink (the embedded catalogue data) must stay in the package.
+exclude = ["tests/"]
+publish = true
+build = "build.rs"
+
+[dependencies]
+isoloom-spec.workspace = true
+indexmap.workspace = true
+regex.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+jsonschema.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

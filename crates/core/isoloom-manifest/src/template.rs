@@ -1,0 +1,395 @@
+//! Templates: strings holding `${root.path}` placeholders the runner fills at run time (`$$` is a
+//! literal `$`). A template is parsed into its parts, so an unknown root, a lone `$` or a
+//! `${secrets.…}` can't be held at all.
+
+use std::borrow::Cow;
+use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
+
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::names::{EnvName, Name, PortName, SnakeName};
+use crate::{Error, Result};
+
+/// A value the runner knows about the run itself (`${run.…}`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum RunVar {
+    /// The run's name (`${run.name}`): the embedder's, else the lab's name.
+    Name,
+    /// The manifest's folder, absolute (`${run.dir}`).
+    Dir,
+    /// The run's private folder (`${run.state_dir}`).
+    StateDir,
+    /// The Vagrant provider the run uses (`${run.provider}`).
+    Provider,
+    /// The runner's SSH key (`${run.ssh_key}`).
+    SshKey,
+    /// The run's own `known_hosts` (`${run.known_hosts}`).
+    KnownHosts,
+    /// The public half of the runner's SSH key, one line (`${run.ssh_public_key}`).
+    SshPublicKey,
+    /// The run's slot on its server, 1 to 99 (`${run.slot}`): the lowest no other run on the same
+    /// place holds, kept for the run's life, so two runs on one server never share names.
+    Slot,
+}
+
+impl RunVar {
+    const ALL: [RunVar; 8] = [
+        RunVar::Name,
+        RunVar::Dir,
+        RunVar::StateDir,
+        RunVar::Provider,
+        RunVar::SshKey,
+        RunVar::KnownHosts,
+        RunVar::SshPublicKey,
+        RunVar::Slot,
+    ];
+
+    /// The path after `run.`.
+    #[must_use]
+    pub fn key(self) -> &'static str {
+        match self {
+            RunVar::Name => "name",
+            RunVar::Dir => "dir",
+            RunVar::StateDir => "state_dir",
+            RunVar::Provider => "provider",
+            RunVar::SshKey => "ssh_key",
+            RunVar::KnownHosts => "known_hosts",
+            RunVar::SshPublicKey => "ssh_public_key",
+            RunVar::Slot => "slot",
+        }
+    }
+}
+
+/// One `${…}` placeholder.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Placeholder {
+    /// `${run.…}`.
+    Run(RunVar),
+    /// `${params.NAME}`: a param's value.
+    Param(EnvName),
+    /// `${outputs.name}`: an output, once it can be read.
+    Output(SnakeName),
+    /// `${published.<machine>.<port>}`: the host port a machine's port, by its name, got.
+    Published {
+        /// The machine.
+        machine: Name,
+        /// The port's name.
+        port: PortName,
+    },
+    /// `${host.<machine>}`: where the machine's published ports answer, as the driver reports it
+    /// (this computer's loopback when they are forwarded to it; the machine's own address on a
+    /// provider that forwards nothing, ESXi).
+    Host(Name),
+    /// `${machine}`: the machine of a `lifecycle.provision.machine` step.
+    Machine,
+    /// `${value}`: an output's raw value, in its `format`.
+    Value,
+}
+
+impl Placeholder {
+    /// Reads what is between `${` and `}` (`template` is the whole text, for the error).
+    fn parse(inner: &str, template: &str) -> Result<Placeholder> {
+        let trimmed = inner.trim();
+        if trimmed == "secrets" || trimmed.starts_with("secrets.") {
+            return Err(Error::SecretPlaceholder { template: template.to_owned() });
+        }
+        let unknown = || Error::UnknownPlaceholder {
+            template: template.to_owned(),
+            placeholder: inner.to_owned(),
+        };
+        if let Some(key) = inner.strip_prefix("run.") {
+            return RunVar::ALL.into_iter().find(|v| v.key() == key).map(Placeholder::Run).ok_or_else(unknown);
+        }
+        if let Some(name) = inner.strip_prefix("params.") {
+            return EnvName::parse(name).map(Placeholder::Param).map_err(|_| unknown());
+        }
+        if let Some(name) = inner.strip_prefix("outputs.") {
+            return SnakeName::parse(name).map(Placeholder::Output).map_err(|_| unknown());
+        }
+        if let Some(rest) = inner.strip_prefix("published.") {
+            return published(rest).ok_or_else(unknown);
+        }
+        if let Some(machine) = inner.strip_prefix("host.") {
+            return Name::parse(machine).map(Placeholder::Host).map_err(|_| unknown());
+        }
+        match inner {
+            "machine" => Ok(Placeholder::Machine),
+            "value" => Ok(Placeholder::Value),
+            _ => Err(unknown()),
+        }
+    }
+
+    /// The root, as validation names it (`run`, `params`, `machine`).
+    #[must_use]
+    pub fn root(&self) -> &'static str {
+        match self {
+            Placeholder::Run(_) => "run",
+            Placeholder::Param(_) => "params",
+            Placeholder::Output(_) => "outputs",
+            Placeholder::Published { .. } => "published",
+            Placeholder::Host(_) => "host",
+            Placeholder::Machine => "machine",
+            Placeholder::Value => "value",
+        }
+    }
+}
+
+/// `<machine>.<port>`, after `published.`: a port's name has no dot.
+fn published(rest: &str) -> Option<Placeholder> {
+    let (machine, port) = rest.rsplit_once('.')?;
+    Some(Placeholder::Published {
+        machine: Name::parse(machine).ok()?,
+        port: PortName::parse(port).ok()?,
+    })
+}
+
+impl Display for Placeholder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Placeholder::Run(v) => write!(f, "run.{}", v.key()),
+            Placeholder::Param(n) => write!(f, "params.{n}"),
+            Placeholder::Output(n) => write!(f, "outputs.{n}"),
+            Placeholder::Published { machine, port } => write!(f, "published.{machine}.{port}"),
+            Placeholder::Host(machine) => write!(f, "host.{machine}"),
+            Placeholder::Machine => f.write_str("machine"),
+            Placeholder::Value => f.write_str("value"),
+        }
+    }
+}
+
+/// A piece of a template: literal text (unescaped), or a placeholder.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Part {
+    /// Text, as it reads once filled (a `$` here is written `$$`).
+    Text(String),
+    /// A placeholder.
+    Placeholder(Placeholder),
+}
+
+/// A string that may hold `${placeholder}`s (`$$` is a literal `$`). There is no `secrets.`
+/// root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a
+/// command line.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Template {
+    /// Never two texts in a row, never an empty text: one spelling, one value.
+    parts: Vec<Part>,
+}
+
+impl Template {
+    /// The template written as `text`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::LoneDollar`] for a `$` that starts no placeholder (a literal one is
+    /// `$$`), [`Error::UnclosedPlaceholder`] for a `${` without its `}`,
+    /// [`Error::SecretPlaceholder`] for `${secrets.…}`, and
+    /// [`Error::UnknownPlaceholder`] for a root or a name outside the grammar.
+    pub fn parse(text: &str) -> Result<Template> {
+        let mut parts = Vec::new();
+        let mut literal = String::new();
+        let mut rest = text;
+        while let Some((before, after)) = rest.split_once('$') {
+            literal.push_str(before);
+            if let Some(next) = after.strip_prefix('$') {
+                literal.push('$');
+                rest = next;
+                continue;
+            }
+            let Some(open) = after.strip_prefix('{') else {
+                return Err(Error::LoneDollar { template: text.to_owned() });
+            };
+            let Some((inner, next)) = open.split_once('}') else {
+                return Err(Error::UnclosedPlaceholder { template: text.to_owned() });
+            };
+            parts.push(Part::Text(std::mem::take(&mut literal)));
+            parts.push(Part::Placeholder(Placeholder::parse(inner, text)?));
+            rest = next;
+        }
+        literal.push_str(rest);
+        parts.push(Part::Text(literal));
+        Ok(Template::from_parts(parts))
+    }
+
+    /// Literal text, with no placeholder.
+    #[must_use]
+    pub fn text(text: &str) -> Template {
+        Template::from_parts(vec![Part::Text(text.to_owned())])
+    }
+
+    /// The template of `parts`, in order.
+    pub fn from_parts(parts: impl IntoIterator<Item = Part>) -> Template {
+        let mut out: Vec<Part> = Vec::new();
+        for part in parts {
+            match (out.last_mut(), part) {
+                (_, Part::Text(t)) if t.is_empty() => {}
+                (Some(Part::Text(last)), Part::Text(t)) => last.push_str(&t),
+                (_, p) => out.push(p),
+            }
+        }
+        Template { parts: out }
+    }
+
+    /// Its parts, in order.
+    #[must_use]
+    pub fn parts(&self) -> &[Part] {
+        &self.parts
+    }
+
+    /// Its placeholders, in order.
+    pub fn placeholders(&self) -> impl Iterator<Item = &Placeholder> {
+        self.parts.iter().filter_map(|p| match p {
+            Part::Placeholder(p) => Some(p),
+            Part::Text(_) => None,
+        })
+    }
+}
+
+impl FromStr for Template {
+    type Err = Error;
+
+    fn from_str(text: &str) -> Result<Template> {
+        Template::parse(text)
+    }
+}
+
+impl From<Placeholder> for Template {
+    fn from(p: Placeholder) -> Template {
+        Template {
+            parts: vec![Part::Placeholder(p)],
+        }
+    }
+}
+
+impl Display for Template {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for part in &self.parts {
+            match part {
+                Part::Text(t) => f.write_str(&t.replace('$', "$$"))?,
+                Part::Placeholder(p) => write!(f, "${{{p}}}")?,
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Serialize for Template {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for Template {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Template, D::Error> {
+        Template::parse(&String::deserialize(d)?).map_err(serde::de::Error::custom)
+    }
+}
+
+/// The template grammar as a regular expression: literal text, `$$`, and the known placeholders.
+pub(crate) fn grammar() -> String {
+    let roots = [
+        "run\\.(?:name|dir|state_dir|provider|ssh_key|known_hosts|ssh_public_key|slot)",
+        "params\\.[A-Za-z_][A-Za-z0-9_]*",
+        "outputs\\.[a-z][a-z0-9_]*",
+        "published\\.[A-Za-z0-9][A-Za-z0-9_.-]*\\.[a-z][a-z0-9-]{0,30}",
+        "host\\.[A-Za-z0-9][A-Za-z0-9_.-]*",
+        "machine",
+        "value",
+    ];
+    format!("^(?:[^$]|\\$\\$|\\$\\{{(?:{})\\}})*$", roots.join("|"))
+}
+
+impl JsonSchema for Template {
+    fn schema_name() -> Cow<'static, str> {
+        "Template".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        json_schema!({
+            "description": "A string that may hold `${placeholder}`s (`$$` is a literal `$`). Roots: `run.name`, `run.dir` (the manifest's folder), `run.state_dir`, `run.provider`, `run.ssh_key`, `run.known_hosts`, `run.ssh_public_key`, `run.slot` (the run's slot on its server, 1 to 99), `params.<NAME>`, `outputs.<name>`, `published.<machine>.<port>` (a port by its name), `host.<machine>` (where the machine's published ports answer, as the driver reports it), `machine` (a per-machine step), `value` (an output's own `format`). There is no `secrets.` root: a secret reaches a tool only through its slot's delivery, so no value ever sits on a command line.",
+            "type": "string",
+            "pattern": grammar(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn round_trip(text: &str) -> Template {
+        let t = Template::parse(text).unwrap();
+        assert_eq!(t.to_string(), text);
+        t
+    }
+
+    #[test]
+    fn placeholders_and_text_are_told_apart() {
+        let t = round_trip("${run.state_dir}/ports.yml");
+        assert_eq!(
+            t.parts(),
+            [Part::Placeholder(Placeholder::Run(RunVar::StateDir)), Part::Text("/ports.yml".into())]
+        );
+        let two = round_trip("http://localhost:${published.web.site}/ and ${published.dns.dns-udp}");
+        assert_eq!(two.placeholders().count(), 2);
+        round_trip("{{.ServerVersion}}");
+        round_trip("costs $$5");
+    }
+
+    #[test]
+    fn secrets_are_refused_whatever_the_spacing() {
+        for text in ["${secrets.FLAG}", "a ${ secrets.x } b", "${secrets}"] {
+            assert_eq!(Template::parse(text).unwrap_err().code(), "secret_placeholder", "{text}");
+        }
+    }
+
+    #[test]
+    fn malformed_templates_say_why() {
+        assert_eq!(Template::parse("$5").unwrap_err().code(), "lone_dollar");
+        assert_eq!(Template::parse("${run.name").unwrap_err().code(), "unclosed_placeholder");
+        for unknown in [
+            "${run.title}",
+            "${env.HOME}",
+            "${published.web}",
+            "${published.web.-x}",
+            "${outputs.Web}",
+            "${host}",
+            "${host.}",
+            "${host.-web}",
+        ] {
+            assert_eq!(Template::parse(unknown).unwrap_err().code(), "unknown_placeholder", "{unknown}");
+        }
+    }
+
+    #[test]
+    fn a_placeholder_is_written_from_its_root() {
+        for (text, root) in [
+            ("${run.known_hosts}", "run"),
+            ("${params.REGION}", "params"),
+            ("${outputs.web_site}", "outputs"),
+            ("${published.web.site}", "published"),
+            ("${host.web}", "host"),
+            ("${machine}", "machine"),
+            ("${value}", "value"),
+        ] {
+            assert_eq!(round_trip(text).placeholders().next().map(Placeholder::root), Some(root), "{text}");
+        }
+        assert_eq!(RunVar::SshKey.key(), "ssh_key");
+    }
+
+    #[test]
+    fn a_template_is_built_from_text_or_a_placeholder() {
+        assert_eq!(Template::text("a $ b").to_string(), "a $$ b");
+        assert_eq!(Template::from(Placeholder::Machine).to_string(), "${machine}");
+        assert_eq!(Template::from(Placeholder::Run(RunVar::Dir)).parts().len(), 1);
+        assert_eq!("${machine}/x".parse::<Template>(), Template::parse("${machine}/x"));
+    }
+
+    #[test]
+    fn parts_are_kept_in_one_spelling() {
+        let built = Template::from_parts([Part::Text("a".into()), Part::Text(String::new()), Part::Text("$b".into())]);
+        assert_eq!(built, Template::parse("a$$b").unwrap());
+        assert_eq!(built.to_string(), "a$$b");
+    }
+}

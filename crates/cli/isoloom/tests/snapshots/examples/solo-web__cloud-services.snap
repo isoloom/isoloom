@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ cloud-services (needs `cloud:` (cloud services instead of machines))
+
+# isoloom generate --target cloud-services (exit 1)
+· cloud-services: not possible for this spec (see `isoloom targets`)

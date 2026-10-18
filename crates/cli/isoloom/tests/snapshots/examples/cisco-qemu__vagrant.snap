@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ vagrant (machines.vios.app.appliance: an appliance's packaging exists only as a container)
+
+# isoloom generate --target vagrant (exit 1)
+· vagrant: machines.vios.app.appliance: an appliance's packaging exists only as a container

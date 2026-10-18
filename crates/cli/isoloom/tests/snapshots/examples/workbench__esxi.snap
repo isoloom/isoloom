@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ esxi (machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM)
+
+# isoloom generate --target esxi (exit 1)
+· esxi: machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM

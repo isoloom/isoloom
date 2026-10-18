@@ -1,0 +1,13 @@
+# Joins the workstations to corp.example, dc01 as their DNS server, with dc01's administrator.
+- hosts: domain:!dc01
+  gather_facts: false
+  tasks:
+    - name: dc01 answers their DNS queries
+      ansible.windows.win_dns_client: { adapter_names: "*", dns_servers: ["{{ hostvars['dc01']['ansible_host'] }}"] }
+    - name: Members of corp.example
+      microsoft.ad.membership:
+        dns_domain_name: corp.example
+        domain_admin_user: "{{ hostvars['dc01']['ansible_user'] }}@corp.example"
+        domain_admin_password: "{{ hostvars['dc01']['ansible_password'] }}"
+        state: domain
+        reboot: true

@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "lifecycle.up[0].argv[9]: `price: $5`: a `$` that starts no placeholder; write `$$` for a literal `$`",
+  "schema": true
+}

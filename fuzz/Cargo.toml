@@ -1,0 +1,66 @@
+# The fuzz targets (cargo-fuzz, PLAN 3d), run by `cargo xtask fuzz`. A workspace of its own: they
+# build with nightly and libFuzzer, which the main workspace's gates (stable, three platforms)
+# don't. Each crash a run finds becomes a regression test in the crate it belongs to.
+[package]
+name = "isoloom-fuzz"
+description = "Isoloom's fuzz targets: the spec parser, the spec pipeline (lowering and validation), the run manifest parser and the quoting helpers."
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+# The inputs each target starts from (folders, relative to this one), besides its own corpus.
+[package.metadata.seeds]
+spec_syntax = ["../plan/phase2/spec-examples", "../examples"]
+spec_model = ["../plan/phase2/spec-examples", "../examples"]
+manifest = ["../crates/core/isoloom-manifest/fixtures", "../plan/phase2/examples"]
+quoting = []
+
+[dependencies]
+libfuzzer-sys = "0.4"
+isoloom-spec = { path = "../crates/core/isoloom-spec" }
+isoloom-plan = { path = "../crates/core/isoloom-plan" }
+isoloom-render = { path = "../crates/core/isoloom-render" }
+isoloom-manifest = { path = "../crates/core/isoloom-manifest" }
+
+[lints.rust]
+missing_docs = "deny"
+unused = { level = "deny", priority = -1 }
+
+[lints.clippy]
+all = { level = "deny", priority = -2 }
+pedantic = { level = "deny", priority = -1 }
+
+[[bin]]
+name = "spec_syntax"
+path = "fuzz_targets/spec_syntax.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "spec_model"
+path = "fuzz_targets/spec_model.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "manifest"
+path = "fuzz_targets/manifest.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "quoting"
+path = "fuzz_targets/quoting.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

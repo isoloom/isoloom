@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A small Active Directory domain: VM targets only (Windows has no container form).
+version: 1
+name: corp-ad-basics
+
+networks:
+  dmz: { cidr: 10.40.10.0/24 }
+  corp: { cidr: 10.40.20.0/24 }
+  access: { cidr: 10.40.99.0/24 }
+
+reach:
+  - { from: access, to: dmz }
+  - { from: dmz, to: corp }
+
+# Shared fields: every Windows box gets the same size through its group, and the group is an
+# Ansible inventory group for the domain playbooks.
+groups:
+  domain:
+    members: [dc01, ws]      # ws means both workstations
+    resources: { cpus: 2, memory_mb: 4096, disk_gb: 60 }
+
+machines:
+  dc01:
+    os: windows-server@2022
+    networks: { corp: 5 }
+    ports: { dns: 53, kerberos: 88, ldap: 389, smb: 445 }
+  ws:
+    os: windows@11
+    count: 2                   # ws-01 and ws-02, at .21 and .22
+    networks: { corp: 21 }
+    depends_on: [dc01]
+  web01:
+    os: debian@12
+    networks: { dmz: 10, corp: 10 }
+    ports: { web: 80 }
+    app:
+      build: build/web01                         # the container form: its own Dockerfile
+      steps: [{ playbook: provision/web01.yml }] # the VM form: its playbook
+  user:
+    access: true
+    networks: { access: 10 }
+
+# The domain is set up from Isoloom's Ansible controller, which reaches the Windows machines over
+# WinRM (a Windows machine's own steps are PowerShell scripts): each playbook picks its hosts.
+provision:
+  - ansible: provision/ad-domain.yml   # promotes dc01
+  - ansible: provision/ad-join.yml     # joins the workstations
+  - ansible: provision/ws.yml
+
+checks:
+  - checks/domain-up.sh
+  - name: web01 reaches the directory on dc01
+    from: web01                          # from web01 itself: its own route to dc01
+    script: checks/web01-reaches-dc01.sh

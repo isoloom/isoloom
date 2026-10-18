@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ docker-vm (machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own)
+
+# isoloom generate --target docker-vm (exit 1)
+· docker-vm: machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own

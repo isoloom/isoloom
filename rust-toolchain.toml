@@ -1,0 +1,7 @@
+# The toolchain every host builds Isoloom with (rustup installs it on first use). The two extra
+# targets are the full gate's cross-platform clippy legs (`cargo xtask check-all`).
+[toolchain]
+channel = "1.99.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]

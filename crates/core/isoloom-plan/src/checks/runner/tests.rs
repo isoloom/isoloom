@@ -1,0 +1,386 @@
+use isoloom_spec::probe::Url;
+use proptest::prelude::*;
+
+use super::super::{HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
+use super::{Host, Line, Render, looks_expanded, parse_line, script, single_quoted, with_directives};
+
+/// Text a tool may print before a runner's line: anything without the runner's marker.
+fn prefix() -> impl Strategy<Value = String> {
+    "[ -~]{0,12}".prop_filter("no marker", |p| !p.contains("isoloom-check: "))
+}
+
+/// A check's name: printable, no `: ` (a FAIL line's separator), nothing trailing to trim.
+fn name() -> impl Strategy<Value = String> {
+    "[!-~]([ -~]{0,20}[!-~])?".prop_filter("no separator", |n| !n.contains(": "))
+}
+
+proptest! {
+    #[test]
+    fn a_pass_line_reads_back_its_name(before in prefix(), n in name()) {
+        prop_assert_eq!(parse_line(&format!("{before}isoloom-check: PASS {n}  ")), Some(Line::Pass(n)));
+    }
+
+    #[test]
+    fn a_fail_line_reads_back_its_name_and_why(before in prefix(), n in name(), why in "[ -~]{0,30}") {
+        let expected = Line::Fail(n.clone(), why.trim_end().to_owned());
+        prop_assert_eq!(parse_line(&format!("{before}isoloom-check: FAIL {n}: {why}")), Some(expected));
+    }
+
+    #[test]
+    fn an_end_line_reads_back_its_counts(before in prefix(), passed in any::<u32>(), failed in any::<u32>()) {
+        let line = format!("{before}isoloom-check: END {passed} passed, {failed} failed");
+        prop_assert_eq!(parse_line(&line), Some(Line::End(passed, failed)));
+    }
+
+    #[test]
+    fn a_line_without_the_marker_is_none(line in prefix()) {
+        prop_assert_eq!(parse_line(&line), None);
+    }
+
+    #[test]
+    fn a_quoted_text_is_read_back_whole(text in "\\PC{0,30}") {
+        prop_assert_eq!(single_quoted(&isoloom_spec::shell::quote(&text)).join("'"), text);
+    }
+
+    #[test]
+    fn any_line_reads_without_a_panic(line in "\\PC{0,60}") {
+        let _line = parse_line(&line);
+    }
+}
+
+#[test]
+fn single_quoted_parts_are_read_as_sh_reads_them() {
+    let exec = r"_exec 'sh -c '\''echo $x'\''' 'ok'";
+    assert_eq!(single_quoted(exec), ["sh -c ", "echo $x", "", "ok"]);
+    assert_eq!(single_quoted(r#"fail 'n' "it's $out" \'$y"#), ["n"], "double quotes and escapes hold none");
+    assert_eq!(single_quoted("echo 'unclosed $x"), ["unclosed $x"]);
+}
+
+#[test]
+fn what_shellcheck_reads_as_an_expansion_is_found() {
+    for text in ["$x", "a ${b}", "$(c)", "$1", "`d`", "x``y`z`"] {
+        assert!(looks_expanded(text), "{text}");
+    }
+    for text in ["%s", "$", "a $ b", "``", "one ` only", "$-x"] {
+        assert!(!looks_expanded(text), "{text}");
+    }
+}
+
+#[test]
+fn a_line_quoting_an_expansion_gets_its_directive_and_others_none() {
+    let lines = "if _retry 0 _exec 'echo $HOME' ''; then pass 'n'; fi\n  pass 'plain'\n";
+    assert_eq!(with_directives(lines), format!("{DIRECTIVE}{lines}"));
+    let indented = with_directives("  pass '`id`'\n");
+    assert_eq!(indented, format!("  {DIRECTIVE}  pass '`id`'\n"));
+}
+
+/// The line before a check that single-quotes what looks like an expansion.
+const DIRECTIVE: &str = "# shellcheck disable=SC2016 # the check's own text, quoted as written\n";
+
+#[test]
+fn a_fail_line_without_a_reason_has_an_empty_one() {
+    assert_eq!(parse_line("isoloom-check: FAIL web"), Some(Line::Fail("web".into(), String::new())));
+    assert_eq!(parse_line("isoloom-check: END 3 passed"), None);
+    assert_eq!(parse_line("isoloom-check: SKIP web"), None);
+}
+
+/// A machine's host as `<name>.<network>`, a literal as written.
+fn host(h: &Host, _: &Position) -> String {
+    match h {
+        Host::Machine { name, network } => format!("{name}.{network}"),
+        Host::Literal(l) => l.clone(),
+    }
+}
+
+fn run_script(path: &str) -> String {
+    format!("cd /opt/isoloom && sh {path}")
+}
+
+fn run_playbook(path: &str) -> String {
+    format!("ansible-playbook {path}")
+}
+
+/// The runner of `checks` from `user`, the targets that run playbooks (`playbooks`) or not.
+fn runner(checks: &[Resolved], playbooks: bool) -> String {
+    let playbook: &dyn Fn(&str) -> String = &run_playbook;
+    let r = Render {
+        host: &host,
+        script: &run_script,
+        playbook: playbooks.then_some(playbook),
+    };
+    script(&Position::Machine("user".into()), &checks.iter().collect::<Vec<_>>(), &r)
+}
+
+/// One check named `n`, written by the author, waiting `wait` seconds.
+fn check(n: &str, wait: u32, probe: Probe) -> Resolved {
+    Resolved {
+        name: n.into(),
+        position: Position::Machine("user".into()),
+        probe,
+        wait,
+        derived: false,
+    }
+}
+
+fn http(url: &str, expect: HttpExpect, request: HttpRequest) -> Probe {
+    Probe::Http {
+        url: Url::parse(url).expect("the test's URL parses"),
+        expect,
+        request,
+    }
+}
+
+fn tcp(expect: TcpExpect, exchange: TcpExchange) -> Probe {
+    Probe::Tcp {
+        host: Host::Machine {
+            name: "db".into(),
+            network: "lan".into(),
+        },
+        port: 5432,
+        expect,
+        exchange,
+    }
+}
+
+/// The lines of check `c` in its runner: between the helpers and the summary.
+fn lines(c: Resolved) -> String {
+    let all = runner(&[c], true);
+    let after = all.split_once(super::RUNTIME).map_or("", |(_, rest)| rest);
+    after
+        .strip_prefix('\n')
+        .and_then(|rest| rest.split_once("\necho \"isoloom-check: END"))
+        .map(|(check, _)| check.to_owned())
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_runner_reports_each_check_and_fails_when_one_failed() {
+    let mut derived = check("db:5432 from user", 30, tcp(TcpExpect::Open, TcpExchange::default()));
+    derived.derived = true;
+    let sh = runner(&[check("checks/a.sh", 0, Probe::Script { path: "checks/a.sh".into() }), derived], true);
+    assert!(sh.starts_with("#!/bin/sh\n# Generated by isoloom from isoloom.yml."), "{sh}");
+    assert!(sh.contains("# The environment's checks, from user. `isothrum check` runs it"), "{sh}");
+    assert!(sh.contains(super::RUNTIME));
+    assert!(
+        sh.contains("if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then\nif _retry 30 _tcp 'db.lan' 5432;"),
+        "{sh}"
+    );
+    assert_eq!(sh.matches("ISOLOOM_DERIVED").count(), 1, "only the derived check: {sh}");
+    assert!(
+        sh.ends_with("\necho \"isoloom-check: END $passed passed, $failed failed\"\n[ \"$failed\" -eq 0 ]\n"),
+        "{sh}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_runner_with_every_kind_of_check_is_valid_sh() {
+    let checks = [
+        check("a", 30, http("http://web/x?$y", HttpExpect::Status(200), HttpRequest::default())),
+        check("b", 0, http("https://web:8443/", HttpExpect::Blocked, HttpRequest::default())),
+        check(
+            "c",
+            30,
+            http(
+                "http://web/",
+                HttpExpect::Any,
+                HttpRequest {
+                    method: Some("post".into()),
+                    body: Some("it's".into()),
+                    ..HttpRequest::default()
+                },
+            ),
+        ),
+        check(
+            "d",
+            30,
+            tcp(
+                TcpExpect::Open,
+                TcpExchange {
+                    send: Some("PING".into()),
+                    contains: Some("PONG".into()),
+                },
+            ),
+        ),
+        check(
+            "e",
+            0,
+            Probe::Exec {
+                command: "id -u".into(),
+                expect: Some("0".into()),
+            },
+        ),
+        check("f", 0, Probe::Playbook { path: "checks/f.yml".into() }),
+    ];
+    let sh = runner(&checks, false);
+    let out = std::process::Command::new("sh").arg("-n").arg("-c").arg(&sh).output().expect("sh runs");
+    assert!(out.status.success(), "{}\n{sh}", String::from_utf8_lossy(&out.stderr));
+}
+
+#[test]
+fn an_http_check_compares_the_status_says_what_came_and_follows_when_asked() {
+    let plain = lines(check("site", 30, http("http://web/a$b", HttpExpect::Status(200), HttpRequest::default())));
+    // `$b` single-quoted reads as an expansion to shellcheck: the line says it is meant.
+    assert_eq!(
+        plain,
+        DIRECTIVE.to_owned()
+            + "if _retry 30 _http_is 'http://web/a$b' 200; then pass 'site'; else fail 'site' \"expected HTTP 200 from http://web/a\\$b, got $(_http 'http://web/a$b')\"; fi\n"
+    );
+    let follow = HttpRequest {
+        follow: true,
+        ..HttpRequest::default()
+    };
+    let followed = lines(check("site", 30, http("http://web/", HttpExpect::Status(302), follow)));
+    assert!(
+        followed.contains("_http_is 'http://web/' 302 follow;") && followed.contains("(after redirects), got $(_http 'http://web/' follow)"),
+        "{followed}"
+    );
+    let any = lines(check("any", 30, http("http://web/", HttpExpect::Any, HttpRequest::default())));
+    assert_eq!(
+        any,
+        "if _retry 30 _http_any 'http://web/'; then pass 'any'; else fail 'any' \"nothing answers at http://web/\"; fi\n"
+    );
+    let blocked = lines(check(
+        "no",
+        0,
+        http(
+            "http://web/",
+            HttpExpect::Blocked,
+            HttpRequest {
+                method: Some("post".into()),
+                ..HttpRequest::default()
+            },
+        ),
+    ));
+    assert_eq!(
+        blocked,
+        "c=$(_http 'http://web/'); if [ \"$c\" = 000 ]; then pass 'no'; else fail 'no' \"http://web/ answered (HTTP $c); it should be blocked\"; fi\n"
+    );
+}
+
+#[test]
+fn a_request_sends_its_method_headers_and_body_with_curl() {
+    let request = |method: Option<&str>, body: Option<&str>, follow: bool| HttpRequest {
+        method: method.map(Into::into),
+        headers: vec![("X-A".into(), "1 2".into())],
+        body: body.map(Into::into),
+        contains: Some("ok".into()),
+        follow,
+    };
+    let req = |expect, r| lines(check("r", 30, http("http://web/", expect, r)));
+    assert_eq!(
+        req(HttpExpect::Status(201), request(Some("put"), Some("x"), false)),
+        "if _retry 30 _req 201 'ok' -X 'PUT' -H 'X-A: 1 2' --data-binary 'x' 'http://web/'; then pass 'r'; else fail 'r' \"$out\"; fi\n"
+    );
+    assert!(req(HttpExpect::Any, request(Some("post"), None, true)).contains("_req any 'ok' -L --max-redirs 5 -d '' -H 'X-A: 1 2' 'http://web/'"));
+    assert!(
+        req(HttpExpect::Any, request(Some("post"), Some("x"), true)).contains("_req any 'ok' -L --max-redirs 5 -H 'X-A: 1 2' --data-binary 'x' 'http://web/'")
+    );
+    assert!(req(HttpExpect::Any, request(Some("head"), None, true)).contains("-L --max-redirs 5 -I -H"));
+    assert!(req(HttpExpect::Any, request(Some("post"), None, false)).contains("_req any 'ok' -X 'POST' -H"));
+    assert!(req(HttpExpect::Any, request(None, None, false)).contains("_req any 'ok' -H 'X-A: 1 2' 'http://web/'"));
+}
+
+#[test]
+fn a_tcp_check_connects_or_reads_back_and_a_blocked_one_must_not_connect() {
+    assert_eq!(
+        lines(check("db", 30, tcp(TcpExpect::Open, TcpExchange::default()))),
+        "if _retry 30 _tcp 'db.lan' 5432; then pass 'db'; else fail 'db' \"nothing listens at db.lan:5432\"; fi\n"
+    );
+    assert_eq!(
+        lines(check(
+            "db",
+            0,
+            tcp(
+                TcpExpect::Blocked,
+                TcpExchange {
+                    send: None,
+                    contains: Some("x".into())
+                }
+            )
+        )),
+        "if _tcp 'db.lan' 5432; then fail 'db' \"db.lan:5432 answered; it should be blocked\"; else pass 'db'; fi\n"
+    );
+    assert_eq!(
+        lines(check(
+            "db",
+            30,
+            tcp(
+                TcpExpect::Open,
+                TcpExchange {
+                    send: Some("PING".into()),
+                    contains: Some("PONG".into())
+                }
+            )
+        )),
+        "if _retry 30 _tcp_read 'db.lan' 5432 'PING' 'PONG'; then pass 'db'; else fail 'db' \"$out\"; fi\n"
+    );
+    assert!(
+        lines(check(
+            "db",
+            30,
+            tcp(
+                TcpExpect::Open,
+                TcpExchange {
+                    send: None,
+                    contains: Some("+OK".into())
+                }
+            )
+        ))
+        .contains("_tcp_read 'db.lan' 5432 '' '+OK';")
+    );
+}
+
+#[test]
+fn exec_scripts_and_playbooks_run_where_the_target_says() {
+    assert_eq!(
+        lines(check(
+            "uid",
+            0,
+            Probe::Exec {
+                command: "id -u".into(),
+                expect: Some("0".into())
+            }
+        )),
+        "if _retry 0 _exec 'id -u' '0'; then pass 'uid'; else fail 'uid' \"$(printf '%s' \"$out\" | tail -n 1)\"; fi\n"
+    );
+    assert!(
+        lines(check(
+            "ok",
+            0,
+            Probe::Exec {
+                command: "true".into(),
+                expect: None
+            }
+        ))
+        .contains("_exec 'true' '';")
+    );
+    assert_eq!(
+        lines(check("checks/a.sh", 10, Probe::Script { path: "checks/a.sh".into() })),
+        "echo '== checks/a.sh'\nif _retry 10 sh -c 'cd /opt/isoloom && sh checks/a.sh'; then pass 'checks/a.sh'; else fail 'checks/a.sh' \"checks/a.sh exited non-zero\"; fi\n"
+    );
+    let playbook = check("checks/b.yml", 0, Probe::Playbook { path: "checks/b.yml".into() });
+    assert!(
+        lines(playbook.clone())
+            .contains("sh -c 'ansible-playbook checks/b.yml'; then pass 'checks/b.yml'; else fail 'checks/b.yml' \"checks/b.yml failed\"; fi\n")
+    );
+    let nowhere = runner(&[playbook], false);
+    assert!(
+        nowhere.contains("\nfail 'checks/b.yml' \"Ansible checks don't run from this position\"\n"),
+        "{nowhere}"
+    );
+}
+
+#[test]
+fn a_head_request_is_curls_own_only_when_following_redirects() {
+    let head = |follow: bool| {
+        let request = HttpRequest {
+            method: Some("head".into()),
+            follow,
+            ..HttpRequest::default()
+        };
+        lines(check("h", 30, http("http://web/", HttpExpect::Status(200), request)))
+    };
+    assert!(head(false).contains("_req 200 '' -X 'HEAD' 'http://web/'"), "{}", head(false));
+    assert!(head(true).contains("_req 200 '' -L --max-redirs 5 -I 'http://web/'"), "{}", head(true));
+}

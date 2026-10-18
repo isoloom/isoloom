@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ proxmox (networks with a `gateway` machine on Proxmox come later)
+
+# isoloom generate --target proxmox (exit 1)
+· proxmox: networks with a `gateway` machine on Proxmox come later

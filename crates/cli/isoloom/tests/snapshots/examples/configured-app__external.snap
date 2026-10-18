@@ -1,0 +1,8 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ external (overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host)
+
+# isoloom generate --target external (exit 1)
+· external: overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host

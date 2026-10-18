@@ -1,0 +1,151 @@
+---
+source: crates/core/isoloom-catalogue/tests/catalogue/embedded.rs
+expression: "format!(\"{:#?}\\n{:#?}\\n{:#?}\\n{:#?}\", r.install, r.configure, r.start,\nr.files)"
+---
+[
+    Repository(
+        Repository {
+            name: RepositoryName(
+                "nginx",
+            ),
+            url: HttpsUrl(
+                "https://nginx.org/packages/debian",
+            ),
+            key: RepositoryKey {
+                url: HttpsUrl(
+                    "https://nginx.org/keys/nginx_signing.key",
+                ),
+                sha256: Sha256(
+                    "55385da31d198fa6a5012d40ae98ecb272a6c4e8fffffba94719ffd3e87de37a",
+                ),
+            },
+            suite: None,
+            components: Some(
+                [
+                    AptWord(
+                        "nginx",
+                    ),
+                ],
+            ),
+            priority: Some(
+                900,
+            ),
+        },
+    ),
+    Packages(
+        [
+            Package {
+                name: PackageName(
+                    "nginx",
+                ),
+                version: Some(
+                    PackageVersion(
+                        "1.30.6-1~bookworm",
+                    ),
+                ),
+            },
+        ],
+    ),
+]
+[
+    Template(
+        Template {
+            from: ProjectPath(
+                ".isoloom/catalogue/nginx/files/default.conf",
+            ),
+            to: AbsPath(
+                "/etc/nginx/conf.d/default.conf",
+            ),
+            owner: None,
+            group: None,
+            mode: Some(
+                Mode(
+                    420,
+                ),
+            ),
+        },
+    ),
+    File(
+        FileStep {
+            path: AbsPath(
+                "/etc/nginx/isoloom.d",
+            ),
+            state: Directory,
+            owner: None,
+            group: None,
+            mode: Some(
+                Mode(
+                    493,
+                ),
+            ),
+        },
+    ),
+    Template(
+        Template {
+            from: ProjectPath(
+                ".isoloom/catalogue/nginx/files/php.conf",
+            ),
+            to: AbsPath(
+                "/etc/nginx/isoloom.d/php.conf",
+            ),
+            owner: None,
+            group: None,
+            mode: Some(
+                Mode(
+                    420,
+                ),
+            ),
+        },
+    ),
+    File(
+        FileStep {
+            path: AbsPath(
+                "/usr/share/nginx/html",
+            ),
+            state: Absent,
+            owner: None,
+            group: None,
+            mode: None,
+        },
+    ),
+    Copy(
+        Copy {
+            from: ProjectPath(
+                "site/",
+            ),
+            to: AbsPath(
+                "/usr/share/nginx/html/",
+            ),
+            owner: None,
+            mode: None,
+        },
+    ),
+    Firewall(
+        Firewall {
+            allow: [
+                Named(
+                    PortName(
+                        "http",
+                    ),
+                ),
+            ],
+        },
+    ),
+    Service(
+        Unit {
+            name: UnitName(
+                "nginx",
+            ),
+            enabled: true,
+        },
+    ),
+]
+[]
+{
+    ProjectPath(
+        ".isoloom/catalogue/nginx/files/default.conf",
+    ): "# SPDX-License-Identifier: Apache-2.0\n# Written by Isoloom from the catalogue's nginx entry, the same in every form. Isoloom fills in\n# its placeholders when it generates; nginx's own $variables stay as they are.\n# `with: { config: <file> }` puts a server block of your own in this file's place.\nserver {\n    listen      80;\n    server_name _;\n    root        /usr/share/nginx/html;\n    index       index.html index.htm index.php;\n\n    location / {\n        try_files $uri $uri/ =404;\n    }\n\n    # PHP through a php-fpm machine, when `with.php_fpm` is set (files/php.conf).\n    include /etc/nginx/isoloom.d/*.conf;\n}\n",
+    ProjectPath(
+        ".isoloom/catalogue/nginx/files/php.conf",
+    ): "# SPDX-License-Identifier: Apache-2.0\n# Written by Isoloom from the catalogue's nginx entry when `with.php_fpm` is set. The php-fpm\n# machine keeps its own copy of the site at /var/www/html (the php-fpm entry's `root`), so the\n# script's path is the one it has there. `fastcgi_pass` is that machine's address and port.\nlocation ~ \\.php$ {\n    try_files     $uri =404;\n    fastcgi_pass  {{ machines.fpm.addresses.lab }}:9000;\n    fastcgi_index index.php;\n    include       fastcgi_params;\n    fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;\n}\n",
+}

@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ docker-vm (machines.files01.os: Windows has no container form in 1.0)
+
+# isoloom generate --target docker-vm (exit 1)
+· docker-vm: machines.files01.os: Windows has no container form in 1.0

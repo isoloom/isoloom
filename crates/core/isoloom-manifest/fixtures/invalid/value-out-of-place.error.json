@@ -1,0 +1,5 @@
+{
+  "code": "placeholder_out_of_place",
+  "message": "environment.message: `${value}` is bound only in an output's `format`",
+  "schema": false
+}

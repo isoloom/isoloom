@@ -1,0 +1,83 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: air-gapped
+networks:
+  lab:
+    cidr: 192.168.62.0/24
+    internet: false
+    gateway: ~
+    docker:
+      cidr: 10.62.0.0/24
+reach: []
+inputs: []
+machines:
+  store:
+    networks:
+      lab: 20
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 6379
+        name: redis
+        http: false
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "redis:7-alpine"
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/store.sh
+      image: ~
+  app:
+    networks:
+      lab: 10
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: web
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on:
+      - store
+    volumes: {}
+    access: false
+    docker:
+      image: "nginx:1.27-alpine"
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/app.sh
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks: []
+targets: ~

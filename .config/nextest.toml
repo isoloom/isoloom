@@ -1,0 +1,10 @@
+# cargo-nextest, the test runner (`cargo xtask test`, PLAN 3d): each test runs in its own process.
+
+[profile.default]
+# A flaky test fails loudly: nothing is retried.
+retries = 0
+# Every test runs, so one failure doesn't hide another.
+fail-fast = false
+# A test still running after 30 s is reported as slow, and listed again in the summary.
+slow-timeout = { period = "30s" }
+final-status-level = "slow"

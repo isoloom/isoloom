@@ -1,0 +1,30 @@
+[package]
+name = "isoloom-terraform"
+description = "The Terraform backends of Isoloom (Proxmox, ESXi, cloud VMs, cloud Docker, cloud services)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-terraform"
+keywords = ["isoloom", "terraform", "iac", "hcl"]
+categories = ["config"]
+exclude = ["tests/"]
+publish = true
+
+[dependencies]
+isoloom-spec.workspace = true
+isoloom-plan.workspace = true
+isoloom-render.workspace = true
+isoloom-manifest.workspace = true
+serde_json.workspace = true
+indexmap.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

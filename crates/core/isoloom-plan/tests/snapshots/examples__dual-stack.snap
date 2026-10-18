@@ -1,0 +1,97 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: dual-stack
+networks:
+  front:
+    cidr: 10.67.10.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+    ipv6:
+      cidr: "fd00:67:10::/64"
+  back:
+    cidr: 10.67.20.0/24
+    internet: false
+    gateway: ~
+    docker: ~
+    ipv6:
+      cidr: "fd00:67:20::/64"
+reach:
+  - from: front
+    to: back
+    ports:
+      - 80
+inputs: []
+machines:
+  web:
+    networks:
+      back: 10
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: web
+        http: true
+        publish: ~
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker:
+      image: "nginx:1.27-alpine"
+      build: ~
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+  user:
+    networks:
+      front: 10
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes: {}
+    access: true
+    docker:
+      image: "debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858"
+      build: ~
+      init: []
+      idle: true
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the web page answers over IPv6 through the router
+    from: user
+    http: "http://[fd00:67:20::10]/"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 200
+    wait: 60
+targets: ~

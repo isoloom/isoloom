@@ -1,0 +1,32 @@
+[package]
+name = "isoloom-spec"
+description = "The Isoloom spec: model, parsing, normalization and validation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-spec"
+keywords = ["isoloom", "infrastructure", "iac", "spec", "network"]
+categories = ["config", "parser-implementations"]
+exclude = ["tests/"]
+publish = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_yaml_ng.workspace = true
+indexmap.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+saphyr-parser.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
+jsonschema = { version = "0.58", default-features = false }
+
+[lints]
+workspace = true

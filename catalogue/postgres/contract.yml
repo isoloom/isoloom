@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What postgres does, proven on the container form (the official image). `cargo xtask catalogue
+# check postgres` builds a small lab (`web`, an access machine `probe`) and runs it on `docker`
+# through the Isothrum CLI.
+cases:
+  default:
+    with: { password: "pg-secret" }
+
+checks:
+  - name: the port answers
+    tcp: "{{ machine }}:5432"
+    wait: 2m
+  - name: postgres reports the release asked for
+    exec: psql -U "{{ with.user }}" -d "{{ with.database }}" -tAc 'select version()'
+    expect: "PostgreSQL {{ version }}"
+  - name: the server is ready for connections
+    exec: pg_isready -q && echo READY
+    expect: READY
+  - name: the application database exists
+    exec: psql -U "{{ with.user }}" -d "{{ with.database }}" -tAc 'select 1'
+    expect: "1"
+
+# Equal in both forms, or the case fails.
+facts:
+  - name: the server version
+    exec: postgres --version

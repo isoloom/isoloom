@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ hosted (environment-level provisioning (`provision:`) runs on VM targets for now)
+
+# isoloom generate --target hosted (exit 1)
+· hosted: environment-level provisioning (`provision:`) runs on VM targets for now

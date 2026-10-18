@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "identity.compose.files[0]: `../compose.yml` goes up with `..`: a path stays inside the folder it is relative to",
+  "schema": true
+}

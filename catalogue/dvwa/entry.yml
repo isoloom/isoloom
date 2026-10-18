@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The dvwa entry: Damn Vulnerable Web Application, a deliberately insecure PHP/MySQL app for CTF
+# and training, delivered as a prebuilt image on Docker Hub (there is no package or VM install
+# form; the image bundles Apache and MySQL). lock.yml beside it is written only by
+# `cargo xtask catalogue refresh dvwa`, which pins the image's digest.
+name: dvwa
+description: >-
+  Damn Vulnerable Web Application (DVWA), a deliberately insecure PHP/MySQL web application for
+  security training and CTF labs, run from a prebuilt image.
+upstream: https://github.com/digininja/DVWA
+licence:
+  software: GPL-3.0-only
+  notes: The image bundles Apache, PHP and MySQL under their own licences.
+
+# DVWA ships as a prebuilt image; the `1.9` tag is pinned by digest in lock.yml.
+releases:
+  - version: "1.9"
+    source: download
+    os: [debian@12]
+default: "1.9"
+
+# The image on Docker Hub, pinned by digest in lock.yml. It bundles its own Apache/PHP/MySQL; the
+# machine's `os:` is nominal.
+images:
+  debian@12: docker.io/vulnerables/web-dvwa:{{ version }}
+
+ports:
+  http: { port: 80, protocol: http }
+
+recipe: {}

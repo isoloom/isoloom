@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Machines that already exist: two VMs someone built by hand on a home lab, reached over SSH at
+# the addresses `overrides.external` gives. Isoloom creates nothing on that target: it provisions
+# them, runs the checks from each, and reaches them. Networks and `reach` describe what the lab's
+# own switches and firewall should allow, which the derived checks verify. The machines' OS and
+# steps are the same spec's on the other targets, so it also builds the lab from scratch.
+version: 1
+name: existing-hosts
+
+networks:
+  lab: { cidr: 192.168.1.0/24 }
+
+machines:
+  web:
+    os: debian@12
+    networks: { lab: 20 }
+    ports: { web: { port: 80, protocol: http } }
+    app:
+      steps: [{ run: provision/web.sh }]
+  cache:
+    os: debian@12
+    networks: { lab: 21 }
+    # Kernel-level access (it changes a kernel boot option).
+    privileged: true
+    ports: { redis: 6379 }
+    app:
+      # A kernel boot option, the restart that applies it, then Redis.
+      steps: [{ run: provision/cache-boot.sh }, reboot, { run: provision/cache.sh }]
+
+overrides:
+  external:
+    machines:
+      web: { ssh: { address: 192.168.1.20, user: florian, key: ~/.ssh/id_ed25519 } }
+      cache: { ssh: { address: 192.168.1.21, user: florian, key: ~/.ssh/id_ed25519 } }
+
+checks:
+  - name: the cache came back with transparent hugepages off
+    from: cache
+    exec: cat /sys/kernel/mm/transparent_hugepage/enabled
+    expect: "[never]"

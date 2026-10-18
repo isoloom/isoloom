@@ -1,0 +1,14 @@
+# A second made-up entry, smaller: a machine may run it beside `demo` on a VM.
+name: mini
+description: A made-up service with one setting, for the catalogue's own tests.
+upstream: https://example.org/
+licence: { software: MIT }
+releases:
+  - { version: "1.0", source: distro, os: [debian@12] }
+default: "1.0"
+settings:
+  size: { type: integer, minimum: 1, default: 1, description: How big. }
+recipe:
+  configure:
+    - command: "mini --size {{ with.size }}"
+      creates: /etc/mini

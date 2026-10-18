@@ -1,0 +1,157 @@
+//! The Vagrant backend's rendering of a few examples, as snapshots, its determinism, and its
+//! refusals from the plan.
+
+use std::error::Error;
+use std::path::Path;
+
+use isoloom_plan::Environment;
+use isoloom_render::GeneratedFile;
+use isoloom_render::backend::Backend;
+use isoloom_spec::model::Target;
+use isoloom_vagrant::VagrantBackend;
+
+/// A test's outcome: a failed step is its report.
+type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+
+/// An example of the project, which must be valid, planned for Vagrant.
+fn plan(example: &str) -> Outcome<Environment> {
+    let lab = isoloom_plan::Lab::new(isoloom_spec::load(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example),
+    )?);
+    let problems = lab.problems();
+    if !problems.is_empty() {
+        return Err(format!("{example} isn't valid: {problems:?}").into());
+    }
+    Ok(Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None))
+}
+
+/// The files the Vagrant backend renders for an example, from its plan.
+fn render(example: &str) -> Outcome<Vec<GeneratedFile>> {
+    Ok(VagrantBackend.render(&plan(example)?)?)
+}
+
+/// An example's Vagrantfile.
+fn vagrantfile(example: &str) -> Outcome<String> {
+    let file = render(example)?
+        .into_iter()
+        .find(|f| f.path.ends_with("/Vagrantfile"))
+        .ok_or("no Vagrantfile")?;
+    Ok(file.contents)
+}
+
+/// A spec written in a test, planned for Vagrant.
+fn parsed(yaml: &str) -> Outcome<Environment> {
+    let lab = isoloom_plan::Lab::parse(yaml).map_err(|problems| format!("{problems:?}"))?;
+    Ok(Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None))
+}
+
+#[test]
+fn hello_stack() -> Outcome {
+    insta::assert_snapshot!(vagrantfile("hello-stack")?);
+    Ok(())
+}
+
+#[test]
+fn segmented_routes_through_the_router() -> Outcome {
+    insta::assert_snapshot!(vagrantfile("segmented")?);
+    Ok(())
+}
+
+#[test]
+fn windows_hello_over_winrm() -> Outcome {
+    insta::assert_snapshot!(vagrantfile("windows-hello")?);
+    Ok(())
+}
+
+#[test]
+fn tuned_web_settings() -> Outcome {
+    insta::assert_snapshot!(vagrantfile("tuned-web")?);
+    Ok(())
+}
+
+#[test]
+fn shared_files_over_nfs() -> Outcome {
+    insta::assert_snapshot!(vagrantfile("shared-files")?);
+    Ok(())
+}
+
+#[test]
+fn ansible_pair_from_the_controller() -> Outcome {
+    insta::assert_snapshot!(vagrantfile("ansible-pair")?);
+    Ok(())
+}
+
+#[test]
+fn rendering_twice_gives_the_same_files() -> Outcome {
+    for example in ["hello-stack", "segmented", "edge-firewall", "vlan-office", "existing-hosts"] {
+        assert_eq!(render(example)?, render(example)?, "{example}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_renderable_example_has_no_refusal() -> Outcome {
+    assert_eq!(VagrantBackend.refusal(&plan("hello-stack")?), None);
+    Ok(())
+}
+
+#[test]
+fn appliances_are_refused_from_the_capabilities() -> Outcome {
+    let env = parsed(
+        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  sw:\n    networks: { lab: 10 }\n    os: debian@12\n    app: { appliance: cisco-iol, image: x, steps: [{ run: s.sh }] }\n",
+    )?;
+    let why = VagrantBackend.refusal(&env).ok_or("not refused")?;
+    assert!(why.contains("network appliance"), "{why}");
+    assert!(VagrantBackend.render(&env).is_err());
+    Ok(())
+}
+
+#[test]
+fn a_machine_without_a_box_is_refused_without_rendering() -> Outcome {
+    let lab = isoloom_plan::Lab::parse(
+        "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  m:\n    networks: { lab: 10 }\n    os: debian@12\n",
+    )
+    .map_err(|problems| format!("{problems:?}"))?;
+    let mut spec = lab.for_target(Target::Vagrant);
+    // Parsing refuses an OS it doesn't know; a spec built in code can still name one.
+    spec.machines.get_mut("m").and_then(|m| m.vm.as_mut()).ok_or("a VM")?.os = "plan9".into();
+    let env = Environment::build(&spec, Target::Vagrant, None);
+    let why = VagrantBackend.refusal(&env).ok_or("not refused")?;
+    assert!(why.contains("no Vagrant box for `plan9`"), "{why}");
+    let refused = VagrantBackend.render(&env).err().ok_or("rendered")?;
+    assert_eq!(refused.to_string(), format!("vagrant: {why}"));
+    Ok(())
+}
+
+/// Vagrant 2.4 picks one build of a multi-architecture box by `box_architecture` (an older one
+/// takes any: a ppc64le Debian on an amd64 host). libvirt's roboxes boxes are such boxes: a
+/// machine's gets its own architecture, Isoloom's own VMs the host's.
+#[test]
+fn libvirts_own_boxes_are_pinned_to_an_architecture() -> Outcome {
+    let file = vagrantfile("ansible-pair")?;
+    let libvirt_blocks: Vec<&str> = file.split("provider \"libvirt\" do |v, o|").skip(1).collect();
+    assert!(!libvirt_blocks.is_empty(), "no libvirt box of its own");
+    for block in libvirt_blocks {
+        let body = block.split("\n    end").next().unwrap_or_default();
+        assert!(
+            body.contains("o.vm.box_architecture = \"amd64\"") || body.contains("o.vm.box_architecture = :auto"),
+            "{body}"
+        );
+    }
+    assert!(file.contains("o.vm.box_architecture = :auto"), "the controller takes the host's");
+    Ok(())
+}
+
+/// Hyper-V forwards no ports: each published TCP port is relayed from 127.0.0.1 to the VM at every
+/// start, and the relay goes with the VM. Alpine's controller keeps its hostname there: setting
+/// one restarts every interface, which closed the SSH session setting it.
+#[test]
+fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
+    let file = vagrantfile("solo-web")?;
+    assert!(file.contains("IsoloomHyperV.ports(machine, [[80, "), "the relay at start");
+    assert!(file.contains("IsoloomHyperV.unports([[80, "), "the relay gone with the VM");
+    let controller = file.split("config.vm.define \"isoloom-controller\"").nth(1).ok_or("no controller")?;
+    let hyperv = controller.split("provider \"hyperv\" do |v, o|").nth(1).ok_or("no hyperv block")?;
+    assert!(hyperv.split("\n    end").next().unwrap_or_default().contains("o.vm.hostname = nil"));
+    Ok(())
+}

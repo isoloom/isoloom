@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "exception/expect": {
+      "isoloom-spec": 2,
+      "xtask": 1
+    }
+  }
+}

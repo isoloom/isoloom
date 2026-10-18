@@ -1,0 +1,6 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"machines:\\n  web:\\n    os: debian@10\\n    networks: { lab: 10 }\\n\"))"
+---
+error[invalid-value] machines.web.os  (isoloom.yml:7:5)
+  debian has no version `10`; use one of: 11, 12, 13 (`debian` alone is debian@12)

@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What openssh does the same as a container and as a VM. `cargo xtask catalogue check openssh`
+# builds one small lab per case (`web`, the case's helpers and an access machine `probe`) and runs
+# it on `docker` and on `vagrant` through the Isothrum CLI. The busybox probe has no SSH client,
+# so a login is not exercised here; the account and password auth are delivered, and sshd's
+# config is proven valid.
+cases:
+  default: {}
+  login:
+    with: { username: ctf, password: "s3cret-pw" }
+
+checks:
+  - name: the ssh port answers
+    tcp: "{{ machine }}:22"
+    wait: 2m
+  - name: openssh reports the release asked for
+    exec: ssh -V 2>&1
+    expect: "OpenSSH_{{ version }}"
+  - name: sshd's configuration is valid
+    exec: /usr/sbin/sshd -t 2>&1 && echo CONFIG_OK
+    expect: CONFIG_OK
+  - name: the login account exists
+    case: login
+    exec: id "{{ with.username }}" 2>&1
+    expect: "{{ with.username }}"
+
+# Equal in both forms, or the case fails: the claim behind `os:` and the build behind the version.
+facts:
+  - name: the OS
+    exec: . /etc/os-release && echo "$ID $VERSION_ID"
+  - name: openssh's build
+    exec: ssh -V 2>&1

@@ -1,0 +1,198 @@
+//! Networks: address blocks, their Docker and traffic-control settings, VLANs, and the
+//! reach between them.
+
+use indexmap::IndexMap;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use super::Ipv6;
+pub use super::bridged::Bridged;
+
+/// A network: an address block, whether it reaches the internet, and what routes it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Network {
+    /// The network's private IPv4 block (inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16),
+    /// a /24 to a /29, e.g. `10.20.0.0/24`. A LAN split into `vlans` may be larger, from /8.
+    pub cidr: String,
+    /// Whether machines on it may reach the internet (default true).
+    #[serde(default = "yes")]
+    pub internet: bool,
+    /// A machine of the environment that routes this network (an edge firewall): it takes the
+    /// gateway address, and its own configuration decides what crosses it. Isoloom adds no
+    /// router of its own here, so `reach` and `internet` on this network become expected
+    /// behavior for the checks to verify.
+    #[serde(default)]
+    pub gateway: Option<String>,
+    /// How the Docker target lays this network out, when it differs from the other targets.
+    #[serde(default)]
+    #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
+    pub docker: Option<NetworkDocker>,
+    /// The VLANs this LAN is split into, by id (1-4094), each with its own block inside the
+    /// LAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming
+    /// the LAN covers all of its VLANs. Each VLAN becomes a network of its own,
+    /// `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub vlans: IndexMap<u16, Vlan>,
+    /// On a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance:
+    /// cisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.
+    /// Its ports are derived, so the machine lists no `networks`: an access port per VLAN, then
+    /// a trunk per machine on several of the LAN's VLANs. Docker targets only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub switch: Option<String>,
+    /// Set by parsing on the networks a LAN's VLANs become: that LAN and the VLAN's id, so a
+    /// target can carry them on one 802.1Q segment (a machine on several of them gets a trunk).
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub vlan: Option<(String, u16)>,
+    /// Link impairment on traffic entering this network through Isoloom's router (a slow or
+    /// lossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule
+    /// touching it, no `gateway` machine).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tc: Option<Tc>,
+    /// The network's IPv6 block: dual-stack beside `cidr`, or IPv6-only (`only: true`).
+    /// Machines get an IPv6 address on it (derived from their octet, or handed out by the
+    /// target) and routes to the other IPv6 blocks the `reach` rules open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ipv6: Option<Ipv6>,
+    /// An existing network, by its name on the target (a Docker network, a Proxmox bridge, an
+    /// ESXi port group): the machines join it, and Isoloom never creates or deletes it. `cidr`
+    /// is its block, and the machines keep fixed addresses in it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
+    pub external: Option<String>,
+    /// Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed
+    /// addresses in `cidr`, or DHCP from the LAN).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bridged: Option<Bridged>,
+    /// The largest packet the network carries, in bytes (576 to 9216): smaller to mimic a
+    /// tunnel or a VPN link, jumbo frames (9000) for a storage network. A LAN's VLANs carry
+    /// the LAN's. Default: the target's own (1500 on most).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mtu: Option<u16>,
+}
+
+impl Network {
+    /// Whether the network is outside the environment (`external` or `bridged`): Isoloom
+    /// doesn't make it, route it or put its own machines on it.
+    #[must_use]
+    pub fn is_outside(&self) -> bool {
+        self.external.is_some() || self.bridged.is_some()
+    }
+
+    /// Whether its machines take their address from the LAN's DHCP server.
+    #[must_use]
+    pub fn is_dhcp(&self) -> bool {
+        self.bridged.as_ref().is_some_and(|b| b.dhcp)
+    }
+}
+
+/// Link impairment (Linux netem on the router's interface into the network).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Tc {
+    /// The one-way delay added to every packet entering the network, e.g. `50ms`, `1s`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delay: Option<String>,
+    /// Random variation of the delay, e.g. `5ms` (needs `delay`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jitter: Option<String>,
+    /// The share of packets entering the network that are dropped at random, in percent
+    /// (`0.5` = 0.5%).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss: Option<f64>,
+    /// The bandwidth cap on traffic entering the network, as `tc` writes a rate, e.g. `10mbit`,
+    /// `512kbit`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<String>,
+}
+
+impl Tc {
+    /// The netem parameters, as `tc qdisc ... netem` takes them.
+    #[must_use]
+    pub fn netem(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(d) = &self.delay {
+            parts.push(format!("delay {d}"));
+            if let Some(j) = &self.jitter {
+                parts.push(j.clone());
+            }
+        }
+        if let Some(l) = self.loss {
+            parts.push(format!("loss {l}%"));
+        }
+        if let Some(r) = &self.rate {
+            parts.push(format!("rate {r}"));
+        }
+        parts.join(" ")
+    }
+}
+
+/// A VLAN of a LAN (see [`Network::vlans`]).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Vlan {
+    /// Its IPv4 block, inside the LAN's (e.g. 10.10.10.0/24 in 10.10.0.0/16).
+    pub cidr: String,
+    /// Whether machines on it may reach the internet (default: as the LAN).
+    #[serde(default)]
+    pub internet: Option<bool>,
+}
+
+/// A network on the Docker target.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NetworkDocker {
+    /// The block to use on Docker instead of `cidr` (same size, inside 10.0.0.0/8). Without
+    /// it, a network outside 10.0.0.0/8 is moved into 10.0.0.0/8 automatically, since Docker's
+    /// own pools, Docker Desktop and home networks use 172.16.0.0/12 and 192.168.0.0/16.
+    pub cidr: String,
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// Traffic allowed from one network to another (one way: answers come back), on some ports or
+/// all of them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Reach {
+    /// The network the connections start from: its machines may open them.
+    pub from: String,
+    /// The network those connections may reach: its machines accept them, on `ports`.
+    pub to: String,
+    /// The destination ports allowed. Empty (the default): every port.
+    #[serde(default)]
+    pub ports: Vec<u16>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_external_or_a_bridged_network_is_outside_the_environment() -> Result<(), serde_yaml_ng::Error> {
+        let outside = |yaml| serde_yaml_ng::from_str::<Network>(yaml).map(|n| n.is_outside());
+        assert!(!outside("{ cidr: 10.0.0.0/24 }")?);
+        assert!(outside("{ cidr: 10.0.0.0/24, external: corp }")?);
+        assert!(outside("{ cidr: 10.0.0.0/24, bridged: { interface: eth0 } }")?);
+        Ok(())
+    }
+
+    #[test]
+    fn netem_takes_the_delay_its_jitter_the_loss_and_the_rate() {
+        let tc = Tc {
+            delay: Some("50ms".into()),
+            jitter: Some("5ms".into()),
+            loss: Some(0.5),
+            rate: Some("10mbit".into()),
+        };
+        assert_eq!(tc.netem(), "delay 50ms 5ms loss 0.5% rate 10mbit");
+        let jitter_alone = Tc {
+            jitter: Some("5ms".into()),
+            ..Tc::default()
+        };
+        assert_eq!(jitter_alone.netem(), "", "a jitter goes with a delay");
+    }
+}

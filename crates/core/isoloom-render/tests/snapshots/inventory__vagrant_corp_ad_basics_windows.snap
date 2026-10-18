@@ -1,0 +1,29 @@
+---
+source: crates/isoloom-render/tests/inventory.rs
+expression: "inventory::render(&env(\"corp-ad-basics\", Target::Vagrant), &Access::vagrant())"
+---
+[linux]
+web01 ansible_host=10.40.10.10
+
+[windows]
+dc01 ansible_host=10.40.20.5 ansible_port=5985 ansible_winrm_scheme=http ansible_winrm_transport=basic
+ws-01 ansible_host=10.40.20.21 ansible_port=5985 ansible_winrm_scheme=http ansible_winrm_transport=basic
+ws-02 ansible_host=10.40.20.22 ansible_port=5985 ansible_winrm_scheme=http ansible_winrm_transport=basic
+
+[linux:vars]
+ansible_user=vagrant
+ansible_password=vagrant
+ansible_become=true
+
+[windows:vars]
+ansible_user=vagrant
+ansible_password=vagrant
+ansible_connection=winrm
+ansible_winrm_server_cert_validation=ignore
+ansible_winrm_operation_timeout_sec=400
+ansible_winrm_read_timeout_sec=500
+
+[domain]
+dc01
+ws-01
+ws-02

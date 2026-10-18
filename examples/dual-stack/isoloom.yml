@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Two dual-stack networks and a router: the user on `front` reaches the web server on `back`
+# over IPv4 and IPv6 alike, on port 80 only, through Isoloom's router. Every machine gets an
+# IPv6 address that reads like its IPv4 one: the web server at 10.67.20.10 is fd00:67:20::10.
+version: 1
+name: dual-stack
+
+networks:
+  front: { cidr: 10.67.10.0/24, ipv6: { cidr: "fd00:67:10::/64" } }
+  back:  { cidr: 10.67.20.0/24, internet: false, ipv6: { cidr: "fd00:67:20::/64" } }
+
+reach:
+  - { from: front, to: back, ports: [80] }
+
+machines:
+  # A published image on containers, a Debian VM its step sets up (`service: nginx` in Phase 4).
+  web:
+    os: debian@12
+    networks: { back: 10 }
+    ports: { web: { port: 80, protocol: http } }
+    app:
+      image: "nginx:1.27-alpine"
+      steps: [{ run: provision/web.sh }]
+
+  # Where the user stands: Debian, as a container or a VM.
+  user:
+    os: debian@12
+    access: true
+    networks: { front: 10 }
+
+checks:
+  - name: the web page answers over IPv6 through the router
+    from: user
+    http: "http://[fd00:67:20::10]/"
+    expect: 200
+    wait: 60

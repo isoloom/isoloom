@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A web server tuned the way a production one is: an environment variable its process reads,
+# a deeper accept queue (a kernel parameter) and more open files (a process limit). A container
+# gets them from its runtime; a VM from its own configuration (systemd, sysctl.d, limits.d), so
+# the checks read the same three values from inside the machine on every target. As a VM it
+# also has a virtual TPM 2.0 (measured boot, sealed secrets), where the target gives one: the
+# targets that can't (DigitalOcean, Linode) refuse it rather than drop it.
+# Its cache has a data disk of its own, formatted XFS on the VM targets.
+version: 1
+name: tuned-web
+
+networks:
+  app: { cidr: 10.83.0.0/24 }
+
+machines:
+  web:
+    os: debian@12
+    networks: { app: 10 }
+    ports: { web: { port: 80, protocol: http } }
+    environment: { APP_MODE: production }
+    sysctls: { net.core.somaxconn: 4096 }
+    ulimits: { nofile: { soft: 8192, hard: 16384 } }
+    disks: { cache: { size_gb: 50, fs: xfs, mount: /var/cache/web } }
+    hardware: { tpm: required }
+    app:
+      image: "nginx:1.27-alpine"
+      steps: [{ run: provision/web.sh }]
+
+checks:
+  - name: the machine's environment has APP_MODE
+    from: web
+    exec: printenv APP_MODE
+    expect: production
+  - name: the accept queue is 4096 deep
+    from: web
+    exec: cat /proc/sys/net/core/somaxconn
+    expect: "4096"
+  - name: a process may open 8192 files (16384 at most)
+    from: web
+    exec: "sh -c 'echo $(ulimit -Sn)/$(ulimit -Hn)'"
+    expect: 8192/16384
+  - name: the cache disk is mounted
+    from: web
+    exec: "grep -q ' /var/cache/web ' /proc/mounts && echo mounted"
+    expect: mounted

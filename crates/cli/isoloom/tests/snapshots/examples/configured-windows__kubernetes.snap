@@ -1,0 +1,8 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ kubernetes (machines.iis.os: Windows has no container form in 1.0)
+
+# isoloom generate --target kubernetes (exit 1)
+· kubernetes: machines.iis.os: Windows has no container form in 1.0

@@ -1,0 +1,24 @@
+---
+source: crates/isoloom-render/tests/inventory.rs
+expression: "inventory::render(&env(\"ansible-pair\", Target::Vagrant), &Access::vagrant())"
+---
+[linux]
+web ansible_host=10.63.0.10
+cache ansible_host=10.63.0.20 maxmemory='"64mb"'
+
+[windows]
+
+[linux:vars]
+ansible_user=vagrant
+ansible_password=vagrant
+ansible_become=true
+
+[webservers]
+web
+
+[caches]
+cache
+
+[pair]
+web
+cache

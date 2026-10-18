@@ -1,0 +1,31 @@
+[package]
+name = "isoloom-compose"
+description = "The Docker Compose backend of Isoloom (docker, hosted)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-compose"
+keywords = ["isoloom", "docker", "compose", "iac"]
+categories = ["config", "virtualization"]
+exclude = ["tests/"]
+publish = true
+
+[dependencies]
+isoloom-spec.workspace = true
+isoloom-plan.workspace = true
+isoloom-render.workspace = true
+isoloom-manifest.workspace = true
+serde_yaml_ng.workspace = true
+serde.workspace = true
+indexmap.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

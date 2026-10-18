@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# One Windows server with IIS: provisioned in PowerShell over WinRM, its page published on the
+# host's loopback. VM targets only (Windows has no container form). The Vagrant box is pinned
+# explicitly in `overrides` (the same one the built-in table uses).
+version: 1
+name: windows-hello
+
+networks:
+  lab: { cidr: 192.168.57.0/24 }
+
+machines:
+  web01:
+    os: windows-server@2019
+    networks: { lab: 10 }
+    ports: { web: { port: 80, protocol: http, publish: 8082 } }
+    resources: { cpus: 2, memory_mb: 3072 }
+    app:
+      steps: [{ run: provision/iis.ps1 }]
+
+overrides:
+  vagrant:
+    machines:
+      web01:
+        box: StefanScherer/windows_2019
+        box_version: "2021.05.15"
+        boxes:
+          qemu: peru/windows-server-2019-standard-x64-eval   # on QEMU (x86 emulated on an Apple Silicon Mac)
+          hyperv: StefanScherer/windows_2019   # on Hyper-V: its last version with a Hyper-V build
+        winrm: plaintext
+
+checks:
+  - checks/web01-answers.sh

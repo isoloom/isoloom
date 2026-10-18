@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# An edge firewall that belongs to the environment: `fw` routes the DMZ and the LAN, and its
+# own rules (build/fw/rules.nft) decide what crosses. Isoloom adds no router of its own; `reach`
+# describes what the firewall should allow, and the derived checks verify it.
+version: 1
+name: edge-firewall
+
+networks:
+  outside: { cidr: 10.70.0.0/24 }
+  dmz:     { cidr: 10.70.10.0/24, gateway: fw }
+  lan:     { cidr: 10.70.20.0/24, gateway: fw, internet: false }
+
+reach:
+  - { from: outside, to: dmz, ports: [80] }
+  - { from: dmz, to: lan, ports: [6379] }
+
+machines:
+  fw:
+    os: debian@12
+    networks: { outside: 5, dmz: 1, lan: 1 }
+    ports: { status: { port: 8080, protocol: http } }
+    app:
+      build: build/fw                        # the container form: its own Dockerfile
+      steps: [{ run: provision/fw.sh }]      # the VM form: its script
+
+  web:
+    os: debian@12
+    networks: { dmz: 10 }
+    aliases: [www.edge.test]
+    ports: { web: { port: 80, protocol: http } }
+    app:
+      build: build/web
+      steps: [{ run: provision/web.sh }]
+
+  # A published image on containers, a Debian VM its step sets up (`service: redis` in Phase 4).
+  cache:
+    os: debian@12
+    networks: { lan: 20 }
+    ports: { redis: 6379 }
+    app:
+      image: "redis:7-alpine"
+      steps: [{ run: provision/cache.sh }]
+
+  user:
+    os: debian@12
+    access: true
+    networks: { outside: 10 }
+
+checks:
+  - name: the web page answers through the firewall
+    from: user
+    script: checks/web-through-firewall.sh
+  - name: the web server answers by its other name
+    from: user
+    http: http://www.edge.test/

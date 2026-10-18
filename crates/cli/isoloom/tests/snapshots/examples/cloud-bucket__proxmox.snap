@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ proxmox (cloud services run on `cloud-services` only)
+
+# isoloom generate --target proxmox (exit 1)
+· proxmox: not possible for this spec (see `isoloom targets`)

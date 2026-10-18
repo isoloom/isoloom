@@ -1,0 +1,16 @@
+# Written by `cargo xtask catalogue refresh postgres` (plan/phase4/design.md §4.8), never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
+# when upstream has moved under a pin.
+refreshed: 2026-10-16
+releases:
+  '16':
+    images:
+      debian@12:
+        digest: sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+        platforms:
+        - amd64
+        - arm64
+        entrypoint:
+        - docker-entrypoint.sh
+        command:
+        - postgres

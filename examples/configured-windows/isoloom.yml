@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A Windows server written in the configuration model: each step kind rendered by Isoloom's
+# PowerShell library on the VM's set-up, behind its guard. IIS as a Windows feature, its page
+# copied and its configuration a template, a local group and user, a folder, a guarded command,
+# its port opened in Windows Firewall, and W3SVC as its service. VM targets only (Windows has no
+# container form).
+version: 1
+name: configured-windows
+
+networks:
+  lab: { cidr: 10.67.0.0/24 }
+
+machines:
+  iis:
+    os: windows-server@2022
+    networks: { lab: 10 }
+    ports: { http: { port: 80, protocol: http, publish: 8087 } }
+    resources: { cpus: 2, memory_mb: 3072 }
+    app:
+      steps:
+        - packages: [Web-Server]
+        - group: { name: Site Editors }
+        - user: { name: editor, groups: [Site Editors], password: Lab-content-1 }
+        - file: { path: 'C:\inetpub\isoloom', state: directory }
+        - copy: { from: site/, to: 'C:\inetpub\wwwroot' }
+        - template: { from: conf/about.txt, to: 'C:\inetpub\wwwroot\about.txt' }
+        - command: 'Set-Content -Path C:\inetpub\isoloom\stamp.txt -Value configured'
+          creates: 'C:\inetpub\isoloom\stamp.txt'
+        - firewall: { allow: [http] }
+        - service: W3SVC
+
+checks:
+  - checks/iis-answers.sh

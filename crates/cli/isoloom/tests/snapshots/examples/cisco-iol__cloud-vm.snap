@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ cloud-vm (machines.r1.app.appliance: an appliance's packaging exists only as a container)
+
+# isoloom generate --target cloud-vm (exit 1)
+· cloud-vm: machines.r1.app.appliance: an appliance's packaging exists only as a container

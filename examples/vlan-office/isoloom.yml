@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# An office LAN split into two VLANs, as a switch would: staff on VLAN 10, guests on VLAN 20.
+# Staff may reach the intranet server; guests only the internet. Each VLAN becomes a network
+# of its own (`office-vlan10`, `office-vlan20`); machines join them as `office.vlan10`. The
+# admin box is on both: on Docker it gets one 802.1Q trunk (`office.10`, `office.20`).
+version: 1
+name: vlan-office
+
+networks:
+  office:
+    cidr: 10.70.0.0/16
+    internet: false
+    vlans:
+      10: { cidr: 10.70.10.0/24 }
+      20: { cidr: 10.70.20.0/24, internet: true }
+  servers: { cidr: 10.70.99.0/24, internet: false }
+
+reach:
+  - { from: office.vlan10, to: servers, ports: [80] }
+
+machines:
+  # A published image on containers, a Debian VM its step sets up (`service: nginx` in Phase 4).
+  intranet:
+    os: debian@12
+    networks: { servers: 10 }
+    ports: { web: { port: 80, protocol: http } }
+    app:
+      image: "nginx:1.27-alpine"
+      steps: [{ run: provision/intranet.sh }]
+
+  staff:
+    os: debian@12
+    access: true
+    networks: { office.vlan10: 10 }
+
+  # Laptops: their OS alone, nothing to install.
+  guest:
+    os: debian@12
+    networks: { office.vlan20: 10 }
+
+  admin:
+    os: debian@12
+    networks: { office.vlan10: 50, office.vlan20: 50 }
+
+checks:
+  - name: staff reach the intranet
+    from: staff
+    http: http://intranet/
+    expect: 200
+    wait: 60
+  - name: guests don't
+    from: guest
+    tcp: intranet:80
+    expect: blocked
+  - name: the admin box reaches the intranet over its trunk
+    from: admin
+    http: http://intranet/
+    expect: 200
+    wait: 60

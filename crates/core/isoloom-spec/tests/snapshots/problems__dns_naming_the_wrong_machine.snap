@@ -1,0 +1,7 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"machines:\\n  dc01:\\n    os: windows-server@2022\\n    networks: { lab: 10 }\\n  station:\\n    os: debian@12\\n    networks: { lab: 20 }\\n    dns: { servers: [dc1] }\\n\"))"
+---
+error[unknown-reference] machines.station.dns.servers[0]  (isoloom.yml:12:22)
+  `dc1` is neither an address nor a machine
+  fix: did you mean `dc01`?

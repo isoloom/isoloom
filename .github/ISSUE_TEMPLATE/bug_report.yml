@@ -1,0 +1,79 @@
+name: Bug report
+description: Isoloom did something wrong, or refused something it should do.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A security vulnerability goes through SECURITY.md, not here.
+        Before pasting anything, remove secrets, tokens, passwords and private addresses.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what Isoloom did, and the error or output (trimmed to the relevant part).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: isoloom --version
+      placeholder: isoloom 1.2.3
+    validations:
+      required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Target
+      options:
+        - docker
+        - hosted
+        - kubernetes
+        - helm
+        - kustomize
+        - vagrant
+        - docker-vm
+        - hybrid
+        - proxmox
+        - esxi
+        - cloud-vm
+        - cloud-docker
+        - cloud-services
+        - external
+        - none (validate, generate, import, another command)
+    validations:
+      required: true
+  - type: input
+    id: details
+    attributes:
+      label: Target details
+      description: The Vagrant provider, the cloud, the Kubernetes distribution, the host OS, as they apply.
+      placeholder: vagrant with libvirt on Fedora 42
+  - type: textarea
+    id: targets
+    attributes:
+      label: isoloom targets --host
+      description: The output of `isoloom targets --host` in the project folder.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: spec
+    attributes:
+      label: Spec excerpt
+      description: The smallest isoloom.yml that shows the problem, or the part of yours involved.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: The generated file involved (under .isoloom/), logs, or how often it happens.

@@ -1,0 +1,1001 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "The entry's name, its folder's, as a machine's `service:` writes it (`nginx`)."
+    },
+    "description": {
+      "type": "string",
+      "description": "What it is, in a sentence or two, for the generated catalogue page."
+    },
+    "upstream": {
+      "type": "string",
+      "pattern": "^https://[^\\s/]+\\S*$",
+      "description": "The software's home page."
+    },
+    "licence": {
+      "$ref": "#/$defs/Licence",
+      "description": "The software's licence, recorded for the catalogue page."
+    },
+    "releases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Release"
+      },
+      "description": "The releases a machine may ask for (`service: nginx@1.30`), each with its OSes."
+    },
+    "default": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*$",
+      "description": "The release `service: <name>` resolves to: one of `releases`, pinned, so a lab never\nchanges under its author when a newer release is added."
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "alma": {
+          "type": "string"
+        },
+        "alma@9": {
+          "type": "string"
+        },
+        "alpine": {
+          "type": "string"
+        },
+        "alpine@3.19": {
+          "type": "string"
+        },
+        "alpine@3.24": {
+          "type": "string"
+        },
+        "centos": {
+          "type": "string"
+        },
+        "centos@7": {
+          "type": "string"
+        },
+        "debian": {
+          "type": "string"
+        },
+        "debian@11": {
+          "type": "string"
+        },
+        "debian@12": {
+          "type": "string"
+        },
+        "debian@13": {
+          "type": "string"
+        },
+        "fedora": {
+          "type": "string"
+        },
+        "fedora@42": {
+          "type": "string"
+        },
+        "kali": {
+          "type": "string"
+        },
+        "kali@rolling": {
+          "type": "string"
+        },
+        "rocky": {
+          "type": "string"
+        },
+        "rocky@9": {
+          "type": "string"
+        },
+        "ubuntu": {
+          "type": "string"
+        },
+        "ubuntu@14.04": {
+          "type": "string"
+        },
+        "ubuntu@16.04": {
+          "type": "string"
+        },
+        "ubuntu@18.04": {
+          "type": "string"
+        },
+        "ubuntu@20.04": {
+          "type": "string"
+        },
+        "ubuntu@22.04": {
+          "type": "string"
+        },
+        "ubuntu@24.04": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "string"
+        },
+        "windows-server": {
+          "type": "string"
+        },
+        "windows-server@2008r2": {
+          "type": "string"
+        },
+        "windows-server@2012r2": {
+          "type": "string"
+        },
+        "windows-server@2016": {
+          "type": "string"
+        },
+        "windows-server@2019": {
+          "type": "string"
+        },
+        "windows-server@2022": {
+          "type": "string"
+        },
+        "windows-server@2025": {
+          "type": "string"
+        },
+        "windows@10": {
+          "type": "string"
+        },
+        "windows@11": {
+          "type": "string"
+        }
+      },
+      "description": "The official images, by OS: an image reference with `{{ version }}`\n(`docker.io/library/nginx:{{ version }}-trixie`), only where the image's OS is that OS.",
+      "default": {}
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "$ref": "#/$defs/Setting"
+        }
+      },
+      "description": "The settings a machine gives in `with:`, by name: the schema of `with:`."
+    },
+    "ports": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9-]{0,30}$": {
+          "$ref": "#/$defs/EntryPort"
+        }
+      },
+      "description": "The machine's ports, by name: a fixed number, or a `port` setting's."
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(-[a-z0-9]+)*$": {
+          "type": "string",
+          "pattern": "^(/|[A-Za-z]:[\\\\/])[^\\n]*$"
+        }
+      },
+      "description": "Data that persists, by name: its absolute path, the same in both forms (the machine's\nvolumes).",
+      "default": {}
+    },
+    "health": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Healthcheck"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "When the service counts as healthy beyond its ports answering (the spec's\n`healthcheck`)."
+    },
+    "daemons": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,127}$": {
+          "$ref": "#/$defs/Daemon"
+        }
+      },
+      "description": "The daemons the entry runs, by the key a `service` step names: added to the daemon table."
+    },
+    "image": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImageUse"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "How the settings reach the official image, when the entry has one."
+    },
+    "recipe": {
+      "$ref": "#/$defs/Recipe",
+      "description": "The recipe: `install`, `configure` and `start`, each a list of steps."
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "upstream",
+    "licence",
+    "releases",
+    "default",
+    "recipe"
+  ],
+  "description": "An Isoloom catalogue entry: a service, its releases, the settings of `with:`, its ports, daemons and recipe (written by hand).",
+  "title": "entry.yml",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Licence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "software": {
+          "type": "string",
+          "description": "The software's licence, as an SPDX expression (`BSD-2-Clause`)."
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What else to know (the images bundle their base distribution's packages).",
+          "default": null
+        }
+      },
+      "required": [
+        "software"
+      ],
+      "description": "The licence of what an entry installs."
+    },
+    "Release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*$",
+          "description": "The upstream version: exact for `vendor` and `download` (`1.30.6`), the series for\n`distro` (`2.4`)."
+        },
+        "channel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Its upstream channel (`stable`, `mainline`, `lts`), when upstream has several.",
+          "default": null
+        },
+        "source": {
+          "$ref": "#/$defs/Source",
+          "description": "Where the VM form installs it from."
+        },
+        "os": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Os"
+          },
+          "description": "The OSes it runs on, each in full (`debian@12`): its first is the one the parity\ncontract's exit run uses."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "type": "string"
+            }
+          },
+          "description": "Variables its recipe reads as `{{ vars.<name> }}`.",
+          "default": {}
+        }
+      },
+      "required": [
+        "version",
+        "source",
+        "os"
+      ],
+      "description": "One release of the service."
+    },
+    "Source": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "vendor",
+          "description": "The vendor's own package repository, pinned to an exact version (`lock.yml` holds each\nOS's package version string)."
+        },
+        {
+          "type": "string",
+          "const": "distro",
+          "description": "The OS's own packages: pinned to a series, since the archive moves within it."
+        },
+        {
+          "type": "string",
+          "const": "download",
+          "description": "A pinned archive (a `file` step with `url` and `sha256`)."
+        }
+      ],
+      "description": "Where a release comes from."
+    },
+    "Os": {
+      "description": "An OS as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default version (`debian` is `debian@12`).",
+      "type": "string",
+      "enum": [
+        "debian",
+        "debian@11",
+        "debian@12",
+        "debian@13",
+        "ubuntu",
+        "ubuntu@14.04",
+        "ubuntu@16.04",
+        "ubuntu@18.04",
+        "ubuntu@20.04",
+        "ubuntu@22.04",
+        "ubuntu@24.04",
+        "rocky",
+        "rocky@9",
+        "alma",
+        "alma@9",
+        "alpine",
+        "alpine@3.19",
+        "alpine@3.24",
+        "kali",
+        "kali@rolling",
+        "fedora",
+        "fedora@42",
+        "centos",
+        "centos@7",
+        "windows",
+        "windows@10",
+        "windows@11",
+        "windows-server",
+        "windows-server@2008r2",
+        "windows-server@2012r2",
+        "windows-server@2016",
+        "windows-server@2019",
+        "windows-server@2022",
+        "windows-server@2025"
+      ]
+    },
+    "Setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/SettingType",
+          "description": "What it holds."
+        },
+        "description": {
+          "type": "string",
+          "description": "What it sets, for editors and the catalogue page."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "`with:` must give it.",
+          "default": false
+        },
+        "default": {
+          "description": "Its value when `with:` leaves it out. A setting with neither `required` nor `default` is\noptional: unset, `when: { unset: <setting> }` holds.",
+          "default": null
+        },
+        "pattern": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "regex",
+          "description": "A `string`'s rule, a regular expression the whole value matches."
+        },
+        "values": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "A `string`'s allowed values.",
+          "default": null
+        },
+        "minimum": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "description": "An `integer`'s lowest value.",
+          "default": null
+        },
+        "maximum": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "description": "An `integer`'s highest value.",
+          "default": null
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,31}$",
+          "description": "A `password`'s value file's owner (default root).",
+          "default": null
+        },
+        "items": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "$ref": "#/$defs/Setting"
+            }
+          },
+          "description": "A `list`'s item: its fields, by name, each a setting of any type but `list`."
+        },
+        "max": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "A `list`'s most items.",
+          "default": null
+        }
+      },
+      "required": [
+        "type",
+        "description"
+      ],
+      "description": "One setting."
+    },
+    "SettingType": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "string",
+          "description": "Text: in a template, it needs a `pattern` or `values`."
+        },
+        {
+          "type": "string",
+          "const": "integer",
+          "description": "A whole number."
+        },
+        {
+          "type": "string",
+          "const": "boolean",
+          "description": "`true` or `false`."
+        },
+        {
+          "type": "string",
+          "const": "port",
+          "description": "A port number, 1 to 65535: a port of `ports:` may take its number from it."
+        },
+        {
+          "type": "string",
+          "const": "endpoint",
+          "description": "`<machine>:<port>` (the machine's address on a network it shares with this one), or\n`<address>:<port>`."
+        },
+        {
+          "type": "string",
+          "const": "folder",
+          "description": "A folder of the project (`site/`)."
+        },
+        {
+          "type": "string",
+          "const": "file",
+          "description": "A file of the project (`nginx/site.conf`)."
+        },
+        {
+          "type": "string",
+          "const": "password",
+          "description": "A literal (lab content), `{ secret: <name> }` or `{ input: <NAME> }`: a value file at\n`/run/isoloom/with/<setting>`, reached as `{{ with.<setting>.path }}`."
+        },
+        {
+          "type": "string",
+          "const": "list",
+          "description": "A list of items, each a map of `items`' fields: a step repeats for each with `for_each`."
+        }
+      ],
+      "description": "What a setting holds, and how it reaches the machine."
+    },
+    "EntryPort": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Its number, when it is fixed.",
+          "default": null
+        },
+        "setting": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "The `port` setting giving its number.",
+          "default": null
+        },
+        "protocol": {
+          "$ref": "#/$defs/PortProtocol",
+          "description": "What it speaks: `tcp` (default), `udp`, `http`, `https` or `tls`.",
+          "default": "tcp"
+        }
+      },
+      "description": "One of an entry's ports: its number, and what it speaks."
+    },
+    "PortProtocol": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "tcp",
+          "description": "TCP, the default: probed by connecting."
+        },
+        {
+          "type": "string",
+          "const": "udp",
+          "description": "UDP (DNS, SNMP, TFTP): nothing waits for it and no derived check probes it."
+        },
+        {
+          "type": "string",
+          "const": "http",
+          "description": "HTTP over TCP: derived checks request a page."
+        },
+        {
+          "type": "string",
+          "const": "https",
+          "description": "HTTPS over TCP: derived checks request a page over TLS, certificates unchecked."
+        },
+        {
+          "type": "string",
+          "const": "tls",
+          "description": "TLS over TCP (not HTTP): probes speak TLS, certificates unchecked."
+        }
+      ],
+      "description": "What a port speaks: TCP or UDP, and for TCP whether probes and checks speak HTTP or TLS."
+    },
+    "Healthcheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "test": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandLine"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A command run inside the machine: healthy when it exits with 0 (exactly one of `test`\nand `http`).",
+          "default": null
+        },
+        "http": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HealthPage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A page the machine serves: healthy when it answers with a 2xx or 3xx status."
+        },
+        "interval": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The time between two tries (`5s`, `1m30s`). Default: 5s.",
+          "default": null
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "How long one try may take. Default: 3s.",
+          "default": null
+        },
+        "retries": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Failed tries in a row before the machine counts as unhealthy. Default: 60.",
+          "default": null
+        },
+        "start_period": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A grace period after start before the first try counts (`30s`). Default: 10s.",
+          "default": null
+        }
+      },
+      "description": "When a machine counts as healthy, besides its ports answering: a command that succeeds, or\na page that answers."
+    },
+    "CommandLine": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "A text run by the machine's shell (`/bin/sh -c`; PowerShell on a Windows VM), with its\nvariables, pipes and `&&`."
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments run as they are, the program first (no shell in between)."
+        }
+      ],
+      "description": "A command line: a text the shell runs, or a list of arguments run as they are."
+    },
+    "HealthPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/PortRef",
+          "description": "The port it is served on: a declared port's name or a number."
+        },
+        "path": {
+          "type": "string",
+          "description": "The page's path. Default: `/`.",
+          "default": "/"
+        }
+      },
+      "required": [
+        "port"
+      ],
+      "description": "A page a healthcheck requests on the machine itself."
+    },
+    "PortRef": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "A port number."
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,30}$",
+          "description": "One of the machine's ports, by name."
+        }
+      ],
+      "description": "A port a healthcheck names: one of the machine's ports by name, or a port number."
+    },
+    "Daemon": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/PerFamily_UnitName",
+          "description": "Its unit: one name on every Linux family, or a name per family (`{ debian: ssh, redhat:\nsshd, alpine: sshd }`), which also says the families it exists on."
+        },
+        "package": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PerFamily_PackageName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The package that ships it, one name or per family: a recipe that installs it without a\n`service` step for the daemon gets a warning."
+        },
+        "foreground": {
+          "$ref": "#/$defs/PerFamily_Argv",
+          "description": "Its foreground form: what a container's runner `exec`s (`[nginx, -g, \"daemon off;\"]`),\none on every Linux family or one per family."
+        },
+        "user": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,31}$",
+          "description": "The user it drops to in a container (default root).",
+          "default": null
+        },
+        "logs": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(/|[A-Za-z]:[\\\\/])[^\\n]*$": {
+              "$ref": "#/$defs/LogStream"
+            }
+          },
+          "description": "Its log files, each linked to the container's `stdout` or `stderr`."
+        }
+      },
+      "required": [
+        "unit",
+        "foreground"
+      ],
+      "description": "One daemon."
+    },
+    "PerFamily_UnitName": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,127}$"
+        },
+        {
+          "type": "object",
+          "description": "Per family: `debian` (Debian, Ubuntu, Kali), `redhat` (Rocky, AlmaLinux, Fedora, CentOS), `alpine`, `windows`.",
+          "propertyNames": {
+            "enum": [
+              "debian",
+              "redhat",
+              "alpine",
+              "windows"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,127}$"
+          }
+        }
+      ]
+    },
+    "PerFamily_PackageName": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9+._:-]{0,127}$"
+        },
+        {
+          "type": "object",
+          "description": "Per family: `debian` (Debian, Ubuntu, Kali), `redhat` (Rocky, AlmaLinux, Fedora, CentOS), `alpine`, `windows`.",
+          "propertyNames": {
+            "enum": [
+              "debian",
+              "redhat",
+              "alpine",
+              "windows"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9+._:-]{0,127}$"
+          }
+        }
+      ]
+    },
+    "PerFamily_Argv": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        {
+          "type": "object",
+          "description": "Per family: `debian` (Debian, Ubuntu, Kali), `redhat` (Rocky, AlmaLinux, Fedora, CentOS), `alpine`, `windows`.",
+          "propertyNames": {
+            "enum": [
+              "debian",
+              "redhat",
+              "alpine",
+              "windows"
+            ]
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      ]
+    },
+    "LogStream": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "stdout",
+          "description": "Standard output."
+        },
+        {
+          "type": "string",
+          "const": "stderr",
+          "description": "Standard error."
+        }
+      ],
+      "description": "A container's output stream."
+    },
+    "ImageUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variables the image reads, each a text with placeholders\n(`POSTGRES_PASSWORD_FILE: \"{{ with.password.path }}\"`).",
+          "default": {}
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(/|[A-Za-z]:[\\\\/])[^\\n]*$": {
+              "type": "string"
+            }
+          },
+          "description": "Paths in the image filled from a `folder` or `file` setting\n(`/docker-entrypoint-initdb.d: \"{{ with.init }}\"`).",
+          "default": {}
+        },
+        "command": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The image's command, in place of its own (its arguments), with placeholders.",
+          "default": null
+        },
+        "start": {
+          "$ref": "#/$defs/ImageStart",
+          "description": "Who runs the `start` steps: the image's own entrypoint (`image`, the default), or\nIsoloom's runner before it (`run`)."
+        }
+      },
+      "description": "How the settings reach the official image (design §4.5): its own entrypoint reads variables\nand files, or Isoloom's runner runs the recipe's `start` steps first."
+    },
+    "ImageStart": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "image",
+          "description": "The image's own entrypoint, fed by `environment` and `files`."
+        },
+        {
+          "type": "string",
+          "const": "run",
+          "description": "Isoloom's runner runs the recipe's `start` steps, then `exec`s the image's own\nentrypoint and command (recorded in `lock.yml`)."
+        }
+      ],
+      "description": "Who prepares the official image at each start."
+    },
+    "Recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "install": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EntryStep"
+          },
+          "description": "Installs the service: skipped on the official image's form, which is this phase."
+        },
+        "configure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EntryStep"
+          },
+          "description": "Configures it, in every form (on the official image, as a thin build over it)."
+        },
+        "start": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EntryStep"
+          },
+          "description": "Prepares each start: host keys, a first-start database, passwords from secrets. Runs\nbefore the services at each start, with the secrets and inputs as files."
+        }
+      },
+      "description": "The recipe, phase by phase, in the order they run."
+    },
+    "EntryStep": {
+      "description": "A step of the configuration model (the spec's `app.steps`: `reboot`, or a map with one kind key), its texts holding `{{ version }}`, `{{ os.* }}`, `{{ vars.* }}`, `{{ with.* }}` and `{{ item.* }}`. A repository's `key` may be `{ url, fingerprint }`: the refresh pins its SHA-256 in lock.yml.",
+      "anyOf": [
+        {
+          "const": "reboot"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "when": {
+              "$ref": "#/$defs/When"
+            },
+            "for_each": {
+              "type": "string",
+              "description": "A list setting: the step repeats for each of its items, with `{{ item.<field> }}`."
+            }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "When": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/OsFamily"
+          },
+          "description": "The machine's OS family, as `os:` writes it (`debian`, `ubuntu`, `rocky`, `alpine`)."
+        },
+        "os": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Os"
+          },
+          "description": "The machine's OS, in full (`debian@12`).",
+          "default": null
+        },
+        "release": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The release: a channel (`mainline`) or a version or its prefix (`1.30`).",
+          "default": null
+        },
+        "set": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "A setting `with:` gives (or that has a default).",
+          "default": null
+        },
+        "unset": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "A setting `with:` leaves out, with no default.",
+          "default": null
+        }
+      },
+      "description": "Where an entry's step applies: every condition given holds (a list holds when one of its\nvalues does). Never the form: both forms run the same recipe."
+    },
+    "OsFamily": {
+      "type": "string",
+      "enum": [
+        "debian",
+        "ubuntu",
+        "rocky",
+        "alma",
+        "alpine",
+        "kali",
+        "fedora",
+        "centos",
+        "windows",
+        "windows-server"
+      ]
+    }
+  }
+}

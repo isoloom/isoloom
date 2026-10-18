@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ esxi (machine `box`: ESXi runs x86-64 VMs only)
+
+# isoloom generate --target esxi (exit 1)
+· esxi: machine `box`: ESXi runs x86-64 VMs only

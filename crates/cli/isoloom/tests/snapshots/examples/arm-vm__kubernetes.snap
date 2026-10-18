@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ kubernetes (machines.box.command: its steps install services, but no `service` step or `command` runs one in a container)
+
+# isoloom generate --target kubernetes (exit 1)
+· kubernetes: machines.box.command: its steps install services, but no `service` step or `command` runs one in a container

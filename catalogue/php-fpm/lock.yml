@@ -1,0 +1,5 @@
+# Written by `cargo xtask catalogue refresh php-fpm` (plan/phase4/design.md §4.8), never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
+# when upstream has moved under a pin. php-fpm installs from the OS's own archive (a `distro`
+# release) and has no official image, so there is nothing to pin.
+refreshed: 2026-10-17

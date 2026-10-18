@@ -1,0 +1,8 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ hosted (machines.iis.os: Windows has no container form in 1.0)
+
+# isoloom generate --target hosted (exit 1)
+· hosted: machines.iis.os: Windows has no container form in 1.0

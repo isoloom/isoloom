@@ -1,0 +1,20 @@
+# The firewall's rules, the same on its container and its VM. Addresses, not interface
+# names, so they don't depend on how the target names the interfaces.
+table inet fw
+delete table inet fw
+table inet fw {
+  chain forward {
+    type filter hook forward priority 0; policy drop;
+    ct state established,related accept
+    # outside -> dmz: the web server only
+    ip saddr 10.70.0.0/24 ip daddr 10.70.10.0/24 tcp dport 80 accept
+    # dmz -> lan: the cache only
+    ip saddr 10.70.10.0/24 ip daddr 10.70.20.0/24 tcp dport 6379 accept
+    # dmz -> internet (the lan gets none)
+    ip saddr 10.70.10.0/24 ip daddr != 10.70.0.0/16 accept
+  }
+  chain postrouting {
+    type nat hook postrouting priority 100;
+    ip saddr 10.70.10.0/24 ip daddr != 10.70.0.0/16 masquerade
+  }
+}

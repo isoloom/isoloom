@@ -1,0 +1,98 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: shared-files
+networks:
+  app:
+    cidr: 10.84.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  writer:
+    networks:
+      app: 10
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes:
+      shared: /srv/shared
+    disks:
+      data:
+        size_gb: 50
+        mount: /srv/data
+    access: false
+    docker:
+      image: "debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858"
+      build: ~
+      init:
+        - steps/write.sh
+      idle: true
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+  reader:
+    networks:
+      app: 11
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports: []
+    inputs: []
+    resources: ~
+    depends_on: []
+    volumes:
+      shared: /data/shared
+    access: false
+    docker:
+      image: "debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858"
+      build: ~
+      init:
+        - steps/look.sh
+      idle: true
+    vm:
+      os: debian-12
+      provision: []
+      image: ~
+volumes:
+  shared:
+    owner: writer
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the reader sees what the writer wrote
+    from: reader
+    http: ~
+    tcp: ~
+    exec: cat /data/shared/greeting
+    script: ~
+    expect: written by the writer
+    wait: ~
+  - name: "the writer's data disk is mounted"
+    from: writer
+    http: ~
+    tcp: ~
+    exec: "grep -q ' /srv/data ' /proc/mounts && echo mounted"
+    script: ~
+    expect: mounted
+    wait: ~
+targets: ~

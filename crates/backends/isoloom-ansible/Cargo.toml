@@ -1,0 +1,24 @@
+[package]
+name = "isoloom-ansible"
+description = "The Ansible backend of Isoloom: hosts that already exist, as an inventory and playbooks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-ansible"
+keywords = ["isoloom", "ansible", "provisioning", "iac"]
+categories = ["config"]
+publish = true
+
+[dependencies]
+isoloom-spec.workspace = true
+isoloom-catalogue.workspace = true
+isoloom-plan.workspace = true
+isoloom-render.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

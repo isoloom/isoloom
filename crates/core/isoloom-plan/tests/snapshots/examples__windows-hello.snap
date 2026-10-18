@@ -1,0 +1,56 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+assertion_line: 44
+expression: example(&name).spec()
+---
+version: 1
+name: windows-hello
+networks:
+  lab:
+    cidr: 192.168.57.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs: []
+machines:
+  web01:
+    networks:
+      lab: 10
+    os: windows-server@2019
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: web
+        http: true
+        publish: 8082
+    inputs: []
+    resources:
+      cpus: 2
+      memory_mb: 3072
+      disk_gb: ~
+    depends_on: []
+    volumes: {}
+    access: false
+    docker: ~
+    vm:
+      os: windows-server-2019
+      provision:
+        - provision/iis.ps1
+      image:
+        vagrant: StefanScherer/windows_2019
+        vagrant_version: 2021.05.15
+        qemu: peru/windows-server-2019-standard-x64-eval
+        hyperv: StefanScherer/windows_2019
+        winrm: plaintext
+common: ~
+groups: {}
+provision: []
+checks:
+  - checks/web01-answers.sh
+targets: ~

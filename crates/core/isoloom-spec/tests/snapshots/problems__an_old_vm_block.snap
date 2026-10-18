@@ -1,0 +1,7 @@
+---
+source: crates/core/isoloom-spec/tests/problems.rs
+expression: "rendered(&spec(\"machines:\\n  dc01:\\n    networks: { lab: 10 }\\n    vm: { os: windows-server@2019, provision: [dc.ps1], image: { vagrant: StefanScherer/windows_2019 } }\\n\"))"
+---
+error[removed-field] machines.dc01.vm  (isoloom.yml:8:5)
+  a machine says what it runs, never how a platform runs it, so `vm:` is gone
+  fix: `os: windows-server@2019`; `app: { steps: [{ run: dc.ps1 }] }`; `vm.image` → `overrides: { vagrant: { machines: { dc01: { box, box_version } } } }` (and `proxmox`, the clouds)

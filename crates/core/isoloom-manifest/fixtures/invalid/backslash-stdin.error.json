@@ -1,0 +1,5 @@
+{
+  "code": "field",
+  "message": "lifecycle.up[0].stdin: `checks\\networks.sh` has a `\\`: paths are `/`-separated on every host, and the runner converts them",
+  "schema": true
+}

@@ -1,0 +1,1 @@
+{{ machine.name }} at {{ machine.addresses.lab }}, configured by isoloom.

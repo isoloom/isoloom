@@ -1,0 +1,8 @@
+---
+source: crates/backends/isoloom-terraform/tests/cloud_docker.rs
+expression: all
+---
+==> .isoloom/cloud-services/terraform.tfvars.json
+{
+  "region": "us-east-1"
+}

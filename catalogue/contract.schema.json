@@ -1,0 +1,101 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(-[a-z0-9]+)*$": {
+          "$ref": "#/$defs/Case"
+        }
+      },
+      "description": "The set-ups a conformance lab is built for, by name; `default` always runs."
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContractCheck"
+      },
+      "description": "What both forms must pass, in the spec's check grammar."
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Fact"
+      },
+      "description": "Commands whose output must be equal in both forms."
+    }
+  },
+  "required": [
+    "cases",
+    "checks"
+  ],
+  "description": "An Isoloom catalogue entry's parity contract: the cases, the checks both forms pass, and the facts both forms share.",
+  "title": "contract.yml",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Case": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "with": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The service machine's `with:`.",
+          "default": {}
+        },
+        "project": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The lab's project files, by path: their content, inline.",
+          "default": {}
+        },
+        "machines": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Helper machines, by name, as a spec writes a machine (`{ service: php-fpm, with: … }`):\neach gets the service machine's OS and network.",
+          "default": {}
+        }
+      },
+      "description": "One set-up of the conformance lab."
+    },
+    "ContractCheck": {
+      "type": "object",
+      "description": "A check of the spec's grammar (`name`, `http`, `tcp`, `exec`, `script`, `expect`, `contains`, `wait`), with `{{ machine }}`, `{{ version }}` and `{{ with.* }}`; `case` limits it to one case. An `exec` runs in the service machine.",
+      "properties": {
+        "case": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": true
+    },
+    "Fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "What it states (`the OS`)."
+        },
+        "exec": {
+          "type": "string",
+          "description": "The command, run by `sh -c`."
+        }
+      },
+      "required": [
+        "name",
+        "exec"
+      ],
+      "description": "A command run in the service machine, whose output must be the same in both forms."
+    }
+  }
+}

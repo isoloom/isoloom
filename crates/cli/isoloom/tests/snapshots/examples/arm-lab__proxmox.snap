@@ -1,0 +1,9 @@
+---
+source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 219
+---
+# isoloom targets
+✗ proxmox (machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM)
+
+# isoloom generate --target proxmox (exit 1)
+· proxmox: machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM

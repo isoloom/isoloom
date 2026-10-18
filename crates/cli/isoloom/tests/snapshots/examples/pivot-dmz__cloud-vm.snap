@@ -1,0 +1,8 @@
+---
+source: crates/isoloom/tests/example_snapshots.rs
+---
+# isoloom targets
+✗ cloud-vm (no cloud can run it (aws: machine `user`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); azure: machine `user`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); gcp: machine `user`: no GCP image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04); digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode: machine `gateway` is on several networks: a Linode instance has one VPC interface; oci: machine `user`: no Oracle Cloud image for `kali` yet (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)))
+
+# isoloom generate --target cloud-vm (exit 1)
+· cloud-vm: no cloud can run it (aws: machine `user`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); azure: machine `user`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025); gcp: machine `user`: no GCP image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04); digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode: machine `gateway` is on several networks: a Linode instance has one VPC interface; oci: machine `user`: no Oracle Cloud image for `kali` yet (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04))

@@ -1,0 +1,3 @@
+# Checked out with LF everywhere: the committed outputs and docs/spec.md are compared byte for byte
+# with what the generators write (LF), Windows included.
+* text=auto eol=lf

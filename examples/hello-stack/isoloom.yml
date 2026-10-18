@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A web server and a cache, as containers or as native VMs, with the same behavior:
+# the page answers on web:80, the cache holds the greeting seeded at start, and nothing
+# reaches the internet.
+version: 1
+name: hello-stack
+
+networks:
+  app: { cidr: 10.60.0.0/24, internet: false }
+
+machines:
+  # A recipe per form: the official Redis image on containers, a Debian 12 VM its step sets up.
+  # `setup` seeds the greeting once the cache answers, the same way on both.
+  cache:
+    os: debian@12
+    networks: { app: 20 }
+    ports: { redis: 6379 }
+    volumes: { data: /data }
+    app:
+      image: "redis:7-alpine"
+      steps: [{ run: provision/cache.sh }]
+    setup: [build/cache/seed.sh]
+
+  web:
+    os: debian@12
+    networks: { app: 10 }
+    ports: { web: { port: 80, protocol: http, publish: 8080 } }
+    depends_on: [cache]
+    app:
+      build: build/web
+      steps: [{ run: provision/web.sh }]
+
+checks:
+  - checks/cache-seeded.sh
+  - name: the page greets
+    http: http://web/
+    expect: 200
+  - name: the cache holds the greeting, read inside it
+    from: cache
+    exec: redis-cli get greeting
+    expect: hello from isoloom
+  - name: the cache answers a PING
+    tcp: cache:6379
+    send: PING
+    contains: +PONG
+  - name: the page says hello
+    http: http://web/
+    headers: { Accept: text/html }
+    contains: hello from isoloom
+  - name: the folder's address without its slash redirects
+    http: http://web/hello
+    expect: 301
+  - name: the folder's page, past the redirect
+    http: http://web/hello
+    follow: true
+  - name: the static page refuses a POST
+    http: http://web/
+    method: POST
+    body: "greeting=hi"
+    expect: 405
+
+message: |
+  The page answers at {{ machines.web.ports.web.url }} (and at
+  http://web/ from inside). The cache at {{ machines.cache.addresses.app }}:6379 holds the
+  greeting seeded at start; nothing here reaches the internet.

@@ -1,0 +1,29 @@
+[package]
+name = "isoloom-plan"
+description = "The target-neutral plan of a lab: the spec lowered per target, the environment a backend renders, its checks and requirements."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-plan"
+keywords = ["isoloom", "plan", "iac", "infrastructure"]
+categories = ["config"]
+exclude = ["tests/"]
+publish = true
+
+[dependencies]
+isoloom-spec.workspace = true
+isoloom-catalogue.workspace = true
+indexmap.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
+serde_yaml_ng.workspace = true
+
+[lints]
+workspace = true

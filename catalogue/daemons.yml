@@ -1,0 +1,22 @@
+# The daemon table's daemons no entry owns (plan/phase4/design.md §3.4): for each, its unit and
+# package per family (`debian`: Debian, Ubuntu, Kali; `redhat`: Rocky, AlmaLinux, Fedora,
+# CentOS; `alpine`; `windows`), and the foreground form a container runs it in (what its
+# official image runs, where it has one). A `service: <key>` step without `run` takes its
+# container form from here; a recipe that installs its package without a `service` step for it
+# gets a warning. An entry that comes to own a daemon moves it into its own `daemons:`.
+apache:
+  unit: { debian: apache2, redhat: httpd, alpine: apache2 }
+  package: { debian: apache2, redhat: httpd, alpine: apache2 }
+  foreground: { debian: [apache2ctl, -D, FOREGROUND], redhat: [httpd, -D, FOREGROUND], alpine: [httpd, -D, FOREGROUND] }
+ssh:
+  unit: { debian: ssh, redhat: sshd, alpine: sshd }
+  package: openssh-server
+  foreground: [/usr/sbin/sshd, -D, -e]
+cron:
+  unit: { debian: cron, redhat: crond }
+  package: { debian: cron, redhat: cronie }
+  foreground: { debian: [cron, -f], redhat: [crond, -n] }
+rsyslog:
+  unit: rsyslog
+  package: rsyslog
+  foreground: [rsyslogd, -n]
