@@ -488,6 +488,25 @@ output "ssh_user" {
       }
     },
     {
+      "name": "isoloom-access",
+      "role": "access",
+      "addresses": {
+        "access": "10.61.99.10"
+      },
+      "native": {
+        "service": "isoloom-access"
+      }
+    },
+    {
+      "name": "isoloom-access-routes",
+      "role": "infra",
+      "of": "isoloom-access",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-access-routes"
+      }
+    },
+    {
       "name": "isoloom-check",
       "role": "check",
       "of": "user",
@@ -693,7 +712,19 @@ output "ssh_user" {
   ],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [],
+    "setup": [
+      {
+        "id": "stand-ins",
+        "note": "Starting the access machine's stand-in…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name segmented --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "admin"
+        },
+        "timeout_s": 600
+      }
+    ],
     "runners": [
       {
         "id": "isoloom-check",
@@ -1368,6 +1399,25 @@ output "ssh_user" {
       }
     },
     {
+      "name": "isoloom-access",
+      "role": "access",
+      "addresses": {
+        "access": "10.61.99.10"
+      },
+      "native": {
+        "service": "isoloom-access"
+      }
+    },
+    {
+      "name": "isoloom-access-routes",
+      "role": "infra",
+      "of": "isoloom-access",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-access-routes"
+      }
+    },
+    {
       "name": "isoloom-check",
       "role": "check",
       "of": "user",
@@ -1573,7 +1623,19 @@ output "ssh_user" {
   ],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [],
+    "setup": [
+      {
+        "id": "stand-ins",
+        "note": "Starting the access machine's stand-in…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name segmented --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 600
+      }
+    ],
     "runners": [
       {
         "id": "isoloom-check",
@@ -2131,6 +2193,25 @@ output "ssh_user" {
       }
     },
     {
+      "name": "isoloom-access",
+      "role": "access",
+      "addresses": {
+        "access": "10.61.99.10"
+      },
+      "native": {
+        "service": "isoloom-access"
+      }
+    },
+    {
+      "name": "isoloom-access-routes",
+      "role": "infra",
+      "of": "isoloom-access",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-access-routes"
+      }
+    },
+    {
       "name": "isoloom-check",
       "role": "check",
       "of": "user",
@@ -2336,7 +2417,19 @@ output "ssh_user" {
   ],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [],
+    "setup": [
+      {
+        "id": "stand-ins",
+        "note": "Starting the access machine's stand-in…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name segmented --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 600
+      }
+    ],
     "runners": [
       {
         "id": "isoloom-check",
@@ -3001,6 +3094,25 @@ output "ssh_user" {
       }
     },
     {
+      "name": "isoloom-access",
+      "role": "access",
+      "addresses": {
+        "access": "10.61.99.10"
+      },
+      "native": {
+        "service": "isoloom-access"
+      }
+    },
+    {
+      "name": "isoloom-access-routes",
+      "role": "infra",
+      "of": "isoloom-access",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-access-routes"
+      }
+    },
+    {
       "name": "isoloom-check",
       "role": "check",
       "of": "user",
@@ -3206,7 +3318,19 @@ output "ssh_user" {
   ],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [],
+    "setup": [
+      {
+        "id": "stand-ins",
+        "note": "Starting the access machine's stand-in…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name segmented --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 600
+      }
+    ],
     "runners": [
       {
         "id": "isoloom-check",
@@ -3748,6 +3872,25 @@ output "ssh_user" {
       }
     },
     {
+      "name": "isoloom-access",
+      "role": "access",
+      "addresses": {
+        "access": "10.61.99.10"
+      },
+      "native": {
+        "service": "isoloom-access"
+      }
+    },
+    {
+      "name": "isoloom-access-routes",
+      "role": "infra",
+      "of": "isoloom-access",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-access-routes"
+      }
+    },
+    {
       "name": "isoloom-check",
       "role": "check",
       "of": "user",
@@ -3953,7 +4096,19 @@ output "ssh_user" {
   ],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [],
+    "setup": [
+      {
+        "id": "stand-ins",
+        "note": "Starting the access machine's stand-in…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name segmented --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 600
+      }
+    ],
     "runners": [
       {
         "id": "isoloom-check",
@@ -4560,6 +4715,25 @@ output "ssh_user" {
       }
     },
     {
+      "name": "isoloom-access",
+      "role": "access",
+      "addresses": {
+        "access": "10.61.99.10"
+      },
+      "native": {
+        "service": "isoloom-access"
+      }
+    },
+    {
+      "name": "isoloom-access-routes",
+      "role": "infra",
+      "of": "isoloom-access",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-access-routes"
+      }
+    },
+    {
       "name": "isoloom-check",
       "role": "check",
       "of": "user",
@@ -4765,7 +4939,19 @@ output "ssh_user" {
   ],
   "checks": {
     "protocol": "isoloom-check/1",
-    "setup": [],
+    "setup": [
+      {
+        "id": "stand-ins",
+        "note": "Starting the access machine's stand-in…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name segmented --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "ubuntu"
+        },
+        "timeout_s": 600
+      }
+    ],
     "runners": [
       {
         "id": "isoloom-check",
