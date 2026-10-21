@@ -114,9 +114,6 @@ pub enum Error {
     /// An app's `config` without an `appliance`.
     #[error("`config` is an appliance's: it goes with `appliance`")]
     ConfigWithoutAppliance,
-    /// An app with both an `image` and a `build`.
-    #[error("`image` and `build` are both given: a container comes from one")]
-    ImageAndBuild,
     /// An appliance built from a Dockerfile.
     #[error("an appliance comes from its `image` (or `firmware`), not a `build`")]
     ApplianceBuild,

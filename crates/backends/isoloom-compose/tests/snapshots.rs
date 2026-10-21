@@ -45,6 +45,22 @@ fn a_machine_runs_its_own_process() -> Outcome {
 }
 
 #[test]
+fn a_build_with_a_published_image_emits_both_image_and_build() -> Outcome {
+    let fixture = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/build-and-image.yml"))?;
+    let rendered = compose(render(isoloom_spec::parse(&fixture)?)?)?;
+    assert!(
+        rendered.contains("image: ghcr.io/cyberctf/ad-kerberoasting:1"),
+        "the published image:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("build:") && rendered.contains("context: ../../build/web"),
+        "the build block:\n{rendered}"
+    );
+    insta::assert_snapshot!(rendered);
+    Ok(())
+}
+
+#[test]
 fn hello_stack() -> Outcome {
     insta::assert_snapshot!(compose(example("hello-stack")?)?);
     Ok(())

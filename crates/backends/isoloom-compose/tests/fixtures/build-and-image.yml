@@ -1,0 +1,12 @@
+# A container that both builds its image and names it: `app.image` beside `app.build`. Compose
+# builds and tags it as that name in development; production pulls the published image.
+version: 1
+name: build-and-image
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    ports: { site: 8000 }
+    app:
+      image: ghcr.io/cyberctf/ad-kerberoasting:1
+      build: build/web

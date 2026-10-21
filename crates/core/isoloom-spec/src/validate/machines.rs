@@ -235,7 +235,8 @@ fn docker(at: &str, d: &DockerImpl, p: &mut Problems) {
     match (&d.image, &d.build) {
         // A Dynamips router's container, and the image Isoloom generates from steps, are Isoloom's.
         _ if emulated || d.generated.is_some() => {}
-        (Some(_), Some(_)) => p.add(format!("{at}.docker"), "use `image` or `build`, not both"),
+        // `image` with `build` is the Compose combo: the build is tagged as that published name
+        // (built in development, pulled in production).
         (None, None) => p.add(format!("{at}.docker"), "set `image` (a published image) or `build` (a folder in the project)"),
         _ => {}
     }
