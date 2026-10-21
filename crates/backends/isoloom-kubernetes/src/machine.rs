@@ -36,7 +36,7 @@ impl<'a> Machine<'a> {
             .iter()
             .filter(|(_, mp)| mp.shape == MachineShape::Container)
             .filter_map(|(name, plan)| {
-                let Some(isoloom_plan::Image::Container { reference, build }) = &plan.image else {
+                let Some(isoloom_plan::Image::Container { reference, build, .. }) = &plan.image else {
                     return None;
                 };
                 Some(Machine {

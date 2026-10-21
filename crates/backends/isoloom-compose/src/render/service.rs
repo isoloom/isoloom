@@ -72,7 +72,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         restart: Some(Restart::UnlessStopped),
         ..Service::default()
     };
-    if let Some(Image::Container { reference, build }) = &plan.image {
+    if let Some(Image::Container { reference, build, .. }) = &plan.image {
         svc.image = Some(reference.clone());
         svc.build = build.as_ref().map(|b| build_of(env, b));
     }

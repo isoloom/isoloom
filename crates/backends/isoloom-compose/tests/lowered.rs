@@ -29,6 +29,22 @@ fn render(name: &str) -> Outcome<Vec<GeneratedFile>> {
     Ok(isoloom_compose::render(Target::Docker, &plan(name)?)?)
 }
 
+/// The Docker plan of an inline spec.
+fn plan_of(source: &str) -> Outcome<Environment> {
+    let parsed = isoloom_spec::syntax::parse(source).map_err(|p| format!("doesn't parse: {p:?}"))?;
+    let lowered = lower(&parsed, isoloom_plan::Lab::new(parsed.clone()).catalogue(), Scope::Target(Target::Docker));
+    Ok(Environment::build(&lowered.spec, Target::Docker, None))
+}
+
+/// The `up` lifecycle of the Docker run manifest, as text. In a host Compose manifest `--build`
+/// appears only in the `up` step and `--ignore-pull-failures` only in the pull step, so a run's
+/// pull-or-build behaviour is readable from this text.
+fn up_lifecycle_text(env: &Environment) -> Outcome<String> {
+    let backend = isoloom_compose::ComposeBackend(Target::Docker);
+    let manifest = isoloom_render::backend::Backend::run_manifest(&backend, env)?.ok_or("no run manifest")?;
+    Ok(format!("{:?}", manifest.lifecycle.up))
+}
+
 /// The text of the file at `path` among `files`.
 fn file<'a>(files: &'a [GeneratedFile], path: &str) -> Outcome<&'a str> {
     let found = files.iter().find(|f| f.path == path).ok_or_else(|| format!("no {path}"))?;
@@ -67,6 +83,24 @@ fn a_flag_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
     };
     assert_eq!(var.to_string(), "FLAG");
     assert_eq!(steps.iter().map(ToString::to_string).collect::<Vec<_>>(), ["up", "start"]);
+    Ok(())
+}
+
+/// A machine that publishes an image it also builds (the Compose build+image combo) makes the run
+/// pull the published image first; `up` then drops `--build`, so a student runs the published
+/// image and only an image that could not be pulled is built. A lab that only builds locally keeps
+/// `--build` and gains no pull step, so an author's edits always rebuild.
+#[test]
+fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() -> Outcome {
+    let combo = up_lifecycle_text(&plan_of(
+        "version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/cyberctf/lab-web:1\n      build: { context: web }\n",
+    )?)?;
+    assert!(combo.contains("--ignore-pull-failures"), "a published build pulls first: {combo}");
+    assert!(!combo.contains("--build"), "a published build must not force a local build: {combo}");
+
+    let local = up_lifecycle_text(&plan_of("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      build: { context: web }\n")?)?;
+    assert!(!local.contains("--ignore-pull-failures"), "a local build gains no pull step: {local}");
+    assert!(local.contains("--build"), "a local build still forces a build: {local}");
     Ok(())
 }
 

@@ -18,6 +18,11 @@ pub enum Image {
         reference: String,
         /// How the project builds it, if it does.
         build: Option<Build>,
+        /// Whether `reference` is a published image, pullable from a registry (`app.image` was
+        /// given: an image-only machine, or the build+image combo), rather than a tag the project
+        /// only builds locally. When it is, a run pulls it before falling back to the build, so a
+        /// student uses the published image instead of building it.
+        published: bool,
     },
     /// A VM's operating system.
     Vm {
@@ -93,6 +98,7 @@ pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, reci
             Some(Image::Container {
                 reference: Images::of(spec).pull(&tag),
                 build: own.or(generated),
+                published: d.image.is_some(),
             })
         }
         MachineShape::Vm => m.vm.as_ref().map(|vm| Image::Vm { os: vm.os.clone() }),
@@ -119,7 +125,8 @@ mod tests {
             image("pub"),
             Some(Image::Container {
                 reference: "nginx".into(),
-                build: None
+                build: None,
+                published: true,
             })
         );
         let Some(Image::Container {
@@ -130,9 +137,10 @@ mod tests {
                 target,
                 args,
             }),
+            published: false,
         }) = image("own")
         else {
-            panic!("a build of the project's own")
+            panic!("a build of the project's own, with no published image")
         };
         assert_eq!(
             (reference.as_str(), context.as_str(), dockerfile.as_deref(), target.as_deref()),
@@ -146,9 +154,10 @@ mod tests {
                 base,
                 process,
             }),
+            published: false,
         }) = image("gen")
         else {
-            panic!("a generated build")
+            panic!("a generated build, with no published image")
         };
         assert_eq!(
             (generated.as_str(), written.as_str()),
