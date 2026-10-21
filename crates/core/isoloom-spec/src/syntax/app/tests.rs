@@ -38,9 +38,22 @@ fn two_recipes_give_each_form_its_own() {
 }
 
 #[test]
+fn an_image_beside_a_build_tags_the_build_as_that_published_name() {
+    let Some(Recipe::Build(b)) = app("{ image: ghcr.io/x/y:1, build: build/web }").unwrap().container else {
+        panic!("a build tagged with the published image")
+    };
+    assert_eq!((b.image.as_deref(), b.context.as_str()), (Some("ghcr.io/x/y:1"), "build/web"));
+    let Some(Recipe::Build(full)) = app("{ image: ghcr.io/x/y:1, build: { context: web, target: prod } }").unwrap().container else {
+        panic!("the full build keeps its fields and gains the image")
+    };
+    assert_eq!((full.image.as_deref(), full.target.as_deref()), (Some("ghcr.io/x/y:1"), Some("prod")));
+}
+
+#[test]
 fn recipes_that_cannot_go_together_are_refused() {
     for (yaml, why) in [
-        ("{ image: a, build: b }", "both given"),
+        ("{ appliance: cisco-iol, image: x, build: b }", "not a `build`"),
+        ("{ appliance: cisco-iol, build: b }", "not a `build`"),
         ("{}", "needs a recipe"),
         ("{ appliance: cisco-iol }", "runs its `image`"),
         ("{ appliance: cisco-dynamips, image: x, firmware: f }", "no `image`"),

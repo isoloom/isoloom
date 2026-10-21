@@ -322,6 +322,9 @@ fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_
         Container::Supplied => return None,
         Container::Recipe(Recipe::Image(i)) => d.image = Some(i.clone()),
         Container::Recipe(Recipe::Build(b)) => {
+            // `image` beside `build` (the Compose combo): the build is tagged as that published
+            // name. Without it the build is tagged locally (`image` stays `None`).
+            d.image.clone_from(&b.image);
             d.build = Some(b.context.clone());
             d.dockerfile.clone_from(&b.dockerfile);
             d.target.clone_from(&b.target);

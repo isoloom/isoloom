@@ -50,6 +50,13 @@ pub struct ApplianceRecipe {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Build {
+    /// The published image name/tag this build produces, when `app.image` is given beside
+    /// `build` (`ghcr.io/cyberctf/ad-kerberoasting:1`): development builds and tags it, production
+    /// pulls it. `None` for a build with no published name (tagged locally). Set from `app.image`,
+    /// never read from inside `build:`.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub image: Option<String>,
     /// The build context: a folder of the project.
     pub context: String,
     /// The Dockerfile, anywhere in the project (default `<context>/Dockerfile`).
@@ -67,13 +74,14 @@ pub struct Build {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct AppInput {
-    /// A published image, by tag or digest (`example/clamd:1.4`): the container form. Not with
-    /// `build`.
+    /// A published image, by tag or digest (`example/clamd:1.4`): the container form. With
+    /// `build`, the name that build is tagged with: development builds and tags it, production
+    /// pulls it.
     #[serde(default)]
     image: Option<String>,
     /// The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,
     /// target, args }`. The container form; translating it to a VM is never attempted, so add
-    /// `os` and `steps` for a VM form.
+    /// `os` and `steps` for a VM form. With `image`, the build is tagged as that published name.
     #[serde(default, deserialize_with = "build")]
     #[schemars(with = "Option<BuildInput>")]
     build: Option<Build>,
@@ -127,6 +135,7 @@ impl From<BuildInput> for Build {
     fn from(written: BuildInput) -> Build {
         match written {
             BuildInput::Folder(context) => Build {
+                image: None,
                 context,
                 dockerfile: None,
                 target: None,
@@ -149,11 +158,13 @@ impl TryFrom<AppInput> for App {
             return Err(Error::ConfigWithoutAppliance);
         }
         let container = match (a.image, a.build, a.appliance) {
-            (Some(_), Some(_), _) => return Err(Error::ImageAndBuild),
             (_, Some(_), Some(_)) => return Err(Error::ApplianceBuild),
             (image, None, Some(kind)) => Some(Recipe::Appliance(appliance(kind, image, a.config, a.firmware)?)),
             (_, _, None) if a.firmware.is_some() => return Err(Error::FirmwareWithoutDynamips),
             (Some(image), None, None) => Some(Recipe::Image(image)),
+            // `image` beside `build`: the build is tagged as that published name (built in dev,
+            // pulled in production), the way Docker Compose's `image` + `build` combine.
+            (Some(image), Some(b), None) => Some(Recipe::Build(Build { image: Some(image), ..b })),
             (None, Some(b), None) => Some(Recipe::Build(b)),
             (None, None, None) => None,
         };

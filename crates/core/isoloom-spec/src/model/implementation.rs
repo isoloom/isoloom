@@ -11,11 +11,12 @@ use super::Resources;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DockerImpl {
-    /// A published image (exactly one of `image` and `build`).
+    /// A published image. With `build`, the name that build is tagged with (built in
+    /// development, pulled in production); on its own, the image to pull.
     #[serde(default)]
     pub image: Option<String>,
-    /// A folder of the project, built into the machine's image as its build context (exactly
-    /// one of `image` and `build`).
+    /// A folder of the project, built into the machine's image as its build context. With
+    /// `image`, the build is tagged as that published name.
     #[serde(default)]
     pub build: Option<String>,
     /// The Dockerfile, a file anywhere in the project (default: `Dockerfile` in `build`): an

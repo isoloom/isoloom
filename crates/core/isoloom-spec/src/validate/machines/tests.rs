@@ -154,7 +154,8 @@ fn clones_share_no_alias() {
 #[test]
 fn a_container_is_an_image_or_a_build() {
     let docker = |d: &str| of(&format!("  web: {{ networks: {{ lan: 10 }}, docker: {d} }}\n"));
-    assert_eq!(docker("{ image: a, build: b }"), ["machines.web.docker: use `image` or `build`, not both"]);
+    // `image` beside `build` is the Compose combo (the build is tagged as that published name).
+    assert_eq!(docker("{ image: a, build: b }"), Vec::<String>::new());
     assert_eq!(
         docker("{ idle: true }"),
         ["machines.web.docker: set `image` (a published image) or `build` (a folder in the project)"]

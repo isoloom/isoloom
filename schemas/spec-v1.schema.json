@@ -1247,10 +1247,10 @@
       "properties": {
         "image": {
           "type": "string",
-          "description": "A published image, by tag or digest (`example/clamd:1.4`): the container form. Not with\n`build`."
+          "description": "A published image, by tag or digest (`example/clamd:1.4`): the container form. With\n`build`, the name that build is tagged with: development builds and tags it, production\npulls it."
         },
         "build": {
-          "description": "The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,\ntarget, args }`. The container form; translating it to a VM is never attempted, so add\n`os` and `steps` for a VM form.",
+          "description": "The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,\ntarget, args }`. The container form; translating it to a VM is never attempted, so add\n`os` and `steps` for a VM form. With `image`, the build is tagged as that published name.",
           "$ref": "#/$defs/BuildInput"
         },
         "steps": {

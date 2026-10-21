@@ -354,13 +354,13 @@ A custom app: its own image, its own Dockerfile, a network appliance, or portabl
 
 ### `machines.*.app.image`
 
-A published image, by tag or digest (`example/clamd:1.4`): the container form. Not with `build`.
+A published image, by tag or digest (`example/clamd:1.4`): the container form. With `build`, the name that build is tagged with: development builds and tags it, production pulls it.
 
 - **Type:** string
 
 ### `machines.*.app.build`
 
-The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form; translating it to a VM is never attempted, so add `os` and `steps` for a VM form.
+The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form; translating it to a VM is never attempted, so add `os` and `steps` for a VM form. With `image`, the build is tagged as that published name.
 
 - **Type:** string or mapping
 

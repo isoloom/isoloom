@@ -321,12 +321,11 @@ fn a_machine_with_no_form_leaves_no_target() {
 // The container recipe.
 
 #[test]
-fn image_and_build() {
-    assert_problem(
-        &with_machine("{ networks: { lab: 5 }, app: { image: nginx, build: web } }"),
-        "machines.m.app",
-        "both given",
-    );
+fn image_beside_build_is_the_compose_combo() {
+    // `image` with `build` is legal: the build is tagged as that published name (built in
+    // development, pulled in production), the way Docker Compose's `image` + `build` combine.
+    let yaml = with_machine("{ networks: { lab: 5 }, app: { image: ghcr.io/x/y:1, build: web } }");
+    assert_eq!(problems(&yaml), Vec::<String>::new(), "the combo is valid");
 }
 
 #[test]
