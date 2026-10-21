@@ -263,13 +263,17 @@ fn builtin_windows(os: &str) -> Option<VagrantBox> {
         // older Windows. No cloud or Proxmox image is mapped for these.
         "windows-server-2008r2" => b("jborean93/WindowsServer2008R2", Some("0.7.0"), None),
         "windows-server-2012r2" => b("jborean93/WindowsServer2012R2", Some("1.2.0"), None),
-        "windows-server-2016" => b("StefanScherer/windows_2016", Some("2019.02.14"), None),
+        "windows-server-2016" => b("StefanScherer/windows_2016", Some("2019.02.14"), Some("jborean93/WindowsServer2016")),
         // The box GOAD uses (VirtualBox, VMware), pinned to its known-good version. On QEMU (an
         // Apple Silicon Mac emulating x86), an evaluation box built for libvirt. On Hyper-V, its
         // last version with a Hyper-V build.
         "windows-server-2019" => with_hyperv(
             with_qemu(
-                b("StefanScherer/windows_2019", Some("2021.05.15"), None),
+                b(
+                    "StefanScherer/windows_2019",
+                    Some("2021.05.15"),
+                    Some("peru/windows-server-2019-standard-x64-eval"),
+                ),
                 "peru/windows-server-2019-standard-x64-eval",
             ),
             "StefanScherer/windows_2019",
