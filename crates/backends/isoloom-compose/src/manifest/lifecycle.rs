@@ -2,7 +2,7 @@
 //! previous run's leftovers is retried.
 
 use isoloom_manifest::{Action, Argv, Condition, HostArgv, Lifecycle, NonEmpty, Park, Recovery, Retries, Step, StepId, Template, When};
-use isoloom_plan::{Environment, Lifetime, MachineShape};
+use isoloom_plan::{Environment, Image, Lifetime, MachineShape};
 use isoloom_render::run_manifest::{cleanup, noted, tolerated};
 
 use super::machines::Member;
@@ -37,7 +37,7 @@ pub(super) fn owner<'a>(members: &'a [Member], job: &'a str) -> &'a str {
 pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Lifecycle> {
     let stop = || run("stop", compose(&["stop"])?, 300);
     Ok(Lifecycle {
-        up: NonEmpty::new(up(plan, members)?, "lifecycle.up")?,
+        up: NonEmpty::new(up(env, plan, members)?, "lifecycle.up")?,
         down: NonEmpty::new(down(env)?, "lifecycle.down")?,
         park: Some(Park {
             pause: Some(vec![stop()?]),
@@ -50,23 +50,46 @@ pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member])
     })
 }
 
-/// Pin the host ports, check they are free, clear stale networks, start everything but the leaf
-/// jobs and wait for it, then run each leaf job attached.
-fn up(plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>> {
-    let mut args = vec!["up", "--detach", "--build", "--pull", "missing", "--wait", "--wait-timeout", WAIT_TIMEOUT];
+/// Pin the host ports, check they are free, clear stale networks, pull any published images,
+/// start everything but the leaf jobs and wait for it, then run each leaf job attached.
+fn up(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>> {
+    // A lab that publishes a built image (the build+image combo) pulls it first, so a student runs
+    // the published image rather than building it; `up` then builds only what could not be pulled.
+    // A lab that only builds locally keeps `--build`, so an author's edits are always rebuilt.
+    let pull_published = publishes_a_built_image(env);
+    let mut args = vec!["up", "--detach"];
+    if !pull_published {
+        args.push("--build");
+    }
+    args.extend(["--pull", "missing", "--wait", "--wait-timeout", WAIT_TIMEOUT]);
     args.extend(plan.wait.iter().map(String::as_str));
     let mut steps = vec![
         noted(act("pin-ports", Action::ComposePinPorts)?, "Picking the lab's host ports…"),
         act("ports-free", Action::ComposeCheckPortsFree)?,
         tolerated(act("stale-networks", Action::ComposeRemoveStaleNetworks)?),
-        noted(run("up", compose(&args)?, 1800)?, "Starting the lab's containers…"),
     ];
+    if pull_published {
+        // Pull the published images; a service with no published image, or one not pushed yet,
+        // fails the pull and is built by `up`. Tolerated, so an unreachable registry still falls
+        // back to building rather than failing the run.
+        let pull = ["pull", "--ignore-pull-failures"];
+        steps.push(noted(tolerated(run("pull", compose(&pull)?, 1800)?), "Pulling the lab's published images…"));
+    }
+    steps.push(noted(run("up", compose(&args)?, 1800)?, "Starting the lab's containers…"));
     for job in &plan.jobs {
         let attached = ["up", "--no-deps", "--exit-code-from", job, job];
         let note = format!("Running {}'s set-up script…", owner(members, job));
         steps.push(noted(run(&job_step(job), compose(&attached)?, 600)?, &note));
     }
     Ok(steps)
+}
+
+/// Whether any machine runs a published image it also builds (the build+image combo), so the run
+/// pulls before building and a student uses the published image instead of building it.
+pub(super) fn publishes_a_built_image(env: &Environment) -> bool {
+    env.machines
+        .values()
+        .any(|mp| matches!(&mp.image, Some(Image::Container { build: Some(_), published: true, .. })))
 }
 
 /// Remove everything, the check runners included; the volumes the spec keeps survive (`down`

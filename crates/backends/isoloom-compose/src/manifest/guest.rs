@@ -15,7 +15,7 @@ use isoloom_render::{OUTPUT_DIR, steps};
 
 use super::Project;
 use super::checks::{Planned, planned, stand_ins};
-use super::lifecycle::{job_step, owner, ready};
+use super::lifecycle::{job_step, owner, publishes_a_built_image, ready};
 use super::machines::{Member, classify, machines};
 use super::slots::{Starts, slots};
 use crate::error::Result;
@@ -99,13 +99,24 @@ const START: &str = "start";
 /// Compose reads from its environment read from the VM's copy first.
 fn start(env: &Environment, vm: &InVm, plan: &StartPlan, members: &[Member]) -> Result<Vec<GuestCommand>> {
     let files = host_environment(env);
-    let mut up = format!("up --detach --build --pull missing --wait --wait-timeout {WAIT_TIMEOUT}");
+    // As on the host: a lab that publishes a built image pulls it first (a student runs the
+    // published image), so it drops `--build` and `up` builds only what could not be pulled; a
+    // lab that only builds locally keeps `--build`.
+    let pull_published = publishes_a_built_image(env);
+    let build = if pull_published { "" } else { " --build" };
+    let mut up = format!("up --detach{build} --pull missing --wait --wait-timeout {WAIT_TIMEOUT}");
     for service in &plan.wait {
         up.push(' ');
         up.push_str(service);
     }
+    let mut out = Vec::new();
+    if pull_published {
+        let pulling = Some("Pulling the lab's published images in the VM…".to_owned());
+        let pull = text("pull --ignore-pull-failures");
+        out.push(command("pull", pulling, vm.compose(&files, &pull), 1800)?);
+    }
     let starting = Some("Starting the lab's containers in the VM…".to_owned());
-    let mut out = vec![command(START, starting, vm.compose(&files, &text(&up)), 1800)?];
+    out.push(command(START, starting, vm.compose(&files, &text(&up)), 1800)?);
     for job in &plan.jobs {
         let note = Some(format!("Running {}'s set-up script…", owner(members, job)));
         let attached = format!("up --no-deps --exit-code-from {job} {job}");
