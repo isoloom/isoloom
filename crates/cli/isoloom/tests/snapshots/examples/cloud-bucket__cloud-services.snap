@@ -15,7 +15,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "cloud-bucket",

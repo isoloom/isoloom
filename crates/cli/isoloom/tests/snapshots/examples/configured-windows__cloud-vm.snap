@@ -382,7 +382,7 @@ resource "local_file" "isoloom_project" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "configured-windows",
@@ -1249,7 +1249,7 @@ resource "local_file" "isoloom_project" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "configured-windows",
