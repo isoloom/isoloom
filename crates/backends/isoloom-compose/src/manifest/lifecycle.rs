@@ -87,9 +87,16 @@ fn up(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Vec<Ste
 /// Whether any machine runs a published image it also builds (the build+image combo), so the run
 /// pulls before building and a student uses the published image instead of building it.
 pub(super) fn publishes_a_built_image(env: &Environment) -> bool {
-    env.machines
-        .values()
-        .any(|mp| matches!(&mp.image, Some(Image::Container { build: Some(_), published: true, .. })))
+    env.machines.values().any(|mp| {
+        matches!(
+            &mp.image,
+            Some(Image::Container {
+                build: Some(_),
+                published: true,
+                ..
+            })
+        )
+    })
 }
 
 /// Remove everything, the check runners included; the volumes the spec keeps survive (`down`

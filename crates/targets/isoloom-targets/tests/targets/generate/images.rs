@@ -22,7 +22,10 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
             .contains("  user:\n    image: ${ISOLOOM_ACCESS_IMAGE:-kalilinux/kali-rolling}\n    platform: linux/amd64\n    profiles:\n    - access\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"),
         "{compose}"
     );
-    assert!(!compose.contains("isoloom-access"));
+    // A check that runs from its position can't depend on it (it is on demand, in the `access`
+    // profile), so the check-profile stand-in `isoloom-access` stands in at its addresses; the
+    // access box keeps its own `user` service above and is never collapsed into the stand-in.
+    assert!(compose.contains("\n  isoloom-access:\n"), "{compose}");
     // Its VM too: defined but not started by `up` (`autostart: false`), its box overridable.
     let vagrant = generated(&applied, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     assert!(

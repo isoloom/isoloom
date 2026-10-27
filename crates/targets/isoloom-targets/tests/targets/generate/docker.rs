@@ -67,7 +67,9 @@ fn reach_rules_add_a_router_with_matching_rules() -> Outcome {
     // Offline machines lose their default route; no Docker-internal network with a router.
     assert!(compose.contains("ip route del default"));
     assert!(!compose.contains("internal: true"));
-    // Names across networks, and checks from the access machine (a Debian container here).
+    // Names across networks, and checks from the access machine's position. The access box is on
+    // demand (the `access` profile), so a check in the `check` profile can't share its namespace:
+    // it runs from the stand-in at the box's addresses (`isoloom-access`), not the box itself.
     assert!(compose.contains("cache:10.61.20.20"));
     let check = compose
         .split("\n  isoloom-check:\n")
@@ -76,7 +78,7 @@ fn reach_rules_add_a_router_with_matching_rules() -> Outcome {
         .split("\n  isoloom-check-")
         .next()
         .unwrap();
-    assert!(check.contains("network_mode: service:user") && !compose.contains("isoloom-access"), "{compose}");
+    assert!(check.contains("network_mode: service:isoloom-access"), "{compose}");
     Ok(())
 }
 
