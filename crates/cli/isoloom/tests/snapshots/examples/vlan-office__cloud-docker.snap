@@ -197,7 +197,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "vlan-office",
@@ -1154,7 +1154,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "vlan-office",
@@ -2044,7 +2044,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "vlan-office",
@@ -2930,7 +2930,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "vlan-office",
@@ -3807,7 +3807,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "vlan-office",
@@ -4702,7 +4702,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "vlan-office",

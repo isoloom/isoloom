@@ -655,7 +655,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "segmented",
@@ -1457,7 +1457,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "environment": {
     "name": "segmented",

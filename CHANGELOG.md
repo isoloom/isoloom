@@ -8,6 +8,25 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
+## [1.0.2] — 2026-10-27
+
+### Added
+
+- **A container machine can declare both `app.image` and `app.build`** — the Compose
+  `build:`+`image:` combination. The build is tagged with the published image name, so a
+  developer builds and tags it locally while a student pulls the pre-built image. The former
+  rule that a machine used *either* `image` *or* `build` is relaxed; a machine that still gives
+  only one behaves exactly as before.
+- **A lab that publishes a built image now pulls it before `up`.** When a machine publishes an
+  image it also builds, the Docker run does `docker compose pull --ignore-pull-failures` first
+  and `up` drops `--build`: a present published image is used as-is and only a missing one is
+  built from its context (pull-if-available-else-build). A lab that only builds locally keeps
+  `--build` and gains no pull step, so an author's edits always rebuild. The same treatment
+  applies to the Docker-in-VM guest path.
+- **libvirt boxes for Windows Server 2016 and 2019**, so Windows VM labs deploy on
+  vagrant-libvirt (KVM); the StefanScherer boxes those versions mapped to are
+  VirtualBox/VMware-only. (2022/2025/10/11 already had libvirt builds.)
+
 ## [1.0.1] — 2026-10-18
 
 ### Fixed
