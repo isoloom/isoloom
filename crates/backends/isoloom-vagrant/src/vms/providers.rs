@@ -192,6 +192,8 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::Libvirt), params, |r| {
         if let Some(b) = g.libvirt_box {
             r.assign("o.vm.box", Value::str(b));
+            // A box of its own: the main box's version pin isn't one of its versions (as for QEMU).
+            r.assign("o.vm.box_version", Value::str(">= 0"));
             // A roboxes box, with a build for each architecture and each one's metadata: the
             // machine's own, else (Isoloom's own VMs) the host's.
             let arch = g.qemu.arch.map_or_else(|| Value::sym("auto"), |a| Value::str(a.id()));

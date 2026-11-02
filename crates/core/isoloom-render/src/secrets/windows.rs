@@ -133,7 +133,7 @@ pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> St
         "$ErrorActionPreference = 'Stop'\n{PROTECT}\n$k = {k}\nNew-Item -ItemType Directory -Force $k | Out-Null\nProtect-IsoloomPath $k\n\
          foreach ($e in @{{ {pairs} }}.GetEnumerator()) {{ $v = [Environment]::GetEnvironmentVariable($e.Value); \
          if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) {{ continue }}; \
-         $b = if ($v) {{ [Convert]::FromBase64String($v) }} else {{ [byte[]]@() }}; \
+         $b = [byte[]]::new(0); if ($v) {{ $b = [Convert]::FromBase64String($v) }}; \
          [IO.File]::WriteAllBytes(\"$k\\$($e.Key).new\", $b); Move-Item -Force \"$k\\$($e.Key).new\" \"$k\\$($e.Key)\" }}\n\
          Set-Content -Path {} -Value ''\n{}",
         powershell::quote(DELIVERED),

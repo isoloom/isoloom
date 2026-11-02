@@ -1259,6 +1259,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provider "libvirt" do |v, o|
       o.vm.box = "generic/alpine319"
+      o.vm.box_version = ">= 0"
       o.vm.box_architecture = :auto
       v.cpus = 1
       v.memory = 512

@@ -124,6 +124,13 @@ fn values_from_the_environment_are_kept_then_placed_without_waiting() {
         ps.contains("if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) { continue }"),
         "an empty value keeps the kept one: {ps}"
     );
+    // An empty value writes an empty file: `$b` is initialised to an empty byte array directly, not
+    // through `else { [byte[]]@() }`, whose empty array PowerShell unwraps to $null -- which made
+    // WriteAllBytes throw "Value cannot be null" the first time an unset input was delivered.
+    assert!(
+        ps.contains("$b = [byte[]]::new(0); if ($v) { $b = [Convert]::FromBase64String($v) };") && !ps.contains("[byte[]]@()"),
+        "an empty value must not reach WriteAllBytes as $null: {ps}"
+    );
     assert!(ps.contains(&format!("Set-Content -Path '{DELIVERED}' -Value ''\n")), "{ps}");
     assert!(
         ps.contains("Register-ScheduledTask -TaskName 'isoloom-apply-secrets'") && !ps.contains("Start-Sleep"),
