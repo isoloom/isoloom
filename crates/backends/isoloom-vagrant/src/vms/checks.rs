@@ -77,7 +77,6 @@ pub(crate) fn in_their_place(env: &Environment) -> Vec<Resolved> {
 /// The runner script of a position's checks, next to the Vagrantfile as `checks/<file>.sh`.
 pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Position, group: &[&Resolved]) -> GeneratedFile {
     let host = |h: &Host, _: &Position| isoloom_render::checks::address_of(env, h);
-    let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");
     let run_playbook = |path: &str| {
         let (folder, playbook) = path.rsplit_once('/').unwrap_or((".", path));
         format!(
@@ -86,7 +85,7 @@ pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Positi
     };
     let render = checks::Render {
         host: &host,
-        script: &run_script,
+        script: &isoloom_render::checks::script_command,
         playbook: Some(&run_playbook),
     };
     GeneratedFile {

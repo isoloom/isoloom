@@ -99,8 +99,9 @@ else
   curl -fsSL https://get.docker.com | VERSION=29.9.0 sh
 fi"#;
 
-/// Where the project is unpacked on a Windows VM, and the machine's own scripts with it.
-const WINDOWS_PROJECT_DIR: &str = "C:\\isoloom";
+/// Where the project is unpacked on a Windows VM, and the machine's own scripts with it; where
+/// a Windows recipe runs from too (see [`crate::configure::powershell`]).
+pub(crate) const WINDOWS_PROJECT_DIR: &str = "C:\\isoloom";
 
 /// Installs packages with the machine's own package manager (Debian and Ubuntu, or the RHEL
 /// family: Rocky, AlmaLinux, CentOS, Fedora).

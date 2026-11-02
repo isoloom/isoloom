@@ -8,6 +8,7 @@ use isoloom_spec::syntax::{FileState, Guard, Invocation};
 
 use super::Configured;
 use crate::powershell::quote;
+use crate::steps::WINDOWS_PROJECT_DIR;
 use crate::{GeneratedFile, header};
 
 /// The library, as Isoloom ships it.
@@ -15,9 +16,6 @@ pub const LIBRARY: &str = include_str!("powershell/configure.ps1");
 
 /// Where the library is generated, from the project folder.
 pub const LIBRARY_PATH: &str = ".isoloom/configure/lib/configure.ps1";
-
-/// Where a Windows VM's project is, and where its recipe runs from.
-const PROJECT_DIR: &str = "C:\\isoloom";
 
 /// The file the restart rule reads on a Windows VM.
 const CHANGED: &str = "C:\\Windows\\Temp\\isoloom-configure.changed";
@@ -42,7 +40,7 @@ pub fn script(c: &Configured<'_>, resources: &[Resource], fresh: bool) -> String
         "Set-Content -LiteralPath $env:ISOLOOM_CHANGED -Value 'changed'"
     };
     let library = super::compact(LIBRARY);
-    format!("$ErrorActionPreference = 'Stop'\n{library}$env:ISOLOOM_CHANGED = '{CHANGED}'\n{mark}\nSet-Location -LiteralPath '{PROJECT_DIR}'\n{calls}")
+    format!("$ErrorActionPreference = 'Stop'\n{library}$env:ISOLOOM_CHANGED = '{CHANGED}'\n{mark}\nSet-Location -LiteralPath '{WINDOWS_PROJECT_DIR}'\n{calls}")
 }
 
 /// Step `r`'s call(s), one per line; `None` for a step the library doesn't run (a script, a

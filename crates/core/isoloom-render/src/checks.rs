@@ -1,7 +1,10 @@
-//! What the backends' check runners share: where a probe reaches its host.
+//! What the backends' check runners share: where a probe reaches its host, and how a VM target
+//! runs a project check script.
 
 use isoloom_plan::Environment;
 use isoloom_plan::checks::Host;
+
+use crate::steps::PROJECT_DIR;
 
 /// A probe's host at its address: a machine where a probe reaches it on the network
 /// ([`Environment::probe_address`]), a literal as written. For the targets that keep the
@@ -12,6 +15,13 @@ pub fn address_of(env: &Environment, host: &Host) -> String {
         Host::Machine { name, network } => env.probe_address(name, network),
         Host::Literal(literal) => literal.clone(),
     }
+}
+
+/// The shell command a VM target runs a project check script with: from the project copy at
+/// [`PROJECT_DIR`], then `sh <path>` (what a backend hands [`isoloom_plan::checks::Render::script`]).
+#[must_use]
+pub fn script_command(path: &str) -> String {
+    format!("cd {PROJECT_DIR} && sh {path}")
 }
 
 #[cfg(test)]

@@ -446,18 +446,23 @@ pub fn of(spec: &Spec) -> Vec<Requirement> {
     out
 }
 
+/// The name of the first machine `pred` holds for, in the spec's order.
+fn first_machine(spec: &Spec, pred: impl Fn(&isoloom_spec::Machine) -> bool) -> Option<String> {
+    spec.machines.iter().find(|(_, m)| pred(m)).map(|(name, _)| name.clone())
+}
+
 /// What the containers' limits, the links' impairment and the machines' own processes ask for:
 /// at most one requirement of each kind, the first machine or network that asks.
 fn limits(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
-    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !m.ulimits.is_empty()) {
-        out.push(Requirement::Ulimits { machine: name.clone() });
+    if let Some(machine) = first_machine(spec, |m| !m.ulimits.is_empty()) {
+        out.push(Requirement::Ulimits { machine });
     }
     if spec.networks.values().any(|n| n.tc.is_some()) {
         out.push(Requirement::TrafficControl);
     }
-    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !crate::process::Process::of(m).is_empty()) {
-        out.push(Requirement::MachineProcess { machine: name.clone() });
+    if let Some(machine) = first_machine(spec, |m| !crate::process::Process::of(m).is_empty()) {
+        out.push(Requirement::MachineProcess { machine });
     }
     out.extend(secrets(spec));
     out
@@ -466,12 +471,12 @@ fn limits(spec: &Spec) -> Vec<Requirement> {
 /// What the machines' secrets ask for: delivering them at all, then owning their files.
 fn secrets(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
-    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| !m.secrets.is_empty()) {
-        out.push(Requirement::Secrets { machine: name.clone() });
+    if let Some(machine) = first_machine(spec, |m| !m.secrets.is_empty()) {
+        out.push(Requirement::Secrets { machine });
     }
     let owned = |m: &isoloom_spec::Machine| m.secrets.iter().any(|s| s.mount().uid.is_some() || s.mount().gid.is_some());
-    if let Some((name, _)) = spec.machines.iter().find(|(_, m)| owned(m)) {
-        out.push(Requirement::SecretOwner { machine: name.clone() });
+    if let Some(machine) = first_machine(spec, owned) {
+        out.push(Requirement::SecretOwner { machine });
     }
     out
 }

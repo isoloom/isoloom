@@ -4,7 +4,7 @@
 
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position};
-use isoloom_render::checks::address_of;
+use isoloom_render::checks::{address_of, script_command};
 use isoloom_render::hcl_builder::{Block, Expression, list, object, string};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 
@@ -14,10 +14,9 @@ use crate::module::output;
 /// at `/opt/isoloom`.
 pub(crate) fn runners(env: &Environment, dir: &str) -> Vec<GeneratedFile> {
     let host = |h: &Host, _: &Position| address_of(env, h);
-    let run_script = |path: &str| format!("cd /opt/isoloom && sh {path}");
     let render = checks::Render {
         host: &host,
-        script: &run_script,
+        script: &script_command,
         playbook: None,
     };
     checks::by_position(env.spec(), &env.checks)
@@ -58,7 +57,7 @@ pub(crate) fn output_block(env: &Environment, dir: &str, how: Invocation, at: &d
             let r = at(&pos)?;
             let script = format!("{OUTPUT_DIR}/{dir}/checks/{}.sh", pos.id());
             let run = match how {
-                Invocation::Command => ("command", string(format!("cd /opt/isoloom && sh {script}"))),
+                Invocation::Command => ("command", string(script_command(&script))),
                 Invocation::Script => ("script", string(script)),
             };
             Some(object([
