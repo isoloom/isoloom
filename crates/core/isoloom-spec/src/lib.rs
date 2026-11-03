@@ -42,7 +42,7 @@ pub mod windows;
 pub use error::{Error, Result};
 pub use load::{SPEC_FILE, SPEC_FILES, find, load, load_profiled, load_with, parse};
 pub use model::{Appliance, Arch, Check, CloudServices, Declared, Dns, Expect, KNOWN_OS, Machine, Network, Port, Reach, Resources, Shape, Target, Tc, Vlan};
-pub use sizing::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB, Totals, totals};
+pub use sizing::{CONTAINER_DISK_GB, CONTAINER_MEMORY_MB, DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB, Totals, totals, totals_for};
 pub use syntax::Spec;
 pub use targets::{derive, effective};
 pub use validate::{Problem, validate, validate_files};
