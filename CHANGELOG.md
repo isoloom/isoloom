@@ -8,6 +8,16 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
+## [1.0.3] — 2026-11-03
+
+### Added
+
+- **Per-target resource totals** — `isoloom_spec::totals_for(spec, target)` sizes each machine the
+  way the chosen target runs it (a container reserves less memory and disk than a VM), so the same
+  spec reads lighter on the Docker targets than on the VM ones. The existing `totals` keeps
+  reporting the all-VM figure (the heaviest form). Lets a consumer show a lab's minimum to run as a
+  Docker-to-VM range.
+
 ## [1.0.2] — 2026-10-27
 
 ### Added
