@@ -95,6 +95,9 @@ pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.text(&crate::vms::project_rb());
     vagrantfile::inputs(&mut r, &env.spec().inputs, false);
+    if env.machines.values().any(|m| m.shape == MachineShape::Container && !m.ports.is_empty()) {
+        vagrantfile::chosen_ports(&mut r);
+    }
     r.blank();
     r.block("Vagrant.configure(\"2\")", "config", |r| configure(r, env, guest));
     GeneratedFile {
@@ -122,9 +125,18 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
         r.assign("config.ssh.forward_env", Value::array(forwarded.iter().map(|v| Value::str(v))));
     }
     vagrantfile::libvirt_prefix(r, "config", &env.name);
-    let containers = env.machines.values().filter(|m| m.shape == MachineShape::Container);
-    for p in containers.flat_map(|m| &m.ports) {
-        r.call(vagrantfile::forwarded_port("config", p.publish, p.publish, p.protocol));
+    // Each container's published port is served inside the VM at its own number; the VM forwards
+    // it from a host port the runner picks (looked up by `<machine>/<port>`, defaulting to publish).
+    for (name, m) in env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container) {
+        for p in &m.ports {
+            r.call(vagrantfile::forwarded_port_chosen(
+                "config",
+                p.publish,
+                &format!("{name}/{}", p.name),
+                p.publish,
+                p.protocol,
+            ));
+        }
     }
     let size = host_size(env);
     let label = format!("{} · docker", env.name);

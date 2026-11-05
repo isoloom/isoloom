@@ -68,10 +68,29 @@ const ESXI: [(&str, &str, Option<&str>, bool); 5] = [
 /// The params the Vagrantfile reads, every step getting them; `ISOLOOM_DERIVED` only the check
 /// runners'.
 pub(super) fn params(runners: &[CheckRunner]) -> Result<Vec<Param>> {
-    let mut out = vec![hyperv_switch()?];
+    let mut out = vec![hyperv_switch()?, publish_fixed()?];
     out.extend(remote_params()?);
     out.extend(derived_switch(runners.iter().map(|r| r.step.id.clone()).collect())?);
     Ok(out)
+}
+
+/// Whether each published port takes its own `publish:` number on the host instead of a free one
+/// the runner picks at the first start (the player's "use the lab's own ports" choice). Unset, the
+/// runner picks free ports, so two VM labs forwarding one number never collide.
+fn publish_fixed() -> Result<Param> {
+    param(
+        &Wanted {
+            name: "ISOLOOM_PUBLISH_FIXED",
+            description: "Forward each published port from its own `publish` number on the host, instead of a free port the runner picks.",
+            default: None,
+            values: &["1"],
+            required: false,
+            hosts: &[],
+            providers: &[],
+            set_by: SetBy::Embedder,
+        },
+        StepSelection::Every,
+    )
 }
 
 /// The Hyper-V switch the VMs' first adapter goes on.

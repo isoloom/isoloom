@@ -182,6 +182,9 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(hyperv::HYPERV_RB);
     r.blank();
     vagrantfile::inputs(r, &env.spec().inputs, values::any(env));
+    if env.machines.values().any(|m| !m.ports.is_empty()) {
+        vagrantfile::chosen_ports(r);
+    }
     esxi(r, env);
     r.blank();
 }

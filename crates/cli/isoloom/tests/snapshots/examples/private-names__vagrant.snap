@@ -897,7 +897,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.3"
+    "version": "1.0.5"
   },
   "environment": {
     "name": "private-names",
@@ -1078,6 +1078,23 @@ echo "isoloom-check: END $passed passed, $failed failed"
         {
           "via": "env",
           "var": "ISOLOOM_HYPERV_SWITCH",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_PUBLISH_FIXED",
+      "description": "Forward each published port from its own `publish` number on the host, instead of a free port the runner picks.",
+      "values": [
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_FIXED",
           "steps": [
             "*"
           ]

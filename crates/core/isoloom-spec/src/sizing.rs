@@ -150,7 +150,8 @@ mod tests {
     #[test]
     fn hybrid_sizes_each_machine_by_its_own_kind() {
         // A container-capable machine (container on hybrid) beside a VM-only one (a VM on hybrid).
-        let spec = spec("machines:\n  web: { networks: { lan: 10 }, docker: { image: x } }\n  win: { networks: { lan: 11 }, vm: { os: windows-server@2022 } }\n");
+        let spec =
+            spec("machines:\n  web: { networks: { lan: 10 }, docker: { image: x } }\n  win: { networks: { lan: 11 }, vm: { os: windows-server@2022 } }\n");
         let hybrid = totals_for(&spec, Target::Hybrid);
         assert_eq!(hybrid.memory_mb, CONTAINER_MEMORY_MB + DEFAULT_MEMORY_MB);
         assert_eq!(hybrid.disk_gb, CONTAINER_DISK_GB + DEFAULT_DISK_GB);

@@ -421,6 +421,9 @@ module IsoloomHyperV
   end
 end
 
+require "json"
+# The host ports the runner chose for this run; each forward defaults to its own number.
+ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (app); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
@@ -721,7 +724,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.60.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
-    m.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
+    m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
       v.name = "hello-stack · web"
       v.linked_clone = true
@@ -1391,7 +1394,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.3"
+    "version": "1.0.5"
   },
   "environment": {
     "name": "hello-stack",
@@ -1572,6 +1575,23 @@ echo "isoloom-check: END $passed passed, $failed failed"
         {
           "via": "env",
           "var": "ISOLOOM_HYPERV_SWITCH",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_PUBLISH_FIXED",
+      "description": "Forward each published port from its own `publish` number on the host, instead of a free port the runner picks.",
+      "values": [
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_FIXED",
           "steps": [
             "*"
           ]
@@ -1799,7 +1819,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "protocol": "tcp",
           "http": true,
           "publish": {
-            "mode": "fixed",
+            "mode": "ephemeral",
             "preferred": 8080,
             "address": "127.0.0.1"
           }

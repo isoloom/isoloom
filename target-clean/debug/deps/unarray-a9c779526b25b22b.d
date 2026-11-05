@@ -1,0 +1,10 @@
+/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/unarray-a9c779526b25b22b.d: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/build.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/map.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/from_iter.rs
+
+/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/libunarray-a9c779526b25b22b.rlib: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/build.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/map.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/from_iter.rs
+
+/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/libunarray-a9c779526b25b22b.rmeta: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/build.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/map.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/from_iter.rs
+
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/lib.rs:
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/build.rs:
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/map.rs:
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unarray-0.1.4/src/from_iter.rs:

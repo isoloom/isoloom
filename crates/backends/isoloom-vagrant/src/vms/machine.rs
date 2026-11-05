@@ -52,7 +52,14 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         }
         super::bridged::networks(r, env, mp);
         for p in &mp.ports {
-            r.call(vagrantfile::forwarded_port("m", p.port, p.publish, p.protocol));
+            // The runner looks its chosen host port up by `<machine>/<port>`, defaulting to publish.
+            r.call(vagrantfile::forwarded_port_chosen(
+                "m",
+                p.port,
+                &format!("{name}/{}", p.name),
+                p.publish,
+                p.protocol,
+            ));
         }
         providers::blocks(r, &guest(env, name, mp, &image, link));
         transport::provisioners(r, env, name, os);

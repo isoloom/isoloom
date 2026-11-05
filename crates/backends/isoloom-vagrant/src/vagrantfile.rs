@@ -46,9 +46,37 @@ pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, env: &str) {
     });
 }
 
+/// The Ruby hash of the host ports the runner chose for this run, read once at a VM Vagrantfile's
+/// top (see [`chosen_ports`]); each forwarded port looks its own number up in it.
+pub(crate) const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
+
+/// The runner's chosen host ports, read once at the top of a VM's Vagrantfile: a JSON object
+/// `{"<machine>/<port>": <host port>}` in `ISOLOOM_HOSTPORTS`, empty when it set none (a run with
+/// no ephemeral port, or an older runner). Each forwarded port then defaults to its own `publish`
+/// number, so the file still works without it.
+pub(crate) fn chosen_ports(r: &mut Ruby) {
+    r.text("require \"json\"\n");
+    r.comment("The host ports the runner chose for this run; each forward defaults to its own number.");
+    r.assign(HOSTPORTS, Value::raw(format!("(JSON.parse(ENV.fetch(\"{HOSTPORTS}\", \"{{}}\")) rescue {{}})")));
+}
+
 /// A port forwarded from the host's loopback: `guest` in the VM to `host` on this machine. UDP
 /// says so (vagrant-libvirt skips those, with a warning; `isoloom run` repeats it).
 pub(crate) fn forwarded_port(var: &str, guest: u16, host: u16, protocol: Protocol) -> Call {
+    forwarded_port_with(var, guest, host, protocol)
+}
+
+/// A forwarded port whose host number the runner chooses at launch: the Vagrantfile reads it from
+/// [`HOSTPORTS`] by `key` (`"<machine>/<port>"`), defaulting to `publish` when the runner set none
+/// (a fixed port, or an older runner that forwards at the published number).
+pub(crate) fn forwarded_port_chosen(var: &str, guest: u16, key: &str, publish: u16, protocol: Protocol) -> Call {
+    // `key` is `<machine>/<port>` of validated names (no quote can appear in it).
+    let host = Value::raw(format!("{HOSTPORTS}.fetch(\"{key}\", {publish})"));
+    forwarded_port_with(var, guest, host, protocol)
+}
+
+/// A forwarded port with any `host` expression (a literal number, or a lookup).
+fn forwarded_port_with(var: &str, guest: u16, host: impl Into<Value>, protocol: Protocol) -> Call {
     let call = Call::new(format!("{var}.vm.network"))
         .arg(Value::str("forwarded_port"))
         .kw("guest", guest)

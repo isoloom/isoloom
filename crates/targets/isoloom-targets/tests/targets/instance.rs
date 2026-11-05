@@ -68,8 +68,9 @@ fn vagrant_instances_differ_by_name_only() -> Outcome {
     // VM labels and internal network names carry the instance; addresses don't move.
     assert!(vf.contains("isoloom-hello-stack-1-app") && vf.contains("hello-stack-1 · web"), "{vf}");
     assert!(vf.contains("10.60.0.10"));
-    // Published ports shift so two instances can both forward to the host.
-    assert!(vf.contains("guest: 80, host: 8180"), "{vf}");
+    // The runner picks each forward a free host port; the per-instance shift is the default it
+    // falls back to, so two instances can both forward even without a runner choosing.
+    assert!(vf.contains("guest: 80, host: ISOLOOM_HOSTPORTS.fetch(") && vf.contains(", 8180)"), "{vf}");
     // The project copy leaves every instance folder behind.
     assert!(vf.contains("rel.start_with?(\".isoloom\")"));
     Ok(())

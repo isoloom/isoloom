@@ -330,6 +330,9 @@ IsoloomProject::UNTAR_PS1 = <<'PS1'
   "$files files in $dest$note"
 }
 PS1
+require "json"
+# The host ports the runner chose for this run; each forward defaults to its own number.
+ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
   config.vm.box = "bento/debian-12"
@@ -340,7 +343,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider "libvirt" do |v|
     v.default_prefix = "hello-stack_"
   end
-  config.vm.network "forwarded_port", guest: 8080, host: 8080, host_ip: "127.0.0.1"
+  config.vm.network "forwarded_port", guest: 8080, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
     v.name = "hello-stack · docker"
@@ -657,7 +660,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.3"
+    "version": "1.0.5"
   },
   "environment": {
     "name": "hello-stack",
@@ -1438,7 +1441,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.3"
+    "version": "1.0.5"
   },
   "environment": {
     "name": "hello-stack",

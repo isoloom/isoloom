@@ -1,0 +1,1 @@
+{"rustc":18096061278120783953,"features":"[]","declared_features":"[\"default\", \"std\"]","target":3267950875828120012,"profile":9469513639638652478,"path":3899733032065689072,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"debug/.fingerprint/arraydeque-78e66d2b1523b06a/dep-lib-arraydeque","checksum":false}}],"rustflags":[],"config":9396254390672932401,"compile_kind":0}

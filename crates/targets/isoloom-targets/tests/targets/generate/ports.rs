@@ -139,7 +139,7 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() -> O
     // Vagrant: forwarded as UDP; app waits for dns on TCP 53.
     let vf = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     assert!(
-        vf.contains("guest: 53, host: 10053, host_ip: \"127.0.0.1\", protocol: \"udp\" # not on libvirt"),
+        vf.contains("guest: 53, host: ISOLOOM_HOSTPORTS.fetch(") && vf.contains(", 10053), host_ip: \"127.0.0.1\", protocol: \"udp\" # not on libvirt"),
         "{vf}"
     );
     assert!(!vf.contains("/dev/tcp/syslog/514"), "{vf}");

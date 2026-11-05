@@ -1,0 +1,10 @@
+/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/walkdir-89721543d2aad2e6.d: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/dent.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/error.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/util.rs
+
+/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/libwalkdir-89721543d2aad2e6.rlib: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/dent.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/error.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/util.rs
+
+/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/libwalkdir-89721543d2aad2e6.rmeta: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/dent.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/error.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/util.rs
+
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/lib.rs:
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/dent.rs:
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/error.rs:
+/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/walkdir-2.5.0/src/util.rs:

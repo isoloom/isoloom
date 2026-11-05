@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 
-use isoloom_manifest::{Machine, Name, Native, OsName, Provider, PublishMode, Resources, Role, Template};
+use isoloom_manifest::{Machine, Name, Native, OsName, Provider, Resources, Role, Template};
 use isoloom_plan::{Controller, Environment};
 use isoloom_render::run_manifest::{addresses, arch, port};
 use isoloom_spec::validate::Cidr;
@@ -73,8 +73,9 @@ fn helper_size() -> Resources {
     }
 }
 
-/// A lab machine: its OS, size and addresses, and its ports, published ones forwarded from the
-/// host's loopback at their `publish` number (always: Vagrant has no ephemeral forward).
+/// A lab machine: its OS, size and addresses, and its ports. A published port is forwarded from
+/// the host's loopback to a port the runner picks free at the first start (reflected in the lab's
+/// URL), unless the spec fixed it (`publish: { fixed: true }`), when it forwards that number.
 fn lab_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
     let (Some(mp), Some(m)) = (env.machines.get(name), env.spec().machines.get(name)) else {
         return Ok(());
@@ -92,11 +93,9 @@ fn lab_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
     out.addresses = addresses(mp)?;
     let loopback = Template::text(LOOPBACK);
     for p in &m.ports {
-        let mut port = port(&m.port_label(p), p, &mp.ports, &loopback)?;
-        if let Some(publish) = &mut port.publish {
-            publish.mode = PublishMode::Fixed;
-        }
-        out.ports.push(port);
+        // The host port is the runner's to choose (ephemeral), unless the spec fixed it: the
+        // shared `port` builder reads that from the plan's `fixed` flag.
+        out.ports.push(port(&m.port_label(p), p, &mp.ports, &loopback)?);
     }
     Ok(())
 }
@@ -138,6 +137,8 @@ fn native(env: &Environment, d: &Define) -> Result<Native> {
 
 #[cfg(test)]
 mod tests {
+    use isoloom_manifest::PublishMode;
+
     use super::*;
     use crate::testing::environment;
 
@@ -162,9 +163,11 @@ checks: [{ http: 'http://web/', wait: 30 }]
         assert!(!vm_names.contains_key(&Provider::Qemu));
         assert_eq!(ms[0].role, Role::Target);
         let site = &ms[0].ports[0];
+        // Not fixed in the spec, so the host port is the runner's to pick (ephemeral); 8086 is the
+        // fallback it defaults to when the runner picked none.
         assert_eq!(
             site.publish.as_ref().map(|p| (p.mode, p.preferred.map(u16::from))),
-            Some((PublishMode::Fixed, Some(8086)))
+            Some((PublishMode::Ephemeral, Some(8086)))
         );
         assert_eq!((ms[1].role, ms[1].keep_running), (Role::Infra, false));
         assert_eq!(ms[1].addresses[&Name::parse("lab").unwrap()].to_string(), "10.9.0.253");
