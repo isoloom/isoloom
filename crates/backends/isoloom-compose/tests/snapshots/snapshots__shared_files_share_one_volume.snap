@@ -37,6 +37,7 @@ services:
     network_mode: service:writer
     volumes:
     - ../../steps/write.sh:/isoloom/init/write.sh:ro
+    - ../..:/opt/isoloom:ro
     - shared:/srv/shared
     - writer-data:/srv/data
     depends_on:
@@ -72,6 +73,7 @@ services:
     network_mode: service:reader
     volumes:
     - ../../steps/look.sh:/isoloom/init/look.sh:ro
+    - ../..:/opt/isoloom:ro
     - shared:/data/shared
     depends_on:
       reader:

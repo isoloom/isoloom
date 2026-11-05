@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use isoloom_manifest as manifest;
 use isoloom_plan::{Environment, Image, PublishedPort};
 use isoloom_render::container::{PROBE_DIR, init_names};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, constraints, trunks};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, constraints, steps::PROJECT_DIR, trunks};
 use isoloom_spec::model;
 
 use super::{Out, configs, hardware, process, secrets};
@@ -334,7 +334,8 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
     for (job, script) in init_names(m.name, m.spec).into_iter().zip(&d.init) {
         let mounted = format!("/isoloom/init/{}", file_name(script));
         // A setup job runs as root with what the machine has: its network, volumes, files (value
-        // files included) and privileges.
+        // files included) and privileges, plus the project at /opt/isoloom, exactly as a VM's
+        // steps have it, so one `setup:` script finds its files at the same path on every target.
         let mut j = Service {
             image: image.clone(),
             user: Some("root".into()),
@@ -349,6 +350,7 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
             ..Service::default()
         };
         j.volumes.push(format!("{ROOT}/{script}:{mounted}:ro").into());
+        j.volumes.push(format!("{ROOT}:{PROJECT_DIR}:ro").into());
         j.volumes.extend(storage::volume_mounts(plan));
         j.after(m.name, readiness(m.spec));
         if sidecars::needed(env, m) {

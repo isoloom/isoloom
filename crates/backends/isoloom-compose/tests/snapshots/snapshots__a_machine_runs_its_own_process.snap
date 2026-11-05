@@ -57,6 +57,7 @@ services:
       FLAG: ${FLAG:-}
     volumes:
     - ../../flag.sh:/isoloom/init/flag.sh:ro
+    - ../..:/opt/isoloom:ro
     depends_on:
       web:
         condition: service_healthy

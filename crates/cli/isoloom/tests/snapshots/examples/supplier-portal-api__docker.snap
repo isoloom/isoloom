@@ -333,6 +333,7 @@ services:
       API_URL: ${API_URL:-}
     volumes:
     - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro
+    - ../..:/opt/isoloom:ro
     secrets:
     - source: input-launch-token
       target: /run/lab/launch-token

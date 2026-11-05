@@ -445,6 +445,7 @@ services:
     network_mode: service:cache
     volumes:
     - ../../build/cache/seed.sh:/isoloom/init/seed.sh:ro
+    - ../..:/opt/isoloom:ro
     - cache-data:/data
     depends_on:
       cache:
