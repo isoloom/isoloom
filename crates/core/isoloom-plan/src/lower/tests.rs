@@ -10,10 +10,10 @@ fn built_in() -> &'static isoloom_catalogue::Catalogue {
     crate::testing::lab("version: 1\nname: t\n").catalogue()
 }
 
-/// A design example of `plan/phase2/spec-examples`, parsed.
+/// A design example of `tests/spec-examples`, parsed.
 fn example(name: &str) -> syntax::Spec {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../plan/phase2/spec-examples")
+        .join("../../../tests/spec-examples")
         .join(name)
         .join("isoloom.yml");
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));

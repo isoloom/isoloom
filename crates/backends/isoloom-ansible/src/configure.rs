@@ -1,4 +1,4 @@
-//! The Ansible configuration-management renderer (design `plan/phase4/design.md` §2, §6.1): a
+//! The Ansible configuration-management renderer: a
 //! machine's resolved recipe ([`Recipe`](isoloom_plan::configure::Recipe)) as native tasks from
 //! `ansible.builtin` and `ansible.posix` only, in a generated role per machine
 //! (`isoloom_machine_<m>`), run by `site.yml` through the one Ansible inventory (the controller on

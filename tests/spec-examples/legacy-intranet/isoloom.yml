@@ -1,0 +1,86 @@
+# An intranet whose uploads a scanner watches, with a status board beside it: portable recipes
+# for every machine, and the rare per-target facts in `overrides:`. Made up for the syntax design
+# (plan/phase2/spec.md); the project files it names aren't part of the example.
+#
+# Targets: every machine target. Each override applies to one target, and is refused if nothing on
+# that target uses it.
+version: 1
+name: legacy-intranet
+
+networks:
+  office: { cidr: 192.168.70.0/24 }
+
+volumes:
+  uploads: { owner: portal }
+
+machines:
+  portal:
+    os: debian@12
+    networks: { office: 10 }
+    app:
+      steps:                         # one recipe: a Dockerfile on containers, set-up on VMs
+        - packages: [apache2, libapache2-mod-php, php-sqlite3]
+        - copy: { from: portal/, to: /var/www/html/, owner: www-data }
+        - run: provision/portal.sh   # enables the modules; installs and configures only
+    command: [apachectl, -D, FOREGROUND]
+    ports:
+      web: { port: 80, protocol: http, publish: 8086 }
+    volumes: { uploads: /var/www/html/uploads }
+
+  scanner:
+    os: debian@12
+    networks: { office: 20 }
+    app:
+      steps:
+        - packages: [clamav-daemon]
+        - copy: { from: scanner/clamd.conf, to: /etc/clamav/clamd.conf }
+    command: [clamd, --foreground]
+    ports: { clamd: 3310 }
+    volumes: { uploads: /scan/inbox }
+
+  status:
+    os: debian@12
+    networks: { office: 40 }
+    app:
+      image: example/status-board:2.1    # the container form: the vendor's image
+      steps:                             # the VM form: the same board from its release archive
+        - run: provision/status-board.sh
+    ports:
+      board: { port: 3000, protocol: http }
+
+  clerk:
+    os: debian@12                    # a bare machine: the OS image kept running, or a fresh VM
+    access: true
+    networks: { office: 30 }
+
+checks:
+  - name: the portal answers
+    from: clerk
+    http: http://portal/
+    wait: 2m
+  - name: the scanner sees the portal's uploads
+    from: scanner
+    exec: test -d /scan/inbox && echo shared
+    expect: shared
+  - name: the status board answers
+    from: clerk
+    http: http://status:3000/
+    wait: 2m
+
+overrides:
+  docker:
+    networks:
+      office: { cidr: 10.70.0.0/24 }     # Docker Desktop and home networks use 192.168.0.0/16
+  vagrant:
+    machines:
+      portal:
+        box: example/debian-12-lts       # a box with the long-term kernel the portal's module needs
+        box_version: "12.20260901.1"
+  proxmox:
+    machines:
+      status: { lxc: true }              # its image as an LXC container, lighter than a VM
+    volumes:
+      uploads: { virtiofs: {} }          # a folder of the server, instead of NFS from the portal
+  aws:
+    machines:
+      portal: { image: ami-0123456789abcdef0 }   # a hardened image in the module's region

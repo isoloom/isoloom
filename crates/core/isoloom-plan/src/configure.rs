@@ -1,6 +1,7 @@
-//! The configuration model resolved (PLAN §3, design `plan/phase4/design.md` §1–§3): what a
+//! The configuration model resolved: what a
 //! machine's recipe is once its OS, its ports and the daemon table have been read, with nothing
-//! left to resolve. The CM renderers (`isoloom-render::configure`: the shell and PowerShell libraries, the
+//! left to resolve. The CM renderers (`isoloom-render::configure`: the shell and PowerShell
+//! libraries, the
 //! Dockerfile, cloud-init, Ansible) render a [`Recipe`]; they never read the authored steps.
 //!
 //! - [`recipe`]: a machine's steps resolved for its family ([`Family`]), or the steps the family
@@ -9,7 +10,8 @@
 //! - [`DaemonTable`]: the daemons' units and foreground forms; [`unstarted`]: the daemons a
 //!   recipe installs and no step starts.
 //! - [`fill`]: a template's placeholders filled in for one machine on one target.
-//! - [`Configure`] and [`Handoff`]: the CM tools, each target's default, and how the infrastructure tool
+//! - [`Configure`] and [`Handoff`]: the CM tools, each target's default, and how the infrastructure
+//! tool
 //!   reaches the rendered configuration.
 //!
 //! All of it is pure: no I/O, no clock, no environment.

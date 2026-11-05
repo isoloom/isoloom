@@ -14,9 +14,9 @@ cargo-fuzz = true
 
 # The inputs each target starts from (folders, relative to this one), besides its own corpus.
 [package.metadata.seeds]
-spec_syntax = ["../plan/phase2/spec-examples", "../examples"]
-spec_model = ["../plan/phase2/spec-examples", "../examples"]
-manifest = ["../crates/core/isoloom-manifest/fixtures", "../plan/phase2/examples"]
+spec_syntax = ["../tests/spec-examples", "../examples"]
+spec_model = ["../tests/spec-examples", "../examples"]
+manifest = ["../crates/core/isoloom-manifest/fixtures", "seeds/manifest"]
 quoting = []
 
 [dependencies]

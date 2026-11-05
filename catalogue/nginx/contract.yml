@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../contract.schema.json
 #
-# What nginx does the same as a container and as a VM (plan/phase4/design.md §4.6).
+# What nginx does the same as a container and as a VM.
 # `cargo xtask catalogue check nginx` builds one small lab per case: this machine (`web`), the
 # case's helper machines, and an access machine (`probe`) running the checks. It runs the lab on
 # `docker` and on `vagrant` through the Isothrum CLI. A case passes when every check passes in

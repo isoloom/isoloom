@@ -1,5 +1,5 @@
-//! One Ansible task per step kind, from `ansible.builtin` and `ansible.posix` modules only (design
-//! `plan/phase4/design.md` §2.2), each reaching the state and behind the guard the shell library
+//! One Ansible task per step kind, from `ansible.builtin` and `ansible.posix` modules only, each
+//! reaching the state and behind the guard the shell library
 //! reaches and keeps (`isoloom-render::configure::shell`). The resource conformance harness
 //! (`cargo xtask conformance --renderer ansible`) proves a task leaves what the shell leaves: it
 //! applies the role, then the shell library on top, and the shell changes nothing.

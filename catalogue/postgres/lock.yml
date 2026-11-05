@@ -1,4 +1,4 @@
-# Written by `cargo xtask catalogue refresh postgres` (plan/phase4/design.md §4.8), never by hand: the
+# Written by `cargo xtask catalogue refresh postgres`, never by hand: the
 # pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
 # when upstream has moved under a pin.
 refreshed: 2026-10-16

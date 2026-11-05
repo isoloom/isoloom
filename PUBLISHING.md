@@ -3,7 +3,7 @@
 The Isoloom crates are released to [crates.io](https://crates.io) so that consumers (the Isothrum
 runner, the desktop app, the Cyber CTF launcher and any external user) depend on published
 versions rather than git revisions. That way the 1.0 history squash can't break anyone, and each
-consumer upgrades on its own schedule (see PLAN.md §0).
+consumer upgrades on its own schedule.
 
 Everything here is licensed Apache-2.0.
 

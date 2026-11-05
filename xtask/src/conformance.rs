@@ -1,5 +1,5 @@
-//! `cargo xtask conformance`: the configuration renderers' resource conformance (design
-//! `plan/phase4/design.md` §6.3). Each step kind, rendered by each renderer, is applied twice in
+//! `cargo xtask conformance`: the configuration renderers' resource conformance. Each step kind,
+//! rendered by each renderer, is applied twice in
 //! each Linux family's pinned official image (Debian 12, Ubuntu 24.04, Rocky 9, Alpine 3.24):
 //!
 //! - **shell:** the VM's set-up steps that run the recipe (the shell library and its calls),

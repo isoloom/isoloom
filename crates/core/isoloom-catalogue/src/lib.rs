@@ -1,5 +1,5 @@
 //! Isoloom's service catalogue: what a machine's `service: nginx@1.30` with its `with:` means on
-//! its OS, in both forms (design `plan/phase4/design.md` §4).
+//! its OS, in both forms.
 //!
 //! - **Data, embedded:** the entries are the repository's `catalogue/<entry>/` folders
 //!   (`entry.yml` by hand, `lock.yml` from `cargo xtask catalogue refresh`, `contract.yml`,

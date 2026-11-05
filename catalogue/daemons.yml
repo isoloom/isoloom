@@ -1,4 +1,4 @@
-# The daemon table's daemons no entry owns (plan/phase4/design.md §3.4): for each, its unit and
+# The daemon table's daemons no entry owns: for each, its unit and
 # package per family (`debian`: Debian, Ubuntu, Kali; `redhat`: Rocky, AlmaLinux, Fedora,
 # CentOS; `alpine`; `windows`), and the foreground form a container runs it in (what its
 # official image runs, where it has one). A `service: <key>` step without `run` takes its

@@ -1,4 +1,4 @@
-# Written by `cargo xtask catalogue refresh` (plan/phase4/design.md §4.7), never by hand: the official
+# Written by `cargo xtask catalogue refresh`, never by hand: the official
 # Galaxy collections the Ansible renderer may name, pinned. GPL-3.0: referenced, never embedded.
 collections:
 - name: ansible.posix

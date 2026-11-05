@@ -13,10 +13,10 @@ use isoloom_spec::model::Target;
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
-/// The Docker plan of a design example of `plan/phase2/spec-examples`.
+/// The Docker plan of a design example of `tests/spec-examples`.
 fn plan(name: &str) -> Outcome<Environment> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../plan/phase2/spec-examples")
+        .join("../../../tests/spec-examples")
         .join(name)
         .join("isoloom.yml");
     let source = isoloom_spec::syntax::parse(&std::fs::read_to_string(path)?).map_err(|problems| format!("{name} doesn't parse: {problems:?}"))?;

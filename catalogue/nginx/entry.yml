@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../entry.schema.json
 #
-# The nginx entry (plan/phase4/design.md §4), written by hand; lock.yml beside it is written only
+# The nginx entry, written by hand; lock.yml beside it is written only
 # by `cargo xtask catalogue refresh nginx`. The recipe below is rendered for every form and CM
 # tool:
 # - the official image's thin build (only `configure`);

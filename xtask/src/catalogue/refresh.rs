@@ -166,7 +166,7 @@ fn packages(
 fn write_lock(path: &Path, name: &str, mut lock: Lock) -> Res<()> {
     lock.refreshed = today()?;
     let header = format!(
-        "# Written by `cargo xtask catalogue refresh {name}` (plan/phase4/design.md §4.8), never by hand: the\n# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1\n# when upstream has moved under a pin.\n"
+        "# Written by `cargo xtask catalogue refresh {name}`, never by hand: the\n# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1\n# when upstream has moved under a pin.\n"
     );
     std::fs::write(path, header + &serde_yaml_ng::to_string(&lock)?)?;
     Ok(())
@@ -206,7 +206,7 @@ fn collections(dir: &Path, args: &Args) -> Res<Vec<String>> {
     if changes.is_empty() {
         println!("catalogue refresh: collections: current");
     } else {
-        let header = "# Written by `cargo xtask catalogue refresh` (plan/phase4/design.md §4.7), never by hand: the official\n# Galaxy collections the Ansible renderer may name, pinned. GPL-3.0: referenced, never embedded.\n";
+        let header = "# Written by `cargo xtask catalogue refresh`, never by hand: the official\n# Galaxy collections the Ansible renderer may name, pinned. GPL-3.0: referenced, never embedded.\n";
         std::fs::write(&path, header.to_owned() + &serde_yaml_ng::to_string(&new)?)?;
         println!(
             "catalogue refresh: collections: {} change(s) written to catalogue/collections.yml",

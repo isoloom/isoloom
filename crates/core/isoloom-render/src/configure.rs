@@ -1,5 +1,5 @@
-//! The configuration renderers whose output an infrastructure file embeds or builds from (design
-//! `plan/phase4/design.md` §2, §3, §6.1): each renders a machine's resolved recipe
+//! The configuration renderers whose output an infrastructure file embeds or builds from: each
+//! renders a machine's resolved recipe
 //! ([`Recipe`], on the plan) and nothing else.
 //!
 //! - [`shell`]: the POSIX library and a recipe's calls, for a Linux VM's set-up and every

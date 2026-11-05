@@ -1,5 +1,5 @@
-//! The cloud-init carrier for a machine's recipe (design `plan/phase4/design.md` §2.1, §2.3,
-//! §5b): the shell library and a recipe's calls, as one `sh` script, delivered in a `write_files`
+//! The cloud-init carrier for a machine's recipe: the shell library and a recipe's calls, as one
+//! `sh` script, delivered in a `write_files`
 //! entry (gzip then base64, `encoding: gz+b64`) and run from `runcmd` at the step's place in the
 //! machine's set-up.
 //!
