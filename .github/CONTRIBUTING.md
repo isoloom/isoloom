@@ -30,7 +30,7 @@ When a change is meant to alter output, review the snapshot diffs with `cargo in
 commit the accepted snapshots, and explain each kind of difference in the pull request.
 
 Isoloom generates files; it runs nothing. To run an environment for real, generate it and hand
-it to the [Isothrum runner](https://github.com/isoloom/isothrum):
+it to the [Isothrum runner](https://github.com/Isothrum/isothrum):
 
 ```sh
 cargo build -q -p isoloom && export PATH=$PWD/target/debug:$PATH

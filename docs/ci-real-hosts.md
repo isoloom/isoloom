@@ -127,7 +127,7 @@ Each workflow builds the sibling binary from source:
 
 | Variable | In | Meaning |
 |---|---|---|
-| `ISOTHRUM_REF` | isoloom workflows | Git ref of `isoloom/isothrum` to build the `isothrum` runner from (default `main`) |
+| `ISOTHRUM_REF` | isoloom workflows | Git ref of `Isothrum/isothrum` to build the `isothrum` runner from (default `main`) |
 | `ISOLOOM_REF` | isothrum workflow | Git ref of `isoloom/isoloom` to build the `isoloom` generator from (default `main`) |
 
 Pin these to a released tag for a reproducible certification run.

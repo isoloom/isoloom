@@ -235,7 +235,7 @@ mod tests {
             m.iter().map(|m| (m.github.as_str(), m.url.as_str())).collect::<Vec<_>>(),
             [
                 ("https://github.com/isoloom/isoloom", "file:///home/me/isoloom-mirrors/isoloom.git"),
-                ("https://github.com/isoloom/isothrum", "file:///home/me/isoloom-mirrors/isothrum.git"),
+                ("https://github.com/Isothrum/isothrum", "file:///home/me/isoloom-mirrors/isothrum.git"),
             ]
         );
         assert_eq!(m[0].key(), "url.file:///home/me/isoloom-mirrors/isoloom.git.insteadof");
@@ -249,7 +249,7 @@ mod tests {
         assert_eq!(m[0].dir, "C:/Users/vagrant/isoloom-mirrors/isoloom.git");
         assert_eq!(m[0].url, "file:///C:/Users/vagrant/isoloom-mirrors/isoloom.git");
         assert_eq!(m[0].key(), "url.file:///C:/Users/vagrant/isoloom-mirrors/isoloom.git.insteadof");
-        assert_eq!(m[1].github, "https://github.com/isoloom/isothrum");
+        assert_eq!(m[1].github, "https://github.com/Isothrum/isothrum");
         assert_eq!(parent(&m), "C:/Users/vagrant/isoloom-mirrors");
     }
 
@@ -266,7 +266,7 @@ mod tests {
         );
         assert!(
             linux.contains(
-                "git config --global --replace-all 'url.file:///home/me/isoloom-mirrors/isothrum.git.insteadof' 'https://github.com/isoloom/isothrum'"
+                "git config --global --replace-all 'url.file:///home/me/isoloom-mirrors/isothrum.git.insteadof' 'https://github.com/Isothrum/isothrum'"
             ),
             "{linux}"
         );

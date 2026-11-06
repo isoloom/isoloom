@@ -20,7 +20,7 @@ prove it.
 **Isoloom is a converter. It runs nothing itself.** It reads one `isoloom.yml`, writes each
 tool's files under `.isoloom/`, and emits a versioned **run manifest** (`run.json`) describing
 how to bring the environment up, check it and tear it down. You run the native tools yourself, or
-hand the manifest to the [Isothrum runner](https://github.com/isoloom/isothrum). Isoloom also
+hand the manifest to the [Isothrum runner](https://github.com/Isothrum/isothrum). Isoloom also
 goes the other way: `isoloom import` drafts a spec from files you already have.
 
 ```yaml
@@ -106,7 +106,7 @@ server and cloud) are Tier 1 for 1.0, the rest Tier 2 (generated and validated).
 
 Isoloom doesn't run anything. Each target writes a run manifest (`.isoloom/<target>/run.json`)
 alongside its files — the native commands, readiness criteria, outputs and checks. The
-[Isothrum runner](https://github.com/isoloom/isothrum) executes it (`isothrum up`, `check`,
+[Isothrum runner](https://github.com/Isothrum/isothrum) executes it (`isothrum up`, `check`,
 `park`, `resume`, `down`), or you run each tool's files by hand (`docker compose up`,
 `kubectl apply -k`, `vagrant up`, `terraform apply`, `ansible-playbook`).
 

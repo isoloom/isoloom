@@ -85,7 +85,7 @@ jobs:
       - name: Check out Isothrum (the runner)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: isoloom/isothrum
+          repository: Isothrum/isothrum
           ref: ${{ env.ISOTHRUM_REF }}
           path: .isothrum-src
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2

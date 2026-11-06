@@ -5,7 +5,7 @@ manifest** (`.isoloom/<target>/run.json`): a versioned, self-contained descripti
 the environment up, check it and tear it down. Isoloom runs nothing itself. The run manifest is
 the contract between Isoloom and a runner.
 
-The [Isothrum runner](https://github.com/isoloom/isothrum) executes it. You can also run each
+The [Isothrum runner](https://github.com/Isothrum/isothrum) executes it. You can also run each
 tool's files by hand (`docker compose up`, `kubectl apply -k`, `vagrant up`, `terraform apply`,
 `ansible-playbook`); the manifest exists so a runner doesn't have to know each tool's commands.
 
@@ -72,7 +72,7 @@ isothrum down
 ```
 
 The runner's own commands, options, event stream (version 0) and error codes are documented in
-the [Isothrum repository](https://github.com/isoloom/isothrum).
+the [Isothrum repository](https://github.com/Isothrum/isothrum).
 
 ## See also
 
