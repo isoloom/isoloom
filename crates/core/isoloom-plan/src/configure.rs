@@ -11,7 +11,7 @@
 //!   recipe installs and no step starts.
 //! - [`fill`]: a template's placeholders filled in for one machine on one target.
 //! - [`Configure`] and [`Handoff`]: the CM tools, each target's default, and how the infrastructure
-//! tool
+//!   tool
 //!   reaches the rendered configuration.
 //!
 //! All of it is pure: no I/O, no clock, no environment.
