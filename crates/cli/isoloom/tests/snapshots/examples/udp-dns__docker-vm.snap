@@ -334,7 +334,7 @@ require "json"
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "bento/debian-12"
+  config.vm.box = "generic/debian12"
   config.vm.hostname = "udp-dns"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
@@ -359,7 +359,8 @@ Vagrant.configure("2") do |config|
     v.cpus = 2
     v.memory = 2048
   end
-  config.vm.provider "utm" do |v|
+  config.vm.provider "utm" do |v, o|
+    o.vm.box = "utm/bookworm"
     v.name = "udp-dns · docker"
     v.cpus = 2
     v.memory = 2048
@@ -368,8 +369,7 @@ Vagrant.configure("2") do |config|
     v.smp = "cpus=2"
     v.memory = "2048M"
   end
-  config.vm.provider "libvirt" do |v, o|
-    o.vm.box = "generic/debian12"
+  config.vm.provider "libvirt" do |v|
     v.cpus = 2
     v.memory = 2048
   end
@@ -659,7 +659,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.6"
+    "version": "1.0.7"
   },
   "environment": {
     "name": "udp-dns",
@@ -1370,7 +1370,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.6"
+    "version": "1.0.7"
   },
   "environment": {
     "name": "udp-dns",

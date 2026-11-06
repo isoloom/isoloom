@@ -109,7 +109,11 @@ pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
 /// The VM: its box and name, the published ports, its size on every provider, then Docker, SSH
 /// accepting the values given at launch, the project and the environment.
 fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
-    r.assign("config.vm.box", Value::str("bento/debian-12"));
+    // generic/debian12 has a build for every provider the docker-vm supports — virtualbox, vmware,
+    // parallels, libvirt, qemu and hyperv — so one box covers them all (UTM, which has none, is
+    // given its own below). bento/debian-12 had only virtualbox/vmware/parallels, so qemu and
+    // hyperv could not find their box.
+    r.assign("config.vm.box", Value::str("generic/debian12"));
     r.assign("config.vm.hostname", Value::str(&env.name));
     r.call(
         Call::new("config.vm.synced_folder")
@@ -184,14 +188,17 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
         r.assign(&format!("v.vmx[{}]", Value::str("memsize")), Value::str(&mem.to_string()));
     });
     r.block(provider("parallels"), "v", named);
-    // Apple Silicon Macs: UTM and QEMU, as for the VMs of the Vagrant target.
-    r.block(provider("utm"), "v", named);
+    // Apple Silicon Macs: UTM and QEMU, as for the VMs of the Vagrant target. UTM has no
+    // generic/debian12 build, so it takes a UTM box of the same Debian 12.
+    r.block(provider("utm"), "v, o", |r| {
+        r.assign("o.vm.box", Value::str("utm/bookworm"));
+        named(r);
+    });
     r.block(provider("qemu"), "v", |r| {
         r.assign("v.smp", Value::str(&format!("cpus={cpus}")));
         r.assign("v.memory", Value::str(&format!("{mem}M")));
     });
-    r.block(provider("libvirt"), "v, o", |r| {
-        r.assign("o.vm.box", Value::str("generic/debian12"));
+    r.block(provider("libvirt"), "v", |r| {
         r.assign("v.cpus", cpus);
         r.assign("v.memory", mem);
     });

@@ -8,6 +8,16 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
+## [1.0.7] — 2026-11-06
+
+### Fixed
+
+- **docker-vm runs on QEMU and Hyper-V.** The helper VM's box was `bento/debian-12`, which ships
+  only VirtualBox, VMware and Parallels builds, so running a container lab in a VM on QEMU or
+  Hyper-V could not find the box. It is now `generic/debian12`, which has a build for every
+  provider the docker-vm supports (VirtualBox, VMware, Parallels, libvirt, QEMU and Hyper-V); UTM,
+  which has none, takes `utm/bookworm`.
+
 ## [1.0.6] — 2026-11-06
 
 ### Fixed

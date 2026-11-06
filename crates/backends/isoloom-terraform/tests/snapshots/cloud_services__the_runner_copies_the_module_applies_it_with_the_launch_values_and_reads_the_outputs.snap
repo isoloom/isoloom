@@ -7,7 +7,7 @@ expression: json
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.6"
+    "version": "1.0.7"
   },
   "environment": {
     "name": "goat",
