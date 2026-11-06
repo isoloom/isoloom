@@ -17,9 +17,11 @@ use isoloom_plan::Environment;
 
 use crate::steps::{CLOUD_INIT_WAIT, INSTALL_DOCKER, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE};
 
-/// Where a VM readied over SSH learns which variables it accepts from a session (the launch's
-/// values): the runner forwards them with `SendEnv`, and sshd drops any it does not list here.
-const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
+/// The sshd drop-in directory where a VM readied over SSH learns which variables it accepts from a
+/// session (the launch's values): the runner forwards them with `SendEnv`, and sshd drops any not
+/// listed in `isoloom-env.conf` here. A bare Terraform-made VM (cloud-docker) may ship without this
+/// directory, so it is created before the drop-in is written.
+const ACCEPT_ENV_DIR: &str = "/etc/ssh/sshd_config.d";
 
 /// A shell command line run in the VM, as one step of the VM's backend. One line for the VM's
 /// login shell, with no single quote: `vagrant ssh -c` wraps it in single quotes.
@@ -147,7 +149,7 @@ impl GuestCompose {
             id: StepId::parse("accept-env")?,
             note: Some("Letting the VM accept the launch's values…".into()),
             command: Template::text(&format!(
-                "echo AcceptEnv {vars} | sudo tee {ACCEPT_ENV_FILE} >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\""
+                "sudo mkdir -p {ACCEPT_ENV_DIR} && echo AcceptEnv {vars} | sudo tee {ACCEPT_ENV_DIR}/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\""
             )),
             timeout_s: 60,
         }))
@@ -383,6 +385,9 @@ mod tests {
         let line = cmd.command.to_string();
         assert!(line.contains("AcceptEnv CTF_LAUNCH_TOKEN FLAG"), "{line}");
         assert!(line.contains("/etc/ssh/sshd_config.d/isoloom-env.conf"), "{line}");
+        // The drop-in directory is created first: a bare Terraform-made VM may lack it, and `tee`
+        // cannot create it, so without this the forwarded launch values would arrive unset.
+        assert!(line.contains("sudo mkdir -p /etc/ssh/sshd_config.d &&"), "{line}");
         assert!(line.contains("systemctl reload ssh || systemctl reload sshd"), "{line}");
         // The way in wraps the command in single quotes, so it must contain none.
         assert!(!line.contains('\''), "{line}");

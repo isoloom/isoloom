@@ -607,7 +607,7 @@ output "ssh_user" {
         "note": "Letting the VM accept the launch's values…",
         "action": "ssh.run",
         "with": {
-          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "command": "sudo mkdir -p /etc/ssh/sshd_config.d && echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -1473,7 +1473,7 @@ output "ssh_user" {
         "note": "Letting the VM accept the launch's values…",
         "action": "ssh.run",
         "with": {
-          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "command": "sudo mkdir -p /etc/ssh/sshd_config.d && echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -2227,7 +2227,7 @@ output "ssh_user" {
         "note": "Letting the VM accept the launch's values…",
         "action": "ssh.run",
         "with": {
-          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "command": "sudo mkdir -p /etc/ssh/sshd_config.d && echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3083,7 +3083,7 @@ output "ssh_user" {
         "note": "Letting the VM accept the launch's values…",
         "action": "ssh.run",
         "with": {
-          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "command": "sudo mkdir -p /etc/ssh/sshd_config.d && echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -3816,7 +3816,7 @@ output "ssh_user" {
         "note": "Letting the VM accept the launch's values…",
         "action": "ssh.run",
         "with": {
-          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "command": "sudo mkdir -p /etc/ssh/sshd_config.d && echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -4623,7 +4623,7 @@ output "ssh_user" {
         "note": "Letting the VM accept the launch's values…",
         "action": "ssh.run",
         "with": {
-          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "command": "sudo mkdir -p /etc/ssh/sshd_config.d && echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
