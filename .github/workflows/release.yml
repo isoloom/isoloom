@@ -11,7 +11,12 @@ permissions:
   contents: write
 
 jobs:
+  # The release binaries build only after the test + quality-ratchet gate passes (a tag skips ci.yml).
+  gate:
+    uses: ./.github/workflows/gate.yml
+
   build:
+    needs: gate
     strategy:
       fail-fast: false
       matrix:
