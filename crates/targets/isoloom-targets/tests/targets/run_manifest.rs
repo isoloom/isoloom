@@ -298,10 +298,11 @@ fn secrets_project_files_kept_volumes_and_tools_reach_the_manifest() -> Outcome 
         down[1]["argv"],
         serde_json::json!(["docker", "volume", "rm", "--force", "${run.name}_app-cache"])
     );
-    // An HTTPS port is the entry; a tool's port is information; both fixed, so no ISOLOOM_PUBLISH_FIXED.
+    // An HTTPS port is the entry; a tool's port is information. Both are fixed, so ISOLOOM_PUBLISH_FIXED
+    // does nothing here, but it is still declared: an embedder may pass it for any lab that publishes.
     assert_eq!(json["outputs"][0]["format"], "https://127.0.0.1:${value}/");
     assert_eq!(json["outputs"][1]["from"]["machine"], "isoloom-tool-shell");
     let params: Vec<&str> = m.params.iter().map(|p| p.name.as_str()).collect();
-    assert_eq!(params, ["ISOLOOM_PUBLISH_ADDRESS"]);
+    assert_eq!(params, ["ISOLOOM_PUBLISH_ADDRESS", "ISOLOOM_PUBLISH_FIXED"]);
     Ok(())
 }

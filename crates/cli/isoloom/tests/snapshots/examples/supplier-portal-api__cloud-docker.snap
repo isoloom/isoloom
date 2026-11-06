@@ -203,7 +203,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -601,6 +601,17 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "accept-env",
+        "note": "Letting the VM accept the launch's values…",
+        "action": "ssh.run",
+        "with": {
+          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "host": "${outputs.ip}",
+          "user": "admin"
+        },
+        "timeout_s": 60
       },
       {
         "id": "start",
@@ -1062,7 +1073,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -1456,6 +1467,17 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "accept-env",
+        "note": "Letting the VM accept the launch's values…",
+        "action": "ssh.run",
+        "with": {
+          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 60
       },
       {
         "id": "start",
@@ -1859,7 +1881,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -2199,6 +2221,17 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "accept-env",
+        "note": "Letting the VM accept the launch's values…",
+        "action": "ssh.run",
+        "with": {
+          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 60
       },
       {
         "id": "start",
@@ -2647,7 +2680,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -3046,6 +3079,17 @@ output "ssh_user" {
         "timeout_s": 600
       },
       {
+        "id": "accept-env",
+        "note": "Letting the VM accept the launch's values…",
+        "action": "ssh.run",
+        "with": {
+          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 60
+      },
+      {
         "id": "start",
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
@@ -3426,7 +3470,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -3766,6 +3810,17 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "accept-env",
+        "note": "Letting the VM accept the launch's values…",
+        "action": "ssh.run",
+        "with": {
+          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 60
       },
       {
         "id": "start",
@@ -4231,7 +4286,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -4562,6 +4617,17 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "accept-env",
+        "note": "Letting the VM accept the launch's values…",
+        "action": "ssh.run",
+        "with": {
+          "command": "echo AcceptEnv API_URL LAUNCH_TOKEN | sudo tee /etc/ssh/sshd_config.d/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\"",
+          "host": "${outputs.ip}",
+          "user": "ubuntu"
+        },
+        "timeout_s": 60
       },
       {
         "id": "start",

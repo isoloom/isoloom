@@ -65,8 +65,10 @@ pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Par
             &[],
             StepSelection::Every,
         )?);
-    }
-    if published.contains(&PublishMode::Ephemeral) {
+        // Declared whenever a port is published, even if every one is already `fixed:` (no
+        // ephemeral one to pin): an embedder (the launcher's "the lab's own ports" choice) may
+        // pass it for any lab that publishes a port, and it is a no-op where the compose file
+        // already pins the port to its `publish:` number.
         let what = "Set: each published port takes its `publish:` number instead of an ephemeral one.";
         out.push(param(PUBLISH_FIXED, what, None, &["1"], StepSelection::Every)?);
     }

@@ -8,6 +8,36 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
+## [1.0.6] — 2026-11-06
+
+### Fixed
+
+- **A container lab whose every published port is `fixed:` can start with the embedder's "pin the
+  ports" option.** The Compose manifest declared `ISOLOOM_PUBLISH_FIXED` only when a lab had a
+  random (ephemeral) port, so passing it to an all-fixed lab failed with "isn't a param of this
+  manifest". It is now declared whenever a lab publishes any port (a no-op where a port is already
+  pinned to its `publish:` number).
+- **Cloud-docker delivers the launch's input values to the containers.** The VM a cloud-docker run
+  creates is set up bare over SSH, so its `sshd` dropped the variables the runner forwards
+  (`SendEnv`), and a container that reads an input (e.g. a launch token) failed to start with the
+  variable "is not set". The run manifest now tells the VM's `sshd` to accept them (`AcceptEnv`)
+  before the containers start, as docker-vm on Proxmox already does through cloud-init.
+
+## [1.0.5] — 2026-11-05
+
+### Added
+
+- **A local VM lab's published ports get a free host port, picked by the runner** (paired with
+  Isothrum 1.0.3). A privileged port (80/443) no longer needs administrator rights to forward, and
+  two labs that publish the same port no longer collide. Opt back into the fixed numbers with
+  `ISOLOOM_PUBLISH_FIXED`.
+
+## [1.0.4] — 2026-11-04
+
+### Changed
+
+- A Compose setup job is given the project at `/opt/isoloom`, as the VMs have it.
+
 ## [1.0.3] — 2026-11-03
 
 ### Added

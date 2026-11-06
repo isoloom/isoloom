@@ -489,7 +489,7 @@ secrets:
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -544,6 +544,23 @@ secrets:
         {
           "via": "env",
           "var": "ISOLOOM_PUBLISH_ADDRESS",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_PUBLISH_FIXED",
+      "description": "Set: each published port takes its `publish:` number instead of an ephemeral one.",
+      "values": [
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_FIXED",
           "steps": [
             "*"
           ]

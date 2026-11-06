@@ -104,6 +104,12 @@ fn up_steps(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, guest: &Gu
     let mut into = into_vm(way_in, &RelPath::parse("setup.sh")?, "../../..")?;
     boot_wait(&mut into)?;
     up.extend(into);
+    // The VM is readied bare over SSH (no cloud-init `AcceptEnv`, unlike docker-vm on Proxmox), so
+    // its sshd must be told to accept the launch's values the runner forwards (`SendEnv`) before
+    // the start steps run; otherwise the containers' env vars arrive unset.
+    if let Some(accept) = guest.accept_env_command()? {
+        up.push(accept.step(way_in)?);
+    }
     for command in &guest.start {
         up.push(command.step(way_in)?);
     }

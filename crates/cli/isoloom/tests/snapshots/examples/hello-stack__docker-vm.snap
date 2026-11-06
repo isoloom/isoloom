@@ -660,7 +660,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "hello-stack",
@@ -1441,7 +1441,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.5"
+    "version": "1.0.6"
   },
   "environment": {
     "name": "hello-stack",

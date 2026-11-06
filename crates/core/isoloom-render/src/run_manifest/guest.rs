@@ -17,6 +17,10 @@ use isoloom_plan::Environment;
 
 use crate::steps::{CLOUD_INIT_WAIT, INSTALL_DOCKER, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE};
 
+/// Where a VM readied over SSH learns which variables it accepts from a session (the launch's
+/// values): the runner forwards them with `SendEnv`, and sshd drops any it does not list here.
+const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
+
 /// A shell command line run in the VM, as one step of the VM's backend. One line for the VM's
 /// login shell, with no single quote: `vagrant ssh -c` wraps it in single quotes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,6 +125,32 @@ impl GuestCompose {
             })
             .collect();
         vars.into_iter().collect()
+    }
+
+    /// The command that makes a VM readied over SSH accept the [`forwarded`](Self::forwarded)
+    /// variables (`AcceptEnv`) and reloads sshd, run before the start steps so the sessions that
+    /// create the containers carry the launch's values. `None` when nothing is forwarded. A VM
+    /// whose image sets `AcceptEnv` from cloud-init (docker-vm on Proxmox) does not need it; a VM
+    /// Terraform makes bare (cloud-docker) does, since nothing else tells its sshd.
+    ///
+    /// # Errors
+    ///
+    /// A step id the manifest refuses (a bug: it is fixed). The forwarded names are environment
+    /// variables (upper snake case), so the command needs no quoting.
+    pub fn accept_env_command(&self) -> Result<Option<GuestCommand>, ManifestError> {
+        let forwarded = self.forwarded();
+        if forwarded.is_empty() {
+            return Ok(None);
+        }
+        let vars = forwarded.join(" ");
+        Ok(Some(GuestCommand {
+            id: StepId::parse("accept-env")?,
+            note: Some("Letting the VM accept the launch's values…".into()),
+            command: Template::text(&format!(
+                "echo AcceptEnv {vars} | sudo tee {ACCEPT_ENV_FILE} >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\""
+            )),
+            timeout_s: 60,
+        }))
     }
 
     /// The machines, each published port answering at `address` (this computer's loopback, the
@@ -316,5 +346,45 @@ mod tests {
             status: command("ps", "docker compose ps"),
         };
         assert_eq!(guest.forwarded(), ["FLAG", "TOKEN"]);
+    }
+
+    #[test]
+    fn accept_env_is_none_without_forwarded_vars_and_lists_them_otherwise() {
+        let slot = |name: &str, var: &str| SecretSlot {
+            name: Identifier::parse(name).unwrap(),
+            kind: SlotKind::Input,
+            required: false,
+            sensitive: true,
+            machines: Vec::new(),
+            providers: BTreeSet::new(),
+            source: None,
+            default: None,
+            deliver: NonEmpty::one(Delivery::Env {
+                var: EnvName::parse(var).unwrap(),
+                steps: StepSelection::Every,
+            }),
+        };
+        let guest = |slots: Vec<SecretSlot>| GuestCompose {
+            machines: Vec::new(),
+            networks: Vec::new(),
+            slots,
+            params: Vec::new(),
+            start: Vec::new(),
+            ready: Vec::new(),
+            check_setup: Vec::new(),
+            runners: Vec::new(),
+            status: command("ps", "docker compose ps"),
+        };
+        assert_eq!(guest(Vec::new()).accept_env_command().unwrap(), None);
+        let cmd = guest(vec![slot("TOKEN", "CTF_LAUNCH_TOKEN"), slot("FLAG", "FLAG")])
+            .accept_env_command()
+            .unwrap()
+            .expect("a command when a value is forwarded");
+        let line = cmd.command.to_string();
+        assert!(line.contains("AcceptEnv CTF_LAUNCH_TOKEN FLAG"), "{line}");
+        assert!(line.contains("/etc/ssh/sshd_config.d/isoloom-env.conf"), "{line}");
+        assert!(line.contains("systemctl reload ssh || systemctl reload sshd"), "{line}");
+        // The way in wraps the command in single quotes, so it must contain none.
+        assert!(!line.contains('\''), "{line}");
     }
 }
