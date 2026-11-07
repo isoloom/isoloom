@@ -73,7 +73,9 @@ pub const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0
 /// [`COMPOSE_VERSION`]. The RPM family (Rocky, AlmaLinux, CentOS, Fedora) still uses Docker's own
 /// install script, pinned to [`DOCKER_VERSION`]. TODO(4.7): inline the dnf/RPM path too, its key
 /// pinned by SHA-256 (`e6c650e0…`), proven on a Rocky/Fedora guest. The apt branch fails closed (a
-/// `set -e` subshell, the key verified before use).
+/// `set -e` subshell, the key verified before use). On a non-x86 host (an Apple Silicon Mac's VM,
+/// an Arm cloud VM) the apt branch adds QEMU's user-mode emulation (`qemu-user-static`, registered
+/// with binfmt for every container), since a lab's images are x86 unless its spec says otherwise.
 pub const INSTALL_DOCKER: &str = r#"command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   set -e
   export DEBIAN_FRONTEND=noninteractive
@@ -94,6 +96,10 @@ pub const INSTALL_DOCKER: &str = r#"command -v docker >/dev/null || if command -
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
+  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
+  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
+  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
   curl -fsSL https://get.docker.com | VERSION=29.9.0 sh

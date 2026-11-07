@@ -8,6 +8,23 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
+## [Unreleased]
+
+### Fixed
+
+- **A VM's fixed forwarded ports no longer fail as collisions on macOS 27.** Vagrant's own check
+  of a host port before forwarding it (`Socket.tcp` with a timeout) reads every port as in use on
+  macOS 27 (Ruby bug #22223: a refused connection hands back a socket), so a docker-vm or VM lab
+  with a fixed published port failed at "forwarded port … is already in use" before its VM
+  booted, on UTM, VirtualBox, Parallels and VMware alike. Every generated Vagrantfile now
+  corrects that check on a Mac, reading the socket's own error.
+- **A Docker host on an Arm CPU runs a lab's x86 images.** A lab's images are built for x86
+  unless its spec says otherwise, and a docker-vm helper VM on an Apple Silicon Mac (UTM, QEMU)
+  or an Arm cloud VM had no way to run them: the lab's probe failed with `exit 255` right after
+  the images were built. The Docker host's set-up now installs QEMU's user-mode emulation
+  (`qemu-user-static`, registered with binfmt) on a non-x86 Debian or Ubuntu host, as Docker
+  Desktop provides on its own.
+
 ## [1.0.8] — 2026-11-07
 
 ### Fixed

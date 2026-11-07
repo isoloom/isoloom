@@ -180,6 +180,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.assign("HOST_ARCH", Value::raw(format!("{ARM_HOST} ? \"aarch64\" : \"x86_64\"")));
     r.text(&project_rb());
     r.text(hyperv::HYPERV_RB);
+    r.text(vagrantfile::PORT_CHECK_RB);
     r.blank();
     vagrantfile::inputs(r, &env.spec().inputs, values::any(env));
     if env.machines.values().any(|m| !m.ports.is_empty()) {

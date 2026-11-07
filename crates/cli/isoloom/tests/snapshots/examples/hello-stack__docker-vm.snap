@@ -330,6 +330,32 @@ IsoloomProject::UNTAR_PS1 = <<'PS1'
   "$files files in $dest$note"
 }
 PS1
+# Vagrant's own check of a host port before forwarding it (`Vagrant::Util::IsPortOpen`) asks
+# `Socket.tcp` with a timeout, and on macOS 27 that hands back a socket for a refused connection
+# (Ruby bug #22223: the retried `connect_nonblock` answers EISCONN while the socket's SO_ERROR
+# still holds ECONNREFUSED). Every host port then reads as in use, and a VM's fixed forwarded
+# port fails as a collision before the VM boots (the SSH one Vagrant moves, to a port that read
+# as free by luck). On a Mac the check reads the socket's error itself, as Vagrant's should.
+if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
+  require "vagrant/util/is_port_open"
+
+  module Vagrant::Util::IsPortOpen
+    def is_port_open?(host, port)
+      addr = Addrinfo.tcp(host, port)
+      sock = Socket.new(addr.afamily, addr.socktype, addr.protocol)
+      begin
+        if sock.connect_nonblock(addr, exception: false) == :wait_writable
+          return false unless sock.wait_writable(0.1)
+        end
+        sock.getsockopt(Socket::SOL_SOCKET, Socket::SO_ERROR).int.zero?
+      rescue SystemCallError
+        false
+      ensure
+        sock.close
+      end
+    end
+  end
+end
 require "json"
 # The host ports the runner chose for this run; each forward defaults to its own number.
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
@@ -407,6 +433,10 @@ Vagrant.configure("2") do |config|
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n \"$v\" ] || { echo \"docker-ce 29.9.0 is not in Docker's apt repository\" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades \"docker-ce=$v\" \"docker-ce-cli=$v\" containerd.io docker-buildx-plugin \"docker-compose-plugin=5.6.0-*\"
+  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
+  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
+  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  [ \"$(dpkg --print-architecture)\" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
   curl -fsSL https://get.docker.com | VERSION=29.9.0 sh
@@ -1416,6 +1446,10 @@ command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
+  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
+  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
+  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
   curl -fsSL https://get.docker.com | VERSION=29.9.0 sh

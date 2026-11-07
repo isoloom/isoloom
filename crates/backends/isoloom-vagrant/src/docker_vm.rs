@@ -94,6 +94,7 @@ pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
     r.blank();
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.text(&crate::vms::project_rb());
+    r.text(vagrantfile::PORT_CHECK_RB);
     vagrantfile::inputs(&mut r, &env.spec().inputs, false);
     // Always read the runner's chosen host ports: the QEMU provider block below reads the helper
     // VM's own SSH forward port from it, so the hash must be defined even when no container port is.

@@ -9,6 +9,11 @@ use isoloom_spec::model::Protocol;
 
 use crate::ruby::{Call, Ruby, Value};
 
+/// Vagrant's host-port check, corrected for macOS 27 (`vagrant_port_check.rb`): Vagrant's own
+/// reads every port as in use there (Ruby bug #22223), so a VM's fixed forwarded ports fail as
+/// collisions before it boots. Emitted after the project helpers in every Vagrantfile.
+pub(crate) const PORT_CHECK_RB: &str = include_str!("vagrant_port_check.rb");
+
 /// `<var>.vm.provision "shell", name: <name>`: a shell provisioner, its script still to add.
 pub(crate) fn shell(var: &str, name: &str) -> Call {
     Call::new(format!("{var}.vm.provision")).arg(Value::str("shell")).kw("name", Value::str(name))
