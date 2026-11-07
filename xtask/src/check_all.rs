@@ -97,6 +97,17 @@ impl Repo {
             other => other.id(),
         }
     }
+
+    /// The GitHub URL its consumers pin. Isothrum keeps its own org, the launcher is under
+    /// `Cyber-Courses`, and Isoloom is under `isoloom`.
+    pub(crate) fn github(self) -> String {
+        let org = match self {
+            Repo::Isoloom => "isoloom",
+            Repo::Isothrum => "Isothrum",
+            Repo::Launcher => "Cyber-Courses",
+        };
+        format!("https://github.com/{org}/{}", self.folder())
+    }
 }
 
 /// A host the gates run on.

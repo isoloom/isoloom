@@ -246,6 +246,39 @@ mod tests {
         Ok(Run::Argv(HostArgv::Every(Argv::new(Program::parse("vagrant")?, args))))
     }
 
+    /// A sensitive input slot delivered to every step as the environment variable `var`.
+    fn slot(name: &str, var: &str) -> SecretSlot {
+        SecretSlot {
+            name: Identifier::parse(name).unwrap(),
+            kind: SlotKind::Input,
+            required: false,
+            sensitive: true,
+            machines: Vec::new(),
+            providers: BTreeSet::new(),
+            source: None,
+            default: None,
+            deliver: NonEmpty::one(Delivery::Env {
+                var: EnvName::parse(var).unwrap(),
+                steps: StepSelection::Every,
+            }),
+        }
+    }
+
+    /// A guest compose carrying only `slots`: everything else empty, with a plain `ps` status.
+    fn guest(slots: Vec<SecretSlot>) -> GuestCompose {
+        GuestCompose {
+            machines: Vec::new(),
+            networks: Vec::new(),
+            slots,
+            params: Vec::new(),
+            start: Vec::new(),
+            ready: Vec::new(),
+            check_setup: Vec::new(),
+            runners: Vec::new(),
+            status: command("ps", "docker compose ps"),
+        }
+    }
+
     #[test]
     fn a_command_becomes_a_step_of_the_vms_way_in() {
         let s = command("start", "docker compose up").step(&vagrant_ssh).unwrap();
@@ -322,61 +355,12 @@ mod tests {
 
     #[test]
     fn the_variables_forwarded_are_the_slots_each_once() {
-        let slot = |name: &str, var: &str| SecretSlot {
-            name: Identifier::parse(name).unwrap(),
-            kind: SlotKind::Input,
-            required: false,
-            sensitive: true,
-            machines: Vec::new(),
-            providers: BTreeSet::new(),
-            source: None,
-            default: None,
-            deliver: NonEmpty::one(Delivery::Env {
-                var: EnvName::parse(var).unwrap(),
-                steps: StepSelection::Every,
-            }),
-        };
-        let guest = GuestCompose {
-            machines: Vec::new(),
-            networks: Vec::new(),
-            slots: vec![slot("TOKEN", "TOKEN"), slot("FLAG", "FLAG"), slot("again", "TOKEN")],
-            params: Vec::new(),
-            start: Vec::new(),
-            ready: Vec::new(),
-            check_setup: Vec::new(),
-            runners: Vec::new(),
-            status: command("ps", "docker compose ps"),
-        };
-        assert_eq!(guest.forwarded(), ["FLAG", "TOKEN"]);
+        let g = guest(vec![slot("TOKEN", "TOKEN"), slot("FLAG", "FLAG"), slot("again", "TOKEN")]);
+        assert_eq!(g.forwarded(), ["FLAG", "TOKEN"]);
     }
 
     #[test]
     fn accept_env_is_none_without_forwarded_vars_and_lists_them_otherwise() {
-        let slot = |name: &str, var: &str| SecretSlot {
-            name: Identifier::parse(name).unwrap(),
-            kind: SlotKind::Input,
-            required: false,
-            sensitive: true,
-            machines: Vec::new(),
-            providers: BTreeSet::new(),
-            source: None,
-            default: None,
-            deliver: NonEmpty::one(Delivery::Env {
-                var: EnvName::parse(var).unwrap(),
-                steps: StepSelection::Every,
-            }),
-        };
-        let guest = |slots: Vec<SecretSlot>| GuestCompose {
-            machines: Vec::new(),
-            networks: Vec::new(),
-            slots,
-            params: Vec::new(),
-            start: Vec::new(),
-            ready: Vec::new(),
-            check_setup: Vec::new(),
-            runners: Vec::new(),
-            status: command("ps", "docker compose ps"),
-        };
         assert_eq!(guest(Vec::new()).accept_env_command().unwrap(), None);
         let cmd = guest(vec![slot("TOKEN", "CTF_LAUNCH_TOKEN"), slot("FLAG", "FLAG")])
             .accept_env_command()

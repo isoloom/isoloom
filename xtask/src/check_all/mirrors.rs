@@ -1,7 +1,8 @@
 //! The Isoloom and Isothrum commits the consumers pin, on the SSH hosts.
 //!
-//! Isothrum and the launcher pin them by git (`https://github.com/isoloom/<repo>`), but local
-//! `main` is never pushed, so GitHub hasn't got them. Before a run that copies a consumer, each SSH
+//! Isothrum and the launcher pin them by git (Isoloom under `github.com/isoloom`, Isothrum under
+//! its own `github.com/Isothrum`), but local `main` is never pushed, so GitHub hasn't got them.
+//! Before a run that copies a consumer, each SSH
 //! host gets a bare mirror of this machine's Isoloom and Isothrum `main` in its home
 //! (`~/isoloom-mirrors/<repo>.git`, fetched from a git bundle), and its global git configuration
 //! rewrites the GitHub URL to that mirror (`url.<mirror>.insteadOf`), replacing any other rewrite of
@@ -18,9 +19,6 @@ use crate::{Res, process, text};
 
 /// The repositories mirrored: the ones the consumers pin by git.
 const MIRRORED: [Repo; 2] = [Repo::Isoloom, Repo::Isothrum];
-
-/// Where the consumers' pins point.
-const GITHUB: &str = "https://github.com/isoloom";
 
 /// The mirrors' folder, in the host's home.
 const FOLDER: &str = "isoloom-mirrors";
@@ -75,7 +73,7 @@ pub(super) fn mirrors(home: &str) -> Vec<Mirror> {
                 bundle: format!("{base}.bundle"),
                 dir,
                 url,
-                github: format!("{GITHUB}/{}", repo.folder()),
+                github: repo.github(),
             }
         })
         .collect()
