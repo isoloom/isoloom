@@ -820,7 +820,7 @@ locals {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.7"
+    "version": "1.0.8"
   },
   "environment": {
     "name": "several-addresses",

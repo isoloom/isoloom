@@ -8,6 +8,25 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
+## [1.0.8] — 2026-11-07
+
+### Fixed
+
+- **Cloud-docker creates the `sshd` drop-in directory before writing to it.** The run manifest
+  wrote the `AcceptEnv` drop-in to `/etc/ssh/sshd_config.d/` without first ensuring the directory
+  exists, so a bare VM without it failed the setup. The directory is now created before the
+  drop-in is written.
+- **The QEMU docker-vm helper VM's SSH forward takes a chosen free host port.** The forwarded SSH
+  port was left to collide; it is now bound to a free host port picked ahead of time, matching how
+  the other providers forward it.
+
+### Changed
+
+- **Isothrum references point at the new `Isothrum` GitHub org.** The runner moved to its own
+  organisation, and the references across the workspace follow it.
+- **Release tags now gate on tests and the quality ratchet before publishing.** Pushing a release
+  tag runs the full test suite and the quality ratchet first, so a red tree can no longer publish.
+
 ## [1.0.7] — 2026-11-06
 
 ### Fixed

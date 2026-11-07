@@ -660,7 +660,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.7"
+    "version": "1.0.8"
   },
   "environment": {
     "name": "cisco-qemu",
@@ -1303,7 +1303,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.7"
+    "version": "1.0.8"
   },
   "environment": {
     "name": "cisco-qemu",
