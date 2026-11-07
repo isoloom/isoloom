@@ -95,9 +95,9 @@ pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.text(&crate::vms::project_rb());
     vagrantfile::inputs(&mut r, &env.spec().inputs, false);
-    if env.machines.values().any(|m| m.shape == MachineShape::Container && !m.ports.is_empty()) {
-        vagrantfile::chosen_ports(&mut r);
-    }
+    // Always read the runner's chosen host ports: the QEMU provider block below reads the helper
+    // VM's own SSH forward port from it, so the hash must be defined even when no container port is.
+    vagrantfile::chosen_ports(&mut r);
     r.blank();
     r.block("Vagrant.configure(\"2\")", "config", |r| configure(r, env, guest));
     GeneratedFile {
@@ -197,6 +197,12 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
     r.block(provider("qemu"), "v", |r| {
         r.assign("v.smp", Value::str(&format!("cpus={cpus}")));
         r.assign("v.memory", Value::str(&format!("{mem}M")));
+        // vagrant-qemu forwards the VM's SSH (guest 22) to one fixed host port (50022) with weak
+        // auto-correct, so two local docker-vm labs — or a half-created VM left by a failed start —
+        // collide on it. Take the free host port the runner chose for this VM (the way published
+        // ports do), defaulting to 50022 when it set none; auto-correct stays on as a last resort.
+        r.assign("v.ssh_port", Value::raw(format!("{}.fetch(\"{VM}/ssh\", 50022)", vagrantfile::HOSTPORTS)));
+        r.assign("v.ssh_auto_correct", true);
     });
     r.block(provider("libvirt"), "v", |r| {
         r.assign("v.cpus", cpus);

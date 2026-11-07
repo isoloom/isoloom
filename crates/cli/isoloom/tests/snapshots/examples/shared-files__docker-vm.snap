@@ -330,6 +330,9 @@ IsoloomProject::UNTAR_PS1 = <<'PS1'
   "$files files in $dest$note"
 }
 PS1
+require "json"
+# The host ports the runner chose for this run; each forward defaults to its own number.
+ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/debian12"
@@ -365,6 +368,8 @@ Vagrant.configure("2") do |config|
   config.vm.provider "qemu" do |v|
     v.smp = "cpus=2"
     v.memory = "2048M"
+    v.ssh_port = ISOLOOM_HOSTPORTS.fetch("docker/ssh", 50022)
+    v.ssh_auto_correct = true
   end
   config.vm.provider "libvirt" do |v|
     v.cpus = 2
