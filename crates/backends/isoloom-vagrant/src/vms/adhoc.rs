@@ -5,8 +5,9 @@
 //! Vagrantfile loads every such file at the end of `Vagrant.configure` ([`loader`]). What a VM
 //! needs to join each network on each provider is generated here ([`preamble`]): the network's
 //! name on the hypervisor and its netmask, the environment's label, the lab machines' names for
-//! the VM's hosts file, and this host's default box. On QEMU every network's hub keeps a port for
-//! the runner's VM, named after it ([`ADHOC_NAME`], see [`super::qemu`]).
+//! the VM's hosts file, this host's default box, and what a VM running a container image needs
+//! (Debian 12's box per provider, Docker's installer). On QEMU every network's hub keeps a port
+//! for the runner's VM, named after it ([`ADHOC_NAME`], see [`super::qemu`]).
 
 use std::net::Ipv4Addr;
 
@@ -15,12 +16,24 @@ use isoloom_plan::Environment;
 use isoloom_plan::addressing::netmask;
 use isoloom_plan::lifecycle::Step;
 use isoloom_render::steps;
+use isoloom_spec::images;
 
 use super::ARM_HOST;
 use crate::ruby::{Ruby, Value};
 
 /// The Ruby module (`vagrant_adhoc.rb`): `IsoloomAdHoc.define` and the loader's `files`.
 pub(crate) const ADHOC_RB: &str = include_str!("../vagrant_adhoc.rb");
+
+/// Debian 12 for a VM that runs a container image: the box Isoloom's own Debian VMs use on the
+/// desktop hypervisors (VirtualBox, VMware, Parallels), with arm64 builds too.
+const IMAGE_BOX: &str = "bento/debian-12";
+
+/// Debian 12 on libvirt, where bento's box has no build (the roboxes one, as Isoloom's VMs).
+const IMAGE_BOX_LIBVIRT: &str = "generic/debian12";
+
+/// The disk of a VM running a container image on QEMU, where the cloud image's own is 10 GB: an
+/// attack box unpacks to 12 GB. Sparse, as the Docker helper VM's (see [`crate::docker_vm`]).
+const IMAGE_DISK_GB: u32 = 40;
 
 /// The define name of the runner's ad-hoc attack VM: Isoloom's reserved namespace (a spec's
 /// machine is never called so), the name the runner gives every attacker box it stands up itself,
@@ -29,7 +42,7 @@ pub(crate) const ADHOC_NAME: &str = "isoloom-access";
 
 /// What the runner's definitions need at hand, before `Vagrant.configure`: the environment's
 /// label, each lab network as a VM joins it, the lab machines' names, this host's default box,
-/// then the module.
+/// Debian 12's boxes and Docker's installer for a VM running a container image, then the module.
 pub(crate) fn preamble(r: &mut Ruby, env: &Environment) {
     r.comment("Machines the runner adds to the running environment (see IsoloomAdHoc below).");
     r.assign("ADHOC_LABEL", Value::str(&env.name));
@@ -52,6 +65,15 @@ pub(crate) fn preamble(r: &mut Ruby, env: &Environment) {
             Value::str(access::DEFAULT_BOX)
         )),
     );
+    r.assign("ADHOC_IMAGE_BOX", Value::str(IMAGE_BOX));
+    r.hash(
+        "ADHOC_IMAGE_BOXES",
+        [("libvirt", IMAGE_BOX_LIBVIRT), ("qemu", images::QEMU_DEBIAN_12)]
+            .into_iter()
+            .map(|(p, b)| (Value::str(p), Value::str(b))),
+    );
+    r.assign("ADHOC_IMAGE_DISK_GB", Value::raw(IMAGE_DISK_GB.to_string()));
+    r.assign("ADHOC_DOCKER", Value::str(steps::INSTALL_DOCKER));
     r.text(ADHOC_RB);
     r.blank();
 }
@@ -105,6 +127,14 @@ mod tests {
             text.contains("ADHOC_BOX = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"cloud-image/debian-12\" : \"kalilinux/rolling\""),
             "{text}"
         );
+        // A VM running a container image: Debian 12 per provider, and Docker's installer.
+        assert!(text.contains("ADHOC_IMAGE_BOX = \"bento/debian-12\""), "{text}");
+        assert!(
+            text.contains("\"libvirt\" => \"generic/debian12\"") && text.contains("\"qemu\" => \"cloud-image/debian-12\""),
+            "{text}"
+        );
+        assert!(text.contains("ADHOC_DOCKER = \"command -v docker >/dev/null || "), "{text}");
+        assert!(text.contains("ADHOC_IMAGE_DISK_GB = 40"), "{text}");
         assert!(text.contains("module IsoloomAdHoc"), "{text}");
     }
 

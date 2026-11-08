@@ -16,7 +16,7 @@ fn every_vagrantfile_loads_the_runners_machines_and_says_how_they_join_each_netw
     let vf = generated(&lab(TWO_NETS)?, Target::Vagrant, "Vagrantfile")?;
     assert!(vf.contains("module IsoloomAdHoc"), "{vf}");
     assert!(
-        vf.contains("def self.define(vagrant, name, network:, ip:, box: nil, cpus: 2, memory: 2048)"),
+        vf.contains("def self.define(vagrant, name, network:, ip:, box: nil, image: nil, cpus: 2, memory: 2048)"),
         "{vf}"
     );
     assert!(vf.contains("ADHOC_LABEL = \"t\""), "{vf}");
@@ -35,10 +35,7 @@ fn every_vagrantfile_loads_the_runners_machines_and_says_how_they_join_each_netw
         vf.contains("ADHOC_BOX = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"cloud-image/debian-12\" : \"kalilinux/rolling\""),
         "{vf}"
     );
-    assert!(
-        vf.contains("box ||= ENV.fetch(\"ISOLOOM_ACCESS_BOX\", ADHOC_BOX)"),
-        "the runner's box first: {vf}"
-    );
+    assert!(vf.contains("picked = box || ENV[\"ISOLOOM_ACCESS_BOX\"]"), "the runner's box first: {vf}");
     // Loaded last, inside `Vagrant.configure`, so a definition can call `config.vm.define`.
     let loader = "  IsoloomAdHoc.files.each { |f| eval(File.read(f), binding, f) }\nend\n";
     assert!(vf.ends_with(loader), "{vf}");
@@ -49,6 +46,29 @@ fn every_vagrantfile_loads_the_runners_machines_and_says_how_they_join_each_netw
     // Not started by `vagrant up`; on QEMU, on the port its network's hub keeps for it.
     assert!(vf.contains("vagrant.vm.define name, autostart: false do |m|"), "{vf}");
     assert!(vf.contains("QEMU_HUBS.dig(network, name)"), "{vf}");
+    Ok(())
+}
+
+#[test]
+fn the_hook_runs_a_container_image_as_a_vm_with_docker() -> Outcome {
+    let vf = generated(&lab(TWO_NETS)?, Target::Vagrant, "Vagrantfile")?;
+    // The image picks a Debian 12 box per provider unless one is named, and brings Docker.
+    assert!(vf.contains("box = picked || (image ? ADHOC_IMAGE_BOX : ADHOC_BOX)"), "{vf}");
+    assert!(vf.contains("ADHOC_IMAGE_BOX = \"bento/debian-12\""), "{vf}");
+    assert!(
+        vf.contains("\"libvirt\" => \"generic/debian12\"") && vf.contains("\"qemu\" => \"cloud-image/debian-12\""),
+        "{vf}"
+    );
+    assert!(vf.contains("ADHOC_DOCKER = \"command -v docker >/dev/null || "), "{vf}");
+    assert!(vf.contains("m.vm.provision \"shell\", name: \"docker\", inline: ADHOC_DOCKER"), "{vf}");
+    // On QEMU the cloud image's 10 GB disk grows for the image.
+    assert!(
+        vf.contains("v.disk_resize = IsoloomQemu.disk(debian[\"qemu\"], ADHOC_IMAGE_DISK_GB) if defined?(IsoloomQemu)"),
+        "{vf}"
+    );
+    // The image idle on the VM's own network, as the Compose access service runs it.
+    let run = "docker run -d --name #{n} --restart unless-stopped --network host --cap-add NET_ADMIN --cap-add NET_RAW --entrypoint sleep #{i} infinity";
+    assert!(vf.contains(run), "{vf}");
     Ok(())
 }
 
