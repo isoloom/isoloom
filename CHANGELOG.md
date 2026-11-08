@@ -12,6 +12,11 @@ stable spec format.
 
 ### Added
 
+- **The runner's ad-hoc VM takes a hostname.** `IsoloomAdHoc.define` accepts `hostname:`, the name
+  the VM answers to inside (a container on the VM's network shares it); its define name otherwise.
+  The runner gives its attack box `attackbox`, so a learner's prompt reads `root@attackbox` rather
+  than Isoloom's internal `isoloom-access`.
+
 - **The runner's ad-hoc attack VM can run a container image.** `IsoloomAdHoc.define` takes an
   `image:`: the VM is then a container run as a VM, as Isoloom runs a container machine on this
   target: Debian 12's box for the provider (`bento/debian-12`; `generic/debian12` on libvirt, the

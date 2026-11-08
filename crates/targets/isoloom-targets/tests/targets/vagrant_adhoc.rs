@@ -16,7 +16,7 @@ fn every_vagrantfile_loads_the_runners_machines_and_says_how_they_join_each_netw
     let vf = generated(&lab(TWO_NETS)?, Target::Vagrant, "Vagrantfile")?;
     assert!(vf.contains("module IsoloomAdHoc"), "{vf}");
     assert!(
-        vf.contains("def self.define(vagrant, name, network:, ip:, box: nil, image: nil, cpus: 2, memory: 2048)"),
+        vf.contains("def self.define(vagrant, name, network:, ip:, box: nil, image: nil, hostname: nil, cpus: 2, memory: 2048)"),
         "{vf}"
     );
     assert!(vf.contains("ADHOC_LABEL = \"t\""), "{vf}");
@@ -45,6 +45,8 @@ fn every_vagrantfile_loads_the_runners_machines_and_says_how_they_join_each_netw
     );
     // Not started by `vagrant up`; on QEMU, on the port its network's hub keeps for it.
     assert!(vf.contains("vagrant.vm.define name, autostart: false do |m|"), "{vf}");
+    // The name it answers to inside: the runner's (`attackbox`), else its define name.
+    assert!(vf.contains("m.vm.hostname = hostname || name"), "{vf}");
     assert!(vf.contains("QEMU_HUBS.dig(network, name)"), "{vf}");
     Ok(())
 }

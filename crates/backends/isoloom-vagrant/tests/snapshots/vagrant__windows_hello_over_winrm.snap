@@ -616,8 +616,10 @@ module IsoloomAdHoc
 
   # A VM `name` on lab network `network` at `ip`, defined (in `vagrant`, the configure block's
   # `config`) but not started: a VM of `box`, or one running the container `image` (then a Debian
-  # 12 box with Docker, per provider, unless a box is named).
-  def self.define(vagrant, name, network:, ip:, box: nil, image: nil, cpus: 2, memory: 2048)
+  # 12 box with Docker, per provider, unless a box is named). `hostname` is the name it answers to
+  # inside (the runner's attack box: `attackbox`; a container on the VM's network shares it), its
+  # define name otherwise.
+  def self.define(vagrant, name, network:, ip:, box: nil, image: nil, hostname: nil, cpus: 2, memory: 2048)
     net = ADHOC_NETWORKS.fetch(network) { fail!("no lab network `#{network}` (#{ADHOC_NETWORKS.keys.join(", ")})") }
     picked = box || ENV["ISOLOOM_ACCESS_BOX"]
     box = picked || (image ? ADHOC_IMAGE_BOX : ADHOC_BOX)
@@ -626,7 +628,7 @@ module IsoloomAdHoc
     label = "#{ADHOC_LABEL} · #{name}"
     vagrant.vm.define name, autostart: false do |m|
       m.vm.box = box
-      m.vm.hostname = name
+      m.vm.hostname = hostname || name
       m.vm.network "private_network", ip: ip, netmask: net["netmask"], virtualbox__intnet: net["name"], libvirt__network_name: net["name"], libvirt__dhcp_enabled: false
       m.vm.provider "virtualbox" do |v|
         v.name = label
