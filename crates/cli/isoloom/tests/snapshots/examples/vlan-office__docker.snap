@@ -1139,6 +1139,7 @@ volumes:
           "--build",
           "--pull",
           "missing",
+          "--remove-orphans",
           "--wait",
           "--wait-timeout",
           "600"

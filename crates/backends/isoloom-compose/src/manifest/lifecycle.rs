@@ -61,7 +61,8 @@ fn up(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Vec<Ste
     if !pull_published {
         args.push("--build");
     }
-    args.extend(["--pull", "missing", "--wait", "--wait-timeout", WAIT_TIMEOUT]);
+    // A service the lab no longer has (a machine taken out, then the run updated) goes.
+    args.extend(["--pull", "missing", "--remove-orphans", "--wait", "--wait-timeout", WAIT_TIMEOUT]);
     args.extend(plan.wait.iter().map(String::as_str));
     let mut steps = vec![
         noted(act("pin-ports", Action::ComposePinPorts)?, "Picking the lab's host ports…"),

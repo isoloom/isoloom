@@ -524,7 +524,7 @@
           "ssh",
           "--no-tty",
           "--command",
-          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
           "default"
         ],
         "timeout_s": 1800

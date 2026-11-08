@@ -586,7 +586,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -1441,7 +1441,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -2178,7 +2178,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3022,7 +3022,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -3743,7 +3743,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -4529,7 +4529,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },

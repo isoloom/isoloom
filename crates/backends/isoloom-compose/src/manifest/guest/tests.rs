@@ -37,7 +37,7 @@ fn guest_of(yaml: &str) -> GuestCompose {
 fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
     let g = guest_of(FLAGGED);
     let start = g.start[0].command.to_string();
-    assert!(start.starts_with("cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml up --detach --build --pull missing --wait --wait-timeout 600"), "{start}");
+    assert!(start.starts_with("cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600"), "{start}");
     assert_eq!(g.start[0].id.as_str(), "start");
     // Web's set-up job runs attached once the rest is up.
     let jobs: Vec<&str> = g.start.iter().skip(1).map(|c| c.id.as_str()).collect();

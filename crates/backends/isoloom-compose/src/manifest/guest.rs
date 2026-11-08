@@ -104,7 +104,8 @@ fn start(env: &Environment, vm: &InVm, plan: &StartPlan, members: &[Member]) -> 
     // lab that only builds locally keeps `--build`.
     let pull_published = publishes_a_built_image(env);
     let build = if pull_published { "" } else { " --build" };
-    let mut up = format!("up --detach{build} --pull missing --wait --wait-timeout {WAIT_TIMEOUT}");
+    // As on the host: a service the lab no longer has goes.
+    let mut up = format!("up --detach{build} --pull missing --remove-orphans --wait --wait-timeout {WAIT_TIMEOUT}");
     for service in &plan.wait {
         up.push(' ');
         up.push_str(service);
