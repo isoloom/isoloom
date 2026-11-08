@@ -249,3 +249,18 @@ fn an_existing_host_has_an_address_a_port_and_a_user() {
         );
     }
 }
+
+#[test]
+fn a_name_or_alias_starting_with_isoloom_is_refused() {
+    // The attack VM is `isoloom-access`, the controller `isoloom-controller`: a machine so named
+    // would share the attack VM's hub port, and `isoloom-web` would share `web`'s check step.
+    assert_eq!(
+        of("  isoloom-access: { networks: { lan: 10 }, docker: { image: nginx } }\n"),
+        ["machines.isoloom-access: names starting with `isoloom-` are Isoloom's own (its controller, the attack box): choose another"]
+    );
+    assert_eq!(
+        of("  web: { networks: { lan: 10 }, docker: { image: nginx }, aliases: [isoloom-web] }\n"),
+        ["machines.web.aliases[0]: names starting with `isoloom-` are Isoloom's own (its controller, the attack box): choose another"]
+    );
+    assert_eq!(of("  isoloomweb: { networks: { lan: 10 }, docker: { image: nginx } }\n"), Vec::<String>::new());
+}

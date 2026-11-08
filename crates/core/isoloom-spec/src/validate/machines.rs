@@ -90,10 +90,17 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
     }
 }
 
+/// What Isoloom's own machines and services are named with (its controller, the attack box, the
+/// check runners): a spec's machine or alias starting so would collide with them.
+const RESERVED_PREFIX: &str = "isoloom-";
+const RESERVED_NAME: &str = "names starting with `isoloom-` are Isoloom's own (its controller, the attack box): choose another";
+
 /// The machine's name (a DNS label short enough for Kubernetes), and a network to be on.
 fn name_and_networks(s: &Subject, p: &mut Problems) {
     if !dns_label(s.name) {
         p.add(&s.at, "machine names are DNS names: kebab-case, starting with a letter");
+    } else if s.name.starts_with(RESERVED_PREFIX) {
+        p.add(&s.at, RESERVED_NAME);
     } else if s.name.len() > 53 {
         // The machine's published entry point is the Kubernetes Service `<name>-published`,
         // a 63-character DNS label; 10 characters are the suffix.
@@ -203,6 +210,8 @@ fn aliases(s: &Subject, p: &mut Problems) {
     for (i, a) in s.m.aliases.iter().enumerate() {
         if !dns_name(a) {
             p.add(format!("{at}.aliases[{i}]"), format!("`{a}` isn't a DNS name like api.example.com (lowercase)"));
+        } else if a.starts_with(RESERVED_PREFIX) {
+            p.add(format!("{at}.aliases[{i}]"), RESERVED_NAME);
         } else if spec.machines.contains_key(a) || spec.machines.iter().any(|(o, om)| o != name && om.aliases.contains(a)) {
             p.add(format!("{at}.aliases[{i}]"), format!("`{a}` already names another machine"));
         }
