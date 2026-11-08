@@ -315,8 +315,16 @@ output "address_web01" {
   value = aws_instance.web01.public_ip
 }
 
+output "ssh_user_web01" {
+  value = "isoloom"
+}
+
 output "address_isoloom_controller" {
   value = aws_eip.isoloom_controller.public_ip
+}
+
+output "ssh_user_isoloom_controller" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -746,6 +754,16 @@ resource "local_file" "isoloom_project" {
       }
     },
     {
+      "name": "ssh_user_web01",
+      "description": "The user the runner's key lets in on web01.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web01"
+      }
+    },
+    {
       "name": "address_isoloom_controller",
       "description": "isoloom-controller's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -753,6 +771,16 @@ resource "local_file" "isoloom_project" {
       "from": {
         "kind": "terraform_output",
         "name": "address_isoloom_controller"
+      }
+    },
+    {
+      "name": "ssh_user_isoloom_controller",
+      "description": "The user the runner's key lets in on isoloom-controller.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_isoloom_controller"
       }
     },
     {
@@ -1182,8 +1210,16 @@ output "address_web01" {
   value = azurerm_public_ip.web01.ip_address
 }
 
+output "ssh_user_web01" {
+  value = "isoloom"
+}
+
 output "address_isoloom_controller" {
   value = azurerm_public_ip.isoloom_controller.ip_address
+}
+
+output "ssh_user_isoloom_controller" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1609,6 +1645,16 @@ resource "local_file" "isoloom_project" {
       }
     },
     {
+      "name": "ssh_user_web01",
+      "description": "The user the runner's key lets in on web01.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web01"
+      }
+    },
+    {
       "name": "address_isoloom_controller",
       "description": "isoloom-controller's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -1616,6 +1662,16 @@ resource "local_file" "isoloom_project" {
       "from": {
         "kind": "terraform_output",
         "name": "address_isoloom_controller"
+      }
+    },
+    {
+      "name": "ssh_user_isoloom_controller",
+      "description": "The user the runner's key lets in on isoloom-controller.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_isoloom_controller"
       }
     },
     {

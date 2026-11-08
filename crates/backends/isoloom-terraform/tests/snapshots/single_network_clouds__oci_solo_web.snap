@@ -382,6 +382,10 @@ output "address_web" {
   value = oci_core_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "ubuntu"
+}
+
 output "ssh_users" {
   value = { web = "ubuntu" }
 }

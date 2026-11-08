@@ -192,6 +192,10 @@ output "address_web" {
   value = aws_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "admin"
+}
+
 output "ssh_users" {
   value = { web = "admin" }
 }
@@ -573,6 +577,16 @@ output "checks" {
         "kind": "terraform_output",
         "name": "address_web"
       }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
     }
   ],
   "checks": {
@@ -853,6 +867,10 @@ output "machines" {
 
 output "address_web" {
   value = azurerm_public_ip.web.ip_address
+}
+
+output "ssh_user_web" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1232,6 +1250,16 @@ output "checks" {
         "kind": "terraform_output",
         "name": "address_web"
       }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
     }
   ],
   "checks": {
@@ -1564,6 +1592,10 @@ output "machines" {
 
 output "address_web" {
   value = google_compute_instance.web.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_web" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -1945,6 +1977,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     }
   ],
@@ -2379,6 +2421,10 @@ output "address_web" {
   value = oci_core_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "ubuntu"
+}
+
 output "ssh_users" {
   value = { web = "ubuntu" }
 }
@@ -2703,6 +2749,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     }
   ],

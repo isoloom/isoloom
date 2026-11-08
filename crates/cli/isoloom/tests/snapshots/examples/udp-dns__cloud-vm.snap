@@ -277,8 +277,16 @@ output "address_dns" {
   value = aws_instance.dns.public_ip
 }
 
+output "ssh_user_dns" {
+  value = "admin"
+}
+
 output "address_client" {
   value = aws_instance.client.public_ip
+}
+
+output "ssh_user_client" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -769,6 +777,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_dns",
+      "description": "The user the runner's key lets in on dns.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_dns"
+      }
+    },
+    {
       "name": "address_client",
       "description": "client's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -776,6 +794,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_client"
+      }
+    },
+    {
+      "name": "ssh_user_client",
+      "description": "The user the runner's key lets in on client.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_client"
       }
     },
     {
@@ -1221,8 +1249,16 @@ output "address_dns" {
   value = azurerm_public_ip.dns.ip_address
 }
 
+output "ssh_user_dns" {
+  value = "isoloom"
+}
+
 output "address_client" {
   value = azurerm_public_ip.client.ip_address
+}
+
+output "ssh_user_client" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1708,6 +1744,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_dns",
+      "description": "The user the runner's key lets in on dns.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_dns"
+      }
+    },
+    {
       "name": "address_client",
       "description": "client's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -1715,6 +1761,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_client"
+      }
+    },
+    {
+      "name": "ssh_user_client",
+      "description": "The user the runner's key lets in on client.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_client"
       }
     },
     {
@@ -2330,8 +2386,16 @@ output "address_dns" {
   value = google_compute_instance.dns.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_dns" {
+  value = "admin"
+}
+
 output "address_client" {
   value = google_compute_instance.client.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_client" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -2821,6 +2885,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_dns",
+      "description": "The user the runner's key lets in on dns.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_dns"
+      }
+    },
+    {
       "name": "address_client",
       "description": "client's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2828,6 +2902,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_client"
+      }
+    },
+    {
+      "name": "ssh_user_client",
+      "description": "The user the runner's key lets in on client.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_client"
       }
     },
     {
@@ -3252,8 +3336,16 @@ output "address_dns" {
   value = one(linode_instance.dns.ipv4)
 }
 
+output "ssh_user_dns" {
+  value = "root"
+}
+
 output "address_client" {
   value = one(linode_instance.client.ipv4)
+}
+
+output "ssh_user_client" {
+  value = "root"
 }
 
 output "ssh_users" {
@@ -3683,6 +3775,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_dns",
+      "description": "The user the runner's key lets in on dns.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_dns"
+      }
+    },
+    {
       "name": "address_client",
       "description": "client's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3690,6 +3792,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_client"
+      }
+    },
+    {
+      "name": "ssh_user_client",
+      "description": "The user the runner's key lets in on client.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_client"
       }
     },
     {
@@ -4147,8 +4259,16 @@ output "address_dns" {
   value = oci_core_instance.dns.public_ip
 }
 
+output "ssh_user_dns" {
+  value = "ubuntu"
+}
+
 output "address_client" {
   value = oci_core_instance.client.public_ip
+}
+
+output "ssh_user_client" {
+  value = "ubuntu"
 }
 
 output "ssh_users" {
@@ -4579,6 +4699,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_dns",
+      "description": "The user the runner's key lets in on dns.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_dns"
+      }
+    },
+    {
       "name": "address_client",
       "description": "client's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -4586,6 +4716,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_client"
+      }
+    },
+    {
+      "name": "ssh_user_client",
+      "description": "The user the runner's key lets in on client.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_client"
       }
     },
     {

@@ -223,8 +223,16 @@ output "address_web" {
   value = aws_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "admin"
+}
+
 output "address_cache" {
   value = aws_instance.cache.public_ip
+}
+
+output "ssh_user_cache" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -659,6 +667,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "address_cache",
       "description": "cache's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -666,6 +684,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_cache"
+      }
+    },
+    {
+      "name": "ssh_user_cache",
+      "description": "The user the runner's key lets in on cache.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_cache"
       }
     }
   ],
@@ -1046,8 +1074,16 @@ output "address_web" {
   value = azurerm_public_ip.web.ip_address
 }
 
+output "ssh_user_web" {
+  value = "isoloom"
+}
+
 output "address_cache" {
   value = azurerm_public_ip.cache.ip_address
+}
+
+output "ssh_user_cache" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1478,6 +1514,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "address_cache",
       "description": "cache's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -1485,6 +1531,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_cache"
+      }
+    },
+    {
+      "name": "ssh_user_cache",
+      "description": "The user the runner's key lets in on cache.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_cache"
       }
     }
   ],
@@ -1953,8 +2009,16 @@ output "address_web" {
   value = google_compute_instance.web.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_web" {
+  value = "admin"
+}
+
 output "address_cache" {
   value = google_compute_instance.cache.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_cache" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -2388,6 +2452,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "address_cache",
       "description": "cache's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2395,6 +2469,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_cache"
+      }
+    },
+    {
+      "name": "ssh_user_cache",
+      "description": "The user the runner's key lets in on cache.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_cache"
       }
     }
   ],
@@ -2674,8 +2758,16 @@ output "address_web" {
   value = one(linode_instance.web.ipv4)
 }
 
+output "ssh_user_web" {
+  value = "root"
+}
+
 output "address_cache" {
   value = one(linode_instance.cache.ipv4)
+}
+
+output "ssh_user_cache" {
+  value = "root"
 }
 
 output "ssh_users" {
@@ -3052,6 +3144,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "address_cache",
       "description": "cache's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3059,6 +3161,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_cache"
+      }
+    },
+    {
+      "name": "ssh_user_cache",
+      "description": "The user the runner's key lets in on cache.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_cache"
       }
     }
   ],
@@ -3516,8 +3628,16 @@ output "address_web" {
   value = oci_core_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "ubuntu"
+}
+
 output "address_cache" {
   value = oci_core_instance.cache.public_ip
+}
+
+output "ssh_user_cache" {
+  value = "ubuntu"
 }
 
 output "ssh_users" {
@@ -3896,6 +4016,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "address_cache",
       "description": "cache's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3903,6 +4033,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_cache"
+      }
+    },
+    {
+      "name": "ssh_user_cache",
+      "description": "The user the runner's key lets in on cache.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_cache"
       }
     }
   ],

@@ -32,6 +32,12 @@ pub(crate) fn address_output(machine: &str) -> String {
     format!("address_{}", ident(machine).to_ascii_lowercase())
 }
 
+/// The output holding the SSH user the runner's key lets in on `machine` (its guest delivery
+/// signs in as it).
+pub(crate) fn ssh_user_output(machine: &str) -> String {
+    format!("ssh_user_{}", ident(machine).to_ascii_lowercase())
+}
+
 fn at(machine: &str) -> Result<Template, ManifestError> {
     Ok(Template::from(Placeholder::Output(SnakeName::parse(&address_output(machine))?)))
 }
@@ -119,6 +125,11 @@ fn outputs(env: &Environment, machines: &[Machine]) -> Result<Vec<Output>, Manif
             &address_output(name),
             OutputRole::Address,
             &format!("{name}'s public address: the runner's SSH and its published ports reach it there."),
+        )?);
+        out.push(state(
+            &ssh_user_output(name),
+            OutputRole::Info,
+            &format!("The user the runner's key lets in on {name}."),
         )?);
     }
     let shown_at = |m: &Machine| {

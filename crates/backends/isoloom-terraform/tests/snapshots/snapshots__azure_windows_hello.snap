@@ -369,8 +369,16 @@ output "address_web01" {
   value = azurerm_public_ip.web01.ip_address
 }
 
+output "ssh_user_web01" {
+  value = "isoloom"
+}
+
 output "address_isoloom_controller" {
   value = azurerm_public_ip.isoloom_controller.ip_address
+}
+
+output "ssh_user_isoloom_controller" {
+  value = "isoloom"
 }
 
 output "ssh_users" {

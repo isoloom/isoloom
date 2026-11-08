@@ -226,8 +226,16 @@ output "address_cache" {
   value = aws_instance.cache.public_ip
 }
 
+output "ssh_user_cache" {
+  value = "admin"
+}
+
 output "address_web" {
   value = aws_instance.web.public_ip
+}
+
+output "ssh_user_web" {
+  value = "admin"
 }
 
 output "ssh_users" {

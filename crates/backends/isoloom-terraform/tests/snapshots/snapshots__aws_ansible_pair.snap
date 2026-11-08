@@ -259,12 +259,24 @@ output "address_web" {
   value = aws_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "admin"
+}
+
 output "address_cache" {
   value = aws_instance.cache.public_ip
 }
 
+output "ssh_user_cache" {
+  value = "admin"
+}
+
 output "address_isoloom_controller" {
   value = aws_eip.isoloom_controller.public_ip
+}
+
+output "ssh_user_isoloom_controller" {
+  value = "admin"
 }
 
 output "ssh_users" {

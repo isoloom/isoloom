@@ -409,16 +409,32 @@ output "address_intranet" {
   value = aws_instance.intranet.public_ip
 }
 
+output "ssh_user_intranet" {
+  value = "admin"
+}
+
 output "address_staff" {
   value = aws_instance.staff.public_ip
+}
+
+output "ssh_user_staff" {
+  value = "admin"
 }
 
 output "address_guest" {
   value = aws_instance.guest.public_ip
 }
 
+output "ssh_user_guest" {
+  value = "admin"
+}
+
 output "address_admin" {
   value = aws_eip.admin.public_ip
+}
+
+output "ssh_user_admin" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -983,6 +999,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_intranet",
+      "description": "The user the runner's key lets in on intranet.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_intranet"
+      }
+    },
+    {
       "name": "address_staff",
       "description": "staff's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -990,6 +1016,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_staff"
+      }
+    },
+    {
+      "name": "ssh_user_staff",
+      "description": "The user the runner's key lets in on staff.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_staff"
       }
     },
     {
@@ -1003,6 +1039,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_guest",
+      "description": "The user the runner's key lets in on guest.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_guest"
+      }
+    },
+    {
       "name": "address_admin",
       "description": "admin's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -1010,6 +1056,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_admin"
+      }
+    },
+    {
+      "name": "ssh_user_admin",
+      "description": "The user the runner's key lets in on admin.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_admin"
       }
     }
   ],
@@ -1744,16 +1800,32 @@ output "address_intranet" {
   value = azurerm_public_ip.intranet.ip_address
 }
 
+output "ssh_user_intranet" {
+  value = "isoloom"
+}
+
 output "address_staff" {
   value = azurerm_public_ip.staff.ip_address
+}
+
+output "ssh_user_staff" {
+  value = "isoloom"
 }
 
 output "address_guest" {
   value = azurerm_public_ip.guest.ip_address
 }
 
+output "ssh_user_guest" {
+  value = "isoloom"
+}
+
 output "address_admin" {
   value = azurerm_public_ip.admin.ip_address
+}
+
+output "ssh_user_admin" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -2313,6 +2385,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_intranet",
+      "description": "The user the runner's key lets in on intranet.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_intranet"
+      }
+    },
+    {
       "name": "address_staff",
       "description": "staff's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2320,6 +2402,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_staff"
+      }
+    },
+    {
+      "name": "ssh_user_staff",
+      "description": "The user the runner's key lets in on staff.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_staff"
       }
     },
     {
@@ -2333,6 +2425,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_guest",
+      "description": "The user the runner's key lets in on guest.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_guest"
+      }
+    },
+    {
       "name": "address_admin",
       "description": "admin's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2340,6 +2442,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_admin"
+      }
+    },
+    {
+      "name": "ssh_user_admin",
+      "description": "The user the runner's key lets in on admin.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_admin"
       }
     }
   ],
@@ -3337,16 +3449,32 @@ output "address_intranet" {
   value = google_compute_instance.intranet.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_intranet" {
+  value = "admin"
+}
+
 output "address_staff" {
   value = google_compute_instance.staff.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_staff" {
+  value = "admin"
 }
 
 output "address_guest" {
   value = google_compute_instance.guest.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_guest" {
+  value = "admin"
+}
+
 output "address_admin" {
   value = google_compute_instance.admin.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_admin" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -3908,6 +4036,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_intranet",
+      "description": "The user the runner's key lets in on intranet.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_intranet"
+      }
+    },
+    {
       "name": "address_staff",
       "description": "staff's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3915,6 +4053,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_staff"
+      }
+    },
+    {
+      "name": "ssh_user_staff",
+      "description": "The user the runner's key lets in on staff.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_staff"
       }
     },
     {
@@ -3928,6 +4076,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_guest",
+      "description": "The user the runner's key lets in on guest.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_guest"
+      }
+    },
+    {
       "name": "address_admin",
       "description": "admin's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3935,6 +4093,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_admin"
+      }
+    },
+    {
+      "name": "ssh_user_admin",
+      "description": "The user the runner's key lets in on admin.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_admin"
       }
     }
   ],
@@ -4696,16 +4864,32 @@ output "address_intranet" {
   value = oci_core_instance.intranet.public_ip
 }
 
+output "ssh_user_intranet" {
+  value = "ubuntu"
+}
+
 output "address_staff" {
   value = oci_core_instance.staff.public_ip
+}
+
+output "ssh_user_staff" {
+  value = "ubuntu"
 }
 
 output "address_guest" {
   value = oci_core_instance.guest.public_ip
 }
 
+output "ssh_user_guest" {
+  value = "ubuntu"
+}
+
 output "address_admin" {
   value = oci_core_instance.admin.public_ip
+}
+
+output "ssh_user_admin" {
+  value = "ubuntu"
 }
 
 output "ssh_users" {
@@ -5210,6 +5394,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_intranet",
+      "description": "The user the runner's key lets in on intranet.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_intranet"
+      }
+    },
+    {
       "name": "address_staff",
       "description": "staff's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -5217,6 +5411,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_staff"
+      }
+    },
+    {
+      "name": "ssh_user_staff",
+      "description": "The user the runner's key lets in on staff.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_staff"
       }
     },
     {
@@ -5230,6 +5434,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_guest",
+      "description": "The user the runner's key lets in on guest.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_guest"
+      }
+    },
+    {
       "name": "address_admin",
       "description": "admin's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -5237,6 +5451,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_admin"
+      }
+    },
+    {
+      "name": "ssh_user_admin",
+      "description": "The user the runner's key lets in on admin.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_admin"
       }
     }
   ],

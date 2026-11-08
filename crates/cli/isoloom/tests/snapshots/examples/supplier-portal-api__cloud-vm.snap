@@ -238,8 +238,16 @@ output "address_database" {
   value = aws_instance.database.public_ip
 }
 
+output "ssh_user_database" {
+  value = "admin"
+}
+
 output "address_web" {
   value = aws_instance.web.public_ip
+}
+
+output "ssh_user_web" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -718,6 +726,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_database",
+      "description": "The user the runner's key lets in on database.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_database"
+      }
+    },
+    {
       "name": "address_web",
       "description": "web's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -725,6 +743,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     },
     {
@@ -1151,8 +1179,16 @@ output "address_database" {
   value = azurerm_public_ip.database.ip_address
 }
 
+output "ssh_user_database" {
+  value = "isoloom"
+}
+
 output "address_web" {
   value = azurerm_public_ip.web.ip_address
+}
+
+output "ssh_user_web" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1627,6 +1663,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_database",
+      "description": "The user the runner's key lets in on database.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_database"
+      }
+    },
+    {
       "name": "address_web",
       "description": "web's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -1634,6 +1680,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     },
     {
@@ -2233,8 +2289,16 @@ output "address_database" {
   value = google_compute_instance.database.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_database" {
+  value = "admin"
+}
+
 output "address_web" {
   value = google_compute_instance.web.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_web" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -2714,6 +2778,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_database",
+      "description": "The user the runner's key lets in on database.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_database"
+      }
+    },
+    {
       "name": "address_web",
       "description": "web's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2721,6 +2795,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     },
     {
@@ -3042,8 +3126,16 @@ output "address_database" {
   value = one(linode_instance.database.ipv4)
 }
 
+output "ssh_user_database" {
+  value = "root"
+}
+
 output "address_web" {
   value = one(linode_instance.web.ipv4)
+}
+
+output "ssh_user_web" {
+  value = "root"
 }
 
 output "ssh_users" {
@@ -3464,6 +3556,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_database",
+      "description": "The user the runner's key lets in on database.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_database"
+      }
+    },
+    {
       "name": "address_web",
       "description": "web's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3471,6 +3573,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     },
     {
@@ -3987,8 +4099,16 @@ output "address_database" {
   value = oci_core_instance.database.public_ip
 }
 
+output "ssh_user_database" {
+  value = "ubuntu"
+}
+
 output "address_web" {
   value = oci_core_instance.web.public_ip
+}
+
+output "ssh_user_web" {
+  value = "ubuntu"
 }
 
 output "ssh_users" {
@@ -4412,6 +4532,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_database",
+      "description": "The user the runner's key lets in on database.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_database"
+      }
+    },
+    {
       "name": "address_web",
       "description": "web's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -4419,6 +4549,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     },
     {

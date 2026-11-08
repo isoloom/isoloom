@@ -149,6 +149,10 @@ output "address_web" {
   value = one(linode_instance.web.ipv4)
 }
 
+output "ssh_user_web" {
+  value = "root"
+}
+
 output "ssh_users" {
   value = { web = "root" }
 }

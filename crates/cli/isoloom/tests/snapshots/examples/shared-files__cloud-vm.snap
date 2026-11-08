@@ -229,8 +229,16 @@ output "address_writer" {
   value = aws_instance.writer.public_ip
 }
 
+output "ssh_user_writer" {
+  value = "admin"
+}
+
 output "address_reader" {
   value = aws_instance.reader.public_ip
+}
+
+output "ssh_user_reader" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -649,6 +657,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_writer",
+      "description": "The user the runner's key lets in on writer.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_writer"
+      }
+    },
+    {
       "name": "address_reader",
       "description": "reader's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -656,6 +674,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_reader"
+      }
+    },
+    {
+      "name": "ssh_user_reader",
+      "description": "The user the runner's key lets in on reader.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_reader"
       }
     }
   ],
@@ -1047,8 +1075,16 @@ output "address_writer" {
   value = azurerm_public_ip.writer.ip_address
 }
 
+output "ssh_user_writer" {
+  value = "isoloom"
+}
+
 output "address_reader" {
   value = azurerm_public_ip.reader.ip_address
+}
+
+output "ssh_user_reader" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1463,6 +1499,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_writer",
+      "description": "The user the runner's key lets in on writer.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_writer"
+      }
+    },
+    {
       "name": "address_reader",
       "description": "reader's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -1470,6 +1516,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_reader"
+      }
+    },
+    {
+      "name": "ssh_user_reader",
+      "description": "The user the runner's key lets in on reader.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_reader"
       }
     }
   ],
@@ -1938,8 +1994,16 @@ output "address_writer" {
   value = google_compute_instance.writer.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_writer" {
+  value = "admin"
+}
+
 output "address_reader" {
   value = google_compute_instance.reader.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_reader" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -2357,6 +2421,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_writer",
+      "description": "The user the runner's key lets in on writer.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_writer"
+      }
+    },
+    {
       "name": "address_reader",
       "description": "reader's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2364,6 +2438,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_reader"
+      }
+    },
+    {
+      "name": "ssh_user_reader",
+      "description": "The user the runner's key lets in on reader.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_reader"
       }
     }
   ],
@@ -2644,8 +2728,16 @@ output "address_writer" {
   value = one(linode_instance.writer.ipv4)
 }
 
+output "ssh_user_writer" {
+  value = "root"
+}
+
 output "address_reader" {
   value = one(linode_instance.reader.ipv4)
+}
+
+output "ssh_user_reader" {
+  value = "root"
 }
 
 output "ssh_users" {
@@ -3006,6 +3098,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_writer",
+      "description": "The user the runner's key lets in on writer.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_writer"
+      }
+    },
+    {
       "name": "address_reader",
       "description": "reader's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3013,6 +3115,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_reader"
+      }
+    },
+    {
+      "name": "ssh_user_reader",
+      "description": "The user the runner's key lets in on reader.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_reader"
       }
     }
   ],
@@ -3474,8 +3586,16 @@ output "address_writer" {
   value = oci_core_instance.writer.public_ip
 }
 
+output "ssh_user_writer" {
+  value = "ubuntu"
+}
+
 output "address_reader" {
   value = oci_core_instance.reader.public_ip
+}
+
+output "ssh_user_reader" {
+  value = "ubuntu"
 }
 
 output "ssh_users" {
@@ -3838,6 +3958,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_writer",
+      "description": "The user the runner's key lets in on writer.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_writer"
+      }
+    },
+    {
       "name": "address_reader",
       "description": "reader's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3845,6 +3975,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_reader"
+      }
+    },
+    {
+      "name": "ssh_user_reader",
+      "description": "The user the runner's key lets in on reader.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_reader"
       }
     }
   ],

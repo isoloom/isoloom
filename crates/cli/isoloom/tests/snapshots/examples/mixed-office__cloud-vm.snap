@@ -380,8 +380,16 @@ output "address_files01" {
   value = azurerm_public_ip.files01.ip_address
 }
 
+output "ssh_user_files01" {
+  value = "isoloom"
+}
+
 output "address_intranet" {
   value = azurerm_public_ip.intranet.ip_address
+}
+
+output "ssh_user_intranet" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -818,6 +826,16 @@ resource "local_file" "isoloom_project" {
       }
     },
     {
+      "name": "ssh_user_files01",
+      "description": "The user the runner's key lets in on files01.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_files01"
+      }
+    },
+    {
       "name": "address_intranet",
       "description": "intranet's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -825,6 +843,16 @@ resource "local_file" "isoloom_project" {
       "from": {
         "kind": "terraform_output",
         "name": "address_intranet"
+      }
+    },
+    {
+      "name": "ssh_user_intranet",
+      "description": "The user the runner's key lets in on intranet.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_intranet"
       }
     },
     {

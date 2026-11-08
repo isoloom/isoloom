@@ -129,6 +129,10 @@ output "address_web" {
   value = digitalocean_droplet.web.ipv4_address
 }
 
+output "ssh_user_web" {
+  value = "root"
+}
+
 output "ssh_users" {
   value = { web = "root" }
 }

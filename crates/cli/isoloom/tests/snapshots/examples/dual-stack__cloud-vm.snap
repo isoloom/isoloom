@@ -420,8 +420,16 @@ output "address_web" {
   value = azurerm_public_ip.web.ip_address
 }
 
+output "ssh_user_web" {
+  value = "isoloom"
+}
+
 output "address_user" {
   value = azurerm_public_ip.user.ip_address
+}
+
+output "ssh_user_user" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -892,6 +900,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "address_user",
       "description": "user's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -899,6 +917,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_user"
+      }
+    },
+    {
+      "name": "ssh_user_user",
+      "description": "The user the runner's key lets in on user.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_user"
       }
     }
   ],
@@ -1742,8 +1770,16 @@ output "address_web" {
   value = oci_core_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "ubuntu"
+}
+
 output "address_user" {
   value = oci_core_instance.user.public_ip
+}
+
+output "ssh_user_user" {
+  value = "ubuntu"
 }
 
 output "ssh_users" {
@@ -2159,6 +2195,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "address_user",
       "description": "user's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2166,6 +2212,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_user"
+      }
+    },
+    {
+      "name": "ssh_user_user",
+      "description": "The user the runner's key lets in on user.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_user"
       }
     }
   ],

@@ -327,8 +327,16 @@ output "address_cache" {
   value = azurerm_public_ip.cache.ip_address
 }
 
+output "ssh_user_cache" {
+  value = "isoloom"
+}
+
 output "address_web" {
   value = azurerm_public_ip.web.ip_address
+}
+
+output "ssh_user_web" {
+  value = "isoloom"
 }
 
 output "ssh_users" {

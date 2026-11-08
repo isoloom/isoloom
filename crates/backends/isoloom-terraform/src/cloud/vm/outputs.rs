@@ -36,11 +36,13 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
     let machines: Vec<(&str, Expression)> = vms(env).map(|(n, _)| (n, (reach.public_ip)(n))).collect();
     let users: Vec<(&str, Expression)> = vms(env).map(|(n, mp)| (n, string((reach.user)(mp)))).collect();
     m.block(output("machines", object(machines)));
-    for (n, _) in vms(env) {
+    for (n, mp) in vms(env) {
         m.block(output(&super::manifest::address_output(n), (reach.public_ip)(n)));
+        m.block(output(&super::manifest::ssh_user_output(n), string((reach.user)(mp))));
     }
-    if let Some((address, _)) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
+    if let Some((address, user)) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
         m.block(output(&super::manifest::address_output("isoloom-controller"), address.clone()));
+        m.block(output(&super::manifest::ssh_user_output("isoloom-controller"), string(*user)));
     }
     m.block(output("ssh_users", object(users)));
     m.block(output("ip", stand_at(env, reach)));

@@ -262,8 +262,16 @@ output "address_cache" {
   value = one(linode_instance.cache.ipv4)
 }
 
+output "ssh_user_cache" {
+  value = "root"
+}
+
 output "address_web" {
   value = one(linode_instance.web.ipv4)
+}
+
+output "ssh_user_web" {
+  value = "root"
 }
 
 output "ssh_users" {

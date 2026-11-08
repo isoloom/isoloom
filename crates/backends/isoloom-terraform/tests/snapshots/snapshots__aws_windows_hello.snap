@@ -300,8 +300,16 @@ output "address_web01" {
   value = aws_instance.web01.public_ip
 }
 
+output "ssh_user_web01" {
+  value = "isoloom"
+}
+
 output "address_isoloom_controller" {
   value = aws_eip.isoloom_controller.public_ip
+}
+
+output "ssh_user_isoloom_controller" {
+  value = "admin"
 }
 
 output "ssh_users" {

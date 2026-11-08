@@ -189,6 +189,10 @@ output "address_web" {
   value = aws_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "admin"
+}
+
 output "ssh_users" {
   value = { web = "admin" }
 }
@@ -568,6 +572,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "web_web",
       "description": "web's web (port 80).",
       "role": "entry",
@@ -832,6 +846,10 @@ output "machines" {
 
 output "address_web" {
   value = azurerm_public_ip.web.ip_address
+}
+
+output "ssh_user_web" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1209,6 +1227,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "web_web",
       "description": "web's web (port 80).",
       "role": "entry",
@@ -1472,6 +1500,10 @@ output "machines" {
 
 output "address_web" {
   value = digitalocean_droplet.web.ipv4_address
+}
+
+output "ssh_user_web" {
+  value = "root"
 }
 
 output "ssh_users" {
@@ -1795,6 +1827,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "web_web",
       "description": "web's web (port 80).",
       "role": "entry",
@@ -2025,6 +2067,10 @@ output "machines" {
 
 output "address_web" {
   value = google_compute_instance.web.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_web" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -2405,6 +2451,16 @@ output "published" {
       }
     },
     {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
+      }
+    },
+    {
       "name": "web_web",
       "description": "web's web (port 80).",
       "role": "entry",
@@ -2603,6 +2659,10 @@ output "machines" {
 
 output "address_web" {
   value = one(linode_instance.web.ipv4)
+}
+
+output "ssh_user_web" {
+  value = "root"
 }
 
 output "ssh_users" {
@@ -2923,6 +2983,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     },
     {
@@ -3359,6 +3429,10 @@ output "address_web" {
   value = oci_core_instance.web.public_ip
 }
 
+output "ssh_user_web" {
+  value = "ubuntu"
+}
+
 output "ssh_users" {
   value = { web = "ubuntu" }
 }
@@ -3679,6 +3753,16 @@ output "published" {
       "from": {
         "kind": "terraform_output",
         "name": "address_web"
+      }
+    },
+    {
+      "name": "ssh_user_web",
+      "description": "The user the runner's key lets in on web.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_web"
       }
     },
     {

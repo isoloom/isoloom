@@ -181,6 +181,10 @@ output "address_web" {
   value = google_compute_instance.web.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_web" {
+  value = "admin"
+}
+
 output "ssh_users" {
   value = { web = "admin" }
 }

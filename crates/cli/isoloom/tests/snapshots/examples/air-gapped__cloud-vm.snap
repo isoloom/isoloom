@@ -238,8 +238,16 @@ output "address_store" {
   value = aws_instance.store.public_ip
 }
 
+output "ssh_user_store" {
+  value = "admin"
+}
+
 output "address_app" {
   value = aws_instance.app.public_ip
+}
+
+output "ssh_user_app" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -717,6 +725,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_store",
+      "description": "The user the runner's key lets in on store.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_store"
+      }
+    },
+    {
       "name": "address_app",
       "description": "app's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -724,6 +742,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_app"
+      }
+    },
+    {
+      "name": "ssh_user_app",
+      "description": "The user the runner's key lets in on app.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_app"
       }
     }
   ],
@@ -1116,8 +1144,16 @@ output "address_store" {
   value = azurerm_public_ip.store.ip_address
 }
 
+output "ssh_user_store" {
+  value = "isoloom"
+}
+
 output "address_app" {
   value = azurerm_public_ip.app.ip_address
+}
+
+output "ssh_user_app" {
+  value = "isoloom"
 }
 
 output "ssh_users" {
@@ -1590,6 +1626,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_store",
+      "description": "The user the runner's key lets in on store.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_store"
+      }
+    },
+    {
       "name": "address_app",
       "description": "app's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -1597,6 +1643,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_app"
+      }
+    },
+    {
+      "name": "ssh_user_app",
+      "description": "The user the runner's key lets in on app.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_app"
       }
     }
   ],
@@ -2139,8 +2195,16 @@ output "address_store" {
   value = google_compute_instance.store.network_interface[0].access_config[0].nat_ip
 }
 
+output "ssh_user_store" {
+  value = "admin"
+}
+
 output "address_app" {
   value = google_compute_instance.app.network_interface[0].access_config[0].nat_ip
+}
+
+output "ssh_user_app" {
+  value = "admin"
 }
 
 output "ssh_users" {
@@ -2615,6 +2679,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_store",
+      "description": "The user the runner's key lets in on store.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_store"
+      }
+    },
+    {
       "name": "address_app",
       "description": "app's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -2622,6 +2696,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_app"
+      }
+    },
+    {
+      "name": "ssh_user_app",
+      "description": "The user the runner's key lets in on app.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_app"
       }
     }
   ],
@@ -2953,8 +3037,16 @@ output "address_store" {
   value = one(linode_instance.store.ipv4)
 }
 
+output "ssh_user_store" {
+  value = "root"
+}
+
 output "address_app" {
   value = one(linode_instance.app.ipv4)
+}
+
+output "ssh_user_app" {
+  value = "root"
 }
 
 output "ssh_users" {
@@ -3371,6 +3463,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_store",
+      "description": "The user the runner's key lets in on store.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_store"
+      }
+    },
+    {
       "name": "address_app",
       "description": "app's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -3378,6 +3480,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_app"
+      }
+    },
+    {
+      "name": "ssh_user_app",
+      "description": "The user the runner's key lets in on app.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_app"
       }
     }
   ],
@@ -3700,8 +3812,16 @@ output "address_store" {
   value = oci_core_instance.store.public_ip
 }
 
+output "ssh_user_store" {
+  value = "ubuntu"
+}
+
 output "address_app" {
   value = oci_core_instance.app.public_ip
+}
+
+output "ssh_user_app" {
+  value = "ubuntu"
 }
 
 output "ssh_users" {
@@ -4119,6 +4239,16 @@ output "checks" {
       }
     },
     {
+      "name": "ssh_user_store",
+      "description": "The user the runner's key lets in on store.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_store"
+      }
+    },
+    {
       "name": "address_app",
       "description": "app's public address: the runner's SSH and its published ports reach it there.",
       "role": "address",
@@ -4126,6 +4256,16 @@ output "checks" {
       "from": {
         "kind": "terraform_output",
         "name": "address_app"
+      }
+    },
+    {
+      "name": "ssh_user_app",
+      "description": "The user the runner's key lets in on app.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user_app"
       }
     }
   ],
