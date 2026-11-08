@@ -1,4 +1,5 @@
-/target
+# Cargo build folders (target/, and any target-* a build was pointed at).
+/target*/
 .vagrant/
 
 # Terraform working dirs (provider binaries), created by running the generated modules

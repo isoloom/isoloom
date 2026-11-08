@@ -1,9 +1,0 @@
-/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/num_integer-29f180dc5695b23c.d: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/roots.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/average.rs
-
-/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/libnum_integer-29f180dc5695b23c.rlib: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/roots.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/average.rs
-
-/private/tmp/claude-501/-Users-florianamette-code-isoloom/ce789cde-1d0d-4d82-bc57-94dbbf3c8273/scratchpad/isoloom-rel/target-clean/debug/deps/libnum_integer-29f180dc5695b23c.rmeta: /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/lib.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/roots.rs /Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/average.rs
-
-/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/lib.rs:
-/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/roots.rs:
-/Users/florianamette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-integer-0.1.47/src/average.rs:
