@@ -204,6 +204,9 @@ resource "aws_instance" "iis" {
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.iis.id]
   user_data                   = "<powershell>\n$p = ConvertTo-SecureString '${random_password.windows.result}' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n${var.expires_at != "" ? "Register-ScheduledTask -TaskName isoloom-expiry -Action (New-ScheduledTaskAction -Execute shutdown.exe -Argument '/s /t 0') -Trigger (New-ScheduledTaskTrigger -Once -At ([DateTimeOffset]::FromUnixTimeSeconds(${var.expires_at}).LocalDateTime)) -User SYSTEM -RunLevel Highest -Force | Out-Null" : ""}\n</powershell>\n"
+  lifecycle {
+    ignore_changes = [user_data]
+  }
   root_block_device {
     volume_size = 50
   }

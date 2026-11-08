@@ -58,12 +58,23 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
     at_boot.extend(gateways::at_boot(mp));
     let user = image_user(mp.os.as_deref().unwrap_or_default());
-    let instance = nesting(instance, mp).add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot)));
+    let instance = nesting(instance, mp)
+        .add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot)))
+        .add_block(set_up_once("user_data_base64"));
     if addresses::needs_interfaces(mp) {
         m.blocks(several_networks((name, mp), instance));
     } else {
         m.block(one_network((name, mp), instance));
     }
+}
+
+/// A machine sets itself up once, at its first boot, from its user data (`attribute`): a later
+/// apply with other values in it (the launch's inputs, which a run never keeps) leaves a machine
+/// that runs alone, where AWS would stop and start it to change the attribute.
+fn set_up_once(attribute: &str) -> Block {
+    Block::builder("lifecycle")
+        .add_attribute(("ignore_changes", list([reference(attribute)])))
+        .build()
 }
 
 /// A TPM on AWS is NitroTPM, which the AMI enables (`tpm_support`): the plan stops when the
@@ -198,6 +209,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
         .add_attribute(("associate_public_ip_address", boolean(true)))
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
         .add_attribute(("user_data", windows_user_data()))
+        .add_block(set_up_once("user_data"))
         .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
         .add_blocks(disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));
