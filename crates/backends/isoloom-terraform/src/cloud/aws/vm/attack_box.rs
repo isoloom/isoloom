@@ -34,8 +34,10 @@ const FAILED: &str = "/var/lib/isoloom/attack-box-failed";
 /// Its user on the Debian image (AWS's Debian images log in as `admin`).
 const USER: &str = "admin";
 
-/// An instance big enough for an attack image and its tools (Kali's unpacks to about 12 GB).
-const INSTANCE_TYPE: &str = "t3.medium";
+/// The box's instance: 2 GB for the box and its tools, and an instance type a Free Tier account
+/// may run (it refuses `t3.medium`). The disk ([`DISK_GB`]) holds the image (Kali's unpacks to
+/// about 12 GB).
+const INSTANCE_TYPE: &str = "t3.small";
 const DISK_GB: u64 = 40;
 
 /// `attack_box`: the box's image, empty for none.
