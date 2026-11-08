@@ -12,6 +12,11 @@ stable spec format.
 
 ### Fixed
 
+- **A container lab in a VM boots on QEMU.** The docker-vm helper VM kept `generic/debian12` on
+  the QEMU provider, whose libvirt build never comes up under vagrant-qemu (the VM starts, SSH
+  never answers, `vagrant up` gives up after the boot timeout). On QEMU the helper now boots the
+  Debian cloud image the Vagrant target's VMs use there (`cloud-image/debian-12`), with its 10 GB
+  disk grown to 40 GB for Docker's images and the lab's volumes.
 - **A VM's fixed forwarded ports no longer fail as collisions on macOS 27.** Vagrant's own check
   of a host port before forwarding it (`Socket.tcp` with a timeout) reads every port as in use on
   macOS 27 (Ruby bug #22223: a refused connection hands back a socket), so a docker-vm or VM lab

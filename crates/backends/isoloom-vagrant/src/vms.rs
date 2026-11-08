@@ -36,7 +36,7 @@ mod nested;
 mod own;
 pub(crate) mod provider;
 pub(crate) mod providers;
-mod qemu;
+pub(crate) mod qemu;
 mod transport;
 mod values;
 mod windows;

@@ -28,6 +28,7 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container as docker;
 use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
+use isoloom_spec::images;
 
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
@@ -65,6 +66,9 @@ pub(crate) fn prepares(env: &Environment, guest: &GuestCompose) -> Vec<&'static 
 /// The project provisioner.
 const PROJECT: &str = "project";
 
+/// The helper VM's disk on QEMU, in GB: room for Docker's images and the lab's volumes.
+const DISK_GB: u32 = 40;
+
 /// `config.vm.provision "<name>", type: "<kind>"`: a provisioner named at the top level, which
 /// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
 /// provisioner's own `name:` option, and the project provisioner has no such option).
@@ -95,6 +99,8 @@ pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.text(&crate::vms::project_rb());
     r.text(vagrantfile::PORT_CHECK_RB);
+    // `IsoloomQemu.disk`, for the helper VM's disk on QEMU.
+    r.text(crate::vms::qemu::QEMU_RB);
     vagrantfile::inputs(&mut r, &env.spec().inputs, false);
     // Always read the runner's chosen host ports: the QEMU provider block below reads the helper
     // VM's own SSH forward port from it, so the hash must be defined even when no container port is.
@@ -195,9 +201,22 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
         r.assign("o.vm.box", Value::str("utm/bookworm"));
         named(r);
     });
-    r.block(provider("qemu"), "v", |r| {
+    r.block(provider("qemu"), "v, o", |r| {
+        // vagrant-qemu boots the Debian cloud image, as the VMs of the Vagrant target do on QEMU
+        // (generic/debian12's libvirt build never comes up under it: the box is found, the VM
+        // starts, SSH never answers). The main box's version pin isn't one of this box's.
+        r.assign("o.vm.box", Value::str(images::QEMU_DEBIAN_12));
+        r.assign("o.vm.box_version", Value::str(">= 0"));
         r.assign("v.smp", Value::str(&format!("cpus={cpus}")));
         r.assign("v.memory", Value::str(&format!("{mem}M")));
+        // The cloud image's disk is 10 GB, little for Docker's images and the lab's volumes: an
+        // overlay of DISK_GB (sparse, so it costs what it holds), which the image's cloud-init
+        // grows the root file system into. `IsoloomQemu.disk` keeps the box's own size when
+        // that is already larger.
+        r.assign(
+            "v.disk_resize",
+            Value::raw(format!("IsoloomQemu.disk({}, {DISK_GB})", Value::str(images::QEMU_DEBIAN_12))),
+        );
         // vagrant-qemu forwards the VM's SSH (guest 22) to one fixed host port (50022) with weak
         // auto-correct, so two local docker-vm labs — or a half-created VM left by a failed start —
         // collide on it. Take the free host port the runner chose for this VM (the way published

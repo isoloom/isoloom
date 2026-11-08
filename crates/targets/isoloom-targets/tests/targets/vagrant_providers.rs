@@ -99,6 +99,27 @@ fn qemu_sizes_the_disk_only_above_the_box() -> Outcome {
     Ok(())
 }
 
+/// A container lab: its docker-vm helper VM.
+const CONTAINERS: &str = "version: 1\nname: c\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lab: 10 }\n    ports: { site: { port: 80, protocol: http, publish: 8080 } }\n    app: { image: nginx }\n";
+
+#[test]
+fn docker_vm_boots_the_cloud_image_on_qemu_with_room_for_docker() -> Outcome {
+    let vf = generated(&lab(CONTAINERS)?, Target::DockerVm, "Vagrantfile")?;
+    // generic/debian12, the helper's box elsewhere, never comes up under vagrant-qemu: QEMU takes
+    // the Debian cloud image the Vagrant target's VMs take there, its 10 GB disk grown for Docker.
+    let qemu = between(&vf, "config.vm.provider \"qemu\"", "\n  end\n")?;
+    assert!(qemu.contains("do |v, o|"), "{qemu}");
+    assert!(qemu.contains("o.vm.box = \"cloud-image/debian-12\""), "{qemu}");
+    assert!(
+        qemu.contains("o.vm.box_version = \">= 0\""),
+        "the main box's pin isn't the cloud image's: {qemu}"
+    );
+    assert!(qemu.contains("v.disk_resize = IsoloomQemu.disk(\"cloud-image/debian-12\", 40)"), "{qemu}");
+    assert!(vf.contains("module IsoloomQemu"), "the disk helper is in the Vagrantfile");
+    assert!(vf.contains("config.vm.box = \"generic/debian12\""), "the other providers keep their box");
+    Ok(())
+}
+
 #[test]
 fn utm_refuses_vms_on_a_network() -> Outcome {
     let spec = lab(THREE)?;
