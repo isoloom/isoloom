@@ -8,7 +8,7 @@ The spec file format has its own version (`version: 1` in `isoloom.yml`), which 
 independent of the crate version. 1.0 is the first stable release and the first
 stable spec format.
 
-## [Unreleased]
+## [1.0.9] — 2026-11-08
 
 ### Added
 

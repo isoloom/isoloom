@@ -192,7 +192,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.8"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "segmented",
@@ -1111,7 +1111,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.8"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "segmented",
@@ -1963,7 +1963,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.8"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "segmented",
@@ -2811,7 +2811,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.8"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "segmented",
@@ -3650,7 +3650,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.8"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "segmented",
@@ -4507,7 +4507,7 @@ output "ssh_user" {
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.8"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "segmented",
