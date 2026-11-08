@@ -130,7 +130,7 @@ pub fn derived_switch(steps: Vec<StepId>) -> Result<Option<Param>, ManifestError
 }
 
 /// The derived checks' switch, as a runner reads it.
-pub const DERIVED: &str = "ISOLOOM_DERIVED";
+pub const DERIVED: &str = isoloom_plan::checks::DERIVED;
 
 /// `s` as a clean-up: it runs whatever happened before it, and its failure is only logged.
 #[must_use]

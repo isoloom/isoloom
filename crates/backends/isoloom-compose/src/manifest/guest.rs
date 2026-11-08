@@ -153,7 +153,7 @@ fn runners(env: &Environment, vm: &InVm) -> Result<(Vec<GuestRunner>, Vec<StepId
 fn compose_runner(vm: &InVm, p: &Planned<'_>) -> Result<GuestRunner> {
     let id = format!("check-{}", p.pos.id());
     let run = [
-        Part::Text("--profile check run --rm --no-deps --env ISOLOOM_DERIVED=".into()),
+        Part::Text(format!("--profile check run --rm --no-deps --env {}=", isoloom_render::run_manifest::DERIVED)),
         Part::Placeholder(Placeholder::Param(EnvName::parse(DERIVED)?)),
         Part::Text(format!(" {}", p.service)),
     ];

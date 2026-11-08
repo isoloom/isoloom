@@ -23,7 +23,7 @@ pub(super) const PUBLISH_ADDRESS: &str = "ISOLOOM_PUBLISH_ADDRESS";
 /// Set: each published port takes its `publish` number.
 const PUBLISH_FIXED: &str = "ISOLOOM_PUBLISH_FIXED";
 /// `0`: the checks derived from the spec are skipped.
-const DERIVED: &str = "ISOLOOM_DERIVED";
+use isoloom_render::run_manifest::DERIVED;
 
 fn env_name(name: &str) -> Result<EnvName> {
     Ok(EnvName::parse(name)?)

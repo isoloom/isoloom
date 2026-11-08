@@ -26,6 +26,7 @@ use isoloom_manifest::Manifest;
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container as docker;
+use isoloom_render::run_manifest::DERIVED;
 use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::images;
@@ -74,8 +75,6 @@ fn named(name: &str, kind: &str) -> Call {
 }
 /// The Compose file the VM runs, from the project's copy.
 const COMPOSE: &str = ".isoloom/docker/compose.yml";
-/// The derived-checks switch, read from the host's environment when Vagrant runs.
-const DERIVED: &str = "ENV.fetch(\"ISOLOOM_DERIVED\", \"1\")";
 
 /// The CPUs and memory (MB) of the VM: the containers' host's, at least 2 GB.
 pub(crate) fn host_size(env: &Environment) -> (u32, u32) {
@@ -266,10 +265,10 @@ fn checks(r: &mut Ruby, env: &Environment) {
     let profile = format!("docker compose -f {COMPOSE} --profile check");
     let access = docker::as_arguments(&format!("{profile} config --services | grep -x -e isoloom-access -e isoloom-access-routes"));
     let script = format!(
-        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} up -d --wait --no-deps \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; {}exit \"$failed\"",
+        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} up -d --wait --no-deps \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}exit \"$failed\"",
         exec_runs(env)
     );
-    let derived = Value::hash([(Value::str("ISOLOOM_DERIVED"), Value::raw(DERIVED))]);
+    let derived = crate::vagrantfile::derived_from_host();
     let vars = if env.spec().inputs.is_empty() {
         derived
     } else {

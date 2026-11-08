@@ -79,7 +79,16 @@ pub(super) fn runners(env: &Environment) -> Result<Runners> {
 
 fn compose_runner(pos: &Position, service: &str, group: &[&Resolved]) -> Result<CheckRunner> {
     let id = format!("check-{}", pos.id());
-    let args = ["--profile", "check", "run", "--rm", "--no-deps", "--env", "ISOLOOM_DERIVED", service];
+    let args = [
+        "--profile",
+        "check",
+        "run",
+        "--rm",
+        "--no-deps",
+        "--env",
+        isoloom_render::run_manifest::DERIVED,
+        service,
+    ];
     let mut step = Step::argv(StepId::parse(&id)?, compose(&args)?);
     step.timeout_s = NonZeroU32::new(timeout_s(group));
     let mut rm = Step::action(StepId::parse(&format!("rm-{id}"))?, Action::ComposeRemoveContainers);

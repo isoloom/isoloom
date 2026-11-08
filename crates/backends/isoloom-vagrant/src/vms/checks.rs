@@ -118,7 +118,7 @@ pub(crate) fn provisioner(r: &mut Ruby, file: &str, group: &[&Resolved]) {
             Value::raw(format!("{list}{REFRESH} + File.read(File.join(__dir__, {}))", Value::str(&runner))),
         )
     };
-    let derived = Value::hash([(Value::str("ISOLOOM_DERIVED"), Value::raw("ENV.fetch(\"ISOLOOM_DERIVED\", \"1\")"))]);
+    let derived = crate::vagrantfile::derived_from_host();
     r.call(call.kw("env", derived));
 }
 

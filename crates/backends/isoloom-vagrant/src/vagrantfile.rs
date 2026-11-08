@@ -14,6 +14,13 @@ use crate::ruby::{Call, Ruby, Value};
 /// collisions before it boots. Emitted after the project helpers in every Vagrantfile.
 pub(crate) const PORT_CHECK_RB: &str = include_str!("vagrant_port_check.rb");
 
+/// The derived-checks switch as a check provisioner's `env`: `{ "ISOLOOM_DERIVED" => ... }`, read
+/// from the host's environment when Vagrant runs (on, `1`, unless the host sets it).
+pub(crate) fn derived_from_host() -> Value {
+    let name = isoloom_render::run_manifest::DERIVED;
+    Value::hash([(Value::str(name), Value::raw(format!("ENV.fetch({}, \"1\")", Value::str(name))))])
+}
+
 /// `<var>.vm.provision "shell", name: <name>`: a shell provisioner, its script still to add.
 pub(crate) fn shell(var: &str, name: &str) -> Call {
     Call::new(format!("{var}.vm.provision")).arg(Value::str("shell")).kw("name", Value::str(name))

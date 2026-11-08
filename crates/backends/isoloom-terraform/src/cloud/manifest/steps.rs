@@ -24,7 +24,7 @@ const BOOT_WAIT_S: u32 = 900;
 const UNREACHABLE_S: u32 = 600;
 
 /// `0`: the checks derived from the spec are skipped.
-const DERIVED: &str = "ISOLOOM_DERIVED";
+use isoloom_render::run_manifest::DERIVED;
 
 /// A machine the runner delivers the project to and waits for: its name in the manifest, where
 /// SSH reaches it, who logs in, how long its set-up may take.

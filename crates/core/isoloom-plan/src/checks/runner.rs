@@ -32,7 +32,9 @@ pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
     for c in checks {
         s.push('\n');
         if c.derived {
-            s.push_str("if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then\n");
+            s.push_str("if [ \"${");
+            s.push_str(super::DERIVED);
+            s.push_str(":-1}\" != 0 ]; then\n");
         }
         s.push_str(&with_directives(&check_lines(c, position, r)));
         if c.derived {

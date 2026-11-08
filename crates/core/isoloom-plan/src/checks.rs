@@ -23,6 +23,10 @@ mod runner;
 pub use derived::{allowed, derived, from_networks};
 pub use runner::{Line, Render, parse_line, script};
 
+/// The switch of the checks derived from the spec (`0` skips them): the check runner reads it,
+/// and every target passes it through from the host. Named once, here.
+pub const DERIVED: &str = "ISOLOOM_DERIVED";
+
 use isoloom_spec::model::{Check, Declared, Expect, Spec};
 
 /// Where a check runs from.

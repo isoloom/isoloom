@@ -158,8 +158,8 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
     for (pos, group) in by_position(env.spec(), &env.checks) {
         let Some((machine, host)) = check_host(env, &pos) else { continue };
         let derived = Template::from_parts([
-            Part::Text("ISOLOOM_DERIVED=".into()),
-            Part::Placeholder(Placeholder::Param(EnvName::parse("ISOLOOM_DERIVED")?)),
+            Part::Text(format!("{}=", isoloom_render::run_manifest::DERIVED)),
+            Part::Placeholder(Placeholder::Param(EnvName::parse(isoloom_render::run_manifest::DERIVED)?)),
             Part::Text(" sh -s".into()),
         ]);
         let with = [
