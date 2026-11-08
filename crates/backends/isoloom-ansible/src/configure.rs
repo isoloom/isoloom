@@ -79,7 +79,9 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
 }
 
 /// `requirements.yml` naming the pinned collections the roles use (today only `ansible.posix`,
-/// for a `firewall` step), from the embedded catalogue; `None` when no role names one.
+/// for a `firewall` step), from the embedded catalogue; `None` when no role names one. A catalogue
+/// that doesn't load never gets here (validation refuses the lab, `Lab::problems`), and the
+/// embedded one's `ansible.posix` pin is held by `a_firewall_recipe_pins_ansible_posix_in_requirements`.
 ///
 /// Each entry carries the exact version, its archive `source`, and the `sha256` that
 /// `catalogue/collections.yml` pins (never dropped): a run checks the archive against it before
