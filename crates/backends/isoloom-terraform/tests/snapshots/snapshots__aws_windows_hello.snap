@@ -30,17 +30,7 @@ variable "region" {
 variable "attack_box" {
   type        = string
   default     = ""
-  description = "Set while the learner has an attack box on the lab's network (its container image, for the container form); empty: none."
-}
-
-variable "attack_box_form" {
-  type        = string
-  default     = "kali"
-  description = "The attack box's form: kali (an instance of Kali's own image) or container (a Debian instance running attack_box's image)."
-  validation {
-    condition     = contains(["kali", "container"], var.attack_box_form)
-    error_message = "attack_box_form is kali or container."
-  }
+  description = "The attack box's container image, set while the learner has one on the lab's network; empty: none."
 }
 
 variable "allowed_cidr" {
@@ -308,7 +298,7 @@ resource "aws_eip" "isoloom_controller" {
   depends_on        = [aws_internet_gateway.env]
 }
 
-# The learner's attack box, while the runner asks for one (`attack_box`), in its form (`attack_box_form`).
+# The learner's attack box, while the runner asks for one (`attack_box`: its image).
 resource "aws_security_group" "isoloom_access" {
   count  = var.attack_box == "" ? 0 : 1
   name   = "${local.name}-isoloom-access"
@@ -335,29 +325,11 @@ resource "aws_security_group" "isoloom_access" {
   }
 }
 
-data "aws_ami" "kali" {
-  most_recent = true
-  owners      = ["aws-marketplace"]
-  filter {
-    name   = "name"
-    values = ["debian-kali-last-snapshot-amd64-*"]
-  }
-  count = var.attack_box_form == "kali" ? var.attack_box == "" ? 0 : 1 : 0
-  filter {
-    name   = "product-code"
-    values = ["7lgvy7mt78lgoi4lant0znp5h"]
-  }
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-}
-
 resource "aws_instance" "isoloom_access" {
   count                       = var.attack_box == "" ? 0 : 1
-  ami                         = var.attack_box_form == "kali" ? data.aws_ami.kali[0].id : data.aws_ami.debian_12.id
+  ami                         = data.aws_ami.debian_12.id
   instance_type               = "t3.small"
-  user_data_base64            = base64gzip(var.attack_box_form == "kali" ? "#!/bin/sh\n# Isoloom: the learner's attack box, Kali itself. Ready: /var/lib/isoloom/attack-box-ready; failed: /var/lib/isoloom/attack-box-failed.\nmkdir -p /var/lib/isoloom\nhostnamectl set-hostname attackbox 2>/dev/null || hostname attackbox\ngrep -q attackbox /etc/hosts || echo '127.0.1.1 attackbox' >> /etc/hosts\nif (export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold kali-linux-headless) > /var/lib/isoloom/attack-box.log 2>&1; then touch /var/lib/isoloom/attack-box-ready; else tail -n 20 /var/lib/isoloom/attack-box.log > /var/lib/isoloom/attack-box-failed; fi\n" : "#!/bin/sh\n# Isoloom: the learner's attack box, a container. Ready: /var/lib/isoloom/attack-box-ready; failed: /var/lib/isoloom/attack-box-failed.\nmkdir -p /var/lib/isoloom\ncommand -v docker >/dev/null || if command -v apt-get >/dev/null; then (\n  set -e\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq ca-certificates curl\n  install -m 0755 -d /etc/apt/keyrings\n  k=$(mktemp)\n  # shellcheck disable=SC1091,SC2154 # /etc/os-release is on the guest, not here.\n  _id=$(. /etc/os-release && printf %s \"$ID\")\n  # shellcheck disable=SC1091,SC2154\n  _cn=$(. /etc/os-release && printf %s \"$VERSION_CODENAME\")\n  curl -fsSL \"https://download.docker.com/linux/$_id/gpg\" -o \"$k\"\n  echo \"1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570  $k\" | sha256sum -c -\n  install -m 0644 \"$k\" /etc/apt/keyrings/docker.asc\n  rm -f \"$k\"\n  echo \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$_id $_cn stable\" > /etc/apt/sources.list.d/docker.list\n  apt-get update -qq\n  v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')\n  [ -n \"$v\" ] || { echo \"docker-ce 29.9.0 is not in Docker's apt repository\" >&2; exit 1; }\n  apt-get install -y -qq --allow-downgrades \"docker-ce=$v\" \"docker-ce-cli=$v\" containerd.io docker-buildx-plugin \"docker-compose-plugin=5.6.0-*\"\n  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon\n  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which\n  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).\n  [ \"$(dpkg --print-architecture)\" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support\n)\nelse\n  curl -fsSL https://get.docker.com | VERSION=29.9.0 sh\nfi\nif docker run -d --name isoloom-access --hostname attackbox --network host --restart unless-stopped '${var.attack_box}' sleep infinity > /var/lib/isoloom/attack-box.log 2>&1; then touch /var/lib/isoloom/attack-box-ready; else cp /var/lib/isoloom/attack-box.log /var/lib/isoloom/attack-box-failed; fi\n")
+  user_data_base64            = base64gzip("#!/bin/sh\n# Isoloom: the learner's attack box. Ready: /var/lib/isoloom/attack-box-ready; failed: /var/lib/isoloom/attack-box-failed.\nmkdir -p /var/lib/isoloom\ncommand -v docker >/dev/null || if command -v apt-get >/dev/null; then (\n  set -e\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq ca-certificates curl\n  install -m 0755 -d /etc/apt/keyrings\n  k=$(mktemp)\n  # shellcheck disable=SC1091,SC2154 # /etc/os-release is on the guest, not here.\n  _id=$(. /etc/os-release && printf %s \"$ID\")\n  # shellcheck disable=SC1091,SC2154\n  _cn=$(. /etc/os-release && printf %s \"$VERSION_CODENAME\")\n  curl -fsSL \"https://download.docker.com/linux/$_id/gpg\" -o \"$k\"\n  echo \"1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570  $k\" | sha256sum -c -\n  install -m 0644 \"$k\" /etc/apt/keyrings/docker.asc\n  rm -f \"$k\"\n  echo \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$_id $_cn stable\" > /etc/apt/sources.list.d/docker.list\n  apt-get update -qq\n  v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')\n  [ -n \"$v\" ] || { echo \"docker-ce 29.9.0 is not in Docker's apt repository\" >&2; exit 1; }\n  apt-get install -y -qq --allow-downgrades \"docker-ce=$v\" \"docker-ce-cli=$v\" containerd.io docker-buildx-plugin \"docker-compose-plugin=5.6.0-*\"\n  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon\n  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which\n  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).\n  [ \"$(dpkg --print-architecture)\" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support\n)\nelse\n  curl -fsSL https://get.docker.com | VERSION=29.9.0 sh\nfi\nif docker run -d --name isoloom-access --hostname attackbox --network host --restart unless-stopped '${var.attack_box}' sleep infinity > /var/lib/isoloom/attack-box.log 2>&1; then touch /var/lib/isoloom/attack-box-ready; else cp /var/lib/isoloom/attack-box.log /var/lib/isoloom/attack-box-failed; fi\n")
   subnet_id                   = aws_subnet.lab.id
   associate_public_ip_address = true
   key_name                    = aws_key_pair.env.key_name
@@ -377,11 +349,7 @@ output "lab_address_isoloom_access" {
 }
 
 output "ssh_user_isoloom_access" {
-  value = var.attack_box_form == "kali" ? "kali" : "admin"
-}
-
-output "attack_box_form" {
-  value = var.attack_box_form
+  value = "admin"
 }
 
 output "machines" {

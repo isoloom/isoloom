@@ -173,7 +173,7 @@ fn machines_refusal(env: &Environment) -> Option<String> {
 pub(crate) const DRIVER: Driver = Driver {
     usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
     requires: (&[providers::AWS], &[providers::RANDOM, providers::TIME, providers::LOCAL]),
-    variables: || vec![region(), attack_box::variable(), attack_box::form_variable()],
+    variables: || vec![region(), attack_box::variable()],
     provider: |env, m| {
         m.block(provider(instance::tags(env)));
         Vec::new()

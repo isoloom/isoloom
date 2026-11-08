@@ -67,14 +67,10 @@ fn every_target_boots_the_machines_own_image() -> Outcome {
         let text = cloud(c)?;
         assert!(text.contains(line), "{c}: {text}");
     }
-    // No lookup for an OS no machine boots: the attack box's alone (`attack_box`), Kali's for the
-    // box itself and Debian 12's for its container form.
+    // No lookup for an OS no machine boots: Debian 12's alone, for the attack box (`attack_box`).
     let aws = cloud("aws")?;
-    assert_eq!(aws.matches("data \"aws_ami\"").count(), 2, "{aws}");
-    assert!(
-        aws.contains("data \"aws_ami\" \"debian_12\"") && aws.contains("data \"aws_ami\" \"kali\""),
-        "{aws}"
-    );
+    assert_eq!(aws.matches("data \"aws_ami\"").count(), 1, "{aws}");
+    assert!(aws.contains("data \"aws_ami\" \"debian_12\""), "{aws}");
     Ok(())
 }
 
