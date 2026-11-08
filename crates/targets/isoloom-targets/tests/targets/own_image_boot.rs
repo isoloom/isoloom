@@ -78,7 +78,8 @@ fn every_target_boots_the_machines_own_image() -> Outcome {
 fn a_proxmox_template_is_cloned_and_an_own_image_stands_in_for_the_os() -> Outcome {
     let kali = spec("os: kali, app: { steps: [{ run: s.sh }] }")?;
     assert!(refusal(&kali, Target::Proxmox).unwrap().contains("no Proxmox image for `kali`"));
-    assert!(refusal(&kali, Target::CloudVm).unwrap().contains("no AWS image for `kali`"));
+    // Kali is an AWS OS (its Marketplace image): only Proxmox needs the machine's own image.
+    assert_eq!(refusal(&kali, Target::CloudVm), None);
     let s = build(
         "os: kali, app: { steps: [{ run: s.sh }] }",
         "",

@@ -42,9 +42,18 @@ fn targets_say_what_generates_and_why_the_others_dont() -> Outcome {
     let generated = lookup(&r, "targets.generated").unwrap().as_array().unwrap();
     assert!(generated.iter().any(|t| t == "docker") && generated.iter().any(|t| t == "vagrant"));
     assert!(generated.iter().any(|t| t == "cloud-vm"));
-    // pivot-dmz's Kali access machine has no cloud image: refused, with the reason.
+    // pivot-dmz's Kali machine runs on AWS alone: the other clouds are refused, with the reason.
     let p = resolve(&example("pivot-dmz")?);
-    assert!(lookup(&p, "targets.refused.cloud-vm").unwrap().as_str().unwrap().contains("kali"));
+    assert!(lookup(&p, "targets.clouds.cloud-vm.refused.azure").unwrap().as_str().unwrap().contains("kali"));
+    // arm-vm runs on no cloud: cloud-vm is refused as a whole, with the reason.
+    let a = resolve(&example("arm-vm")?);
+    assert!(
+        lookup(&a, "targets.refused.cloud-vm")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .contains("no cloud can run it")
+    );
     assert!(
         lookup(&r, "targets.not_possible.hybrid")
             .unwrap()
@@ -130,8 +139,8 @@ fn cloud_vm_lists_its_generated_and_refused_clouds() -> Outcome {
 
 #[test]
 fn only_a_generated_cloud_vm_lists_its_clouds() -> Outcome {
-    // pivot-dmz: cloud-vm is refused as a whole (AWS has no Kali image), so no clouds.
-    let p = resolve(&example("pivot-dmz")?);
+    // arm-vm: cloud-vm is refused as a whole (no cloud runs it), so no clouds.
+    let p = resolve(&example("arm-vm")?);
     assert!(lookup(&p, "targets.refused.cloud-vm").is_some());
     assert_eq!(lookup(&p, "targets.clouds").unwrap(), &serde_json::json!({}));
     // segmented: every cloud-vm cloud is listed once, generated or refused; no other target is.

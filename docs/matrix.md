@@ -148,7 +148,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.os = alma@9` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = alpine@3.19` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = alpine@3.24` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = kali@rolling` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = kali@rolling` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = fedora@42` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = centos@7` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = windows@10` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
@@ -744,7 +744,6 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `proxmox`: target: machine `m`: no Proxmox image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04)
