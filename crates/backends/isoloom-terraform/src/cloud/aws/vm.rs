@@ -17,7 +17,6 @@
 //! - Environment-level `provision:`: the core's controller, a Debian instance on every network.
 
 mod addresses;
-pub(crate) mod attack_box;
 mod machines;
 mod network;
 mod outputs;
@@ -173,7 +172,7 @@ fn machines_refusal(env: &Environment) -> Option<String> {
 pub(crate) const DRIVER: Driver = Driver {
     usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
     requires: (&[providers::AWS], &[providers::RANDOM, providers::TIME, providers::LOCAL]),
-    variables: || vec![region(), attack_box::variable()],
+    variables: || vec![region()],
     provider: |env, m| {
         m.block(provider(instance::tags(env)));
         Vec::new()
@@ -192,7 +191,6 @@ fn write(env: &Environment, m: &mut Module) {
     vm::credentials(env, m);
     m.blocks(amis(env));
     MACHINES.write(env, m);
-    attack_box::write(env, m);
     outputs::blocks(env, m);
 }
 
@@ -202,8 +200,9 @@ fn amis(env: &Environment) -> Vec<Block> {
         .filter(|(_, mp)| own_image::of(mp, own_image::aws).is_none())
         .filter_map(|(_, mp)| mp.os.as_deref())
         .collect();
-    // The controller's OS, which the attack box runs on too (`attack_box`).
-    oses.push(controller::OS);
+    if controller::needed(env) {
+        oses.push(controller::OS);
+    }
     oses.sort_unstable();
     oses.dedup();
     oses.into_iter()

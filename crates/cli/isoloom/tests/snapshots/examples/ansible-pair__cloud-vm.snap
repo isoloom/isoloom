@@ -42,12 +42,6 @@ variable "region" {
   default = "eu-west-3"
 }
 
-variable "attack_box" {
-  type        = string
-  default     = ""
-  description = "The attack box's container image, set while the learner has one on the lab's network; empty: none."
-}
-
 variable "allowed_cidr" {
   type        = string
   description = "Who may reach the machines (SSH and the published ports), e.g. your IP/32"
@@ -275,60 +269,6 @@ resource "aws_eip" "isoloom_controller" {
   depends_on        = [aws_internet_gateway.env]
 }
 
-# The learner's attack box, while the runner asks for one (`attack_box`: its image).
-resource "aws_security_group" "isoloom_access" {
-  count  = var.attack_box == "" ? 0 : 1
-  name   = "${local.name}-isoloom-access"
-  vpc_id = aws_vpc.env.id
-  ingress {
-    description = "its network (lab)"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["10.63.0.0/24"]
-  }
-  ingress {
-    description = "SSH from allowed_cidr"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_instance" "isoloom_access" {
-  count                       = var.attack_box == "" ? 0 : 1
-  ami                         = data.aws_ami.debian_12.id
-  instance_type               = "t3.medium"
-  user_data_base64            = base64gzip("#!/bin/sh\n# Isoloom: the learner's attack box. Ready: /var/lib/isoloom/attack-box-ready; failed: /var/lib/isoloom/attack-box-failed.\nmkdir -p /var/lib/isoloom\ncommand -v docker >/dev/null || if command -v apt-get >/dev/null; then (\n  set -e\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq ca-certificates curl\n  install -m 0755 -d /etc/apt/keyrings\n  k=$(mktemp)\n  # shellcheck disable=SC1091,SC2154 # /etc/os-release is on the guest, not here.\n  _id=$(. /etc/os-release && printf %s \"$ID\")\n  # shellcheck disable=SC1091,SC2154\n  _cn=$(. /etc/os-release && printf %s \"$VERSION_CODENAME\")\n  curl -fsSL \"https://download.docker.com/linux/$_id/gpg\" -o \"$k\"\n  echo \"1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570  $k\" | sha256sum -c -\n  install -m 0644 \"$k\" /etc/apt/keyrings/docker.asc\n  rm -f \"$k\"\n  echo \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$_id $_cn stable\" > /etc/apt/sources.list.d/docker.list\n  apt-get update -qq\n  v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')\n  [ -n \"$v\" ] || { echo \"docker-ce 29.9.0 is not in Docker's apt repository\" >&2; exit 1; }\n  apt-get install -y -qq --allow-downgrades \"docker-ce=$v\" \"docker-ce-cli=$v\" containerd.io docker-buildx-plugin \"docker-compose-plugin=5.6.0-*\"\n  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon\n  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which\n  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).\n  [ \"$(dpkg --print-architecture)\" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support\n)\nelse\n  curl -fsSL https://get.docker.com | VERSION=29.9.0 sh\nfi\nif docker run -d --name isoloom-access --hostname attackbox --network host --restart unless-stopped '${var.attack_box}' sleep infinity > /var/lib/isoloom/attack-box.log 2>&1; then touch /var/lib/isoloom/attack-box-ready; else cp /var/lib/isoloom/attack-box.log /var/lib/isoloom/attack-box-failed; fi\n")
-  subnet_id                   = aws_subnet.lab.id
-  associate_public_ip_address = true
-  key_name                    = aws_key_pair.env.key_name
-  vpc_security_group_ids      = [aws_security_group.isoloom_access[0].id]
-  root_block_device {
-    volume_size = 40
-  }
-  tags = { Name = "${local.name}-isoloom-access" }
-}
-
-output "address_isoloom_access" {
-  value = try(aws_instance.isoloom_access[0].public_ip, "")
-}
-
-output "lab_address_isoloom_access" {
-  value = try(aws_instance.isoloom_access[0].private_ip, "")
-}
-
-output "ssh_user_isoloom_access" {
-  value = "admin"
-}
-
 output "machines" {
   value = { web = aws_instance.web.public_ip, cache = aws_instance.cache.public_ip }
 }
@@ -450,18 +390,6 @@ output "checks" {
         {
           "via": "tf_var",
           "var": "region"
-        }
-      ]
-    },
-    {
-      "name": "attack_box",
-      "description": "The attack box's container image, set while the learner has one on the lab's network; empty: none..",
-      "default": "",
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "tf_var",
-          "var": "attack_box"
         }
       ]
     },
