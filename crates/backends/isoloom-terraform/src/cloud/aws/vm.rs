@@ -119,8 +119,20 @@ fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
         "windows-server-2019" => ("801119661308", "Windows_Server-2019-English-Full-Base-*", "isoloom"),
         "windows-server-2022" => ("801119661308", "Windows_Server-2022-English-Full-Base-*", "isoloom"),
         "windows-server-2025" => ("801119661308", "Windows_Server-2025-English-Full-Base-*", "isoloom"),
+        // Kali's own image, on the AWS Marketplace (free; an account may have to accept its terms
+        // there once). Pinned to its product by [`product_code`].
+        "kali" => ("aws-marketplace", "debian-kali-last-snapshot-amd64-*", "kali"),
         _ => return None,
     })
+}
+
+/// The Marketplace product an OS's image must belong to, when its owner is the Marketplace (any
+/// seller lists there: the name alone could match a look-alike).
+fn product_code(os: &str) -> Option<&'static str> {
+    match os {
+        "kali" => Some("7lgvy7mt78lgoi4lant0znp5h"),
+        _ => None,
+    }
 }
 
 /// The SSH user of an OS's image (`admin` for an OS without one).
@@ -207,6 +219,12 @@ fn amis(env: &Environment) -> Vec<Block> {
     oses.dedup();
     oses.into_iter()
         .filter_map(|o| image(o).map(|(owner, filter, _)| (o, owner, filter)))
-        .map(|(o, owner, filter)| ami(&ident(o), owner, filter).add_block(ami_filter("architecture", "x86_64")).build())
+        .map(|(o, owner, filter)| {
+            let lookup = ami(&ident(o), owner, filter).add_block(ami_filter("architecture", "x86_64"));
+            match product_code(o) {
+                Some(code) => lookup.add_block(ami_filter("product-code", code)).build(),
+                None => lookup.build(),
+            }
+        })
         .collect()
 }

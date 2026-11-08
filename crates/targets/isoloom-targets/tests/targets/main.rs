@@ -8,6 +8,7 @@ mod checks;
 mod clones;
 mod cloud_docker;
 mod cloud_services;
+mod cloud_vm_aws_kali;
 mod cloud_vm_azure;
 mod cloud_vm_digitalocean;
 mod cloud_vm_gcp;
