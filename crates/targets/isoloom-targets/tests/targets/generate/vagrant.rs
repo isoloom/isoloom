@@ -85,7 +85,7 @@ fn provider_block<'a>(vf: &'a str, vm: &str, provider: &str) -> Outcome<&'a str>
 }
 
 #[test]
-fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() -> Outcome {
+fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
     // GOAD-Mini's shape: one Windows DC and the controller running the lab's playbooks.
     let spec = lab(
         "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    ports: { ldap: 389 }\n    app: { steps: [{ run: p.ps1 }] }\nprovision:\n  - ansible: ansible/main.yml\n",
@@ -116,14 +116,20 @@ fn qemu_emulates_another_cpu_and_links_a_pair_of_vms() -> Outcome {
     let ctl = provider_block(vf, "isoloom-controller", "qemu")?;
     assert!(ctl.contains("o.vm.box = \"cloud-image/debian-12\""), "{ctl}");
     assert!(!ctl.contains("v.arch"), "Isoloom's own VMs run on the host's CPU: {ctl}");
-    // One listens, the other connects, on the same port; the DC is defined (and up) first.
-    let port = |b: &str, side: &str| {
-        b.split(&format!("v.socket_opts = \"{side}=127.0.0.1:"))
+    // Both connect to the network's hub, each on its own port, in the order they are defined; the
+    // hub keeps a third port for the attack VM the runner adds later.
+    let port = |b: &str| {
+        b.split("v.socket_opts = \"connect=127.0.0.1:")
             .nth(1)
             .and_then(|r| r.get(..5))
-            .map(str::to_owned)
+            .and_then(|p| p.parse::<u16>().ok())
     };
-    assert!(port(dc, "listen").is_some() && port(dc, "listen") == port(ctl, "connect"), "{dc}\n{ctl}");
+    let (dc_port, ctl_port) = (port(dc), port(ctl));
+    assert!(dc_port.is_some() && ctl_port == dc_port.map(|p| p + 1), "{dc}\n{ctl}");
+    assert!(
+        vf.contains(&format!("\"isoloom-access\" => {}", dc_port.unwrap_or_default() + 2)),
+        "a port kept for the runner's VM: {vf}"
+    );
 
     // Other providers are untouched.
     assert!(!provider_block(vf, "dc01", "virtualbox")?.contains("socket"));

@@ -10,6 +10,27 @@ stable spec format.
 
 ## [Unreleased]
 
+### Added
+
+- **The runner can add a machine to a running `vagrant` environment.** As GNS3 adds a node to a
+  live topology: every Vagrantfile now carries `IsoloomAdHoc`, with what a VM needs to join each
+  lab network on each provider (its name on the hypervisor, its netmask, the lab machines' names
+  for the VM's hosts file, this host's default box), and loads the definitions the runner writes
+  under the run's state folder (`<VAGRANT_DOTFILE_PATH>/adhoc/*.rb`) at the end of
+  `Vagrant.configure`. A definition is one `IsoloomAdHoc.define(config, name, network:, ip:,
+  box:)` line, `autostart: false`: `vagrant up` never starts it, the runner boots it alone while
+  the lab runs and destroys it alone. This is how a VM lab whose spec declares no `access: true`
+  machine gets its attack VM (Isothrum 1.0.5). Its default box follows the host's CPU as OS images
+  do: Kali's `kalilinux/rolling` on x86, the Debian cloud image on Arm (Kali's box has no arm64
+  build). Hyper-V, ESXi and UTM give a late VM no lab network this way.
+
+### Changed
+
+- **On QEMU every lab network links its VMs through a hub.** Two VMs on a network were a socket
+  pair (one listening, the other connecting), which left a VM added later no way in: the hub now
+  serves every network, with one port kept for the runner's ad-hoc VM (`isoloom-access` in
+  `QEMU_HUBS`), reserved when the Vagrantfile is written.
+
 ### Fixed
 
 - **A container lab in a VM boots on QEMU.** The docker-vm helper VM kept `generic/debian12` on

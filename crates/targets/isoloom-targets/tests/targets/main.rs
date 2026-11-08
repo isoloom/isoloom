@@ -40,5 +40,6 @@ mod testing;
 mod tiers;
 mod tools;
 mod trunks;
+mod vagrant_adhoc;
 mod vagrant_manifest;
 mod vagrant_providers;

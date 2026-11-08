@@ -15,9 +15,9 @@
 //!   that list them.
 //! - On QEMU (vagrant-qemu), a machine boots its libvirt-format box with its own CPU, emulated
 //!   when the host's is another (x86 Windows on an Apple Silicon Mac: slow, so longer timeouts).
-//!   Without root, two VMs on a network link as a socket listen/connect pair, and any other
-//!   number through a hub (a QEMU process with no machine), each VM on one network; the QEMU
-//!   provider's refusal ([`provider`]) says when a spec doesn't fit. A disk size grows the
+//!   Without root, the VMs of a network link through a hub (a QEMU process with no machine, a
+//!   listen port per VM and one kept for the runner's ad-hoc VM), each VM on one network; the
+//!   QEMU provider's refusal ([`provider`]) says when a spec doesn't fit. A disk size grows the
 //!   box's disk, never below the box's own.
 //! - On UTM (`vagrant_utm`), a VM gets no private network; the UTM provider's refusal
 //!   ([`provider`]) refuses a spec whose VMs are on one.
@@ -25,7 +25,11 @@
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
 //!   guest ([`hyperv`]); the Hyper-V provider's refusal ([`provider`]) says when a machine has no
 //!   Hyper-V box.
+//! - The runner adds machines to the running environment (its ad-hoc attack VM) through
+//!   [`adhoc`]: definitions it writes under the run's state folder, loaded at the end of
+//!   `Vagrant.configure`, joining a lab network as the lab's VMs do on each provider.
 
+pub(crate) mod adhoc;
 mod boot;
 mod bridged;
 mod checks;
@@ -138,6 +142,7 @@ fn render_in(env: &Environment, layout: &Layout) -> Result<Files> {
     let mut r = Ruby::new();
     preamble(&mut r, env, layout.dir);
     qemu_preamble(&mut r, env, &links);
+    adhoc::preamble(&mut r, env);
     let mut runners = Vec::new();
     r.block("Vagrant.configure(\"2\")", "config", |r| {
         settings(r, env);
@@ -154,6 +159,7 @@ fn render_in(env: &Environment, layout: &Layout) -> Result<Files> {
             runners.extend(own::controller_vm(r, &ctx));
         }
         r.text(layout.extra);
+        adhoc::loader(r);
     });
     let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{}/Vagrantfile", layout.dir),
@@ -199,9 +205,13 @@ fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu:
         return;
     }
     r.text(qemu::QEMU_RB);
-    let hubs = qemu::hubs(links);
+    let hubs = qemu::hubs(&env.name, links);
     if !hubs.is_empty() {
-        r.comment("QEMU: each network's hub port of each of its VMs, in the order they start.");
+        r.comment(&format!(
+            "QEMU: each network's hub port of each of its VMs, in the order they start, then the one kept
+for the runner's ad-hoc VM (`{}`, see IsoloomAdHoc).",
+            adhoc::ADHOC_NAME
+        ));
         r.hash(
             "QEMU_HUBS",
             hubs.iter()

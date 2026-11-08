@@ -256,10 +256,8 @@ fn link(r: &mut Ruby, l: &Link) {
     if let Link::Refused(why) = l {
         r.comment(&format!("No private network on QEMU: {why}."));
     }
-    if let Some(opts) = l.socket_opts() {
-        if let Link::Hub(h) = l {
-            r.comment(&format!("Port {} of network `{}`'s hub (see IsoloomQemu).", h.port, h.net));
-        }
+    if let (Some(opts), Link::Hub(h)) = (l.socket_opts(), l) {
+        r.comment(&format!("Port {} of network `{}`'s hub (see IsoloomQemu).", h.port, h.net));
         r.assign("v.advanced_network", true);
         r.assign("v.net_mode", Value::sym("socket"));
         r.assign("v.socket_opts", Value::str(&opts));

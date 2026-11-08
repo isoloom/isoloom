@@ -1,10 +1,11 @@
 //! Each VM's link under Vagrant's QEMU provider. The plugin gives a VM one private network, a
-//! QEMU `socket` netdev. Without root, two VMs link as a pair: one listens, the other connects,
-//! on a loopback port of the host. Multicast, the plugin's other no-root mode, doesn't send on a
-//! Mac (Darwin refuses to send from a socket bound to the group), so a network with any other
-//! number of VMs gets a hub instead: one QEMU process with no machine, a `listen` port per VM
-//! on one emulated hub, each VM connecting to its own ([`QEMU_RB`]). vmnet, TAP and
-//! `socket_vmnet` would need root (or a daemon running as root): Isoloom uses none of them.
+//! QEMU `socket` netdev. Multicast, the plugin's other no-root mode, doesn't send on a Mac
+//! (Darwin refuses to send from a socket bound to the group), so every network gets a hub: one
+//! QEMU process with no machine, a `listen` port per VM on one emulated hub, each VM connecting
+//! to its own, and one more port kept for the VM the runner adds to the running lab (its ad-hoc
+//! attack VM, [`super::adhoc`]), which joins later ([`QEMU_RB`]). A socket pair (one VM listening,
+//! the other connecting) would leave a late VM no way in. vmnet, TAP and `socket_vmnet` would
+//! need root (or a daemon running as root): Isoloom uses none of them.
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachineShape};
@@ -22,9 +23,6 @@ pub(crate) const QEMU_RB: &str = include_str!("../vagrant_qemu.rb");
 pub(crate) enum Link {
     /// On no network.
     None,
-    /// QEMU's `socket` netdev options: `listen=` for the first VM of the pair, `connect=` for
-    /// the second.
-    Socket(String),
     /// A port of its network's hub, which the VM connects to.
     Hub(HubPort),
     /// Why QEMU can't give it its network (the VM then has none there).
@@ -44,7 +42,6 @@ impl Link {
     /// The `socket` netdev options the VM runs with, when it has a link.
     pub(crate) fn socket_opts(&self) -> Option<String> {
         match self {
-            Link::Socket(opts) => Some(opts.clone()),
             Link::Hub(h) => Some(format!("connect=127.0.0.1:{}", h.port)),
             Link::None | Link::Refused(_) => None,
         }
@@ -81,17 +78,11 @@ pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String
             let link = match nets.as_slice() {
                 [] => Link::None,
                 [net] => {
-                    let on = members(net);
-                    let at = on.iter().position(|n| n == name).unwrap_or_default();
-                    if on.len() == 2 {
-                        let side = if at == 0 { "listen" } else { "connect" };
-                        Link::Socket(format!("{side}=127.0.0.1:{}", port(&env.name, net)))
-                    } else {
-                        Link::Hub(HubPort {
-                            net: (*net).to_owned(),
-                            port: hub_port(&env.name, net, at),
-                        })
-                    }
+                    let at = members(net).iter().position(|n| n == name).unwrap_or_default();
+                    Link::Hub(HubPort {
+                        net: (*net).to_owned(),
+                        port: hub_port(&env.name, net, at),
+                    })
                 }
                 more => Link::Refused(format!("`{name}` is on {} networks, and QEMU gives a VM one", more.len())),
             };
@@ -100,14 +91,19 @@ pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String
         .collect()
 }
 
-/// Each network with a hub, and its VMs with their ports, in the order the VMs are defined:
-/// the hub listens on every port, and stops once none of the VMs is left.
-pub(crate) fn hubs(links: &IndexMap<String, Link>) -> IndexMap<String, IndexMap<String, u16>> {
+/// Each network with a hub, and its VMs with their ports, in the order the VMs are defined, then
+/// the port kept for the runner's ad-hoc VM ([`super::adhoc::ADHOC_NAME`], the next one): the hub
+/// listens on every port, and stops once none of the VMs is left.
+pub(crate) fn hubs(env: &str, links: &IndexMap<String, Link>) -> IndexMap<String, IndexMap<String, u16>> {
     let mut out: IndexMap<String, IndexMap<String, u16>> = IndexMap::new();
     for (vm, link) in links {
         if let Link::Hub(h) = link {
             out.entry(h.net.clone()).or_default().insert(vm.clone(), h.port);
         }
+    }
+    for (net, ports) in &mut out {
+        let spare = hub_port(env, net, ports.len());
+        ports.insert(super::adhoc::ADHOC_NAME.to_owned(), spare);
     }
     out
 }
@@ -166,22 +162,47 @@ mod tests {
     }
 
     #[test]
-    fn hubs_name_every_vm_of_the_network_with_its_port() {
+    fn hubs_name_every_vm_of_the_network_with_its_port_and_keep_one_for_the_runners_vm() {
         use super::{HubPort, Link};
-        let hub = |port| Link::Hub(HubPort { net: "app".into(), port });
+        let base = super::port("lab", "app");
+        let hub = |at: u16| {
+            Link::Hub(HubPort {
+                net: "app".into(),
+                port: base + at,
+            })
+        };
         let links: indexmap::IndexMap<String, Link> = [
-            ("r".to_owned(), hub(30000)),
+            ("r".to_owned(), hub(0)),
             ("lone".to_owned(), Link::None),
-            ("a".to_owned(), hub(30001)),
-            ("pair".to_owned(), Link::Socket("listen=127.0.0.1:1".into())),
-            ("b".to_owned(), hub(30002)),
+            ("a".to_owned(), hub(1)),
+            ("other".to_owned(), Link::Refused("on two networks".into())),
+            ("b".to_owned(), hub(2)),
         ]
         .into_iter()
         .collect();
-        let hubs = super::hubs(&links);
-        // Every VM is named, not only the first: the hub stops once none of them is left.
+        let hubs = super::hubs("lab", &links);
+        // Every VM is named, not only the first: the hub stops once none of them is left. The
+        // runner's ad-hoc VM comes last, on the next port, so it can join later.
         let app: Vec<(&str, u16)> = hubs["app"].iter().map(|(vm, p)| (vm.as_str(), *p)).collect();
-        assert_eq!(app, [("r", 30000), ("a", 30001), ("b", 30002)]);
+        assert_eq!(app, [("r", base), ("a", base + 1), ("b", base + 2), ("isoloom-access", base + 3)]);
         assert_eq!(hubs.len(), 1);
+    }
+
+    #[test]
+    fn every_network_is_a_hub_even_with_two_vms() {
+        let env = crate::testing::environment(
+            "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 } }\n  b: { os: debian@12, networks: { lab: 11 } }\n",
+        );
+        let links = super::links(&env, false);
+        let base = super::port("t", "lab");
+        assert_eq!(links["a"], super::Link::Hub(super::HubPort { net: "lab".into(), port: base }));
+        assert_eq!(
+            links["b"],
+            super::Link::Hub(super::HubPort {
+                net: "lab".into(),
+                port: base + 1
+            })
+        );
+        assert_eq!(super::hubs("t", &links)["lab"]["isoloom-access"], base + 2);
     }
 }
