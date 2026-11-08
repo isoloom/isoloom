@@ -10,11 +10,17 @@ pub struct HostSize {
     pub cpus: u32,
     /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself.
     pub memory_mb: u32,
-    /// Disk in GB: 5 per container unless it says, at least 20.
+    /// Disk in GB: 5 per container unless it says, at least [`HostSize::MIN_DISK_GB`] (the
+    /// learner's attack box runs on this host too).
     pub disk_gb: u32,
 }
 
 impl HostSize {
+    /// The smallest disk of a containers' host: the learner's attack box is added to it while the
+    /// lab runs, and an attack image like Kali's with its tools unpacks to about 12 GB, on top of
+    /// the system, Docker and the lab's own images. 20 GB filled up.
+    pub const MIN_DISK_GB: u32 = 40;
+
     /// The host's size for the environment's containers.
     #[must_use]
     pub fn of(env: &Environment) -> HostSize {
@@ -29,7 +35,7 @@ impl HostSize {
         HostSize {
             cpus: cpus.clamp(2, 16),
             memory_mb,
-            disk_gb: disk_gb.max(20),
+            disk_gb: disk_gb.max(Self::MIN_DISK_GB),
         }
     }
 
@@ -66,7 +72,7 @@ mod tests {
             HostSize {
                 cpus: 4,
                 memory_mb: 512 + 4096 + 1024,
-                disk_gb: 35
+                disk_gb: 40
             }
         );
         assert_eq!(size.pick(["small", "medium", "large"]), "medium");
@@ -76,7 +82,7 @@ mod tests {
     fn a_few_small_containers_take_the_smallest_host() {
         let size =
             host_size("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: nginx } }\n");
-        assert_eq!((size.cpus, size.memory_mb, size.disk_gb), (2, 1536, 20));
+        assert_eq!((size.cpus, size.memory_mb, size.disk_gb), (2, 1536, 40));
         assert_eq!(size.pick(["small", "medium", "large"]), "small");
     }
 

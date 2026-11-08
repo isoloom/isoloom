@@ -165,7 +165,7 @@ resource "aws_instance" "env" {
   instance_initiated_shutdown_behavior = "terminate"
   user_data_base64                     = base64gzip("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
   root_block_device {
-    volume_size = 20
+    volume_size = 40
     volume_type = "gp3"
     encrypted   = true
   }
@@ -366,7 +366,14 @@ output "ssh_user" {
       ]
     }
   ],
-  "networks": [],
+  "networks": [
+    {
+      "name": "lan",
+      "cidr": "10.90.0.0/24",
+      "internet": true,
+      "native": "workbench_lan"
+    }
+  ],
   "machines": [
     {
       "name": "isoloom-docker-host",
@@ -859,6 +866,7 @@ resource "azurerm_linux_virtual_machine" "env" {
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "StandardSSD_LRS"
+    disk_size_gb         = 40
   }
   source_image_reference {
     publisher = "Debian"
@@ -1056,7 +1064,14 @@ output "ssh_user" {
       ]
     }
   ],
-  "networks": [],
+  "networks": [
+    {
+      "name": "lan",
+      "cidr": "10.90.0.0/24",
+      "internet": true,
+      "native": "workbench_lan"
+    }
+  ],
   "machines": [
     {
       "name": "isoloom-docker-host",
@@ -1629,7 +1644,14 @@ output "ssh_user" {
       ]
     }
   ],
-  "networks": [],
+  "networks": [
+    {
+      "name": "lan",
+      "cidr": "10.90.0.0/24",
+      "internet": true,
+      "native": "workbench_lan"
+    }
+  ],
   "machines": [
     {
       "name": "isoloom-docker-host",
@@ -2107,7 +2129,7 @@ resource "google_compute_instance" "env" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 30
+      size  = 40
     }
   }
   network_interface {
@@ -2309,7 +2331,14 @@ output "ssh_user" {
       ]
     }
   ],
-  "networks": [],
+  "networks": [
+    {
+      "name": "lan",
+      "cidr": "10.90.0.0/24",
+      "internet": true,
+      "native": "workbench_lan"
+    }
+  ],
   "machines": [
     {
       "name": "isoloom-docker-host",
@@ -2866,7 +2895,14 @@ output "ssh_user" {
       ]
     }
   ],
-  "networks": [],
+  "networks": [
+    {
+      "name": "lan",
+      "cidr": "10.90.0.0/24",
+      "internet": true,
+      "native": "workbench_lan"
+    }
+  ],
   "machines": [
     {
       "name": "isoloom-docker-host",
@@ -3488,7 +3524,14 @@ output "ssh_user" {
     }
   ],
   "secrets": [],
-  "networks": [],
+  "networks": [
+    {
+      "name": "lan",
+      "cidr": "10.90.0.0/24",
+      "internet": true,
+      "native": "workbench_lan"
+    }
+  ],
   "machines": [
     {
       "name": "isoloom-docker-host",

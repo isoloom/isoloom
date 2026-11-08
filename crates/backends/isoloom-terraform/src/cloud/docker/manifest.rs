@@ -72,7 +72,9 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         }),
         params,
         secrets,
-        networks: Vec::new(),
+        // The lab's networks as Compose names them in the VM, as docker-vm lists them: what the
+        // runner reads and draws, and where it puts an ad-hoc attack box beside the containers.
+        networks: guest.networks.clone(),
         machines,
         outputs,
         lifecycle: steps::terraform_lifecycle(up)?,

@@ -2,6 +2,7 @@
 //! and subnet, a firewall, and a Debian instance.
 
 use isoloom_plan::Environment;
+use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
@@ -28,7 +29,7 @@ pub(crate) const DRIVER: Driver = Driver {
 /// the host they make.
 fn resources(env: &Environment, m: &mut Module, setup: Expression) -> Host {
     m.blocks(network(env));
-    m.block(vm(env, setup));
+    m.block(vm(env, HostSize::of(env), setup));
     Host {
         address: public_ip("env"),
         user: "isoloom",
@@ -78,7 +79,7 @@ fn network(env: &Environment) -> Vec<Block> {
 
 /// Debian 12 in the region's first zone, the `isoloom` user with the runner's key, set up by its
 /// startup script (Google's Debian images have no cloud-init; the script runs at every boot).
-fn vm(env: &Environment, setup: Expression) -> Block {
+fn vm(env: &Environment, size: HostSize, setup: Expression) -> Block {
     let ssh_keys = Template::text("isoloom:").with_expr(reference("var.ssh_public_key"));
     resource("google_compute_instance")
         .add_attribute(("machine_type", reference("var.machine_type")))
@@ -89,7 +90,7 @@ fn vm(env: &Environment, setup: Expression) -> Block {
                 .add_block(
                     Block::builder("initialize_params")
                         .add_attribute(("image", string("debian-cloud/debian-12")))
-                        .add_attribute(("size", number(30)))
+                        .add_attribute(("size", number(size.disk_gb.into())))
                         .build(),
                 )
                 .build(),

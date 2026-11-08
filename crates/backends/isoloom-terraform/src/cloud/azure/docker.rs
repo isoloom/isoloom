@@ -2,6 +2,7 @@
 //! static public address, a security group, and a Debian VM.
 
 use isoloom_plan::Environment;
+use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, number, reference, string};
 use isoloom_spec::model::Protocol;
 
@@ -29,7 +30,7 @@ fn resources(env: &Environment, m: &mut Module, custom_data: Expression) -> Host
     m.blocks(network());
     m.block(security_group(env));
     m.blocks(interface());
-    m.block(vm(custom_data));
+    m.block(vm(HostSize::of(env), custom_data));
     Host {
         address: reference("azurerm_public_ip.env.ip_address"),
         user: "isoloom",
@@ -120,7 +121,7 @@ fn interface() -> Vec<Block> {
 }
 
 /// Debian 12, the `isoloom` user with the runner's key, set up from its custom data.
-fn vm(custom_data: Expression) -> Block {
+fn vm(size: HostSize, custom_data: Expression) -> Block {
     placed("azurerm_linux_virtual_machine")
         .add_attribute(("size", reference("var.size")))
         .add_attribute(("custom_data", call("base64encode", [custom_data])))
@@ -136,6 +137,7 @@ fn vm(custom_data: Expression) -> Block {
             Block::builder("os_disk")
                 .add_attribute(("caching", string("ReadWrite")))
                 .add_attribute(("storage_account_type", string("StandardSSD_LRS")))
+                .add_attribute(("disk_size_gb", number(size.disk_gb.into())))
                 .build(),
         )
         .add_block(

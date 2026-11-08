@@ -66,6 +66,19 @@ fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
     Ok(())
 }
 
+/// cloud-docker lists the lab's networks as docker-vm does, by their Compose names in the VM: the
+/// runner reads them for the lab's status and puts an ad-hoc attack box on them. An empty list
+/// left the launcher drawing networks guessed from the machines' addresses.
+#[test]
+fn cloud_docker_lists_the_labs_networks() -> Outcome {
+    let files = generate(&lab(FLAG_PORTAL)?, Target::CloudDocker)?;
+    let cloud = run_json(&files, ".isoloom/cloud-docker/aws/run.json")?;
+    let local = run_json(&generate(&lab(FLAG_PORTAL)?, Target::DockerVm)?, ".isoloom/docker-vm/run.json")?;
+    assert!(!cloud.networks.is_empty(), "{:?}", cloud.networks);
+    assert_eq!(cloud.networks, local.networks, "the same networks as docker-vm's");
+    Ok(())
+}
+
 /// The shared run-manifest fixture `name`.
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core/isoloom-manifest/fixtures").join(name)
