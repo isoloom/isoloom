@@ -1503,7 +1503,7 @@ locals {
     },
     {
       "name": "user",
-      "role": "target",
+      "role": "access",
       "arch": "amd64",
       "addresses": {
         "access": "10.40.99.10"

@@ -12,7 +12,7 @@ name: kali
 networks: { lan: { cidr: 10.70.0.0/24 } }
 machines:
   web: { os: debian@12, networks: { lan: 10 } }
-  attacker: { os: kali@rolling, networks: { lan: 20 } }
+  attacker: { os: kali@rolling, access: true, networks: { lan: 20 } }
 ")?;
     let tf = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
     // Compared with the alignment's spaces squeezed: `ami = …`, whatever the block's widest name.
@@ -25,6 +25,21 @@ machines:
     assert!(tf.contains("values = [\"7lgvy7mt78lgoi4lant0znp5h\"]"), "pinned to Kali's product: {tf}");
     assert!(tf.contains("ami = data.aws_ami.kali.id"), "{tf}");
     assert!(tf.contains("output \"ssh_user_attacker\" {\n value = \"kali\""), "{tf}");
+    // Kali's image is a 25 GB snapshot: AWS refuses a smaller root volume (the default is 20).
+    assert!(tf.contains("volume_size = 25"), "{tf}");
+    // The access machine keeps its role in the run manifest.
+    let run = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/aws/run.json")?;
+    let run: serde_json::Value = serde_json::from_str(&run).unwrap();
+    let role = |name: &str| {
+        run["machines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["name"] == name)
+            .map(|m| m["role"].clone())
+    };
+    assert_eq!(role("attacker"), Some("access".into()));
+    assert_eq!(role("web"), Some("target".into()));
     Ok(())
 }
 

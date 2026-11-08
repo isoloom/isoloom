@@ -76,7 +76,9 @@ pub(crate) fn machine(name: &str, role: Role, addresses: BTreeMap<Name, IpAddr>)
 /// A target machine: a bare machine with its OS, Windows flag and architecture, then each spec
 /// port fixed at its own number on `at` (the machine's public address).
 pub(crate) fn target_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::model::Machine, at: &Template) -> Result<Machine, ManifestError> {
-    let mut m = machine(name, Role::Target, addresses(mp)?)?;
+    // The access machine keeps its role (where the learner stands); every machine is made at `up`.
+    let role = if spec.access { Role::Access } else { Role::Target };
+    let mut m = machine(name, role, addresses(mp)?)?;
     m.os = mp.os.as_deref().map(OsName::parse).transpose()?;
     m.windows = mp.is_windows();
     m.arch = Some(arch(mp.arch));

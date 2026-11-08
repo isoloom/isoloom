@@ -1457,7 +1457,7 @@ locals {
     },
     {
       "name": "staff",
-      "role": "target",
+      "role": "access",
       "os": "debian-12",
       "arch": "amd64",
       "addresses": {

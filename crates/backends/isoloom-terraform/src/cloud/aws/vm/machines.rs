@@ -68,6 +68,14 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     }
 }
 
+/// A Linux machine's root disk: what its spec asks for (the default otherwise), at least what its
+/// image needs (AWS refuses a volume smaller than the image's snapshot).
+fn root_disk_gb(mp: &MachinePlan) -> u32 {
+    let wanted = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB);
+    let image = own_image::of(mp, own_image::aws).map_or_else(|| super::image_min_disk_gb(mp.os.as_deref().unwrap_or_default()), |_| 0);
+    wanted.max(image)
+}
+
 /// A machine sets itself up once, at its first boot, from its user data (`attribute`): a later
 /// apply with other values in it (the launch's inputs, which a run never keeps) leaves a machine
 /// that runs alone, where AWS would stop and start it to change the attribute.
@@ -108,7 +116,7 @@ fn one_network((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Bloc
         .add_attribute(("associate_public_ip_address", boolean(true)))
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
-        .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)))
+        .add_block(disk(root_disk_gb(mp)))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
         .build()
 }
@@ -133,7 +141,7 @@ fn several_networks((name, mp): (&str, &MachinePlan), instance: BlockBuilder) ->
         instance
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
             .add_block(primary(&first))
-            .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)))
+            .add_block(disk(root_disk_gb(mp)))
             .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
             .build(),
     );

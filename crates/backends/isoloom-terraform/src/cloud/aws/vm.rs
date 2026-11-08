@@ -126,6 +126,15 @@ fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
     })
 }
 
+/// The smallest root disk an OS's image takes, in GB (its snapshot's size), when it is more than
+/// the default.
+pub(super) fn image_min_disk_gb(os: &str) -> u32 {
+    match os {
+        "kali" => 25,
+        _ => 0,
+    }
+}
+
 /// The Marketplace product an OS's image must belong to, when its owner is the Marketplace (any
 /// seller lists there: the name alone could match a look-alike).
 fn product_code(os: &str) -> Option<&'static str> {

@@ -1306,7 +1306,7 @@ locals {
     },
     {
       "name": "user",
-      "role": "target",
+      "role": "access",
       "os": "debian-12",
       "arch": "amd64",
       "addresses": {
