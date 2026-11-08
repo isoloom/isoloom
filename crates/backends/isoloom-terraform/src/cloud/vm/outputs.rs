@@ -30,8 +30,9 @@ pub(crate) fn write_as(env: &Environment, user: &str, public_ip: &dyn Fn(&str) -
     write(env, &reach, m);
 }
 
-/// The outputs every cloud module gives: `machines`, `ssh_users`, `ip`, `ready_file`, `checks`
-/// and `published`.
+/// The outputs every cloud module gives: `machines`, each machine's `address_<m>` and
+/// `ssh_user_<m>` (what the run manifest reads), `ssh_users` (for an operator reading
+/// `terraform output`), `ip`, `ready_file`, `checks` and `published`.
 pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
     let machines: Vec<(&str, Expression)> = vms(env).map(|(n, _)| (n, (reach.public_ip)(n))).collect();
     let users: Vec<(&str, Expression)> = vms(env).map(|(n, mp)| (n, string((reach.user)(mp)))).collect();
@@ -102,5 +103,40 @@ fn runner(env: &Environment, reach: &Reach, p: &Position) -> Option<Runner> {
             host,
             user: string(user),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_render::hcl_builder::Module;
+    use isoloom_spec::model::Target;
+
+    use crate::cloud::{aws, azure, digitalocean, gcp, linode, oci};
+    use crate::machine::vms;
+
+    /// Each `ssh_user_<machine>` output is the user the cloud's driver gives the run manifest's
+    /// guest: the runner's secret delivery signs in as the one, its ready and SSH steps as the
+    /// other, so a difference locks the delivery out.
+    #[test]
+    fn every_clouds_ssh_user_outputs_are_its_drivers_users() {
+        let spec = "version: 1\nname: u\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n  api: { networks: { lan: 11 }, os: ubuntu@24.04 }\n";
+        let env = crate::testing::planned(spec, Target::CloudVm);
+        for driver in [
+            aws::vm::DRIVER,
+            azure::vm::DRIVER,
+            gcp::vm::DRIVER,
+            digitalocean::vm::DRIVER,
+            linode::vm::DRIVER,
+            oci::vm::DRIVER,
+        ] {
+            let mut m = Module::new("");
+            (driver.write)(&env, &mut m);
+            let text = m.render().unwrap();
+            for (name, mp) in vms(&env) {
+                let user = (driver.user)(mp.os.as_deref().unwrap_or_default());
+                let output = format!("output \"{}\" {{\n  value = \"{user}\"\n}}", super::super::manifest::ssh_user_output(name));
+                assert!(text.contains(&output), "{name}: {output}\n{text}");
+            }
+        }
     }
 }
