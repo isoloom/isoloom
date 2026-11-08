@@ -66,9 +66,6 @@ pub(crate) fn prepares(env: &Environment, guest: &GuestCompose) -> Vec<&'static 
 /// The project provisioner.
 const PROJECT: &str = "project";
 
-/// The helper VM's disk on QEMU, in GB: room for Docker's images and the lab's volumes.
-const DISK_GB: u32 = 40;
-
 /// `config.vm.provision "<name>", type: "<kind>"`: a provisioner named at the top level, which
 /// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
 /// provisioner's own `name:` option, and the project provisioner has no such option).
@@ -151,7 +148,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
     }
     let size = host_size(env);
     let label = format!("{} · docker", env.name);
-    desktop_providers(r, &label, size);
+    desktop_providers(r, &label, size, docker::HostSize::of(env).disk_gb);
     esxi(r, &format!("{}-docker", env.name), size);
     if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
         r.call(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
@@ -173,7 +170,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
 
 /// The size on the providers of this machine (VirtualBox, VMware, Parallels, UTM, QEMU,
 /// libvirt), named `label` where the provider shows a name.
-fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
+fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb: u32) {
     let provider = |name: &str| Call::new("config.vm.provider").arg(Value::str(name));
     let named = |v: &mut Ruby| {
         v.assign("v.name", Value::str(label));
@@ -210,12 +207,13 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32)) {
         r.assign("v.smp", Value::str(&format!("cpus={cpus}")));
         r.assign("v.memory", Value::str(&format!("{mem}M")));
         // The cloud image's disk is 10 GB, little for Docker's images and the lab's volumes: an
-        // overlay of DISK_GB (sparse, so it costs what it holds), which the image's cloud-init
+        // overlay of the containers' host disk (`HostSize`, as cloud-docker's and Proxmox's;
+        // sparse, so it costs what it holds), which the image's cloud-init
         // grows the root file system into. `IsoloomQemu.disk` keeps the box's own size when
         // that is already larger.
         r.assign(
             "v.disk_resize",
-            Value::raw(format!("IsoloomQemu.disk({}, {DISK_GB})", Value::str(images::QEMU_DEBIAN_12))),
+            Value::raw(format!("IsoloomQemu.disk({}, {disk_gb})", Value::str(images::QEMU_DEBIAN_12))),
         );
         // vagrant-qemu forwards the VM's SSH (guest 22) to one fixed host port (50022) with weak
         // auto-correct, so two local docker-vm labs — or a half-created VM left by a failed start —

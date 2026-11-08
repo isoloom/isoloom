@@ -45,3 +45,27 @@ fn without_a_disk_the_box_keeps_its_own() -> Outcome {
     }
     Ok(())
 }
+
+/// docker-vm's VM on QEMU takes the containers' host disk, as cloud-docker's and Proxmox's do: at
+/// least 40 GB, more when the lab's containers ask for more.
+#[test]
+fn docker_vms_qemu_disk_is_the_containers_host_disk() -> Outcome {
+    let with_disk = |gb: u32| {
+        lab(&format!(
+            "version: 1
+name: disks
+networks: {{ lab: {{ cidr: 10.77.0.0/24 }} }}
+machines:
+  web:
+    networks: {{ lab: 10 }}
+    app: {{ image: nginx }}
+    resources: {{ disk_gb: {gb} }}
+"
+        ))
+    };
+    let small = generated(&with_disk(5)?, Target::DockerVm, "Vagrantfile")?;
+    assert!(small.contains("IsoloomQemu.disk(\"cloud-image/debian-12\", 40)"), "{small}");
+    let large = generated(&with_disk(70)?, Target::DockerVm, "Vagrantfile")?;
+    assert!(large.contains("IsoloomQemu.disk(\"cloud-image/debian-12\", 70)"), "{large}");
+    Ok(())
+}

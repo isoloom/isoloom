@@ -32,8 +32,9 @@ const IMAGE_BOX: &str = "bento/debian-12";
 const IMAGE_BOX_LIBVIRT: &str = "generic/debian12";
 
 /// The disk of a VM running a container image on QEMU, where the cloud image's own is 10 GB: an
-/// attack box unpacks to 12 GB. Sparse, as the Docker helper VM's (see [`crate::docker_vm`]).
-const IMAGE_DISK_GB: u32 = 40;
+/// attack box unpacks to 12 GB. The containers' host's least disk; sparse, as the Docker helper
+/// VM's (see [`crate::docker_vm`]).
+const IMAGE_DISK_GB: u32 = isoloom_render::container::HostSize::MIN_DISK_GB;
 
 /// The define name of the runner's ad-hoc attack VM: Isoloom's reserved namespace (a spec's
 /// machine is never called so), the name the runner gives every attacker box it stands up itself,
