@@ -25,6 +25,8 @@ machines:
     assert!(tf.contains("values = [\"7lgvy7mt78lgoi4lant0znp5h\"]"), "pinned to Kali's product: {tf}");
     assert!(tf.contains("ami = data.aws_ami.kali.id"), "{tf}");
     assert!(tf.contains("output \"ssh_user_attacker\" {\n value = \"kali\""), "{tf}");
+    // Named after itself, not after its image (Kali's names itself `kali`).
+    assert!(tf.contains("hostnamectl set-hostname attacker"), "{tf}");
     // Kali's image is a 25 GB snapshot: AWS refuses a smaller root volume (the default is 20).
     assert!(tf.contains("volume_size = 25"), "{tf}");
     // The access machine keeps its role in the run manifest.

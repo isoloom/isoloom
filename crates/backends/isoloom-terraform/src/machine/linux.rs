@@ -132,8 +132,18 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
 /// delivers, the controller's key, the launch inputs, `hooks.at_boot`, then the steps the
 /// platform doesn't do itself (`hooks.skip`), `hooks.before_egress` before the machine closes
 /// itself off. A `reboot` step ends a part; the next one starts with what a restart undid.
+/// The machine named after itself, as on every other target (a cloud's image names it after its
+/// address, or its distribution): kept through a reboot, where cloud-init would name it again.
+fn host_name(name: &str) -> Template {
+    Template::text(format!(
+        "hostnamectl set-hostname {name} 2>/dev/null || hostname {name}; \
+grep -q ' {name}$' /etc/hosts || echo '127.0.1.1 {name}' >> /etc/hosts; \
+[ ! -d /etc/cloud/cloud.cfg.d ] || echo 'preserve_hostname: true' > /etc/cloud/cloud.cfg.d/99-isoloom-hostname.cfg"
+    ))
+}
+
 pub(crate) fn set_up(env: &Environment, (name, mp): (&str, &MachinePlan), user: &str, hooks: &Hooks) -> SetUp {
-    let mut first = vec![project_wait()];
+    let mut first = vec![Tracked::new("its host name", host_name(name)), project_wait()];
     if controller::needed(env) {
         first.push(Tracked::new("the controller's key", controller::authorize_as(user)));
     }
