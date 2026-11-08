@@ -43,13 +43,9 @@ fn qemu_links_three_vms_through_a_hub() -> Outcome {
         .collect::<Outcome<_>>()?;
     assert_eq!(ports[1], ports[0] + 1, "{ports:?}");
     assert_eq!(ports[2], ports[0] + 2, "{ports:?}");
-    // The runner's ad-hoc attack VM, added later, has its port from the start.
     let hubs = format!(
-        "QEMU_HUBS = {{\n  \"lab\" => {{ \"a\" => {}, \"b\" => {}, \"c\" => {}, \"isoloom-access\" => {} }},\n}}",
-        ports[0],
-        ports[1],
-        ports[2],
-        ports[0] + 3
+        "QEMU_HUBS = {{\n  \"lab\" => {{ \"a\" => {}, \"b\" => {}, \"c\" => {} }},\n}}",
+        ports[0], ports[1], ports[2]
     );
     assert!(vf.contains(&hubs), "{vf}");
     assert!(vf.contains("module IsoloomQemu"));
@@ -74,14 +70,13 @@ fn qemu_links_three_vms_through_a_hub() -> Outcome {
 
 #[test]
 fn qemu_links_two_vms_through_a_hub_too_and_refuses_a_vm_on_two_networks() -> Outcome {
-    // Two VMs were a socket pair once (one listening, the other connecting), which left the
-    // runner's attack VM no way in: now a hub, with its port kept.
+    // Two VMs link through a hub too, not a socket pair (one listening, the other connecting).
     let two = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n";
     let vf = vagrantfile(two)?;
     let (a, b) = (connects_to(provider_block(&vf, "a", "qemu")?)?, connects_to(provider_block(&vf, "b", "qemu")?)?);
     assert_eq!(b, a + 1);
     assert!(!vf.contains("v.socket_opts = \"listen="), "no socket pair: {vf}");
-    assert!(vf.contains(&format!("\"isoloom-access\" => {}", a + 2)), "{vf}");
+    assert!(!vf.contains("isoloom-access"), "no port kept for a VM the lab doesn't declare: {vf}");
     assert!(vf.contains("module IsoloomQemu"), "the hub needs the helper");
 
     let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10, dmz: 10 }\n    app: { steps: [{ run: p.sh }] }\n";

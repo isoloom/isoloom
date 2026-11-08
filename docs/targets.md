@@ -49,18 +49,6 @@ Two targets fan out:
 The run manifest is one file per target; the provider or cloud is chosen when the runner brings
 it up, not baked into the manifest.
 
-On `vagrant`, the runner can add a machine to the running environment, as GNS3 adds a node to a
-live topology (its ad-hoc attack VM, when the spec declares no `access: true` machine): every
-Vagrantfile carries `IsoloomAdHoc`, with what a VM needs to join each lab network on each
-provider (the network's name on the hypervisor, its netmask, the lab machines' names, this
-host's default box), and loads the runner's definitions from `<VAGRANT_DOTFILE_PATH>/adhoc/*.rb`
-at the end of `Vagrant.configure`. A definition is one line, `IsoloomAdHoc.define(config,
-"<name>", network: "<lab network>", ip: "<free address>", box: "<box or nil>")`, defined
-`autostart: false`: the runner boots it (`vagrant up <name> --provider=<p>`) and destroys it alone.
-On QEMU every lab network links its VMs through a hub, which keeps one port for the runner's VM
-(`isoloom-access` in `QEMU_HUBS`), so it can join later. Hyper-V, ESXi and UTM give a late VM no
-lab network this way; a spec's own `access: true` machine runs there as before.
-
 ## Tiers: how far a target is proven
 
 Each target sits in a tier that states how far it has been proven. Tiers are worked out from

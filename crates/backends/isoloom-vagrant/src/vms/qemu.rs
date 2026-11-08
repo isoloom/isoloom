@@ -2,10 +2,8 @@
 //! QEMU `socket` netdev. Multicast, the plugin's other no-root mode, doesn't send on a Mac
 //! (Darwin refuses to send from a socket bound to the group), so every network gets a hub: one
 //! QEMU process with no machine, a `listen` port per VM on one emulated hub, each VM connecting
-//! to its own, and one more port kept for the VM the runner adds to the running lab (its ad-hoc
-//! attack VM, [`super::adhoc`]), which joins later ([`QEMU_RB`]). A socket pair (one VM listening,
-//! the other connecting) would leave a late VM no way in. vmnet, TAP and `socket_vmnet` would
-//! need root (or a daemon running as root): Isoloom uses none of them.
+//! to its own ([`QEMU_RB`]). vmnet, TAP and `socket_vmnet` would need root (or a daemon running
+//! as root): Isoloom uses none of them.
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachineShape};
@@ -91,19 +89,14 @@ pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String
         .collect()
 }
 
-/// Each network with a hub, and its VMs with their ports, in the order the VMs are defined, then
-/// the port kept for the runner's ad-hoc VM ([`super::adhoc::ADHOC_NAME`], the next one): the hub
-/// listens on every port, and stops once none of the VMs is left.
-pub(crate) fn hubs(env: &str, links: &IndexMap<String, Link>) -> IndexMap<String, IndexMap<String, u16>> {
+/// Each network with a hub, and its VMs with their ports, in the order the VMs are defined: the
+/// hub listens on every port, and stops once none of the VMs is left.
+pub(crate) fn hubs(links: &IndexMap<String, Link>) -> IndexMap<String, IndexMap<String, u16>> {
     let mut out: IndexMap<String, IndexMap<String, u16>> = IndexMap::new();
     for (vm, link) in links {
         if let Link::Hub(h) = link {
             out.entry(h.net.clone()).or_default().insert(vm.clone(), h.port);
         }
-    }
-    for (net, ports) in &mut out {
-        let spare = hub_port(env, net, ports.len());
-        ports.insert(super::adhoc::ADHOC_NAME.to_owned(), spare);
     }
     out
 }
@@ -162,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn hubs_name_every_vm_of_the_network_with_its_port_and_keep_one_for_the_runners_vm() {
+    fn hubs_name_every_vm_of_the_network_with_its_port() {
         use super::{HubPort, Link};
         let base = super::port("lab", "app");
         let hub = |at: u16| {
@@ -180,11 +173,10 @@ mod tests {
         ]
         .into_iter()
         .collect();
-        let hubs = super::hubs("lab", &links);
-        // Every VM is named, not only the first: the hub stops once none of them is left. The
-        // runner's ad-hoc VM comes last, on the next port, so it can join later.
+        let hubs = super::hubs(&links);
+        // Every VM is named, not only the first: the hub stops once none of them is left.
         let app: Vec<(&str, u16)> = hubs["app"].iter().map(|(vm, p)| (vm.as_str(), *p)).collect();
-        assert_eq!(app, [("r", base), ("a", base + 1), ("b", base + 2), ("isoloom-access", base + 3)]);
+        assert_eq!(app, [("r", base), ("a", base + 1), ("b", base + 2)]);
         assert_eq!(hubs.len(), 1);
     }
 
@@ -203,6 +195,6 @@ mod tests {
                 port: base + 1
             })
         );
-        assert_eq!(super::hubs("t", &links)["lab"]["isoloom-access"], base + 2);
+        assert_eq!(super::hubs(&links)["lab"].len(), 2);
     }
 }

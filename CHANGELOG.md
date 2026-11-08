@@ -10,22 +10,16 @@ stable spec format.
 
 ## [Unreleased]
 
-### Added
+### Removed
 
-- **The runner's ad-hoc VM takes a hostname.** `IsoloomAdHoc.define` accepts `hostname:`, the name
-  the VM answers to inside (a container on the VM's network shares it); its define name otherwise.
-  The runner gives its attack box `attackbox`, so a learner's prompt reads `root@attackbox` rather
-  than Isoloom's internal `isoloom-access`.
-
-- **The runner's ad-hoc attack VM can run a container image.** `IsoloomAdHoc.define` takes an
-  `image:`: the VM is then a container run as a VM, as Isoloom runs a container machine on this
-  target: Debian 12's box for the provider (`bento/debian-12`; `generic/debian12` on libvirt, the
-  Debian cloud image on QEMU; arm64 builds on an Apple Silicon Mac, where the image's arm64 build
-  runs natively), Docker installed by Isoloom's own step, and the image idle in it on the VM's
-  network (`--network host`, `NET_ADMIN`/`NET_RAW`, `sleep infinity` as the Compose access
-  service), so the VM's lab address is the attacker's. A `box:` or `ISOLOOM_ACCESS_BOX` still
-  names the VM's box. This is how the Cyber CTF launcher's attack-box image reaches a lab running
-  as VMs (Isothrum 1.0.6) instead of being asked of Vagrant Cloud as a box.
+- **The Vagrantfile's hook for the runner's ad-hoc VM.** A Vagrantfile no longer carries
+  `IsoloomAdHoc` (its `ADHOC_*` constants and the loader of `<VAGRANT_DOTFILE_PATH>/adhoc/*.rb`),
+  and on QEMU a network's hub no longer keeps a spare port for that VM (`isoloom-access` is gone
+  from `QEMU_HUBS`). The runner no longer stands up an attack VM of its own on a lab that declares
+  no `access: true` machine: a lab's own access machine is unchanged, and a launcher adds its attack
+  box as an ordinary lab machine. `isoloom_manifest::access::DEFAULT_BOX` and `DEFAULT_ARM64_BOX`,
+  which only that VM used, are removed too. The unreleased `hostname:` and `image:` of
+  `IsoloomAdHoc.define` go with it.
 
 ## [1.0.9] — 2026-11-08
 

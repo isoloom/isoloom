@@ -67,8 +67,8 @@ fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
 }
 
 /// cloud-docker lists the lab's networks as docker-vm does, by their Compose names in the VM: the
-/// runner reads them for the lab's status and puts an ad-hoc attack box on them. An empty list
-/// left the launcher drawing networks guessed from the machines' addresses.
+/// runner reads them for the lab's status. An empty list left the launcher drawing networks
+/// guessed from the machines' addresses.
 #[test]
 fn cloud_docker_lists_the_labs_networks() -> Outcome {
     let files = generate(&lab(FLAG_PORTAL)?, Target::CloudDocker)?;

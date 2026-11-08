@@ -116,8 +116,7 @@ fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
     let ctl = provider_block(vf, "isoloom-controller", "qemu")?;
     assert!(ctl.contains("o.vm.box = \"cloud-image/debian-12\""), "{ctl}");
     assert!(!ctl.contains("v.arch"), "Isoloom's own VMs run on the host's CPU: {ctl}");
-    // Both connect to the network's hub, each on its own port, in the order they are defined; the
-    // hub keeps a third port for the attack VM the runner adds later.
+    // Both connect to the network's hub, each on its own port, in the order they are defined.
     let port = |b: &str| {
         b.split("v.socket_opts = \"connect=127.0.0.1:")
             .nth(1)
@@ -126,10 +125,7 @@ fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
     };
     let (dc_port, ctl_port) = (port(dc), port(ctl));
     assert!(dc_port.is_some() && ctl_port == dc_port.map(|p| p + 1), "{dc}\n{ctl}");
-    assert!(
-        vf.contains(&format!("\"isoloom-access\" => {}", dc_port.unwrap_or_default() + 2)),
-        "a port kept for the runner's VM: {vf}"
-    );
+    assert!(!vf.contains("isoloom-access"), "no port kept for a VM the lab doesn't declare: {vf}");
 
     // Other providers are untouched.
     assert!(!provider_block(vf, "dc01", "virtualbox")?.contains("socket"));

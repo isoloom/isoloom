@@ -7,11 +7,7 @@
 //!   [`IMAGE_ENV`] to the image the learner picked (its default is baked into the service).
 //! - Vagrant: the access VM is defined `autostart: false`, so `vagrant up` skips it; the runner
 //!   hot-adds it with `vagrant up <name> --provider=<p>`, setting [`BOX_ENV`] to the box the
-//!   learner picked, and takes it out with `vagrant destroy -f <name>`. A spec with no access
-//!   machine gets one the runner adds to the running lab itself, as GNS3 adds a node to a live
-//!   topology: a definition it writes under the run's state folder (`<dotfile>/adhoc/<name>.rb`,
-//!   calling the Vagrantfile's `IsoloomAdHoc.define`), booted and destroyed the same way. Its box
-//!   defaults to [`DEFAULT_BOX`] on an x86 host and [`DEFAULT_ARM64_BOX`] on an Arm one.
+//!   learner picked, and takes it out with `vagrant destroy -f <name>`.
 
 /// The Compose profile the access service sits in (so the initial `up` skips it).
 pub const PROFILE: &str = "access";
@@ -27,12 +23,3 @@ pub const BOX_ENV: &str = "ISOLOOM_ACCESS_BOX";
 
 /// The image an access Compose service runs when the learner picks nothing of their own.
 pub const DEFAULT_IMAGE: &str = "kalilinux/kali-rolling";
-
-/// The Vagrant box an access VM runs when the learner picks nothing of their own, on an x86
-/// host.
-pub const DEFAULT_BOX: &str = "kalilinux/rolling";
-
-/// The Vagrant box an access VM runs when the learner picks nothing of their own, on an Arm
-/// host (an Apple Silicon Mac): Kali's box has no arm64 build, and emulated it is far too slow;
-/// the Debian cloud image has one for every local provider, QEMU included.
-pub const DEFAULT_ARM64_BOX: &str = "cloud-image/debian-12";

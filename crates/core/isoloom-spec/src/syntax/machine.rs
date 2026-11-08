@@ -140,11 +140,7 @@ pub(crate) struct MachineInput {
     _count: Option<u8>,
     /// The machine the user lands on (at most one). Without `os`, the runner supplies it. On
     /// demand: the initial start skips it and the runner hot-adds it with the image or box the user
-    /// picked (`ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX`). A spec with none still gets an attack
-    /// machine on the local targets: one the runner adds to the running lab itself (a container on
-    /// Docker; on `vagrant`, a VM it defines through the Vagrantfile's `IsoloomAdHoc` hook, on one
-    /// lab network at a free address, its box the user's pick, else Kali's on an x86 host and the
-    /// Debian cloud image on an Arm one).
+    /// picked (`ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX`).
     #[serde(default)]
     access: bool,
     /// Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,
