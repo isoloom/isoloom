@@ -186,6 +186,47 @@ fn check_tells_a_missing_file_from_one_it_cant_read() -> Outcome {
     Ok(())
 }
 
+#[test]
+fn check_quiet_shows_only_failures_and_json_one_result_per_file() -> Outcome {
+    let dir = project("check-quiet-json", ALIASED)?;
+    let generated = isoloom(&dir, &[&"generate", &dir, &"--target", &"docker"])?;
+    assert_eq!(generated.code, Some(0), "{generated:?}");
+    let quiet = isoloom(&dir, &[&"check", &dir, &"--target", &"docker", &"--quiet"])?;
+    assert_eq!(quiet.code, Some(0), "{quiet:?}");
+    assert!(
+        !quiet.stdout.contains("✓ .isoloom/") && quiet.stdout.contains(" files up to date"),
+        "{}",
+        quiet.stdout
+    );
+    std::fs::write(dir.join(".isoloom/docker/compose.yml"), "changed\n")?;
+    let quiet = isoloom(&dir, &[&"check", &dir, &"--target", &"docker", &"-q"])?;
+    assert_eq!(quiet.code, Some(1), "{quiet:?}");
+    assert_eq!(
+        quiet.stdout,
+        "✗ .isoloom/docker/compose.yml is out of date\nrun `isoloom generate` and commit the result\n"
+    );
+    let json = isoloom(&dir, &[&"check", &dir, &"--target", &"docker", &"--json"])?;
+    assert_eq!(json.code, Some(1), "{json:?}");
+    let report: serde_json::Value = serde_json::from_str(&json.stdout)?;
+    let files = report["files"].as_array().ok_or("no files")?;
+    let compose = files.iter().find(|f| f["path"] == ".isoloom/docker/compose.yml").ok_or("no compose.yml")?;
+    assert_eq!(compose["status"], "out_of_date");
+    assert!(
+        files
+            .iter()
+            .filter(|f| f["path"] != ".isoloom/docker/compose.yml")
+            .all(|f| f["status"] == "current"),
+        "{report:#}"
+    );
+    assert_eq!(
+        report["summary"],
+        serde_json::json!({ "ok": false, "checked": files.len(), "current": files.len() - 1, "failed": 1 })
+    );
+    let both = isoloom(&dir, &[&"check", &dir, &"--quiet", &"--json"])?;
+    assert_eq!(both.code, Some(2), "{both:?}");
+    Ok(())
+}
+
 const PROFILED: &str = "version: 1
 name: shop
 networks:
