@@ -447,6 +447,40 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
+ISOLOOM_NAT_ROUTE = <<~'SH'
+set -eu
+gw=10.0.2.2
+nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
+# No default route through the emulated network, or no other one to prefer: nothing to do.
+[ -n "$nat" ] || exit 0
+ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
+    nmcli connection modify "$con" ipv4.route-metric 200
+    nmcli device reapply "$nat" || true
+  fi
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  dir=/etc/systemd/network/$(basename "$file").d
+  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
+    mkdir -p "$dir"
+    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
+    networkctl reload && networkctl reconfigure "$nat" || true
+  fi
+elif [ -f /etc/network/interfaces ]; then
+  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
+    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
+    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
+      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+  done
+fi
+# The route as it is now, whatever the configuration does at its next renewal.
+ip -4 route replace default via "$gw" dev "$nat" metric 200
+for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+done
+SH
 
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (dmz, internal, access); a missing one reuses the last.
@@ -557,6 +591,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-dmz", libvirt__network_name: "isoloom-pivot-dmz-dmz", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.30.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.30.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-access", libvirt__network_name: "isoloom-pivot-dmz-access", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · router"
       v.linked_clone = true
@@ -574,10 +609,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "pivot-dmz · router"
       v.cpus = 1
       v.memory = 512
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -709,6 +745,7 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "gateway"
     m.vm.network "private_network", ip: "10.30.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-dmz", libvirt__network_name: "isoloom-pivot-dmz-dmz", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.30.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · gateway"
       v.linked_clone = true
@@ -726,10 +763,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "pivot-dmz · gateway"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -889,6 +927,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "app"
     m.vm.network "private_network", ip: "10.30.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · app"
       v.linked_clone = true
@@ -906,10 +945,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "pivot-dmz · app"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1114,6 +1154,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "db"
     m.vm.network "private_network", ip: "10.30.20.30", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-internal", libvirt__network_name: "isoloom-pivot-dmz-internal", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · db"
       v.linked_clone = true
@@ -1131,10 +1172,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "pivot-dmz · db"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1339,6 +1381,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "kalilinux/rolling")
     m.vm.hostname = "user"
     m.vm.network "private_network", ip: "10.30.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-pivot-dmz-access", libvirt__network_name: "isoloom-pivot-dmz-access", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "pivot-dmz · user"
       v.linked_clone = true
@@ -1356,10 +1399,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "pivot-dmz · user"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box_architecture = "amd64"
@@ -2306,7 +2350,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · router",
           "vmware_esxi": "pivot-dmz-router"
         },
-        "boot_digest": "sha256:595989c52d59963b8256cd18dfcf64c4366161c4a355f88c7b485789d0534beb"
+        "boot_digest": "sha256:fcd25206e8a0aebffca677b7f58757e6adb35fdc18340d66caba228fc3259606"
       }
     },
     {
@@ -2333,7 +2377,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · gateway",
           "vmware_esxi": "pivot-dmz-gateway"
         },
-        "boot_digest": "sha256:e271072865fc95896a06ded54de6aa827e4bf1630104aefa1a1319b26d745448"
+        "boot_digest": "sha256:352b8defcdf5cbdcb91741ea33e4d2acc263840b9f839d30805c5ef8fc9a71ca"
       },
       "ports": [
         {
@@ -2373,7 +2417,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · app",
           "vmware_esxi": "pivot-dmz-app"
         },
-        "boot_digest": "sha256:695230b2a543a47a56a144ac82266c89728de5685b52c3c99bfd62b7690e81eb"
+        "boot_digest": "sha256:e69da00e875bb261c52451cd1c300951a25896f464f65934aee6e7ac2526737c"
       },
       "ports": [
         {
@@ -2407,7 +2451,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · db",
           "vmware_esxi": "pivot-dmz-db"
         },
-        "boot_digest": "sha256:c5a527fbcf0596937d2ef630d86894f02523fca5611932bc96adc6b17d3833cb"
+        "boot_digest": "sha256:c1ab6bdac73d5e0903422be3fd65c615b3cf962776eec469016537dcbbc35712"
       },
       "ports": [
         {
@@ -2442,7 +2486,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · user",
           "vmware_esxi": "pivot-dmz-user"
         },
-        "boot_digest": "sha256:f093c63056adf70f11134f1221f4d7e12d7b7212abe40a2363a7b63ec1cd661c"
+        "boot_digest": "sha256:e80ddad3abc0ee643771870efceb96139ace18c0d1e14ca66656df7b60f09588"
       }
     }
   ],

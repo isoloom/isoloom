@@ -447,6 +447,40 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
+ISOLOOM_NAT_ROUTE = <<~'SH'
+set -eu
+gw=10.0.2.2
+nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
+# No default route through the emulated network, or no other one to prefer: nothing to do.
+[ -n "$nat" ] || exit 0
+ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
+    nmcli connection modify "$con" ipv4.route-metric 200
+    nmcli device reapply "$nat" || true
+  fi
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  dir=/etc/systemd/network/$(basename "$file").d
+  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
+    mkdir -p "$dir"
+    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
+    networkctl reload && networkctl reconfigure "$nat" || true
+  fi
+elif [ -f /etc/network/interfaces ]; then
+  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
+    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
+    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
+      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+  done
+fi
+# The route as it is now, whatever the configuration does at its next renewal.
+ip -4 route replace default via "$gw" dev "$nat" metric 200
+for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+done
+SH
 
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (outside, dmz, lan); a missing one reuses the last.
@@ -558,6 +592,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.0.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-outside", libvirt__network_name: "isoloom-edge-firewall-outside", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.10.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-dmz", libvirt__network_name: "isoloom-edge-firewall-dmz", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.20.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-lan", libvirt__network_name: "isoloom-edge-firewall-lan", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "edge-firewall · fw"
       v.linked_clone = true
@@ -575,10 +610,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "edge-firewall · fw"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -700,6 +736,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-dmz", libvirt__network_name: "isoloom-edge-firewall-dmz", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "edge-firewall · web"
       v.linked_clone = true
@@ -717,10 +754,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "edge-firewall · web"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -921,6 +959,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
     m.vm.network "private_network", ip: "10.70.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-lan", libvirt__network_name: "isoloom-edge-firewall-lan", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "edge-firewall · cache"
       v.linked_clone = true
@@ -938,10 +977,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "edge-firewall · cache"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1142,6 +1182,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
     m.vm.network "private_network", ip: "10.70.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-outside", libvirt__network_name: "isoloom-edge-firewall-outside", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "edge-firewall · user"
       v.linked_clone = true
@@ -1159,10 +1200,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "edge-firewall · user"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -2101,7 +2143,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · fw",
           "vmware_esxi": "edge-firewall-fw"
         },
-        "boot_digest": "sha256:87688cf47df3a610a5217d6373b62df6d2722e5058f964599042a9c21c1e32c4"
+        "boot_digest": "sha256:52895b621f9f1deecf390381bf01623f125f51c92660f90d34a53b1b1946ac44"
       },
       "ports": [
         {
@@ -2135,7 +2177,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · web",
           "vmware_esxi": "edge-firewall-web"
         },
-        "boot_digest": "sha256:ca035d0504ad31fb2a769857e29a626de0e44d4692650992a1f30c299cfabdb7"
+        "boot_digest": "sha256:931a2534c525068c2b903464447165575e67cebb40ead6c9359609689d294c38"
       },
       "ports": [
         {
@@ -2169,7 +2211,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · cache",
           "vmware_esxi": "edge-firewall-cache"
         },
-        "boot_digest": "sha256:f1d79cc759021563a43d0239daae0f16e628ad5b8fc6c2643acdca02ca61d1a6"
+        "boot_digest": "sha256:afe7f1fced555fe68518a8dd54d9ee54cc25a5598156f47402181d47e8225b65"
       },
       "ports": [
         {
@@ -2204,7 +2246,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · user",
           "vmware_esxi": "edge-firewall-user"
         },
-        "boot_digest": "sha256:4bed363166b22bcb25d78061af17e77e171e96efd18fb45c7f525aa80a7b8748"
+        "boot_digest": "sha256:48647e0fe861e60fa2845a1888a036734c7440d416cc413d7fe7533c7f13d762"
       }
     }
   ],

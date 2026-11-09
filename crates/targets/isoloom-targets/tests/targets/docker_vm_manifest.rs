@@ -46,7 +46,7 @@ fn vagrant_brings_the_vm_up_then_compose_starts_in_it_over_vagrant_ssh() -> Outc
     let Run::Argv(HostArgv::Every(argv)) = &vm.run else { panic!() };
     let up_args: Vec<String> = argv.args().iter().map(ToString::to_string).collect();
     // Every provisioner but the lab's start: Compose is the next steps'.
-    assert_eq!(up_args[up_args.len() - 2..], ["--provision-with", "docker,accept-env,project"]);
+    assert_eq!(up_args[up_args.len() - 2..], ["--provision-with", "nat-route,docker,accept-env,project"]);
     let start = m.lifecycle.up.iter().find(|s| s.id.as_str() == "start").unwrap();
     let Run::Argv(HostArgv::Every(start_argv)) = &start.run else { panic!() };
     let piped: Vec<String> = start_argv.args().iter().map(ToString::to_string).collect();

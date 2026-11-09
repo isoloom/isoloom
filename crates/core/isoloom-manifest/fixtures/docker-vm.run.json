@@ -512,7 +512,7 @@
           "--provider",
           "${run.provider}",
           "--provision-with",
-          "docker,accept-env,project"
+          "nat-route,docker,accept-env,project"
         ],
         "timeout_s": 3600
       },

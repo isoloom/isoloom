@@ -57,13 +57,19 @@ pub fn manifest(env: &Environment, guest: &GuestCompose) -> crate::Result<Manife
     crate::manifest::docker_vm::manifest(env, guest).map_err(|e| e.on(Target::DockerVm))
 }
 
-/// The VM's own provisioners, in order: everything `vagrant up` runs but the lab's start (the
-/// constraints, when the spec has some; Docker; SSH accepting the forwarded values, when there
-/// are some; the project).
+/// The VM's own provisioners, in order: everything `vagrant up` runs but the lab's start (UTM's
+/// default route, a no-op elsewhere; the constraints, when the spec has some; Docker; SSH
+/// accepting the forwarded values, when there are some; the project).
 pub(crate) fn prepares(env: &Environment, guest: &GuestCompose) -> Vec<&'static str> {
     let constraints = steps::linux(env, "", &isoloom_plan::Step::Prelude).map(|_| vagrantfile::CONSTRAINTS);
     let accept = (!guest.forwarded().is_empty()).then_some(ACCEPT_ENV);
-    constraints.into_iter().chain([vagrantfile::DOCKER]).chain(accept).chain([PROJECT]).collect()
+    [crate::vms::utm::NAT_ROUTE]
+        .into_iter()
+        .chain(constraints)
+        .chain([vagrantfile::DOCKER])
+        .chain(accept)
+        .chain([PROJECT])
+        .collect()
 }
 
 /// The project provisioner.
@@ -113,6 +119,7 @@ fn written(env: &Environment, guest: &GuestCompose) -> Ruby {
     r.text(vagrantfile::PORT_CHECK_RB);
     // `IsoloomQemu.disk`, for the helper VM's disk on QEMU.
     r.text(crate::vms::qemu::QEMU_RB);
+    crate::vms::utm::constant(&mut r);
     vagrantfile::inputs(&mut r, &env.spec().inputs, false);
     // Always read the runner's chosen host ports: the QEMU provider block below reads the helper
     // VM's own SSH forward port from it, so the hash must be defined even when no container port is.
@@ -171,6 +178,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
         })
         .collect();
     crate::host_folders::render(r, "config", &shares);
+    crate::vms::utm::placeholder(r, "config");
     if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
         r.provision(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
     }
@@ -218,6 +226,7 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
     r.block(provider("utm"), "v, o", |r| {
         r.assign("o.vm.box", Value::str("utm/bookworm"));
         named(r);
+        crate::vms::utm::override_in_block(r);
     });
     r.block(provider("qemu"), "v, o", |r| {
         // vagrant-qemu boots the Debian cloud image, as the VMs of the Vagrant target do on QEMU

@@ -444,6 +444,40 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
+ISOLOOM_NAT_ROUTE = <<~'SH'
+set -eu
+gw=10.0.2.2
+nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
+# No default route through the emulated network, or no other one to prefer: nothing to do.
+[ -n "$nat" ] || exit 0
+ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
+    nmcli connection modify "$con" ipv4.route-metric 200
+    nmcli device reapply "$nat" || true
+  fi
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  dir=/etc/systemd/network/$(basename "$file").d
+  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
+    mkdir -p "$dir"
+    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
+    networkctl reload && networkctl reconfigure "$nat" || true
+  fi
+elif [ -f /etc/network/interfaces ]; then
+  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
+    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
+    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
+      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+  done
+fi
+# The route as it is now, whatever the configuration does at its next renewal.
+ip -4 route replace default via "$gw" dev "$nat" metric 200
+for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+done
+SH
 
 require "json"
 # The host ports the runner chose for this run; each forward defaults to its own number.
@@ -555,6 +589,7 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.80.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-solo-web-app", libvirt__network_name: "isoloom-solo-web-app", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "solo-web · web"
       v.linked_clone = true
@@ -572,10 +607,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "solo-web · web"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -703,6 +739,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
     m.vm.network "private_network", ip: "10.80.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-solo-web-app", libvirt__network_name: "isoloom-solo-web-app", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "solo-web · controller"
       v.linked_clone = true
@@ -720,10 +757,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "solo-web · controller"
       v.cpus = 1
       v.memory = 512
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1337,7 +1375,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "solo-web · web",
           "vmware_esxi": "solo-web-web"
         },
-        "boot_digest": "sha256:1878b958d05c8a3777be7f2bc68ffd09c6d65ab75a8d8e8e5767b303522a2ca9"
+        "boot_digest": "sha256:caa61677a298cb8da706f73d7f09604da18f9ce3498697d036257120957c631b"
       },
       "ports": [
         {
@@ -1374,7 +1412,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "solo-web · controller",
           "vmware_esxi": "solo-web-controller"
         },
-        "boot_digest": "sha256:9ffe80dddbcc3cb624f5f80d328b0ea5b0385c2beceab011582033068add53e0"
+        "boot_digest": "sha256:2a89b3627afb3e28ed9337eff0f968189059ab0038ae2665efbbb3691f23ef74"
       }
     }
   ],

@@ -21,7 +21,8 @@
 //!   listen port per VM), each VM on one network; the QEMU provider's refusal ([`provider`])
 //!   says when a spec doesn't fit. A disk size grows the box's disk, never below the box's own.
 //! - On UTM (`vagrant_utm`), a VM gets no private network; the UTM provider's refusal
-//!   ([`provider`]) refuses a spec whose VMs are on one.
+//!   ([`provider`]) refuses a spec whose VMs are on one. A Linux VM's default route goes through
+//!   UTM's shared network, not the plugin's slow emulated one ([`utm`]).
 //! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
 //!   guest ([`hyperv`]); the Hyper-V provider's refusal ([`provider`]) says when a machine has no
@@ -39,6 +40,7 @@ pub(crate) mod provider;
 pub(crate) mod providers;
 pub(crate) mod qemu;
 mod transport;
+pub(crate) mod utm;
 mod values;
 mod windows;
 
@@ -192,6 +194,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(&project_rb());
     r.text(hyperv::HYPERV_RB);
     r.text(vagrantfile::PORT_CHECK_RB);
+    utm::constant(r);
     r.blank();
     vagrantfile::inputs(r, &env.spec().inputs, values::any(env));
     if env.machines.values().any(|m| !m.ports.is_empty()) {

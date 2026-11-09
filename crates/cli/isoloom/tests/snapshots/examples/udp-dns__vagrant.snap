@@ -445,6 +445,40 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
+ISOLOOM_NAT_ROUTE = <<~'SH'
+set -eu
+gw=10.0.2.2
+nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
+# No default route through the emulated network, or no other one to prefer: nothing to do.
+[ -n "$nat" ] || exit 0
+ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
+    nmcli connection modify "$con" ipv4.route-metric 200
+    nmcli device reapply "$nat" || true
+  fi
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  dir=/etc/systemd/network/$(basename "$file").d
+  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
+    mkdir -p "$dir"
+    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
+    networkctl reload && networkctl reconfigure "$nat" || true
+  fi
+elif [ -f /etc/network/interfaces ]; then
+  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
+    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
+    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
+      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+  done
+fi
+# The route as it is now, whatever the configuration does at its next renewal.
+ip -4 route replace default via "$gw" dev "$nat" metric 200
+for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+done
+SH
 
 require "json"
 # The host ports the runner chose for this run; each forward defaults to its own number.
@@ -557,6 +591,7 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "isoloom-router"
     m.vm.network "private_network", ip: "10.66.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-servers", libvirt__network_name: "isoloom-udp-dns-servers", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.66.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-users", libvirt__network_name: "isoloom-udp-dns-users", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "udp-dns · router"
       v.linked_clone = true
@@ -574,10 +609,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "udp-dns · router"
       v.cpus = 1
       v.memory = 512
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -707,6 +743,7 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "dns"
     m.vm.network "private_network", ip: "10.66.10.53", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-servers", libvirt__network_name: "isoloom-udp-dns-servers", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 53, host: ISOLOOM_HOSTPORTS.fetch("dns/dns-udp", 10053), host_ip: "127.0.0.1", protocol: "udp" # not on libvirt: vagrant-libvirt skips UDP forwards
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "udp-dns · dns"
       v.linked_clone = true
@@ -724,10 +761,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "udp-dns · dns"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -927,6 +965,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "client"
     m.vm.network "private_network", ip: "10.66.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-users", libvirt__network_name: "isoloom-udp-dns-users", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "udp-dns · client"
       v.linked_clone = true
@@ -944,10 +983,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "udp-dns · client"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1718,7 +1758,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · router",
           "vmware_esxi": "udp-dns-router"
         },
-        "boot_digest": "sha256:01b712b1cef6b483e2b82cb40db7d01ebca42ee95faceab20ae6329b717c4ccd"
+        "boot_digest": "sha256:755a271272f0097d55efd8b9a3f1ae49c4017c872d355a77c3d998a6166d45e4"
       }
     },
     {
@@ -1744,7 +1784,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · dns",
           "vmware_esxi": "udp-dns-dns"
         },
-        "boot_digest": "sha256:11e66e0ba9900d5d12e7f05bb8b9c260da8202d10499e76778809df576bd0f81"
+        "boot_digest": "sha256:a1fadfd59033a1e60af81e66c2609794d5172cca0a08e131bec29ed429fafec6"
       },
       "ports": [
         {
@@ -1790,7 +1830,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · client",
           "vmware_esxi": "udp-dns-client"
         },
-        "boot_digest": "sha256:f6445b52cad6d3aa3ead5af9f77e128769840a73a100da8ed63f1f253f1fee36"
+        "boot_digest": "sha256:79e2d62800b72f25febc6e62fced061a0dc12adef768a79132eac1cf2919d5ea"
       }
     }
   ],

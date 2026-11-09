@@ -143,3 +143,32 @@ fn vmware_runs_a_machine_with_nested_virtualization() -> Outcome {
     assert!(!provider_block(&vf, "b", "vmware_desktop")?.contains("vhv.enable"));
     Ok(())
 }
+
+#[test]
+fn on_utm_a_linux_vms_default_route_leaves_the_emulated_network_and_nothing_changes_elsewhere() -> Outcome {
+    // A Linux VM and a Windows one, with no network (UTM gives none), and the docker-vm VM.
+    let spec = "version: 1\nname: t\nmachines:\n  web:\n    os: debian@12\n    app: { steps: [{ run: p.sh }] }\n  win:\n    os: windows-server@2022\n    app: { steps: [{ run: p.ps1 }] }\n";
+    let vf = vagrantfile(spec)?;
+    assert!(vf.contains("ISOLOOM_NAT_ROUTE = <<~'SH'\nset -eu\ngw=10.0.2.2\n"), "{vf}");
+    let web = define(&vf, "web")?;
+    let first = web.lines().find(|l| l.contains(".vm.provision")).ok_or("no provisioner")?;
+    assert_eq!(first.trim(), "m.vm.provision \"nat-route\", type: \"shell\", run: \"always\", inline: \":\"");
+    let utm = provider_block(&vf, "web", "utm")?;
+    assert!(
+        utm.contains("o.vm.provision \"nat-route\", type: \"shell\", run: \"always\", preserve_order: true, inline: ISOLOOM_NAT_ROUTE"),
+        "{utm}"
+    );
+    for other in ["virtualbox", "vmware_desktop", "parallels", "qemu", "libvirt"] {
+        assert!(!provider_block(&vf, "web", other)?.contains("nat-route"), "{other}");
+    }
+    assert!(!define(&vf, "win")?.contains("nat-route"), "a Windows VM has no such provisioner");
+    let dvm = generated(&crate::testing::example("hello-stack")?, Target::DockerVm, "docker-vm/Vagrantfile")?;
+    let dvm_utm = between(&dvm, "config.vm.provider \"utm\"", "\n  end\n")?;
+    assert!(dvm_utm.contains("preserve_order: true, inline: ISOLOOM_NAT_ROUTE"), "{dvm_utm}");
+    let dvm_first = dvm
+        .lines()
+        .find(|l| l.trim_start().starts_with("config.vm.provision"))
+        .ok_or("no provisioner")?;
+    assert!(dvm_first.contains("\"nat-route\""), "{dvm_first}");
+    Ok(())
+}

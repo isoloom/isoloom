@@ -446,6 +446,40 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
+ISOLOOM_NAT_ROUTE = <<~'SH'
+set -eu
+gw=10.0.2.2
+nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
+# No default route through the emulated network, or no other one to prefer: nothing to do.
+[ -n "$nat" ] || exit 0
+ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
+    nmcli connection modify "$con" ipv4.route-metric 200
+    nmcli device reapply "$nat" || true
+  fi
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  dir=/etc/systemd/network/$(basename "$file").d
+  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
+    mkdir -p "$dir"
+    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
+    networkctl reload && networkctl reconfigure "$nat" || true
+  fi
+elif [ -f /etc/network/interfaces ]; then
+  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
+    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
+    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
+      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+  done
+fi
+# The route as it is now, whatever the configuration does at its next renewal.
+ip -4 route replace default via "$gw" dev "$nat" metric 200
+for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+done
+SH
 
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (front, back, access); a missing one reuses the last.
@@ -557,6 +591,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.61.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-front", libvirt__network_name: "isoloom-segmented-front", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.61.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-back", libvirt__network_name: "isoloom-segmented-back", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.61.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "segmented · router"
       v.linked_clone = true
@@ -574,10 +609,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "segmented · router"
       v.cpus = 1
       v.memory = 512
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -708,6 +744,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
     m.vm.network "private_network", ip: "10.61.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-back", libvirt__network_name: "isoloom-segmented-back", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.disk :disk, size: "10GB", primary: true
     m.vm.provider "virtualbox" do |v|
       v.name = "segmented · cache"
@@ -726,10 +763,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "segmented · cache"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -954,6 +992,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.61.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-front", libvirt__network_name: "isoloom-segmented-front", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "segmented · web"
       v.linked_clone = true
@@ -971,10 +1010,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "segmented · web"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1140,6 +1180,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
     m.vm.network "private_network", ip: "10.61.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "segmented · user"
       v.linked_clone = true
@@ -1157,10 +1198,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "segmented · user"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1997,7 +2039,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · router",
           "vmware_esxi": "segmented-router"
         },
-        "boot_digest": "sha256:8899d9857ea6e5a6c03c4e0d849cee55f3a8acc95a43617d97b4859ed624472d"
+        "boot_digest": "sha256:6047c32fcf63de1a980f8ae0053288f5c2a92feb4455c98b4d65487061788227"
       }
     },
     {
@@ -2023,7 +2065,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · cache",
           "vmware_esxi": "segmented-cache"
         },
-        "boot_digest": "sha256:f68dcf0447131fd485e203dcc45a92a02b83e16eca956f6f4ac1b4d8a31cd32b"
+        "boot_digest": "sha256:7dd651cf69dd4361784edb4b494b4f3146a45498a1e2df269cea6b3558375748"
       },
       "ports": [
         {
@@ -2057,7 +2099,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · web",
           "vmware_esxi": "segmented-web"
         },
-        "boot_digest": "sha256:69a9405d209066bcf9456a02bc8f4a05a71785febf3c5dcc872bc3c7ee4d82bf"
+        "boot_digest": "sha256:31cd2b1d231b8a001ab4e841ddd8d81d29abf0860dd179a493cb41a6b61d7045"
       },
       "ports": [
         {
@@ -2098,7 +2140,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · user",
           "vmware_esxi": "segmented-user"
         },
-        "boot_digest": "sha256:ba42505dcb3d3207508dc16bf567631ba2e5974ab35e8931b81a383ab270b46b"
+        "boot_digest": "sha256:8430639367a74434e2eddaaf7909539e6c57d4ba9160791ad95ba3fa7ef8485f"
       }
     }
   ],

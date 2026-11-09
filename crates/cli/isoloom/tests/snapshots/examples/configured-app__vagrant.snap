@@ -449,6 +449,40 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
+ISOLOOM_NAT_ROUTE = <<~'SH'
+set -eu
+gw=10.0.2.2
+nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
+# No default route through the emulated network, or no other one to prefer: nothing to do.
+[ -n "$nat" ] || exit 0
+ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
+    nmcli connection modify "$con" ipv4.route-metric 200
+    nmcli device reapply "$nat" || true
+  fi
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  dir=/etc/systemd/network/$(basename "$file").d
+  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
+    mkdir -p "$dir"
+    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
+    networkctl reload && networkctl reconfigure "$nat" || true
+  fi
+elif [ -f /etc/network/interfaces ]; then
+  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
+    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
+    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
+      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+  done
+fi
+# The route as it is now, whatever the configuration does at its next renewal.
+ip -4 route replace default via "$gw" dev "$nat" metric 200
+for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+done
+SH
 
 require "json"
 # The host ports the runner chose for this run; each forward defaults to its own number.
@@ -560,6 +594,7 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.66.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/http", 8086), host_ip: "127.0.0.1"
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "configured-app · web"
       v.linked_clone = true
@@ -577,10 +612,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "configured-app · web"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1106,6 +1142,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/ubuntu-24.04"
     m.vm.hostname = "api"
     m.vm.network "private_network", ip: "10.66.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "configured-app · api"
       v.linked_clone = true
@@ -1123,10 +1160,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "configured-app · api"
       v.cpus = 1
       v.memory = 1024
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box_architecture = "amd64"
@@ -1505,6 +1543,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
     m.vm.network "private_network", ip: "10.66.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
+    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "configured-app · controller"
       v.linked_clone = true
@@ -1522,10 +1561,11 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "utm" do |v|
+    m.vm.provider "utm" do |v, o|
       v.name = "configured-app · controller"
       v.cpus = 1
       v.memory = 512
+      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -2321,7 +2361,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · web",
           "vmware_esxi": "configured-app-web"
         },
-        "boot_digest": "sha256:bcb7812a7df3b3b837b2869b03fbbb7e44994cf9f01df609f55cca6f8c607698"
+        "boot_digest": "sha256:5f964eb288f72848cb98555b5606eb9c24e9f7bb20292e73a0240901c2db4498"
       },
       "ports": [
         {
@@ -2360,7 +2400,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · api",
           "vmware_esxi": "configured-app-api"
         },
-        "boot_digest": "sha256:354943388c05a7a557a8ba1c2d100372d8408bd00718dcc5e65fa91261f51764"
+        "boot_digest": "sha256:bf76c2abc542cb878b97909592d161d7d2cb79f818dbc4bba495b139981ad04c"
       },
       "ports": [
         {
@@ -2398,7 +2438,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · controller",
           "vmware_esxi": "configured-app-controller"
         },
-        "boot_digest": "sha256:8f966def580444c74b345c171cbe6a4522874a471a1ac4e87f51cff8f388ce69"
+        "boot_digest": "sha256:1f615c89552f77941c558986e33d18a85fe339d0391b11d000b7768dae3c91bb"
       }
     }
   ],

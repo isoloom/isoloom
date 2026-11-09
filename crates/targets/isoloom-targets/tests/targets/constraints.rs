@@ -91,7 +91,12 @@ fn every_linux_vm_runs_the_preamble_first() -> Outcome {
     // cache, web, user and the router: each VM's first provisioner.
     assert_eq!(vf.matches("name: \"constraints\"").count(), 4, "{vf}");
     for block in vf.split("config.vm.define").skip(1) {
-        let first = block.lines().find(|l| l.contains(".vm.provision")).unwrap();
+        // After UTM's default-route provisioner (a no-op elsewhere), which comes first everywhere.
+        let first = block
+            .lines()
+            .filter(|l| l.contains(".vm.provision"))
+            .find(|l| !l.contains("\"nat-route\""))
+            .unwrap();
         assert!(first.contains("name: \"constraints\""), "first provisioner: {first}");
     }
     assert!(vf.contains("Acquire::http::Proxy") && vf.contains("mirror.corp/debian") && vf.contains("ntp.corp") && vf.contains("timesyncd"));
@@ -128,7 +133,11 @@ fn every_linux_vm_runs_the_preamble_first() -> Outcome {
     let setup = file(&spec, Target::DockerVm, "docker-vm/proxmox/setup.sh")?;
     assert!(setup.contains("# The proxy") && setup.contains("get.docker.com"), "{setup}");
     let docker_vm = file(&spec, Target::DockerVm, "docker-vm/Vagrantfile")?;
-    let first = docker_vm.lines().find(|l| l.contains("config.vm.provision")).unwrap();
+    let first = docker_vm
+        .lines()
+        .filter(|l| l.contains("config.vm.provision"))
+        .find(|l| !l.contains("\"nat-route\""))
+        .unwrap();
     assert!(first.contains("\"constraints\", type: \"shell\""), "{first}");
     Ok(())
 }

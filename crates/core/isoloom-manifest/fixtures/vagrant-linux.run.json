@@ -406,7 +406,7 @@
           "utm": "flag-vm · web",
           "vmware_esxi": "flag-vm-web"
         },
-        "boot_digest": "sha256:8696c7b08d6e3897a8f1b58c2f1df3a674e6075d6955fb362df5b6c3829719ac"
+        "boot_digest": "sha256:e71c991f4c14423a702a2be9a2d83aad451d5e2dbce221a3a8e42efcf192070f"
       },
       "ports": [
         {
@@ -443,7 +443,7 @@
           "utm": "flag-vm · controller",
           "vmware_esxi": "flag-vm-controller"
         },
-        "boot_digest": "sha256:ec0f1c616901272d27c217693bd411c9b110496a27bb101df7c15a516676305b"
+        "boot_digest": "sha256:2ea0b7c803ecd6be0c121506fd8f5e2234e3c6d2679da1efa84003998b941d71"
       }
     }
   ],
