@@ -22,10 +22,15 @@
 //! doesn't know, so a manifest that uses a field added in a minor release needs a runner built
 //! with that release. The policy is [`COMPATIBILITY`], which the schema states too.
 //!
-//! The crate is pure: it reads and writes text, and touches no file, process or clock. Its enums
-//! are exhaustive on purpose: the manifest is a closed, versioned contract, so a runner must handle
-//! every step action, delivery and condition, and a new one fails its build instead of falling
-//! into a wildcard.
+//! [`COMPATIBILITY`] is the document's: what a runner reading `run.json` relies on. The types
+//! mirror the document and are exhaustive on purpose, enums and structs alike: the manifest is a
+//! closed, versioned contract, so a runner must handle every step action, delivery and
+//! condition, and a new one fails its build instead of falling into a wildcard. A new optional
+//! field of the document is a new public field of its struct, in a minor release: code that
+//! builds one of these structs by hand, or destructures one without `..`, follows it then. Read
+//! a manifest with [`parse`], match its structs with `..`.
+//!
+//! The crate is pure: it reads and writes text, and touches no file, process or clock.
 //!
 //! # Example
 //!

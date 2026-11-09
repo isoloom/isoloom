@@ -171,6 +171,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Changed
 
+- **`isoloom_manifest::COMPATIBILITY` is the document's**, and the crate says what it means for
+  its Rust types: they mirror the document and stay exhaustive, so a new optional field (a minor
+  release) is a new struct field; building them by hand isn't part of the library promise, as
+  for the spec model ([policies](docs/reference/policies.md#what-is-stable)).
 - **Step timeouts count time without progress**: the manifest's `timeout_s` and
   `provider_timeout_s` say so (a step stops after that long without new output, or at six
   hours, or the limit when longer), as Isothrum runs them.
