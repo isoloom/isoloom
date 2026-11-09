@@ -59,6 +59,18 @@ fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
 }
 
 #[test]
+fn a_published_build_pulls_first_in_the_vm_as_on_the_host_its_failure_tolerated() {
+    let g = guest_of("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/example/lab-web:1\n      build: { context: web }\n");
+    let ids: Vec<&str> = g.start.iter().map(|c| c.id.as_str()).collect();
+    assert_eq!(ids, ["pull", "start"]);
+    assert!(g.start[0].command.to_string().ends_with("pull --ignore-pull-failures"));
+    assert_eq!(g.start[0].failure, Failure::Tolerate);
+    assert_eq!(g.start[0].note.as_deref(), Some("Pulling the lab's published images in the VM…"));
+    assert!(!g.start[1].command.to_string().contains("--build"));
+    assert_eq!(g.start[1].failure, Failure::Fail);
+}
+
+#[test]
 fn the_flag_reaches_only_the_start_steps_and_is_forwarded_into_the_vm() {
     let g = guest_of(FLAGGED);
     let flag = g.slots.iter().find(|s| s.name.as_str() == "FLAG").unwrap();

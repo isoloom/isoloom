@@ -17,7 +17,7 @@ use super::Project;
 use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
 
 use super::checks::{Planned, planned, stand_ins};
-use super::lifecycle::{WAIT_TIMEOUT, job_step, owner, publishes_a_built_image, ready};
+use super::lifecycle::{self, ready};
 use super::machines::{Member, classify, machines};
 use super::slots::{Starts, slots};
 use crate::error::Result;
@@ -107,35 +107,20 @@ pub(crate) fn guest(env: &Environment, file: &ComposeFile) -> Result<GuestCompos
 /// The start step's id.
 const START: &str = "start";
 
-/// Everything but the leaf jobs up and healthy, then each leaf job attached; the project files
-/// Compose reads from its environment read from the VM's copy first.
+/// The project's start ([`super::lifecycle::start`]), the project files Compose reads from its
+/// environment read from the VM's copy first.
 fn start(env: &Environment, vm: &InVm, plan: &StartPlan, members: &[Member]) -> Result<Vec<GuestCommand>> {
     let files = host_environment(env);
-    // As on the host: a lab that publishes a built image pulls it first (a user runs the
-    // published image), so it drops `--build` and `up` builds only what could not be pulled; a
-    // lab that only builds locally keeps `--build`.
-    let pull_published = publishes_a_built_image(env);
-    let build = if pull_published { "" } else { " --build" };
-    // As on the host: a service the lab no longer has goes.
-    let mut up = format!("up --detach{build} --pull missing --remove-orphans --wait --wait-timeout {WAIT_TIMEOUT}");
-    for service in &plan.wait {
-        up.push(' ');
-        up.push_str(service);
-    }
-    let mut out = Vec::new();
-    if pull_published {
-        let pulling = Some("Pulling the lab's published images in the VM…".to_owned());
-        let pull = text("pull --ignore-pull-failures");
-        out.push(command("pull", pulling, vm.compose(&files, &pull), 1800)?);
-    }
-    let starting = Some("Starting the lab's containers in the VM…".to_owned());
-    out.push(command(START, starting, vm.compose(&files, &text(&up)), 1800)?);
-    for job in &plan.jobs {
-        let note = Some(format!("Running {}'s set-up script…", owner(members, job)));
-        let attached = format!("up --no-deps --exit-code-from {job} {job}");
-        out.push(command(&job_step(job), note, vm.compose(&files, &text(&attached)), 600)?);
-    }
-    Ok(out)
+    lifecycle::start(env, plan, members, START, " in the VM")
+        .into_iter()
+        .map(|s| {
+            let mut c = command(&s.id, Some(s.note), vm.compose(&files, &text(&s.args.join(" "))), s.timeout_s)?;
+            if s.tolerated {
+                c.failure = Failure::Tolerate;
+            }
+            Ok(c)
+        })
+        .collect()
 }
 
 /// Each position's runner (`compose run` of its `check` service, `ISOLOOM_DERIVED` passed on),

@@ -51,39 +51,82 @@ pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member])
     })
 }
 
-/// Pin the host ports, check they are free, clear stale networks, pull any published images,
-/// start everything but the leaf jobs and wait for it, then run each leaf job attached.
+/// Pin the host ports, check they are free, clear stale networks, then start the project
+/// ([`start`]).
 fn up(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>> {
-    // A lab that publishes a built image (the build+image combo) pulls it first, so a user runs
-    // the published image rather than building it; `up` then builds only what could not be pulled.
-    // A lab that only builds locally keeps `--build`, so an author's edits are always rebuilt.
-    let pull_published = publishes_a_built_image(env);
-    let mut args = vec!["up", "--detach"];
-    if !pull_published {
-        args.push("--build");
-    }
-    // A service the lab no longer has (a machine taken out, then the run updated) goes.
-    args.extend(["--pull", "missing", "--remove-orphans", "--wait", "--wait-timeout", WAIT_TIMEOUT]);
-    args.extend(plan.wait.iter().map(String::as_str));
     let mut steps = vec![
         noted(act("pin-ports", Action::ComposePinPorts)?, "Picking the lab's host ports…"),
         act("ports-free", Action::ComposeCheckPortsFree)?,
         tolerated(act("stale-networks", Action::ComposeRemoveStaleNetworks)?),
     ];
+    for s in start(env, plan, members, "up", "") {
+        let args: Vec<&str> = s.args.iter().map(String::as_str).collect();
+        let step = noted(run(&s.id, compose(&args)?, s.timeout_s)?, &s.note);
+        steps.push(if s.tolerated { tolerated(step) } else { step });
+    }
+    Ok(steps)
+}
+
+/// One step of a Compose project's start, the same on this computer and in a VM.
+pub(super) struct StartStep {
+    /// Its id.
+    pub(super) id: String,
+    /// What it says it is doing.
+    pub(super) note: String,
+    /// Compose's arguments.
+    pub(super) args: Vec<String>,
+    /// How long it may run, in seconds.
+    pub(super) timeout_s: u32,
+    /// Whether its failure is only logged.
+    pub(super) tolerated: bool,
+}
+
+/// How a Compose project starts, on this computer and in a VM (`place` ends the notes: ` in the
+/// VM`): the published images pulled first when the lab publishes one it builds, everything but
+/// the leaf jobs up and healthy (the step `up_id`), then each leaf job attached.
+pub(super) fn start(env: &Environment, plan: &StartPlan, members: &[Member], up_id: &str, place: &str) -> Vec<StartStep> {
+    let words = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+    // A lab that publishes a built image (the build+image combo) pulls it first, so a user runs
+    // the published image rather than building it; `up` then builds only what could not be pulled.
+    // A lab that only builds locally keeps `--build`, so an author's edits are always rebuilt.
+    let pull_published = publishes_a_built_image(env);
+    let mut up = vec!["up", "--detach"];
+    if !pull_published {
+        up.push("--build");
+    }
+    // A service the lab no longer has (a machine taken out, then the run updated) goes.
+    up.extend(["--pull", "missing", "--remove-orphans", "--wait", "--wait-timeout", WAIT_TIMEOUT]);
+    up.extend(plan.wait.iter().map(String::as_str));
+    let mut out = Vec::new();
     if pull_published {
         // Pull the published images; a service with no published image, or one not pushed yet,
         // fails the pull and is built by `up`. Tolerated, so an unreachable registry still falls
         // back to building rather than failing the run.
-        let pull = ["pull", "--ignore-pull-failures"];
-        steps.push(noted(tolerated(run("pull", compose(&pull)?, 1800)?), "Pulling the lab's published images…"));
+        out.push(StartStep {
+            id: "pull".to_owned(),
+            note: format!("Pulling the lab's published images{place}…"),
+            args: words(&["pull", "--ignore-pull-failures"]),
+            timeout_s: 1800,
+            tolerated: true,
+        });
     }
-    steps.push(noted(run("up", compose(&args)?, 1800)?, "Starting the lab's containers…"));
+    out.push(StartStep {
+        id: up_id.to_owned(),
+        note: format!("Starting the lab's containers{place}…"),
+        args: words(&up),
+        timeout_s: 1800,
+        tolerated: false,
+    });
     for job in &plan.jobs {
-        let attached = ["up", "--no-deps", "--exit-code-from", job, job];
-        let note = format!("Running {}'s set-up script…", owner(members, job));
-        steps.push(noted(run(&job_step(job), compose(&attached)?, 600)?, &note));
+        out.push(StartStep {
+            id: job_step(job),
+            note: format!("Running {}'s set-up script…", owner(members, job)),
+            args: words(&["up", "--no-deps", "--exit-code-from", job, job]),
+            timeout_s: 600,
+            tolerated: false,
+        });
     }
-    Ok(steps)
+    out
 }
 
 /// Whether any machine runs a published image it also builds (the build+image combo), so the run

@@ -58,6 +58,9 @@ stable spec format.
 
 ### Fixed
 
+- **Compose in a VM tolerates a failed pull of the lab's published images**, as on this
+  computer: an unreachable registry falls back to building (docker-vm, cloud-docker), instead of
+  failing the start. Both describe the start once now.
 - **A lab's own access machine can start after its checks ran.** The checks that run from the
   access machine's seat run from a stand-in at its addresses (`isoloom-access`, check profile),
   which nothing took down: once checked, the lab's access machine couldn't come up (Docker:
