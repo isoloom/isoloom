@@ -388,6 +388,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -488,6 +489,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run

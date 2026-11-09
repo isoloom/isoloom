@@ -319,6 +319,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A Kubernetes pod keeps `SYS_CHROOT`**, the one capability of the runtime's default set
+  besides `NET_RAW` it dropped, though `baseline` allows it: sshd's privilege separation needs it.
 - **A network appliance keeps the spec's `volumes`, `host_folders` and `environment`** on the
   Docker targets: its own mounts and variables (configuration files, `IOL_PID`) replaced them,
   silently. They are added to the spec's now.

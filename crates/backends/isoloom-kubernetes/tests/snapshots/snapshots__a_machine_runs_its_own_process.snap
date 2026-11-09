@@ -87,6 +87,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 8000
         readinessProbe:
@@ -144,6 +145,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         env:
         - name: DEMO_SECRET
           valueFrom:
@@ -248,6 +250,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 9000
         startupProbe:
@@ -398,6 +401,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 8000
         readinessProbe:
@@ -455,6 +459,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         env:
         - name: DEMO_SECRET
           valueFrom:
@@ -559,6 +564,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 9000
         startupProbe:

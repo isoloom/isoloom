@@ -3,8 +3,8 @@
 //! (busybox copies and waits) run as a non-root user with none, a container running an image
 //! Isoloom can't vouch for (the machine's, its jobs, the root-owned copies, the checks) keeps
 //! only the capabilities a root process of a stock image needs (`chown`, `setuid` to its own
-//! user, a port under 1024), without `NET_RAW` or any the Pod Security Standards' `baseline`
-//! level refuses. The namespace enforces that level, or `privileged` when a machine needs more
+//! user, a port under 1024, `chroot` for sshd's privilege separation), without `NET_RAW` or any
+//! the Pod Security Standards' `baseline` level refuses. The namespace enforces that level, or `privileged` when a machine needs more
 //! (`privileged: true`, a sysctl outside the safe set).
 
 use crate::machine::Machine;
@@ -13,9 +13,10 @@ use crate::objects::{Capabilities, ContainerSecurity, PodSecurity, SeccompProfil
 /// The namespace label the Pod Security admission enforces.
 pub(crate) const ENFORCE_LABEL: &str = "pod-security.kubernetes.io/enforce";
 
-/// What a container running a stock image as root keeps: the runtime's default set without
-/// `NET_RAW` (raw sockets: spoofing on the pod network), all of which `baseline` allows.
-const ROOT_CAPABILITIES: [&str; 12] = [
+/// What a container running a stock image as root keeps: the runtime's default set (containerd's
+/// and Docker's 14) without `NET_RAW` (raw sockets: spoofing on the pod network), all of which
+/// `baseline` allows.
+const ROOT_CAPABILITIES: [&str; 13] = [
     "AUDIT_WRITE",
     "CHOWN",
     "DAC_OVERRIDE",
@@ -28,6 +29,7 @@ const ROOT_CAPABILITIES: [&str; 12] = [
     "SETGID",
     "SETPCAP",
     "SETUID",
+    "SYS_CHROOT",
 ];
 
 /// The sysctls `baseline` allows (the kubelet's safe set); any other needs `privileged`.
@@ -110,12 +112,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_stock_image_keeps_what_root_needs_and_never_raw_sockets() {
+    fn a_stock_image_keeps_the_runtimes_default_set_but_raw_sockets() {
         let c = image_user();
         let caps = c.capabilities.unwrap();
         assert_eq!(caps.drop, ["ALL"]);
-        assert!(caps.add.contains(&"SETUID") && caps.add.contains(&"NET_BIND_SERVICE"));
-        assert!(!caps.add.contains(&"NET_RAW") && !caps.add.contains(&"SYS_ADMIN"));
+        let runtime_default = [
+            "AUDIT_WRITE",
+            "CHOWN",
+            "DAC_OVERRIDE",
+            "FOWNER",
+            "FSETID",
+            "KILL",
+            "MKNOD",
+            "NET_BIND_SERVICE",
+            "NET_RAW",
+            "SETFCAP",
+            "SETGID",
+            "SETPCAP",
+            "SETUID",
+            "SYS_CHROOT",
+        ];
+        let kept: Vec<&str> = runtime_default.into_iter().filter(|cap| *cap != "NET_RAW").collect();
+        assert_eq!(caps.add, kept);
         assert_eq!((c.allow_privilege_escalation, c.privileged, c.run_as_non_root), (Some(false), false, None));
     }
 

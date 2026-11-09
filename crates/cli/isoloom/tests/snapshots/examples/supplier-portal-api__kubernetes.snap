@@ -413,6 +413,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 3207
         readinessProbe:
@@ -475,6 +476,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         env:
         - name: MYSQL_ALLOW_EMPTY_PASSWORD
           value: '1'
@@ -604,6 +606,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 3206
         readinessProbe:
@@ -788,6 +791,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -843,6 +847,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -892,6 +897,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -1102,6 +1108,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1159,6 +1166,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1210,6 +1218,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1493,6 +1502,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 3207
         readinessProbe:
@@ -1555,6 +1565,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         env:
         - name: MYSQL_ALLOW_EMPTY_PASSWORD
           value: '1'
@@ -1684,6 +1695,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 3206
         readinessProbe:

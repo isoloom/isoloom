@@ -315,6 +315,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-shared
           mountPath: /isoloom-seed
@@ -346,6 +347,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         resources:
           requests:
             cpu: 100m
@@ -383,6 +385,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
@@ -506,6 +509,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         resources:
           requests:
             cpu: 100m
@@ -541,6 +545,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared
@@ -655,6 +660,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -704,6 +710,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -972,6 +979,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1023,6 +1031,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1296,6 +1305,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-shared
           mountPath: /isoloom-seed
@@ -1327,6 +1337,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         resources:
           requests:
             cpu: 100m
@@ -1364,6 +1375,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
@@ -1487,6 +1499,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         resources:
           requests:
             cpu: 100m
@@ -1522,6 +1535,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared

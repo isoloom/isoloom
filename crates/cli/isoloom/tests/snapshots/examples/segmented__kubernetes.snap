@@ -407,6 +407,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-data
           mountPath: /isoloom-seed
@@ -435,6 +436,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 6379
         readinessProbe:
@@ -597,6 +599,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 80
         - containerPort: 4444
@@ -691,6 +694,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         resources:
           requests:
             cpu: 100m
@@ -878,6 +882,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -927,6 +932,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -976,6 +982,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -1176,6 +1183,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1227,6 +1235,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1278,6 +1287,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1571,6 +1581,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: vol-data
           mountPath: /isoloom-seed
@@ -1599,6 +1610,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 6379
         readinessProbe:
@@ -1761,6 +1773,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 80
         - containerPort: 4444
@@ -1855,6 +1868,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         resources:
           requests:
             cpu: 100m

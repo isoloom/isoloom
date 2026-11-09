@@ -303,6 +303,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 6379
         readinessProbe:
@@ -447,6 +448,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 80
         readinessProbe:
@@ -646,6 +648,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -695,6 +698,7 @@ spec:
         - SETGID
         - SETPCAP
         - SETUID
+        - SYS_CHROOT
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -885,6 +889,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -936,6 +941,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1129,6 +1135,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 6379
         readinessProbe:
@@ -1273,6 +1280,7 @@ spec:
             - SETGID
             - SETPCAP
             - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 80
         readinessProbe:
