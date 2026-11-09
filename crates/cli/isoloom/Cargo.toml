@@ -17,6 +17,15 @@ publish = true
 name = "isoloom"
 path = "src/main.rs"
 
+# `cargo binstall isoloom`: the release archives the release workflow publishes.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/isoloom-{ target }{ archive-suffix }"
+bin-dir = "isoloom-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
 [dependencies]
 isoloom-spec.workspace = true
 isoloom-targets.workspace = true
