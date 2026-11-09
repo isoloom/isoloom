@@ -158,3 +158,24 @@ fn no_generation_is_let_fail_quietly() -> Outcome {
     }
     Ok(())
 }
+
+#[test]
+fn ci_runs_every_gate_the_release_gate_runs() -> Outcome {
+    // CONTRIBUTING: every gate runs locally and in CI. gate.yml (the release path) is the list;
+    // ci.yml's `check` job runs each of its commands too (`--locked` aside).
+    let commands = |file: &str| -> Outcome<Vec<String>> {
+        let text = std::fs::read_to_string(root().join(".github/workflows").join(file))?;
+        Ok(text
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("- run: "))
+            .map(|c| c.replace(" --locked", ""))
+            .collect())
+    };
+    let ci = commands("ci.yml")?;
+    let gate = commands("gate.yml")?;
+    assert!(gate.iter().any(|c| c.contains("xtask -- quality")), "{gate:?}");
+    for c in gate {
+        assert!(ci.contains(&c), "ci.yml doesn't run the gate `{c}`");
+    }
+    Ok(())
+}

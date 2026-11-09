@@ -21,6 +21,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # The engineering-standard ratchet (clean-code counts per crate against quality-baseline.json).
+      - run: cargo run -p xtask -- quality
       - name: Examples validate
         run: |
           for e in examples/*/; do cargo run -q -p isoloom -- validate "$e" --skip-files; cargo run -q -p isoloom -- targets "$e"; done
