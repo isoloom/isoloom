@@ -1060,11 +1060,6 @@
           "type": "string",
           "const": "tfvars_json",
           "description": "A Terraform variable file in JSON."
-        },
-        {
-          "type": "string",
-          "const": "dotenv",
-          "description": "`NAME=value` lines."
         }
       ],
       "description": "The format of a file in the run's state folder."
@@ -1080,16 +1075,6 @@
           "type": "string",
           "const": "ssh",
           "description": "Plain SSH with the runner's key."
-        },
-        {
-          "type": "string",
-          "const": "vagrant_ssh",
-          "description": "`vagrant ssh`."
-        },
-        {
-          "type": "string",
-          "const": "winrm",
-          "description": "WinRM."
         }
       ],
       "description": "How a value reaches a guest."
@@ -1186,11 +1171,6 @@
           "type": "string",
           "const": "connection",
           "description": "What reaches the server or cloud account (a password, a token, keys)."
-        },
-        {
-          "type": "string",
-          "const": "generated",
-          "description": "Made once per run by the runner and kept in its state."
         }
       ],
       "description": "What a slot holds."
@@ -2321,18 +2301,8 @@
         },
         {
           "type": "string",
-          "const": "ssh",
-          "description": "The lab host's login."
-        },
-        {
-          "type": "string",
           "const": "address",
           "description": "An address."
-        },
-        {
-          "type": "string",
-          "const": "credential",
-          "description": "A credential."
         },
         {
           "type": "string",
@@ -2393,25 +2363,6 @@
             "name"
           ],
           "description": "A Terraform output of the module."
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "type": "string",
-              "description": "The value."
-            },
-            "kind": {
-              "type": "string",
-              "const": "static"
-            }
-          },
-          "required": [
-            "kind",
-            "value"
-          ],
-          "description": "A value known when the files were generated."
         }
       ],
       "description": "Where an output's value comes from."
@@ -2640,11 +2591,6 @@
           "type": "string",
           "const": "unix_seconds",
           "description": "Seconds since the Unix epoch."
-        },
-        {
-          "type": "string",
-          "const": "minutes_from_now",
-          "description": "Minutes from the apply."
         }
       ],
       "description": "How a run's expiry is passed to the module."

@@ -55,7 +55,7 @@ fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
         .iter()
         .filter_map(|o| match &o.from {
             OutputSource::PublishedPort { machine, port } => Some((machine.as_str(), port.as_str())),
-            _ => None,
+            OutputSource::TerraformOutput { .. } => None,
         })
         .collect();
     assert_eq!(published, [("web", "portal")], "web's portal is the lab's one published port");

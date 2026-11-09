@@ -14,12 +14,8 @@ use crate::template::Template;
 pub enum OutputRole {
     /// Where to start: the Open button.
     Entry,
-    /// The lab host's login.
-    Ssh,
     /// An address.
     Address,
-    /// A credential.
-    Credential,
     /// Anything else worth showing.
     Info,
 }
@@ -42,11 +38,6 @@ pub enum OutputSource {
         /// The value when the state has none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         default: Option<String>,
-    },
-    /// A value known when the files were generated.
-    Static {
-        /// The value.
-        value: String,
     },
 }
 

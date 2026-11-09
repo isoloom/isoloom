@@ -237,8 +237,6 @@ pub struct Recovery {
 pub enum ExpiryUnit {
     /// Seconds since the Unix epoch.
     UnixSeconds,
-    /// Minutes from the apply.
-    MinutesFromNow,
 }
 
 /// Runs that stop themselves (cloud auto-stop): the runner computes the expiry when it applies,

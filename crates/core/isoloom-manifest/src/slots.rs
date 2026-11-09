@@ -38,8 +38,6 @@ pub enum TfVarShape {
 pub enum StateFileFormat {
     /// A Terraform variable file in JSON.
     TfvarsJson,
-    /// `NAME=value` lines.
-    Dotenv,
 }
 
 /// How a value reaches a guest.
@@ -48,10 +46,6 @@ pub enum StateFileFormat {
 pub enum Transport {
     /// Plain SSH with the runner's key.
     Ssh,
-    /// `vagrant ssh`.
-    VagrantSsh,
-    /// WinRM.
-    Winrm,
 }
 
 /// Where a value goes. Never a command-line argument.
@@ -136,8 +130,6 @@ pub enum SlotKind {
     Secret,
     /// What reaches the server or cloud account (a password, a token, keys).
     Connection,
-    /// Made once per run by the runner and kept in its state.
-    Generated,
 }
 
 /// One of Isoloom's secret stores.

@@ -92,6 +92,10 @@ stable spec format.
   and `Error::Unpaired`.** They described choosing a CM tool per target (`--configure`,
   `overrides.<target>.configure`), which no command or spec key ever offered: each target renders
   its machines' configuration its own way.
+- **Run manifest values Isoloom never writes**: the `vagrant_ssh` and `winrm` transports of a
+  guest delivery, the `dotenv` state-file format, the `generated` slot kind, the `ssh` and
+  `credential` output roles, the `static` output source and the `minutes_from_now` expiry unit
+  (`schemas/run-manifest-v0.schema.json` regenerated). A manifest holding one is refused.
 
 ## [1.0.9] — 2026-11-08
 
