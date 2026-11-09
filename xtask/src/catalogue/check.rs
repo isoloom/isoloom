@@ -15,7 +15,7 @@ use isoloom_catalogue::{CaseName, Catalogue, Entry, Release, Version, pick};
 use isoloom_spec::syntax::OsRef;
 
 use super::harness::{self, Harness};
-use crate::{Res, process, repo};
+use crate::{Res, repo};
 
 /// The arguments of `cargo xtask catalogue check`.
 #[derive(clap::Args)]
@@ -35,9 +35,9 @@ pub(crate) struct Args {
     #[arg(long)]
     case: Vec<String>,
     /// The runner's command line: one that takes `up`, `check --json` and `down` with
-    /// `--target`, `--name`, `--home` and `--provider` (default: `isothrum` on `PATH`).
+    /// `--target`, `--name`, `--home` and `--provider`.
     #[arg(long)]
-    runner: Option<PathBuf>,
+    runner: PathBuf,
     /// The Vagrant provider of the VM form (default: `virtualbox`, `libvirt` on Linux).
     #[arg(long)]
     provider: Option<String>,
@@ -78,10 +78,7 @@ pub(crate) fn run(args: &Args) -> Res<ExitCode> {
     };
     let harness = Harness {
         isoloom: harness::isoloom(&root)?,
-        runner: args
-            .runner
-            .clone()
-            .unwrap_or_else(|| process::program("isothrum", &std::env::var_os("PATH").unwrap_or_default()).into()),
+        runner: args.runner.clone(),
         work: repo::target_dir(&root).join("catalogue-check").join(entry.name().as_str()),
         provider: args
             .provider
