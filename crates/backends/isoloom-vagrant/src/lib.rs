@@ -43,7 +43,7 @@ mod error;
 mod host_folders;
 pub mod hybrid;
 mod manifest;
-pub mod ruby;
+mod ruby;
 #[cfg(test)]
 mod testing;
 mod vagrantfile;
@@ -52,5 +52,7 @@ mod vms;
 pub use backend::VagrantBackend;
 pub use error::{Error, Result};
 pub use host_folders::docker_vm_refusal;
+/// A Ruby string literal holding any text, as every Vagrantfile string is written.
+pub use ruby::quote as ruby_quote;
 pub use vms::network_name;
 pub use vms::provider::{disk_refusal, provider_refusal};
