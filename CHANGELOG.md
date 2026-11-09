@@ -12,6 +12,21 @@ stable spec format.
 
 ### Added
 
+- **`isoloom generate` removes the files it no longer writes, and `isoloom check` reports them.**
+  A lab that stopped allowing a target (a Debian machine made Windows: `docker`, `docker-vm`,
+  `cloud-docker`, `kubernetes` and four clouds' `cloud-vm`) kept that target's old files and
+  `run.json`, and `check` passed. `generate` now lists what it wrote in `.isoloom/.generated` and
+  removes a listed file it no longer writes (every target's under `.isoloom/`; with `--target`,
+  that target's folder only), then a folder that leaves empty; `check` fails on such a file.
+  Isoloom owns exactly the listed files: what a runner or its tools write there
+  (`.terraform.lock.hcl`, `.isoloom-reach/`, `.vagrant/`) stays, and so does its folder.
+- **The library takes the person's regions like the image table** (`Lab::with_regions`, from
+  `Defaults::regions`; `Lab::plan`, `Environment::regions`), and says each cloud's built-in one
+  (`isoloom_targets::default_regions`). Also: `isoloom_spec::MachineSize` (a machine's size in a
+  form), `isoloom_render::run_manifest::{machine, resources, secret_source}`,
+  `MachinePlan::{reads_input, reads_input_file}`, `isoloom_plan::routing::{forwarding,
+  routes_ipv6}`, `isoloom_spec::windows::esxi_guest_os`, `isoloom_terraform::hcl_quote` and
+  `isoloom_targets::Error::Instance`.
 - **`isoloom validate` shows the spec's warnings**: a daemon a recipe installs with no `service`
   step for it, a `seal: best-effort` machine. Each reads `! warning: <field>` with its reason and
   fix, and `--json` lists them under `warnings`; they never fail validation. They were worked out
@@ -46,6 +61,31 @@ stable spec format.
 
 ### Changed
 
+- **A machine's size follows one rule everywhere**: its `resources`, each field left out the
+  default of the form it runs as (a container 1 CPU, 512 MB, 5 GB; a VM 1 CPU, 1024 MB, 20 GB).
+  Every lab machine of a run manifest carries `machines[].resources` as it runs on that target
+  (Compose set it only when the spec did, Vagrant always with the VM defaults, Terraform never),
+  and `resolved.json` gives a machine's size in each of its forms, `resources.docker` and
+  `resources.vm` (it gave every machine the VM defaults): **`resolved_version` is 4**. The spec's
+  docs say so.
+- **An input read as a file is the input's own slot on every target**: on `cloud-vm` it was a
+  secret slot named `input-<name>`; it is the slot `<INPUT>` of kind `input`, delivered over SSH to
+  the machines reading it as a file (and an entry of the module's `inputs` for those reading it in
+  their environment). A VM keeps its value under the input's name
+  (`/var/lib/isoloom/secrets/<INPUT>`, was `input-<name>`). A `cloud-vm` secret slot names its
+  store and is required, as on `docker` and `vagrant`.
+- **Every Kubernetes object carries `app.kubernetes.io/managed-by: isoloom`**, as Compose's
+  containers carry `isoloom.managed` and the clouds' resources `managed-by`. Google Cloud's project
+  of its own and Linode's firewalls carry the environment's labels and tags.
+- **The controller is `isoloom-controller` in Proxmox's and ESXi's run manifests and `checks`
+  output** (was `controller`), as on the clouds.
+- **`docker-vm`'s `up` provisions `nat-route` first** (`--provision-with nat-route,docker,...`),
+  and every Linux VM of the Vagrant target has that provisioner first: see Fixed.
+- The run manifest's `entry` output role is "the address a user opens first", and a dormant port
+  "one nothing listens on until something in the machine starts it" (schemas regenerated).
+- CI's `check` job runs the quality ratchet, as the release gate does; its `terraform` job
+  validates the ESXi modules and the cloud-services module too. `publish-crates.yml` pins
+  `actions/checkout` and `rust-lang/crates-io-auth-action` to commit SHAs.
 - **`isoloom check` checks what `isoloom generate` writes**: a profile's pinned target, or the one
   `--target` names (new), else every target. A target asked for that refuses the lab fails.
 - **A cloud refuses a machine bigger than its largest size**, naming the machine, the memory it
@@ -157,6 +197,37 @@ stable spec format.
 
 ### Fixed
 
+- **A default region reached `main.tf` but not the run**: `isoloom generate` rewrote a cloud
+  module's text for the region in the person's defaults while `run.json`'s `region` param kept the
+  built-in one, which a runner hands Terraform. The lab now writes the region into the module's
+  variable and the param alike.
+- **Proxmox refuses secrets and inputs as files**: its machine waited half an hour for a delivery
+  the run manifest had no slot for, then failed. A Proxmox machine sits behind its router, which
+  guest delivery doesn't go through, so nothing could deliver them (as on ESXi). An input in a
+  machine's environment still reaches it.
+- **Proxmox and ESXi run checks from a Linux VM or the controller**: a position's checks ran on
+  its machine whatever its OS (mixed-office's piped `sh -s` into a Windows Server), and the
+  networks' from the first VM, Windows or not. The rule is the clouds': the machine when it is a
+  Linux VM, else the controller, else the first Linux VM.
+- **DigitalOcean and Linode pick a size that fits the disk too** (a 50 GB disk got a 25 GB
+  droplet), and refuse a disk larger than their largest size's, naming the machine and the size.
+- **`cloud-docker` refuses containers that need more memory than the largest Docker host**
+  (16 GB), naming the container that asks for the most; they got that host all the same.
+- **On UTM, a Linux VM's internet goes through UTM's shared network**: vagrant_utm gives a VM
+  UTM's shared network and the plugin's emulated one (QEMU user mode, `10.0.2.0/24`), both with a
+  DHCP default route at the same metric, and Linux picked the emulated one, about 12 times slower
+  (an image pull of a gigabyte took over half an hour in `docker-vm`'s VM). A `nat-route`
+  provisioner, first and at every `up`, gives the emulated card's default route metric 200, now
+  and in the guest's network configuration (NetworkManager, systemd-networkd or ifupdown); SSH
+  and forwarded ports still use it. It does nothing on the other providers or without a second
+  default route.
+- **A gateway forwards IPv6 when the lab routes it**, on every VM target (it forwarded IPv4 only
+  outside Compose); its forwarding is a plan step every VM backend renders, and routers and
+  gateways decide IPv6 by one rule.
+- **`isoloom_targets::resolved::resolve_with` fails for an instance the lab can't be** (library):
+  it returned the lab as written while its snapshot said `"instance": n`.
+- **`isoloom-catalogue` fails to build without its catalogue folder** instead of embedding an
+  empty catalogue.
 - **A cloud VM keeps its set-up across every reboot**: its set-up unit stays enabled, and at
   every boot it schedules the run's expiry again and brings back what a restart undoes (extra
   interfaces, routes, the inputs file); it used to stop first once the set-up was done. A
@@ -228,6 +299,13 @@ stable spec format.
 
 ### Removed
 
+- **Library items replaced or nothing outside their crate used**:
+  `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}` (the lab takes
+  the regions: `Lab::with_regions`) and `isoloom_spec::files` (`GeneratedFile` is
+  `isoloom_render`'s, re-exported by `isoloom-targets` as before);
+  `isoloom_targets::resolved::{render_message_at, HostPort}`. `isoloom_terraform::hcl_builder`
+  (use `hcl_quote`), `isoloom_targets::tiers::os_id` and the `isoloom_render::more_addresses`
+  re-export are crate-internal.
 - **Library items nothing outside their crate used** (this round): the HCL builder moved from
   `isoloom-render` into `isoloom-terraform` (`isoloom_terraform::hcl_builder`), Ruby's quoting
   into `isoloom-vagrant` (`isoloom_vagrant::ruby_quote`); `isoloom_render::configure::{powershell,
