@@ -13,7 +13,7 @@ use crate::requirements::Requirement;
 
 /// The step placing `m`'s files, when it has any.
 #[must_use]
-pub fn step(m: &Machine) -> Option<Step> {
+pub(crate) fn step(m: &Machine) -> Option<Step> {
     (!m.files.is_empty()).then(|| Step::Files { files: m.files.clone() })
 }
 
@@ -34,7 +34,7 @@ pub fn reads_project(lifecycle: &[Step]) -> bool {
 /// container's project file with its own owner or mode (Compose mounts a project file as it
 /// is), a file on an existing host (Isoloom writes nothing there). At most one of each kind,
 /// the first machine that asks.
-pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+pub(crate) fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
     let mut out = Vec::new();
     let owned = spec
         .machines

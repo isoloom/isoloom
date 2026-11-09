@@ -53,7 +53,7 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
 
 /// The Dockerfile of machine `c`'s image, from `base`, running `process`.
 #[must_use]
-pub fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> String {
+pub(crate) fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> String {
     let library = if super::uses_library(c.recipe()) {
         format!("COPY {} {LIBRARY}\n", shell::LIBRARY_PATH)
     } else {

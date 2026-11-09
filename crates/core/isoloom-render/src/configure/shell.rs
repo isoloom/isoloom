@@ -36,7 +36,7 @@ pub(crate) fn library_file() -> GeneratedFile {
 /// reboot ran before it in this apply, so nothing has changed yet; otherwise one may have, and
 /// the services after it restart (the rule errs on restarting).
 #[must_use]
-pub fn script(c: &Configured<'_>, resources: &[Resource], fresh: bool) -> String {
+pub(crate) fn script(c: &Configured<'_>, resources: &[Resource], fresh: bool) -> String {
     let calls: String = resources
         .iter()
         .filter_map(|r| call(c, r))
@@ -122,7 +122,7 @@ fn called(text: &str) -> BTreeSet<String> {
 /// for a step the library doesn't run (a script, a reboot, a playbook: the set-up's own steps)
 /// or one with nothing to do (no port to open).
 #[must_use]
-pub fn call(c: &Configured<'_>, r: &Resource) -> Option<String> {
+pub(crate) fn call(c: &Configured<'_>, r: &Resource) -> Option<String> {
     let line = match r {
         Resource::Repository(p) => repository(p),
         Resource::Packages(ps) => words(

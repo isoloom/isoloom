@@ -394,7 +394,7 @@ impl Environment {
 
 /// Whether the target runs the environment on Docker's networks (their Docker blocks).
 #[must_use]
-pub fn on_docker(target: Target) -> bool {
+pub(crate) fn on_docker(target: Target) -> bool {
     matches!(target, Target::Docker | Target::Hosted)
 }
 

@@ -20,7 +20,7 @@ use serde_yaml_ng::{Mapping, Value};
 use crate::syntax::{Code, FieldPath, Problem};
 
 /// The highest `count`.
-pub const MAX: u8 = 99;
+pub(crate) const MAX: u8 = 99;
 
 fn key(s: &str) -> Value {
     Value::String(s.to_owned())
@@ -28,7 +28,7 @@ fn key(s: &str) -> Value {
 
 /// A clone's name.
 #[must_use]
-pub fn name(base: &str, index: u8) -> String {
+pub(crate) fn name(base: &str, index: u8) -> String {
     format!("{base}-{index:02}")
 }
 
@@ -42,7 +42,7 @@ type Clones = IndexMap<String, Vec<String>>;
 ///
 /// An `invalid-value` [`Problem`] at the field: a `count` that isn't 2 to [`MAX`], a count on
 /// the access machine, or a network's `gateway` or `switch` naming a counted machine.
-pub fn expand(doc: &mut Value) -> Result<Clones, Problem> {
+pub(crate) fn expand(doc: &mut Value) -> Result<Clones, Problem> {
     let Value::Mapping(top) = doc else { return Ok(Clones::new()) };
     let Some(Value::Mapping(machines)) = top.get(key("machines")).cloned() else {
         return Ok(Clones::new());

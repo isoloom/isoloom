@@ -43,7 +43,7 @@ pub enum OutsideAddress {
 
 /// The spec's outside networks, in spec order.
 #[must_use]
-pub fn networks(spec: &Spec) -> IndexMap<String, OutsideNetwork> {
+pub(crate) fn networks(spec: &Spec) -> IndexMap<String, OutsideNetwork> {
     spec.networks
         .iter()
         .filter_map(|(name, n)| {
@@ -59,7 +59,7 @@ pub fn networks(spec: &Spec) -> IndexMap<String, OutsideNetwork> {
 
 /// Machine `m`'s addresses on the outside networks it joins, in its order.
 #[must_use]
-pub fn addresses(spec: &Spec, m: &Machine) -> IndexMap<String, OutsideAddress> {
+pub(crate) fn addresses(spec: &Spec, m: &Machine) -> IndexMap<String, OutsideAddress> {
     m.networks
         .iter()
         .filter_map(|(net, octet)| {
@@ -77,7 +77,7 @@ pub fn addresses(spec: &Spec, m: &Machine) -> IndexMap<String, OutsideAddress> {
 /// The spec without its outside networks, as the rest of the plan and the backends read it:
 /// the networks gone, and gone from each machine's list.
 #[must_use]
-pub fn without(spec: &Spec) -> Spec {
+pub(crate) fn without(spec: &Spec) -> Spec {
     let mut s = spec.clone();
     s.networks.retain(|_, n| !n.is_outside());
     for m in s.machines.values_mut() {
@@ -89,7 +89,7 @@ pub fn without(spec: &Spec) -> Spec {
 /// What the outside networks ask of a backend: joining an existing network, bridging a host
 /// interface. At most one of each, the first network that asks.
 #[must_use]
-pub fn requirements(spec: &Spec) -> Vec<Requirement> {
+pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
     if let Some((network, n)) = spec.networks.iter().find(|(_, n)| n.external.is_some()) {
         out.push(Requirement::ExternalNetwork {

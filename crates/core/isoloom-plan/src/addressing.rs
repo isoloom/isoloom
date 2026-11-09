@@ -38,7 +38,7 @@ pub fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
 /// The host's own address on a network (Docker's bridge): the gateway address, unless a
 /// machine is the network's gateway; then the router's address, unused on such networks.
 #[must_use]
-pub fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
+pub(crate) fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
     let block = cidr(spec, network);
     if spec.networks.get(network).is_some_and(|n| n.gateway.is_some()) {
         block.router()
@@ -51,7 +51,7 @@ pub fn host_address(spec: &Spec, network: &str) -> Ipv4Addr {
 /// any, else `to`'s first address. `0.0.0.0` when `to` has none: it is on no network (or isn't
 /// a machine of the spec, which validation refuses wherever a machine is named).
 #[must_use]
-pub fn address_for(spec: &Spec, from: &str, to: &str) -> Ipv4Addr {
+pub(crate) fn address_for(spec: &Spec, from: &str, to: &str) -> Ipv4Addr {
     let shared = |n: &str| spec.machines.get(from).is_some_and(|a| a.networks.contains_key(n));
     let Some(b) = spec.machines.get(to) else {
         return Ipv4Addr::UNSPECIFIED;

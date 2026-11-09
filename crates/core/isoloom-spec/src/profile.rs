@@ -85,7 +85,7 @@ fn valid_name(name: &str) -> bool {
 ///
 /// [`Error::ProfileName`] for a name that isn't kebab-case, [`Error::NoProfile`] (with the
 /// project's profiles) when there is no such file, [`Error::TwoProfiles`] when both exist.
-pub fn path(project: &Path, name: &str) -> Result<PathBuf> {
+pub(crate) fn path(project: &Path, name: &str) -> Result<PathBuf> {
     if !valid_name(name) {
         return Err(Error::ProfileName(name.to_owned()));
     }
@@ -129,7 +129,7 @@ pub fn list(project: &Path) -> Vec<String> {
 ///
 /// # Errors
 ///
-/// As [`path`], then [`Error::Read`] for a file that can't be read, then as [`parse`].
+/// As `path` (the profile file, refused when its name or place is wrong), then [`Error::Read`] for a file that can't be read, then as [`parse`].
 pub fn load(project: &Path, name: &str) -> Result<Profile> {
     let path = path(project, name)?;
     let text = std::fs::read_to_string(&path).map_err(|source| Error::Read { path: path.clone(), source })?;

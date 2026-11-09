@@ -12,7 +12,7 @@ use crate::requirements::Requirement;
 /// What the machines' own boots ask of the backend: the first VM that sets `vm.boot`. A
 /// container or an existing host boots its own way whatever the spec says, so only VMs count.
 #[must_use]
-pub fn requirements(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
+pub(crate) fn requirements(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
     machines
         .iter()
         .find(|(_, mp)| mp.shape == MachineShape::Vm && mp.boot.is_some())

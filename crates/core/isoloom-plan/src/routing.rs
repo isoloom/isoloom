@@ -90,7 +90,7 @@ pub fn routes(spec: &Spec, name: &str, m: &Machine) -> Vec<(String, Ipv4Addr)> {
 /// A machine is offline when none of its networks reaches the internet and no gateway
 /// decides for it.
 #[must_use]
-pub fn offline(spec: &Spec, name: &str, m: &Machine) -> bool {
+pub(crate) fn offline(spec: &Spec, name: &str, m: &Machine) -> bool {
     !m.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.internet)) && default_gateway(spec, name, m).is_none()
 }
 

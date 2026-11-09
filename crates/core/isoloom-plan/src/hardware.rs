@@ -101,7 +101,7 @@ impl Need {
 /// What the machines' hardware asks of the backend: one requirement per machine and need, in
 /// machine order. `shape` is each machine's shape on the target; an existing or supplied
 /// machine asks nothing (it is used as it is).
-pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+pub(crate) fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
     let mut out = Vec::new();
     for (name, m) in &spec.machines {
         let needs: &[(bool, Need, Need)] = &[

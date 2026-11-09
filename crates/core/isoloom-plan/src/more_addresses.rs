@@ -44,7 +44,7 @@ pub fn of(spec: &Spec, m: &Machine) -> IndexMap<String, Vec<Ipv4Addr>> {
 
 /// The set-up step that adds them, when the machine has any.
 #[must_use]
-pub fn step(spec: &Spec, m: &Machine) -> Option<Step> {
+pub(crate) fn step(spec: &Spec, m: &Machine) -> Option<Step> {
     let addresses: Vec<MoreAddresses> = of(spec, m)
         .into_iter()
         .filter_map(|(n, more)| {
@@ -61,7 +61,7 @@ pub fn step(spec: &Spec, m: &Machine) -> Option<Step> {
 /// What they ask of the backend: for each shape the target gives such machines, the first
 /// machine with several addresses on a network. A VM's and a container's ask for different
 /// things, so a target running both (`hybrid`) is asked about each.
-pub fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+pub(crate) fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
     let mut out: Vec<Requirement> = Vec::new();
     for (name, m) in &spec.machines {
         let network = m.more_addresses.iter().find(|(_, o)| !o.is_empty()).map(|(n, _)| n.clone());

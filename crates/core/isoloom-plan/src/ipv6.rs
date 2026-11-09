@@ -63,7 +63,7 @@ pub fn only(spec: &Spec, network: &str) -> bool {
 /// The IPv6 address a machine at `octet` has on a network, when the network is IPv6 and its
 /// addresses are derived (with `auto`, the target picks it).
 #[must_use]
-pub fn address(spec: &Spec, network: &str, octet: u8) -> Option<Ipv6Addr> {
+pub(crate) fn address(spec: &Spec, network: &str, octet: u8) -> Option<Ipv6Addr> {
     let v6 = spec.networks.get(network)?.ipv6.as_ref()?;
     if v6.addresses != Ipv6Addresses::Static {
         return None;
@@ -87,7 +87,7 @@ pub fn router_address(spec: &Spec, network: &str) -> Option<Ipv6Addr> {
 
 /// The router's IPv6 addresses, on each IPv6 network it routes (empty without a router).
 #[must_use]
-pub fn router(spec: &Spec) -> IndexMap<String, Ipv6Addr> {
+pub(crate) fn router(spec: &Spec) -> IndexMap<String, Ipv6Addr> {
     if !routing::needed(spec) {
         return IndexMap::new();
     }
@@ -98,7 +98,7 @@ pub fn router(spec: &Spec) -> IndexMap<String, Ipv6Addr> {
 /// its first IPv6 network the router is on. Gateway networks carry no IPv6 (validated), so the
 /// router is the only next hop.
 #[must_use]
-pub fn routes(spec: &Spec, m: &Machine) -> Vec<Route6> {
+pub(crate) fn routes(spec: &Spec, m: &Machine) -> Vec<Route6> {
     let router = router(spec);
     let Some(via) = m.networks.keys().find_map(|n| router.get(n)) else {
         return Vec::new();
@@ -144,7 +144,7 @@ pub(crate) fn no_auto_addresses(f: &mut fmt::Formatter<'_>, network: &str) -> fm
 /// What the IPv6 networks ask of a backend: IPv6 at all, IPv6-only networks, addresses the
 /// target hands out. At most one of each kind, naming the first network that asks.
 #[must_use]
-pub fn requirements(spec: &Spec) -> Vec<Requirement> {
+pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
     let first = |pick: fn(&isoloom_spec::model::Ipv6) -> bool| {
         spec.networks
             .iter()

@@ -37,7 +37,7 @@ pub struct Record {
 
 /// The zone of `spec`, when `dns.private` is on.
 #[must_use]
-pub fn plan(spec: &Spec) -> Option<PrivateDns> {
+pub(crate) fn plan(spec: &Spec) -> Option<PrivateDns> {
     let domain = spec.private_domain()?;
     let mut records = Vec::new();
     for (name, m) in &spec.machines {
@@ -70,7 +70,7 @@ pub(crate) fn with_domain(spec: &Spec, names: Vec<String>) -> Vec<String> {
 
 /// What the zone asks of a backend: names it serves itself, by its DNS or each VM's hosts file.
 #[must_use]
-pub fn requirements(spec: &Spec) -> Option<Requirement> {
+pub(crate) fn requirements(spec: &Spec) -> Option<Requirement> {
     spec.private_domain().map(|domain| Requirement::PrivateDns { domain })
 }
 

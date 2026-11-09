@@ -9,7 +9,7 @@ use crate::requirements::Requirement;
 
 /// The first network with an `mtu`, then the first machine with a `rate_limit`.
 #[must_use]
-pub fn requirements(spec: &Spec) -> Vec<Requirement> {
+pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
     let mtu = spec.networks.iter().find(|(_, n)| n.mtu.is_some());
     let rate = spec.machines.iter().find(|(_, m)| m.rate_limit.is_some());
     mtu.map(|(n, _)| Requirement::NetworkMtu { network: n.clone() })

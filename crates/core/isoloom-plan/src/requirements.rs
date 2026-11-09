@@ -433,7 +433,7 @@ pub fn refusal(requirements: &[Requirement], caps: &Capabilities) -> Option<Refu
 
 /// Everything `spec` requires, most fundamental first.
 #[must_use]
-pub fn of(spec: &Spec) -> Vec<Requirement> {
+pub(crate) fn of(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
     if !spec.provision.is_empty() {
         out.push(Requirement::EnvironmentProvisioning);
@@ -522,7 +522,7 @@ pub(crate) fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineSh
 /// The first VM that requires a TPM (`vm.tpm: true`); one Windows 11 merely expects is given
 /// where the target can, so it requires nothing.
 #[must_use]
-pub fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
+pub(crate) fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
     machines
         .iter()
         .find(|(_, m)| m.shape == MachineShape::Vm && m.tpm == Some(Tpm::Required))

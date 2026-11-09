@@ -5,7 +5,7 @@
 //! VM targets, the user on the `external` target). It reaches the same end state as the shell
 //! library, so the forms stay equal; the resource conformance harness proves it.
 //!
-//! - [`project`]: an environment's whole Ansible project (`site.yml`, the roles, and
+//! - `project`: an environment's whole Ansible project (`site.yml`, the roles, and
 //!   `requirements.yml` when a role names a pinned collection), under a target's folder.
 //! - [`role_files`] and `role_name`: one machine's role, which the conformance harness renders
 //!   and runs on its own.
@@ -37,7 +37,7 @@ const PROJECT_VAR: &str = "{{ (playbook_dir + '/../..') | realpath }}";
 /// each host's role, the roles themselves, and `requirements.yml` when a role names a pinned
 /// collection. A host without a recipe (a bare user machine) gets no role and no play.
 #[must_use]
-pub fn project(env: &Environment, base: &str) -> Vec<GeneratedFile> {
+pub(crate) fn project(env: &Environment, base: &str) -> Vec<GeneratedFile> {
     let configured: Vec<(String, Configured<'_>)> = hosts(env)
         .into_iter()
         .filter_map(|h| Some((h.name.to_owned(), Configured::of(env, h.name)?)))

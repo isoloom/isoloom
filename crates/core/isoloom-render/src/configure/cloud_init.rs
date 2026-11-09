@@ -3,7 +3,7 @@
 //! entry (gzip then base64, `encoding: gz+b64`) and run from `runcmd` at the step's place in the
 //! machine's set-up.
 //!
-//! **Parity by construction.** The script is exactly [`shell::script`]'s output, the same text a
+//! **Parity by construction.** The script is exactly `shell::script`'s output, the same text a
 //! Linux VM's shell set-up runs. cloud-init only delivers it compressed and runs it, so it leaves
 //! exactly the state the shell renderer leaves. The resource conformance harness proves it by
 //! running real cloud-init (`cargo xtask conformance --renderer cloud-init`): cloud-init writes
@@ -59,7 +59,7 @@ pub struct Configure {
 }
 
 /// The `index`-th configure run of machine `c`, its `resources` and `fresh` flag as the shell
-/// renderer takes them (see [`shell::script`]): the script compressed into a `write_files` entry
+/// renderer takes them (see `shell::script`): the script compressed into a `write_files` entry
 /// and the `runcmd` that runs it. A machine's runs are numbered from 0, in set-up order.
 #[must_use]
 pub fn configure(c: &Configured<'_>, resources: &[Resource], fresh: bool, index: usize) -> Configure {

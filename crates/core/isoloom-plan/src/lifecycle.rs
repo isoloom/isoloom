@@ -174,7 +174,7 @@ pub enum RunKind {
 
 /// The set-up steps of VM `name`, its configuration resolved as `recipe`.
 #[must_use]
-pub fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) -> MachineLifecycle {
+pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) -> MachineLifecycle {
     let mut steps = vec![Step::Prelude];
     if m.resources.and_then(|r| r.disk_gb).is_some() {
         steps.push(Step::DiskGrow);

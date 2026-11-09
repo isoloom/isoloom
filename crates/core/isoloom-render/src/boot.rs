@@ -2,7 +2,7 @@
 //! egress rules) changes kernel state a reboot forgets; a VM backend whose machines restart
 //! (a `reboot` step, `vagrant reload`, a stopped cloud VM) wraps it with [`at_boot`] so it is
 //! applied now and again at every boot. A machine's own command and `before` steps run the same
-//! way, as a [`service`].
+//! way, as a `service`.
 
 use isoloom_spec::shell::quote;
 

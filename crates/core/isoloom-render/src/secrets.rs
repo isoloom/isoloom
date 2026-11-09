@@ -56,7 +56,7 @@ fn receive(names: &[String], files: &[SecretFile]) -> String {
 /// Each kept secret copied to its path, with its owner and mode (root and [`VM_DEFAULT_MODE`]
 /// unless the spec says), its folder made when missing.
 #[must_use]
-pub fn place(files: &[SecretFile]) -> String {
+pub(crate) fn place(files: &[SecretFile]) -> String {
     files
         .iter()
         .map(|f| {
@@ -76,7 +76,7 @@ pub fn place(files: &[SecretFile]) -> String {
 /// Waits for the delivery mark, saying so once; fails after `DELIVERY_TIMEOUT` seconds with
 /// what to do. `who` names the machine in the messages.
 #[must_use]
-pub fn wait(who: &str) -> String {
+pub(crate) fn wait(who: &str) -> String {
     let (waiting, missing) = messages(who);
     format!("{}\n", crate::steps::wait_for_mark(DELIVERED, DELIVERY_TIMEOUT, &waiting, &missing))
 }
@@ -92,7 +92,7 @@ fn messages(who: &str) -> (String, String) {
 
 /// A VM's `Secrets` step: the wait, then its files put in place now and at every boot.
 #[must_use]
-pub fn step(machine: &str, files: &[SecretFile]) -> String {
+pub(crate) fn step(machine: &str, files: &[SecretFile]) -> String {
     format!("set -e\n{}{}", wait(machine), placed(files))
 }
 

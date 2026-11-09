@@ -43,7 +43,7 @@ Set-Acl -Path $p -AclObject $acl }";
 
 /// The path of a secret file on Windows: a drive path as it is, a path from `/` on drive C:.
 #[must_use]
-pub fn path(p: &str) -> String {
+pub(crate) fn path(p: &str) -> String {
     if is_drive_path(p) {
         p.to_owned()
     } else {
@@ -73,7 +73,7 @@ fn receive(names: &[String], files: &[SecretFile]) -> String {
 /// empty and limited to SYSTEM and Administrators before the value is written into it, so it
 /// never holds the value with its folder's (wider) access list.
 #[must_use]
-pub fn place(files: &[SecretFile]) -> String {
+pub(crate) fn place(files: &[SecretFile]) -> String {
     let set: String = files
         .iter()
         .map(|f| format!("Set-IsoloomSecret {} {}\n", powershell::quote(&f.name), powershell::quote(&path(&f.path))))
@@ -91,7 +91,7 @@ pub fn place(files: &[SecretFile]) -> String {
 /// Waits for the delivery mark, saying so once; fails after
 /// `DELIVERY_TIMEOUT` seconds with what to do.
 #[must_use]
-pub fn wait(who: &str) -> String {
+pub(crate) fn wait(who: &str) -> String {
     let (waiting, missing) = super::messages(who);
     let (waiting, missing) = (powershell::quote(&waiting), powershell::quote(&missing));
     format!(
@@ -104,7 +104,7 @@ pub fn wait(who: &str) -> String {
 /// A Windows VM's `Secrets` step: the wait, then the placing script written, registered as a
 /// startup task (as SYSTEM) and run now.
 #[must_use]
-pub fn step(machine: &str, files: &[SecretFile]) -> String {
+pub(crate) fn step(machine: &str, files: &[SecretFile]) -> String {
     format!("{}{}", wait(machine), placed(files))
 }
 
@@ -124,7 +124,7 @@ fn placed(files: &[SecretFile]) -> String {
 /// (Vagrant's provisioner environment over WinRM): each of `values`, a secret's name and the
 /// variable holding its value in base64 (PowerShell never expands anything in it), kept in the
 /// SYSTEM- and Administrators-only folder and the delivery marked; then the placing script
-/// written, registered and run, as [`step`] does. Nothing waits. An empty or unset variable
+/// written, registered and run, as `step` does. Nothing waits. An empty or unset variable
 /// writes an empty value the first time, and keeps the value already kept after.
 #[must_use]
 pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> String {

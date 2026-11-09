@@ -41,7 +41,7 @@ pub struct Field {
 
 /// Every field of `schema` (the output of [`crate::schema::schema`]), in the schema's
 /// order: a field, then the fields inside it.
-pub fn fields(schema: &Value) -> Vec<Field> {
+pub(crate) fn fields(schema: &Value) -> Vec<Field> {
     let empty = Map::new();
     let walker = Walker {
         defs: schema.get("$defs").and_then(Value::as_object).unwrap_or(&empty),

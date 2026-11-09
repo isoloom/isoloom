@@ -2,11 +2,11 @@
 //! renders a machine's resolved recipe
 //! ([`Recipe`], on the plan) and nothing else.
 //!
-//! - [`shell`]: the POSIX library and a recipe's calls, for a Linux VM's set-up and every
+//! - `shell`: the POSIX library and a recipe's calls, for a Linux VM's set-up and every
 //!   generated Dockerfile (cloud-init carries the VM's script).
 //! - [`cloud_init`]: the same shell script, delivered in a cloud-config `write_files` entry
 //!   (gzip then base64) and run from `runcmd`, for the targets that hand a VM its user data.
-//! - [`powershell`]: the PowerShell library and a recipe's calls, for a Windows VM's set-up.
+//! - `powershell`: the PowerShell library and a recipe's calls, for a Windows VM's set-up.
 //! - [`dockerfile`]: the image a container builds from its recipe, its process Isoloom's
 //!   `supervisor` when it runs services.
 //! - [`files`]: the files they add to a target's: the Dockerfiles, the libraries, the supervisors and
@@ -23,8 +23,8 @@ use crate::GeneratedFile;
 pub mod cloud_init;
 pub mod dockerfile;
 mod password;
-pub mod powershell;
-pub mod shell;
+pub(crate) mod powershell;
+pub(crate) mod shell;
 pub(crate) mod supervisor;
 mod units;
 

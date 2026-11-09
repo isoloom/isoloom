@@ -32,7 +32,7 @@ pub(crate) fn library_file() -> GeneratedFile {
 /// A Windows VM's set-up step for `resources` (see [`super::shell::script`]): the library, then
 /// each step's call, from the project folder, stopping at the first error.
 #[must_use]
-pub fn script(c: &Configured<'_>, resources: &[Resource], fresh: bool) -> String {
+pub(crate) fn script(c: &Configured<'_>, resources: &[Resource], fresh: bool) -> String {
     let calls: String = resources.iter().filter_map(|r| call(c, r)).collect();
     let mark = if fresh {
         "Remove-Item -LiteralPath $env:ISOLOOM_CHANGED -Force -ErrorAction SilentlyContinue"
@@ -46,7 +46,7 @@ pub fn script(c: &Configured<'_>, resources: &[Resource], fresh: bool) -> String
 /// Step `r`'s call(s), one per line; `None` for a step the library doesn't run (a script, a
 /// reboot, a playbook) or one Windows can't carry (a repository: lowering refuses it).
 #[must_use]
-pub fn call(c: &Configured<'_>, r: &Resource) -> Option<String> {
+pub(crate) fn call(c: &Configured<'_>, r: &Resource) -> Option<String> {
     let line = match r {
         Resource::Packages(ps) => format!("Install-IsoloomFeature -Name {}", list(ps.iter().map(|p| p.name.to_string()))),
         Resource::Copy(cp) => format!("Copy-IsoloomItem -From {} -To {}", quote(cp.from.as_str()), quote(cp.to.as_str())),

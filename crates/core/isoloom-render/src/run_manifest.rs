@@ -259,7 +259,7 @@ pub fn port(label: &str, p: &model::Port, published: &[PublishedPort], address: 
 /// # Errors
 ///
 /// Fails on a name the manifest refuses.
-pub fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
+pub(crate) fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
     Ok(Machine {
         name: Name::parse(name)?,
         role,

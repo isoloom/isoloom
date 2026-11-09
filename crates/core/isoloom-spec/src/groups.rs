@@ -141,7 +141,7 @@ pub fn members(spec: &Spec, group: &str) -> Vec<String> {
 /// # Errors
 ///
 /// An `invalid-value` [`Problem`] when `common:`, `groups:` or a group isn't a mapping.
-pub fn expand(doc: &mut Value) -> Result<(), Problem> {
+pub(crate) fn expand(doc: &mut Value) -> Result<(), Problem> {
     let Value::Mapping(top) = doc else { return Ok(()) };
     let common = common_of(top)?;
     let groups = groups_of(top)?;
@@ -232,7 +232,7 @@ fn merged(own: &Mapping, common: &Mapping, mine: &[&str], groups: &Groups) -> Va
 
 /// The groups' problems: a reserved or taken name, a member that names nothing, a cycle.
 #[must_use]
-pub fn problems(spec: &Spec) -> Vec<validate::Problem> {
+pub(crate) fn problems(spec: &Spec) -> Vec<validate::Problem> {
     let membership = Membership::of_spec(spec);
     let invalid = |at: String, message: String| validate::Problem::new(Code::InvalidValue, at, message);
     let mut out = Vec::new();

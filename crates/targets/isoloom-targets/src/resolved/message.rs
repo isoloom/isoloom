@@ -23,7 +23,7 @@ pub fn render_message(lab: &Lab, instance: Option<u8>) -> Result<Option<String>>
 
 /// The message as it reads where the environment runs on `target`: on the targets that run
 /// the Compose file, machines are at their Docker addresses, so `machines.<m>.addresses` is
-/// filled with those (see [`on_target`]).
+/// filled with those (see `on_target`).
 ///
 /// # Errors
 ///
@@ -93,7 +93,7 @@ fn with_port(url: &str, host: u16) -> String {
 /// really has there (they differ when the spec's networks are outside 10.0.0.0/8, or for an
 /// instance); elsewhere the snapshot is unchanged.
 #[must_use]
-pub fn on_target(mut snapshot: Value, target: Target) -> Value {
+pub(crate) fn on_target(mut snapshot: Value, target: Target) -> Value {
     if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker | Target::DockerVm) {
         return snapshot;
     }

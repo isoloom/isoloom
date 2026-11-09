@@ -20,7 +20,7 @@ use isoloom_spec::validate::docker_cidrs;
 
 /// The spec's constraints, when it has any that change something.
 #[must_use]
-pub fn of(spec: &Spec) -> Option<&Constraints> {
+pub(crate) fn of(spec: &Spec) -> Option<&Constraints> {
     spec.constraints
         .as_ref()
         .filter(|c| c.proxy.is_some() || !c.registries.is_empty() || c.mirrors.is_some() || !c.ntp.is_empty())
@@ -37,7 +37,7 @@ fn proxies(c: &Constraints) -> Option<(&str, &str)> {
 /// What is reached without the proxy: localhost, the environment's machine names and network
 /// blocks (as written, and Docker's), then the spec's own list, each once.
 #[must_use]
-pub fn no_proxy(spec: &Spec) -> Vec<String> {
+pub(crate) fn no_proxy(spec: &Spec) -> Vec<String> {
     let local = ["localhost", "127.0.0.1", "::1"].map(str::to_owned);
     let names = spec.machines.iter().flat_map(|(name, m)| std::iter::once(name).chain(&m.aliases).cloned());
     let blocks = spec.networks.values().map(|n| n.cidr.clone());

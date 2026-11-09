@@ -7,7 +7,7 @@ use crate::model::{Shape, Spec, Target};
 
 /// Machines lacking the implementation a shape needs (the access machine never counts).
 #[must_use]
-pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
+pub(crate) fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
     spec.machines
         .iter()
         .filter(|(_, m)| !m.access)
@@ -26,7 +26,7 @@ pub fn missing(spec: &Spec, shape: Shape) -> Vec<String> {
 
 /// Every target the implementations allow, narrowed by the spec's `targets:` when set.
 #[must_use]
-pub fn derive(spec: &Spec) -> Vec<Target> {
+pub(crate) fn derive(spec: &Spec) -> Vec<Target> {
     // Cloud services run on their own target only; a spec without machines runs nowhere else.
     if spec.cloud.is_some() {
         return vec![Target::CloudServices];

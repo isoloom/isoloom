@@ -41,19 +41,19 @@ mod error;
 pub mod hardware;
 pub mod images;
 pub mod ipv6;
-pub mod lab;
+mod lab;
 pub mod lifecycle;
 pub mod links;
 pub mod lower;
 pub mod machine_files;
 pub mod more_addresses;
-pub mod outside;
+mod outside;
 pub mod private_dns;
 pub mod process;
-pub mod requirements;
+mod requirements;
 pub mod routing;
 pub mod secrets;
-pub mod storage;
+mod storage;
 #[cfg(test)]
 mod testing;
 

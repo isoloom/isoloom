@@ -239,7 +239,7 @@ pub fn parse_set(s: &str) -> Result<(&str, &str)> {
 
 /// A value as YAML would read it (`3` a number, `true` a boolean, else text).
 #[must_use]
-pub fn scalar(text: &str) -> Value {
+pub(crate) fn scalar(text: &str) -> Value {
     serde_yaml_ng::from_str(text).unwrap_or_else(|_| Value::String(text.to_owned()))
 }
 

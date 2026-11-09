@@ -25,7 +25,7 @@ pub enum Lifetime {
 /// The lifetime of the storage behind machine volume `volume`: a top-level volume's own, else
 /// the environment's.
 #[must_use]
-pub fn lifetime(spec: &Spec, volume: &str) -> Lifetime {
+pub(crate) fn lifetime(spec: &Spec, volume: &str) -> Lifetime {
     let Some(v) = spec.volumes.get(volume) else {
         return Lifetime::Environment;
     };
@@ -67,7 +67,7 @@ impl DataDisk {
 
 /// Machine `name`'s data disks, in spec order.
 #[must_use]
-pub fn disks(name: &str, m: &Machine) -> Vec<DataDisk> {
+pub(crate) fn disks(name: &str, m: &Machine) -> Vec<DataDisk> {
     let windows = m.vm.as_ref().is_some_and(|vm| images::is_windows(&vm.os));
     let default = if windows { Filesystem::Ntfs } else { Filesystem::Ext4 };
     m.disks
@@ -86,7 +86,7 @@ pub fn disks(name: &str, m: &Machine) -> Vec<DataDisk> {
 /// data disks (raw ones apart), tmpfs modes, folders of the computer that runs the lab. At most
 /// one of each kind: the first that asks.
 #[must_use]
-pub fn requirements(spec: &Spec) -> Vec<Requirement> {
+pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
     if let Some((v, _)) = spec.volumes.iter().find(|(_, v)| v.persistent) {
         out.push(Requirement::PersistentVolume { volume: v.clone() });
