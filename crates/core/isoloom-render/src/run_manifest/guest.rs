@@ -11,7 +11,7 @@ use std::num::NonZeroU32;
 
 use isoloom_manifest::{
     Action, Check, CheckProtocol, CheckRunner, Checks, Condition, Delivery, Error as ManifestError, Failure, Guest, Machine, Name, Network, Output, OutputRole,
-    Param, PathTemplate, PublishMode, RelPath, Resources, Role, Run, SecretSlot, Step, StepId, Template,
+    Param, Part, PathTemplate, Placeholder, PublishMode, RelPath, Resources, Role, Run, SecretSlot, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
 
@@ -55,6 +55,30 @@ impl GuestCommand {
         s.timeout_s = NonZeroU32::new(self.timeout_s);
         s.failure = self.failure;
         Ok(s)
+    }
+
+    /// The command as a shell line in the VM itself, which no runner fills in (a Vagrantfile's
+    /// own provisioner): each `${params.<NAME>}` the environment variable `NAME`, which that
+    /// provisioner sets.
+    ///
+    /// # Errors
+    ///
+    /// [`ManifestError::PlaceholderOutOfPlace`] for any other placeholder: only a runner fills
+    /// those in.
+    pub fn in_vm_shell(&self) -> Result<String, ManifestError> {
+        self.command
+            .parts()
+            .iter()
+            .map(|part| match part {
+                Part::Text(text) => Ok(text.clone()),
+                Part::Placeholder(Placeholder::Param(name)) => Ok(format!("\"${name}\"")),
+                Part::Placeholder(other) => Err(ManifestError::PlaceholderOutOfPlace {
+                    at: format!("guest command `{}`", self.id),
+                    root: other.root(),
+                    only: "a runner's steps",
+                }),
+            })
+            .collect()
     }
 
     /// `commands` as steps through `way_in`, in order.

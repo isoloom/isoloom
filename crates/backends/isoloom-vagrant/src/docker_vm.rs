@@ -25,14 +25,14 @@
 //! file can't run: its capabilities are Compose's.
 
 use crate::boxes;
-use isoloom_manifest::Manifest;
-use isoloom_plan::checks::{Position, Probe};
+use crate::error::Result;
+use isoloom_manifest::{Failure, Manifest};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container::{self as docker, DOCKER_HOST as VM};
-use isoloom_render::run_manifest::DERIVED;
-use isoloom_render::run_manifest::guest::GuestCompose;
+use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::model::Target;
+use isoloom_spec::shell::quote;
 
 use crate::host_folders::Share;
 use crate::ruby::{BootStatements, Call, Provision, Ruby, Value};
@@ -87,8 +87,6 @@ const CA_CERTIFICATES: &str = "ca-certificates";
 fn named(name: &str, kind: &str) -> Provision {
     Provision::new("config", name).kw("type", Value::str(kind))
 }
-/// The Compose file the VM runs, from the project's copy.
-const COMPOSE: &str = ".isoloom/docker/compose.yml";
 
 /// The CPUs and memory (MB) of the VM: the containers' host's.
 fn host_size(env: &Environment) -> (u32, u32) {
@@ -96,24 +94,44 @@ fn host_size(env: &Environment) -> (u32, u32) {
     (size.cpus, size.memory_mb)
 }
 
+/// What the VM is called after its environment: `<env> · docker`, `<env>-docker`
+/// (`crate::vms::label`, `crate::vms::vm_name`).
+pub(crate) const HOST: &str = "docker";
+
 /// `.isoloom/docker-vm/Vagrantfile`: the VM, Docker, then the Compose file up as `guest` starts it,
 /// and its checks.
-#[must_use]
-pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
-    GeneratedFile {
+///
+/// # Errors
+///
+/// [`crate::Error::Manifest`] when a command of `guest` holds a placeholder only a runner fills in
+/// (a bug of the Compose backend, which builds them).
+pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> Result<GeneratedFile> {
+    Ok(GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
-        contents: written(env, guest).finish(),
-    }
+        contents: written(env, guest).map_err(|e| e.on(Target::DockerVm))?.finish(),
+    })
 }
 
 /// What the Vagrantfile of `env` applies to its VM only when it boots ([`BootStatements`]), as
 /// its builder records it while writing it.
-pub(crate) fn boot(env: &Environment, guest: &GuestCompose) -> BootStatements {
-    written(env, guest).boot().clone()
+pub(crate) fn boot(env: &Environment, guest: &GuestCompose) -> Result<BootStatements> {
+    Ok(written(env, guest)?.boot().clone())
+}
+
+/// The scripts of the provisioners that run `guest`'s commands in the VM.
+struct Scripts {
+    /// The environment's start.
+    environment: String,
+    /// The checks, when there are some.
+    checks: Option<String>,
 }
 
 /// The Vagrantfile of `env`, written.
-fn written(env: &Environment, guest: &GuestCompose) -> Ruby {
+fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
+    let scripts = Scripts {
+        environment: environment_script(env, guest)?,
+        checks: checks_script(guest)?,
+    };
     let mut r = Ruby::new();
     r.text(&header("#"));
     r.comment(&format!(
@@ -131,13 +149,13 @@ fn written(env: &Environment, guest: &GuestCompose) -> Ruby {
     // VM's own SSH forward port from it, so the hash must be defined even when no container port is.
     vagrantfile::chosen_ports(&mut r);
     r.blank();
-    r.configure(|r| configure(r, env, guest));
-    r
+    r.configure(|r| configure(r, env, guest, &scripts));
+    Ok(r)
 }
 
 /// The VM: its box and name, the published ports, its size on every provider, then Docker, SSH
 /// accepting the values given at launch, the project and the environment.
-fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
+fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Scripts) {
     // generic/debian12 has a build for the providers here but UTM and QEMU (VirtualBox, VMware,
     // Parallels, libvirt); those two are given their own box below. Hyper-V isn't offered here.
     r.assign("config.vm.box", Value::str("generic/debian12"));
@@ -170,9 +188,8 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
         }
     }
     let size = host_size(env);
-    let label = format!("{} · docker", env.name);
-    desktop_providers(r, &label, size, docker::HostSize::of(env).disk_gb);
-    esxi(r, &format!("{}-docker", env.name), size);
+    desktop_providers(r, &crate::vms::label(env, HOST), size, docker::HostSize::of(env).disk_gb);
+    esxi(r, &crate::vms::vm_name(env, HOST), size);
     // The containers' host folders, shared read-write where Compose finds them (a read-only one
     // is bound read-only into its container).
     let shares: Vec<Share> = docker::host_folders::of_containers(env)
@@ -203,8 +220,10 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
         );
         r.provision(named(ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
     }
-    environment(r, env, guest);
-    checks(r, env);
+    environment(r, env, &scripts.environment);
+    if let Some(script) = &scripts.checks {
+        checks(r, env, script);
+    }
 }
 
 /// The size on the providers of this machine (VirtualBox, VMware, Parallels, UTM, QEMU,
@@ -285,38 +304,41 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
 /// The Compose file up as `guest` starts it (published on every address of the VM, at the fixed
 /// host ports Vagrant forwards), with the containers' secrets once they were delivered and the
 /// values given at launch, then the ready mark.
-fn environment(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
-    let start: Vec<String> = guest.start.iter().map(|c| c.command.to_string()).collect();
-    let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
-    let script = format!(
-        "{secrets}{} && {} && echo ready > {}",
-        start.join(" && "),
-        steps::MAKE_STATE_DIR,
-        steps::READY_FILE
-    );
+fn environment(r: &mut Ruby, env: &Environment, script: &str) {
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
-    r.provision(shell("config", "environment").kw("inline", Value::str(&script)).kw_opt("env", inputs));
+    r.provision(shell("config", "environment").kw("inline", Value::str(script)).kw_opt("env", inputs));
 }
 
-/// Checks on demand: every runner of the Compose `check` profile (one per position), then the
-/// `exec` checks piped into their machines; the derived checks switched off with
-/// `ISOLOOM_DERIVED=0` on the host.
-fn checks(r: &mut Ruby, env: &Environment) {
-    if env.checks.is_empty() {
-        return;
-    }
-    let profile = format!("docker compose -f {COMPOSE} --profile check");
-    let (stand_in, routes) = (docker::STAND_IN, docker::routes_service(docker::STAND_IN));
-    let access = docker::as_arguments(&format!("{profile} config --services | grep -x -e {stand_in} -e {routes}"));
-    // The stand-ins go once the checks ran, whatever they found, so the access machine they
-    // stand in for can take its addresses; failing to take them down fails no check.
-    let script = format!(
-        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} {up} \"$@\"; for s in $({profile} config --services | grep '^{runners}'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}[ $# -eq 0 ] || {profile} {down} \"$@\" || true; exit \"$failed\"",
-        exec_runs(env),
-        up = docker::STAND_INS_UP.verb.join(" "),
-        down = docker::STAND_INS_DOWN.verb.join(" "),
-        runners = docker::CHECK_RUNNER_PREFIX,
-    );
+/// The environment's start in the VM: the containers' secrets, `guest`'s start steps, the ready
+/// mark.
+fn environment_script(env: &Environment, guest: &GuestCompose) -> Result<String> {
+    let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
+    Ok(format!(
+        "{secrets}{}{} && echo ready > {}",
+        sequence(&guest.start)?,
+        steps::MAKE_STATE_DIR,
+        steps::READY_FILE
+    ))
+}
+
+/// `commands` as script lines, in order, each as its failure policy says: a failed one ends the
+/// script, or, when tolerated (a clean-up), is said and passed.
+fn sequence(commands: &[GuestCommand]) -> Result<String> {
+    commands
+        .iter()
+        .map(|c| {
+            let line = c.in_vm_shell()?;
+            Ok(match c.failure {
+                Failure::Fail => format!("{line} || exit 1\n"),
+                Failure::Tolerate => format!("{line} || echo {} >&2\n", quote(&format!("{}: failed, tolerated", c.id))),
+            })
+        })
+        .collect()
+}
+
+/// Checks on demand (`script`); the derived checks switched off with `ISOLOOM_DERIVED=0` on the
+/// host.
+fn checks(r: &mut Ruby, env: &Environment, script: &str) {
     let derived = crate::vagrantfile::derived_from_host();
     let vars = if env.spec().inputs.is_empty() {
         derived
@@ -324,28 +346,25 @@ fn checks(r: &mut Ruby, env: &Environment) {
         Value::raw(format!("INPUTS.merge({derived})"))
     };
     let call = shell("config", "checks").kw("run", Value::str("never"));
-    r.provision(call.kw("inline", Value::str(&script)).kw("env", vars));
+    r.provision(call.kw("inline", Value::str(script)).kw("env", vars));
 }
 
-/// The `exec` checks' runners, piped into their machines (see `docker::exec_runner`), one per
-/// machine in the order of its first check.
-fn exec_runs(env: &Environment) -> String {
-    let mut machines: Vec<&str> = Vec::new();
-    for c in &env.checks {
-        if let (Probe::Exec { .. }, Position::Machine(m)) = (&c.probe, &c.position)
-            && !machines.contains(&m.as_str())
-        {
-            machines.push(m);
-        }
+/// The checks as the run manifest runs them (`guest`'s): the stand-ins set up, every runner, then
+/// the stand-ins taken down whatever the runners found. None without runners.
+fn checks_script(guest: &GuestCompose) -> Result<Option<String>> {
+    if guest.runners.is_empty() {
+        return Ok(None);
     }
-    let runs: Vec<String> = machines
+    let runners: String = guest
+        .runners
         .iter()
-        .map(|m| {
-            format!(
-                "docker compose -f {COMPOSE} exec -T {m} sh -s < .isoloom/docker/checks/{} || failed=1; ",
-                docker::exec_runner(m)
-            )
-        })
-        .collect();
-    runs.concat()
+        .map(|g| Ok(format!("  {} || failed=1\n", g.command.in_vm_shell()?)))
+        .collect::<Result<_>>()?;
+    let setup = sequence(&guest.check_setup)?;
+    let checked = if setup.is_empty() {
+        runners
+    } else {
+        format!("if (\n{setup}); then\n{runners}else\n  failed=1\nfi\n")
+    };
+    Ok(Some(format!("failed=0\n{checked}{}exit \"$failed\"", sequence(&guest.check_teardown)?)))
 }

@@ -5,9 +5,9 @@
 use std::net::Ipv4Addr;
 
 use crate::boxes::HyperVBox;
+use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
-use isoloom_plan::{Controller, Environment};
 use isoloom_render::boot::{self, Trigger};
 use isoloom_render::inventory::{self, Access};
 use isoloom_render::router;
@@ -185,12 +185,7 @@ const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add
 pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let env = ctx.env;
     let (bx, version) = controller_box(env.spec());
-    let controller = Controller::of(env.spec());
-    let size = Size {
-        cpus: controller.cpus,
-        mem: controller.memory_mb,
-        disk: controller.disk_gb,
-    };
+    let size = Size::controller(env.spec());
     let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
     let mut guest = helper(env, "controller", size, addresses(env, Cidr::controller), link);
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other

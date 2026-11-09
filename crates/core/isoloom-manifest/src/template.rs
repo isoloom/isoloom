@@ -89,6 +89,21 @@ pub enum Placeholder {
 }
 
 impl Placeholder {
+    /// What the placeholder starts with (`run`, `params`, `outputs`, `published`, `host`,
+    /// `machine`, `value`): what binds it.
+    #[must_use]
+    pub fn root(&self) -> &'static str {
+        match self {
+            Placeholder::Run(_) => "run",
+            Placeholder::Param(_) => "params",
+            Placeholder::Output(_) => "outputs",
+            Placeholder::Published { .. } => "published",
+            Placeholder::Host(_) => "host",
+            Placeholder::Machine => "machine",
+            Placeholder::Value => "value",
+        }
+    }
+
     /// Reads what is between `${` and `}` (`template` is the whole text, for the error).
     fn parse(inner: &str, template: &str) -> Result<Placeholder> {
         let trimmed = inner.trim();
@@ -133,14 +148,14 @@ fn published(rest: &str) -> Option<Placeholder> {
 
 impl Display for Placeholder {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.root())?;
         match self {
-            Placeholder::Run(v) => write!(f, "run.{}", v.key()),
-            Placeholder::Param(n) => write!(f, "params.{n}"),
-            Placeholder::Output(n) => write!(f, "outputs.{n}"),
-            Placeholder::Published { machine, port } => write!(f, "published.{machine}.{port}"),
-            Placeholder::Host(machine) => write!(f, "host.{machine}"),
-            Placeholder::Machine => f.write_str("machine"),
-            Placeholder::Value => f.write_str("value"),
+            Placeholder::Run(v) => write!(f, ".{}", v.key()),
+            Placeholder::Param(n) => write!(f, ".{n}"),
+            Placeholder::Output(n) => write!(f, ".{n}"),
+            Placeholder::Published { machine, port } => write!(f, ".{machine}.{port}"),
+            Placeholder::Host(machine) => write!(f, ".{machine}"),
+            Placeholder::Machine | Placeholder::Value => Ok(()),
         }
     }
 }

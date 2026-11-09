@@ -364,15 +364,40 @@ fn a_lab_without_an_access_machine_has_no_stand_in_to_start_or_take_down() -> Ou
 }
 
 #[test]
-fn the_vagrantfiles_checks_take_the_stand_ins_down_after_them() -> Outcome {
+fn the_vagrantfiles_checks_run_the_manifests_stand_ins_and_runners() -> Outcome {
     let files = generate(&lab(ACCESS_SEAT)?, Target::DockerVm)?;
     let vf = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
-    let checks = vf.lines().find(|l| l.contains("name: \"checks\"")).ok_or("no checks provisioner")?;
-    let (up, down) = (at(checks, "up --detach --wait --no-deps")?, at(checks, "rm --stop --force \\\"$@\\\"")?);
-    assert!(up < at(checks, "isoloom-check")? && at(checks, "isoloom-check")? < down, "{checks}");
-    assert!(checks.contains("grep -x -e isoloom-access -e isoloom-routes-isoloom-access"), "{checks}");
-    // The checks' own result, not the stand-ins' removal, is the provisioner's.
-    assert!(checks.contains("|| true; exit \\\"$failed\\\"\""), "{checks}");
+    let manifest = isoloom_manifest::parse(file(&files, ".isoloom/docker-vm/run.json")?)?;
+    let checks = vf.split("name: \"checks\"").nth(1).ok_or("no checks provisioner")?;
+    let checks = checks.split("\n  config.vm").next().unwrap_or_default();
+    let up = at(checks, "--profile check up --detach --wait --no-deps isoloom-access || exit 1")?;
+    let down = at(
+        checks,
+        "--profile check rm --stop --force isoloom-access || echo 'stand-ins-down: failed, tolerated'",
+    )?;
+    // Each runner of the run manifest, between them, its failure the provisioner's.
+    let runners = &manifest.checks.runners;
+    assert_eq!(checks.matches(" || failed=1").count(), runners.len(), "{checks}");
+    for r in runners {
+        let runner = at(checks, &format!("--env ISOLOOM_DERIVED=\\\"$ISOLOOM_DERIVED\\\" {} || failed=1", r.id))?;
+        assert!(up < runner && runner < down, "{checks}");
+    }
+    assert!(
+        checks.contains("\nexit \\\"$failed\\\"\", env: "),
+        "the runners' verdict is the provisioner's: {checks}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_vagrantfile_tolerates_what_the_manifest_tolerates_and_stops_at_the_rest() -> Outcome {
+    let published = "version: 1\nname: pub\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: 'ghcr.io/example/lab-web:1', build: { context: web } } }\n";
+    let files = generate(&lab(published)?, Target::DockerVm)?;
+    let vf = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
+    let start = vf.split("name: \"environment\"").nth(1).ok_or("no environment provisioner")?;
+    let pull = at(start, "pull --ignore-pull-failures || echo 'pull: failed, tolerated' >&2")?;
+    let up = at(start, "--wait-timeout 600 || exit 1")?;
+    assert!(pull < up && up < at(start, "echo ready")?, "{start}");
     Ok(())
 }
 

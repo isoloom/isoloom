@@ -27,6 +27,24 @@ impl Size {
     /// Isoloom's own small VMs (router, tool shell): the box's disk.
     pub(crate) const HELPER: Size = Size { cpus: 1, mem: 512, disk: None };
 
+    /// The controller's: the spec's `controller` sizes, else its defaults.
+    pub(crate) fn controller(spec: &isoloom_spec::model::Spec) -> Size {
+        let c = isoloom_plan::Controller::of(spec);
+        Size {
+            cpus: c.cpus,
+            mem: c.memory_mb,
+            disk: c.disk_gb,
+        }
+    }
+
+    /// Its CPUs and memory, as a run manifest gives a machine's.
+    pub(crate) fn resources(self) -> isoloom_manifest::Resources {
+        isoloom_manifest::Resources {
+            cpus: Some(self.cpus),
+            memory_mb: Some(self.mem),
+        }
+    }
+
     /// A lab machine's size as it runs ([`isoloom_plan::MachinePlan::size`]); its disk only when
     /// the spec sets one (else the box's).
     pub(crate) fn of(mp: &isoloom_plan::MachinePlan) -> Size {

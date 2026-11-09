@@ -325,6 +325,15 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`docker-vm`'s Vagrantfile runs the run manifest's commands, with their failure policy.** Its
+  `environment` provisioner chained the start steps with `&&`, so a tolerated one (the pull of
+  the lab's published images) stopped the start when it failed; each step now ends the script
+  on failure unless the manifest tolerates it. Its `checks` provisioner runs the manifest's own
+  stand-in set-up, runners and tear-down (one runner per position, in the Compose project the
+  start made) instead of rebuilding them, and the Vagrant run manifest refuses to omit a VM's
+  boot digest (`NoBootDigest`, a bug) instead of writing none. Library:
+  `isoloom_render::run_manifest::guest::GuestCommand::in_vm_shell`,
+  `isoloom_manifest::Placeholder::root`.
 - **A Proxmox LXC container is a container's size** (1 CPU, 512 MB, 5 GB unless its `resources`
   say), as its run manifest said; `main.tf` gave it a VM's (1024 MB, 20 GB). Every backend sizes a
   lab machine by one rule now (library: `isoloom_plan::MachinePlan::size`, its `resources` the

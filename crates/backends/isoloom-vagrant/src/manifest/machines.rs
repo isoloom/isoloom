@@ -7,13 +7,15 @@
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 
-use isoloom_manifest::{Machine, Name, Native, OsName, Provider, Resources, Role, Template};
-use isoloom_plan::{Controller, Environment};
+use isoloom_manifest::{Machine, Name, Native, OsName, Provider, Role, Template};
+use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{addresses, arch, port};
+use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use super::keeps_controller;
-use crate::error::Result;
+use crate::error::{Error, Result};
+use crate::vms::providers::Size;
 use crate::vms::{Define, Kind, Shape, label, vm_name};
 
 /// Where a forwarded port listens on the host.
@@ -22,10 +24,20 @@ const LOOPBACK: &str = "127.0.0.1";
 /// The Vagrantfile's VMs, in its order, each with its boot digest among `boot_digests` (by define
 /// name, [`crate::boot_digest::of`] what its Vagrantfile applies at boot).
 pub(super) fn machines(env: &Environment, shape: &Shape, boot_digests: &BTreeMap<String, String>) -> Result<Vec<Machine>> {
-    shape.defines.iter().map(|d| machine(env, d, boot_digests.get(&d.name).cloned())).collect()
+    shape
+        .defines
+        .iter()
+        .map(|d| {
+            let digest = boot_digests.get(&d.name).ok_or_else(|| Error::NoBootDigest {
+                target: Target::Vagrant,
+                machine: d.name.clone(),
+            })?;
+            machine(env, d, digest)
+        })
+        .collect()
 }
 
-fn machine(env: &Environment, d: &Define, boot_digest: Option<String>) -> Result<Machine> {
+fn machine(env: &Environment, d: &Define, boot_digest: &str) -> Result<Machine> {
     let mut out = isoloom_render::run_manifest::machine(&d.name, Role::Infra)?;
     out.native = Some(native(env, d, boot_digest)?);
     match d.kind {
@@ -33,33 +45,21 @@ fn machine(env: &Environment, d: &Define, boot_digest: Option<String>) -> Result
         Kind::Router => {
             let routed = env.router.iter().flatten().map(|(n, a)| Ok((Name::parse(n)?, IpAddr::V4(*a))));
             out.addresses = routed.collect::<Result<_>>()?;
-            out.resources = Some(helper_size());
+            out.resources = Some(Size::HELPER.resources());
         }
         Kind::ToolShell => {
             let index = env.spec().tools.keys().position(|t| t == "shell").unwrap_or_default();
             out.role = Role::Tool;
             out.addresses = on_every_network(env, |c| c.tool(index))?;
-            out.resources = Some(helper_size());
+            out.resources = Some(Size::HELPER.resources());
         }
         Kind::Controller => {
-            let size = Controller::of(env.spec());
             out.addresses = on_every_network(env, Cidr::controller)?;
-            out.resources = Some(Resources {
-                cpus: Some(size.cpus),
-                memory_mb: Some(size.memory_mb),
-            });
+            out.resources = Some(Size::controller(env.spec()).resources());
             out.keep_running = keeps_controller(env);
         }
     }
     Ok(out)
-}
-
-/// Isoloom's own small VMs: 1 CPU, 512 MB.
-fn helper_size() -> Resources {
-    Resources {
-        cpus: Some(1),
-        memory_mb: Some(512),
-    }
 }
 
 /// A lab machine: its OS, size and addresses, and its ports. A published port is forwarded from
@@ -109,13 +109,13 @@ pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMa
     ])
 }
 
-fn native(env: &Environment, d: &Define, boot_digest: Option<String>) -> Result<Native> {
+fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
     let (shown, plain) = (label(env, &d.what), vm_name(env, &d.what));
     let vm_names = vm_names(shown, plain, format!("{}_{}", env.name, d.name));
     Ok(Native::Vagrant {
         vagrant: Name::parse(&d.name)?,
         vm_names,
-        boot_digest,
+        boot_digest: Some(boot_digest.to_owned()),
     })
 }
 
@@ -137,7 +137,11 @@ machines:
 checks: [{ http: 'http://web/', wait: 30 }]
 ",
         );
-        let ms = machines(&env, &Shape::of(&env), &BTreeMap::from([("web".to_owned(), "sha256:0".to_owned())])).unwrap();
+        let digests = BTreeMap::from([
+            ("web".to_owned(), "sha256:0".to_owned()),
+            ("isoloom-controller".to_owned(), "sha256:1".to_owned()),
+        ]);
+        let ms = machines(&env, &Shape::of(&env), &digests).unwrap();
         let names: Vec<&str> = ms.iter().map(|m| m.name.as_str()).collect();
         assert_eq!(names, ["web", "isoloom-controller"]);
         let Some(Native::Vagrant { vm_names, boot_digest, .. }) = &ms[0].native else {
@@ -162,5 +166,13 @@ checks: [{ http: 'http://web/', wait: 30 }]
             panic!()
         };
         assert_eq!(controller[&Provider::VmwareEsxi], "shop-controller");
+    }
+
+    #[test]
+    fn a_vm_without_a_boot_digest_is_a_bug_not_a_manifest_without_one() {
+        let env = environment("version: 1\nname: shop\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, os: debian@12 }\n");
+        let err = machines(&env, &Shape::of(&env), &BTreeMap::new()).unwrap_err();
+        assert!(matches!(&err, Error::NoBootDigest { machine, .. } if machine == "web"), "{err}");
+        assert_eq!(err.to_string(), "vagrant: the Vagrantfile records nothing it applies at boot to `web`");
     }
 }

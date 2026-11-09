@@ -99,7 +99,7 @@ impl Backend for DockerVmBackend {
         backend::check(Target::DockerVm, env, &self.capabilities())?;
         let guest = guest(env)?;
         let mut files = docker_files(env)?;
-        files.push(docker_vm::vagrantfile(env, &guest));
+        files.push(docker_vm::vagrantfile(env, &guest)?);
         if on_proxmox(env) {
             files.extend(isoloom_terraform::docker_vm_module(env, &guest)?);
         }

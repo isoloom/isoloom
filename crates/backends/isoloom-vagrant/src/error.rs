@@ -26,6 +26,15 @@ pub enum Error {
         /// Why, as the refusal reads.
         reason: String,
     },
+    /// A VM the Vagrantfile defines without a record of what it applies to it at boot, so the
+    /// run manifest has no boot digest for it: a bug of this backend, which writes both.
+    #[error("{}: the Vagrantfile records nothing it applies at boot to `{machine}`", target.id())]
+    NoBootDigest {
+        /// The target whose Vagrantfile it is.
+        target: Target,
+        /// The VM's define.
+        machine: String,
+    },
     /// A value of the run manifest was refused by the manifest's own types: a bug of this
     /// backend, which builds every one of them.
     #[error("{}: {MANIFEST_REFUSED}", target.id())]
@@ -61,6 +70,7 @@ impl Error {
         match self {
             Error::Refused { refusal, .. } => Error::Refused { target, refusal },
             Error::Unsupported { reason, .. } => Error::Unsupported { target, reason },
+            Error::NoBootDigest { machine, .. } => Error::NoBootDigest { target, machine },
             Error::Manifest { source, .. } => Error::Manifest { target, source },
         }
     }
@@ -73,6 +83,7 @@ impl From<Error> for RenderError {
         match e {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
             Error::Unsupported { target, reason } => RenderError::Unsupported { target, what: reason },
+            e @ Error::NoBootDigest { target, .. } => RenderError::internal(target, "the run manifest has no boot digest for a VM", e),
             Error::Manifest { target, source } => RenderError::internal(target, MANIFEST_REFUSED, source),
         }
     }

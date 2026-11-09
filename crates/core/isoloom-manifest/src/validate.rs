@@ -165,10 +165,10 @@ impl Manifest {
                     }
                     // An output's only template is its `format`.
                     Placeholder::Value if !at.starts_with("outputs[") => {
-                        return Err(out_of_place(at, "value", "an output's `format`"));
+                        return Err(out_of_place(at, p, "an output's `format`"));
                     }
                     Placeholder::Machine if !at.starts_with("lifecycle.provision.machine[") => {
-                        return Err(out_of_place(at, "machine", "the steps of `lifecycle.provision.machine`"));
+                        return Err(out_of_place(at, p, "the steps of `lifecycle.provision.machine`"));
                     }
                     _ => {}
                 }
@@ -206,8 +206,8 @@ impl Manifest {
     }
 }
 
-fn out_of_place(at: String, root: &'static str, only: &'static str) -> Error {
-    Error::PlaceholderOutOfPlace { at, root, only }
+fn out_of_place(at: String, p: &Placeholder, only: &'static str) -> Error {
+    Error::PlaceholderOutOfPlace { at, root: p.root(), only }
 }
 
 #[cfg(test)]
