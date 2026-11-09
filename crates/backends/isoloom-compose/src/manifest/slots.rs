@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 use isoloom_manifest::{
     Delivery, EnvName, Identifier, Machine, Name, NonEmpty, Param, PublishMode, Role, SecretSlot, SecretSource, SetBy, SlotKind, StepId, StepSelection, Store,
 };
-use isoloom_plan::{Environment, MachineShape, ValueSource};
-use isoloom_spec::model::{SecretSource as SpecSource, secret_variable};
+use isoloom_plan::{Environment, MachineShape};
+use isoloom_spec::model::secret_variable;
 
 use isoloom_render::container::project_variables;
 
@@ -107,12 +107,7 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, sta
     let mut out = Vec::new();
     for input in &env.spec().inputs {
         // A machine reads an input from its environment, or from a file Compose puts in place.
-        let file = |m: &isoloom_plan::MachinePlan| m.secrets.iter().any(|s| s.source == ValueSource::Input(input.clone()));
-        let readers: Vec<&str> = containers
-            .iter()
-            .filter(|(_, m)| m.inputs.contains(input) || file(m))
-            .map(|(n, _)| n.as_str())
-            .collect();
+        let readers: Vec<&str> = containers.iter().filter(|(_, m)| m.reads_input(input)).map(|(n, _)| n.as_str()).collect();
         if !readers.is_empty() {
             let mut s = slot(input, SlotKind::Input, None, input, reach(&readers, members, plan, starts)?)?;
             // The spec's own word on it; an input it says nothing of is masked.
@@ -125,7 +120,9 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, sta
         }
     }
     for (name, source) in &env.spec().secrets {
-        let Some(source) = spec_source(source) else { continue };
+        let Some(source) = isoloom_render::run_manifest::secret_source(source) else {
+            continue;
+        };
         let holders: Vec<&str> = containers
             .iter()
             .filter(|(_, m)| m.secrets.iter().any(|s| &s.name == name))
@@ -147,22 +144,6 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, sta
         out.push(slot(&var, SlotKind::Secret, Some(source), &var, reach(&[], members, plan, starts)?)?);
     }
     Ok(out)
-}
-
-/// Where the runner reads a secret: its store. An input's file has none (the input's slot
-/// carries it).
-fn spec_source(s: &SpecSource) -> Option<SecretSource> {
-    let store = match s {
-        SpecSource::Env { .. } => Store::Env,
-        SpecSource::File { .. } => Store::File,
-        SpecSource::Vault { .. } => Store::Vault,
-        SpecSource::Sops { .. } => Store::Sops,
-        SpecSource::Input { .. } => return None,
-    };
-    Some(SecretSource {
-        store,
-        reference: s.reference().to_owned(),
-    })
 }
 
 /// Who gets a value: some machines and their `init:` jobs, through the steps that create or

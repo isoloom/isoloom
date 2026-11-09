@@ -35,6 +35,19 @@ pub struct SecretFile {
     pub mode: Option<u32>,
 }
 
+impl SecretFile {
+    /// The name its value is delivered and kept under on a VM (`/var/lib/isoloom/secrets/<name>`):
+    /// an input's file, the input's own name (the slot a run manifest gives the input); a
+    /// secret, its name.
+    #[must_use]
+    pub fn kept(&self) -> &str {
+        match &self.source {
+            ValueSource::Input(input) => input,
+            ValueSource::Secret(_) => &self.name,
+        }
+    }
+}
+
 /// The mode a container's secret file has when the spec sets none: readable by every user of
 /// the container, as Compose and Kubernetes both default to. A container usually runs one
 /// process as one user, so this is what its image expects.

@@ -396,3 +396,56 @@ fn the_vagrantfiles_checks_take_the_stand_ins_down_after_them() -> Outcome {
 fn at(text: &str, what: &str) -> Outcome<usize> {
     Ok(text.find(what).ok_or_else(|| format!("no {what} in {text}"))?)
 }
+
+/// One VM-or-container machine reading a secret and an input as files and another input in its
+/// environment: every target that runs it gives each the same slot.
+const VALUES: &str = "
+version: 1
+name: values
+networks: { lan: { cidr: 10.72.0.0/24 } }
+secrets:
+  db-password: { env: DB_PASSWORD }
+inputs: [LAUNCH_TOKEN, API_URL]
+machines:
+  db:
+    os: debian@12
+    networks: { lan: 10 }
+    environment: { API_URL: { input: API_URL } }
+    files:
+      - { path: /run/db-password, secret: db-password }
+      - { path: /run/launch-token, input: LAUNCH_TOKEN }
+    app: { image: nginx, steps: [{ run: p.sh }] }
+";
+
+#[test]
+fn a_secret_and_an_input_get_the_same_slot_on_every_target() -> Outcome {
+    let lab = lab(VALUES)?;
+    // What a slot says whatever the target: its name, kind, whether it must be given, whether it
+    // is masked, where the runner reads it, its value when left out (its deliveries differ).
+    let shape = |m: &Manifest| -> Vec<String> {
+        let mut out: Vec<String> = m
+            .secrets
+            .iter()
+            .filter(|s| s.kind != isoloom_manifest::SlotKind::Connection)
+            .map(|s| {
+                format!(
+                    "{} {:?} required={} sensitive={} source={:?} default={:?}",
+                    s.name, s.kind, s.required, s.sensitive, s.source, s.default
+                )
+            })
+            .collect();
+        out.sort();
+        out
+    };
+    let docker = shape(&run_json(&generate(&lab, Target::Docker)?, ".isoloom/docker/run.json")?);
+    assert_eq!(docker.len(), 3, "{docker:?}");
+    for (target, path) in [
+        (Target::Vagrant, ".isoloom/vagrant/run.json"),
+        (Target::CloudVm, ".isoloom/cloud-vm/aws/run.json"),
+        (Target::CloudVm, ".isoloom/cloud-vm/digitalocean/run.json"),
+        (Target::CloudDocker, ".isoloom/cloud-docker/gcp/run.json"),
+    ] {
+        assert_eq!(shape(&run_json(&generate(&lab, target)?, path)?), docker, "{path}");
+    }
+    Ok(())
+}

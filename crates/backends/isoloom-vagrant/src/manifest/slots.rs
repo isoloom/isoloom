@@ -6,11 +6,10 @@
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    CheckRunner, Delivery, EnvName, HostOs, Identifier, Lifecycle, Name, NonEmpty, Param, Provider, SecretSlot, SecretSource, SetBy, SlotKind, StepId,
-    StepSelection, Store,
+    CheckRunner, Delivery, EnvName, HostOs, Identifier, Lifecycle, Name, NonEmpty, Param, Provider, SecretSlot, SetBy, SlotKind, StepId, StepSelection,
 };
-use isoloom_plan::{Environment, ValueSource};
-use isoloom_spec::model::{SecretSource as SpecSource, secret_variable};
+use isoloom_plan::Environment;
+use isoloom_spec::model::secret_variable;
 
 use isoloom_render::run_manifest::derived_switch;
 
@@ -161,12 +160,7 @@ pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<Secr
     let vms: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == isoloom_plan::MachineShape::Vm).collect();
     let mut out = Vec::new();
     for input in &spec.inputs {
-        let file = |m: &isoloom_plan::MachinePlan| m.secrets.iter().any(|s| s.source == ValueSource::Input(input.clone()));
-        let readers: Vec<&str> = vms
-            .iter()
-            .filter(|(_, m)| m.inputs.contains(input) || file(m))
-            .map(|(n, _)| n.as_str())
-            .collect();
+        let readers: Vec<&str> = vms.iter().filter(|(_, m)| m.reads_input(input)).map(|(n, _)| n.as_str()).collect();
         if readers.is_empty() {
             continue;
         }
@@ -179,7 +173,9 @@ pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<Secr
         out.push(s);
     }
     for (name, source) in &spec.secrets {
-        let Some(store) = store(source) else { continue };
+        let Some(source) = isoloom_render::run_manifest::secret_source(source) else {
+            continue;
+        };
         let holders: Vec<&str> = vms
             .iter()
             .filter(|(_, m)| m.secrets.iter().any(|s| &s.name == name))
@@ -189,10 +185,7 @@ pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<Secr
             continue;
         }
         let mut s = slot(name, SlotKind::Secret, &holders, env_var(&secret_variable(name), provisioning(lifecycle)?)?)?;
-        s.source = Some(SecretSource {
-            store,
-            reference: source.reference().to_owned(),
-        });
+        s.source = Some(source);
         out.push(s);
     }
     out.push(esxi_password()?);
@@ -204,17 +197,6 @@ pub(super) fn esxi_password() -> Result<SecretSlot> {
     let mut password = slot("ESXI_PASSWORD", SlotKind::Connection, &[], env_var("ESXI_PASSWORD", StepSelection::Every)?)?;
     password.providers = BTreeSet::from([Provider::VmwareEsxi]);
     Ok(password)
-}
-
-/// A secret's store; an input's file has none (the input's slot carries it).
-fn store(s: &SpecSource) -> Option<Store> {
-    match s {
-        SpecSource::Env { .. } => Some(Store::Env),
-        SpecSource::File { .. } => Some(Store::File),
-        SpecSource::Vault { .. } => Some(Store::Vault),
-        SpecSource::Sops { .. } => Some(Store::Sops),
-        SpecSource::Input { .. } => None,
-    }
 }
 
 /// A required, sensitive slot named `name`, for `machines`, delivered as `deliver`.

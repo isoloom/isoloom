@@ -755,13 +755,13 @@ Vagrant.configure("2") do |config|
       umask 077
       mkdir -p /var/lib/isoloom/secrets
       chmod 700 /var/lib/isoloom/secrets
-      v="$(printenv ISOLOOM_SECRET_INPUT_LAUNCH_TOKEN || true)"; if [ -n "$v" ] || [ ! -e /var/lib/isoloom/secrets/input-launch-token ]; then printf '%s' "$v" | base64 -d > /var/lib/isoloom/secrets/input-launch-token.new; mv -f /var/lib/isoloom/secrets/input-launch-token.new /var/lib/isoloom/secrets/input-launch-token; fi
+      v="$(printenv ISOLOOM_SECRET_INPUT_LAUNCH_TOKEN || true)"; if [ -n "$v" ] || [ ! -e /var/lib/isoloom/secrets/LAUNCH_TOKEN ]; then printf '%s' "$v" | base64 -d > /var/lib/isoloom/secrets/LAUNCH_TOKEN.new; mv -f /var/lib/isoloom/secrets/LAUNCH_TOKEN.new /var/lib/isoloom/secrets/LAUNCH_TOKEN; fi
       touch /var/lib/isoloom/secrets/.delivered
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/apply-secrets.sh <<'APPLY-SECRETS'
       #!/bin/sh
       # The machine's secrets, put in place
-      install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-launch-token '/run/lab/launch-token'
+      install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/LAUNCH_TOKEN '/run/lab/launch-token'
       exit 0
       APPLY-SECRETS
       chmod +x /etc/isoloom/apply-secrets.sh

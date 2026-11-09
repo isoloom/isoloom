@@ -175,10 +175,30 @@ pub(crate) fn slots(cloud: Cloud, steps: &[&str]) -> Result<Vec<SecretSlot>, Man
         .collect()
 }
 
-/// The launch's plain value `name` (`sensitive: false`), read by `machines`: one entry of the
-/// module's `inputs`, empty when not given.
-pub(crate) fn input(name: &str, sensitive: bool, machines: Vec<isoloom_manifest::Name>) -> Result<SecretSlot, ManifestError> {
-    Ok(SecretSlot {
+/// The launch's value `name`, an input: an entry of the module's `inputs` for the machines that
+/// read it in their environment (`env_readers`), delivered over SSH to those that read it as a
+/// file (`file_readers`, kept under its own name: `/var/lib/isoloom/secrets/<name>`); empty when
+/// not given. `None` when no machine reads it.
+pub(crate) fn input(
+    name: &str,
+    sensitive: bool,
+    env_readers: &[isoloom_manifest::Name],
+    file_readers: &[isoloom_manifest::Name],
+) -> Result<Option<SecretSlot>, ManifestError> {
+    let mut deliver = Vec::new();
+    if !env_readers.is_empty() {
+        deliver.push(Delivery::TfVar {
+            var: SnakeName::parse(INPUTS)?,
+            shape: TfVarShape::MapEntry,
+        });
+    }
+    deliver.extend(file_readers.iter().map(guest));
+    if deliver.is_empty() {
+        return Ok(None);
+    }
+    let mut machines = env_readers.to_vec();
+    machines.extend(file_readers.iter().filter(|m| !env_readers.contains(m)).cloned());
+    Ok(Some(SecretSlot {
         name: Identifier::parse(name)?,
         kind: SlotKind::Input,
         required: false,
@@ -187,36 +207,35 @@ pub(crate) fn input(name: &str, sensitive: bool, machines: Vec<isoloom_manifest:
         providers: BTreeSet::new(),
         source: None,
         default: Some(String::new()),
-        deliver: NonEmpty::one(Delivery::TfVar {
-            var: SnakeName::parse(INPUTS)?,
-            shape: TfVarShape::MapEntry,
-        }),
-    })
+        deliver: NonEmpty::new(deliver, "the machines reading the input")?,
+    }))
 }
 
 /// A machine secret delivered over SSH, the fallback every cloud shares (the stores on AWS, Azure
-/// and GCP are a hardening): the runner writes the value into `/var/lib/isoloom/secrets/<name>`
-/// and the machine's set-up waits for it. The value reaches no generated file and no state.
-pub(crate) fn guest_secret(name: &str, sensitive: bool, machines: &[isoloom_manifest::Name]) -> Result<SecretSlot, ManifestError> {
-    let deliver = machines
-        .iter()
-        .map(|m| Delivery::Guest {
-            machine: m.clone(),
-            transport: isoloom_manifest::Transport::Ssh,
-            during_step: None,
-        })
-        .collect::<Vec<_>>();
+/// and GCP are a hardening): the runner reads it from its `source` (as on every target) and
+/// writes it into `/var/lib/isoloom/secrets/<name>`, and the machine's set-up waits for it. The
+/// value reaches no generated file and no state.
+pub(crate) fn guest_secret(name: &str, source: SecretSource, machines: &[isoloom_manifest::Name]) -> Result<SecretSlot, ManifestError> {
     Ok(SecretSlot {
         name: Identifier::parse(name)?,
         kind: SlotKind::Secret,
-        required: false,
-        sensitive,
+        required: true,
+        sensitive: true,
         machines: machines.to_vec(),
         providers: BTreeSet::new(),
-        source: None,
-        default: Some(String::new()),
-        deliver: NonEmpty::new(deliver, "the machines receiving the secret")?,
+        source: Some(source),
+        default: None,
+        deliver: NonEmpty::new(machines.iter().map(guest).collect(), "the machines receiving the secret")?,
     })
+}
+
+/// Guest delivery to `machine` over SSH, once `up`'s steps are done.
+fn guest(machine: &isoloom_manifest::Name) -> Delivery {
+    Delivery::Guest {
+        machine: machine.clone(),
+        transport: isoloom_manifest::Transport::Ssh,
+        during_step: None,
+    }
 }
 
 #[cfg(test)]

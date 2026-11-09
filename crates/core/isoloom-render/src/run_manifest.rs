@@ -19,6 +19,24 @@ use isoloom_plan::checks::{Probe, Resolved};
 use isoloom_plan::{Environment, MachinePlan, PublishedPort};
 use isoloom_spec::model;
 
+/// Where the runner reads secret `source` when the embedder gives no value: its store and what
+/// the store is asked for, as the spec writes it. An input's file has none: the input's own slot
+/// carries its value.
+#[must_use]
+pub fn secret_source(source: &model::SecretSource) -> Option<isoloom_manifest::SecretSource> {
+    let store = match source {
+        model::SecretSource::Env { .. } => isoloom_manifest::Store::Env,
+        model::SecretSource::File { .. } => isoloom_manifest::Store::File,
+        model::SecretSource::Vault { .. } => isoloom_manifest::Store::Vault,
+        model::SecretSource::Sops { .. } => isoloom_manifest::Store::Sops,
+        model::SecretSource::Input { .. } => return None,
+    };
+    Some(isoloom_manifest::SecretSource {
+        store,
+        reference: source.reference().to_owned(),
+    })
+}
+
 /// What generated files and messages call the program that executes a run manifest: no
 /// particular one, the contract it follows. The one phrase every target says it with.
 pub const RUNNER: &str = "the runner (run.json)";

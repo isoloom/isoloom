@@ -65,7 +65,7 @@ pub(crate) fn place(files: &[SecretFile]) -> String {
                 f.uid.unwrap_or(0),
                 f.gid.unwrap_or(0),
                 f.mode.unwrap_or(VM_DEFAULT_MODE),
-                f.name,
+                f.kept(),
                 quote(&f.path)
             )
         })
@@ -134,6 +134,15 @@ pub fn compose_variable(spec: &Spec, name: &str) -> String {
     }
 }
 
+/// The name secret `name`'s value is kept under on a machine: an input's file, the input's own
+/// name; a secret, its name (as [`SecretFile::kept`]).
+fn kept_name<'a>(spec: &'a Spec, name: &'a str) -> &'a str {
+    match spec.secrets.get(name) {
+        Some(SecretSource::Input { input }) => input,
+        _ => name,
+    }
+}
+
 /// On a Docker host, before `docker compose up`: the wait, then each secret of `names` in the
 /// variable the Compose file reads it from ([`compose_variable`]), its last line breaks kept.
 /// Nothing when there are none.
@@ -146,7 +155,8 @@ pub fn host_environment(spec: &Spec, names: &[String]) -> String {
         .iter()
         .map(|name| {
             let var = compose_variable(spec, name);
-            format!("{var}=\"$(cat {KEPT_DIR}/{name}; printf x)\"; {var}=\"${{{var}%x}}\"; export {var}\n")
+            let kept = kept_name(spec, name);
+            format!("{var}=\"$(cat {KEPT_DIR}/{kept}; printf x)\"; {var}=\"${{{var}%x}}\"; export {var}\n")
         })
         .collect::<Vec<_>>()
         .concat();

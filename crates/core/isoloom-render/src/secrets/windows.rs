@@ -76,7 +76,7 @@ fn receive(names: &[String], files: &[SecretFile]) -> String {
 pub(crate) fn place(files: &[SecretFile]) -> String {
     let set: String = files
         .iter()
-        .map(|f| format!("Set-IsoloomSecret {} {}\n", powershell::quote(&f.name), powershell::quote(&path(&f.path))))
+        .map(|f| format!("Set-IsoloomSecret {} {}\n", powershell::quote(f.kept()), powershell::quote(&path(&f.path))))
         .collect::<Vec<_>>()
         .concat();
     format!(

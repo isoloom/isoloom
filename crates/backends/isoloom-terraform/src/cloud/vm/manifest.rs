@@ -158,29 +158,35 @@ fn runners(env: &Environment, guests: &[Guest]) -> Result<Vec<CheckRunner>, Mani
     Ok(out)
 }
 
-/// The launch's plain values (`sensitive: false`), one entry each of the module's `inputs`,
-/// written into the machines that read them by their own set-up.
+/// The launch's values (inputs), each one slot: an entry of the module's `inputs` for the
+/// machines reading it in their environment, delivered over SSH to those reading it as a file;
+/// then each secret a machine reads.
 fn inputs(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
     let spec = env.spec();
     let mut out = Vec::new();
     for input in &spec.inputs {
-        let readers = manifest::input_readers(env, input)?;
-        if readers.is_empty() {
-            continue;
-        }
+        let env_readers = manifest::input_readers(env, input)?;
+        let file_readers: Vec<Name> = vms(env)
+            .filter(|(_, mp)| mp.reads_input_file(input))
+            .map(|(n, _)| Name::parse(n))
+            .collect::<Result<_, _>>()?;
         let sensitive = !spec.plain_inputs.contains(input);
-        out.push(connection::input(input, sensitive, readers)?);
+        out.extend(connection::input(input, sensitive, &env_readers, &file_readers)?);
     }
     out.extend(machine_secrets(env)?);
     Ok(out)
 }
 
-/// Each secret a machine reads (`secrets:`): delivered over SSH, so the value stays out of the
-/// state. Owners are the machine's set-up's business (its `Secrets` step places the file).
+/// Each secret a machine reads (`secrets:`), from its store: delivered over SSH, so the value
+/// stays out of the state. Owners are the machine's set-up's business (its `Secrets` step places
+/// the file). An input's file is the input's own slot.
 fn machine_secrets(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
     let spec = env.spec();
     let mut out = Vec::new();
-    for name in spec.secrets.keys() {
+    for (name, source) in &spec.secrets {
+        let Some(source) = isoloom_render::run_manifest::secret_source(source) else {
+            continue;
+        };
         let readers: Vec<Name> = vms(env)
             .filter(|(_, mp)| mp.secrets.iter().any(|s| &s.name == name))
             .map(|(n, _)| Name::parse(n))
@@ -188,7 +194,7 @@ fn machine_secrets(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> 
         if readers.is_empty() {
             continue;
         }
-        out.push(connection::guest_secret(name, true, &readers)?);
+        out.push(connection::guest_secret(name, source, &readers)?);
     }
     Ok(out)
 }

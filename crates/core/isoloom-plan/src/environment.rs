@@ -203,6 +203,21 @@ impl MachinePlan {
     pub fn is_windows(&self) -> bool {
         self.os.as_deref().is_some_and(images::is_windows)
     }
+
+    /// Whether it reads the launch-time input `input`: in its environment, or as a file
+    /// (`files: [{ path, input }]`).
+    #[must_use]
+    pub fn reads_input(&self, input: &str) -> bool {
+        self.inputs.iter().any(|i| i == input) || self.reads_input_file(input)
+    }
+
+    /// Whether it reads the launch-time input `input` as a file (`files: [{ path, input }]`).
+    #[must_use]
+    pub fn reads_input_file(&self, input: &str) -> bool {
+        self.secrets
+            .iter()
+            .any(|s| matches!(&s.source, crate::secrets::ValueSource::Input(i) if i == input))
+    }
 }
 
 /// A route to a network a machine isn't on.

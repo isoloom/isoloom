@@ -102,9 +102,9 @@ pub(crate) fn secret_files(r: &mut Ruby, env: &Environment, machine: &str, os: O
         return;
     };
     let mut seen = std::collections::BTreeSet::new();
-    let unique: Vec<&SecretFile> = mp.secrets.iter().filter(|f| seen.insert(f.name.as_str())).collect();
+    let unique: Vec<&SecretFile> = mp.secrets.iter().filter(|f| seen.insert(f.kept())).collect();
     let read: Vec<(String, Value)> = unique.iter().map(|f| secret_value(f)).collect();
-    let values: Vec<(String, String)> = unique.iter().zip(&read).map(|(f, (var, _))| (f.name.clone(), var.clone())).collect();
+    let values: Vec<(String, String)> = unique.iter().zip(&read).map(|(f, (var, _))| (f.kept().to_owned(), var.clone())).collect();
     let script = match os {
         Os::Linux => secrets::from_environment(&values, &mp.secrets),
         Os::Windows => secrets::windows::from_environment(&values, &mp.secrets),
@@ -165,11 +165,12 @@ machines:
         );
         assert!(!s.contains("isoloom run"), "nothing waits for the old runtime: {s}");
         assert!(
-            s.contains("install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/input-flag '/srv/flag'"),
+            // An input's file is kept under the input's own name, the slot a run manifest gives it.
+            s.contains("install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/FLAG '/srv/flag'"),
             "{s}"
         );
         let w = text(|r| secret_files(r, &env, "dc", Os::Windows));
-        assert!(w.contains("'input-flag' = 'ISOLOOM_SECRET_INPUT_FLAG'") && !w.contains("isoloom run"), "{w}");
+        assert!(w.contains("'FLAG' = 'ISOLOOM_SECRET_INPUT_FLAG'") && !w.contains("isoloom run"), "{w}");
     }
 
     #[test]
