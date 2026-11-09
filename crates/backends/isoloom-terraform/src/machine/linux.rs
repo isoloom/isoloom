@@ -90,6 +90,30 @@ pub(crate) fn depends_on(env: &Environment, mp: &MachinePlan) -> Vec<Expression>
         .collect()
 }
 
+/// Where a walk through a machine's steps is, as both transports split and extend them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum At<'a> {
+    /// The machine is about to close itself off (before its first `Egress`, `Tc` or `Ready`
+    /// step): `Hooks::before_egress` goes here.
+    Closing,
+    /// A `reboot` step: the part ends.
+    Reboot,
+    /// Any other step.
+    Step(&'a Step),
+}
+
+/// `steps` in order, [`At::Closing`] once before the first that closes the machine off and each
+/// `reboot` as [`At::Reboot`].
+fn walk<'a>(steps: impl IntoIterator<Item = &'a Step>) -> impl Iterator<Item = At<'a>> {
+    let mut closing = false;
+    steps.into_iter().flat_map(move |step| {
+        let closes = !closing && matches!(step, Step::Egress | Step::Tc | Step::Ready);
+        closing |= closes;
+        let at = if *step == Step::Reboot { At::Reboot } else { At::Step(step) };
+        closes.then_some(At::Closing).into_iter().chain(std::iter::once(at))
+    })
+}
+
 /// The commands, one list per part between `reboot` steps.
 fn parts(m: &Machine) -> Vec<Vec<Expression>> {
     let (Remote { env, name, plan, .. }, hooks) = (&m.remote, &m.hooks);
@@ -102,26 +126,26 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
     first.extend(hooks.at_boot.iter().cloned());
     let (mut done, mut part) = (Vec::new(), first);
     let mut again: Vec<Template> = Vec::new();
-    let mut closing = false;
-    for step in plan.lifecycle.iter().filter(|s| !(hooks.skip)(s)) {
-        if !closing && matches!(step, Step::Egress | Step::Tc | Step::Ready) {
-            part.extend(hooks.before_egress.iter().cloned());
-            closing = true;
-        }
-        if *step == Step::Reboot {
-            part.push(Shell::Sudo.command(&steps::record_boot()).into());
-            let mut next: Vec<Template> = vec!["set -e".into(), Shell::Sudo.command(&steps::reboot_check()).into()];
-            next.extend(hooks.after_reboot.iter().chain(&hooks.at_boot).cloned());
-            next.extend(again.iter().cloned());
-            done.push(std::mem::replace(&mut part, next));
-        } else if let Some(c) = Shell::Sudo.tracked_step(env, name, step) {
-            if at_every_boot(step)
-                && let Some(raw) = Shell::Sudo.step(env, name, step)
-            {
-                // Re-run after a reboot (the interfaces), without a repeated progress mark.
-                again.push(raw.into());
+    for at in walk(plan.lifecycle.iter().filter(|s| !(hooks.skip)(s))) {
+        match at {
+            At::Closing => part.extend(hooks.before_egress.iter().cloned()),
+            At::Reboot => {
+                part.push(Shell::Sudo.command(&steps::record_boot()).into());
+                let mut next: Vec<Template> = vec!["set -e".into(), Shell::Sudo.command(&steps::reboot_check()).into()];
+                next.extend(hooks.after_reboot.iter().chain(&hooks.at_boot).cloned());
+                next.extend(again.iter().cloned());
+                done.push(std::mem::replace(&mut part, next));
             }
-            part.push(c.into());
+            At::Step(step) => {
+                let Some(c) = Shell::Sudo.tracked_step(env, name, step) else { continue };
+                if at_every_boot(step)
+                    && let Some(raw) = Shell::Sudo.step(env, name, step)
+                {
+                    // Re-run after a reboot (the interfaces), without a repeated progress mark.
+                    again.push(raw.into());
+                }
+                part.push(c.into());
+            }
         }
     }
     done.push(part);
@@ -158,23 +182,21 @@ pub(crate) fn set_up(env: &Environment, (name, mp): (&str, &MachinePlan), user: 
     first.extend(hooks.at_boot.iter().map(|c| Tracked::new("the machine's interfaces", c.clone())));
     again.extend(hooks.at_boot.iter().cloned());
     let (mut parts, mut part) = (Vec::new(), first);
-    let mut closing = false;
-    for step in mp
+    let steps = mp
         .lifecycle
         .iter()
-        .filter(|s| !(hooks.skip)(s) && !matches!(s, Step::Project | Step::Inputs { .. }))
-    {
-        if !closing && matches!(step, Step::Egress | Step::Tc | Step::Ready) {
-            part.extend(hooks.before_egress.iter().map(|c| Tracked::new("published ports", c.clone())));
-            closing = true;
-        }
-        if *step == Step::Reboot {
-            parts.push(std::mem::take(&mut part));
-        } else if let Some(c) = Shell::Root.step(env, name, step) {
-            if at_every_boot(step) {
-                again.push(c.clone().into());
+        .filter(|s| !(hooks.skip)(s) && !matches!(s, Step::Project | Step::Inputs { .. }));
+    for at in walk(steps) {
+        match at {
+            At::Closing => part.extend(hooks.before_egress.iter().map(|c| Tracked::new("published ports", c.clone()))),
+            At::Reboot => parts.push(std::mem::take(&mut part)),
+            At::Step(step) => {
+                let Some(c) = Shell::Root.step(env, name, step) else { continue };
+                if at_every_boot(step) {
+                    again.push(c.clone().into());
+                }
+                part.push(Tracked::new(cloud_init::label(step), c));
             }
-            part.push(Tracked::new(cloud_init::label(step), c));
         }
     }
     parts.push(part);
@@ -182,5 +204,28 @@ pub(crate) fn set_up(env: &Environment, (name, mp): (&str, &MachinePlan), user: 
         each_boot: vec![expiry_shutdown()],
         parts,
         again,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_walk_marks_closing_once_and_each_reboot() {
+        let steps = [Step::Project, Step::Reboot, Step::Egress, Step::Tc, Step::Reboot, Step::Ready];
+        let got: Vec<At<'_>> = walk(&steps).collect();
+        assert_eq!(
+            got,
+            [
+                At::Step(&Step::Project),
+                At::Reboot,
+                At::Closing,
+                At::Step(&Step::Egress),
+                At::Step(&Step::Tc),
+                At::Reboot,
+                At::Step(&Step::Ready),
+            ]
+        );
     }
 }
