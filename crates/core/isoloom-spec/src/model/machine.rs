@@ -228,7 +228,7 @@ pub struct Machine {
     #[serde(default)]
     pub access: bool,
     /// How a container produces this machine: an image or a build, and what only a container
-    /// has (init jobs, appliances). A machine with `docker:` can run on the container targets.
+    /// has (init jobs, appliances).
     #[serde(default)]
     pub docker: Option<DockerImpl>,
     /// How a VM produces this machine (services installed natively, no Docker inside).

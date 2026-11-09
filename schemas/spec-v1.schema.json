@@ -168,7 +168,7 @@
         },
         "switch": {
           "type": "string",
-          "description": "On a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance:\ncisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.\nIts ports are derived, so the machine lists no `networks`: an access port per VLAN, then\na trunk per machine on several of the LAN's VLANs. Docker targets only."
+          "description": "On a LAN split into `vlans`: a switch appliance of the environment (`app.appliance:\ncisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.\nIts ports are derived, so the machine lists no `networks`: an access port per VLAN, then\na trunk per machine on several of the LAN's VLANs. Docker targets only."
         },
         "tc": {
           "description": "Link impairment on traffic entering this network through Isoloom's router (a slow or\nlossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule\ntouching it, no `gateway` machine).",

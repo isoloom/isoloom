@@ -76,7 +76,7 @@ An entry is a folder `catalogue/<entry>/`:
 | `contract.yml` | by hand | the parity contract: the facts that must read the same in both forms |
 | `files/` | by hand | the entry's own templates, each carrying an `SPDX-License-Identifier: Apache-2.0` header |
 
-The catalogue is embedded in the binary at build time (text files only, under 1 MB each);
+The catalogue is embedded in the binary at build time (text files only, under 1 MB in all);
 generating never reads the disk or the network for it. Shared data lives beside the entries:
 `catalogue/daemons.yml` (the daemons no entry owns, with their foreground forms) and
 `catalogue/collections.yml` (the pinned Ansible Galaxy collections, referenced from Galaxy and

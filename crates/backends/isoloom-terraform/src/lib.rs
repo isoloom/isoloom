@@ -1,5 +1,5 @@
 //! The Terraform backends of Isoloom: an environment's plan ([`isoloom_plan::Environment`])
-//! rendered as Terraform modules, with the HCL builder of `isoloom-render`.
+//! rendered as Terraform modules, with the crate's own HCL builder.
 //!
 //! - **Server targets**: `proxmox` ([`ProxmoxBackend`]) and a standalone ESXi host
 //!   ([`EsxiBackend`]), each environment behind a router VM of its own.

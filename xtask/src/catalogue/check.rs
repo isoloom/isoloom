@@ -3,9 +3,8 @@
 //! checkout's `isoloom`, then run through a runner's command line (`up`, `check --json`, `down`)
 //! on a container target (`docker`) and a VM target (`vagrant`, on `--provider`). A case passes
 //! when every check passes in both forms and every fact reads the same in both. There is no Cargo
-//! dependency on a runner: its command line is found on `PATH` or given with `--runner`, so the
-//! repositories still depend one way. Writing `conformance.json` and the catalogue page is the
-//! conformance unit's (4.6); this is the harness they wire up.
+//! dependency on a runner: its command line is given with `--runner`, so the repositories still
+//! depend one way. It reports each case's verdict; it writes no file.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

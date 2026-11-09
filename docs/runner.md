@@ -97,8 +97,10 @@ the runners found.
 
 The spec names secrets and inputs and where each reaches a machine (usually a file); the manifest
 turns each into a **slot** — a name and a destination, with an optional `default`, but no value.
-At run time the runner reads each value from its store (a cloud secret store, the host
-environment, or SSH guest delivery) and delivers it. Values never land in a generated file, the
+At run time the runner reads each value (the embedder's, else from the slot's `source`: the
+runner's environment, a file, HashiCorp Vault or a SOPS-encrypted file) and delivers it as the
+slot says: an environment variable of some steps, a Terraform variable, a file in the run's state
+folder, or a file written into the machine over SSH (guest delivery). Values never land in a generated file, the
 run's state, an event or a log.
 
 ## The egress seal

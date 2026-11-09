@@ -122,7 +122,7 @@ Whether machines on it may reach the internet (default: as the LAN).
 
 ### `networks.*.switch`
 
-On a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance: cisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch. Its ports are derived, so the machine lists no `networks`: an access port per VLAN, then a trunk per machine on several of the LAN's VLANs. Docker targets only.
+On a LAN split into `vlans`: a switch appliance of the environment (`app.appliance: cisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch. Its ports are derived, so the machine lists no `networks`: an access port per VLAN, then a trunk per machine on several of the LAN's VLANs. Docker targets only.
 
 - **Type:** string
 

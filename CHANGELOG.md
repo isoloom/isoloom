@@ -102,8 +102,8 @@ stable spec format.
   "runner", which is what runs a run manifest: the generated script's header ("run by Isoloom's
   supervisor"), the shell library's message for a service left to it, and the docs say so. The
   script's paths (`.isoloom/configure/<machine>/run`, `/usr/local/bin/isoloom-run`) are unchanged.
-  In the library, `isoloom_render::configure::runner` is `configure::supervisor` and
-  `ContainerProcess::is_runner` is `is_supervisor`.
+  In the library, `ContainerProcess::is_runner` is `is_supervisor` (the configure module is
+  crate-internal, below).
 - The tier list's evidence notes (`isoloom targets --json`, `isoloom matrix --json`) name no
   particular runner or build of one: "re-validated end to end through a runner".
 - **Every Terraform module describes `ssh_public_key` the same way** ("The SSH public key the
@@ -143,8 +143,8 @@ stable spec format.
     tags.
 - **AWS `cloud-vm` instances are hardened as the `cloud-docker` host is**: an encrypted gp3 root
   disk, instance metadata by session token only (IMDSv2), and terminated when they shut
-  themselves down (the run's expiry), not left stopped. A machine's own AMI (`vm.image.aws`) must
-  support IMDSv2.
+  themselves down (the run's expiry), not left stopped. A machine's own AMI
+  (`overrides.aws.machines.<machine>.image`) must support IMDSv2.
 - **DigitalOcean's `cloud-docker` firewall lets ICMP out**, as `cloud-vm`'s does: ping and path
   MTU discovery from the containers (every other cloud lets everything out).
 - **One rule for what several crates wrote each their own way** (library): a check runner's name
@@ -272,8 +272,9 @@ stable spec format.
   `secrets::windows::{PLACE_SCRIPT, PLACE_TASK}`, `isoloom_spec::windows::expects_tpm`,
   `profile::valid_name`, `syntax::placeholder::Reference::allowed_in` and `FileSource::is_value`.
 - **`isoloom_targets::matrix::Row::is_field`**, which only the matrix's own tests called.
-- **`isoloom_manifest::access::DEFAULT_IMAGE`** (Kali's image), which nothing could reach: an
-  access machine's Compose service always has its planned image to fall back on.
+- **`isoloom_manifest::access::DEFAULT_IMAGE`** (Kali's image), which nothing read: an access
+  machine's Compose service runs its planned image (its OS's or `--images`'), and one with
+  neither (no `os`) has no image at all.
 - **More items only their own crate used**, now crate-internal (nothing outside it, Isoloom's
   consumers included, named them): `isoloom_ansible::configure::role_name`,
   `isoloom_catalogue::{Catalogue::shared_daemons, ContractCheck::runs_in, Release::os_list,

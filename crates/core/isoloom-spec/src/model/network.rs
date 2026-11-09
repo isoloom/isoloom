@@ -34,7 +34,7 @@ pub struct Network {
     /// `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub vlans: IndexMap<u16, Vlan>,
-    /// On a LAN split into `vlans`: a switch appliance of the environment (`docker.appliance:
+    /// On a LAN split into `vlans`: a switch appliance of the environment (`app.appliance:
     /// cisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.
     /// Its ports are derived, so the machine lists no `networks`: an access port per VLAN, then
     /// a trunk per machine on several of the LAN's VLANs. Docker targets only.
