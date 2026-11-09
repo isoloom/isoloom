@@ -4,8 +4,8 @@
 //! SSH through the router.
 
 use isoloom_manifest::{
-    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Part, PathTemplate, Placeholder, ReadyGrammar, RelPath, RunVar, Seal,
-    SnakeName, Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Part, PathTemplate, Placeholder, RelPath, RunVar, Seal, SnakeName,
+    Step, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{action_with, timeout_s};
@@ -104,23 +104,7 @@ pub(super) fn ready(env: &Environment) -> Result<Vec<Condition>, ManifestError> 
 
 /// The ready file of the machine at `host`, read through the router.
 fn ready_file(host: &str, within: u32) -> Result<Condition, ManifestError> {
-    let unset = || ManifestError::OutOfRange {
-        what: "a timeout",
-        value: 0,
-        min: 1,
-        max: u32::MAX.into(),
-    };
-    Ok(Condition::ReadyFile {
-        host: Template::text(host),
-        user: Template::text(USER),
-        path: output("ready_file")?,
-        log: Some(Template::text(SETUP_LOG)),
-        grammar: ReadyGrammar::V1,
-        via: Some(through_router()?),
-        timeout_s: secs(within).ok_or_else(unset)?,
-        unreachable_timeout_s: secs(UNREACHABLE_S),
-        interval_s: secs(10).ok_or_else(unset)?,
-    })
+    manifest::ready_file(Template::text(host), USER, SETUP_LOG, Some(through_router()?), within)
 }
 
 /// `isoloom@${outputs.ip}`: the router, the machines' jump host.

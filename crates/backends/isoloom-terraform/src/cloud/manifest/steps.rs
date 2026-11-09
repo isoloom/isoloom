@@ -6,15 +6,15 @@
 use std::collections::BTreeMap;
 
 use isoloom_manifest::{
-    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, ReadyGrammar, RelPath, Run,
-    RunVar, Seal, SnakeName, Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RelPath, Run, RunVar, Seal,
+    SnakeName, Step, Template,
 };
 use isoloom_render::run_manifest::noted;
 use isoloom_render::steps::PROJECT_DIR;
 
 use super::connection::SEALED;
 use crate::machine::user_data::{DELIVERED, SETUP_LOG};
-use crate::module::manifest::{self, UNREACHABLE_S, id, output, secs, terraform, words};
+use crate::module::manifest::{self, id, secs, terraform, words};
 
 /// The values the runner gives a cloud module: its key, which the machines let in.
 const VARS: &[(&str, RunVar)] = &[("TF_VAR_ssh_public_key", RunVar::SshPublicKey)];
@@ -165,24 +165,8 @@ pub(crate) fn ready(guests: &[Guest]) -> Result<Vec<Condition>, ManifestError> {
         step: id("apply")?,
         means: Some("the machines exist and booted; each sets itself up from its user data once the project is in".into()),
     }];
-    let unset = || ManifestError::OutOfRange {
-        what: "a timeout",
-        value: 0,
-        min: 1,
-        max: u32::MAX.into(),
-    };
     for g in guests {
-        out.push(Condition::ReadyFile {
-            host: g.address.clone(),
-            user: Template::text(&g.user),
-            path: output("ready_file")?,
-            log: Some(Template::text(SETUP_LOG)),
-            grammar: ReadyGrammar::V1,
-            via: None,
-            timeout_s: secs(g.setup_s).ok_or_else(unset)?,
-            unreachable_timeout_s: secs(UNREACHABLE_S),
-            interval_s: secs(10).ok_or_else(unset)?,
-        });
+        out.push(crate::module::manifest::ready_file(g.address.clone(), &g.user, SETUP_LOG, None, g.setup_s)?);
     }
     Ok(out)
 }
