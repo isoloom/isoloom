@@ -9,6 +9,8 @@
 //!   OS), the other machines' names, settings, routes, waits for dependencies, the `provision`
 //!   steps (`.sh` with sh, `.yml` / `.yaml` with Ansible inside the VM, `reboot` with Vagrant's
 //!   own restart), egress rules, readiness.
+//! - A machine's `host_folders`: its provider's own two-way shared folder, set in that
+//!   provider's block, the providers with none refused (`crate::host_folders`).
 //! - Machines start in dependency order; Vagrant boots and provisions them one after the
 //!   other, so a machine's services are installed before the machines depending on it start.
 //! - Inputs are read from the environment (empty when unset), passed only to the machines

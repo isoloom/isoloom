@@ -5,12 +5,13 @@
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, Lifetime, MachinePlan, MachineShape, VolumeKind};
-use isoloom_render::container::UTILITY_IMAGE;
+use isoloom_render::container::{UTILITY_IMAGE, host_folders};
 use isoloom_spec::model::Machine;
 use isoloom_spec::shell;
 
-use crate::file::{Condition, LongMount, Mount, NetworkMode, Restart, Service, TmpfsOptions, Volume, VolumeOptions};
+use crate::file::{BindOptions, Condition, LongMount, Mount, NetworkMode, Restart, Service, TmpfsOptions, Volume, VolumeOptions};
 use crate::labels::PERSISTENT_LABEL;
+use crate::layout::ROOT;
 
 /// The one-shot service creating the folders machines take of shared volumes.
 pub(crate) const FOLDERS_JOB: &str = "isoloom-volume-folders";
@@ -49,6 +50,25 @@ pub(crate) fn tmpfs(machine: &Machine) -> (Vec<String>, Vec<Mount>) {
         }));
     }
     (plain, long)
+}
+
+/// A machine's host folders, each bound from `${<its variable>:-<where it is on this computer>}`:
+/// the folder itself on this computer's Docker, where the VM shares it when Compose runs in one
+/// (the commands there set the variable). Created when missing.
+pub(crate) fn host_folders(name: &str, machine: &Machine) -> Vec<Mount> {
+    machine
+        .host_folders
+        .iter()
+        .enumerate()
+        .map(|(n, f)| {
+            Mount::Long(LongMount::Bind {
+                source: format!("${{{}:-{}}}", host_folders::variable(name, n), host_folders::on_this_computer(f, ROOT)),
+                target: f.path.clone(),
+                read_only: f.read_only,
+                bind: BindOptions { create_host_path: true },
+            })
+        })
+        .collect()
 }
 
 /// The named volumes of the containers: each machine's (shared ones once), then its disks'. A

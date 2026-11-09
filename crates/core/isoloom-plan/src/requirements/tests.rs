@@ -112,6 +112,10 @@ fn about_storage() -> Vec<(Requirement, &'static str)> {
         (Requirement::DataDisks { machine: web() }, "machine `web` has data disks (`disks`)"),
         (Requirement::RawDisks { machine: web() }, "machine `web` has a raw disk (`fs: raw`)"),
         (Requirement::TmpfsModes { machine: web() }, "machine `web` sets a tmpfs `mode`"),
+        (
+            Requirement::HostFolders { machine: web() },
+            "machine `web` mounts a folder of the computer that runs the lab (`host_folders`)",
+        ),
     ]
 }
 

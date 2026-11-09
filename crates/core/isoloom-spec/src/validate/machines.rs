@@ -68,6 +68,7 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         addresses(&s, blocks, &mut taken, p);
         more_addresses(&s, blocks, &mut taken, p);
         super::volumes::of_machine(&s, p);
+        super::host_folders::of_machine(&s, p);
         super::ports::of_machine(&s, &mut published, p);
         for (i, input) in m.inputs.iter().enumerate() {
             if !spec.inputs.contains(input) {

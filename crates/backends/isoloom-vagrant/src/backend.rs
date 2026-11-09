@@ -70,5 +70,7 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::DataDisks,
         Feature::RawDisks,
         Feature::TmpfsModes,
+        // Each provider's own shared folder; `provider_refusal` refuses the ones with none.
+        Feature::HostFolders,
     ])
 }

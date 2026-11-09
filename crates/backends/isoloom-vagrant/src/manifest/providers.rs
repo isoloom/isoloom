@@ -104,12 +104,13 @@ pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Iden
 }
 
 /// The providers `docker-vm`'s Vagrantfile has a block for (all but Hyper-V), its one VM a plain
-/// Debian one, so nothing of the lab rules a provider out; and Vagrant's state folder for the run.
-pub(super) fn docker_vm_identity(dotfile: &PathTemplate) -> Result<Identity> {
+/// Debian one, so only the containers' host folders rule a provider out (one that shares none);
+/// and Vagrant's state folder for the run.
+pub(super) fn docker_vm_identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
     let providers = PROVIDERS
         .iter()
         .filter(|k| k.id != Provider::Hyperv)
-        .map(|k| provider(k, Elevation::None, None))
+        .map(|k| provider(k, Elevation::None, crate::host_folders::docker_vm_refusal(env.spec(), k.name)))
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {
         providers,

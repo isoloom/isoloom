@@ -13,7 +13,7 @@ pub(crate) use hardware::{DeviceRequest, Reservations, ServiceDevice};
 pub(crate) use network::{Attachment, Block, Ipam, Network};
 pub(crate) use secret::{Secret, ServiceSecret};
 pub(crate) use service::{Build, Condition, Deploy, Healthcheck, Limits, NetworkMode, Resources, Restart, Seconds, Service, Ulimit};
-pub(crate) use storage::{LongMount, Mount, TmpfsOptions, Volume, VolumeOptions};
+pub(crate) use storage::{BindOptions, LongMount, Mount, TmpfsOptions, Volume, VolumeOptions};
 
 use indexmap::IndexMap;
 use serde::Serialize;

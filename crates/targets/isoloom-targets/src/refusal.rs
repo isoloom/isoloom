@@ -63,7 +63,10 @@ pub fn refusal(lab: &Lab, target: Target) -> Option<String> {
 /// network (QEMU gives it one); on `utm`, a VM is on none (`vagrant_utm` has no private
 /// networks); on `hyperv`, a machine whose OS has no known Hyper-V box needs a box override;
 /// `qemu`, `hyperv` and `libvirt` have no bridged networks yet; a machine booting its own way
-/// (`hardware.boot`) runs on `libvirt` (on `qemu` with UEFI and `firmware_format` only).
+/// (`hardware.boot`) runs on `libvirt` (on `qemu` with UEFI and `firmware_format` only); a
+/// machine's host folders (`host_folders`) aren't shared on `hyperv` and `vmware_esxi` (nor
+/// read-only on `qemu`). `docker-vm` refuses a container's host folders on `vmware_esxi` and
+/// `proxmox` (its Proxmox module isn't written then).
 #[must_use]
 pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<String> {
     refusal(lab, target).or_else(|| match (target, provider) {
@@ -71,6 +74,7 @@ pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<S
             let spec = lab.for_target(target);
             isoloom_vagrant::provider_refusal(&spec, p).or_else(|| isoloom_vagrant::disk_refusal(&spec, p))
         }
+        (Target::DockerVm, Some(p)) => isoloom_vagrant::docker_vm_refusal(&lab.for_target(target), p),
         _ => None,
     })
 }

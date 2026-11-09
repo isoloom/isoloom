@@ -50,14 +50,14 @@ Values given at each start (a flag, a launch token): a list of names, or a map o
 Machine fields every machine shares (a machine's own value wins).
 
 - **Type:** mapping
-- **Holds:** `os`, `service`, `with`, `app`, `command`, `setup`, `healthcheck`, `depends_on`, `environment`, `files`, `volumes`, `disks`, `tmpfs`, `resources`, `hardware`, `dns`, `privileged`, `read_only`, `shm_size`, `sysctls`, `ulimits`, `rate_limit`, each as on a machine
+- **Holds:** `os`, `service`, `with`, `app`, `command`, `setup`, `healthcheck`, `depends_on`, `environment`, `files`, `volumes`, `disks`, `host_folders`, `tmpfs`, `resources`, `hardware`, `dns`, `privileged`, `read_only`, `shm_size`, `sysctls`, `ulimits`, `rate_limit`, each as on a machine
 
 ### `groups`
 
 Named sets of machines sharing fields, also Ansible inventory groups and `overrides` keys.
 
 - **Type:** map of name to mapping
-- **Holds:** `os`, `service`, `with`, `app`, `command`, `setup`, `healthcheck`, `depends_on`, `environment`, `files`, `volumes`, `disks`, `tmpfs`, `resources`, `hardware`, `dns`, `privileged`, `read_only`, `shm_size`, `sysctls`, `ulimits`, `rate_limit`, `members`, each as on a machine
+- **Holds:** `os`, `service`, `with`, `app`, `command`, `setup`, `healthcheck`, `depends_on`, `environment`, `files`, `volumes`, `disks`, `host_folders`, `tmpfs`, `resources`, `hardware`, `dns`, `privileged`, `read_only`, `shm_size`, `sysctls`, `ulimits`, `rate_limit`, `members`, each as on a machine
 
 ### `message`
 
@@ -1094,6 +1094,30 @@ Its filesystem: `ext4` (the default on Linux), `xfs`, `ntfs` (the default on Win
 Where it is mounted: an absolute path on Linux and in containers, a drive letter (`E:`) on Windows. Required unless the disk is `raw`.
 
 - **Type:** string
+
+### `machines.*.host_folders`
+
+Folders of the computer that runs the lab, mounted in the machine both ways (what it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, UTM, QEMU with `virtiofsd`, libvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.
+
+- **Type:** list of mappings
+
+### `machines.*.host_folders[].from`
+
+The folder on the computer that runs the lab: relative to the project folder (`shared`, `../notes`), in the home folder of the user running it (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist; a home or absolute one is the running computer's (the lab may run on another computer than the one generating it), so it isn't checked, and it is created when missing.
+
+- **Type:** string
+
+### `machines.*.host_folders[].path`
+
+The absolute path in the machine (Linux machines), not inside Isoloom's own folders (`/opt/isoloom`, `/var/lib/isoloom`, `/etc/isoloom`) or the kernel's (`/proc`, `/sys`, `/dev`), nor one of its volumes, disks or tmpfs mounts.
+
+- **Type:** string
+
+### `machines.*.host_folders[].read_only`
+
+The machine only reads it (it can't write there). Off by default.
+
+- **Type:** boolean
 
 ### `machines.*.tmpfs`
 

@@ -76,6 +76,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
         volumes: m.volumes.clone(),
         files,
         disks: m.disks.clone(),
+        host_folders: m.host_folders.clone(),
         access: m.access,
         vm: vm(l.source, name, m, service),
         docker,

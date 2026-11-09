@@ -24,6 +24,7 @@ mod external;
 mod generate;
 mod groups;
 mod hardware;
+mod host_folders;
 mod instance;
 mod machine_settings;
 mod matrix;

@@ -58,6 +58,13 @@ fn a_build_with_a_published_image_emits_both_image_and_build() -> Outcome {
 }
 
 #[test]
+fn a_machine_binds_folders_of_the_computer_that_runs_the_lab() -> Outcome {
+    let fixture = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/host-folders.yml"))?;
+    insta::assert_snapshot!(compose(render(isoloom_spec::parse(&fixture)?)?)?);
+    Ok(())
+}
+
+#[test]
 fn hello_stack() -> Outcome {
     insta::assert_snapshot!(compose(example("hello-stack")?)?);
     Ok(())

@@ -81,6 +81,20 @@ fn ansible_pair_from_the_controller() -> Outcome {
     Ok(())
 }
 
+/// A VM mounting three folders of the computer that runs the lab: one of the project, one of the
+/// home folder (read-only), one absolute.
+const SHARED_DESK: &str = "version: 1\nname: shared-desk\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  desk: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared }, { from: '~/notes', path: /home/notes, read_only: true }, { from: /srv/drop, path: /srv/drop }] }\n";
+
+#[test]
+fn a_vm_shares_folders_of_the_computer_with_each_providers_own_shared_folder() -> Outcome {
+    let files = VagrantBackend.render(&parsed(SHARED_DESK)?)?;
+    let vagrantfile = &files.iter().find(|f| f.path.ends_with("/Vagrantfile")).ok_or("no Vagrantfile")?.contents;
+    let start = vagrantfile.find("    # This computer's folders").ok_or("no host folders")?;
+    let end = vagrantfile.find("    m.vm.provision \"isoloom_project\"").ok_or("no project")?;
+    insta::assert_snapshot!(vagrantfile.get(start..end).ok_or("out of order")?);
+    Ok(())
+}
+
 #[test]
 fn rendering_twice_gives_the_same_files() -> Outcome {
     for example in ["hello-stack", "segmented", "edge-firewall", "vlan-office", "existing-hosts"] {

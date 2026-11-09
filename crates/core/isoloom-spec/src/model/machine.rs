@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{CommandLine, Disk, Dns, DockerImpl, External, Healthcheck, MachineFile, MachineSecret, Mount, Tmpfs, Ulimit, VmImpl};
+use super::{CommandLine, Disk, Dns, DockerImpl, External, Healthcheck, HostFolder, MachineFile, MachineSecret, Mount, Tmpfs, Ulimit, VmImpl};
 
 /// A machine's CPU architecture. Every target has one: a container platform, a box
 /// architecture, a cloud instance family. Defaults to x86-64.
@@ -219,6 +219,11 @@ pub struct Machine {
     /// disks go with the machine.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub disks: IndexMap<String, Disk>,
+    /// Folders of the computer that runs the lab, mounted in the machine both ways: `{ from,
+    /// path, read_only }`. A container binds it; a VM shares it with its provider's own shared
+    /// folders. The targets whose machines run elsewhere refuse it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub host_folders: Vec<HostFolder>,
     /// The machine the user lands on. It may have no implementation: the runner supplies it.
     #[serde(default)]
     pub access: bool,

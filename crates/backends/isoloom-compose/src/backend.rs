@@ -21,7 +21,7 @@ impl Backend for ComposeBackend {
     }
 
     fn capabilities(&self) -> Capabilities {
-        capabilities()
+        capabilities(self.0)
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
@@ -59,9 +59,11 @@ pub fn guest(env: &Environment) -> crate::Result<GuestCompose> {
 /// `provision:`, no Ansible checks; `exec` checks run inside a container. No bridged
 /// networks: a container reaches the host's LAN through a macvlan network made beforehand
 /// (`external`). Data disks are named volumes, a tmpfs takes a mode, and a volume can be kept
-/// past `down` or exist already; no raw disk (a container gets no block device).
-pub(crate) fn capabilities() -> Capabilities {
-    Capabilities::of([
+/// past `down` or exist already; no raw disk (a container gets no block device). Only on the
+/// `docker` target, folders of the computer that runs the lab: its containers run there (a
+/// hosting service's and the hybrid VM's don't).
+pub(crate) fn capabilities(target: Target) -> Capabilities {
+    let caps = Capabilities::of([
         Feature::NetworkAppliances,
         Feature::Gateways,
         Feature::MachineAliases,
@@ -83,7 +85,8 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::TmpfsModes,
         Feature::PersistentVolumes,
         Feature::ExternalVolumes,
-    ])
+    ]);
+    if target == Target::Docker { caps.with(Feature::HostFolders) } else { caps }
 }
 
 /// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
@@ -126,8 +129,18 @@ mod tests {
             Feature::ExternalVolumes,
         ];
         for f in own_host_only {
-            assert!(capabilities().has(f) && !capabilities_on_a_vm().has(f), "{f:?}");
+            assert!(capabilities(Target::Docker).has(f) && !capabilities_on_a_vm().has(f), "{f:?}");
         }
         assert!(capabilities_on_a_vm().has(Feature::Secrets));
+    }
+
+    #[test]
+    fn only_the_docker_targets_containers_run_on_the_computer_whose_folders_they_mount() {
+        let with: Vec<Target> = [Target::Docker, Target::Hosted, Target::Hybrid]
+            .into_iter()
+            .filter(|t| capabilities(*t).has(Feature::HostFolders))
+            .collect();
+        assert_eq!(with, [Target::Docker]);
+        assert!(!capabilities_on_a_vm().has(Feature::HostFolders), "the VM's backend shares them, when it can");
     }
 }

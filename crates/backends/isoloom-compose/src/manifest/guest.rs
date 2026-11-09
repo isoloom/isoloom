@@ -8,7 +8,7 @@
 
 use isoloom_manifest::{EnvName, Failure, Machine, Name, Part, Placeholder, PublishMode, StepId, Template};
 use isoloom_plan::Environment;
-use isoloom_render::container::{exec_runner, host_environment};
+use isoloom_render::container::{exec_runner, host_environment, host_folders};
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, GuestRunner};
 use isoloom_render::run_manifest::{DERIVED, check, derived_switch, networks, timeout_s};
 use isoloom_render::{OUTPUT_DIR, steps};
@@ -22,10 +22,13 @@ use crate::error::Result;
 use crate::file::ComposeFile;
 use crate::start::StartPlan;
 
-/// The commands of a project in the VM: `docker compose` as root under its name, with its file
-/// and its ports published on every address of the VM at their own numbers.
+/// The commands of a project in the VM: `docker compose` as root under its name, with its file,
+/// its ports published on every address of the VM at their own numbers, and its containers' host
+/// folders where the VM shares them.
 struct InVm {
     project: String,
+    /// `<variable>=<where the VM shares it> ` for each container's host folder.
+    folders: String,
 }
 
 impl InVm {
@@ -33,8 +36,9 @@ impl InVm {
     /// in forwarded and `before` exported.
     fn compose(&self, before: &str, rest: &[Part]) -> Template {
         let head = format!(
-            "cd {} && {before}sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name {} --file {OUTPUT_DIR}/docker/compose.yml ",
+            "cd {} && {before}sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 {}docker compose --project-name {} --file {OUTPUT_DIR}/docker/compose.yml ",
             steps::PROJECT_DIR,
+            self.folders,
             self.project
         );
         Template::from_parts(std::iter::once(Part::Text(head)).chain(rest.iter().cloned()))
@@ -68,7 +72,14 @@ pub(crate) fn guest(env: &Environment, file: &ComposeFile) -> Result<GuestCompos
     let members = classify(env, file)?;
     let plan = StartPlan::of(file);
     let project = Project::Named(file.name.clone());
-    let vm = InVm { project: file.name.clone() };
+    let folders: Vec<String> = host_folders::of_containers(env)
+        .iter()
+        .map(|f| format!("{}={} ", f.variable, f.in_vm))
+        .collect();
+    let vm = InVm {
+        project: file.name.clone(),
+        folders: folders.concat(),
+    };
     let (runners, derived) = runners(env, &vm)?;
     let mut machines: Vec<Machine> = machines(env, file, &members, &project)?;
     for p in machines.iter_mut().flat_map(|m| m.ports.iter_mut()) {

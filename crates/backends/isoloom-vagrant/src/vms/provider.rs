@@ -76,7 +76,8 @@ impl<'a> Provider<'a> {
 /// Why this environment's VMs can't all run under Vagrant's `provider` (as `vagrant up
 /// --provider` names it), if they can't: a machine requiring a TPM the provider doesn't give,
 /// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks, then a
-/// machine's own boot, which only libvirt (and QEMU, for UEFI's format) boots.
+/// machine's own boot, which only libvirt (and QEMU, for UEFI's format) boots, then a machine's
+/// host folders, which Hyper-V and ESXi don't share (nor QEMU read-only).
 #[must_use]
 pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
     let env = Environment::build(spec, Target::Vagrant, None);
@@ -84,6 +85,7 @@ pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
     windows::tpm_refusal(&env, provider)
         .or_else(|| networks_refusal(&env, provider))
         .or_else(|| boot::refusal(&env, provider))
+        .or_else(|| crate::host_folders::refusal(spec, provider.id()))
 }
 
 /// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,

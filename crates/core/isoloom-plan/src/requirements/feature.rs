@@ -60,6 +60,7 @@ named! {
     DataDisks => "data-disks",
     RawDisks => "raw-disks",
     TmpfsModes => "tmpfs-modes",
+    HostFolders => "host-folders",
     VmMoreAddresses => "vm-more-addresses",
     ContainerMoreAddresses => "container-more-addresses",
 }

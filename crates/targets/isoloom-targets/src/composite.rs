@@ -5,12 +5,13 @@
 //!
 //! - `cloud-docker`: the `docker` target's files, then a Terraform module per cloud.
 //! - `docker-vm`: the `docker` target's files, the Vagrantfile, then the Proxmox module (a Docker
-//!   host VM on a Proxmox server, Terraform making only the VM); and a run manifest for each
+//!   host VM on a Proxmox server, Terraform making only the VM, unless a container mounts a
+//!   folder of the computer that runs the lab); and a run manifest for each
 //!   (`docker-vm/run.json`, `docker-vm/proxmox/run.json`), the VM's steps from its backend, then
 //!   the Compose file run inside it as the Compose backend says.
 //! - `hybrid`: the Vagrant VMs and the containers' host, with the containers' Compose file.
 
-use isoloom_plan::{Capabilities, Environment};
+use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{self, Backend, Files, Placed};
 use isoloom_render::run_manifest::guest::GuestCompose;
@@ -84,32 +85,47 @@ impl Backend for DockerVmBackend {
         Target::DockerVm
     }
 
-    /// Compose's but existing networks, as for `cloud-docker`: the VM runs the Compose file.
+    /// Compose's but existing networks, as for `cloud-docker`: the VM runs the Compose file. And
+    /// folders of the computer that runs the lab, which a local VM shares (`docker_vm_refusal`
+    /// says which providers can't).
     fn capabilities(&self) -> Capabilities {
-        isoloom_compose::capabilities_on_a_vm()
+        isoloom_compose::capabilities_on_a_vm().with(Feature::HostFolders)
     }
 
     /// The `docker` target's Compose file (and the files it mounts), the Vagrantfile, and the
-    /// Proxmox module with its set-up script.
+    /// Proxmox module with its set-up script, unless the containers mount folders of the
+    /// computer that runs the lab (the server's VM runs elsewhere).
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::DockerVm, env, &self.capabilities())?;
         let guest = guest(env)?;
         let mut files = docker_files(env)?;
         files.push(docker_vm::vagrantfile(env, &guest));
-        files.extend(isoloom_terraform::docker_vm_module(env, &guest)?);
+        if on_proxmox(env) {
+            files.extend(isoloom_terraform::docker_vm_module(env, &guest)?);
+        }
         Ok(files)
     }
 
     /// One manifest per way the VM is made: Vagrant's (`docker-vm/run.json`), Proxmox's
-    /// (`docker-vm/proxmox/run.json`).
+    /// (`docker-vm/proxmox/run.json`) when the lab can run there.
     fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
         let guest = guest(env)?;
-        Ok(vec![
-            Placed::here(docker_vm::manifest(env, &guest)?),
-            Placed::under("proxmox", isoloom_terraform::docker_vm_manifest(env, &guest)?),
-        ])
+        let mut out = vec![Placed::here(docker_vm::manifest(env, &guest)?)];
+        if on_proxmox(env) {
+            out.push(Placed::under("proxmox", isoloom_terraform::docker_vm_manifest(env, &guest)?));
+        }
+        Ok(out)
     }
 }
+
+/// Whether `docker-vm` writes its Proxmox module: unless a container mounts a folder of the
+/// computer that runs the lab, which the server's VM can't share.
+fn on_proxmox(env: &Environment) -> bool {
+    isoloom_vagrant::docker_vm_refusal(env.spec(), PROXMOX).is_none()
+}
+
+/// The Proxmox server, as `docker-vm`'s variants name it.
+const PROXMOX: &str = "proxmox";
 
 /// The `hybrid` backend: Vagrant VMs, and the containers on one more VM beside them.
 #[derive(Debug, Clone, Copy, Default)]

@@ -31,6 +31,7 @@ pub(crate) const SHARED_FIELDS: &[&str] = &[
     "files",
     "volumes",
     "disks",
+    "host_folders",
     "tmpfs",
     "resources",
     "hardware",

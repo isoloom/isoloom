@@ -9,6 +9,7 @@ mod cloud;
 mod configuration;
 mod constraints;
 mod hardware;
+mod host_folder;
 mod implementation;
 mod ipv6;
 mod machine;
@@ -29,6 +30,7 @@ pub use cloud::{CloudProvider, CloudServices};
 pub use configuration::Configuration;
 pub use constraints::{Constraints, Mirrors, Proxy};
 pub use hardware::{DEFAULT_GPU_DRIVER, Device, DeviceFull, DeviceInput, GpuCount, Gpus, GpusFull, GpusInput};
+pub use host_folder::{HostFolder, HostPath};
 pub use implementation::{
     Appliance, BaseImage, Controller, Dns, DockerImpl, Generated, KNOWN_OS, OwnProcess, Provision, REBOOT_STEP, VmImage, VmImpl, Winrm, is_reboot,
 };

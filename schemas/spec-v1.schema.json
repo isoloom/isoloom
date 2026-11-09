@@ -584,6 +584,14 @@
           "description": "Data disks beside its own, by name: `{ size_gb, fs, mount }`.",
           "default": {}
         },
+        "host_folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HostFolder"
+          },
+          "description": "Folders of the computer that runs the lab, mounted in the machine both ways (what it writes\nthere lands on that computer): `{ from, path, read_only }`, `from` relative to the project\nfolder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose\nmachines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own\nshared folder: VirtualBox, VMware, Parallels, UTM, QEMU with `virtiofsd`, libvirt's\nvirtiofs) and `docker-vm` on a local provider (shared into its VM, then bound). Hyper-V\n(SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.",
+          "default": []
+        },
         "tmpfs": {
           "type": "array",
           "items": {
@@ -2310,6 +2318,29 @@
       ],
       "description": "A data disk's filesystem."
     },
+    "HostFolder": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "The folder on the computer that runs the lab: relative to the project folder (`shared`,\n`../notes`), in the home folder of the user running it (`~/work`), or absolute\n(`/srv/share`, `C:\\share`). A project folder must exist; a home or absolute one is the\nrunning computer's (the lab may run on another computer than the one generating it), so\nit isn't checked, and it is created when missing."
+        },
+        "path": {
+          "type": "string",
+          "description": "The absolute path in the machine (Linux machines), not inside Isoloom's own folders\n(`/opt/isoloom`, `/var/lib/isoloom`, `/etc/isoloom`) or the kernel's (`/proc`, `/sys`,\n`/dev`), nor one of its volumes, disks or tmpfs mounts."
+        },
+        "read_only": {
+          "type": "boolean",
+          "description": "The machine only reads it (it can't write there). Off by default."
+        }
+      },
+      "required": [
+        "from",
+        "path"
+      ],
+      "description": "A folder of the computer that runs the lab, mounted in the machine both ways: what the machine\nwrites there lands on that computer, and what is put there shows in the machine. Only the\ntargets whose machines run on that computer mount one (`docker`, `docker-vm` on a local\nprovider, `vagrant`); the others refuse a spec that asks for one."
+    },
     "Tmpfs": {
       "anyOf": [
         {
@@ -2842,6 +2873,14 @@
           "description": "Data disks beside its own, by name: `{ size_gb, fs, mount }`.",
           "default": {}
         },
+        "host_folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HostFolder"
+          },
+          "description": "Folders of the computer that runs the lab, mounted in the machine both ways (what it writes\nthere lands on that computer): `{ from, path, read_only }`, `from` relative to the project\nfolder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose\nmachines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own\nshared folder: VirtualBox, VMware, Parallels, UTM, QEMU with `virtiofsd`, libvirt's\nvirtiofs) and `docker-vm` on a local provider (shared into its VM, then bound). Hyper-V\n(SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.",
+          "default": []
+        },
         "tmpfs": {
           "type": "array",
           "items": {
@@ -2974,6 +3013,14 @@
           },
           "description": "Data disks beside its own, by name: `{ size_gb, fs, mount }`.",
           "default": {}
+        },
+        "host_folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HostFolder"
+          },
+          "description": "Folders of the computer that runs the lab, mounted in the machine both ways (what it writes\nthere lands on that computer): `{ from, path, read_only }`, `from` relative to the project\nfolder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose\nmachines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own\nshared folder: VirtualBox, VMware, Parallels, UTM, QEMU with `virtiofsd`, libvirt's\nvirtiofs) and `docker-vm` on a local provider (shared into its VM, then bound). Hyper-V\n(SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.",
+          "default": []
         },
         "tmpfs": {
           "type": "array",

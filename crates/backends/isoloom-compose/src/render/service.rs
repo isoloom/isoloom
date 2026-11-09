@@ -66,7 +66,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         extra_hosts: networks::extra_hosts(env, m),
         environment: environment(env, plan),
         ports: plan.ports.iter().map(port).collect(),
-        volumes: storage::volume_mounts(plan).into_iter().chain(long_tmpfs).collect(),
+        volumes: [storage::volume_mounts(plan), long_tmpfs, storage::host_folders(m.name, spec)].concat(),
         secrets: secrets::of_machine(plan),
         configs: configs::mounts(m.name, plan),
         restart: Some(Restart::UnlessStopped),

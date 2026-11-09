@@ -9,6 +9,8 @@
 //! - Checks on demand: `vagrant provision --provision-with checks` (every runner of the Compose
 //!   `check` profile).
 //! - Published ports: the VM forwards them from the host's loopback.
+//! - The containers' host folders: each shared into the VM by its provider's own shared folder,
+//!   under `/mnt/isoloom`, where the commands run there tell Compose to bind it from.
 //! - The run manifest (`docker-vm/run.json`, [`manifest`]): the Isothrum runner brings the VM up
 //!   with every provisioner but the lab's start (`prepares`), then runs the same commands
 //!   through `vagrant ssh`, the values given at launch forwarded into the VM (SSH's `SendEnv`,
@@ -31,6 +33,7 @@ use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::images;
 
+use crate::host_folders::Share;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
@@ -149,6 +152,17 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
     let label = format!("{} · docker", env.name);
     desktop_providers(r, &label, size, docker::HostSize::of(env).disk_gb);
     esxi(r, &format!("{}-docker", env.name), size);
+    // The containers' host folders, shared read-write where Compose finds them (a read-only one
+    // is bound read-only into its container).
+    let shares: Vec<Share> = docker::host_folders::of_containers(env)
+        .into_iter()
+        .map(|f| Share {
+            from: f.folder.from.clone(),
+            guest: f.in_vm,
+            read_only: false,
+        })
+        .collect();
+    crate::host_folders::render(r, "config", &shares);
     if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
         r.call(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
     }

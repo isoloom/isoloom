@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use super::Problem;
-use crate::model::{Check, Spec};
+use crate::model::{Check, HostPath, Spec};
 use crate::syntax::Code;
 
 /// The problems with the project's paths, in the order the spec mentions them.
@@ -24,6 +24,24 @@ impl Paths<'_> {
         } else if !self.lab_dir.join(path).exists() {
             self.problems
                 .push(Problem::new(Code::InvalidValue, at, format!("`{path}` doesn't exist in the project folder")));
+        }
+    }
+}
+
+impl Paths<'_> {
+    /// A host folder relative to the project (it may be beside it, `../shared`): a folder there.
+    /// A home or absolute one is the running computer's, which may not be this one: unchecked.
+    fn folder(&mut self, at: String, from: &str) {
+        let dir = self.lab_dir.join(from);
+        if !dir.exists() {
+            self.problems.push(Problem::new(
+                Code::InvalidValue,
+                at,
+                format!("`{from}` doesn't exist: a folder relative to the project folder"),
+            ));
+        } else if !dir.is_dir() {
+            self.problems
+                .push(Problem::new(Code::InvalidValue, at, format!("`{from}` is a file: name a folder")));
         }
     }
 }
@@ -91,6 +109,11 @@ fn machines(spec: &Spec, paths: &mut Paths) {
                         format!("`{s}` is a folder: name a file"),
                     ));
                 }
+            }
+        }
+        for (i, f) in m.host_folders.iter().enumerate() {
+            if let HostPath::Project(from) = f.host() {
+                paths.folder(format!("machines.{name}.host_folders[{i}].from"), from);
             }
         }
         if let Some(v) = &m.vm {
@@ -224,6 +247,19 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
         assert_eq!(
             found("folder", &["conf/"], &lab(machine))?,
             ["machines.web.files[0].source: `conf` is a folder: name a file"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_host_folder_of_the_project_is_a_folder_there_and_the_others_are_the_running_computers() -> Outcome {
+        let machine = "machines: { web: { networks: { lan: 10 }, docker: { image: nginx }, host_folders: [{ from: shared, path: /a }, { from: notes.txt, path: /b }, { from: gone, path: /c }, { from: '~/x', path: /d }, { from: /nowhere/at/all, path: /e }] } }\n";
+        assert_eq!(
+            found("host-folders", &["shared/", "notes.txt"], &lab(machine))?,
+            [
+                "machines.web.host_folders[1].from: `notes.txt` is a file: name a folder",
+                "machines.web.host_folders[2].from: `gone` doesn't exist: a folder relative to the project folder",
+            ]
         );
         Ok(())
     }

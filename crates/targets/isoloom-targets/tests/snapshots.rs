@@ -54,6 +54,19 @@ fn docker_vm_segmented() -> Outcome {
 }
 
 #[test]
+fn docker_vm_shares_the_containers_host_folders_into_its_vm() -> Outcome {
+    let env = build(
+        "version: 1\nname: shared-desk\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  desk: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared }, { from: '~/notes', path: /home/notes, read_only: true }] }\n",
+        Target::DockerVm,
+    )?;
+    let vagrantfile = file(&DockerVmBackend.render(&env)?, "docker-vm/Vagrantfile")?;
+    let start = vagrantfile.find("  # This computer's folders").ok_or("no host folders")?;
+    let end = vagrantfile.find("  config.vm.provision \"docker\"").ok_or("no Docker")?;
+    insta::assert_snapshot!(vagrantfile.get(start..end).ok_or("out of order")?);
+    Ok(())
+}
+
+#[test]
 fn hybrid_mixed_office_vagrantfile() -> Outcome {
     insta::assert_snapshot!(file(&render(&HybridBackend, "mixed-office")?, "hybrid/Vagrantfile")?);
     Ok(())

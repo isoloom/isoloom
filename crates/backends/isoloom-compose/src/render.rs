@@ -62,7 +62,7 @@ pub(crate) struct Rendered {
 /// writing it (`hybrid` plugs it into its Docker host's networks). Refused as `target` when
 /// `env` needs what Compose can't do.
 pub(crate) fn compose_file(target: Target, env: &Environment) -> Result<Rendered> {
-    if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &crate::backend::capabilities()) {
+    if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &crate::backend::capabilities(target)) {
         return Err(Error::Refused { target, refusal });
     }
     let mut out = Out::default();

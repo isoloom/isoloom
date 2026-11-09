@@ -17,6 +17,7 @@ use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{self, Os};
 use super::{Ctx, boot, checks, windows};
+use crate::host_folders::Share;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
@@ -62,6 +63,13 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
             ));
         }
         providers::blocks(r, &guest(env, name, mp, &image, link));
+        let shares: Vec<Share> = env
+            .spec()
+            .machines
+            .get(name)
+            .map(|m| m.host_folders.iter().map(Share::of).collect())
+            .unwrap_or_default();
+        crate::host_folders::render(r, "m", &shares);
         transport::provisioners(r, env, name, os);
         if let Some(g) = group {
             checks::provisioner(r, name, g);

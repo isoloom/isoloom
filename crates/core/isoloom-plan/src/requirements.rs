@@ -90,6 +90,8 @@ pub enum Feature {
     RawDisks,
     /// A mode on a memory-backed mount (`tmpfs[].mode`).
     TmpfsModes,
+    /// Folders of the computer that runs the lab, mounted in its machines (`host_folders`).
+    HostFolders,
     /// Several addresses on one network for a VM (`lan: [10, 11]`), added by its set-up.
     VmMoreAddresses,
     /// Several addresses on one network for a container or an existing host: no backend has it.
@@ -252,6 +254,11 @@ pub enum Requirement {
         /// The first machine that does.
         machine: String,
     },
+    /// A machine mounts folders of the computer that runs the lab (`host_folders`).
+    HostFolders {
+        /// The first machine that does.
+        machine: String,
+    },
     /// A machine has several addresses on one network (`lan: [10, 11]`).
     MoreAddresses {
         /// The first machine that does.
@@ -299,6 +306,7 @@ impl Requirement {
             Requirement::DataDisks { .. } => Feature::DataDisks,
             Requirement::RawDisks { .. } => Feature::RawDisks,
             Requirement::TmpfsModes { .. } => Feature::TmpfsModes,
+            Requirement::HostFolders { .. } => Feature::HostFolders,
             Requirement::MoreAddresses { shape: MachineShape::Vm, .. } => Feature::VmMoreAddresses,
             Requirement::MoreAddresses { .. } => Feature::ContainerMoreAddresses,
         }
@@ -363,6 +371,7 @@ impl fmt::Display for Requirement {
             Requirement::DataDisks { machine } => crate::storage::no_data_disks(f, machine),
             Requirement::RawDisks { machine } => crate::storage::no_raw_disks(f, machine),
             Requirement::TmpfsModes { machine } => crate::storage::no_tmpfs_modes(f, machine),
+            Requirement::HostFolders { machine } => crate::storage::no_host_folders(f, machine),
         }
     }
 }
@@ -387,6 +396,13 @@ impl Capabilities {
         Capabilities {
             features: features.into_iter().collect(),
         }
+    }
+
+    /// These capabilities and `feature`.
+    #[must_use]
+    pub fn with(mut self, feature: Feature) -> Capabilities {
+        self.features.insert(feature);
+        self
     }
 
     /// Whether the backend has `feature`.

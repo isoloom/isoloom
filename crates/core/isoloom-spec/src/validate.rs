@@ -18,6 +18,7 @@ mod dns;
 mod files;
 mod groups;
 mod hardware;
+mod host_folders;
 mod ipv6;
 mod links;
 mod machine_files;

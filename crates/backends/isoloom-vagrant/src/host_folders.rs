@@ -1,0 +1,257 @@
+//! Folders of the computer that runs the lab, shared into a VM both ways (`host_folders`): each
+//! provider's own two-way shared folder, set in that provider's block (its `override`), so only
+//! the provider `vagrant up` runs shares them. A provider with none stops `vagrant up` with the
+//! reason before creating the VM (and the run manifest's provider says it can't run the lab),
+//! rather than fall back to a one-way copy (rsync).
+//!
+//! - VirtualBox: `virtualbox` (vboxsf, the box's Guest Additions).
+//! - VMware Workstation and Fusion: `vmware` (HGFS, the box's VMware Tools).
+//! - Parallels: `parallels` (the box's Parallels Tools).
+//! - UTM (`vagrant_utm` 0.1.3 or later): `utm` (QEMU's 9p shares).
+//! - QEMU (vagrant-qemu 0.7.0 or later): `qemu_virtiofs`, from `virtiofsd` on the host; it mounts
+//!   every share read-write, so a read-only folder is refused there.
+//! - libvirt: `virtiofs` (libvirt 6.2 or later), the VM's memory shared with `virtiofsd`.
+//! - Hyper-V: none Isoloom uses: its two-way folder is SMB, which asks for a Windows account's
+//!   password at every `vagrant up`.
+//! - ESXi: none: its VMs run on the ESXi host, not on the computer that runs the lab.
+
+use isoloom_plan::{Environment, MachineShape};
+use isoloom_spec::model::{HostFolder, Spec, Target};
+
+use crate::ruby::{Call, Ruby, Value};
+use crate::vms::provider::Provider;
+
+/// The providers whose block shares a folder, in the order the Vagrantfile writes them.
+const SHARING: [Provider<'static>; 6] = [
+    Provider::VirtualBox,
+    Provider::VmwareDesktop,
+    Provider::Parallels,
+    Provider::Utm,
+    Provider::Qemu,
+    Provider::Libvirt,
+];
+
+/// How `provider` shares a folder both ways (Vagrant's synced folder `type:`), if it does.
+fn kind(provider: Provider<'_>) -> Option<&'static str> {
+    match provider {
+        Provider::VirtualBox => Some("virtualbox"),
+        Provider::VmwareDesktop => Some("vmware"),
+        Provider::Parallels => Some("parallels"),
+        Provider::Utm => Some("utm"),
+        Provider::Qemu => Some("qemu_virtiofs"),
+        Provider::Libvirt => Some("virtiofs"),
+        Provider::HyperV | Provider::VmwareEsxi | Provider::Other(_) => None,
+    }
+}
+
+/// Why `provider` can't share a folder of the computer that runs the lab into a VM, if it can't:
+/// it has no two-way shared folder Isoloom uses, or (`read_only`) it can't make one read-only.
+fn why_not(provider: Provider<'_>, read_only: bool) -> Option<String> {
+    let id = provider.id();
+    match provider {
+        Provider::HyperV => Some(format!(
+            "the `{id}` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`"
+        )),
+        Provider::VmwareEsxi => Some(format!("the `{id}` provider's VMs run on the ESXi host, not on this computer")),
+        Provider::Other(_) => Some(format!("Isoloom knows no two-way shared folder of the `{id}` provider")),
+        Provider::Qemu if read_only => Some(format!(
+            "one is read-only (`read_only`), and the `{id}` provider (vagrant-qemu) mounts its VirtioFS shares read-write"
+        )),
+        _ => None,
+    }
+}
+
+/// One folder shared into a VM.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Share {
+    /// The folder, as `from` writes it (relative to the project, `~/...` or absolute).
+    pub(crate) from: String,
+    /// Where the VM mounts it.
+    pub(crate) guest: String,
+    /// The VM only reads it.
+    pub(crate) read_only: bool,
+}
+
+impl Share {
+    /// A machine's own host folder, at its path.
+    pub(crate) fn of(f: &HostFolder) -> Share {
+        Share {
+            from: f.from.clone(),
+            guest: f.path.clone(),
+            read_only: f.read_only,
+        }
+    }
+}
+
+/// The providers' blocks sharing `shares` into the VM `scope` configures (`m`, `config`), then a
+/// trigger stopping `vagrant up` on the providers that can't. Nothing without shares.
+pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share]) {
+    if shares.is_empty() {
+        return;
+    }
+    r.comment("This computer's folders (`host_folders`), both ways: each provider's own shared folder.");
+    let read_only = shares.iter().any(|s| s.read_only);
+    for p in SHARING.into_iter().filter(|p| why_not(*p, read_only).is_none()) {
+        let Some(kind) = kind(p) else { continue };
+        let head = Call::new(format!("{scope}.vm.provider")).arg(Value::str(p.id()));
+        let params = if p == Provider::Libvirt { "v, o" } else { "_, o" };
+        r.block(head, params, |r| {
+            if p == Provider::Libvirt {
+                // virtiofsd reads the VM's memory: it is shared, and backed by a memory file.
+                r.call(Call::new("v.memorybacking").arg(Value::sym("access")).kw("mode", Value::str("shared")));
+                r.call(Call::new("v.memorybacking").arg(Value::sym("source")).kw("type", Value::str("memfd")));
+            }
+            for s in shares {
+                r.call(synced_folder(p, kind, s));
+            }
+        });
+    }
+    refuse_elsewhere(r, scope, read_only);
+}
+
+/// `o.vm.synced_folder <the folder>, <guest>, type: <kind>, create: true`, read-only as the
+/// provider's mount takes it.
+fn synced_folder(p: Provider<'_>, kind: &str, s: &Share) -> Call {
+    let call = Call::new("o.vm.synced_folder")
+        .arg(Value::raw(format!("File.expand_path({}, ROOT)", Value::str(&s.from))))
+        .arg(Value::str(&s.guest))
+        .kw("type", Value::str(kind))
+        .kw("create", true);
+    match (s.read_only, p) {
+        (false, _) => call,
+        (true, Provider::Libvirt) => call.kw("mount_opts", Value::str("ro")),
+        (true, _) => call.kw("mount_options", Value::array([Value::str("ro")])),
+    }
+}
+
+/// A trigger stopping `vagrant up` on the providers that can't share the folders, with the reason,
+/// before the VM is created.
+fn refuse_elsewhere(r: &mut Ruby, scope: &str, read_only: bool) {
+    let all = [
+        Provider::VirtualBox,
+        Provider::VmwareDesktop,
+        Provider::Parallels,
+        Provider::Utm,
+        Provider::Qemu,
+        Provider::Libvirt,
+        Provider::HyperV,
+        Provider::VmwareEsxi,
+    ];
+    let refused = all.into_iter().filter_map(|p| {
+        Some((
+            Value::sym(p.id()),
+            Value::str(&format!("host folders (`host_folders`): {}", why_not(p, read_only)?)),
+        ))
+    });
+    let why = Value::hash(refused);
+    r.block(Call::new(format!("{scope}.trigger.before")).arg(Value::sym("up")), "t", |r| {
+        r.block("t.ruby", "_, machine", |r| {
+            r.assign("why", Value::raw(format!("{why}[machine.provider_name]")));
+            r.line("abort(\"#{machine.name}: \" + why) if why");
+        });
+    });
+}
+
+/// Why the VMs of `spec` (the `vagrant` target's) can't have their host folders under
+/// `provider`, if they can't: the first VM with one, on a provider that shares none (or can't
+/// share one read-only).
+#[must_use]
+pub(crate) fn refusal(spec: &Spec, provider: &str) -> Option<String> {
+    let env = Environment::build(spec, Target::Vagrant, None);
+    let vms = spec
+        .machines
+        .iter()
+        .filter(|(n, m)| !m.host_folders.is_empty() && env.machines.get(*n).is_some_and(|mp| mp.shape == MachineShape::Vm));
+    let (name, m) = vms.into_iter().next()?;
+    let why = why_not(Provider::from(provider), m.host_folders.iter().any(|f| f.read_only))?;
+    Some(format!(
+        "machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): {why}"
+    ))
+}
+
+/// Why `docker-vm`'s VM (`provider`, or `proxmox` for the Proxmox server's) can't share its
+/// containers' host folders, if it can't. The VM shares them read-write (a read-only one is bound
+/// read-only into its container), so only the providers with no shared folder refuse.
+#[must_use]
+pub fn docker_vm_refusal(spec: &Spec, provider: &str) -> Option<String> {
+    let env = Environment::build(spec, Target::Docker, None);
+    let (name, _) = spec
+        .machines
+        .iter()
+        .find(|(n, m)| !m.host_folders.is_empty() && env.machines.get(*n).is_some_and(|mp| mp.shape == MachineShape::Container))?;
+    let why = if provider == "proxmox" {
+        "the Proxmox server's VM runs on the server, not on this computer".to_owned()
+    } else {
+        why_not(Provider::from(provider), false)?
+    };
+    Some(format!(
+        "machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): {why}"
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ruby(shares: &[Share]) -> String {
+        let mut r = Ruby::new();
+        render(&mut r, "m", shares);
+        r.finish()
+    }
+
+    fn share(from: &str, guest: &str, read_only: bool) -> Share {
+        Share {
+            from: from.into(),
+            guest: guest.into(),
+            read_only,
+        }
+    }
+
+    #[test]
+    fn each_provider_shares_both_ways_with_its_own_kind_and_the_others_refuse() {
+        let out = ruby(&[share("shared", "/srv/shared", false), share("~/notes", "/notes", false)]);
+        for (provider, kind) in [
+            ("virtualbox", "virtualbox"),
+            ("vmware_desktop", "vmware"),
+            ("parallels", "parallels"),
+            ("utm", "utm"),
+            ("qemu", "qemu_virtiofs"),
+            ("libvirt", "virtiofs"),
+        ] {
+            assert!(out.contains(&format!("m.vm.provider \"{provider}\" do |")), "{provider}: {out}");
+            assert!(
+                out.contains(&format!(
+                    "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", type: \"{kind}\", create: true\n"
+                )),
+                "{provider}: {out}"
+            );
+        }
+        assert!(out.contains("v.memorybacking :access, mode: \"shared\"\n"), "{out}");
+        assert!(out.contains("File.expand_path(\"~/notes\", ROOT)"), "{out}");
+        assert!(!out.contains("m.vm.provider \"hyperv\""), "{out}");
+        assert!(
+            out.contains(":hyperv => \"host folders (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB"),
+            "{out}"
+        );
+        assert!(
+            out.contains(":vmware_esxi => \"host folders (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host"),
+            "{out}"
+        );
+        assert!(!out.contains(":qemu =>"), "{out}");
+        assert!(out.contains("abort(\"#{machine.name}: \" + why) if why\n"), "{out}");
+    }
+
+    #[test]
+    fn a_read_only_folder_is_mounted_read_only_and_qemu_which_cannot_refuses() {
+        let out = ruby(&[share("/srv/a", "/a", true)]);
+        assert!(out.contains("type: \"virtualbox\", create: true, mount_options: [\"ro\"]\n"), "{out}");
+        assert!(out.contains("type: \"virtiofs\", create: true, mount_opts: \"ro\"\n"), "{out}");
+        assert!(!out.contains("m.vm.provider \"qemu\""), "{out}");
+        assert!(out.contains(":qemu => \"host folders (`host_folders`): one is read-only"), "{out}");
+    }
+
+    #[test]
+    fn nothing_without_a_share() {
+        assert_eq!(ruby(&[]), "");
+    }
+}

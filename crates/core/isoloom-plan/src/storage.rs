@@ -82,7 +82,8 @@ pub fn disks(name: &str, m: &Machine) -> Vec<DataDisk> {
 }
 
 /// What the spec's storage asks of a backend: volumes kept past `down` or existing already,
-/// data disks (raw ones apart), tmpfs modes. At most one of each kind: the first that asks.
+/// data disks (raw ones apart), tmpfs modes, folders of the computer that runs the lab. At most
+/// one of each kind: the first that asks.
 #[must_use]
 pub fn requirements(spec: &Spec) -> Vec<Requirement> {
     let mut out = Vec::new();
@@ -101,6 +102,9 @@ pub fn requirements(spec: &Spec) -> Vec<Requirement> {
     }
     if let Some((m, _)) = spec.machines.iter().find(|(_, m)| m.tmpfs.iter().any(|t| t.mode().is_some())) {
         out.push(Requirement::TmpfsModes { machine: m.clone() });
+    }
+    if let Some((m, _)) = spec.machines.iter().find(|(_, m)| !m.host_folders.is_empty()) {
+        out.push(Requirement::HostFolders { machine: m.clone() });
     }
     out
 }
@@ -137,6 +141,15 @@ pub(crate) fn no_raw_disks(f: &mut std::fmt::Formatter<'_>, machine: &str) -> st
 /// Why Kubernetes refuses machine `machine`'s tmpfs mode.
 pub(crate) fn no_tmpfs_modes(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
     write!(f, "machine `{machine}` sets a tmpfs `mode`: Kubernetes' memory volumes have none")
+}
+
+/// Why a target whose machines don't run on the computer that runs the lab (or that doesn't
+/// share its folders yet) refuses machine `machine`'s host folders.
+pub(crate) fn no_host_folders(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
+    write!(
+        f,
+        "machine `{machine}` mounts a folder of the computer that runs the lab (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them yet"
+    )
 }
 
 #[cfg(test)]

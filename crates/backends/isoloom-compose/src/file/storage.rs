@@ -36,7 +36,8 @@ impl From<String> for Mount {
     }
 }
 
-/// A mount in the long form: a folder of a named volume, or a tmpfs with options.
+/// A mount in the long form: a folder of a named volume, a tmpfs with options, or a folder of the
+/// host.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub(crate) enum LongMount {
@@ -48,6 +49,18 @@ pub(crate) enum LongMount {
         target: String,
         /// The folder mounted.
         volume: VolumeOptions,
+    },
+    /// A folder of the host (a host folder).
+    Bind {
+        /// The folder on the host: absolute, `~`, or relative to the Compose file.
+        source: String,
+        /// The path in the container.
+        target: String,
+        /// The container only reads it.
+        #[serde(skip_serializing_if = "Not::not")]
+        read_only: bool,
+        /// The folder created when missing.
+        bind: BindOptions,
     },
     /// An in-memory file system with a size or a mode.
     Tmpfs {
@@ -63,6 +76,13 @@ pub(crate) enum LongMount {
 pub(crate) struct VolumeOptions {
     /// The folder of the volume mounted instead of all of it.
     pub(crate) subpath: String,
+}
+
+/// `volumes[].bind`.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct BindOptions {
+    /// Create the folder when there is nothing at its path (the long form doesn't by default).
+    pub(crate) create_host_path: bool,
 }
 
 /// `volumes[].tmpfs`.

@@ -2,10 +2,11 @@
 //! files (Compose, Kubernetes) or builds the host they run on (a cloud VM, a local VM): the
 //! images Isoloom brings and the readiness probe here; the one-shot jobs and how a Compose
 //! project starts (`jobs`); the project files read into Compose's environment
-//! (`project_files`); the size of the VM the containers run on (`host`); the containers' side
+//! (`project_files`); where the containers' host folders are bound from ([`host_folders`]); the size of the VM the containers run on (`host`); the containers' side
 //! of a hybrid environment (`hybrid`). Pure functions over the spec and the plan.
 
 mod host;
+pub mod host_folders;
 mod hybrid;
 mod jobs;
 mod project_files;

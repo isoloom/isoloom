@@ -283,6 +283,15 @@ rows:
     about: a memory-backed mount with its own mode
     features: [tmpfs-modes]
     patch: { machines: { m: { tmpfs: [{ path: /run/cache, mode: "1777" }] } } }
+  - field: machines.*.host_folders
+    about: a folder of the computer that runs the lab, mounted both ways
+    features: [host-folders]
+    patch: { machines: { m: { host_folders: [{ from: /srv/shared, path: /srv/shared }] } } }
+  - field: machines.*.host_folders[].read_only
+    value: true
+    about: a folder of the computer that runs the lab, mounted read-only
+    features: [host-folders]
+    patch: { machines: { m: { host_folders: [{ from: /srv/shared, path: /srv/shared, read_only: true }] } } }
 
   # Networks.
   - field: networks.*.internet

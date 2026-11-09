@@ -8,7 +8,8 @@
 //! targets' registry (`isoloom-targets`), and depends on no other backend: [`VagrantBackend`]
 //! renders a planned [`Environment`](isoloom_plan::Environment), purely, into files;
 //! [`docker_vm`] and [`hybrid`] write those targets' Vagrant sides; [`provider_refusal`] and
-//! [`disk_refusal`] say what a provider can't run.
+//! [`disk_refusal`] say what a provider can't run ([`docker_vm_refusal`], what `docker-vm`'s VM
+//! can't).
 //!
 //! # Example
 //!
@@ -38,6 +39,7 @@
 mod backend;
 pub mod docker_vm;
 mod error;
+mod host_folders;
 pub mod hybrid;
 mod manifest;
 mod ruby;
@@ -49,5 +51,6 @@ mod vms;
 
 pub use backend::VagrantBackend;
 pub use error::{Error, Result};
+pub use host_folders::docker_vm_refusal;
 pub use vms::network_name;
 pub use vms::provider::{disk_refusal, provider_refusal};

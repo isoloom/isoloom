@@ -56,7 +56,7 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
         driver: Driver::Vagrant,
         hosts: isoloom_render::run_manifest::every_host(),
         tools: providers::tools()?,
-        identity: providers::docker_vm_identity(&PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
+        identity: providers::docker_vm_identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         params,
         secrets,
         networks: guest.networks.clone(),
