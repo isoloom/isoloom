@@ -94,14 +94,14 @@ mod tests {
     #[test]
     fn a_job_nothing_waits_for_runs_after_the_rest_is_up() {
         let plan = StartPlan::of(&file(&[
-            ("web", service(false, &[], &["db", "web-init-1"])),
-            ("web-init-1", service(true, &[], &[])),
+            ("web", service(false, &[], &["db", "isoloom-init-web-1"])),
+            ("isoloom-init-web-1", service(true, &[], &[])),
             ("db", service(false, &[], &[])),
             ("seed", service(true, &[], &["db"])),
             ("isoloom-check", service(true, &["check"], &[])),
         ]));
         assert_eq!(plan.jobs, ["seed"]);
-        assert_eq!(plan.wait, ["web", "web-init-1", "db"]);
+        assert_eq!(plan.wait, ["web", "isoloom-init-web-1", "db"]);
     }
 
     #[test]
@@ -118,9 +118,9 @@ mod tests {
         );
         let rendered = crate::render::compose_file(Target::Docker, &env).expect("renders");
         let plan = StartPlan::of(&rendered.file);
-        assert_eq!(plan.jobs, ["app-init-1"]);
+        assert_eq!(plan.jobs, ["isoloom-init-app-1"]);
         assert!(
-            plan.wait.contains(&"app".to_owned()) && plan.wait.contains(&"store-init-1".to_owned()),
+            plan.wait.contains(&"app".to_owned()) && plan.wait.contains(&"isoloom-init-store-1".to_owned()),
             "{plan:?}"
         );
         assert!(!plan.wait.iter().any(|w| w.starts_with("isoloom-check")), "profile services aren't started");

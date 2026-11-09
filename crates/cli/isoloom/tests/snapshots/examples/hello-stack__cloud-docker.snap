@@ -470,21 +470,21 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "cache-routes",
+      "name": "isoloom-routes-cache",
       "role": "infra",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-routes"
+        "service": "isoloom-routes-cache"
       }
     },
     {
-      "name": "cache-init-1",
+      "name": "isoloom-init-cache-1",
       "role": "job",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-init-1"
+        "service": "isoloom-init-cache-1"
       }
     },
     {
@@ -516,12 +516,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
@@ -1399,21 +1399,21 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "cache-routes",
+      "name": "isoloom-routes-cache",
       "role": "infra",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-routes"
+        "service": "isoloom-routes-cache"
       }
     },
     {
-      "name": "cache-init-1",
+      "name": "isoloom-init-cache-1",
       "role": "job",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-init-1"
+        "service": "isoloom-init-cache-1"
       }
     },
     {
@@ -1445,12 +1445,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
@@ -2218,21 +2218,21 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "cache-routes",
+      "name": "isoloom-routes-cache",
       "role": "infra",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-routes"
+        "service": "isoloom-routes-cache"
       }
     },
     {
-      "name": "cache-init-1",
+      "name": "isoloom-init-cache-1",
       "role": "job",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-init-1"
+        "service": "isoloom-init-cache-1"
       }
     },
     {
@@ -2264,12 +2264,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
@@ -3136,21 +3136,21 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "cache-routes",
+      "name": "isoloom-routes-cache",
       "role": "infra",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-routes"
+        "service": "isoloom-routes-cache"
       }
     },
     {
-      "name": "cache-init-1",
+      "name": "isoloom-init-cache-1",
       "role": "job",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-init-1"
+        "service": "isoloom-init-cache-1"
       }
     },
     {
@@ -3182,12 +3182,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
@@ -3931,21 +3931,21 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "cache-routes",
+      "name": "isoloom-routes-cache",
       "role": "infra",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-routes"
+        "service": "isoloom-routes-cache"
       }
     },
     {
-      "name": "cache-init-1",
+      "name": "isoloom-init-cache-1",
       "role": "job",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-init-1"
+        "service": "isoloom-init-cache-1"
       }
     },
     {
@@ -3977,12 +3977,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
@@ -4800,21 +4800,21 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "cache-routes",
+      "name": "isoloom-routes-cache",
       "role": "infra",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-routes"
+        "service": "isoloom-routes-cache"
       }
     },
     {
-      "name": "cache-init-1",
+      "name": "isoloom-init-cache-1",
       "role": "job",
       "of": "cache",
       "addresses": {},
       "native": {
-        "service": "cache-init-1"
+        "service": "isoloom-init-cache-1"
       }
     },
     {
@@ -4846,12 +4846,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {

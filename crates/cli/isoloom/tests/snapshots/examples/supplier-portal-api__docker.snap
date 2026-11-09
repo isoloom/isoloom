@@ -348,7 +348,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
     restart: unless-stopped
-  database-init-1:
+  isoloom-init-database-1:
     image: mysql:8.0
     user: root
     entrypoint:
@@ -405,7 +405,7 @@ services:
         condition: service_completed_successfully
       database:
         condition: service_healthy
-      database-init-1:
+      isoloom-init-database-1:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -432,7 +432,7 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      database-init-1:
+      isoloom-init-database-1:
         condition: service_completed_successfully
       web:
         condition: service_healthy
@@ -452,7 +452,7 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      database-init-1:
+      isoloom-init-database-1:
         condition: service_completed_successfully
       web:
         condition: service_healthy
@@ -472,7 +472,7 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      database-init-1:
+      isoloom-init-database-1:
         condition: service_completed_successfully
       web:
         condition: service_healthy
@@ -625,7 +625,7 @@ secrets:
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -646,7 +646,7 @@ secrets:
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -694,12 +694,12 @@ secrets:
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {

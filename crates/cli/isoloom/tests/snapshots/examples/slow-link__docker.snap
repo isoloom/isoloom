@@ -212,7 +212,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: slow-link
     restart: unless-stopped
-  web-routes:
+  isoloom-routes-web:
     image: nicolaka/netshoot:v0.13
     init: true
     entrypoint:
@@ -257,7 +257,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: slow-link
     restart: unless-stopped
-  user-routes:
+  isoloom-routes-user:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - access
@@ -302,7 +302,7 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: slow-link
-  isoloom-access-routes:
+  isoloom-routes-isoloom-access:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
@@ -344,11 +344,11 @@ services:
     depends_on:
       web:
         condition: service_healthy
-      web-routes:
+      isoloom-routes-web:
         condition: service_healthy
       isoloom-access:
         condition: service_started
-      isoloom-access-routes:
+      isoloom-routes-isoloom-access:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -532,12 +532,12 @@ volumes:
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
@@ -557,12 +557,12 @@ volumes:
       }
     },
     {
-      "name": "user-routes",
+      "name": "isoloom-routes-user",
       "role": "infra",
       "of": "user",
       "addresses": {},
       "native": {
-        "service": "user-routes"
+        "service": "isoloom-routes-user"
       }
     },
     {
@@ -576,12 +576,12 @@ volumes:
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -787,7 +787,7 @@ volumes:
           "--wait",
           "--no-deps",
           "isoloom-access",
-          "isoloom-access-routes"
+          "isoloom-routes-isoloom-access"
         ],
         "timeout_s": 600
       }
@@ -863,7 +863,7 @@ volumes:
           "--stop",
           "--force",
           "isoloom-access",
-          "isoloom-access-routes"
+          "isoloom-routes-isoloom-access"
         ],
         "timeout_s": 120,
         "failure": "tolerate"

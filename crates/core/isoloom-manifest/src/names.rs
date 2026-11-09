@@ -151,7 +151,7 @@ pattern_type!(
 );
 
 pattern_type!(
-    /// A step's id, unique within its list (`up`, `job-web-init-1`).
+    /// A step's id, unique within its list (`up`, `job-isoloom-init-web-1`).
     StepId,
     "step id",
     "^[a-z][a-z0-9-]*$",
@@ -330,7 +330,7 @@ mod tests {
         assert!(EnvName::parse("demo_secret").is_ok());
         assert!(EnvName::parse("1FLAG").is_err());
         assert!(Identifier::parse("db-password").is_ok());
-        assert!(StepId::parse("job-web-init-1").is_ok());
+        assert!(StepId::parse("job-isoloom-init-web-1").is_ok());
         assert!(StepId::parse("Up").is_err());
         assert!(SnakeName::parse("web_portal").is_ok());
         assert!(SnakeName::parse("web-portal").is_err());

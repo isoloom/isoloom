@@ -504,7 +504,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
-  intranet-routes:
+  isoloom-routes-intranet:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -551,7 +551,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
-  staff-routes:
+  isoloom-routes-staff:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - access
@@ -598,7 +598,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
-  guest-routes:
+  isoloom-routes-guest:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -643,7 +643,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
     restart: unless-stopped
-  admin-routes:
+  isoloom-routes-admin:
     image: nicolaka/netshoot:v0.13
     init: true
     entrypoint:
@@ -690,7 +690,7 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: vlan-office
-  isoloom-access-routes:
+  isoloom-routes-isoloom-access:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
@@ -731,15 +731,15 @@ services:
     depends_on:
       intranet:
         condition: service_healthy
-      intranet-routes:
+      isoloom-routes-intranet:
         condition: service_healthy
-      guest-routes:
+      isoloom-routes-guest:
         condition: service_healthy
-      admin-routes:
+      isoloom-routes-admin:
         condition: service_healthy
       isoloom-access:
         condition: service_started
-      isoloom-access-routes:
+      isoloom-routes-isoloom-access:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -757,11 +757,11 @@ services:
     depends_on:
       intranet:
         condition: service_healthy
-      intranet-routes:
+      isoloom-routes-intranet:
         condition: service_healthy
-      guest-routes:
+      isoloom-routes-guest:
         condition: service_healthy
-      admin-routes:
+      isoloom-routes-admin:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -779,11 +779,11 @@ services:
     depends_on:
       intranet:
         condition: service_healthy
-      intranet-routes:
+      isoloom-routes-intranet:
         condition: service_healthy
-      guest-routes:
+      isoloom-routes-guest:
         condition: service_healthy
-      admin-routes:
+      isoloom-routes-admin:
         condition: service_healthy
       guest:
         condition: service_started
@@ -803,11 +803,11 @@ services:
     depends_on:
       intranet:
         condition: service_healthy
-      intranet-routes:
+      isoloom-routes-intranet:
         condition: service_healthy
-      guest-routes:
+      isoloom-routes-guest:
         condition: service_healthy
-      admin-routes:
+      isoloom-routes-admin:
         condition: service_healthy
       admin:
         condition: service_started
@@ -1005,12 +1005,12 @@ volumes:
       ]
     },
     {
-      "name": "intranet-routes",
+      "name": "isoloom-routes-intranet",
       "role": "infra",
       "of": "intranet",
       "addresses": {},
       "native": {
-        "service": "intranet-routes"
+        "service": "isoloom-routes-intranet"
       }
     },
     {
@@ -1030,12 +1030,12 @@ volumes:
       }
     },
     {
-      "name": "staff-routes",
+      "name": "isoloom-routes-staff",
       "role": "infra",
       "of": "staff",
       "addresses": {},
       "native": {
-        "service": "staff-routes"
+        "service": "isoloom-routes-staff"
       }
     },
     {
@@ -1054,12 +1054,12 @@ volumes:
       }
     },
     {
-      "name": "guest-routes",
+      "name": "isoloom-routes-guest",
       "role": "infra",
       "of": "guest",
       "addresses": {},
       "native": {
-        "service": "guest-routes"
+        "service": "isoloom-routes-guest"
       }
     },
     {
@@ -1079,12 +1079,12 @@ volumes:
       }
     },
     {
-      "name": "admin-routes",
+      "name": "isoloom-routes-admin",
       "role": "infra",
       "of": "admin",
       "addresses": {},
       "native": {
-        "service": "admin-routes"
+        "service": "isoloom-routes-admin"
       }
     },
     {
@@ -1098,12 +1098,12 @@ volumes:
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -1328,7 +1328,7 @@ volumes:
           "--wait",
           "--no-deps",
           "isoloom-access",
-          "isoloom-access-routes"
+          "isoloom-routes-isoloom-access"
         ],
         "timeout_s": 600
       }
@@ -1557,7 +1557,7 @@ volumes:
           "--stop",
           "--force",
           "isoloom-access",
-          "isoloom-access-routes"
+          "isoloom-routes-isoloom-access"
         ],
         "timeout_s": 120,
         "failure": "tolerate"

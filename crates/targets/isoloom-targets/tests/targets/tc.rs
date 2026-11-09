@@ -68,7 +68,7 @@ fn machines_apply_netem_on_their_own_interface() -> Outcome {
     let spec = slow_link()?;
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     // `web` is on `far`: its network sidecar has `tc` (netshoot) and shapes its interface there.
-    let sidecar = compose.split("\n  web-routes:\n").nth(1).expect("web has a network sidecar");
+    let sidecar = compose.split("\n  isoloom-routes-web:\n").nth(1).expect("web has a network sidecar");
     assert!(sidecar.contains("netshoot"), "{sidecar}");
     assert!(
         sidecar.contains("10\\.75\\.2\\.10") && sidecar.contains("netem delay 80ms 10ms loss 1% rate 10mbit"),

@@ -87,7 +87,8 @@ pub struct Spec {
     pub volumes: IndexMap<String, SharedVolume>,
     /// The environment's machines, by name, started in the order written (after their
     /// `depends_on`). Names starting with `isoloom-` are Isoloom's own (its controller, the
-    /// containers' VM, the check stand-in, the check runners) and refused.
+    /// containers' VM, the check stand-in and runners, the route sidecars, the init jobs) and
+    /// refused.
     #[schemars(default)]
     pub machines: IndexMap<String, Machine>,
     /// Machine fields every machine shares (a machine's own value wins).

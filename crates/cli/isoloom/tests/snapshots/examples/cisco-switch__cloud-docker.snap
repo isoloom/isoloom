@@ -456,12 +456,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -489,12 +489,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {
@@ -1334,12 +1334,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -1367,12 +1367,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {
@@ -2097,12 +2097,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -2130,12 +2130,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {
@@ -2964,12 +2964,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -2997,12 +2997,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {
@@ -3708,12 +3708,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -3741,12 +3741,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {
@@ -4518,12 +4518,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -4551,12 +4551,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {

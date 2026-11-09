@@ -51,7 +51,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
-  fw-routes:
+  isoloom-routes-fw:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -113,7 +113,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
-  web-routes:
+  isoloom-routes-web:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -171,7 +171,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
-  cache-routes:
+  isoloom-routes-cache:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -218,7 +218,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
     restart: unless-stopped
-  user-routes:
+  isoloom-routes-user:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - access
@@ -263,7 +263,7 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: edge-firewall
-  isoloom-access-routes:
+  isoloom-routes-isoloom-access:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
@@ -303,19 +303,19 @@ services:
     depends_on:
       fw:
         condition: service_healthy
-      fw-routes:
+      isoloom-routes-fw:
         condition: service_healthy
       web:
         condition: service_healthy
-      web-routes:
+      isoloom-routes-web:
         condition: service_healthy
       cache:
         condition: service_healthy
-      cache-routes:
+      isoloom-routes-cache:
         condition: service_healthy
       isoloom-access:
         condition: service_started
-      isoloom-access-routes:
+      isoloom-routes-isoloom-access:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -333,15 +333,15 @@ services:
     depends_on:
       fw:
         condition: service_healthy
-      fw-routes:
+      isoloom-routes-fw:
         condition: service_healthy
       web:
         condition: service_healthy
-      web-routes:
+      isoloom-routes-web:
         condition: service_healthy
       cache:
         condition: service_healthy
-      cache-routes:
+      isoloom-routes-cache:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -359,15 +359,15 @@ services:
     depends_on:
       fw:
         condition: service_healthy
-      fw-routes:
+      isoloom-routes-fw:
         condition: service_healthy
       web:
         condition: service_healthy
-      web-routes:
+      isoloom-routes-web:
         condition: service_healthy
       cache:
         condition: service_healthy
-      cache-routes:
+      isoloom-routes-cache:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -385,15 +385,15 @@ services:
     depends_on:
       fw:
         condition: service_healthy
-      fw-routes:
+      isoloom-routes-fw:
         condition: service_healthy
       web:
         condition: service_healthy
-      web-routes:
+      isoloom-routes-web:
         condition: service_healthy
       cache:
         condition: service_healthy
-      cache-routes:
+      isoloom-routes-cache:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'

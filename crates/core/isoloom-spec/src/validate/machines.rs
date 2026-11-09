@@ -92,10 +92,10 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
 }
 
 /// What Isoloom's own machines and services are named with (its controller, the check stand-in,
-/// the check runners): a spec's machine or alias starting so would collide with them.
+/// the check runners, the route sidecars, the init jobs): a spec's machine or alias starting so
+/// would collide with them.
 const RESERVED_PREFIX: &str = "isoloom-";
-const RESERVED_NAME: &str =
-    "names starting with `isoloom-` are Isoloom's own (its controller, the containers' VM, the check stand-in, the check runners): choose another";
+const RESERVED_NAME: &str = "names starting with `isoloom-` are Isoloom's own (its controller, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs): choose another";
 
 /// The machine's name (a DNS label short enough for Kubernetes), and a network to be on.
 fn name_and_networks(s: &Subject, p: &mut Problems) {

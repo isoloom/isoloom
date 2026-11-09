@@ -459,12 +459,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "writer-init-1",
+      "name": "isoloom-init-writer-1",
       "role": "job",
       "of": "writer",
       "addresses": {},
       "native": {
-        "service": "writer-init-1"
+        "service": "isoloom-init-writer-1"
       }
     },
     {
@@ -490,12 +490,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "reader-init-1",
+      "name": "isoloom-init-reader-1",
       "role": "job",
       "of": "reader",
       "addresses": {},
       "native": {
-        "service": "reader-init-1"
+        "service": "isoloom-init-reader-1"
       }
     },
     {
@@ -604,22 +604,22 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
-        "id": "job-writer-init-1",
+        "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from writer-init-1 writer-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-writer-1 isoloom-init-writer-1",
           "host": "${outputs.ip}",
           "user": "admin"
         },
         "timeout_s": 600
       },
       {
-        "id": "job-reader-init-1",
+        "id": "job-isoloom-init-reader-1",
         "note": "Running reader's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from reader-init-1 reader-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-reader-1 isoloom-init-reader-1",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -686,13 +686,13 @@ output "ssh_user" {
     },
     {
       "kind": "step_ok",
-      "step": "job-writer-init-1",
-      "means": "writer's set-up script (writer-init-1) exited 0"
+      "step": "job-isoloom-init-writer-1",
+      "means": "writer's set-up script (isoloom-init-writer-1) exited 0"
     },
     {
       "kind": "step_ok",
-      "step": "job-reader-init-1",
-      "means": "reader's set-up script (reader-init-1) exited 0"
+      "step": "job-isoloom-init-reader-1",
+      "means": "reader's set-up script (isoloom-init-reader-1) exited 0"
     }
   ],
   "outputs": [
@@ -1299,12 +1299,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "writer-init-1",
+      "name": "isoloom-init-writer-1",
       "role": "job",
       "of": "writer",
       "addresses": {},
       "native": {
-        "service": "writer-init-1"
+        "service": "isoloom-init-writer-1"
       }
     },
     {
@@ -1330,12 +1330,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "reader-init-1",
+      "name": "isoloom-init-reader-1",
       "role": "job",
       "of": "reader",
       "addresses": {},
       "native": {
-        "service": "reader-init-1"
+        "service": "isoloom-init-reader-1"
       }
     },
     {
@@ -1444,22 +1444,22 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
-        "id": "job-writer-init-1",
+        "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from writer-init-1 writer-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-writer-1 isoloom-init-writer-1",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
         "timeout_s": 600
       },
       {
-        "id": "job-reader-init-1",
+        "id": "job-isoloom-init-reader-1",
         "note": "Running reader's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from reader-init-1 reader-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-reader-1 isoloom-init-reader-1",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -1526,13 +1526,13 @@ output "ssh_user" {
     },
     {
       "kind": "step_ok",
-      "step": "job-writer-init-1",
-      "means": "writer's set-up script (writer-init-1) exited 0"
+      "step": "job-isoloom-init-writer-1",
+      "means": "writer's set-up script (isoloom-init-writer-1) exited 0"
     },
     {
       "kind": "step_ok",
-      "step": "job-reader-init-1",
-      "means": "reader's set-up script (reader-init-1) exited 0"
+      "step": "job-isoloom-init-reader-1",
+      "means": "reader's set-up script (isoloom-init-reader-1) exited 0"
     }
   ],
   "outputs": [
@@ -2024,12 +2024,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "writer-init-1",
+      "name": "isoloom-init-writer-1",
       "role": "job",
       "of": "writer",
       "addresses": {},
       "native": {
-        "service": "writer-init-1"
+        "service": "isoloom-init-writer-1"
       }
     },
     {
@@ -2055,12 +2055,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "reader-init-1",
+      "name": "isoloom-init-reader-1",
       "role": "job",
       "of": "reader",
       "addresses": {},
       "native": {
-        "service": "reader-init-1"
+        "service": "isoloom-init-reader-1"
       }
     },
     {
@@ -2169,22 +2169,22 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
-        "id": "job-writer-init-1",
+        "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from writer-init-1 writer-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-writer-1 isoloom-init-writer-1",
           "host": "${outputs.ip}",
           "user": "root"
         },
         "timeout_s": 600
       },
       {
-        "id": "job-reader-init-1",
+        "id": "job-isoloom-init-reader-1",
         "note": "Running reader's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from reader-init-1 reader-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-reader-1 isoloom-init-reader-1",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -2251,13 +2251,13 @@ output "ssh_user" {
     },
     {
       "kind": "step_ok",
-      "step": "job-writer-init-1",
-      "means": "writer's set-up script (writer-init-1) exited 0"
+      "step": "job-isoloom-init-writer-1",
+      "means": "writer's set-up script (isoloom-init-writer-1) exited 0"
     },
     {
       "kind": "step_ok",
-      "step": "job-reader-init-1",
-      "means": "reader's set-up script (reader-init-1) exited 0"
+      "step": "job-isoloom-init-reader-1",
+      "means": "reader's set-up script (isoloom-init-reader-1) exited 0"
     }
   ],
   "outputs": [
@@ -2853,12 +2853,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "writer-init-1",
+      "name": "isoloom-init-writer-1",
       "role": "job",
       "of": "writer",
       "addresses": {},
       "native": {
-        "service": "writer-init-1"
+        "service": "isoloom-init-writer-1"
       }
     },
     {
@@ -2884,12 +2884,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "reader-init-1",
+      "name": "isoloom-init-reader-1",
       "role": "job",
       "of": "reader",
       "addresses": {},
       "native": {
-        "service": "reader-init-1"
+        "service": "isoloom-init-reader-1"
       }
     },
     {
@@ -2998,22 +2998,22 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
-        "id": "job-writer-init-1",
+        "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from writer-init-1 writer-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-writer-1 isoloom-init-writer-1",
           "host": "${outputs.ip}",
           "user": "admin"
         },
         "timeout_s": 600
       },
       {
-        "id": "job-reader-init-1",
+        "id": "job-isoloom-init-reader-1",
         "note": "Running reader's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from reader-init-1 reader-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-reader-1 isoloom-init-reader-1",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -3080,13 +3080,13 @@ output "ssh_user" {
     },
     {
       "kind": "step_ok",
-      "step": "job-writer-init-1",
-      "means": "writer's set-up script (writer-init-1) exited 0"
+      "step": "job-isoloom-init-writer-1",
+      "means": "writer's set-up script (isoloom-init-writer-1) exited 0"
     },
     {
       "kind": "step_ok",
-      "step": "job-reader-init-1",
-      "means": "reader's set-up script (reader-init-1) exited 0"
+      "step": "job-isoloom-init-reader-1",
+      "means": "reader's set-up script (isoloom-init-reader-1) exited 0"
     }
   ],
   "outputs": [
@@ -3559,12 +3559,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "writer-init-1",
+      "name": "isoloom-init-writer-1",
       "role": "job",
       "of": "writer",
       "addresses": {},
       "native": {
-        "service": "writer-init-1"
+        "service": "isoloom-init-writer-1"
       }
     },
     {
@@ -3590,12 +3590,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "reader-init-1",
+      "name": "isoloom-init-reader-1",
       "role": "job",
       "of": "reader",
       "addresses": {},
       "native": {
-        "service": "reader-init-1"
+        "service": "isoloom-init-reader-1"
       }
     },
     {
@@ -3704,22 +3704,22 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
-        "id": "job-writer-init-1",
+        "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from writer-init-1 writer-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-writer-1 isoloom-init-writer-1",
           "host": "${outputs.ip}",
           "user": "root"
         },
         "timeout_s": 600
       },
       {
-        "id": "job-reader-init-1",
+        "id": "job-isoloom-init-reader-1",
         "note": "Running reader's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from reader-init-1 reader-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-reader-1 isoloom-init-reader-1",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3786,13 +3786,13 @@ output "ssh_user" {
     },
     {
       "kind": "step_ok",
-      "step": "job-writer-init-1",
-      "means": "writer's set-up script (writer-init-1) exited 0"
+      "step": "job-isoloom-init-writer-1",
+      "means": "writer's set-up script (isoloom-init-writer-1) exited 0"
     },
     {
       "kind": "step_ok",
-      "step": "job-reader-init-1",
-      "means": "reader's set-up script (reader-init-1) exited 0"
+      "step": "job-isoloom-init-reader-1",
+      "means": "reader's set-up script (isoloom-init-reader-1) exited 0"
     }
   ],
   "outputs": [
@@ -4331,12 +4331,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "writer-init-1",
+      "name": "isoloom-init-writer-1",
       "role": "job",
       "of": "writer",
       "addresses": {},
       "native": {
-        "service": "writer-init-1"
+        "service": "isoloom-init-writer-1"
       }
     },
     {
@@ -4362,12 +4362,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "reader-init-1",
+      "name": "isoloom-init-reader-1",
       "role": "job",
       "of": "reader",
       "addresses": {},
       "native": {
-        "service": "reader-init-1"
+        "service": "isoloom-init-reader-1"
       }
     },
     {
@@ -4476,22 +4476,22 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
-        "id": "job-writer-init-1",
+        "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from writer-init-1 writer-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-writer-1 isoloom-init-writer-1",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
         "timeout_s": 600
       },
       {
-        "id": "job-reader-init-1",
+        "id": "job-isoloom-init-reader-1",
         "note": "Running reader's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from reader-init-1 reader-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-reader-1 isoloom-init-reader-1",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
@@ -4558,13 +4558,13 @@ output "ssh_user" {
     },
     {
       "kind": "step_ok",
-      "step": "job-writer-init-1",
-      "means": "writer's set-up script (writer-init-1) exited 0"
+      "step": "job-isoloom-init-writer-1",
+      "means": "writer's set-up script (isoloom-init-writer-1) exited 0"
     },
     {
       "kind": "step_ok",
-      "step": "job-reader-init-1",
-      "means": "reader's set-up script (reader-init-1) exited 0"
+      "step": "job-isoloom-init-reader-1",
+      "means": "reader's set-up script (isoloom-init-reader-1) exited 0"
     }
   ],
   "outputs": [

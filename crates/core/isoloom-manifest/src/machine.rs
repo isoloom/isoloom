@@ -120,8 +120,9 @@ pub struct Network {
     pub name: Name,
     /// Its block where the target creates it.
     pub cidr: Cidr,
-    /// `false`: no route out. On container targets Isoloom enforces it with `<machine>-routes`
-    /// sidecars (role `infra`), not an `internal:` network, so published ports still work.
+    /// `false`: no route out. On container targets Isoloom enforces it with
+    /// `isoloom-routes-<machine>` sidecars (role `infra`), not an `internal:` network, so
+    /// published ports still work.
     pub internet: bool,
     /// Its name where the target creates it: the Docker network (`${run.name}_lab`), the
     /// hypervisor's internal network (`isoloom-<lab>-lab`).
@@ -262,7 +263,7 @@ pub struct Volume {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Machine {
-    /// Its name: the spec's, or Isoloom's for its own (`web-init-1`, `isoloom-check`).
+    /// Its name: the spec's, or Isoloom's for its own (`isoloom-init-web-1`, `isoloom-check`).
     pub name: Name,
     /// What it is to the run.
     pub role: Role,

@@ -3,11 +3,12 @@
 
 use isoloom_spec::model::{Machine, Spec};
 
-/// The one-shot jobs of a machine, in order: `<machine>-init-<n>`.
+/// The one-shot jobs of a machine, in order: `isoloom-init-<machine>-<n>`, under the prefix a
+/// lab's machines can't take, so no machine's name is another's job.
 #[must_use]
 pub fn init_names(name: &str, m: &Machine) -> Vec<String> {
     let n = m.docker.as_ref().map_or(0, |d| d.init.len());
-    (1..=n).map(|i| format!("{name}-init-{i}")).collect()
+    (1..=n).map(|i| format!("isoloom-init-{name}-{i}")).collect()
 }
 
 /// The one-shot jobs no running service waits for: those of machines nothing depends on.

@@ -223,7 +223,7 @@
       "sensitive": true,
       "machines": [
         "web",
-        "web-init-1"
+        "isoloom-init-web-1"
       ],
       "default": "",
       "deliver": [
@@ -232,7 +232,7 @@
           "var": "DEMO_SECRET",
           "steps": [
             "start",
-            "job-web-init-1"
+            "job-isoloom-init-web-1"
           ]
         }
       ]
@@ -280,12 +280,12 @@
       ]
     },
     {
-      "name": "db-routes",
+      "name": "isoloom-routes-db",
       "role": "infra",
       "of": "db",
       "addresses": {},
       "native": {
-        "service": "db-routes"
+        "service": "isoloom-routes-db"
       }
     },
     {
@@ -324,21 +324,21 @@
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
-      "name": "web-init-1",
+      "name": "isoloom-init-web-1",
       "role": "job",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-init-1"
+        "service": "isoloom-init-web-1"
       }
     },
     {
@@ -459,18 +459,18 @@
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db isoloom-routes-db web isoloom-routes-web isoloom-probe-amd64",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
         "timeout_s": 1800
       },
       {
-        "id": "job-web-init-1",
+        "id": "job-isoloom-init-web-1",
         "note": "Running web's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --no-deps --exit-code-from web-init-1 web-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -542,8 +542,8 @@
     },
     {
       "kind": "step_ok",
-      "step": "job-web-init-1",
-      "means": "web's set-up script (web-init-1) exited 0"
+      "step": "job-isoloom-init-web-1",
+      "means": "web's set-up script (isoloom-init-web-1) exited 0"
     }
   ],
   "outputs": [

@@ -28,7 +28,7 @@ fn a_machine_on_two_vlans_gets_a_trunk() -> Outcome {
         !admin.contains("office-vlan10:") && !admin.contains("office-vlan20:"),
         "the trunk carries them: {admin}"
     );
-    let sidecar = service(&c, "admin-routes")?;
+    let sidecar = service(&c, "isoloom-routes-admin")?;
     assert!(sidecar.contains("netshoot"), "{sidecar}");
     assert!(
         sidecar.contains("name office.10 type vlan id 10") && sidecar.contains("10.70.10.50/24 dev office.10"),

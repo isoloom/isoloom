@@ -425,7 +425,7 @@ output "ssh_user" {
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -445,7 +445,7 @@ output "ssh_user" {
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -501,12 +501,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {
@@ -1310,7 +1310,7 @@ output "ssh_user" {
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -1330,7 +1330,7 @@ output "ssh_user" {
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -1386,12 +1386,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {
@@ -2085,7 +2085,7 @@ output "ssh_user" {
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -2105,7 +2105,7 @@ output "ssh_user" {
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -2161,12 +2161,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {
@@ -2959,7 +2959,7 @@ output "ssh_user" {
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -2979,7 +2979,7 @@ output "ssh_user" {
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -3035,12 +3035,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {
@@ -3710,7 +3710,7 @@ output "ssh_user" {
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -3730,7 +3730,7 @@ output "ssh_user" {
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -3786,12 +3786,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {
@@ -4536,7 +4536,7 @@ output "ssh_user" {
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -4556,7 +4556,7 @@ output "ssh_user" {
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -4612,12 +4612,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {

@@ -59,7 +59,7 @@
       "additionalProperties": {
         "$ref": "#/$defs/Machine"
       },
-      "description": "The environment's machines, by name, started in the order written (after their\n`depends_on`). Names starting with `isoloom-` are Isoloom's own (its controller, the\ncontainers' VM, the check stand-in, the check runners) and refused.",
+      "description": "The environment's machines, by name, started in the order written (after their\n`depends_on`). Names starting with `isoloom-` are Isoloom's own (its controller, the\ncontainers' VM, the check stand-in and runners, the route sidecars, the init jobs) and\nrefused.",
       "propertyNames": {
         "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
       }

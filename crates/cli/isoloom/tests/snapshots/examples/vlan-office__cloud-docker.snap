@@ -489,12 +489,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "intranet-routes",
+      "name": "isoloom-routes-intranet",
       "role": "infra",
       "of": "intranet",
       "addresses": {},
       "native": {
-        "service": "intranet-routes"
+        "service": "isoloom-routes-intranet"
       }
     },
     {
@@ -514,12 +514,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "staff-routes",
+      "name": "isoloom-routes-staff",
       "role": "infra",
       "of": "staff",
       "addresses": {},
       "native": {
-        "service": "staff-routes"
+        "service": "isoloom-routes-staff"
       }
     },
     {
@@ -538,12 +538,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "guest-routes",
+      "name": "isoloom-routes-guest",
       "role": "infra",
       "of": "guest",
       "addresses": {},
       "native": {
-        "service": "guest-routes"
+        "service": "isoloom-routes-guest"
       }
     },
     {
@@ -563,12 +563,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "admin-routes",
+      "name": "isoloom-routes-admin",
       "role": "infra",
       "of": "admin",
       "addresses": {},
       "native": {
-        "service": "admin-routes"
+        "service": "isoloom-routes-admin"
       }
     },
     {
@@ -582,12 +582,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -811,7 +811,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -985,7 +985,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -1501,12 +1501,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "intranet-routes",
+      "name": "isoloom-routes-intranet",
       "role": "infra",
       "of": "intranet",
       "addresses": {},
       "native": {
-        "service": "intranet-routes"
+        "service": "isoloom-routes-intranet"
       }
     },
     {
@@ -1526,12 +1526,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "staff-routes",
+      "name": "isoloom-routes-staff",
       "role": "infra",
       "of": "staff",
       "addresses": {},
       "native": {
-        "service": "staff-routes"
+        "service": "isoloom-routes-staff"
       }
     },
     {
@@ -1550,12 +1550,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "guest-routes",
+      "name": "isoloom-routes-guest",
       "role": "infra",
       "of": "guest",
       "addresses": {},
       "native": {
-        "service": "guest-routes"
+        "service": "isoloom-routes-guest"
       }
     },
     {
@@ -1575,12 +1575,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "admin-routes",
+      "name": "isoloom-routes-admin",
       "role": "infra",
       "of": "admin",
       "addresses": {},
       "native": {
-        "service": "admin-routes"
+        "service": "isoloom-routes-admin"
       }
     },
     {
@@ -1594,12 +1594,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -1823,7 +1823,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -1997,7 +1997,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -2398,12 +2398,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "intranet-routes",
+      "name": "isoloom-routes-intranet",
       "role": "infra",
       "of": "intranet",
       "addresses": {},
       "native": {
-        "service": "intranet-routes"
+        "service": "isoloom-routes-intranet"
       }
     },
     {
@@ -2423,12 +2423,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "staff-routes",
+      "name": "isoloom-routes-staff",
       "role": "infra",
       "of": "staff",
       "addresses": {},
       "native": {
-        "service": "staff-routes"
+        "service": "isoloom-routes-staff"
       }
     },
     {
@@ -2447,12 +2447,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "guest-routes",
+      "name": "isoloom-routes-guest",
       "role": "infra",
       "of": "guest",
       "addresses": {},
       "native": {
-        "service": "guest-routes"
+        "service": "isoloom-routes-guest"
       }
     },
     {
@@ -2472,12 +2472,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "admin-routes",
+      "name": "isoloom-routes-admin",
       "role": "infra",
       "of": "admin",
       "addresses": {},
       "native": {
-        "service": "admin-routes"
+        "service": "isoloom-routes-admin"
       }
     },
     {
@@ -2491,12 +2491,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -2720,7 +2720,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -2894,7 +2894,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3399,12 +3399,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "intranet-routes",
+      "name": "isoloom-routes-intranet",
       "role": "infra",
       "of": "intranet",
       "addresses": {},
       "native": {
-        "service": "intranet-routes"
+        "service": "isoloom-routes-intranet"
       }
     },
     {
@@ -3424,12 +3424,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "staff-routes",
+      "name": "isoloom-routes-staff",
       "role": "infra",
       "of": "staff",
       "addresses": {},
       "native": {
-        "service": "staff-routes"
+        "service": "isoloom-routes-staff"
       }
     },
     {
@@ -3448,12 +3448,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "guest-routes",
+      "name": "isoloom-routes-guest",
       "role": "infra",
       "of": "guest",
       "addresses": {},
       "native": {
-        "service": "guest-routes"
+        "service": "isoloom-routes-guest"
       }
     },
     {
@@ -3473,12 +3473,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "admin-routes",
+      "name": "isoloom-routes-admin",
       "role": "infra",
       "of": "admin",
       "addresses": {},
       "native": {
-        "service": "admin-routes"
+        "service": "isoloom-routes-admin"
       }
     },
     {
@@ -3492,12 +3492,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -3721,7 +3721,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -3895,7 +3895,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -4277,12 +4277,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "intranet-routes",
+      "name": "isoloom-routes-intranet",
       "role": "infra",
       "of": "intranet",
       "addresses": {},
       "native": {
-        "service": "intranet-routes"
+        "service": "isoloom-routes-intranet"
       }
     },
     {
@@ -4302,12 +4302,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "staff-routes",
+      "name": "isoloom-routes-staff",
       "role": "infra",
       "of": "staff",
       "addresses": {},
       "native": {
-        "service": "staff-routes"
+        "service": "isoloom-routes-staff"
       }
     },
     {
@@ -4326,12 +4326,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "guest-routes",
+      "name": "isoloom-routes-guest",
       "role": "infra",
       "of": "guest",
       "addresses": {},
       "native": {
-        "service": "guest-routes"
+        "service": "isoloom-routes-guest"
       }
     },
     {
@@ -4351,12 +4351,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "admin-routes",
+      "name": "isoloom-routes-admin",
       "role": "infra",
       "of": "admin",
       "addresses": {},
       "native": {
-        "service": "admin-routes"
+        "service": "isoloom-routes-admin"
       }
     },
     {
@@ -4370,12 +4370,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -4599,7 +4599,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -4773,7 +4773,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -5221,12 +5221,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "intranet-routes",
+      "name": "isoloom-routes-intranet",
       "role": "infra",
       "of": "intranet",
       "addresses": {},
       "native": {
-        "service": "intranet-routes"
+        "service": "isoloom-routes-intranet"
       }
     },
     {
@@ -5246,12 +5246,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "staff-routes",
+      "name": "isoloom-routes-staff",
       "role": "infra",
       "of": "staff",
       "addresses": {},
       "native": {
-        "service": "staff-routes"
+        "service": "isoloom-routes-staff"
       }
     },
     {
@@ -5270,12 +5270,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "guest-routes",
+      "name": "isoloom-routes-guest",
       "role": "infra",
       "of": "guest",
       "addresses": {},
       "native": {
-        "service": "guest-routes"
+        "service": "isoloom-routes-guest"
       }
     },
     {
@@ -5295,12 +5295,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "admin-routes",
+      "name": "isoloom-routes-admin",
       "role": "infra",
       "of": "admin",
       "addresses": {},
       "native": {
-        "service": "admin-routes"
+        "service": "isoloom-routes-admin"
       }
     },
     {
@@ -5314,12 +5314,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -5543,7 +5543,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
@@ -5717,7 +5717,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name vlan-office --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },

@@ -41,8 +41,13 @@ fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
     assert_eq!(g.start[0].id.as_str(), "start");
     // Web's set-up job runs attached once the rest is up.
     let jobs: Vec<&str> = g.start.iter().skip(1).map(|c| c.id.as_str()).collect();
-    assert_eq!(jobs, ["job-web-init-1"]);
-    assert!(g.start[1].command.to_string().ends_with("up --no-deps --exit-code-from web-init-1 web-init-1"));
+    assert_eq!(jobs, ["job-isoloom-init-web-1"]);
+    assert!(
+        g.start[1]
+            .command
+            .to_string()
+            .ends_with("up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1")
+    );
     let ready: Vec<String> = g
         .ready
         .iter()
@@ -51,7 +56,7 @@ fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
             _ => None,
         })
         .collect();
-    assert_eq!(ready, ["start", "job-web-init-1"]);
+    assert_eq!(ready, ["start", "job-isoloom-init-web-1"]);
     assert_eq!(
         g.status.command.to_string(),
         "if command -v docker >/dev/null; then sudo docker compose --project-name shop ps --all --format json; fi"
@@ -84,7 +89,7 @@ fn the_flag_reaches_only_the_start_steps_and_is_forwarded_into_the_vm() {
     };
     assert_eq!(var.as_str(), "DEMO_SECRET");
     let steps: Vec<&str> = steps.iter().map(StepId::as_str).collect();
-    assert_eq!(steps, ["start", "job-web-init-1"]);
+    assert_eq!(steps, ["start", "job-isoloom-init-web-1"]);
     assert_eq!(g.forwarded(), ["DEMO_SECRET"]);
 }
 

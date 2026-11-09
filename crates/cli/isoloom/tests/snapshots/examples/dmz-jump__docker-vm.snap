@@ -614,7 +614,7 @@ systemctl enable --now isoloom-published.service
 "
   config.vm.provision "project", type: "isoloom_project", generated: true
   config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check rm --stop --force \"$@\" || true; exit \"$failed\"", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-routes-isoloom-access); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check rm --stop --force \"$@\" || true; exit \"$failed\"", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
 end
 
 ## .isoloom/docker-vm/proxmox/main.tf
@@ -1134,12 +1134,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "gateway-routes",
+      "name": "isoloom-routes-gateway",
       "role": "infra",
       "of": "gateway",
       "addresses": {},
       "native": {
-        "service": "gateway-routes"
+        "service": "isoloom-routes-gateway"
       }
     },
     {
@@ -1166,12 +1166,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "app-routes",
+      "name": "isoloom-routes-app",
       "role": "infra",
       "of": "app",
       "addresses": {},
       "native": {
-        "service": "app-routes"
+        "service": "isoloom-routes-app"
       }
     },
     {
@@ -1198,12 +1198,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "db-routes",
+      "name": "isoloom-routes-db",
       "role": "infra",
       "of": "db",
       "addresses": {},
       "native": {
-        "service": "db-routes"
+        "service": "isoloom-routes-db"
       }
     },
     {
@@ -1223,12 +1223,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "user-routes",
+      "name": "isoloom-routes-user",
       "role": "infra",
       "of": "user",
       "addresses": {},
       "native": {
-        "service": "user-routes"
+        "service": "isoloom-routes-user"
       }
     },
     {
@@ -1242,12 +1242,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -1479,7 +1479,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -1701,7 +1701,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -2176,12 +2176,12 @@ systemctl enable --now isoloom-published.service
       ]
     },
     {
-      "name": "gateway-routes",
+      "name": "isoloom-routes-gateway",
       "role": "infra",
       "of": "gateway",
       "addresses": {},
       "native": {
-        "service": "gateway-routes"
+        "service": "isoloom-routes-gateway"
       }
     },
     {
@@ -2208,12 +2208,12 @@ systemctl enable --now isoloom-published.service
       ]
     },
     {
-      "name": "app-routes",
+      "name": "isoloom-routes-app",
       "role": "infra",
       "of": "app",
       "addresses": {},
       "native": {
-        "service": "app-routes"
+        "service": "isoloom-routes-app"
       }
     },
     {
@@ -2240,12 +2240,12 @@ systemctl enable --now isoloom-published.service
       ]
     },
     {
-      "name": "db-routes",
+      "name": "isoloom-routes-db",
       "role": "infra",
       "of": "db",
       "addresses": {},
       "native": {
-        "service": "db-routes"
+        "service": "isoloom-routes-db"
       }
     },
     {
@@ -2265,12 +2265,12 @@ systemctl enable --now isoloom-published.service
       }
     },
     {
-      "name": "user-routes",
+      "name": "isoloom-routes-user",
       "role": "infra",
       "of": "user",
       "addresses": {},
       "native": {
-        "service": "user-routes"
+        "service": "isoloom-routes-user"
       }
     },
     {
@@ -2284,12 +2284,12 @@ systemctl enable --now isoloom-published.service
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -2507,7 +2507,7 @@ systemctl enable --now isoloom-published.service
           "ssh",
           "--no-tty",
           "--command",
-          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-routes-isoloom-access",
           "default"
         ],
         "timeout_s": 600
@@ -2747,7 +2747,7 @@ systemctl enable --now isoloom-published.service
           "ssh",
           "--no-tty",
           "--command",
-          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-routes-isoloom-access",
           "default"
         ],
         "timeout_s": 120,

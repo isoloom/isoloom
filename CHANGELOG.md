@@ -32,6 +32,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+- **Breaking: Isoloom's own Compose services all start with `isoloom-`**: a machine's route
+  sidecar is `isoloom-routes-<machine>` (was `<machine>-routes`) and its `init` jobs
+  `isoloom-init-<machine>-<n>` (was `<machine>-init-<n>`; their run-manifest steps
+  `job-isoloom-init-<machine>-<n>`). A machine named `web-routes` or `web-init-1` replaced `web`'s
+  sidecar or job in the Compose file, silently; the prefix is the one a lab's machines can't take.
 - **Breaking: a published port's output is named `<machine>__<port>`** (`web__portal`, was
   `web_portal`), in snake case. Joined by one `_`, two ports could take one name (`web-admin`'s
   `ui` and `web`'s `admin-ui` were both `web_admin_ui`) or a Terraform output's (machine `ssh`'s
@@ -213,8 +218,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **`terraform init` may take 900 s on every target** (Proxmox's run manifests gave it 600 s).
 - **`cargo xtask catalogue check` requires `--runner`**: there is no default runner.
 - **Machine names and aliases starting with `isoloom-` are refused.** They are Isoloom's own (its
-  controller, the check stand-in, the check runners): a machine named `isoloom-access` collided
-  with the stand-in, and `isoloom-web` shared `web`'s check step. `docs/spec.md` says so.
+  controller, the containers' VM, the check stand-in and runners, the route sidecars, the init
+  jobs): a machine named `isoloom-access` collided with the stand-in, and `isoloom-web` shared
+  `web`'s check step. `docs/spec.md` says so.
 - **Compose's start removes the services the lab no longer has** (`up --remove-orphans`), on this
   computer and in a VM: a machine taken out of a lab, then the run brought up to date, goes.
   Services behind a profile that isn't started are still the file's, so they stay.

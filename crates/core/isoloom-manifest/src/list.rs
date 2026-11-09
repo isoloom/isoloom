@@ -151,8 +151,8 @@ mod tests {
     #[test]
     fn a_selection_is_every_step_or_some() {
         assert_eq!(serde_json::from_str::<StepSelection>(r#"["*"]"#).unwrap(), StepSelection::Every);
-        let some: StepSelection = serde_json::from_str(r#"["up", "job-web-init-1"]"#).unwrap();
-        assert_eq!(serde_json::to_string(&some).unwrap(), r#"["up","job-web-init-1"]"#);
+        let some: StepSelection = serde_json::from_str(r#"["up", "job-isoloom-init-web-1"]"#).unwrap();
+        assert_eq!(serde_json::to_string(&some).unwrap(), r#"["up","job-isoloom-init-web-1"]"#);
         assert!(
             serde_json::from_str::<StepSelection>(r#"["*", "up"]"#)
                 .unwrap_err()

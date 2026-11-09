@@ -245,7 +245,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
     restart: unless-stopped
-  r1-routes:
+  isoloom-routes-r1:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -311,7 +311,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
     restart: unless-stopped
-  r2-routes:
+  isoloom-routes-r2:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -353,7 +353,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
     restart: unless-stopped
-  host-a-routes:
+  isoloom-routes-host-a:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -410,7 +410,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
     restart: unless-stopped
-  host-b-routes:
+  isoloom-routes-host-b:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -447,15 +447,15 @@ services:
     volumes:
     - ./checks/host-a.sh:/isoloom/run.sh:ro
     depends_on:
-      r1-routes:
+      isoloom-routes-r1:
         condition: service_healthy
-      r2-routes:
+      isoloom-routes-r2:
         condition: service_healthy
-      host-a-routes:
+      isoloom-routes-host-a:
         condition: service_healthy
       host-b:
         condition: service_healthy
-      host-b-routes:
+      isoloom-routes-host-b:
         condition: service_healthy
       host-a:
         condition: service_started
@@ -625,12 +625,12 @@ volumes:
       }
     },
     {
-      "name": "r1-routes",
+      "name": "isoloom-routes-r1",
       "role": "infra",
       "of": "r1",
       "addresses": {},
       "native": {
-        "service": "r1-routes"
+        "service": "isoloom-routes-r1"
       }
     },
     {
@@ -650,12 +650,12 @@ volumes:
       }
     },
     {
-      "name": "r2-routes",
+      "name": "isoloom-routes-r2",
       "role": "infra",
       "of": "r2",
       "addresses": {},
       "native": {
-        "service": "r2-routes"
+        "service": "isoloom-routes-r2"
       }
     },
     {
@@ -674,12 +674,12 @@ volumes:
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -706,12 +706,12 @@ volumes:
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {

@@ -111,7 +111,7 @@
       "sensitive": true,
       "machines": [
         "web",
-        "web-init-1"
+        "isoloom-init-web-1"
       ],
       "default": "",
       "deliver": [
@@ -121,7 +121,7 @@
           "steps": [
             "up",
             "start",
-            "job-web-init-1"
+            "job-isoloom-init-web-1"
           ]
         }
       ]
@@ -160,12 +160,12 @@
       ]
     },
     {
-      "name": "db-routes",
+      "name": "isoloom-routes-db",
       "role": "infra",
       "of": "db",
       "addresses": {},
       "native": {
-        "service": "db-routes"
+        "service": "isoloom-routes-db"
       }
     },
     {
@@ -204,21 +204,21 @@
       ]
     },
     {
-      "name": "web-routes",
+      "name": "isoloom-routes-web",
       "role": "infra",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-routes"
+        "service": "isoloom-routes-web"
       }
     },
     {
-      "name": "web-init-1",
+      "name": "isoloom-init-web-1",
       "role": "job",
       "of": "web",
       "addresses": {},
       "native": {
-        "service": "web-init-1"
+        "service": "isoloom-init-web-1"
       }
     },
     {
@@ -294,15 +294,15 @@
           "--wait-timeout",
           "600",
           "db",
-          "db-routes",
+          "isoloom-routes-db",
           "web",
-          "web-routes",
+          "isoloom-routes-web",
           "isoloom-probe-amd64"
         ],
         "timeout_s": 1800
       },
       {
-        "id": "job-web-init-1",
+        "id": "job-isoloom-init-web-1",
         "note": "Running web's set-up script…",
         "argv": [
           "docker",
@@ -316,8 +316,8 @@
           "up",
           "--no-deps",
           "--exit-code-from",
-          "web-init-1",
-          "web-init-1"
+          "isoloom-init-web-1",
+          "isoloom-init-web-1"
         ],
         "timeout_s": 600
       }
@@ -436,8 +436,8 @@
     },
     {
       "kind": "step_ok",
-      "step": "job-web-init-1",
-      "means": "web's set-up script (web-init-1) exited 0"
+      "step": "job-isoloom-init-web-1",
+      "means": "web's set-up script (isoloom-init-web-1) exited 0"
     }
   ],
   "outputs": [

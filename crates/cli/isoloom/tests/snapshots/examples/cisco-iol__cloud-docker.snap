@@ -465,12 +465,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r1-routes",
+      "name": "isoloom-routes-r1",
       "role": "infra",
       "of": "r1",
       "addresses": {},
       "native": {
-        "service": "r1-routes"
+        "service": "isoloom-routes-r1"
       }
     },
     {
@@ -490,12 +490,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r2-routes",
+      "name": "isoloom-routes-r2",
       "role": "infra",
       "of": "r2",
       "addresses": {},
       "native": {
-        "service": "r2-routes"
+        "service": "isoloom-routes-r2"
       }
     },
     {
@@ -514,12 +514,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -546,12 +546,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {
@@ -1264,12 +1264,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r1-routes",
+      "name": "isoloom-routes-r1",
       "role": "infra",
       "of": "r1",
       "addresses": {},
       "native": {
-        "service": "r1-routes"
+        "service": "isoloom-routes-r1"
       }
     },
     {
@@ -1289,12 +1289,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r2-routes",
+      "name": "isoloom-routes-r2",
       "role": "infra",
       "of": "r2",
       "addresses": {},
       "native": {
-        "service": "r2-routes"
+        "service": "isoloom-routes-r2"
       }
     },
     {
@@ -1313,12 +1313,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -1345,12 +1345,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {
@@ -1948,12 +1948,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r1-routes",
+      "name": "isoloom-routes-r1",
       "role": "infra",
       "of": "r1",
       "addresses": {},
       "native": {
-        "service": "r1-routes"
+        "service": "isoloom-routes-r1"
       }
     },
     {
@@ -1973,12 +1973,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r2-routes",
+      "name": "isoloom-routes-r2",
       "role": "infra",
       "of": "r2",
       "addresses": {},
       "native": {
-        "service": "r2-routes"
+        "service": "isoloom-routes-r2"
       }
     },
     {
@@ -1997,12 +1997,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -2029,12 +2029,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {
@@ -2736,12 +2736,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r1-routes",
+      "name": "isoloom-routes-r1",
       "role": "infra",
       "of": "r1",
       "addresses": {},
       "native": {
-        "service": "r1-routes"
+        "service": "isoloom-routes-r1"
       }
     },
     {
@@ -2761,12 +2761,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r2-routes",
+      "name": "isoloom-routes-r2",
       "role": "infra",
       "of": "r2",
       "addresses": {},
       "native": {
-        "service": "r2-routes"
+        "service": "isoloom-routes-r2"
       }
     },
     {
@@ -2785,12 +2785,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -2817,12 +2817,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {
@@ -3401,12 +3401,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r1-routes",
+      "name": "isoloom-routes-r1",
       "role": "infra",
       "of": "r1",
       "addresses": {},
       "native": {
-        "service": "r1-routes"
+        "service": "isoloom-routes-r1"
       }
     },
     {
@@ -3426,12 +3426,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r2-routes",
+      "name": "isoloom-routes-r2",
       "role": "infra",
       "of": "r2",
       "addresses": {},
       "native": {
-        "service": "r2-routes"
+        "service": "isoloom-routes-r2"
       }
     },
     {
@@ -3450,12 +3450,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -3482,12 +3482,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {
@@ -4132,12 +4132,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r1-routes",
+      "name": "isoloom-routes-r1",
       "role": "infra",
       "of": "r1",
       "addresses": {},
       "native": {
-        "service": "r1-routes"
+        "service": "isoloom-routes-r1"
       }
     },
     {
@@ -4157,12 +4157,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "r2-routes",
+      "name": "isoloom-routes-r2",
       "role": "infra",
       "of": "r2",
       "addresses": {},
       "native": {
-        "service": "r2-routes"
+        "service": "isoloom-routes-r2"
       }
     },
     {
@@ -4181,12 +4181,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -4213,12 +4213,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {

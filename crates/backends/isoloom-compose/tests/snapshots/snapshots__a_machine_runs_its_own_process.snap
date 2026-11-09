@@ -46,7 +46,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: own-process
     restart: unless-stopped
-  web-init-1:
+  isoloom-init-web-1:
     image: python:3-alpine
     user: root
     entrypoint:
@@ -110,7 +110,7 @@ services:
     depends_on:
       web:
         condition: service_healthy
-      web-init-1:
+      isoloom-init-web-1:
         condition: service_completed_successfully
       api:
         condition: service_healthy
@@ -130,7 +130,7 @@ services:
     depends_on:
       web:
         condition: service_healthy
-      web-init-1:
+      isoloom-init-web-1:
         condition: service_completed_successfully
       api:
         condition: service_healthy

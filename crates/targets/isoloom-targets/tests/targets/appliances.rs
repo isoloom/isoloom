@@ -113,7 +113,7 @@ fn dynamips_builds_its_emulator_and_boots_the_firmware() -> Outcome {
     let (c, files) = compose_of("cisco-dynamips")?;
     let r1 = from(&c, "\n  r1:\n")?;
     assert!(
-        r1.contains("build:\n      context: ./appliances/r1/build") && !r1.split("\n  r1-routes:").next().unwrap().contains("image:"),
+        r1.contains("build:\n      context: ./appliances/r1/build") && !r1.split("\n  isoloom-routes-r1:").next().unwrap().contains("image:"),
         "{r1}"
     );
     assert!(r1.contains("../../images/c7200.bin:/firmware/ios.bin:ro"));
@@ -170,7 +170,7 @@ fn switch_ports(files: &[GeneratedFile]) -> Outcome {
 /// cisco-switch's Compose file: the switch's networks, and the machines around it.
 fn switch_service(c: &str) -> Outcome {
     // Compose: the VLAN networks at the controller address, then the trunk link, in order.
-    let sw = between(c, "\n  sw1:\n", "\n  sw1-routes:\n")?;
+    let sw = between(c, "\n  sw1:\n", "\n  isoloom-routes-sw1:\n")?;
     assert!(
         sw.contains("office-vlan10:\n        ipv4_address: 10.92.10.253\n        interface_name: eth1\n        priority: 999"),
         "{sw}"
@@ -189,7 +189,7 @@ fn switch_service(c: &str) -> Outcome {
         "IOS owns every data port"
     );
     // The trunk machine's end is unchanged; its sidecar waits for the switch to start.
-    let files_routes = between(c, "\n  files-routes:\n", "\n  staff:\n")?;
+    let files_routes = between(c, "\n  isoloom-routes-files:\n", "\n  staff:\n")?;
     assert!(files_routes.contains("name office.10 type vlan id 10"), "{files_routes}");
     assert!(files_routes.contains("      sw1:\n        condition: service_started"), "{files_routes}");
     // The switch has no address: no other machine resolves it.

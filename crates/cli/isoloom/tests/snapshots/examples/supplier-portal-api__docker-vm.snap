@@ -623,7 +623,7 @@ systemctl enable --now isoloom-published.service
   config.vm.provision "shell", name: "environment", inline: "i=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$i\" -gt 0 ] || echo 'the Docker host: waiting for its secrets, which the runner (run.json) delivers'; i=$((i+5)); if [ \"$i\" -gt 1800 ]; then echo 'the Docker host: its secrets never came; start the environment with the runner (run.json), which reads them from their stores and delivers them' >&2; exit 1; fi; sleep 5; done
 LAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/LAUNCH_TOKEN; printf x)\"; LAUNCH_TOKEN=\"${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN
 cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready", env: INPUTS
-  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check rm --stop --force \"$@\" || true; exit \"$failed\"", env: INPUTS.merge({ "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") })
+  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-routes-isoloom-access); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check rm --stop --force \"$@\" || true; exit \"$failed\"", env: INPUTS.merge({ "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") })
 end
 
 ## .isoloom/docker-vm/proxmox/main.tf
@@ -1082,7 +1082,7 @@ output "ssh_user" {
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -1102,7 +1102,7 @@ output "ssh_user" {
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -1158,12 +1158,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {
@@ -1894,7 +1894,7 @@ systemctl enable --now isoloom-published.service
       "sensitive": false,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -1914,7 +1914,7 @@ systemctl enable --now isoloom-published.service
       "sensitive": true,
       "machines": [
         "database",
-        "database-init-1"
+        "isoloom-init-database-1"
       ],
       "default": "",
       "deliver": [
@@ -2000,12 +2000,12 @@ systemctl enable --now isoloom-published.service
       ]
     },
     {
-      "name": "database-init-1",
+      "name": "isoloom-init-database-1",
       "role": "job",
       "of": "database",
       "addresses": {},
       "native": {
-        "service": "database-init-1"
+        "service": "isoloom-init-database-1"
       }
     },
     {

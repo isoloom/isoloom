@@ -279,10 +279,10 @@ fn secrets_project_files_kept_volumes_and_tools_reach_the_manifest() -> Outcome 
     let secret = &json["secrets"][0];
     assert_eq!(secret["name"], "db-password");
     assert_eq!(secret["source"], serde_json::json!({ "store": "env", "reference": "STORE_DB_PASSWORD" }));
-    assert_eq!(secret["machines"], serde_json::json!(["app", "app-init-1"]));
+    assert_eq!(secret["machines"], serde_json::json!(["app", "isoloom-init-app-1"]));
     assert_eq!(secret["deliver"][0]["var"], "ISOLOOM_SECRET_DB_PASSWORD");
     // To the steps that create or start them (Compose writes the file again at each start).
-    assert_eq!(secret["deliver"][0]["steps"], serde_json::json!(["up", "start", "job-app-init-1"]));
+    assert_eq!(secret["deliver"][0]["steps"], serde_json::json!(["up", "start", "job-isoloom-init-app-1"]));
     // A project file with an owner travels through Compose's environment too, read from the project.
     assert_eq!(
         json["secrets"][1]["source"],
@@ -370,7 +370,7 @@ fn the_vagrantfiles_checks_take_the_stand_ins_down_after_them() -> Outcome {
     let checks = vf.lines().find(|l| l.contains("name: \"checks\"")).ok_or("no checks provisioner")?;
     let (up, down) = (at(checks, "up --detach --wait --no-deps")?, at(checks, "rm --stop --force \\\"$@\\\"")?);
     assert!(up < at(checks, "isoloom-check")? && at(checks, "isoloom-check")? < down, "{checks}");
-    assert!(checks.contains("grep -x -e isoloom-access -e isoloom-access-routes"), "{checks}");
+    assert!(checks.contains("grep -x -e isoloom-access -e isoloom-routes-isoloom-access"), "{checks}");
     // The checks' own result, not the stand-ins' removal, is the provisioner's.
     assert!(checks.contains("|| true; exit \\\"$failed\\\"\""), "{checks}");
     Ok(())

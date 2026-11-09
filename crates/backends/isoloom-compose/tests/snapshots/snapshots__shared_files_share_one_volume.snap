@@ -28,7 +28,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
     restart: unless-stopped
-  writer-init-1:
+  isoloom-init-writer-1:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     user: root
     entrypoint:
@@ -64,7 +64,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
     restart: unless-stopped
-  reader-init-1:
+  isoloom-init-reader-1:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     user: root
     entrypoint:
@@ -93,9 +93,9 @@ services:
     volumes:
     - ./checks/writer.sh:/isoloom/run.sh:ro
     depends_on:
-      writer-init-1:
+      isoloom-init-writer-1:
         condition: service_completed_successfully
-      reader-init-1:
+      isoloom-init-reader-1:
         condition: service_completed_successfully
       writer:
         condition: service_started
@@ -113,9 +113,9 @@ services:
     volumes:
     - ./checks/reader.sh:/isoloom/run.sh:ro
     depends_on:
-      writer-init-1:
+      isoloom-init-writer-1:
         condition: service_completed_successfully
-      reader-init-1:
+      isoloom-init-reader-1:
         condition: service_completed_successfully
       reader:
         condition: service_started

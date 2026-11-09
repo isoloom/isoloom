@@ -400,6 +400,19 @@ mod tests {
     }
 
     #[test]
+    fn no_machine_is_named_like_another_machines_sidecar_or_job() {
+        let env = crate::testing::environment(
+            "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24, gateway: fw }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  fw: { networks: { b: 5, a: 1 }, app: { image: alpine } }\n  web: { networks: { a: 10 }, setup: [seed.sh], app: { image: nginx } }\n  web-routes: { networks: { b: 10 }, app: { image: nginx } }\n  web-init-1: { networks: { b: 11 }, app: { image: nginx } }\n",
+        );
+        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        for service in ["web", "web-routes", "web-init-1", "isoloom-routes-web", "isoloom-init-web-1"] {
+            assert!(file.services.contains_key(service), "{service}: {:?}", file.services.keys());
+        }
+        assert_eq!(file.services["web-routes"].image.as_deref(), Some("nginx"));
+        assert_eq!(file.services["web-init-1"].image.as_deref(), Some("nginx"));
+    }
+
+    #[test]
     fn appliance_interfaces_attach_in_order_from_the_highest_priority() {
         let spec = isoloom_plan::Lab::parse(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  r: { networks: { a: 1, b: 1 }, app: { image: iol, appliance: cisco-iol } }\n",

@@ -313,7 +313,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
     restart: unless-stopped
-  dns-routes:
+  isoloom-routes-dns:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -363,13 +363,13 @@ services:
     depends_on:
       dns:
         condition: service_healthy
-      dns-routes:
+      isoloom-routes-dns:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
     restart: unless-stopped
-  client-routes:
+  isoloom-routes-client:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - access
@@ -414,7 +414,7 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
-  isoloom-access-routes:
+  isoloom-routes-isoloom-access:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
@@ -456,11 +456,11 @@ services:
     depends_on:
       dns:
         condition: service_healthy
-      dns-routes:
+      isoloom-routes-dns:
         condition: service_healthy
       isoloom-access:
         condition: service_started
-      isoloom-access-routes:
+      isoloom-routes-isoloom-access:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -478,7 +478,7 @@ services:
     depends_on:
       dns:
         condition: service_healthy
-      dns-routes:
+      isoloom-routes-dns:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -687,12 +687,12 @@ volumes:
       ]
     },
     {
-      "name": "dns-routes",
+      "name": "isoloom-routes-dns",
       "role": "infra",
       "of": "dns",
       "addresses": {},
       "native": {
-        "service": "dns-routes"
+        "service": "isoloom-routes-dns"
       }
     },
     {
@@ -712,12 +712,12 @@ volumes:
       }
     },
     {
-      "name": "client-routes",
+      "name": "isoloom-routes-client",
       "role": "infra",
       "of": "client",
       "addresses": {},
       "native": {
-        "service": "client-routes"
+        "service": "isoloom-routes-client"
       }
     },
     {
@@ -731,12 +731,12 @@ volumes:
       }
     },
     {
-      "name": "isoloom-access-routes",
+      "name": "isoloom-routes-isoloom-access",
       "role": "infra",
       "of": "isoloom-access",
       "addresses": {},
       "native": {
-        "service": "isoloom-access-routes"
+        "service": "isoloom-routes-isoloom-access"
       }
     },
     {
@@ -956,7 +956,7 @@ volumes:
           "--wait",
           "--no-deps",
           "isoloom-access",
-          "isoloom-access-routes"
+          "isoloom-routes-isoloom-access"
         ],
         "timeout_s": 600
       }
@@ -1083,7 +1083,7 @@ volumes:
           "--stop",
           "--force",
           "isoloom-access",
-          "isoloom-access-routes"
+          "isoloom-routes-isoloom-access"
         ],
         "timeout_s": 120,
         "failure": "tolerate"

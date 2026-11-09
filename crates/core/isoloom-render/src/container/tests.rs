@@ -55,12 +55,16 @@ fn readiness_is_the_ports_then_the_machine_s_own_healthcheck() {
 #[test]
 fn the_jobs_nothing_waits_for_run_attached_after_the_rest() {
     let spec = testing::spec(SPEC);
-    assert_eq!(init_names("web", &spec.machines["web"]), ["web-init-1", "web-init-2"]);
-    assert_eq!(leaf_jobs(&spec), ["web-init-1", "web-init-2"], "api waits for db: its job is not a leaf");
+    assert_eq!(init_names("web", &spec.machines["web"]), ["isoloom-init-web-1", "isoloom-init-web-2"]);
+    assert_eq!(
+        leaf_jobs(&spec),
+        ["isoloom-init-web-1", "isoloom-init-web-2"],
+        "api waits for db: its job is not a leaf"
+    );
     assert_eq!(start_commands("dc", &[], Some(60)), "dc up -d --build --wait --wait-timeout 60");
     assert_eq!(
         start_commands("dc", &leaf_jobs(&spec), None),
-        "{ set --; for w in $(dc config --services | grep -vx -e web-init-1 -e web-init-2); do set -- \"$@\" \"$w\"; done; } && dc up -d --build --wait \"$@\" && dc up --no-deps --exit-code-from web-init-1 web-init-1 && dc up --no-deps --exit-code-from web-init-2 web-init-2"
+        "{ set --; for w in $(dc config --services | grep -vx -e isoloom-init-web-1 -e isoloom-init-web-2); do set -- \"$@\" \"$w\"; done; } && dc up -d --build --wait \"$@\" && dc up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1 && dc up --no-deps --exit-code-from isoloom-init-web-2 isoloom-init-web-2"
     );
 }
 

@@ -41,7 +41,10 @@ fn up(m: &Manifest) -> Vec<&str> {
 #[test]
 fn vagrant_brings_the_vm_up_then_compose_starts_in_it_over_vagrant_ssh() -> Outcome {
     let (_, m, _) = manifests()?;
-    assert_eq!(up(&m), ["reconcile", "discard-saved", "forwarded-ports", "up", "start", "job-web-init-1"]);
+    assert_eq!(
+        up(&m),
+        ["reconcile", "discard-saved", "forwarded-ports", "up", "start", "job-isoloom-init-web-1"]
+    );
     let vm = m.lifecycle.up.iter().find(|s| s.id.as_str() == "up").unwrap();
     let Run::Argv(HostArgv::Every(argv)) = &vm.run else { panic!() };
     let up_args: Vec<String> = argv.args().iter().map(ToString::to_string).collect();
@@ -82,7 +85,7 @@ fn proxmox_makes_the_vm_then_sets_it_up_copies_the_project_and_starts_compose_ov
     let (_, _, m) = manifests()?;
     assert_eq!(
         up(&m),
-        ["clear-lock", "init", "apply", "docker", "archive", "project", "start", "job-web-init-1"]
+        ["clear-lock", "init", "apply", "docker", "archive", "project", "start", "job-isoloom-init-web-1"]
     );
     let step = |id: &str| m.lifecycle.up.iter().find(|s| s.id.as_str() == id).unwrap();
     assert_eq!(step("docker").stdin.as_ref().map(ToString::to_string).as_deref(), Some("setup.sh"));
@@ -98,7 +101,7 @@ fn proxmox_makes_the_vm_then_sets_it_up_copies_the_project_and_starts_compose_ov
         step("project").stdin.as_ref().map(ToString::to_string).as_deref(),
         Some("${run.state_dir}/project.tgz")
     );
-    for id in ["docker", "project", "start", "job-web-init-1"] {
+    for id in ["docker", "project", "start", "job-isoloom-init-web-1"] {
         let Run::Action {
             action: Action::SshRun,
             with: args,
@@ -123,7 +126,7 @@ fn proxmox_makes_the_vm_then_sets_it_up_copies_the_project_and_starts_compose_ov
             _ => None,
         })
         .collect();
-    assert_eq!(ready, ["apply", "start", "job-web-init-1"]);
+    assert_eq!(ready, ["apply", "start", "job-isoloom-init-web-1"]);
     Ok(())
 }
 
@@ -142,7 +145,7 @@ fn the_flag_reaches_the_start_steps_and_is_accepted_in_the_vm_never_written() ->
         assert_eq!(var.as_str(), "DEMO_SECRET");
         assert_eq!(
             steps.iter().map(isoloom_manifest::StepId::as_str).collect::<Vec<_>>(),
-            ["start", "job-web-init-1"]
+            ["start", "job-isoloom-init-web-1"]
         );
         let guest = m.guest.as_ref().unwrap();
         assert_eq!(guest.machine.as_str(), "isoloom-docker-host");

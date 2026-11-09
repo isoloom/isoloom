@@ -401,7 +401,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
     restart: unless-stopped
-  writer-init-1:
+  isoloom-init-writer-1:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     user: root
     entrypoint:
@@ -437,7 +437,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: shared-files
     restart: unless-stopped
-  reader-init-1:
+  isoloom-init-reader-1:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
     user: root
     entrypoint:
@@ -466,9 +466,9 @@ services:
     volumes:
     - ./checks/writer.sh:/isoloom/run.sh:ro
     depends_on:
-      writer-init-1:
+      isoloom-init-writer-1:
         condition: service_completed_successfully
-      reader-init-1:
+      isoloom-init-reader-1:
         condition: service_completed_successfully
       writer:
         condition: service_started
@@ -486,9 +486,9 @@ services:
     volumes:
     - ./checks/reader.sh:/isoloom/run.sh:ro
     depends_on:
-      writer-init-1:
+      isoloom-init-writer-1:
         condition: service_completed_successfully
-      reader-init-1:
+      isoloom-init-reader-1:
         condition: service_completed_successfully
       reader:
         condition: service_started
@@ -625,12 +625,12 @@ volumes:
       ]
     },
     {
-      "name": "writer-init-1",
+      "name": "isoloom-init-writer-1",
       "role": "job",
       "of": "writer",
       "addresses": {},
       "native": {
-        "service": "writer-init-1"
+        "service": "isoloom-init-writer-1"
       }
     },
     {
@@ -656,12 +656,12 @@ volumes:
       ]
     },
     {
-      "name": "reader-init-1",
+      "name": "isoloom-init-reader-1",
       "role": "job",
       "of": "reader",
       "addresses": {},
       "native": {
-        "service": "reader-init-1"
+        "service": "isoloom-init-reader-1"
       }
     },
     {
@@ -726,7 +726,7 @@ volumes:
         "timeout_s": 1800
       },
       {
-        "id": "job-writer-init-1",
+        "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "argv": [
           "docker",
@@ -740,13 +740,13 @@ volumes:
           "up",
           "--no-deps",
           "--exit-code-from",
-          "writer-init-1",
-          "writer-init-1"
+          "isoloom-init-writer-1",
+          "isoloom-init-writer-1"
         ],
         "timeout_s": 600
       },
       {
-        "id": "job-reader-init-1",
+        "id": "job-isoloom-init-reader-1",
         "note": "Running reader's set-up script…",
         "argv": [
           "docker",
@@ -760,8 +760,8 @@ volumes:
           "up",
           "--no-deps",
           "--exit-code-from",
-          "reader-init-1",
-          "reader-init-1"
+          "isoloom-init-reader-1",
+          "isoloom-init-reader-1"
         ],
         "timeout_s": 600
       }
@@ -880,13 +880,13 @@ volumes:
     },
     {
       "kind": "step_ok",
-      "step": "job-writer-init-1",
-      "means": "writer's set-up script (writer-init-1) exited 0"
+      "step": "job-isoloom-init-writer-1",
+      "means": "writer's set-up script (isoloom-init-writer-1) exited 0"
     },
     {
       "kind": "step_ok",
-      "step": "job-reader-init-1",
-      "means": "reader's set-up script (reader-init-1) exited 0"
+      "step": "job-isoloom-init-reader-1",
+      "means": "reader's set-up script (isoloom-init-reader-1) exited 0"
     }
   ],
   "outputs": [],

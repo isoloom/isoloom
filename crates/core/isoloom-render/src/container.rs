@@ -135,10 +135,12 @@ pub const STAND_INS_DOWN: StandInStep = StandInStep {
     failure: Failure::Tolerate,
 };
 
-/// The network sidecar of a machine (or of the [`STAND_IN`]), which sets its routes.
+/// The network sidecar of a machine (or of the [`STAND_IN`]), which sets its routes:
+/// `isoloom-routes-<machine>`, under the prefix a lab's machines can't take, so no machine's name
+/// is another's sidecar.
 #[must_use]
 pub fn routes_service(machine: &str) -> String {
-    format!("{machine}-routes")
+    format!("isoloom-routes-{machine}")
 }
 
 #[cfg(test)]

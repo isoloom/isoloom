@@ -226,7 +226,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
     restart: unless-stopped
-  vios-routes:
+  isoloom-routes-vios:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -288,7 +288,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
     restart: unless-stopped
-  csr-routes:
+  isoloom-routes-csr:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -330,7 +330,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
     restart: unless-stopped
-  host-a-routes:
+  isoloom-routes-host-a:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -387,7 +387,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
     restart: unless-stopped
-  host-b-routes:
+  isoloom-routes-host-b:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -424,15 +424,15 @@ services:
     volumes:
     - ./checks/host-a.sh:/isoloom/run.sh:ro
     depends_on:
-      vios-routes:
+      isoloom-routes-vios:
         condition: service_healthy
-      csr-routes:
+      isoloom-routes-csr:
         condition: service_healthy
-      host-a-routes:
+      isoloom-routes-host-a:
         condition: service_healthy
       host-b:
         condition: service_healthy
-      host-b-routes:
+      isoloom-routes-host-b:
         condition: service_healthy
       host-a:
         condition: service_started
@@ -602,12 +602,12 @@ volumes:
       }
     },
     {
-      "name": "vios-routes",
+      "name": "isoloom-routes-vios",
       "role": "infra",
       "of": "vios",
       "addresses": {},
       "native": {
-        "service": "vios-routes"
+        "service": "isoloom-routes-vios"
       }
     },
     {
@@ -627,12 +627,12 @@ volumes:
       }
     },
     {
-      "name": "csr-routes",
+      "name": "isoloom-routes-csr",
       "role": "infra",
       "of": "csr",
       "addresses": {},
       "native": {
-        "service": "csr-routes"
+        "service": "isoloom-routes-csr"
       }
     },
     {
@@ -651,12 +651,12 @@ volumes:
       }
     },
     {
-      "name": "host-a-routes",
+      "name": "isoloom-routes-host-a",
       "role": "infra",
       "of": "host-a",
       "addresses": {},
       "native": {
-        "service": "host-a-routes"
+        "service": "isoloom-routes-host-a"
       }
     },
     {
@@ -683,12 +683,12 @@ volumes:
       ]
     },
     {
-      "name": "host-b-routes",
+      "name": "isoloom-routes-host-b",
       "role": "infra",
       "of": "host-b",
       "addresses": {},
       "native": {
-        "service": "host-b-routes"
+        "service": "isoloom-routes-host-b"
       }
     },
     {

@@ -618,7 +618,7 @@ systemctl enable --now isoloom-published.service
 "
   config.vm.provision "project", type: "isoloom_project", generated: true
   config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-switch --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-access-routes); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check rm --stop --force \"$@\" || true; exit \"$failed\"", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+  config.vm.provision "shell", name: "checks", run: "never", inline: "cd /opt/isoloom && failed=0; set --; for w in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep -x -e isoloom-access -e isoloom-routes-isoloom-access); do set -- \"$@\" \"$w\"; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps \"$@\"; for s in $(docker compose -f .isoloom/docker/compose.yml --profile check config --services | grep '^isoloom-check'); do docker compose -f .isoloom/docker/compose.yml --profile check run --rm --no-deps -e ISOLOOM_DERIVED \"$s\" || failed=1; done; [ $# -eq 0 ] || docker compose -f .isoloom/docker/compose.yml --profile check rm --stop --force \"$@\" || true; exit \"$failed\"", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
 end
 
 ## .isoloom/docker-vm/proxmox/main.tf
@@ -1102,12 +1102,12 @@ output "ssh_user" {
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -1135,12 +1135,12 @@ output "ssh_user" {
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {
@@ -1948,12 +1948,12 @@ systemctl enable --now isoloom-published.service
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -1981,12 +1981,12 @@ systemctl enable --now isoloom-published.service
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {

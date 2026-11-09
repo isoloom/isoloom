@@ -205,7 +205,7 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
             lab_port("inner", 9000, PortKind::Tcp, false),
         ],
     );
-    let job = machine("web-init-1", Role::Job, vec![lab_port("x", 1, PortKind::Tcp, true)]);
+    let job = machine("isoloom-init-web-1", Role::Job, vec![lab_port("x", 1, PortKind::Tcp, true)]);
     let shown = [
         web,
         job,

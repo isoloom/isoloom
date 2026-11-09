@@ -445,7 +445,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-switch
     restart: unless-stopped
-  sw1-routes:
+  isoloom-routes-sw1:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
@@ -500,7 +500,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-switch
     restart: unless-stopped
-  files-routes:
+  isoloom-routes-files:
     image: nicolaka/netshoot:v0.13
     init: true
     entrypoint:
@@ -573,11 +573,11 @@ services:
     volumes:
     - ./checks/files.sh:/isoloom/run.sh:ro
     depends_on:
-      sw1-routes:
+      isoloom-routes-sw1:
         condition: service_healthy
       files:
         condition: service_healthy
-      files-routes:
+      isoloom-routes-files:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -593,11 +593,11 @@ services:
     volumes:
     - ./checks/staff.sh:/isoloom/run.sh:ro
     depends_on:
-      sw1-routes:
+      isoloom-routes-sw1:
         condition: service_healthy
       files:
         condition: service_healthy
-      files-routes:
+      isoloom-routes-files:
         condition: service_healthy
       staff:
         condition: service_started
@@ -615,11 +615,11 @@ services:
     volumes:
     - ./checks/guest.sh:/isoloom/run.sh:ro
     depends_on:
-      sw1-routes:
+      isoloom-routes-sw1:
         condition: service_healthy
       files:
         condition: service_healthy
-      files-routes:
+      isoloom-routes-files:
         condition: service_healthy
       guest:
         condition: service_started
@@ -781,12 +781,12 @@ volumes:
       }
     },
     {
-      "name": "sw1-routes",
+      "name": "isoloom-routes-sw1",
       "role": "infra",
       "of": "sw1",
       "addresses": {},
       "native": {
-        "service": "sw1-routes"
+        "service": "isoloom-routes-sw1"
       }
     },
     {
@@ -814,12 +814,12 @@ volumes:
       ]
     },
     {
-      "name": "files-routes",
+      "name": "isoloom-routes-files",
       "role": "infra",
       "of": "files",
       "addresses": {},
       "native": {
-        "service": "files-routes"
+        "service": "isoloom-routes-files"
       }
     },
     {

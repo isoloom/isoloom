@@ -18,7 +18,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 | 1.x spec | 2.0 | Change it to |
 |---|---|---|
 | `service: dvwa` or `service: juice-shop` | `unknown-reference`: the entries are removed from the catalogue | `app: { image: <the image you used> }` gives the same container |
-| A machine name or alias starting with `isoloom-` | refused: those names are Isoloom's own (its controller, the check stand-in, the check runners) | another name |
+| A machine name or alias starting with `isoloom-` | refused: those names are Isoloom's own (its controller, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs) | another name |
 | A machine using the `openssh` entry and signing in as `ctf` without saying so | the login account defaults to `user` | `with: { username: ctf }` to keep the old account |
 
 ## Behavior that changed
@@ -60,6 +60,9 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   digest changed), each lab machine's `machines[].resources`.
 - A published port's output is named `<machine>__<port>` (`web__portal`, was `web_portal`),
   and a manifest naming an output twice is refused (`duplicate_output`).
+- Isoloom's own Compose services start with `isoloom-`: a route sidecar is
+  `isoloom-routes-<machine>` (was `<machine>-routes`), an `init` job `isoloom-init-<machine>-<n>`
+  (was `<machine>-init-<n>`) and its step `job-isoloom-init-<machine>-<n>`.
 - The controller is `isoloom-controller` in Proxmox's manifests and check output (was
   `controller`).
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.
