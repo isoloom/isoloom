@@ -85,7 +85,7 @@ pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
     windows::tpm_refusal(&env, provider)
         .or_else(|| networks_refusal(&env, provider))
         .or_else(|| boot::refusal(&env, provider))
-        .or_else(|| crate::host_folders::refusal(spec, provider.id()))
+        .or_else(|| crate::host_folders::refusal(&env, provider))
 }
 
 /// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,

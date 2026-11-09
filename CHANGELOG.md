@@ -21,10 +21,11 @@ stable spec format.
   `vmware`, Parallels `parallels`, UTM `utm`, QEMU `qemu_virtiofs` with `virtiofsd` on the host,
   libvirt `virtiofs`); on `docker-vm`, shared into its VM the same way, then bound into the
   container. Hyper-V (its only two-way folder, SMB, asks for a password at every `vagrant up`)
-  and ESXi refuse it, QEMU a read-only one, and so does `docker-vm`'s Proxmox server, whose module
+  and ESXi refuse it, QEMU a read-only one (whichever VM has it), and so does `docker-vm`'s Proxmox server, whose module
   isn't written then. Every target whose machines run elsewhere (`hosted`, `cloud-docker`,
   `kubernetes`, `proxmox`, `esxi`, `cloud-vm`, `external`) and `hybrid` refuse it
-  (`host-folders` in the capability matrix).
+  (`host-folders` in the capability matrix). The Vagrantfile stops `vagrant up` on any provider
+  that doesn't share the folders, one Isoloom doesn't know included, before creating the VM.
 - **Kali on AWS `cloud-vm`.** `os: kali` boots Kali's own image from the AWS Marketplace, pinned
   to its product (the name alone could match a look-alike), logging in as `kali`, like any other
   OS of AWS's image table. An account may have to accept the image's terms on the Marketplace once.

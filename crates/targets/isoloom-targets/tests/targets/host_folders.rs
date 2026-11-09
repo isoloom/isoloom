@@ -84,6 +84,34 @@ fn vagrant_refuses_it_on_the_providers_with_no_two_way_shared_folder() -> Outcom
 }
 
 #[test]
+fn vagrant_refuses_qemu_for_any_vm_with_a_read_only_folder_not_only_the_first() -> Outcome {
+    let lab = valid(
+        "version: 1
+name: two-desks
+networks: { lan: { cidr: 10.30.0.0/24 } }
+machines:
+  a: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared }] }
+  b: { os: debian@12, networks: { lan: 11 }, host_folders: [{ from: notes, path: /notes, read_only: true }] }
+",
+    )?;
+    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).ok_or("QEMU takes b's read-only folder")?;
+    assert!(qemu.contains("machine `b`") && qemu.contains("read-only (`read_only`)"), "{qemu}");
+    assert_eq!(refusal_on(&lab, Target::Vagrant, Some("virtualbox")), None);
+    Ok(())
+}
+
+#[test]
+fn vagrants_vagrantfile_stops_up_on_a_provider_it_does_not_know() -> Outcome {
+    let vagrantfile = generate(&desk()?, Target::Vagrant)?;
+    let vagrantfile = file(&vagrantfile, "vagrant/Vagrantfile")?;
+    assert!(
+        vagrantfile.contains("Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider\" unless ["),
+        "{vagrantfile}"
+    );
+    Ok(())
+}
+
+#[test]
 fn docker_vm_refuses_it_on_esxi_and_proxmox_and_writes_no_proxmox_module() -> Outcome {
     let lab = desk()?;
     for p in ["virtualbox", "vmware_desktop", "parallels", "utm", "qemu", "libvirt"] {
