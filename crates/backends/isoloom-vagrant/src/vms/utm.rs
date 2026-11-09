@@ -23,24 +23,42 @@ pub(crate) const NAT_ROUTE: &str = "nat-route";
 const CONSTANT: &str = "ISOLOOM_NAT_ROUTE";
 
 /// The script: the emulated card's default route at metric 200, now and in its configuration.
+///
+/// The configuration is the card's own: a box may configure every card from one shared file
+/// (Debian's cloud images: netplan's `10-netplan-all.network`), and a setting there would raise
+/// the shared network's route too, a tie again. So systemd-networkd gets a file of its own that
+/// matches the emulated card only and sorts before the shared one. Applying it renews the card's
+/// lease, so its gateway is unreachable for a moment: the script waits for the route to come back
+/// before it touches it. `ISOLOOM_NETWORKD_DIR` (default `/etc/systemd/network`) is for tests.
 pub(crate) const NAT_ROUTE_SH: &str = r#"set -eu
 gw=10.0.2.2
 nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
 # No default route through the emulated network, or no other one to prefer: nothing to do.
 [ -n "$nat" ] || exit 0
 ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+# Waits (up to 30 s) for the card's default route after its configuration was applied again.
+route_back() {
+  i=0
+  until ip -4 route show default via "$gw" dev "$nat" | grep -q .; do
+    i=$((i + 1))
+    [ "$i" -lt 30 ] || return 1
+    sleep 1
+  done
+}
+netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
 if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
   con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
   if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
     nmcli connection modify "$con" ipv4.route-metric 200
-    nmcli device reapply "$nat" || true
+    nmcli device reapply "$nat"
   fi
 elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
-  dir=/etc/systemd/network/$(basename "$file").d
-  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
-    mkdir -p "$dir"
-    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
-    networkctl reload && networkctl reconfigure "$nat" || true
+  own="$netd/05-isoloom-nat-route.network"
+  if [ "$file" != "$own" ]; then
+    mkdir -p "$netd"
+    printf '[Match]\nName=%s\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nRouteMetric=200\n' "$nat" > "$own"
+    networkctl reload
+    networkctl reconfigure "$nat"
   fi
 elif [ -f /etc/network/interfaces ]; then
   for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
@@ -49,8 +67,13 @@ elif [ -f /etc/network/interfaces ]; then
       sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
   done
 fi
+if ! route_back; then
+  echo "nat-route: the emulated card has no default route any more; the shared network carries the traffic"
+  exit 0
+fi
 # The route as it is now, whatever the configuration does at its next renewal.
-ip -4 route replace default via "$gw" dev "$nat" metric 200
+ip -4 route show default via "$gw" dev "$nat" | grep -q ' metric 200' ||
+  ip -4 route replace default via "$gw" dev "$nat" metric 200
 for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
   [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
 done
@@ -86,56 +109,133 @@ mod tests {
 
     use super::NAT_ROUTE_SH;
 
-    /// The script run with a stand-in `ip` whose `route show default [via G] [dev D]` prints the
-    /// lines of `routes` holding each filter given, and nothing else on the `PATH` but the text
-    /// tools it uses (no network manager): the changes it makes through `ip`, one a line.
-    fn changes(routes: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let dir = std::env::temp_dir().join(format!("isoloom-nat-route-{}-{}", std::process::id(), routes.len()));
-        let bin = dir.join("bin");
-        std::fs::create_dir_all(&bin)?;
-        std::fs::write(dir.join("routes"), routes)?;
-        let log = dir.join("log");
-        if log.exists() {
-            std::fs::remove_file(&log)?;
-        }
-        let ip = format!(
-            "#!/bin/sh\nif [ \"$3\" = show ]; then\n  shift 4\n  awk -v want=\"$*\" 'BEGIN {{ n = split(want, w, \" \") }} {{ ok = 1; for (i = 1; i < n; i += 2) if (index($0, w[i] \" \" w[i + 1] \" \") == 0) ok = 0; if (ok) print }}' {}\nelse\n  echo \"$*\" >> {}\nfi\n",
-            dir.join("routes").display(),
-            log.display(),
-        );
-        std::fs::write(bin.join("ip"), ip)?;
-        Command::new("chmod").arg("+x").arg(bin.join("ip")).status()?;
-        for tool in ["awk", "grep", "sed"] {
-            let found = Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
-            if bin.join(tool).exists() {
-                std::fs::remove_file(bin.join(tool))?;
-            }
-            std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), bin.join(tool))?;
-        }
-        let out = Command::new("/bin/sh").arg("-c").arg(NAT_ROUTE_SH).env_clear().env("PATH", &bin).output()?;
-        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-        Ok(if Path::new(&log).exists() {
-            std::fs::read_to_string(&log)?
-        } else {
-            String::new()
-        })
+    /// A run of the script in a scratch folder: stand-ins on a `PATH` holding nothing else but the
+    /// text tools it uses, what they were asked (one call a line), and its networkd folder.
+    struct Run {
+        dir: std::path::PathBuf,
     }
+
+    impl Run {
+        /// A scratch folder named `name`, with a stand-in `ip` whose `route show default [via G]
+        /// [dev D]` prints the lines of `routes` holding each filter given, and logs every other
+        /// call.
+        fn new(name: &str, routes: &str) -> Result<Run, Box<dyn std::error::Error>> {
+            let dir = std::env::temp_dir().join(format!("isoloom-nat-route-{}-{name}", std::process::id()));
+            if dir.exists() {
+                std::fs::remove_dir_all(&dir)?;
+            }
+            std::fs::create_dir_all(dir.join("bin"))?;
+            std::fs::write(dir.join("routes"), routes)?;
+            let run = Run { dir };
+            run.stand_in(
+                "ip",
+                &format!(
+                    "if [ \"$3\" = show ]; then\n  shift 4\n  awk -v want=\"$*\" 'BEGIN {{ n = split(want, w, \" \") }} {{ ok = 1; for (i = 1; i < n; i += 2) if (index($0, w[i] \" \" w[i + 1] \" \") == 0) ok = 0; if (ok) print }}' {}\nelse\n  echo \"ip $*\" >> {}\nfi\n",
+                    run.dir.join("routes").display(),
+                    run.log().display(),
+                ),
+            )?;
+            for tool in ["awk", "grep", "sed", "mkdir"] {
+                let found = Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
+                std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), run.dir.join("bin").join(tool))?;
+            }
+            Ok(run)
+        }
+
+        fn log(&self) -> std::path::PathBuf {
+            self.dir.join("log")
+        }
+
+        fn networkd(&self) -> std::path::PathBuf {
+            self.dir.join("networkd")
+        }
+
+        /// A stand-in `name` running the shell `body`.
+        fn stand_in(&self, name: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
+            let path = self.dir.join("bin").join(name);
+            std::fs::write(&path, format!("#!/bin/sh\n{body}"))?;
+            Command::new("chmod").arg("+x").arg(&path).status()?;
+            Ok(())
+        }
+
+        /// The script run to its end (it must succeed): the calls it made, one a line.
+        fn calls(&self) -> Result<String, Box<dyn std::error::Error>> {
+            let out = Command::new("/bin/sh")
+                .arg("-c")
+                .arg(NAT_ROUTE_SH)
+                .env_clear()
+                .env("PATH", self.dir.join("bin"))
+                .env("ISOLOOM_NETWORKD_DIR", self.networkd())
+                .output()?;
+            assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+            Ok(if Path::new(&self.log()).exists() {
+                std::fs::read_to_string(self.log())?
+            } else {
+                String::new()
+            })
+        }
+    }
+
+    /// The calls the script makes with `routes` and no network manager.
+    fn changes(name: &str, routes: &str) -> Result<String, Box<dyn std::error::Error>> {
+        Run::new(name, routes)?.calls()
+    }
+
+    const TWO_DEFAULTS: &str =
+        "default via 192.168.64.1 dev enp0s1 proto dhcp src 192.168.64.5 metric 100\ndefault via 10.0.2.2 dev enp0s2 proto dhcp src 10.0.2.15 metric 100\n";
 
     #[test]
     fn with_two_default_routes_the_emulated_cards_loses() -> Result<(), Box<dyn std::error::Error>> {
-        let routes =
-            "default via 192.168.64.1 dev enp0s1 proto dhcp src 192.168.64.5 metric 100\ndefault via 10.0.2.2 dev enp0s2 proto dhcp src 10.0.2.15 metric 100\n";
         assert_eq!(
-            changes(routes)?,
-            "-4 route replace default via 10.0.2.2 dev enp0s2 metric 200\n-4 route del default via 10.0.2.2 dev enp0s2 metric 100\n"
+            changes("two", TWO_DEFAULTS)?,
+            "ip -4 route replace default via 10.0.2.2 dev enp0s2 metric 200\nip -4 route del default via 10.0.2.2 dev enp0s2 metric 100\n"
         );
+        Ok(())
+    }
+
+    /// Debian's cloud images configure every card from netplan's one `10-netplan-all.network`: a
+    /// setting there would raise the shared network's route too (a tie again). The emulated card
+    /// gets a file of its own, sorting first, matching it alone.
+    #[test]
+    fn under_networkd_the_emulated_card_gets_a_file_of_its_own() -> Result<(), Box<dyn std::error::Error>> {
+        let run = Run::new("networkd", TWO_DEFAULTS)?;
+        let log = run.log();
+        run.stand_in(
+            "networkctl",
+            &format!(
+                "if [ \"$1\" = status ]; then echo '  Network File: /run/systemd/network/10-netplan-all.network'; else echo \"networkctl $*\" >> {}; fi\n",
+                log.display()
+            ),
+        )?;
+        let calls = run.calls()?;
+        assert!(calls.starts_with("networkctl reload\nnetworkctl reconfigure enp0s2\n"), "{calls}");
+        let own = std::fs::read_to_string(run.networkd().join("05-isoloom-nat-route.network"))?;
+        assert_eq!(own, "[Match]\nName=enp0s2\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nRouteMetric=200\n");
+        assert_eq!(std::fs::read_dir(run.networkd())?.count(), 1, "nothing is added to the shared file");
+        Ok(())
+    }
+
+    /// Once its own file applies, a later run changes nothing in the configuration.
+    #[test]
+    fn a_card_already_on_its_own_file_is_not_reconfigured() -> Result<(), Box<dyn std::error::Error>> {
+        let run = Run::new("own", TWO_DEFAULTS)?;
+        let own = run.networkd().join("05-isoloom-nat-route.network");
+        run.stand_in(
+            "networkctl",
+            &format!(
+                "if [ \"$1\" = status ]; then echo '  Network File: {}'; else echo \"networkctl $*\" >> {}; fi\n",
+                own.display(),
+                run.log().display()
+            ),
+        )?;
+        assert!(!run.calls()?.contains("networkctl"));
         Ok(())
     }
 
     #[test]
     fn the_emulated_network_alone_or_none_is_left_alone() -> Result<(), Box<dyn std::error::Error>> {
-        assert_eq!(changes("default via 10.0.2.2 dev eth0 proto dhcp src 10.0.2.15 metric 100\n")?, "");
-        assert_eq!(changes("default via 192.168.1.1 dev eth0 proto dhcp metric 100\n")?, "");
+        assert_eq!(changes("alone", "default via 10.0.2.2 dev eth0 proto dhcp src 10.0.2.15 metric 100\n")?, "");
+        assert_eq!(changes("other", "default via 192.168.1.1 dev eth0 proto dhcp metric 100\n")?, "");
         Ok(())
     }
 }

@@ -467,18 +467,29 @@ nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i
 # No default route through the emulated network, or no other one to prefer: nothing to do.
 [ -n "$nat" ] || exit 0
 ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
+# Waits (up to 30 s) for the card's default route after its configuration was applied again.
+route_back() {
+  i=0
+  until ip -4 route show default via "$gw" dev "$nat" | grep -q .; do
+    i=$((i + 1))
+    [ "$i" -lt 30 ] || return 1
+    sleep 1
+  done
+}
+netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
 if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
   con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
   if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
     nmcli connection modify "$con" ipv4.route-metric 200
-    nmcli device reapply "$nat" || true
+    nmcli device reapply "$nat"
   fi
 elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
-  dir=/etc/systemd/network/$(basename "$file").d
-  if [ ! -f "$dir/90-isoloom-nat-route.conf" ]; then
-    mkdir -p "$dir"
-    printf '[DHCPv4]\nRouteMetric=200\n' > "$dir/90-isoloom-nat-route.conf"
-    networkctl reload && networkctl reconfigure "$nat" || true
+  own="$netd/05-isoloom-nat-route.network"
+  if [ "$file" != "$own" ]; then
+    mkdir -p "$netd"
+    printf '[Match]\nName=%s\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nRouteMetric=200\n' "$nat" > "$own"
+    networkctl reload
+    networkctl reconfigure "$nat"
   fi
 elif [ -f /etc/network/interfaces ]; then
   for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
@@ -487,8 +498,13 @@ elif [ -f /etc/network/interfaces ]; then
       sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
   done
 fi
+if ! route_back; then
+  echo "nat-route: the emulated card has no default route any more; the shared network carries the traffic"
+  exit 0
+fi
 # The route as it is now, whatever the configuration does at its next renewal.
-ip -4 route replace default via "$gw" dev "$nat" metric 200
+ip -4 route show default via "$gw" dev "$nat" | grep -q ' metric 200' ||
+  ip -4 route replace default via "$gw" dev "$nat" metric 200
 for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
   [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
 done
