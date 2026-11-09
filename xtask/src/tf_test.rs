@@ -16,8 +16,8 @@
 //! The report names each failure's example, target, run, assertion and the planned values it
 //! read; it is also written to `report.txt` in `$TF_TEST_OUT` (default `target/tf-test`), beside
 //! the tree, the container's input and its raw output. A run named `known_bug_<what>` records
-//! a bug of a generated module: it must fail (see [`report`]). `--fast` runs the subset for the
-//! quick check run on every change. Exit status: 0 when every run holds, 1 when one fails, 2 when the harness
+//! a bug of a generated module: it must fail (see [`report`]). `--fast` runs the quick subset,
+//! for every change. Exit status: 0 when every run holds, 1 when one fails, 2 when the harness
 //! itself failed.
 
 mod report;
@@ -36,7 +36,7 @@ use crate::{Res, generate_all, process, repo, verify};
 #[derive(clap::Args)]
 pub(crate) struct Args {
     /// Only the fast subset (one rich example on every target the suites cover), for the
-    /// quick check run on every change.
+    /// quick check of every change.
     #[arg(long)]
     fast: bool,
     /// Only the suites whose path under tests/terraform contains this text (`cloud-vm/aws`).
