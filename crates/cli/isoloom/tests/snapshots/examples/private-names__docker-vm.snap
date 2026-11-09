@@ -1742,7 +1742,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "private-names_default",
           "utm": "private-names · docker",
           "vmware_esxi": "private-names-docker"
-        }
+        },
+        "boot_digest": "sha256:1a99ef1dff7f9616547a1105616911e7eacb2b9026b74b6b64af6212b6443fd5"
       }
     },
     {

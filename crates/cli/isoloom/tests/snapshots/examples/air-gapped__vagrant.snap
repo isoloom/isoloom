@@ -1487,7 +1487,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "air-gapped_store",
           "utm": "air-gapped · store",
           "vmware_esxi": "air-gapped-store"
-        }
+        },
+        "boot_digest": "sha256:eb4a5461d68e892075ab88b243d987094f090e9edc59b38771cda84352e7a9ae"
       },
       "ports": [
         {
@@ -1520,7 +1521,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "air-gapped_app",
           "utm": "air-gapped · app",
           "vmware_esxi": "air-gapped-app"
-        }
+        },
+        "boot_digest": "sha256:36049128d462e4e92db7ccce034785ed45b40c29fbf43d949f17b6ba5f3e1021"
       },
       "ports": [
         {

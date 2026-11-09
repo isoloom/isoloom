@@ -1284,7 +1284,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "arm-vm_box",
           "utm": "arm-vm · box",
           "vmware_esxi": "arm-vm-box"
-        }
+        },
+        "boot_digest": "sha256:3671e3bc3fd7dc4a4cf41f184e12546d98c8f7b7e77a990ec2e01b977155aabd"
       },
       "ports": [
         {

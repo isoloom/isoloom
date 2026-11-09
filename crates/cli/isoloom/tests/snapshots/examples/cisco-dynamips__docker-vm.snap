@@ -1767,7 +1767,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "cisco-dynamips_default",
           "utm": "cisco-dynamips · docker",
           "vmware_esxi": "cisco-dynamips-docker"
-        }
+        },
+        "boot_digest": "sha256:67db0fadbe0c17725b1ea81dde21626559558795a328542392c2a18d6256dd01"
       }
     },
     {

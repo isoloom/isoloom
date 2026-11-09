@@ -1,7 +1,8 @@
 //! Every VM of the Vagrantfile as a manifest machine: the lab's own with their OS, size,
 //! addresses and forwarded ports; Isoloom's (the router, the tool shell, the controller) as
 //! `infra` or `tool`; each with its define name and its VM's name under every provider that
-//! names one (what status and orphan clean-up match, exactly).
+//! names one (what status and orphan clean-up match, exactly), and the digest of what Vagrant
+//! applies to it only at boot (`boot_digest`).
 
 use std::collections::BTreeMap;
 use std::net::IpAddr;
@@ -18,12 +19,13 @@ use crate::vms::{Define, Kind, Shape, label, vm_name};
 /// Where a forwarded port listens on the host.
 const LOOPBACK: &str = "127.0.0.1";
 
-/// The Vagrantfile's VMs, in its order.
-pub(super) fn machines(env: &Environment, shape: &Shape) -> Result<Vec<Machine>> {
-    shape.defines.iter().map(|d| machine(env, d)).collect()
+/// The Vagrantfile's VMs, in its order, each with its boot digest among `boot_digests` (by define
+/// name, [`crate::boot_digest::of`] the Vagrantfile).
+pub(super) fn machines(env: &Environment, shape: &Shape, boot_digests: &BTreeMap<String, String>) -> Result<Vec<Machine>> {
+    shape.defines.iter().map(|d| machine(env, d, boot_digests.get(&d.name).cloned())).collect()
 }
 
-fn machine(env: &Environment, d: &Define) -> Result<Machine> {
+fn machine(env: &Environment, d: &Define, boot_digest: Option<String>) -> Result<Machine> {
     let mut out = Machine {
         name: Name::parse(&d.name)?,
         role: Role::Infra,
@@ -35,7 +37,7 @@ fn machine(env: &Environment, d: &Define) -> Result<Machine> {
         addresses: BTreeMap::new(),
         keep_running: false,
         on_demand: false,
-        native: Some(native(env, d)?),
+        native: Some(native(env, d, boot_digest)?),
         volumes: Vec::new(),
         ports: Vec::new(),
     };
@@ -126,12 +128,13 @@ pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMa
     ])
 }
 
-fn native(env: &Environment, d: &Define) -> Result<Native> {
+fn native(env: &Environment, d: &Define, boot_digest: Option<String>) -> Result<Native> {
     let (shown, plain) = (label(env, &d.what), vm_name(env, &d.what));
     let vm_names = vm_names(shown, plain, format!("{}_{}", env.name, d.name));
     Ok(Native::Vagrant {
         vagrant: Name::parse(&d.name)?,
         vm_names,
+        boot_digest,
     })
 }
 
@@ -153,10 +156,13 @@ machines:
 checks: [{ http: 'http://web/', wait: 30 }]
 ",
         );
-        let ms = machines(&env, &Shape::of(&env)).unwrap();
+        let ms = machines(&env, &Shape::of(&env), &BTreeMap::from([("web".to_owned(), "sha256:0".to_owned())])).unwrap();
         let names: Vec<&str> = ms.iter().map(|m| m.name.as_str()).collect();
         assert_eq!(names, ["web", "isoloom-controller"]);
-        let Some(Native::Vagrant { vm_names, .. }) = &ms[0].native else { panic!() };
+        let Some(Native::Vagrant { vm_names, boot_digest, .. }) = &ms[0].native else {
+            panic!()
+        };
+        assert_eq!(boot_digest.as_deref(), Some("sha256:0"));
         assert_eq!(vm_names[&Provider::Virtualbox], "shop · web");
         assert_eq!(vm_names[&Provider::Hyperv], "shop-web");
         assert_eq!(vm_names[&Provider::Libvirt], "shop_web");

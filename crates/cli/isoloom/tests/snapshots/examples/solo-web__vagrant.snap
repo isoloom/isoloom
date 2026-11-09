@@ -1337,7 +1337,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "solo-web_web",
           "utm": "solo-web · web",
           "vmware_esxi": "solo-web-web"
-        }
+        },
+        "boot_digest": "sha256:25f86258cca6c89604020f7e7a64144d3bacdfb4e443b785281ed196a9af7a42"
       },
       "ports": [
         {
@@ -1373,7 +1374,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "solo-web_isoloom-controller",
           "utm": "solo-web · controller",
           "vmware_esxi": "solo-web-controller"
-        }
+        },
+        "boot_digest": "sha256:1227cace92a5bf8a35900b6342d9349a5d6b03abba0b866c885520049d022e6b"
       }
     }
   ],

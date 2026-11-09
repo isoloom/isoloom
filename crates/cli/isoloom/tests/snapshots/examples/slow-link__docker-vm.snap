@@ -1772,7 +1772,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "slow-link_default",
           "utm": "slow-link · docker",
           "vmware_esxi": "slow-link-docker"
-        }
+        },
+        "boot_digest": "sha256:063bd3d409ddc67579cf3a0c1fd19d0d5ec549b7bcdd8670331cd82a802eb752"
       }
     },
     {

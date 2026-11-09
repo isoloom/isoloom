@@ -1384,7 +1384,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "tuned-web_web",
           "utm": "tuned-web · web",
           "vmware_esxi": "tuned-web-web"
-        }
+        },
+        "boot_digest": "sha256:4f14b21187a284705e4e845045e867265ac0ca8fc99619f0c909ff77bd92240c"
       },
       "ports": [
         {

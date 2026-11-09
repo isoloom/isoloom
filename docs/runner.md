@@ -45,6 +45,18 @@ The runner keeps each run's record, lock, event log and pinned host ports under 
 (`~/.isothrum` for the CLI), never in the lab folder. A secret or input value reaches only the
 steps its delivery names, and every sensitive value is masked (`***`) in events, logs and errors.
 
+### What a VM takes only when it boots
+
+Vagrant applies some of a VM's settings only when it boots it (`vagrant up` of a stopped VM,
+`vagrant reload`): its synced folders (`host_folders`, and `docker-vm`'s folders shared into its
+VM), networks, forwarded ports, size and provider settings. `vagrant up --provision` on a running
+VM runs its provisioners and nothing else. So each Vagrant machine's `native` carries a
+`boot_digest`: a digest of its Vagrantfile configuration other than its provisioners (the
+statements its VMs share included). It is opaque and only compared: a runner keeps the digest
+each VM was booted with and, when it brings a running run up to date with a regenerated manifest,
+reloads a running VM whose digest changed before it runs `up`'s steps again. A manifest written
+before the field existed has none.
+
 ## The checks
 
 `check` runs the manifest's `checks` in three phases, and a runner keeps to them:

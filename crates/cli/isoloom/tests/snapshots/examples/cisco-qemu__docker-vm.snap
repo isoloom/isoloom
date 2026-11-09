@@ -1765,7 +1765,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "cisco-qemu_default",
           "utm": "cisco-qemu · docker",
           "vmware_esxi": "cisco-qemu-docker"
-        }
+        },
+        "boot_digest": "sha256:30b4651f9aa7797329b1f41de2cb95a6d97721115092a33c958fece79b37d10f"
       }
     },
     {

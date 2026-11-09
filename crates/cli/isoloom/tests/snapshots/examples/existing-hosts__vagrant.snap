@@ -1606,7 +1606,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "existing-hosts_web",
           "utm": "existing-hosts · web",
           "vmware_esxi": "existing-hosts-web"
-        }
+        },
+        "boot_digest": "sha256:a628a7a067ea1d66c3caf9f20de0c1448387d8ad9c9cb8dd67c5f13c418f8498"
       },
       "ports": [
         {
@@ -1639,7 +1640,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "existing-hosts_cache",
           "utm": "existing-hosts · cache",
           "vmware_esxi": "existing-hosts-cache"
-        }
+        },
+        "boot_digest": "sha256:5a7012e8ade16aee4d1eaa7391dc697047f24d6826596a2715b32b97c3aca726"
       },
       "ports": [
         {

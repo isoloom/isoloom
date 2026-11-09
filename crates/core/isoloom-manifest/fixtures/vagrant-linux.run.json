@@ -405,7 +405,8 @@
           "libvirt": "flag-vm_web",
           "utm": "flag-vm · web",
           "vmware_esxi": "flag-vm-web"
-        }
+        },
+        "boot_digest": "sha256:d5b2d485728610b27e8743a9d6cded3b5824143ecc34ec9c018a314fc092fb44"
       },
       "ports": [
         {
@@ -441,7 +442,8 @@
           "libvirt": "flag-vm_isoloom-controller",
           "utm": "flag-vm · controller",
           "vmware_esxi": "flag-vm-controller"
-        }
+        },
+        "boot_digest": "sha256:1b690cd2c4113788e875312de8b5865d27ed72d7b61981fd29b17a1b00f26947"
       }
     }
   ],

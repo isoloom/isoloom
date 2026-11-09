@@ -357,7 +357,8 @@
           "libvirt": "flag-portal_default",
           "utm": "flag-portal · docker",
           "vmware_esxi": "flag-portal-docker"
-        }
+        },
+        "boot_digest": "sha256:6dfb163c92b092ca85f70f4083a99f0a7cd6748c17c3d2cfb05a3eb9100ad9ad"
       }
     },
     {

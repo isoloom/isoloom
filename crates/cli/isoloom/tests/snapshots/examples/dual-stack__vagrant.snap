@@ -1791,7 +1791,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "dual-stack_isoloom-router",
           "utm": "dual-stack · router",
           "vmware_esxi": "dual-stack-router"
-        }
+        },
+        "boot_digest": "sha256:ef06e01227c260ab34c838d89e0a02f4a9c07fcbe82e0edbd2ff1d1abd88127b"
       }
     },
     {
@@ -1816,7 +1817,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "dual-stack_web",
           "utm": "dual-stack · web",
           "vmware_esxi": "dual-stack-web"
-        }
+        },
+        "boot_digest": "sha256:47e2a4c8ce84bf8c344496af6ff0d64dc120a77fee11e259504695802d9b4f2e"
       },
       "ports": [
         {
@@ -1850,7 +1852,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "dual-stack_user",
           "utm": "dual-stack · user",
           "vmware_esxi": "dual-stack-user"
-        }
+        },
+        "boot_digest": "sha256:56383e175bd3f2500e42543baf58178eacee7929507f09217b614d142a562a02"
       }
     }
   ],

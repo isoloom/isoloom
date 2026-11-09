@@ -1483,10 +1483,17 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "boot_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A digest of the VM's Vagrantfile configuration but its provisioners: what Vagrant applies only when the VM boots or reloads. Opaque; a runner reloads a running VM whose digest changed since it booted. Absent from older manifests."
         }
       },
       "title": "Native",
-      "description": "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly).",
+      "description": "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly) and the digest of what Vagrant applies to it only at boot (`boot_digest`).",
       "oneOf": [
         {
           "required": [
@@ -1501,6 +1508,9 @@
       ],
       "dependentRequired": {
         "vm_names": [
+          "vagrant"
+        ],
+        "boot_digest": [
           "vagrant"
         ]
       }

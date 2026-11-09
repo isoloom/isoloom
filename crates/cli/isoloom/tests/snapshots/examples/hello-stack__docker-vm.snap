@@ -1895,7 +1895,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "hello-stack_default",
           "utm": "hello-stack · docker",
           "vmware_esxi": "hello-stack-docker"
-        }
+        },
+        "boot_digest": "sha256:af7c5b31670f1fc85cc0b5ddfbf1b8c9e97576e97aabd214fc9f4ab1b7a827df"
       }
     },
     {

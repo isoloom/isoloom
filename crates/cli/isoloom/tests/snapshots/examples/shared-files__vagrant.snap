@@ -1460,7 +1460,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "shared-files_writer",
           "utm": "shared-files · writer",
           "vmware_esxi": "shared-files-writer"
-        }
+        },
+        "boot_digest": "sha256:2629095671cf0b10959551deb4992337567085fd4c3532da81e41c271f85af8d"
       }
     },
     {
@@ -1485,7 +1486,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "shared-files_reader",
           "utm": "shared-files · reader",
           "vmware_esxi": "shared-files-reader"
-        }
+        },
+        "boot_digest": "sha256:41d2e3a847a09b5c9d0da1b1948833b3147cfa44710cf8f4d7863dd06ded0e2e"
       }
     }
   ],

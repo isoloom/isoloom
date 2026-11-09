@@ -1904,7 +1904,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "supplier-portal-api_default",
           "utm": "supplier-portal-api · docker",
           "vmware_esxi": "supplier-portal-api-docker"
-        }
+        },
+        "boot_digest": "sha256:90866f5349f1139428b413ce2b90373c6a03cf23d0b0ee077a78f4ce80c41364"
       }
     },
     {

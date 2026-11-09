@@ -37,6 +37,7 @@
 //! ```
 
 mod backend;
+mod boot_digest;
 pub mod docker_vm;
 mod error;
 mod host_folders;

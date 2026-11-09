@@ -1406,7 +1406,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "private-names_web",
           "utm": "private-names · web",
           "vmware_esxi": "private-names-web"
-        }
+        },
+        "boot_digest": "sha256:056c6cf648e8dd4514549df0014883397958710cab25fd250f1314639db9ade3"
       },
       "ports": [
         {
@@ -1439,7 +1440,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "private-names_client",
           "utm": "private-names · client",
           "vmware_esxi": "private-names-client"
-        }
+        },
+        "boot_digest": "sha256:187cd59090891ba59387011eff9532c620d150dffd2abac768452508aa7500bd"
       }
     }
   ],

@@ -1562,7 +1562,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "mixed-office_files01",
           "utm": "mixed-office · files01",
           "vmware_esxi": "mixed-office-files01"
-        }
+        },
+        "boot_digest": "sha256:d76c03f9a118e7c000c4fad813284d5d96b037fe458bbc49ea49180fbb7746e7"
       },
       "ports": [
         {
@@ -1595,7 +1596,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "mixed-office_intranet",
           "utm": "mixed-office · intranet",
           "vmware_esxi": "mixed-office-intranet"
-        }
+        },
+        "boot_digest": "sha256:e1975251e7ffe4dc8780f534d0ec3233ac57259fccfc16def445d1b88d7ebcd1"
       },
       "ports": [
         {
@@ -1631,7 +1633,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "mixed-office_isoloom-controller",
           "utm": "mixed-office · controller",
           "vmware_esxi": "mixed-office-controller"
-        }
+        },
+        "boot_digest": "sha256:99a9a091910013999b9359ac582efae61ff694b4cb3689d1f424504a8fd3b4e3"
       }
     }
   ],

@@ -1679,7 +1679,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "solo-web_default",
           "utm": "solo-web · docker",
           "vmware_esxi": "solo-web-docker"
-        }
+        },
+        "boot_digest": "sha256:beb9b8a43b769a309947dbb59dac7eb0f11975dd7d5e629d59f2205534c8b8e7"
       }
     },
     {

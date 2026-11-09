@@ -1938,7 +1938,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "segmented_default",
           "utm": "segmented · docker",
           "vmware_esxi": "segmented-docker"
-        }
+        },
+        "boot_digest": "sha256:3ebe5bacfcbf66e6198e595d251180c883566c76722f7d59c79795c18996b97b"
       }
     },
     {

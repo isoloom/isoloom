@@ -1679,7 +1679,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "arm-lab_default",
           "utm": "arm-lab · docker",
           "vmware_esxi": "arm-lab-docker"
-        }
+        },
+        "boot_digest": "sha256:244a87d4dda34afa5a051df2c501ea1c6e7457cbb81b227a13024b39bc21ef0d"
       }
     },
     {

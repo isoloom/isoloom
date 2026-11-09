@@ -1982,7 +1982,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "vlan-office_default",
           "utm": "vlan-office · docker",
           "vmware_esxi": "vlan-office-docker"
-        }
+        },
+        "boot_digest": "sha256:49913528061a65060b3e12ebb630a5e9e76504aff7a155053aade3cf7feb4ceb"
       }
     },
     {

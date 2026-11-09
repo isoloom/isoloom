@@ -1822,7 +1822,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "configured-app_default",
           "utm": "configured-app · docker",
           "vmware_esxi": "configured-app-docker"
-        }
+        },
+        "boot_digest": "sha256:94cbe16e33d9f069405f1ac7b10e4c63b8b790e49cc4c968c713fc35b31c7091"
       }
     },
     {

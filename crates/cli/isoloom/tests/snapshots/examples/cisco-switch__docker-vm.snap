@@ -1843,7 +1843,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "cisco-switch_default",
           "utm": "cisco-switch · docker",
           "vmware_esxi": "cisco-switch-docker"
-        }
+        },
+        "boot_digest": "sha256:dd22ee45738d8e91e8b2b52c95ec43b977aed7a0bbbc79db466a154eae608875"
       }
     },
     {

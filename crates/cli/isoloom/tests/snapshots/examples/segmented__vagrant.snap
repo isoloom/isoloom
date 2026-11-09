@@ -1997,7 +1997,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "segmented_isoloom-router",
           "utm": "segmented · router",
           "vmware_esxi": "segmented-router"
-        }
+        },
+        "boot_digest": "sha256:16cafd4a4c0b1bb9fadc13b6dfe65589f247353fb1cb26827655e51b443bc70e"
       }
     },
     {
@@ -2022,7 +2023,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "segmented_cache",
           "utm": "segmented · cache",
           "vmware_esxi": "segmented-cache"
-        }
+        },
+        "boot_digest": "sha256:00e33f8bc16c1962015d02d041ca7525b7f51e4f7f5f7cd711e365d71db5b271"
       },
       "ports": [
         {
@@ -2055,7 +2057,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "segmented_web",
           "utm": "segmented · web",
           "vmware_esxi": "segmented-web"
-        }
+        },
+        "boot_digest": "sha256:b37884ba8cdf8afcdcd62da3a4cdcf0b74afd27eca29dd95a5dd9eaf46ae6980"
       },
       "ports": [
         {
@@ -2095,7 +2098,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "segmented_user",
           "utm": "segmented · user",
           "vmware_esxi": "segmented-user"
-        }
+        },
+        "boot_digest": "sha256:57b988d7c7dbcd90f98fd0983d34cb4f24403d6fad652f49da90cbc27a2e1343"
       }
     }
   ],

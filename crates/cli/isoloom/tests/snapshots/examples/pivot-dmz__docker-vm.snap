@@ -2044,7 +2044,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "pivot-dmz_default",
           "utm": "pivot-dmz · docker",
           "vmware_esxi": "pivot-dmz-docker"
-        }
+        },
+        "boot_digest": "sha256:70cfc47bde5bdd00212a9692c8076c28c06c364af927d8083ae524f8ea7f9689"
       }
     },
     {

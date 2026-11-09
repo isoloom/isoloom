@@ -1473,7 +1473,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "windows-hello_web01",
           "utm": "windows-hello · web01",
           "vmware_esxi": "windows-hello-web01"
-        }
+        },
+        "boot_digest": "sha256:685239c02b8d507e20aeab7a4d5824dd6fec29413e70bbe5f1a71bb9d60a26fb"
       },
       "ports": [
         {
@@ -1509,7 +1510,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "windows-hello_isoloom-controller",
           "utm": "windows-hello · controller",
           "vmware_esxi": "windows-hello-controller"
-        }
+        },
+        "boot_digest": "sha256:7b1920055198f18e27c866d84bf832d672bacdf82efb734e3e6775263d981650"
       }
     }
   ],

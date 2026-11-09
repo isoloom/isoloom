@@ -1841,7 +1841,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "udp-dns_default",
           "utm": "udp-dns · docker",
           "vmware_esxi": "udp-dns-docker"
-        }
+        },
+        "boot_digest": "sha256:107753acbeb6d1b37207d09cd26cb9998c50645792d83aa235b03a1bffb60ee8"
       }
     },
     {

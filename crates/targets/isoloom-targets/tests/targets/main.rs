@@ -3,6 +3,7 @@
 //! and the run manifests, the way the composition root puts them together.
 
 mod appliances;
+mod boot_digest;
 mod chart;
 mod checks;
 mod clones;

@@ -406,7 +406,8 @@
           "libvirt": "mini-ad_dc01",
           "utm": "mini-ad · dc01",
           "vmware_esxi": "mini-ad-dc01"
-        }
+        },
+        "boot_digest": "sha256:b8b37eec8a54af9d76a69f7026ded6b3fc299b08a87b5e0bd35ecb7038a2453e"
       },
       "ports": [
         {
@@ -446,7 +447,8 @@
           "libvirt": "mini-ad_ws01",
           "utm": "mini-ad · ws01",
           "vmware_esxi": "mini-ad-ws01"
-        }
+        },
+        "boot_digest": "sha256:beed4ac98b3d68c3ae8fbf4bf0b715677f91c405247fef22d22f5c7451fdb278"
       }
     },
     {
@@ -469,7 +471,8 @@
           "libvirt": "mini-ad_isoloom-controller",
           "utm": "mini-ad · controller",
           "vmware_esxi": "mini-ad-controller"
-        }
+        },
+        "boot_digest": "sha256:5e7e32e715e0183dca0336c34efe22458dd741106391e1d8b80bfeaaf4054e78"
       }
     }
   ],

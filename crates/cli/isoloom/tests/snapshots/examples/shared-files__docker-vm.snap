@@ -1804,7 +1804,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "shared-files_default",
           "utm": "shared-files · docker",
           "vmware_esxi": "shared-files-docker"
-        }
+        },
+        "boot_digest": "sha256:7748ba6c4f884049c5382fc4ecbadbfc9a3a62c4634067c923b36d11876c1274"
       }
     },
     {

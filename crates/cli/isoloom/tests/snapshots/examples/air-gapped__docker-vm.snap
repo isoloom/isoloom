@@ -1739,7 +1739,8 @@ systemctl enable --now isoloom-published.service
           "libvirt": "air-gapped_default",
           "utm": "air-gapped · docker",
           "vmware_esxi": "air-gapped-docker"
-        }
+        },
+        "boot_digest": "sha256:fc630d174863834562653cc9cf09efb82058f19a268fade9bca64e8c32a666d1"
       }
     },
     {

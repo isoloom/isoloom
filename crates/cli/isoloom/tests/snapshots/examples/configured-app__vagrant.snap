@@ -2321,7 +2321,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "configured-app_web",
           "utm": "configured-app · web",
           "vmware_esxi": "configured-app-web"
-        }
+        },
+        "boot_digest": "sha256:2eca867d5f29933880b4deef83e1529835f4eec9ad1d0bc21800886c570bba4c"
       },
       "ports": [
         {
@@ -2359,7 +2360,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "configured-app_api",
           "utm": "configured-app · api",
           "vmware_esxi": "configured-app-api"
-        }
+        },
+        "boot_digest": "sha256:41d9ba13522d5d6e39fe989fe183f7193fc2e44c6f78e6c2ec6e393bfd922010"
       },
       "ports": [
         {
@@ -2396,7 +2398,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "configured-app_isoloom-controller",
           "utm": "configured-app · controller",
           "vmware_esxi": "configured-app-controller"
-        }
+        },
+        "boot_digest": "sha256:42e88f40d0bf34ea311f487fd349c2a5964076ef1ac805245252b2879a55369a"
       }
     }
   ],

@@ -803,6 +803,7 @@ dependencies = [
  "isoloom-render",
  "isoloom-spec",
  "proptest",
+ "sha2",
  "thiserror",
 ]
 

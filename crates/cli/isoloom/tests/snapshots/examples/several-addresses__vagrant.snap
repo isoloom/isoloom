@@ -1964,7 +1964,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "several-addresses_web",
           "utm": "several-addresses · web",
           "vmware_esxi": "several-addresses-web"
-        }
+        },
+        "boot_digest": "sha256:3506417514d2480934b6c7a11cd231e59fbd34457c6b44801018025f01cfa71d"
       },
       "ports": [
         {
@@ -1997,7 +1998,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "several-addresses_decoy",
           "utm": "several-addresses · decoy",
           "vmware_esxi": "several-addresses-decoy"
-        }
+        },
+        "boot_digest": "sha256:77e1a0638f473330b9a11b5e753e82af560183e00a79de86e9b13aa847c55f2b"
       }
     },
     {
@@ -2022,7 +2024,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "several-addresses_client",
           "utm": "several-addresses · client",
           "vmware_esxi": "several-addresses-client"
-        }
+        },
+        "boot_digest": "sha256:91d51171f4144d68aab4b4895229dda8dcf9b3bce3a7fb77d9b6d6e6e72812c6"
       }
     }
   ],

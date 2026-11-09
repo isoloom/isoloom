@@ -2299,7 +2299,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "vlan-office_isoloom-router",
           "utm": "vlan-office · router",
           "vmware_esxi": "vlan-office-router"
-        }
+        },
+        "boot_digest": "sha256:adb31b7f0d70e95cad2fb26e2b1abf25e07359738cfd7657c99385fd4956b88e"
       }
     },
     {
@@ -2324,7 +2325,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "vlan-office_intranet",
           "utm": "vlan-office · intranet",
           "vmware_esxi": "vlan-office-intranet"
-        }
+        },
+        "boot_digest": "sha256:b857b965728a71884d203063ac67e74e4ccaed1c7ea23ad13185754d3c607f83"
       },
       "ports": [
         {
@@ -2358,7 +2360,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "vlan-office_staff",
           "utm": "vlan-office · staff",
           "vmware_esxi": "vlan-office-staff"
-        }
+        },
+        "boot_digest": "sha256:94c0ebfd52e43cd07953c81b50375068b35c220a74f320edd1663b2b1ac6d8fe"
       }
     },
     {
@@ -2383,7 +2386,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "vlan-office_guest",
           "utm": "vlan-office · guest",
           "vmware_esxi": "vlan-office-guest"
-        }
+        },
+        "boot_digest": "sha256:d9c931109f0ffd16791dd865999082db58df674cec7c2732911510061e03a2f0"
       }
     },
     {
@@ -2409,7 +2413,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "vlan-office_admin",
           "utm": "vlan-office · admin",
           "vmware_esxi": "vlan-office-admin"
-        }
+        },
+        "boot_digest": "sha256:db181b9da748f27061182d342b90aa289bc38f5f67965565150ebac06ed02877"
       }
     }
   ],

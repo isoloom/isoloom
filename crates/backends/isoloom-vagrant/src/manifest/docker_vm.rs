@@ -35,7 +35,7 @@ const ESXI_STATUS_S: u32 = 90;
 /// message is left empty.
 pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manifest> {
     let way_in = |command: &Template| vagrant_ssh(command);
-    let mut machines = vec![vm(env)?];
+    let mut machines = vec![vm(env, guest)?];
     machines.extend(guest.machines_at(&Template::text(LOOPBACK)));
     let mut params = slots::remote_params()?;
     params.extend(guest.params.iter().cloned());
@@ -96,8 +96,9 @@ fn vagrant_ssh(command: &Template) -> Result<Run, ManifestError> {
     Ok(Run::Argv(HostArgv::Every(Argv::new(run_manifest::program("vagrant")?, args))))
 }
 
-/// The VM: Isoloom's own (`infra`), named as each provider names it.
-fn vm(env: &Environment) -> Result<Machine> {
+/// The VM: Isoloom's own (`infra`), named as each provider names it, with the digest of what
+/// Vagrant applies to it only at boot (its Vagrantfile's, `guest` running in it).
+fn vm(env: &Environment, guest: &GuestCompose) -> Result<Machine> {
     let (cpus, memory_mb) = host_size(env);
     let vm_names = super::machines::vm_names(label(env, "docker"), vm_name(env, "docker"), format!("{}_{DEFINE}", env.name));
     let mut vm = run_manifest::machine(VM, Role::Infra)?;
@@ -105,9 +106,11 @@ fn vm(env: &Environment) -> Result<Machine> {
         cpus: Some(cpus),
         memory_mb: Some(memory_mb),
     });
+    let boot_digest = crate::boot_digest::of(&crate::docker_vm::vagrantfile(env, guest).contents).remove(DEFINE);
     vm.native = Some(Native::Vagrant {
         vagrant: Name::parse(DEFINE)?,
         vm_names,
+        boot_digest,
     });
     Ok(vm)
 }

@@ -2101,7 +2101,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "edge-firewall_fw",
           "utm": "edge-firewall · fw",
           "vmware_esxi": "edge-firewall-fw"
-        }
+        },
+        "boot_digest": "sha256:7e02ad2ce4948889418b56a1cdc67d75fc211d4e9c01846406f838cf7b898706"
       },
       "ports": [
         {
@@ -2134,7 +2135,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "edge-firewall_web",
           "utm": "edge-firewall · web",
           "vmware_esxi": "edge-firewall-web"
-        }
+        },
+        "boot_digest": "sha256:1418aaf53d3706c29c8f056b86a19fe059e5097b83eec74ab4a93a57fed9ad00"
       },
       "ports": [
         {
@@ -2167,7 +2169,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "edge-firewall_cache",
           "utm": "edge-firewall · cache",
           "vmware_esxi": "edge-firewall-cache"
-        }
+        },
+        "boot_digest": "sha256:0f1bb648143f1087fd2d625c3c73be241b5b69af07cf26f412f6772d9aea9a88"
       },
       "ports": [
         {
@@ -2201,7 +2204,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "libvirt": "edge-firewall_user",
           "utm": "edge-firewall · user",
           "vmware_esxi": "edge-firewall-user"
-        }
+        },
+        "boot_digest": "sha256:6fa0ea5102e362d9c9cc0ad22a3205325ed38f72d3f169eb21a6ce6db0812040"
       }
     }
   ],

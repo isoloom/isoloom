@@ -155,6 +155,12 @@ pub enum Native {
         vagrant: Name,
         /// Its VM's name under each provider.
         vm_names: BTreeMap<Provider, String>,
+        /// A digest of what Vagrant applies to the VM only when it boots (`vagrant up` of a
+        /// stopped VM, `vagrant reload`): its Vagrantfile configuration but its provisioners,
+        /// such as its synced folders, networks, forwarded ports, size and provider settings.
+        /// Opaque: a runner compares it with the one the VM was last booted with and reloads a
+        /// running VM whose digest changed; `vagrant up --provision` alone would not apply it.
+        boot_digest: Option<String>,
     },
 }
 
@@ -163,8 +169,8 @@ pub enum Native {
 #[serde(deny_unknown_fields)]
 #[schemars(
     title = "Native",
-    description = "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly).",
-    extend("oneOf" = [{ "required": ["service"] }, { "required": ["vagrant"] }], "dependentRequired" = { "vm_names": ["vagrant"] })
+    description = "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly) and the digest of what Vagrant applies to it only at boot (`boot_digest`).",
+    extend("oneOf" = [{ "required": ["service"] }, { "required": ["vagrant"] }], "dependentRequired" = { "vm_names": ["vagrant"], "boot_digest": ["vagrant"] })
 )]
 struct NativeFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -173,6 +179,11 @@ struct NativeFields {
     vagrant: Option<Name>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     vm_names: Option<BTreeMap<Provider, String>>,
+    /// A digest of the VM's Vagrantfile configuration but its provisioners: what Vagrant applies
+    /// only when the VM boots or reloads. Opaque; a runner reloads a running VM whose digest
+    /// changed since it booted. Absent from older manifests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    boot_digest: Option<String>,
 }
 
 impl Serialize for Native {
@@ -182,11 +193,17 @@ impl Serialize for Native {
                 service: Some(service.clone()),
                 vagrant: None,
                 vm_names: None,
+                boot_digest: None,
             },
-            Native::Vagrant { vagrant, vm_names } => NativeFields {
+            Native::Vagrant {
+                vagrant,
+                vm_names,
+                boot_digest,
+            } => NativeFields {
                 service: None,
                 vagrant: Some(vagrant.clone()),
                 vm_names: Some(vm_names.clone()),
+                boot_digest: boot_digest.clone(),
             },
         };
         fields.serialize(s)
@@ -200,14 +217,17 @@ impl<'de> Deserialize<'de> for Native {
                 service: Some(service),
                 vagrant: None,
                 vm_names: None,
+                boot_digest: None,
             } => Ok(Native::Compose { service }),
             NativeFields {
                 service: None,
                 vagrant: Some(vagrant),
                 vm_names,
+                boot_digest,
             } => Ok(Native::Vagrant {
                 vagrant,
                 vm_names: vm_names.unwrap_or_default(),
+                boot_digest,
             }),
             _ => Err(serde::de::Error::custom(Error::NativeShape)),
         }
@@ -304,5 +324,20 @@ mod tests {
         assert!(matches!(v, Native::Vagrant { ref vm_names, .. } if vm_names[&Provider::Hyperv] == "mini-ad-dc01"));
         let both = serde_json::from_str::<Native>(r#"{"service": "db", "vagrant": "db"}"#).unwrap_err();
         assert!(both.to_string().contains("not both"), "{both}");
+    }
+
+    #[test]
+    fn a_vagrant_machine_may_carry_its_boot_digest_and_an_older_one_has_none() {
+        let older: Native = serde_json::from_str(r#"{"vagrant": "default", "vm_names": {}}"#).unwrap();
+        assert!(matches!(older, Native::Vagrant { boot_digest: None, .. }));
+        let with: Native = serde_json::from_str(r#"{"vagrant": "default", "boot_digest": "sha256:ab"}"#).unwrap();
+        assert!(matches!(with, Native::Vagrant { boot_digest: Some(ref d), .. } if d == "sha256:ab"));
+        assert_eq!(
+            serde_json::to_string(&with).unwrap(),
+            r#"{"vagrant":"default","vm_names":{},"boot_digest":"sha256:ab"}"#
+        );
+        assert_eq!(serde_json::to_string(&older).unwrap(), r#"{"vagrant":"default","vm_names":{}}"#);
+        let service = serde_json::from_str::<Native>(r#"{"service": "db", "boot_digest": "sha256:ab"}"#);
+        assert!(service.is_err());
     }
 }

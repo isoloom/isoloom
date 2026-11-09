@@ -12,6 +12,13 @@ stable spec format.
 
 ### Added
 
+- **The run manifest says what each Vagrant VM takes only when it boots** (`machines[].native.boot_digest`):
+  a digest of the VM's Vagrantfile configuration but its provisioners (synced folders and
+  `host_folders`, networks, forwarded ports, size, provider settings), on `vagrant` and on
+  `docker-vm`'s VM. Vagrant applies those only when a VM boots or reloads, so a runner updating a
+  running run compares it with the digest the VM booted with and reloads the VM when it changed: a
+  host folder added to a running `docker-vm` lab is then mounted, not an empty folder. Optional; an
+  older manifest without it still reads.
 - **A machine can mount a folder of the computer that runs the lab** (`machines.<name>.host_folders:
   [{ from, path, read_only }]`), both ways: what the machine writes there lands on that computer.
   `from` is relative to the project folder (it must exist), in the home folder (`~/work`) or
