@@ -57,7 +57,11 @@ const RULES: Rules = Rules {
     nests: false,
     largest: Some({
         let [.., (size, memory_mb, _)] = SIZES;
-        Largest { memory_mb, size }
+        Largest {
+            memory_mb,
+            size,
+            disk_gb: None,
+        }
     }),
     largest_nesting: None,
     mtu: Mtu::Fixed,

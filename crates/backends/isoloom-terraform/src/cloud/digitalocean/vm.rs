@@ -6,12 +6,12 @@
 
 use crate::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_spec::DEFAULT_MEMORY_MB;
+use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::{Way, rule, ssh_key, vpc};
 use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with, tag_list};
-use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, fit};
+use crate::cloud::vm::rules::{DiskSize, FIREWALLS_TC, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, fit_disk};
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
 use crate::limits::Limits;
 use crate::machine::vms;
@@ -35,7 +35,7 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: false,
-    largest: Some(Largest::of(SIZES)),
+    largest: Some(Largest::of_disks(SIZES)),
     largest_nesting: None,
     mtu: Mtu::Fixed,
     picks_ipv6: false,
@@ -83,12 +83,37 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
     IMAGES.of(os)
 }
 
-/// The droplet sizes, by their memory in MB.
-const SIZES: &[(u32, &str)] = &[(1024, "s-1vcpu-1gb"), (2048, "s-2vcpu-2gb"), (4096, "s-2vcpu-4gb"), (8192, "s-4vcpu-8gb")];
+/// The droplet sizes, smallest first: each one's memory and disk come with it.
+const SIZES: &[DiskSize] = &[
+    DiskSize {
+        memory_mb: 1024,
+        disk_gb: 25,
+        name: "s-1vcpu-1gb",
+    },
+    DiskSize {
+        memory_mb: 2048,
+        disk_gb: 60,
+        name: "s-2vcpu-2gb",
+    },
+    DiskSize {
+        memory_mb: 4096,
+        disk_gb: 80,
+        name: "s-2vcpu-4gb",
+    },
+    DiskSize {
+        memory_mb: 8192,
+        disk_gb: 160,
+        name: "s-4vcpu-8gb",
+    },
+];
 
-/// The droplet size for a machine's memory.
-fn size(memory_mb: u32) -> &'static str {
-    fit(SIZES, memory_mb)
+/// The smallest droplet size with a machine's memory and disk.
+fn size(mp: &MachinePlan) -> &'static str {
+    fit_disk(
+        SIZES,
+        mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
+        mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB),
+    )
 }
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
@@ -136,10 +161,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
     let mut droplet = resource("digitalocean_droplet", &id)
         .add_attribute(("name", name_with(&format!("-{name}"))))
         .add_attribute(("region", reference("var.region")))
-        .add_attribute((
-            "size",
-            string(RULES.gpus.of(mp).unwrap_or(size(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB)))),
-        ))
+        .add_attribute(("size", string(RULES.gpus.of(mp).unwrap_or(size(mp)))))
         .add_attribute(("image", string(slug)))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))

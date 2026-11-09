@@ -97,3 +97,27 @@ machines:
     assert!(tf(&spec)?.is_none(), "a Linode has one VPC interface, so no file is produced");
     Ok(())
 }
+
+#[test]
+fn a_plan_fits_the_disk_too_and_a_disk_beyond_the_largest_is_refused() -> Outcome {
+    let with = |resources: &str| {
+        let mut spec = parse(&web_and_db("ln-lab", "debian@12"))?;
+        spec.machines["web"].resources = serde_yaml_ng::from_str(resources)?;
+        Ok::<_, Box<dyn std::error::Error>>(spec)
+    };
+    // 1 GB of memory fits the nanode; a 100 GB disk takes the 4 GB plan (80 GB is too small).
+    let module = tf(&with("{ memory_mb: 1024, disk_gb: 100 }")?)?.ok_or("refused")?;
+    let web = module.split("resource \"linode_instance\" \"web\"").nth(1).ok_or("no web instance")?;
+    assert!(web.contains("type            = \"g6-standard-4\""), "{web}");
+    let big = with("{ memory_mb: 1024, disk_gb: 400 }")?;
+    assert!(tf(&big)?.is_none(), "a 400 GB disk is refused");
+    let snapshot = isoloom_targets::resolved::resolve(&Lab::new(big));
+    assert_eq!(
+        snapshot
+            .pointer("/targets/clouds/cloud-vm/refused/linode")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default(),
+        "machine `web` asks for a 400 GB disk: the largest Linode size here, `g6-standard-6`, has 320 GB"
+    );
+    Ok(())
+}

@@ -69,3 +69,34 @@ machines:
     assert!(!files.iter().any(|f| f.path == DO), "no digitalocean file (refusal is Some)");
     Ok(())
 }
+
+/// A one-machine lab whose machine has `resources`, on DigitalOcean: its module, or why it is
+/// refused there.
+fn sized(resources: &str) -> Outcome<Result<String, String>> {
+    let lab = isoloom_targets::Lab::parse(&format!(
+        "version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    os: debian@12\n    resources: {resources}\n    app: {{ steps: [{{ run: p.sh }}] }}\n"
+    ))
+    .map_err(|p| format!("{p:?}"))?;
+    let files = generate(&lab, Target::CloudVm)?;
+    if let Some(f) = files.iter().find(|f| f.path == DO) {
+        return Ok(Ok(f.contents.clone()));
+    }
+    let snapshot = isoloom_targets::resolved::resolve(&lab);
+    let refused = snapshot.pointer("/targets/clouds/cloud-vm/refused/digitalocean");
+    Ok(Err(refused.and_then(serde_json::Value::as_str).unwrap_or_default().to_owned()))
+}
+
+#[test]
+fn a_droplet_size_fits_the_disk_too_and_a_disk_beyond_the_largest_is_refused() -> Outcome {
+    // 1 GB of memory fits the smallest droplet; a 50 GB disk takes the next one (60 GB).
+    let tf = sized("{ memory_mb: 1024, disk_gb: 50 }")?.map_err(|e| format!("refused: {e}"))?;
+    assert!(tf.contains("size      = \"s-2vcpu-2gb\""), "{tf}");
+    let small = sized("{ memory_mb: 1024 }")?.map_err(|e| format!("refused: {e}"))?;
+    assert!(small.contains("size      = \"s-1vcpu-1gb\""), "{small}");
+    let refused = sized("{ memory_mb: 1024, disk_gb: 400 }")?.err().ok_or("a 400 GB disk isn't refused")?;
+    assert_eq!(
+        refused,
+        "machine `web` asks for a 400 GB disk: the largest DigitalOcean size here, `s-4vcpu-8gb`, has 160 GB"
+    );
+    Ok(())
+}

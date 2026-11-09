@@ -5,10 +5,10 @@
 use std::ops::RangeInclusive;
 
 use isoloom_plan::Environment;
-use isoloom_spec::DEFAULT_MEMORY_MB;
 use isoloom_spec::model::{Ipv6Addresses, Machine};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::windows::Tpm;
+use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::gpus::{self, GpuSizes};
 use super::{disks, gateways, nested, own_image};
@@ -57,23 +57,73 @@ pub(crate) struct Volumes {
     pub(crate) most: usize,
 }
 
-/// A cloud's largest size for a machine: the most memory its size table gives.
+/// A cloud's largest size for a machine: the most memory its size table gives, and the disk
+/// that comes with it on a cloud whose sizes fix the disk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Largest {
     /// Its memory, in MB.
     pub(crate) memory_mb: u32,
     /// The size.
     pub(crate) size: &'static str,
+    /// Its disk, in GB, when the size fixes it (DigitalOcean's droplets, Linode's plans); `None`
+    /// when a machine's disk is its own setting.
+    pub(crate) disk_gb: Option<u32>,
 }
 
 impl Largest {
     /// The last of `table` (memory in MB, size; smallest first; none when it is empty).
     pub(crate) const fn of(table: &[(u32, &'static str)]) -> Largest {
         match table {
-            [.., (memory_mb, size)] => Largest { memory_mb: *memory_mb, size },
-            [] => Largest { memory_mb: 0, size: "" },
+            [.., (memory_mb, size)] => Largest {
+                memory_mb: *memory_mb,
+                size,
+                disk_gb: None,
+            },
+            [] => Largest {
+                memory_mb: 0,
+                size: "",
+                disk_gb: None,
+            },
         }
     }
+
+    /// The last of `table` (smallest first; none when it is empty), its disk with it.
+    pub(crate) const fn of_disks(table: &[DiskSize]) -> Largest {
+        match table {
+            [.., last] => Largest {
+                memory_mb: last.memory_mb,
+                size: last.name,
+                disk_gb: Some(last.disk_gb),
+            },
+            [] => Largest {
+                memory_mb: 0,
+                size: "",
+                disk_gb: None,
+            },
+        }
+    }
+}
+
+/// A size that comes with its disk (DigitalOcean's droplets, Linode's plans).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DiskSize {
+    /// Its memory, in MB.
+    pub(crate) memory_mb: u32,
+    /// Its disk, in GB.
+    pub(crate) disk_gb: u32,
+    /// The size.
+    pub(crate) name: &'static str,
+}
+
+/// The smallest of `table` (smallest first) with `memory_mb` and `disk_gb` or more; the largest
+/// when none has as much, which the cloud's refusal ([`Rules::memory`], [`Rules::disk`]) rules
+/// out.
+pub(crate) fn fit_disk(table: &[DiskSize], memory_mb: u32, disk_gb: u32) -> &'static str {
+    table
+        .iter()
+        .find(|s| s.memory_mb >= memory_mb && s.disk_gb >= disk_gb)
+        .or(table.last())
+        .map_or("", |s| s.name)
 }
 
 /// The smallest of `table` (memory in MB, size; smallest first) with `memory_mb` or more; the
@@ -235,6 +285,7 @@ impl Rules {
             .or_else(|| self.gpus(env))
             .or_else(|| self.nesting(env))
             .or_else(|| self.memory(env))
+            .or_else(|| self.disk(env))
             .or_else(|| self.mtu(env))
             .or_else(|| self.ipv6_addresses(env))
             .or_else(|| self.volumes(env))
@@ -287,6 +338,26 @@ impl Rules {
                     self.cloud,
                     largest.size,
                     mb(largest.memory_mb)
+                )
+            })
+        })
+    }
+
+    /// Why a machine can't have its disk here, if one can't: more than the cloud's largest size
+    /// comes with, where the size fixes the disk (a GPU type's disk is its own).
+    pub(crate) fn disk(&self, env: &Environment) -> Option<String> {
+        let Largest {
+            size, disk_gb: Some(largest), ..
+        } = self.largest?
+        else {
+            return None;
+        };
+        vms(env).filter(|(_, mp)| self.gpus.of(mp).is_none()).find_map(|(name, mp)| {
+            let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB);
+            (disk > largest).then(|| {
+                format!(
+                    "machine `{name}` asks for a {disk} GB disk: the largest {} size here, `{size}`, has {largest} GB",
+                    self.cloud
                 )
             })
         })
