@@ -26,10 +26,9 @@ fn constrained() -> Outcome<Lab> {
 
 /// Constraints with these registry mirrors only.
 fn mirrors(registries: &[(&str, &str)]) -> Constraints {
-    Constraints {
-        registries: registries.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect(),
-        ..Default::default()
-    }
+    let mut c = Constraints::default();
+    c.registries = registries.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect();
+    c
 }
 
 #[test]

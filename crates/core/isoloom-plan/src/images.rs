@@ -78,10 +78,9 @@ mod tests {
     use super::rewrite_image;
 
     fn mirrors(registries: &[(&str, &str)]) -> Constraints {
-        Constraints {
-            registries: registries.iter().map(|(r, m)| ((*r).to_owned(), (*m).to_owned())).collect::<IndexMap<_, _>>(),
-            ..Constraints::default()
-        }
+        let mut c = Constraints::default();
+        c.registries = registries.iter().map(|(r, m)| ((*r).to_owned(), (*m).to_owned())).collect::<IndexMap<_, _>>();
+        c
     }
 
     /// An image name on Docker Hub, with a tag or not: `redis`, `bitnami/redis:7`.

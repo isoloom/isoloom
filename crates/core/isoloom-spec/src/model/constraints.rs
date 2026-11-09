@@ -1,4 +1,22 @@
-//! What the environment needs from where it runs: constraints, a proxy and mirrors.
+//! What the environment needs from where it runs: constraints, a proxy and mirrors. A new key
+//! is a minor change, so each is built from [`Default`], then its fields set:
+//!
+//! ```
+//! let mut c = isoloom_spec::model::Constraints::default();
+//! c.ntp = vec!["time.corp".to_owned()];
+//! ```
+//!
+//! ```compile_fail
+//! let c = isoloom_spec::model::Constraints { ntp: Vec::new(), ..Default::default() };
+//! ```
+//!
+//! ```compile_fail
+//! let p = isoloom_spec::model::Proxy { http: None, ..Default::default() };
+//! ```
+//!
+//! ```compile_fail
+//! let m = isoloom_spec::model::Mirrors { npm: None, ..Default::default() };
+//! ```
 
 use indexmap::IndexMap;
 use schemars::JsonSchema;
@@ -9,6 +27,7 @@ use serde::{Deserialize, Serialize};
 /// proxy, time from their servers.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Constraints {
     /// The HTTP proxy outbound traffic goes through: set for the machines' containers (and their
     /// builds) and on every Linux VM (shell, apt, dnf, Docker), never for Isoloom's own checks.
@@ -49,6 +68,7 @@ impl Constraints {
 /// An HTTP proxy (see [`Constraints::proxy`]).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Proxy {
     /// The proxy for `http://` URLs, e.g. `http://proxy.corp:3128`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -65,6 +85,7 @@ pub struct Proxy {
 /// Package mirrors (see [`Constraints::mirrors`]).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Mirrors {
     /// Replaces `deb.debian.org/debian` in the Debian VMs' apt sources (`debian-security`, a
     /// separate archive, is left as it is).
