@@ -72,7 +72,7 @@ pub struct Generated {
     pub base: String,
     /// What that image is.
     pub from: BaseImage,
-    /// An entry's official image whose `start` steps Isoloom's runner runs (`image.start:
+    /// An entry's official image whose `start` steps Isoloom's supervisor runs (`image.start:
     /// run`): the image's own process, which the runner `exec`s after them.
     pub after_start: Option<OwnProcess>,
 }

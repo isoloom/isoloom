@@ -136,7 +136,7 @@ fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, of
     (!steps.is_empty()).then(|| model::Configuration::app(os, steps.clone()))
 }
 
-/// Whether the machine's configuration starts a service (in a container, its runner runs it).
+/// Whether the machine's configuration starts a service (in a container, its supervisor runs it).
 fn serves(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>) -> bool {
     let Some(c) = configuration(l, m, service, false) else { return false };
     crate::configure::Recipe::of(&c, &[], &crate::configure::DaemonTable::common()).is_ok_and(|r| !r.daemons.is_empty())
@@ -344,7 +344,7 @@ fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_
                 from: BaseImage::Os,
                 after_start: None,
             });
-            // Isoloom's runner is the process of a container that runs services.
+            // Isoloom's supervisor is the process of a container that runs services.
             d.idle = idle && !serves(l, m, service);
         }
         Container::Os { image } => {

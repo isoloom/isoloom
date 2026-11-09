@@ -428,14 +428,14 @@ isoloom_unit() {
 
 # The `service` step: unit UNIT enabled at boot and running (ENABLED: yes), restarted when an
 # earlier step changed something; or disabled and stopped (ENABLED: no). Without an init
-# system (a container), it says so and leaves it: there the container's runner starts it.
+# system (a container), it says so and leaves it: there the container's supervisor starts it.
 isoloom_service() {
   if [ -d /run/systemd/system ]; then
     isoloom_systemd "$@"
   elif command -v rc-service >/dev/null 2>&1 && [ -d /run/openrc ]; then
     isoloom_openrc "$@"
   else
-    echo "isoloom: no init system runs here: $1 is left to the container's runner"
+    echo "isoloom: no init system runs here: $1 is left to the container's supervisor"
   fi
 }
 

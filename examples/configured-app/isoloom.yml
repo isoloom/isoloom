@@ -5,7 +5,7 @@
 # - `web` (Debian 12): nginx from Debian's packages, a group and a user, a folder, the site
 #   copied, nginx's configuration a template filled in with `api`'s address, the package's own
 #   site removed, a guarded command, its port opened in the firewall, and nginx as its one
-#   service: on a VM a systemd unit, in a container the process Isoloom's runner `exec`s.
+#   service: on a VM a systemd unit, in a container the process Isoloom's supervisor `exec`s.
 # - `api` (Ubuntu 24.04): two services Isoloom defines from `run` (Python's web server on two
 #   ports, one as `nobody`): systemd units on a VM, two daemons under the runner and the engine's
 #   init in a container.

@@ -1,6 +1,6 @@
-//! Isoloom's runner: the process of a container whose recipe runs services, generated
+//! Isoloom's supervisor: the process of a container whose recipe runs services, generated
 //! per machine in POSIX `sh` and installed as the image's entrypoint. The engine's init (Compose's
-//! `init: true`, a pod sharing its process namespace) is PID 1 and reaps what the runner leaves.
+//! `init: true`, a pod sharing its process namespace) is PID 1 and reaps what the supervisor leaves.
 //!
 //! It runs the recipe's `start` steps, links each daemon's log files to the container's output,
 //! then:
@@ -19,13 +19,13 @@ use isoloom_spec::syntax::{AbsPath, UserName};
 use super::{Configured, DIR, shell};
 use crate::{GeneratedFile, header};
 
-/// Where machine `machine`'s runner is generated, from the project folder.
+/// Where machine `machine`'s supervisor is generated, from the project folder.
 #[must_use]
 pub fn path(machine: &str) -> String {
     format!("{DIR}/{machine}/run")
 }
 
-/// Machine `c`'s runner as a generated file, when its container runs `process` through it.
+/// Machine `c`'s supervisor as a generated file, when its container runs `process` through it.
 #[must_use]
 pub fn file(c: &Configured<'_>, process: &ContainerProcess) -> Option<GeneratedFile> {
     Some(GeneratedFile {
@@ -68,7 +68,7 @@ isoloom_start() {
   isoloom_as "$@" >"$isoloom_dir/$_name" 2>&1 &
   isoloom_pids="$isoloom_pids $!"
 }
-# Whether process PID runs (not ended, nor a zombie waiting for this runner).
+# Whether process PID runs (not ended, nor a zombie waiting for this supervisor).
 isoloom_alive() {
   [ -r "/proc/$1/stat" ] && [ "$(sed 's/.*) //' "/proc/$1/stat" | cut -c 1)" != Z ]
 }
@@ -94,7 +94,7 @@ isoloom_watch() {
 }
 "#;
 
-/// Machine `c`'s runner, when its container runs `process` through it (one daemon, or several).
+/// Machine `c`'s supervisor, when its container runs `process` through it (one daemon, or several).
 #[must_use]
 pub fn script(c: &Configured<'_>, process: &ContainerProcess) -> Option<String> {
     let (daemons, command) = match process {
@@ -117,20 +117,20 @@ pub fn script(c: &Configured<'_>, process: &ContainerProcess) -> Option<String> 
         format!("{SUPERVISE}{each}{command}isoloom_watch\n")
     };
     Some(format!(
-        "#!/bin/sh\n{}# The process of machine `{}`'s container: its services, run by Isoloom's runner.\nset -eu\n{start}{AS}{logs}{run}",
+        "#!/bin/sh\n{}# The process of machine `{}`'s container: its services, run by Isoloom's supervisor.\nset -eu\n{start}{AS}{logs}{run}",
         header("#"),
         c.machine()
     ))
 }
 
-/// The runner of an official image whose entry's `start` steps it runs: them, then the image's
+/// The supervisor of an official image whose entry's `start` steps it runs: them, then the image's
 /// own `entrypoint`, with the container's command as its arguments (the image's `CMD`, or the
 /// machine's).
 fn started(c: &Configured<'_>, entrypoint: &[String]) -> String {
     let exec: Vec<String> = entrypoint.iter().map(|a| quote(a)).collect();
     let exec = if exec.is_empty() { String::new() } else { format!("{} ", exec.join(" ")) };
     format!(
-        "#!/bin/sh\n{}# The process of machine `{}`'s container: its entry's start steps, run by Isoloom's runner, then the image's own.\nset -eu\n{}exec {exec}\"$@\"\n",
+        "#!/bin/sh\n{}# The process of machine `{}`'s container: its entry's start steps, run by Isoloom's supervisor, then the image's own.\nset -eu\n{}exec {exec}\"$@\"\n",
         header("#"),
         c.machine(),
         start(c)

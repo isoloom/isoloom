@@ -80,6 +80,12 @@ stable spec format.
   and docker-vm on QEMU its own 40 GB whatever the containers needed; the size follows the
   containers beyond that, from the spec's defaults.
 - The run manifests' and the spec's docs no longer name a particular program running them.
+- **The process Isoloom gives a container that runs services is its "supervisor"**, not its
+  "runner", which is what runs a run manifest: the generated script's header ("run by Isoloom's
+  supervisor"), the shell library's message for a service left to it, and the docs say so. The
+  script's paths (`.isoloom/configure/<machine>/run`, `/usr/local/bin/isoloom-run`) are unchanged.
+  In the library, `isoloom_render::configure::runner` is `configure::supervisor` and
+  `ContainerProcess::is_runner` is `is_supervisor`.
 - The tier list's evidence notes (`isoloom targets --json`, `isoloom matrix --json`) name no
   particular runner or build of one: "re-validated end to end through a runner".
 - **Every Terraform module describes `ssh_public_key` the same way** ("The SSH public key the

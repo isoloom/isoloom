@@ -168,7 +168,7 @@ fn a_setting_naming_a_project_folder_it_lacks_is_a_problem_with_files() {
     assert!(found.contains(&"machines.web.with.root".to_owned()), "{found:?}");
 }
 
-/// nginx's entry, its `start` a guarded command that Isoloom's runner runs before the official
+/// nginx's entry, its `start` a guarded command that Isoloom's supervisor runs before the official
 /// image's own process (`image.start: run`).
 fn started_catalogue() -> isoloom_catalogue::Catalogue {
     let nginx = isoloom_catalogue::Catalogue::embedded().unwrap().entry("nginx").unwrap();
@@ -198,7 +198,7 @@ fn an_image_whose_start_the_runner_runs_runs_it_then_its_own_process() {
     .unwrap();
     let catalogue = started_catalogue();
     let lowered = crate::lower::lower(&source, &catalogue, crate::lower::Scope::Target(Target::Docker));
-    assert_eq!(lowered.refusals, [], "the runner renders the start steps");
+    assert_eq!(lowered.refusals, [], "the supervisor renders the start steps");
     let env = crate::Environment::build(&lowered.spec, Target::Docker, None);
     let web = &env.machines["web"];
     let Some(Image::Container {
@@ -221,6 +221,6 @@ fn an_image_whose_start_the_runner_runs_runs_it_then_its_own_process() {
     let recipe = web.recipe.as_ref().unwrap();
     assert!(
         recipe.install.is_empty() && recipe.start.len() == 1,
-        "the image is install; its start is the runner's"
+        "the image is install; its start is the supervisor's"
     );
 }

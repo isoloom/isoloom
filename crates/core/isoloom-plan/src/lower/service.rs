@@ -195,7 +195,7 @@ pub(super) fn image_configuration(resolved: &[Resolved]) -> Option<model::Config
         })
     }));
     let files = r.files.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-    // The image's own entrypoint prepares each start, unless the entry asks Isoloom's runner to.
+    // The image's own entrypoint prepares each start, unless the entry asks Isoloom's supervisor to.
     let start = if image.start == ImageStart::Run { r.start.clone() } else { Vec::new() };
     Some(model::Configuration::entry(r.os, Vec::new(), configure, start, files))
 }

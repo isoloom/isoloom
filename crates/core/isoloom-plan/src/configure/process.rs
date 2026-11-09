@@ -1,5 +1,5 @@
 //! What a container runs: one daemon as its foreground process, several under the
-//! engine's init and Isoloom's runner, the machine's own command, or nothing (idle). The one rule
+//! engine's init and Isoloom's supervisor, the machine's own command, or nothing (idle). The one rule
 //! for a container built from steps: a daemon runs only where a `service` step or `command` says
 //! so, and a container that would answer nothing on its ports is refused, as is a daemon with no
 //! known foreground form.
@@ -17,7 +17,7 @@ use super::resources::Resource;
 pub enum ContainerProcess {
     /// The official image's own entrypoint and command (a catalogue entry's image form).
     Image,
-    /// A catalogue entry's official image whose `start` steps Isoloom's runner runs at each
+    /// A catalogue entry's official image whose `start` steps Isoloom's supervisor runs at each
     /// start (`image.start: run`), then `exec`s the image's own entrypoint with its command.
     Started {
         /// The image's entrypoint (empty: its command alone).
@@ -29,9 +29,9 @@ pub enum ContainerProcess {
     Idle,
     /// The machine's `command`, as the container's command.
     Command(CommandLine),
-    /// One daemon: the runner runs `start`, then `exec`s the daemon's foreground form.
+    /// One daemon: the supervisor runs `start`, then `exec`s the daemon's foreground form.
     One(Daemon),
-    /// Several daemons (or one and the command) under the engine's init (tini): the runner runs
+    /// Several daemons (or one and the command) under the engine's init (tini): the supervisor runs
     /// `start`, starts each in order, and exits when one does.
     Supervised {
         /// The daemons, in recipe order.
@@ -92,10 +92,10 @@ impl ContainerProcess {
         }
     }
 
-    /// Whether Isoloom's runner is the container's process (one daemon, or several): it needs
+    /// Whether Isoloom's supervisor is the container's process (one daemon, or several): it needs
     /// the engine's init (Compose's `init: true`, a pod sharing its process namespace).
     #[must_use]
-    pub fn is_runner(&self) -> bool {
+    pub fn is_supervisor(&self) -> bool {
         matches!(
             self,
             ContainerProcess::One(_) | ContainerProcess::Supervised { .. } | ContainerProcess::Started { .. }

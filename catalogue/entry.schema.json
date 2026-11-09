@@ -699,7 +699,7 @@
         },
         "foreground": {
           "$ref": "#/$defs/PerFamily_Argv",
-          "description": "Its foreground form: what a container's runner `exec`s (`[nginx, -g, \"daemon off;\"]`),\none on every Linux family or one per family."
+          "description": "Its foreground form: what a container's supervisor `exec`s (`[nginx, -g, \"daemon off;\"]`),\none on every Linux family or one per family."
         },
         "user": {
           "type": [
@@ -856,10 +856,10 @@
         },
         "start": {
           "$ref": "#/$defs/ImageStart",
-          "description": "Who runs the `start` steps: the image's own entrypoint (`image`, the default), or\nIsoloom's runner before it (`run`)."
+          "description": "Who runs the `start` steps: the image's own entrypoint (`image`, the default), or\nIsoloom's supervisor before it (`run`)."
         }
       },
-      "description": "How the settings reach the official image: its own entrypoint reads variables\nand files, or Isoloom's runner runs the recipe's `start` steps first."
+      "description": "How the settings reach the official image: its own entrypoint reads variables\nand files, or Isoloom's supervisor runs the recipe's `start` steps first."
     },
     "ImageStart": {
       "oneOf": [
@@ -871,7 +871,7 @@
         {
           "type": "string",
           "const": "run",
-          "description": "Isoloom's runner runs the recipe's `start` steps, then `exec`s the image's own\nentrypoint and command (recorded in `lock.yml`)."
+          "description": "Isoloom's supervisor runs the recipe's `start` steps, then `exec`s the image's own\nentrypoint and command (recorded in `lock.yml`)."
         }
       ],
       "description": "Who prepares the official image at each start."

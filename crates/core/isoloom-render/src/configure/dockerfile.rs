@@ -3,25 +3,25 @@
 //! VM has) as its working folder, then each step in order. Scripts and copies are the
 //! Dockerfile's own `COPY` and `RUN`, a template a `COPY` of the file Isoloom filled in, and every
 //! other step one `RUN` of the shell library's call. A service doesn't run at build: Isoloom's
-//! runner ([`super::runner`]) is the image's entrypoint, and starts it. The project folder is the
+//! supervisor ([`super::supervisor`]) is the image's entrypoint, and starts it. The project folder is the
 //! build context.
 
 use isoloom_plan::configure::{ContainerProcess, Resource, RunPlan, TemplatePlan};
 use isoloom_plan::{Build, Environment, Image, MachineShape};
 use isoloom_spec::syntax::Mode;
 
-use super::{Configured, rendered_path, runner, shell};
+use super::{Configured, rendered_path, shell, supervisor};
 use crate::steps::PROJECT_DIR;
 use crate::{GeneratedFile, header};
 
 /// Where the shell library is in the image.
 const LIBRARY: &str = "/usr/local/lib/isoloom/configure.sh";
 
-/// Where the runner is in the image.
-const RUNNER: &str = "/usr/local/bin/isoloom-run";
+/// Where the supervisor is in the image.
+const SUPERVISOR: &str = "/usr/local/bin/isoloom-run";
 
 /// The generated Dockerfiles of `env`'s containers, each at its path (its base image pulled
-/// through the registry mirrors), with what each builds from: the shell library, the runner
+/// through the registry mirrors), with what each builds from: the shell library, the supervisor
 /// and the templates filled in.
 #[must_use]
 pub fn files(env: &Environment) -> Vec<GeneratedFile> {
@@ -45,7 +45,7 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
         if super::uses_library(c.recipe()) && !out.iter().any(|f| f.path == shell::LIBRARY_PATH) {
             out.push(shell::library_file());
         }
-        out.extend(runner::file(&c, process));
+        out.extend(supervisor::file(&c, process));
         out.extend(templates(&c));
     }
     out
@@ -59,27 +59,27 @@ pub fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> Str
     } else {
         String::new()
     };
-    // `start` is the runner's, at each start; the build installs and configures.
+    // `start` is the supervisor's, at each start; the build installs and configures.
     let recipe = c.recipe();
     let steps: String = recipe.install.iter().chain(&recipe.configure).filter_map(|r| instructions(c, r)).collect();
-    let entrypoint = if process.is_runner() {
-        // The image's own command stays its arguments, which the runner hands its entrypoint.
+    let entrypoint = if process.is_supervisor() {
+        // The image's own command stays its arguments, which the supervisor hands its entrypoint.
         let command = match process {
             ContainerProcess::Started { command, .. } => serde_json::to_string(command).unwrap_or_else(|_| "[]".to_owned()),
             _ => "[]".to_owned(),
         };
         format!(
-            "{}COPY --chmod=0755 {} {RUNNER}\nENTRYPOINT [\"{RUNNER}\"]\nCMD {command}\n",
+            "{}COPY --chmod=0755 {} {SUPERVISOR}\nENTRYPOINT [\"{SUPERVISOR}\"]\nCMD {command}\n",
             start_files(c),
-            runner::path(c.machine())
+            supervisor::path(c.machine())
         )
     } else {
         String::new()
     };
-    // The project folder is the working folder only when the build or the runner uses it; a bare
+    // The project folder is the working folder only when the build or the supervisor uses it; a bare
     // passthrough of an official image (no steps, the image's own entrypoint) keeps the image's
     // own working folder, which an app may rely on to find its files.
-    let workdir = if process.is_runner() || !steps.is_empty() {
+    let workdir = if process.is_supervisor() || !steps.is_empty() {
         format!("WORKDIR {PROJECT_DIR}\n")
     } else {
         String::new()
@@ -91,7 +91,7 @@ pub fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> Str
     )
 }
 
-/// The project files the recipe's `start` steps read when the runner runs them at each start
+/// The project files the recipe's `start` steps read when the supervisor runs them at each start
 /// (their scripts, their copies' sources), copied into the image's project folder.
 fn start_files(c: &Configured<'_>) -> String {
     c.recipe()
@@ -108,7 +108,7 @@ fn start_files(c: &Configured<'_>) -> String {
 }
 
 /// One step's instructions; `None` for a step a container doesn't run at build (a service, which
-/// the runner starts; a firewall, which a container doesn't have).
+/// the supervisor starts; a firewall, which a container doesn't have).
 fn instructions(c: &Configured<'_>, step: &Resource) -> Option<String> {
     let lines = match step {
         Resource::Run(run) => script(run),

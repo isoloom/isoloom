@@ -35,13 +35,13 @@ pub(super) enum Container<'a> {
     },
     /// A catalogue entry's official image, its OS the machine's: a thin build of the entry's
     /// `configure` over it, and the image's own process (after the entry's `start` steps, run by
-    /// Isoloom's runner, when the entry asks for them: `image.start: run`).
+    /// Isoloom's supervisor, when the entry asks for them: `image.start: run`).
     Entry {
         /// The OS.
         os: OsRef,
         /// The image.
         image: &'a OfficialImage,
-        /// The `start` steps Isoloom's runner runs before the image's own process (empty: the
+        /// The `start` steps Isoloom's supervisor runs before the image's own process (empty: the
         /// image's own entrypoint prepares each start).
         start: &'a [Step],
     },

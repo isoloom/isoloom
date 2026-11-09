@@ -156,7 +156,7 @@ pub enum Service {
         enabled: bool,
     },
     /// A service Isoloom defines: a systemd or OpenRC unit, or a Windows service, on VMs; a
-    /// process of the container's runner in containers.
+    /// process of the container's supervisor in containers.
     Defined {
         /// Its name.
         name: UnitName,

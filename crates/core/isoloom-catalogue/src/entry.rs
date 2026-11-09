@@ -130,7 +130,7 @@ impl TryFrom<EntryPortInput> for EntryPort {
 }
 
 /// How the settings reach the official image: its own entrypoint reads variables
-/// and files, or Isoloom's runner runs the recipe's `start` steps first.
+/// and files, or Isoloom's supervisor runs the recipe's `start` steps first.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ImageUse {
@@ -146,7 +146,7 @@ pub struct ImageUse {
     #[serde(default)]
     pub command: Option<Vec<String>>,
     /// Who runs the `start` steps: the image's own entrypoint (`image`, the default), or
-    /// Isoloom's runner before it (`run`).
+    /// Isoloom's supervisor before it (`run`).
     #[serde(default)]
     pub start: ImageStart,
 }
@@ -159,7 +159,7 @@ pub enum ImageStart {
     /// The image's own entrypoint, fed by `environment` and `files`.
     #[default]
     Image,
-    /// Isoloom's runner runs the recipe's `start` steps, then `exec`s the image's own
+    /// Isoloom's supervisor runs the recipe's `start` steps, then `exec`s the image's own
     /// entrypoint and command (recorded in `lock.yml`).
     Run,
 }

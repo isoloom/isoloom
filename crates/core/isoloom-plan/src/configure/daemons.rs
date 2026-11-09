@@ -16,7 +16,7 @@ use super::family::Family;
 pub struct Daemon {
     /// Its unit (what a VM enables).
     pub unit: UnitName,
-    /// Its foreground form: what the container's runner `exec`s.
+    /// Its foreground form: what the container's supervisor `exec`s.
     pub foreground: Argv,
     /// The user it drops to (root when `None`).
     pub user: Option<UserName>,

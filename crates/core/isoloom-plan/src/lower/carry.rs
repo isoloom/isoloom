@@ -4,7 +4,7 @@
 //!
 //! - **a container built from a recipe** carries every step with a container form: its scripts,
 //!   copies and templates as the Dockerfile's own instructions, every other step as the shell
-//!   library's, and its services under Isoloom's runner;
+//!   library's, and its services under Isoloom's supervisor;
 //! - **a new VM** carries every step, through the shell library (the PowerShell library on
 //!   Windows);
 //! - **a host that already exists** (the `external` target) runs scripts, playbooks and reboots

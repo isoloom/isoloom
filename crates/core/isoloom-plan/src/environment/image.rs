@@ -53,7 +53,7 @@ pub enum Build {
         dockerfile: String,
         /// The image it starts `FROM`: the OS's official image, pinned by digest.
         base: String,
-        /// What the container runs: Isoloom's runner as its entrypoint for its services, its own
+        /// What the container runs: Isoloom's supervisor as its entrypoint for its services, its own
         /// command, or nothing (idle).
         process: ContainerProcess,
     },
@@ -83,7 +83,7 @@ pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, reci
                 base: g.base.clone(),
                 process: match (g.from, &g.after_start) {
                     // An entry's official image keeps its own entrypoint and command, after the
-                    // entry's `start` steps when Isoloom's runner runs them.
+                    // entry's `start` steps when Isoloom's supervisor runs them.
                     (BaseImage::Entry, Some(image)) => ContainerProcess::Started {
                         entrypoint: image.entrypoint.clone(),
                         command: image.command.clone(),

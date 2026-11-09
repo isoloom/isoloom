@@ -9,7 +9,7 @@
 //!   (a Vagrantfile's literals), [`powershell`] (a Windows machine's) and [`inventory`]
 //!   (Ansible's); shell is `isoloom_spec::shell`, below every crate.
 //! - **The configuration renderers** ([`configure`]): a machine's recipe as the shell and
-//!   PowerShell libraries' calls, the Dockerfile its container builds from, and Isoloom's runner,
+//!   PowerShell libraries' calls, the Dockerfile its container builds from, and Isoloom's supervisor,
 //!   the process of a container that runs services.
 //! - **A VM's set-up:** [`steps`] (each [`Step`](isoloom_plan::Step) as Linux shell or
 //!   PowerShell), the scripts kept across restarts ([`boot`]), [`secrets`] delivered at run time,

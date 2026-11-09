@@ -89,13 +89,13 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
     if spec.access {
         access_box(plan, &mut svc);
     }
-    // Isoloom's runner runs its services: under the engine's init, which reaps what they leave.
+    // Isoloom's supervisor runs its services: under the engine's init, which reaps what they leave.
     if let Some(Image::Container {
         build: Some(isoloom_plan::Build::Generated { process, .. }),
         ..
     }) = &plan.image
     {
-        svc.init |= process.is_runner();
+        svc.init |= process.is_supervisor();
     }
     process::apply(plan, &mut svc);
     // A VLAN it reaches through a trunk isn't an interface of its own: the trunk is.

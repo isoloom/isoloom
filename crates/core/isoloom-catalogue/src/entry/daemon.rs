@@ -22,7 +22,7 @@ pub struct Daemon {
     /// `service` step for the daemon gets a warning.
     #[serde(default)]
     pub package: Option<PerFamily<PackageName>>,
-    /// Its foreground form: what a container's runner `exec`s (`[nginx, -g, "daemon off;"]`),
+    /// Its foreground form: what a container's supervisor `exec`s (`[nginx, -g, "daemon off;"]`),
     /// one on every Linux family or one per family.
     pub foreground: PerFamily<Argv>,
     /// The user it drops to in a container (default root).

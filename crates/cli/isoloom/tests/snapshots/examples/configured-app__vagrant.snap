@@ -995,7 +995,7 @@ Vagrant.configure("2") do |config|
         elif command -v rc-service >/dev/null 2>&1 && [ -d /run/openrc ]; then
           isoloom_openrc "$@"
         else
-          echo "isoloom: no init system runs here: $1 is left to the container's runner"
+          echo "isoloom: no init system runs here: $1 is left to the container's supervisor"
         fi
       }
       isoloom_systemd() {
@@ -1414,7 +1414,7 @@ Vagrant.configure("2") do |config|
         elif command -v rc-service >/dev/null 2>&1 && [ -d /run/openrc ]; then
           isoloom_openrc "$@"
         else
-          echo "isoloom: no init system runs here: $1 is left to the container's runner"
+          echo "isoloom: no init system runs here: $1 is left to the container's supervisor"
         fi
       }
       isoloom_systemd() {

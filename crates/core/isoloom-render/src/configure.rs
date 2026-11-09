@@ -8,8 +8,8 @@
 //!   (gzip then base64) and run from `runcmd`, for the targets that hand a VM its user data.
 //! - [`powershell`]: the PowerShell library and a recipe's calls, for a Windows VM's set-up.
 //! - [`dockerfile`]: the image a container builds from its recipe, its process Isoloom's
-//!   [`runner`] when it runs services.
-//! - [`files`]: the files they add to a target's: the Dockerfiles, the libraries, the runners and
+//!   [`supervisor`] when it runs services.
+//! - [`files`]: the files they add to a target's: the Dockerfiles, the libraries, the supervisors and
 //!   the templates filled in for a container's build.
 //!
 //! Every step is rendered in recipe order, behind its guard, so a second apply changes nothing.
@@ -24,8 +24,8 @@ pub mod cloud_init;
 pub mod dockerfile;
 mod password;
 pub mod powershell;
-pub mod runner;
 pub mod shell;
+pub mod supervisor;
 mod units;
 
 pub use units::{linux_unit, systemd_word};
@@ -124,7 +124,7 @@ pub fn rendered_path(machine: &str, from: &ProjectPath) -> String {
 }
 
 /// The files the configuration renderers add to `env`'s: each container's Dockerfile, with its
-/// runner and its filled templates, and the libraries, once, when a recipe uses them (a VM's
+/// supervisor and its filled templates, and the libraries, once, when a recipe uses them (a VM's
 /// set-up embeds its library; the file is the same text, which the validators check).
 #[must_use]
 pub fn files(env: &Environment) -> Vec<GeneratedFile> {

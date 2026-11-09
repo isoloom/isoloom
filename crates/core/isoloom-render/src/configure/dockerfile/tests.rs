@@ -95,7 +95,7 @@ fn a_template_is_copied_filled_in_with_its_owner_and_mode() {
 }
 
 #[test]
-fn a_container_that_runs_services_builds_its_runner_in_as_its_entrypoint() {
+fn a_container_that_runs_services_builds_its_supervisor_in_as_its_entrypoint() {
     let found = built(
         "os: debian@12, ports: { web: 80 }, app: { steps: [{ packages: [nginx] }, { service: nginx }] }",
         &[],
@@ -116,7 +116,7 @@ fn a_container_that_runs_services_builds_its_runner_in_as_its_entrypoint() {
         "{}",
         found[0].contents
     );
-    assert!(!found[0].contents.contains("isoloom_service"), "the runner starts it, not the build");
+    assert!(!found[0].contents.contains("isoloom_service"), "the supervisor starts it, not the build");
 }
 
 #[test]

@@ -38,7 +38,7 @@ ports:
   fastcgi: { setting: port, protocol: tcp }
 
 # php-fpm's daemon: the systemd unit a VM enables, the package that ships it, and the foreground
-# form a built container's runner runs it in (the PHP image's own entrypoint is not used here).
+# form a built container's supervisor runs it in (the PHP image's own entrypoint is not used here).
 daemons:
   php-fpm:
     unit: { debian: php8.2-fpm }
