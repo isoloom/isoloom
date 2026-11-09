@@ -9,7 +9,6 @@ use isoloom_plan::environment::Route;
 use isoloom_spec::shell::quote;
 use isoloom_spec::validate::Cidr;
 
-use super::PKG;
 use crate::network::{ipv6, router, trunks};
 use crate::{boot, powershell};
 
@@ -98,7 +97,7 @@ pub(super) fn egress(env: &Environment) -> String {
         &[],
     );
     format!(
-        "{PKG}\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\n\
-         printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {lab} }} ct state new drop'{lab6} '  }}' '}}' > /etc/isoloom-egress.nft\n{load}"
+        "{}printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {lab} }} ct state new drop'{lab6} '  }}' '}}' > /etc/isoloom-egress.nft\n{load}",
+        super::nftables()
     )
 }

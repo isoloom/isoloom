@@ -3,7 +3,10 @@
 //! and the machine's user data, the set-up it runs itself (`crate::machine::user_data`).
 
 use isoloom_plan::{Environment, MachinePlan, Step};
+use isoloom_render::boot::{self, Trigger};
 use isoloom_render::hcl_builder::{Expression, Template};
+use isoloom_render::steps;
+use isoloom_spec::shell::quote;
 
 use crate::Result;
 use crate::machine::linux::{self, Hooks};
@@ -45,22 +48,67 @@ pub(crate) fn network_does(step: &Step) -> bool {
 }
 
 /// A published port that differs from the service's own, redirected to it inside the machine
-/// (a `before_egress` hook).
+/// (a `before_egress` hook): the rules kept in a file and loaded now and at every boot, as the
+/// egress filter is, with `nft` from the machine's package manager. Run as root; running it
+/// again replaces the table.
 fn redirects(mp: &MachinePlan) -> Vec<Template> {
-    let moved: Vec<_> = mp.ports.iter().filter(|p| p.publish != p.port).collect();
-    if moved.is_empty() {
+    let rules: Vec<String> = mp
+        .ports
+        .iter()
+        .filter(|p| p.publish != p.port)
+        .map(|p| quote(&format!("    {} dport {} redirect to :{}", p.protocol.id(), p.publish, p.port)))
+        .collect();
+    if rules.is_empty() {
         return Vec::new();
     }
-    let mut out = vec![Template::text(
-        "command -v nft >/dev/null || (sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nftables)",
-    )];
-    out.extend(moved.into_iter().map(|p| {
-        Template::text(format!(
-            "sudo nft add table ip isoloom-publish && sudo nft 'add chain ip isoloom-publish prerouting {{ type nat hook prerouting priority -100; }}' && sudo nft add rule ip isoloom-publish prerouting {} dport {} redirect to :{}",
-            p.protocol.id(),
-            p.publish,
-            p.port
-        ))
-    }));
-    out
+    let load = boot::at_boot(
+        "publish",
+        "Published ports redirected to their services",
+        &format!("nft -f {PUBLISH_NFT}\n"),
+        Trigger::Boot,
+        &[],
+    );
+    vec![Template::text(format!(
+        "{}printf '%s\\n' 'table ip isoloom-publish' 'delete table ip isoloom-publish' 'table ip isoloom-publish {{' '  chain prerouting {{' '    type nat hook prerouting priority -100;' {} '  }}' '}}' > {PUBLISH_NFT}\n{load}",
+        steps::nftables(),
+        rules.join(" ")
+    ))]
+}
+
+/// The published-port redirects' ruleset.
+const PUBLISH_NFT: &str = "/etc/isoloom-publish.nft";
+
+#[cfg(test)]
+mod tests {
+    use isoloom_spec::model::Target;
+
+    use isoloom_render::hcl_builder::Piece;
+
+    use super::redirects;
+    use crate::testing::environment;
+
+    #[test]
+    fn a_moved_port_is_redirected_as_root_now_and_at_every_boot() {
+        let env = environment(
+            "version: 1\nname: r\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    ports: { web: { port: 80, protocol: http, publish: 8080 } }\n",
+            Target::CloudVm,
+        );
+        let hooks = redirects(&env.machines["web"]);
+        assert_eq!(hooks.len(), 1);
+        let sh: String = hooks[0]
+            .pieces()
+            .map(|p| match p {
+                Piece::Text(t) => t.to_owned(),
+                Piece::Expr(_) => panic!("plain text"),
+            })
+            .collect();
+        assert!(sh.contains("'    tcp dport 8080 redirect to :80'"), "{sh}");
+        assert!(sh.contains("> /etc/isoloom-publish.nft\n"), "{sh}");
+        assert!(
+            sh.contains("nft -f /etc/isoloom-publish.nft") && sh.contains("systemctl enable isoloom-publish.service"),
+            "{sh}"
+        );
+        assert!(!sh.contains("sudo"), "the set-up runs as root: {sh}");
+        assert!(sh.contains("pkg nftables"), "the machine's own package manager: {sh}");
+    }
 }

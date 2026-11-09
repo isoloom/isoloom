@@ -138,6 +138,13 @@ pub(crate) const WINDOWS_PROJECT_DIR: &str = isoloom_spec::windows::ISOLOOM_DIR;
 /// family: Rocky, AlmaLinux, CentOS, Fedora).
 const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }";
 
+/// `nft`, installed unless it is there, with the machine's own package manager (Alpine's `apk`
+/// too), as root script lines.
+#[must_use]
+pub fn nftables() -> String {
+    format!("{PKG}\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\n")
+}
+
 /// This boot's id: it changes at each boot.
 const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
 

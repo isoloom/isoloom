@@ -129,10 +129,14 @@ fn the_clouds_resume_the_set_up_after_each_reboot() -> Outcome {
         // Two restarts, each the end of a part its unit runs after the next boot.
         assert_eq!(tf.matches("systemctl reboot").count(), 2, "{cloud}");
         assert_eq!(tf.matches("if [ \\\"$part\\\" = ").count(), 3, "{cloud}");
-        // Each part after a restart brings its second interface up again (the first part brings
-        // it up too); the expiry is scheduled again at every boot, before any part.
-        assert_eq!(tf.matches("sudo ip addr add 10.70.1.10/24").count(), 3, "{cloud}");
+        // The first part brings its second interface up; every later boot (a restart between
+        // parts, or any restart once the set-up is ready) brings it up again before the parts.
+        // The expiry is scheduled again at every boot, before anything else.
+        assert_eq!(tf.matches("sudo ip addr add 10.70.1.10/24").count(), 2, "{cloud}");
+        let again = at(&tf, "ready ] || [ \\\"$part\\\" != 1 ]; then")?;
+        assert!(again < at(&tf, "sudo ip addr add 10.70.1.10/24")?, "{cloud}");
         assert!(at(&tf, "shutdown -h")? < at(&tf, "part=$(cat")?, "{cloud}");
+        assert!(!tf.contains("systemctl disable isoloom-setup.service"), "{cloud}");
         // Steps in order, each after its restart; the ready marker last.
         let reboots: Vec<usize> = tf.match_indices("systemctl reboot").map(|(i, _)| i).collect();
         let kernel = at(&tf, "sh kernel.sh")?;
@@ -159,6 +163,19 @@ fn every_cloud_driver_splits_the_set_up_at_a_reboot() -> Outcome {
         let reboot = at(tf, "systemctl reboot")?;
         assert!(at(tf, "sh kernel.sh")? < reboot && reboot < at(tf, "sh last.sh")?, "{cloud}");
         assert!(at(tf, "sh last.sh")? < at(tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?, "{cloud}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_cloud_docker_host_schedules_its_expiry_again_at_every_boot() -> Outcome {
+    let spec =
+        lab("version: 1\nname: d\nnetworks: { lab: { cidr: 10.72.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: \"nginx:1.27\" } }\n")?;
+    for cloud in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
+        let tf = generated(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?;
+        // Cloud-init runs the user data once: a boot unit reschedules the expiry after a restart.
+        assert!(tf.contains("systemctl enable isoloom-expiry.service"), "{cloud}");
+        assert!(tf.contains("ExecStart=-/etc/isoloom/expiry.sh"), "{cloud}");
     }
     Ok(())
 }

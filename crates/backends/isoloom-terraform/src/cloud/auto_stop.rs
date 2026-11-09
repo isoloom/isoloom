@@ -1,8 +1,9 @@
 //! A machine's end. On the clouds, the run's (`expires_at`): a Windows machine's scheduled task
 //! shuts it down then, so a forgotten environment stops costing even when the runner is gone (a
 //! Linux machine's own set-up schedules it itself, at every boot:
-//! `crate::machine::user_data::expiry_shutdown`). The Docker host on a Proxmox server keeps its
-//! `auto_stop_minutes`.
+//! `crate::machine::user_data::expiry_shutdown`; a cloud-docker host's boot script does the
+//! same: `crate::machine::user_data::expiry_only`). The Docker host on a Proxmox server keeps
+//! its `auto_stop_minutes`.
 
 use isoloom_render::hcl_builder::{BinaryOperator, Expression, Template, binary, conditional, reference, string};
 

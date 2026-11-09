@@ -178,7 +178,7 @@ resource "aws_instance" "env" {
   subnet_id              = aws_subnet.env.id
   key_name               = aws_key_pair.env.key_name
   vpc_security_group_ids = [aws_security_group.env.id]
-  user_data_base64       = base64gzip("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
+  user_data_base64       = base64gzip("#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n")
   lifecycle {
     ignore_changes = [user_data_base64]
   }
@@ -1229,7 +1229,7 @@ resource "azurerm_linux_virtual_machine" "env" {
   location              = var.region
   tags                  = local.tags
   size                  = var.size
-  custom_data           = base64encode("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
+  custom_data           = base64encode("#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n")
   admin_username        = "isoloom"
   network_interface_ids = [azurerm_network_interface.env.id]
   admin_ssh_key {
@@ -2219,7 +2219,7 @@ resource "digitalocean_droplet" "env" {
   image     = "debian-12-x64"
   vpc_uuid  = digitalocean_vpc.env.id
   ssh_keys  = [digitalocean_ssh_key.env.id]
-  user_data = "#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n"
+  user_data = "#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n"
   tags      = concat(["isoloom", "pivot-dmz", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   lifecycle {
     ignore_changes = [user_data]
@@ -3230,7 +3230,7 @@ resource "google_compute_instance" "env" {
   }
   metadata = {
     ssh-keys       = "admin:${var.ssh_public_key}"
-    startup-script = "#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n"
+    startup-script = "#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n"
   }
 }
 
@@ -4192,7 +4192,7 @@ resource "linode_instance" "env" {
   image           = "linode/debian12"
   authorized_keys = [trimspace(var.ssh_public_key)]
   metadata {
-    user_data = base64encode("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
+    user_data = base64encode("#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n")
   }
   tags = concat(["isoloom", "pivot-dmz", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   lifecycle {
@@ -5206,7 +5206,7 @@ resource "oci_core_instance" "env" {
   }
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
-    user_data           = base64encode("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
+    user_data           = base64encode("#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n")
   }
   lifecycle {
     ignore_changes = [metadata["user_data"]]
