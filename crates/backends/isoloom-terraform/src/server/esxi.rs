@@ -159,8 +159,8 @@ const PARTS: Parts = Parts {
     target: Target::Esxi,
     refusal,
     usage: |folder| Usage {
-        before: "# Needs:  ovftool on this machine, SSH enabled on the ESXi host\n",
-        apply: " -var esxi_hostname=<host> -var esxi_password=<password>",
+        before: "# Needs:  ovftool on this machine, SSH enabled on the ESXi host\n# Auth:   export TF_VAR_esxi_password=<password> (from the environment: never on a command line)\n",
+        apply: " -var esxi_hostname=<host>",
         ..Usage::with_key(folder, "")
     },
     copy: ProjectCopy::Archive,

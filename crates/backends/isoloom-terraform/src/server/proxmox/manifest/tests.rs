@@ -128,7 +128,9 @@ fn the_variables_are_params_and_the_secrets_slots() {
     let node = param("node").unwrap();
     assert!(node.required && node.default.is_none(), "no default node");
     assert_eq!(param("uplink_bridge").unwrap().default.as_deref(), Some("vmbr0"));
-    assert_eq!(param("proxmox_insecure").unwrap().values, ["true", "false"]);
+    let insecure = param("proxmox_insecure").unwrap();
+    assert_eq!(insecure.values, ["true", "false"]);
+    assert_eq!(insecure.default.as_deref(), Some("false"), "TLS is verified unless the operator says otherwise");
     for runner_set in ["slot", "ssh_public_key", "proxmox_ssh_private_key_file", "proxmox_password", "inputs"] {
         assert!(param(runner_set).is_none(), "{runner_set}");
     }

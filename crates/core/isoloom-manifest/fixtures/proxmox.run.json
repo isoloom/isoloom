@@ -71,8 +71,8 @@
     },
     {
       "name": "proxmox_insecure",
-      "description": "Accept the server's self-signed certificate.",
-      "default": "true",
+      "description": "Accept the server's self-signed certificate (TLS isn't verified).",
+      "default": "false",
       "values": [
         "true",
         "false"

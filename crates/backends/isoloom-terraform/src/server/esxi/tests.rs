@@ -40,6 +40,14 @@ fn module(spec: &str) -> String {
 }
 
 #[test]
+fn the_password_comes_from_the_environment_never_a_command_line() {
+    let tf = module(PAIR);
+    let header: String = tf.lines().take_while(|l| l.starts_with('#')).collect::<Vec<_>>().join("\n");
+    assert!(header.contains("export TF_VAR_esxi_password=<password>"), "{header}");
+    assert!(!header.contains("-var esxi_password"), "{header}");
+}
+
+#[test]
 fn a_vswitch_and_a_port_group_per_network() {
     let tf = module(PAIR);
     for net in ["front", "back"] {

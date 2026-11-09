@@ -150,8 +150,8 @@ variable "proxmox_password" {
 
 variable "proxmox_insecure" {
   type        = bool
-  default     = true
-  description = "Accept the server's self-signed certificate"
+  default     = false
+  description = "Accept the server's self-signed certificate (TLS isn't verified)"
 }
 
 variable "proxmox_ssh_username" {
@@ -757,8 +757,8 @@ locals {
     },
     {
       "name": "proxmox_insecure",
-      "description": "Accept the server's self-signed certificate.",
-      "default": "true",
+      "description": "Accept the server's self-signed certificate (TLS isn't verified).",
+      "default": "false",
       "values": [
         "true",
         "false"

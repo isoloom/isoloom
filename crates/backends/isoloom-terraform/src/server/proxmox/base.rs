@@ -134,12 +134,11 @@ pub(super) fn connection(snippets: &str) -> Vec<Variable> {
             .describe("user@realm!name=secret; or use proxmox_username and proxmox_password"),
         s("proxmox_username").default(string("root@pam")),
         s("proxmox_password").default(string("")).sensitive(),
-        // Defaults to true deliberately (reviewed, security finding S5): Proxmox servers commonly
-        // present a self-signed API certificate, so the operator accepts it. It relaxes TLS
-        // verification to the Proxmox API endpoint only, and is operator-facing.
+        // Verified by default: a server with a self-signed API certificate is accepted only when
+        // the operator says so (`proxmox_insecure=true`), for the Proxmox API endpoint only.
         Variable::new("proxmox_insecure", "bool")
-            .default(boolean(true))
-            .describe("Accept the server's self-signed certificate"),
+            .default(boolean(false))
+            .describe("Accept the server's self-signed certificate (TLS isn't verified)"),
         s("proxmox_ssh_username").default(string("root")).describe(snippets),
         s("proxmox_ssh_private_key_file").default(string("")),
         s("proxmox_ssh_address")
