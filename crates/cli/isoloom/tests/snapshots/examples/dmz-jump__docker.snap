@@ -488,7 +488,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: dmz-jump
-    image: isoloom/dmz-jump-gateway
+    image: localhost/isoloom/dmz-jump-gateway
     platform: linux/amd64
     hostname: gateway
     networks:
@@ -552,7 +552,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: dmz-jump
-    image: isoloom/dmz-jump-app
+    image: localhost/isoloom/dmz-jump-app
     platform: linux/amd64
     hostname: app
     networks:

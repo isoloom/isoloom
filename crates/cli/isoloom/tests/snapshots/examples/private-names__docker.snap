@@ -353,7 +353,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: private-names
-    image: isoloom/private-names-client
+    image: localhost/isoloom/private-names-client
     platform: linux/amd64
     init: true
     entrypoint:

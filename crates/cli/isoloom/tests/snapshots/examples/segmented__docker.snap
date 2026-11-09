@@ -433,7 +433,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: segmented
-    image: isoloom/segmented-web
+    image: localhost/isoloom/segmented-web
     platform: linux/amd64
     hostname: web
     networks:

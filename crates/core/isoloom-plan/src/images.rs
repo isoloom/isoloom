@@ -24,10 +24,15 @@ pub fn rewrite_image(c: &Constraints, image: &str) -> String {
     }
 }
 
+/// Where an image the project builds is tagged when the spec names none: `localhost/`, a
+/// registry no one pushes to or pulls from, so the tag never resolves to someone's Docker Hub
+/// repository.
+pub const BUILT_IMAGE_PREFIX: &str = "localhost/isoloom";
+
 /// The tag a machine's container image goes by: the published one, or the name its build is
-/// tagged with (so its `init:` jobs can reuse it).
+/// tagged with (so its `init:` jobs can reuse it), `localhost/isoloom/<environment>-<machine>`.
 pub(crate) fn tag_of(spec: &Spec, name: &str, image: Option<&str>) -> String {
-    image.map_or_else(|| format!("isoloom/{}-{name}", spec.name), str::to_owned)
+    image.map_or_else(|| format!("{BUILT_IMAGE_PREFIX}/{}-{name}", spec.name), str::to_owned)
 }
 
 /// Resolves the image references of one environment: pulls through the mirrors, except the
@@ -112,10 +117,10 @@ mod tests {
         );
         let images = super::Images::of(&spec);
         assert_eq!(images.pull("nginx"), "m.corp/hub/library/nginx");
-        assert_eq!(images.pull("isoloom/lab-own"), "isoloom/lab-own");
-        assert_eq!(images.pull("isoloom/lab-gen"), "isoloom/lab-gen");
+        assert_eq!(images.pull("localhost/isoloom/lab-own"), "localhost/isoloom/lab-own");
+        assert_eq!(images.pull("localhost/isoloom/lab-gen"), "localhost/isoloom/lab-gen");
         assert_eq!(images.pull("isoloom/lab-web"), "m.corp/hub/isoloom/lab-web", "not built: pulled like any other");
-        assert_eq!(super::tag_of(&spec, "own", None), "isoloom/lab-own");
+        assert_eq!(super::tag_of(&spec, "own", None), "localhost/isoloom/lab-own");
         assert_eq!(super::tag_of(&spec, "web", Some("nginx")), "nginx");
         let none = crate::testing::spec("version: 1\nname: lab\nmachines:\n  web: { app: { image: nginx } }\n");
         assert_eq!(super::Images::of(&none).pull("nginx"), "nginx");

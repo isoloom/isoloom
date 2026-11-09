@@ -20,7 +20,7 @@ appVersion: 0.1.0
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
   cache: redis:7-alpine
-  web: isoloom/segmented-web
+  web: localhost/isoloom/segmented-web
   user: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 
 === .isoloom/kubernetes/chart/values.schema.json

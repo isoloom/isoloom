@@ -1612,7 +1612,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: corp-ad-basics
-    image: isoloom/corp-ad-basics-web01
+    image: localhost/isoloom/corp-ad-basics-web01
     platform: linux/amd64
     hostname: web01
     networks:

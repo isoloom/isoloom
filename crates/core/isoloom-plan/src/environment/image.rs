@@ -144,7 +144,7 @@ mod tests {
         };
         assert_eq!(
             (reference.as_str(), context.as_str(), dockerfile.as_deref(), target.as_deref()),
-            ("isoloom/lab-own", "web", Some("web/Dockerfile.dev"), Some("prod"))
+            ("localhost/isoloom/lab-own", "web", Some("web/Dockerfile.dev"), Some("prod"))
         );
         assert_eq!(args.get("A").map(String::as_str), Some("1"));
         let Some(Image::Container {
@@ -161,7 +161,7 @@ mod tests {
         };
         assert_eq!(
             (generated.as_str(), written.as_str()),
-            ("isoloom/lab-gen", ".isoloom/docker/build/gen/Dockerfile")
+            ("localhost/isoloom/lab-gen", ".isoloom/docker/build/gen/Dockerfile")
         );
         assert!(base.starts_with("debian:12@sha256:"));
         assert_eq!(process, ContainerProcess::Idle, "nothing to run: kept idle");

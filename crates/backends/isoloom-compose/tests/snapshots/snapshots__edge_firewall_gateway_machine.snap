@@ -16,7 +16,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: edge-firewall
-    image: isoloom/edge-firewall-fw
+    image: localhost/isoloom/edge-firewall-fw
     platform: linux/amd64
     sysctls:
       net.ipv4.ip_forward: '1'
@@ -81,7 +81,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: edge-firewall
-    image: isoloom/edge-firewall-web
+    image: localhost/isoloom/edge-firewall-web
     platform: linux/amd64
     hostname: web
     networks:

@@ -19,7 +19,7 @@ resources:
 # Stop:   kubectl delete namespace isoloom-segmented
 # Images built from the project, before starting (a local cluster sharing Docker's images:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
-#   docker build -t isoloom/segmented-web build/web
+#   docker build -t localhost/isoloom/segmented-web build/web
 
 apiVersion: v1
 kind: Namespace
@@ -268,7 +268,7 @@ spec:
             - ALL
       containers:
       - name: web
-        image: isoloom/segmented-web
+        image: localhost/isoloom/segmented-web
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

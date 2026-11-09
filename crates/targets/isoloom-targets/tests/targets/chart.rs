@@ -23,7 +23,7 @@ fn the_chart_is_the_same_environment_with_images_as_values() -> Outcome {
     );
     let values: serde_yaml_ng::Value = serde_yaml_ng::from_str(file(&files, "chart/values.yaml")?).unwrap();
     assert_eq!(values["images"]["cache"].as_str(), Some("redis:7-alpine"));
-    assert_eq!(values["images"]["web"].as_str(), Some("isoloom/hello-stack-web"));
+    assert_eq!(values["images"]["web"].as_str(), Some("localhost/isoloom/hello-stack-web"));
 
     let env = file(&files, "chart/templates/environment.yaml")?;
     assert!(!env.contains("kind: Namespace"), "the release's namespace");

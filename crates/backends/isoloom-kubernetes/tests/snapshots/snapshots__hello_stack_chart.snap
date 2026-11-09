@@ -20,7 +20,7 @@ appVersion: 0.1.0
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
   cache: redis:7-alpine
-  web: isoloom/hello-stack-web
+  web: localhost/isoloom/hello-stack-web
 
 === .isoloom/kubernetes/chart/values.schema.json
 {

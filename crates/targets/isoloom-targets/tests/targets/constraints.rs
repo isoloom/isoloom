@@ -52,7 +52,7 @@ fn compose_pulls_through_the_mirror_and_machines_get_the_proxy() -> Outcome {
         compose.contains(&format!("image: registry.corp/dockerhub/library/{UTILITY_IMAGE}")),
         "Isoloom's own"
     );
-    assert!(compose.contains("image: isoloom/segmented-web"), "a built image is local, not pulled");
+    assert!(compose.contains("image: localhost/isoloom/segmented-web"), "a built image is local, not pulled");
     assert!(!compose.contains("image: redis:7-alpine") && !compose.contains(&format!("image: {UTILITY_IMAGE}")));
     // The built machine: proxy and mirrors as build arguments and environment.
     let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&compose).unwrap();
@@ -83,7 +83,7 @@ fn kubernetes_pulls_through_the_mirror_and_containers_get_the_proxy() -> Outcome
     let spec = constrained()?;
     let all: String = generate(&spec, Target::Kubernetes).unwrap().into_iter().map(|f| f.contents).collect();
     assert!(all.contains("image: registry.corp/dockerhub/library/redis:7-alpine"));
-    assert!(all.contains("image: isoloom/segmented-web"));
+    assert!(all.contains("image: localhost/isoloom/segmented-web"));
     assert!(all.contains("name: HTTP_PROXY") && all.contains("value: http://proxy.corp:3128"), "{all}");
     Ok(())
 }

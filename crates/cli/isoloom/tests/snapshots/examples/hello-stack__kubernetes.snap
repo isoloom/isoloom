@@ -1085,7 +1085,7 @@ spec:
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
   cache: redis:7-alpine
-  web: isoloom/hello-stack-web
+  web: localhost/isoloom/hello-stack-web
 
 ## .isoloom/kubernetes/checks/cache.sh
 #!/bin/sh
@@ -1639,7 +1639,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Stop:   kubectl delete namespace isoloom-hello-stack
 # Images built from the project, before starting (a local cluster sharing Docker's images:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
-#   docker build -t isoloom/hello-stack-web build/web
+#   docker build -t localhost/isoloom/hello-stack-web build/web
 # Published ports, on this computer (each command runs until stopped):
 #   kubectl -n isoloom-hello-stack port-forward svc/web-published 8080:8080
 
@@ -1927,7 +1927,7 @@ spec:
             - ALL
       containers:
       - name: web
-        image: isoloom/hello-stack-web
+        image: localhost/isoloom/hello-stack-web
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

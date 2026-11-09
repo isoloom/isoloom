@@ -136,7 +136,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: solo-web
-    image: isoloom/solo-web-web
+    image: localhost/isoloom/solo-web-web
     platform: linux/amd64
     hostname: web
     networks:

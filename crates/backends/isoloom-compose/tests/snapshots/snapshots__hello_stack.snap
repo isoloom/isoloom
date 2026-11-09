@@ -89,7 +89,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: hello-stack
-    image: isoloom/hello-stack-web
+    image: localhost/isoloom/hello-stack-web
     platform: linux/amd64
     hostname: web
     networks:

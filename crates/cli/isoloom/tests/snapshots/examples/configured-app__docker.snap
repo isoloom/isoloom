@@ -1004,7 +1004,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: configured-app
-    image: isoloom/configured-app-web
+    image: localhost/isoloom/configured-app-web
     platform: linux/amd64
     init: true
     hostname: web
@@ -1041,7 +1041,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: configured-app
-    image: isoloom/configured-app-api
+    image: localhost/isoloom/configured-app-api
     platform: linux/amd64
     init: true
     hostname: api

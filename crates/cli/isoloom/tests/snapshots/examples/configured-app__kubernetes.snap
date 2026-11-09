@@ -870,8 +870,8 @@ spec:
 # images: each machine's image (images built from the project must be pushed where the
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
-  web: isoloom/configured-app-web
-  api: isoloom/configured-app-api
+  web: localhost/isoloom/configured-app-web
+  api: localhost/isoloom/configured-app-api
 
 ## .isoloom/kubernetes/checks/api.sh
 #!/bin/sh
@@ -1328,8 +1328,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Stop:   kubectl delete namespace isoloom-configured-app
 # Images built from the project, before starting (a local cluster sharing Docker's images:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
-#   docker build -t isoloom/configured-app-web -f .isoloom/docker/build/web/Dockerfile .
-#   docker build -t isoloom/configured-app-api -f .isoloom/docker/build/api/Dockerfile .
+#   docker build -t localhost/isoloom/configured-app-web -f .isoloom/docker/build/web/Dockerfile .
+#   docker build -t localhost/isoloom/configured-app-api -f .isoloom/docker/build/api/Dockerfile .
 # Published ports, on this computer (each command runs until stopped):
 #   kubectl -n isoloom-configured-app port-forward svc/web-published 8086:8086
 
@@ -1385,7 +1385,7 @@ spec:
           mountPath: /probe
       containers:
       - name: web
-        image: isoloom/configured-app-web
+        image: localhost/isoloom/configured-app-web
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -1522,7 +1522,7 @@ spec:
           mountPath: /probe
       containers:
       - name: api
-        image: isoloom/configured-app-api
+        image: localhost/isoloom/configured-app-api
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

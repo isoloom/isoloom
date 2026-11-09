@@ -281,7 +281,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: udp-dns
-    image: isoloom/udp-dns-dns
+    image: localhost/isoloom/udp-dns-dns
     platform: linux/amd64
     hostname: dns
     networks:
@@ -346,7 +346,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: udp-dns
-    image: isoloom/udp-dns-client
+    image: localhost/isoloom/udp-dns-client
     platform: linux/amd64
     profiles:
     - access

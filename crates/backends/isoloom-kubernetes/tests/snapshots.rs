@@ -174,8 +174,8 @@ fn every_pulled_image_goes_through_the_mirrors_but_the_built_ones() -> Outcome {
         "Isoloom's probe too"
     );
     assert!(env.contains(&format!("image: registry.corp/hub/library/{UTILITY_IMAGE}\n")), "and its waits");
-    assert!(env.contains("image: isoloom/shop-db\n"), "a built image is local");
-    assert!(env.contains("#   docker build -t isoloom/shop-db db\n"), "{env}");
+    assert!(env.contains("image: localhost/isoloom/shop-db\n"), "a built image is local");
+    assert!(env.contains("#   docker build -t localhost/isoloom/shop-db db\n"), "{env}");
     let jobs = file(&files, "checks/job.yaml")?;
     assert!(jobs.contains(&format!("image: registry.corp/hub/{CHECK_IMAGE}\n")), "{jobs}");
     Ok(())
@@ -199,7 +199,7 @@ fn the_chart_templates_the_images_and_keeps_braces_as_they_are() -> Outcome {
     );
     assert_eq!(
         values.get("images").and_then(|i| i.get("db")).and_then(serde_yaml_ng::Value::as_str),
-        Some("isoloom/shop-db")
+        Some("localhost/isoloom/shop-db")
     );
     Ok(())
 }
@@ -282,7 +282,7 @@ fn a_build_with_its_dockerfile_and_arguments_and_a_plain_message() -> Outcome {
     let files = KubernetesBackend.render(&parsed(&spec)?)?;
     let env = file(&files, "kubernetes/environment.yaml")?;
     assert!(
-        env.contains("#   docker build -t isoloom/shop-db -f db/Dockerfile.dev --build-arg 'V=1 2' db\n"),
+        env.contains("#   docker build -t localhost/isoloom/shop-db -f db/Dockerfile.dev --build-arg 'V=1 2' db\n"),
         "{env}"
     );
     assert_eq!(

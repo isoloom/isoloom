@@ -1345,8 +1345,8 @@ spec:
 # images: each machine's image (images built from the project must be pushed where the
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
-  gateway: isoloom/dmz-jump-gateway
-  app: isoloom/dmz-jump-app
+  gateway: localhost/isoloom/dmz-jump-gateway
+  app: localhost/isoloom/dmz-jump-app
   db: postgres:16
   user: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 
@@ -1984,8 +1984,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Stop:   kubectl delete namespace isoloom-dmz-jump
 # Images built from the project, before starting (a local cluster sharing Docker's images:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
-#   docker build -t isoloom/dmz-jump-gateway build/gateway
-#   docker build -t isoloom/dmz-jump-app build/app
+#   docker build -t localhost/isoloom/dmz-jump-gateway build/gateway
+#   docker build -t localhost/isoloom/dmz-jump-app build/app
 
 apiVersion: v1
 kind: Namespace
@@ -2039,7 +2039,7 @@ spec:
           mountPath: /probe
       containers:
       - name: gateway
-        image: isoloom/dmz-jump-gateway
+        image: localhost/isoloom/dmz-jump-gateway
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -2148,7 +2148,7 @@ spec:
           mountPath: /probe
       containers:
       - name: app
-        image: isoloom/dmz-jump-app
+        image: localhost/isoloom/dmz-jump-app
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

@@ -379,7 +379,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: supplier-portal-api
-    image: isoloom/supplier-portal-api-web
+    image: localhost/isoloom/supplier-portal-api-web
     platform: linux/amd64
     hostname: web
     networks:

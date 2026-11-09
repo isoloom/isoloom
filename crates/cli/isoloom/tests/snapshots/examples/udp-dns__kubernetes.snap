@@ -812,8 +812,8 @@ spec:
 # images: each machine's image (images built from the project must be pushed where the
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
-  dns: isoloom/udp-dns-dns
-  client: isoloom/udp-dns-client
+  dns: localhost/isoloom/udp-dns-dns
+  client: localhost/isoloom/udp-dns-client
 
 ## .isoloom/kubernetes/checks/client.sh
 #!/bin/sh
@@ -1133,8 +1133,8 @@ configMapGenerator:
 # Stop:   kubectl delete namespace isoloom-udp-dns
 # Images built from the project, before starting (a local cluster sharing Docker's images:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
-#   docker build -t isoloom/udp-dns-dns build/dns
-#   docker build -t isoloom/udp-dns-client -f .isoloom/docker/build/client/Dockerfile .
+#   docker build -t localhost/isoloom/udp-dns-dns build/dns
+#   docker build -t localhost/isoloom/udp-dns-client -f .isoloom/docker/build/client/Dockerfile .
 # Published ports, on this computer (each command runs until stopped):
 #   kubectl -n isoloom-udp-dns port-forward svc/dns-published 10053:10053
 
@@ -1189,7 +1189,7 @@ spec:
           mountPath: /probe
       containers:
       - name: dns
-        image: isoloom/udp-dns-dns
+        image: localhost/isoloom/udp-dns-dns
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -1355,7 +1355,7 @@ spec:
             - ALL
       containers:
       - name: client
-        image: isoloom/udp-dns-client
+        image: localhost/isoloom/udp-dns-client
         imagePullPolicy: IfNotPresent
         command:
         - sleep

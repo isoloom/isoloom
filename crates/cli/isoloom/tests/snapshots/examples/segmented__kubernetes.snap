@@ -1030,7 +1030,7 @@ spec:
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
   cache: redis:7-alpine
-  web: isoloom/segmented-web
+  web: localhost/isoloom/segmented-web
   user: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 
 ## .isoloom/kubernetes/checks/cache.sh
@@ -1492,7 +1492,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Stop:   kubectl delete namespace isoloom-segmented
 # Images built from the project, before starting (a local cluster sharing Docker's images:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
-#   docker build -t isoloom/segmented-web build/web
+#   docker build -t localhost/isoloom/segmented-web build/web
 
 apiVersion: v1
 kind: Namespace
@@ -1741,7 +1741,7 @@ spec:
             - ALL
       containers:
       - name: web
-        image: isoloom/segmented-web
+        image: localhost/isoloom/segmented-web
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

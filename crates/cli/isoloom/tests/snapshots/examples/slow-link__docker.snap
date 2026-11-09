@@ -183,7 +183,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: slow-link
-    image: isoloom/slow-link-web
+    image: localhost/isoloom/slow-link-web
     platform: linux/amd64
     hostname: web
     networks:

@@ -962,7 +962,7 @@ spec:
 # cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).
 images:
   database: mysql:8.0
-  web: isoloom/supplier-portal-api-web
+  web: localhost/isoloom/supplier-portal-api-web
 inputs:
   API_URL: ''
   LAUNCH_TOKEN: ''
@@ -1415,7 +1415,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Stop:   kubectl delete namespace isoloom-supplier-portal-api
 # Images built from the project, before starting (a local cluster sharing Docker's images:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
-#   docker build -t isoloom/supplier-portal-api-web build/web
+#   docker build -t localhost/isoloom/supplier-portal-api-web build/web
 # Inputs (optional, unset ones are empty): kubectl -n isoloom-supplier-portal-api create secret generic isoloom-inputs --from-literal=API_URL=… --from-literal=LAUNCH_TOKEN=…
 # Secrets: create isoloom-secrets from their stores once the namespace exists (the pods wait for it):
 #   kubectl -n isoloom-supplier-portal-api create secret generic isoloom-secrets --from-file=input-launch-token=<file>
@@ -1664,7 +1664,7 @@ spec:
             - ALL
       containers:
       - name: web
-        image: isoloom/supplier-portal-api-web
+        image: localhost/isoloom/supplier-portal-api-web
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
