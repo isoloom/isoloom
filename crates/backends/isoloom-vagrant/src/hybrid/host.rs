@@ -3,7 +3,7 @@
 //! containers' Compose file.
 
 use isoloom_plan::Environment;
-use isoloom_render::container::{HostSize, HybridContainers as Containers, docker_net, host_environment};
+use isoloom_render::container::{DOCKER_HOST as HOST, HostSize, HybridContainers as Containers, docker_net, host_environment};
 use isoloom_render::router;
 use isoloom_render::stable_hash;
 use isoloom_spec::model::Target;
@@ -12,8 +12,6 @@ use isoloom_spec::validate::Cidr;
 use crate::error::{Error, Result};
 use crate::ruby::{Call, Provision, Ruby, Value};
 use crate::vagrantfile::{self, shell};
-
-const HOST: &str = "isoloom-docker";
 
 /// One lab network on the host: its interface and the macvlan network on it.
 pub(super) struct Nic {

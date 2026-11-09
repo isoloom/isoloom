@@ -96,6 +96,14 @@ stable spec format.
 
 ### Fixed
 
+- **A lab machine named `docker` no longer stops `docker-vm`** (and with it every `isoloom
+  generate`: "`docker` appears twice"). The VM the containers run in is `isoloom-docker-host`
+  everywhere, under the prefix a lab's machines can't take: `docker-vm`'s run manifests (Vagrant's
+  and Proxmox's) named it `docker`, `cloud-docker`'s `isoloom-docker-host` and the hybrid
+  Vagrantfile `isoloom-docker`. A runner reads the new name from the manifest (`guest.machine`,
+  `machines[]`); on QEMU, the VM's SSH port it chooses is `ISOLOOM_HOSTPORTS`'
+  `isoloom-docker-host/ssh` (was `docker/ssh`). The Vagrant define stays `default`. In the
+  library, `isoloom_render::container::DOCKER_HOST` names it.
 - **`isoloom generate` and `isoloom check` fail when a backend fails**, instead of leaving its
   target out as if the target refused the lab. A failure (a run manifest value the manifest's own
   types refuse, a file a writer couldn't write: a bug) printed a `·` line under `generate` and

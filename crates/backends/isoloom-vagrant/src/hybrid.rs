@@ -3,7 +3,7 @@
 //!
 //! - A machine with `docker:` is a container (the light option); a machine with only `vm:` is a
 //!   VM. The VMs, the router and the controller are what the `vagrant` output makes of them.
-//! - The containers run on one more VM, `isoloom-docker`, plugged into the networks they're on
+//! - The containers run on one more VM, `isoloom-docker-host`, plugged into the networks they're on
 //!   with promiscuous network interfaces: Docker attaches each container to its network directly
 //!   (`macvlan`), at its own address, so VMs and containers reach each other as on one network
 //!   (`host`). Their Compose file is the Compose backend's, plugged into those networks

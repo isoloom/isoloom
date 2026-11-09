@@ -477,7 +477,7 @@ Vagrant.configure("2") do |config|
     v.smp = "cpus=2"
     v.memory = "2048M"
     v.disk_resize = IsoloomQemu.disk("cloud-image/debian-12", 40)
-    v.ssh_port = ISOLOOM_HOSTPORTS.fetch("docker/ssh", 50022)
+    v.ssh_port = ISOLOOM_HOSTPORTS.fetch("isoloom-docker-host/ssh", 50022)
     v.ssh_auto_correct = true
   end
   config.vm.provider "libvirt" do |v|
@@ -996,7 +996,7 @@ output "ssh_user" {
   ],
   "machines": [
     {
-      "name": "docker",
+      "name": "isoloom-docker-host",
       "role": "infra",
       "resources": {
         "cpus": 2,
@@ -1275,7 +1275,7 @@ output "ssh_user" {
     "teardown": []
   },
   "guest": {
-    "machine": "docker",
+    "machine": "isoloom-docker-host",
     "host": "${outputs.ip}",
     "status": {
       "id": "ps",
@@ -1662,7 +1662,7 @@ systemctl enable --now isoloom-published.service
   ],
   "machines": [
     {
-      "name": "docker",
+      "name": "isoloom-docker-host",
       "role": "infra",
       "resources": {
         "cpus": 2,
@@ -1680,7 +1680,7 @@ systemctl enable --now isoloom-published.service
           "utm": "solo-web · docker",
           "vmware_esxi": "solo-web-docker"
         },
-        "boot_digest": "sha256:ae306b246548fbcce025b2a825653cd212c8edb49f9af4edb903b0e88823647c"
+        "boot_digest": "sha256:c09482d888b707f6c791702a614e9d33dc89ea94a6a521128ae69fa5694ba07e"
       }
     },
     {
@@ -1981,7 +1981,7 @@ systemctl enable --now isoloom-published.service
     "retries": 1
   },
   "guest": {
-    "machine": "docker",
+    "machine": "isoloom-docker-host",
     "status": {
       "id": "ps",
       "argv": [

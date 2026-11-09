@@ -340,7 +340,7 @@
   ],
   "machines": [
     {
-      "name": "docker",
+      "name": "isoloom-docker-host",
       "role": "infra",
       "resources": {
         "cpus": 2,
@@ -358,7 +358,7 @@
           "utm": "flag-portal · docker",
           "vmware_esxi": "flag-portal-docker"
         },
-        "boot_digest": "sha256:9b817d07717cc62d9fe0966a481e227bb8414835ba5dd953df46f16407bfbe73"
+        "boot_digest": "sha256:9c8be5edc003c6ba11b928ad0a1c451bedf24001425ebf23f6e6fb28730c768a"
       }
     },
     {
@@ -852,7 +852,7 @@
     "retries": 1
   },
   "guest": {
-    "machine": "docker",
+    "machine": "isoloom-docker-host",
     "status": {
       "id": "ps",
       "argv": [

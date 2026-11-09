@@ -11,7 +11,7 @@ use isoloom_manifest::{
     Role, Run, SCHEMA_URL, SnakeName, StepId, Template,
 };
 use isoloom_plan::Environment;
-use isoloom_render::container::HostSize;
+use isoloom_render::container::{DOCKER_HOST as VM, HostSize};
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, into_vm, ssh_run};
 use isoloom_render::run_manifest::{self, environment, generator, outputs_on_their_hosts};
 use isoloom_spec::model::Target;
@@ -20,8 +20,6 @@ use super::super::docker_host::{SETUP, USER, variables};
 use super::{slots, steps, tools};
 use crate::Error;
 
-/// The VM, as the manifest names it.
-const VM: &str = "docker";
 /// The VM's address on the uplink: where SSH reaches it and the published ports answer.
 const IP: &str = "ip";
 

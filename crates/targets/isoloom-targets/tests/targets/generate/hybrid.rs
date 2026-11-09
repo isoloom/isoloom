@@ -15,7 +15,7 @@ fn hybrid_runs_containers_beside_the_vms() -> Outcome {
     // The Windows server is a VM; the web app is a container, not a VM.
     assert!(vagrantfile.contains("config.vm.define \"files01\""));
     assert!(!vagrantfile.contains("config.vm.define \"intranet\""));
-    assert!(vagrantfile.contains("config.vm.define \"isoloom-docker\""));
+    assert!(vagrantfile.contains("config.vm.define \"isoloom-docker-host\""));
     assert!(vagrantfile.contains("--nicpromisc2"));
     assert!(vagrantfile.contains("docker network create -d macvlan --subnet 192.168.58.0/24"));
     assert!(vagrantfile.contains("guest: 8083, host: 8083, host_ip: \"127.0.0.1\""));

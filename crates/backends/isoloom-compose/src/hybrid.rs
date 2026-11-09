@@ -6,7 +6,7 @@
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachineShape, PublishedPort};
-use isoloom_render::container::{HybridContainers, docker_net};
+use isoloom_render::container::{DOCKER_HOST, HybridContainers, docker_net};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, router};
 use isoloom_spec::model::{Protocol, Spec, Target};
 
@@ -144,7 +144,7 @@ fn external_networks(env: &Environment, nets: &[String], publishing: bool) -> In
 fn contents(compose: &ComposeFile) -> Result<String> {
     let yaml = to_yaml(Target::Hybrid, compose)?;
     Ok(format!(
-        "{}# The containers of a hybrid environment: run on the isoloom-docker VM, on the networks it\n# creates there (macvlan, shared with the VMs). Started by the Vagrantfile next to it.\n\n{yaml}",
+        "{}# The containers of a hybrid environment: run on the {DOCKER_HOST} VM, on the networks\n# it creates there (macvlan, shared with the VMs). Started by the Vagrantfile next to it.\n\n{yaml}",
         header("#")
     ))
 }

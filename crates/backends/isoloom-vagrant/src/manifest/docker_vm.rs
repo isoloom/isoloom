@@ -13,12 +13,13 @@ use isoloom_manifest::{
     PathTemplate, Provider, RelPath, Resources, Role, Run, SCHEMA_URL, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
+use isoloom_render::container::DOCKER_HOST as VM;
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 use isoloom_render::run_manifest::{self, act, noted, outputs_on_their_hosts, run};
 
 use super::lifecycle::{back_up, down, recovery};
 use super::{DOTFILE, on_provider, providers, slots, vagrant_argv};
-use crate::docker_vm::{DEFINE, VM, host_size, prepares};
+use crate::docker_vm::{DEFINE, host_size, prepares};
 use crate::error::Result;
 use crate::vms::{label, vm_name};
 

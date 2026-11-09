@@ -5,7 +5,7 @@
 
 use isoloom_manifest::{Action, Condition, Delivery, HostArgv, Manifest, Run, StepSelection};
 use isoloom_spec::Target;
-use isoloom_targets::{GeneratedFile, generate};
+use isoloom_targets::{GeneratedFile, generate, refusal};
 
 use crate::testing::{Outcome, file, lab};
 
@@ -145,8 +145,8 @@ fn the_flag_reaches_the_start_steps_and_is_accepted_in_the_vm_never_written() ->
             ["start", "job-web-init-1"]
         );
         let guest = m.guest.as_ref().unwrap();
-        assert_eq!(guest.machine.as_str(), "docker");
-        assert!(m.machines.iter().any(|x| x.name.as_str() == "docker"));
+        assert_eq!(guest.machine.as_str(), "isoloom-docker-host");
+        assert!(m.machines.iter().any(|x| x.name.as_str() == "isoloom-docker-host"));
     }
     let vagrantfile = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
     assert!(vagrantfile.contains("config.ssh.forward_env = [\"FLAG\"]"), "{vagrantfile}");
@@ -178,6 +178,41 @@ fn the_containers_published_ports_answer_where_the_driver_says_the_vm_does() -> 
             (publish.mode, publish.preferred.map(u16::from)),
             (isoloom_manifest::PublishMode::Fixed, Some(8080))
         );
+    }
+    Ok(())
+}
+
+/// A lab's machine may be named `docker`: the VM the containers run in is Isoloom's own
+/// (`isoloom-docker-host`), so every target that takes the lab generates it, and each run
+/// manifest lists the machine and the VM apart. A container named so (the container targets),
+/// one beside a Windows VM (hybrid), and a VM named so (the VM targets).
+#[test]
+fn a_machine_named_docker_is_generated_on_every_target_that_takes_it() -> Outcome {
+    let net = "version: 1\nname: dk\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n";
+    let container = "  docker: { networks: { lan: 10 }, ports: { web: { port: 80, publish: 8080 } }, app: { image: nginx } }\n";
+    let vm = |name: &str, os: &str, ip: u8| format!("  {name}: {{ os: {os}, networks: {{ lan: {ip} }} }}\n");
+    let specs = [
+        format!("{net}{container}"),
+        format!("{net}{container}{}", vm("box", "windows-server@2019", 20)),
+        format!("{net}{}", vm("docker", "debian@12", 20)),
+    ];
+    let mut generated = Vec::new();
+    for yaml in &specs {
+        let lab = lab(yaml)?;
+        for target in Target::ALL {
+            if !lab.possible().contains(&target) || refusal(&lab, target).is_some() {
+                continue;
+            }
+            let files = generate(&lab, target).map_err(|e| format!("{}: {e}", target.id()))?;
+            for run in files.iter().filter(|f| f.path.ends_with("run.json")) {
+                let m = isoloom_manifest::parse(&run.contents)?;
+                assert!(m.machines.iter().any(|x| x.name.as_str() == "docker"), "{}", run.path);
+            }
+            generated.push(target);
+        }
+    }
+    for target in Target::ALL.into_iter().filter(|t| !matches!(t, Target::External | Target::CloudServices)) {
+        assert!(generated.contains(&target), "{} never took a machine named docker", target.id());
     }
     Ok(())
 }

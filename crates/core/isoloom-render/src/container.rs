@@ -64,6 +64,11 @@ pub fn exec_runner(machine: &str) -> String {
 /// side (only the `check` profile starts it).
 pub const STAND_IN: &str = "isoloom-access";
 
+/// The VM the containers run in (`docker-vm`'s, `cloud-docker`'s, the hybrid target's), as run
+/// manifests and Vagrantfiles name it: Isoloom's own, under the prefix a lab's machines can't
+/// take, so it never collides with one (a machine named `docker` included).
+pub const DOCKER_HOST: &str = "isoloom-docker-host";
+
 /// What is done to the access machine's stand-ins around the checks, the same on this computer and
 /// in a VM.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

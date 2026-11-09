@@ -27,7 +27,7 @@
 use isoloom_manifest::Manifest;
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_render::container as docker;
+use isoloom_render::container::{self as docker, DOCKER_HOST as VM};
 use isoloom_render::run_manifest::DERIVED;
 use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
@@ -41,8 +41,6 @@ use crate::vagrantfile::{self, shell};
 const DIR: &str = "docker-vm";
 /// Vagrant's name for the file's one machine.
 pub(crate) const DEFINE: &str = "default";
-/// The VM, as the run manifest names it.
-pub(crate) const VM: &str = "docker";
 /// The provisioner letting SSH carry the values given at launch into the VM.
 const ACCEPT_ENV: &str = "accept-env";
 /// Where that provisioner tells `sshd` which variables to accept.

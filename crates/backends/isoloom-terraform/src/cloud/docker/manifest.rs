@@ -15,15 +15,12 @@ use isoloom_manifest::{
     Role, Run, SCHEMA_URL, SnakeName, StateOwner, Step, Template, TerraformIdentity,
 };
 use isoloom_plan::Environment;
-use isoloom_render::container::HostSize;
+use isoloom_render::container::{DOCKER_HOST as HOST, HostSize};
 use isoloom_render::run_manifest::guest::{GuestCompose, into_vm, ssh_run};
 use isoloom_render::run_manifest::{environment, generator, machine, outputs_on_their_hosts};
 
 use super::super::Cloud;
 use super::super::manifest::{self, connection, steps};
-
-/// The host VM, as the manifest names it: a machine of its own (the containers run in it).
-const HOST: &str = "isoloom-docker-host";
 
 /// The host's address (`${outputs.ip}`): where SSH reaches it and its containers' ports answer.
 const IP: &str = "ip";
