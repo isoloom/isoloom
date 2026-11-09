@@ -1647,7 +1647,7 @@ services:
       isoloom.environment: corp-ad-basics
     restart: unless-stopped
   web01-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
     - /bin/sh
@@ -1671,7 +1671,7 @@ services:
       isoloom.environment: corp-ad-basics
     restart: unless-stopped
   isoloom-probe-amd64:
-    image: busybox:1.37.0-musl
+    image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
     platform: linux/amd64
     entrypoint:
     - /bin/cp

@@ -22,17 +22,18 @@ use isoloom_plan::Health;
 use isoloom_plan::checks::Position;
 use isoloom_spec::model::Machine;
 
-/// The check runner: a small image with `sh`, `curl` and busybox `nc`.
-pub const CHECK_IMAGE: &str = "curlimages/curl:8.11.1";
+/// The check runner: a small image with `sh`, `curl` and busybox `nc`. Each helper image is pinned
+/// by the digest of its multi-arch index: what runs never changes under a tag.
+pub const CHECK_IMAGE: &str = "curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777";
 
 /// A static busybox Isoloom brings into every machine with services, so its probe needs
 /// nothing from the machine's image (distroless and `scratch` images have no shell).
-pub const PROBE_IMAGE: &str = "busybox:1.37.0-musl";
+pub const PROBE_IMAGE: &str = "busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478";
 /// Where a machine sees that busybox (read-only).
 pub const PROBE_DIR: &str = "/.isoloom-probe";
 
 /// A small image with busybox `ip`, for the router, route sidecars and the stand-in.
-pub const UTILITY_IMAGE: &str = "alpine:3.20";
+pub const UTILITY_IMAGE: &str = "alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf";
 
 /// A TCP probe for each service port but the dormant ones, run by Isoloom's own busybox (see
 /// [`PROBE_IMAGE`]).

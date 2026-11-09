@@ -8,6 +8,7 @@ use isoloom_kubernetes::KubernetesBackend;
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
+use isoloom_render::container::{CHECK_IMAGE, PROBE_IMAGE, UTILITY_IMAGE};
 use isoloom_spec::model::Target;
 
 /// A test's outcome: a failed step is its report.
@@ -168,12 +169,15 @@ fn every_pulled_image_goes_through_the_mirrors_but_the_built_ones() -> Outcome {
     let files = KubernetesBackend.render(&parsed(MIRRORED)?)?;
     let env = file(&files, "kubernetes/environment.yaml")?;
     assert!(env.contains("image: registry.corp/hub/library/nginx\n"), "{env}");
-    assert!(env.contains("image: registry.corp/hub/library/busybox:1.37.0-musl\n"), "Isoloom's probe too");
-    assert!(env.contains("image: registry.corp/hub/library/alpine:3.20\n"), "and its waits");
+    assert!(
+        env.contains(&format!("image: registry.corp/hub/library/{PROBE_IMAGE}\n")),
+        "Isoloom's probe too"
+    );
+    assert!(env.contains(&format!("image: registry.corp/hub/library/{UTILITY_IMAGE}\n")), "and its waits");
     assert!(env.contains("image: isoloom/shop-db\n"), "a built image is local");
     assert!(env.contains("#   docker build -t isoloom/shop-db db\n"), "{env}");
     let jobs = file(&files, "checks/job.yaml")?;
-    assert!(jobs.contains("image: registry.corp/hub/curlimages/curl:8.11.1\n"), "{jobs}");
+    assert!(jobs.contains(&format!("image: registry.corp/hub/{CHECK_IMAGE}\n")), "{jobs}");
     Ok(())
 }
 
@@ -183,7 +187,10 @@ fn the_chart_templates_the_images_and_keeps_braces_as_they_are() -> Outcome {
     let env = file(&files, "chart/templates/environment.yaml")?;
     assert!(env.contains("image: '{{ index .Values.images \"web\" }}'\n"), "{env}");
     assert!(env.contains("image: '{{ index .Values.images \"db\" }}'\n"), "{env}");
-    assert!(env.contains("image: registry.corp/hub/library/alpine:3.20\n"), "the waits are Isoloom's");
+    assert!(
+        env.contains(&format!("image: registry.corp/hub/library/{UTILITY_IMAGE}\n")),
+        "the waits are Isoloom's"
+    );
     assert!(env.contains("value: hi {{ `{{` }} there }}"), "{env}");
     let values: serde_yaml_ng::Value = serde_yaml_ng::from_str(file(&files, "chart/values.yaml")?)?;
     assert_eq!(

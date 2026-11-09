@@ -2,6 +2,7 @@
 //! every target, and nothing changed without them.
 
 use isoloom_render::constraints::rewrite_image;
+use isoloom_render::container::UTILITY_IMAGE;
 use isoloom_spec::model::Constraints;
 use isoloom_spec::{Target, load, parse};
 use isoloom_targets::{Lab, generate};
@@ -47,9 +48,12 @@ fn images_go_through_their_registry_mirror() {
 fn compose_pulls_through_the_mirror_and_machines_get_the_proxy() -> Outcome {
     let compose = file(&constrained()?, Target::Docker, "docker/compose.yml")?;
     assert!(compose.contains("image: registry.corp/dockerhub/library/redis:7-alpine"), "the spec's images");
-    assert!(compose.contains("image: registry.corp/dockerhub/library/alpine:3.20"), "Isoloom's own");
+    assert!(
+        compose.contains(&format!("image: registry.corp/dockerhub/library/{UTILITY_IMAGE}")),
+        "Isoloom's own"
+    );
     assert!(compose.contains("image: isoloom/segmented-web"), "a built image is local, not pulled");
-    assert!(!compose.contains("image: redis:7-alpine") && !compose.contains("image: alpine:3.20"));
+    assert!(!compose.contains("image: redis:7-alpine") && !compose.contains(&format!("image: {UTILITY_IMAGE}")));
     // The built machine: proxy and mirrors as build arguments and environment.
     let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&compose).unwrap();
     let web = &doc["services"]["web"];

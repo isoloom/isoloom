@@ -363,7 +363,7 @@ spec:
           type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
-        image: busybox:1.37.0-musl
+        image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
         command:
         - /bin/cp
         - /bin/busybox
@@ -545,7 +545,7 @@ spec:
           type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
-        image: busybox:1.37.0-musl
+        image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
         command:
         - /bin/cp
         - /bin/busybox
@@ -562,7 +562,7 @@ spec:
         - name: isoloom-probe
           mountPath: /probe
       - name: wait-cache
-        image: alpine:3.20
+        image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
         command:
         - sh
         - -c
@@ -856,7 +856,7 @@ spec:
       type: RuntimeDefault
   containers:
   - name: check
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     command:
     - /bin/sh
     - /isoloom/run/user.sh
@@ -905,7 +905,7 @@ spec:
       type: RuntimeDefault
   containers:
   - name: check
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     command:
     - /bin/sh
     - /isoloom/run/cache.sh
@@ -954,7 +954,7 @@ spec:
       type: RuntimeDefault
   containers:
   - name: check
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     command:
     - /bin/sh
     - /isoloom/run/web.sh
@@ -1154,7 +1154,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: check
-        image: curlimages/curl:8.11.1
+        image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
         command:
         - /bin/sh
         - /isoloom/run/user.sh
@@ -1205,7 +1205,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: check
-        image: curlimages/curl:8.11.1
+        image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
         command:
         - /bin/sh
         - /isoloom/run/cache.sh
@@ -1256,7 +1256,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: check
-        image: curlimages/curl:8.11.1
+        image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
         command:
         - /bin/sh
         - /isoloom/run/web.sh
@@ -1527,7 +1527,7 @@ spec:
           type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
-        image: busybox:1.37.0-musl
+        image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
         command:
         - /bin/cp
         - /bin/busybox
@@ -1709,7 +1709,7 @@ spec:
           type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
-        image: busybox:1.37.0-musl
+        image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
         command:
         - /bin/cp
         - /bin/busybox
@@ -1726,7 +1726,7 @@ spec:
         - name: isoloom-probe
           mountPath: /probe
       - name: wait-cache
-        image: alpine:3.20
+        image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
         command:
         - sh
         - -c

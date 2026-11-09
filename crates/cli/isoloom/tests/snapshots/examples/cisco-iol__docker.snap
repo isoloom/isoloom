@@ -299,7 +299,7 @@ services:
       isoloom.environment: cisco-iol
     restart: unless-stopped
   r1-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
     - /bin/sh
@@ -362,7 +362,7 @@ services:
       isoloom.environment: cisco-iol
     restart: unless-stopped
   r2-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
     - /bin/sh
@@ -404,7 +404,7 @@ services:
       isoloom.environment: cisco-iol
     restart: unless-stopped
   host-a-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
     - /bin/sh
@@ -461,7 +461,7 @@ services:
       isoloom.environment: cisco-iol
     restart: unless-stopped
   host-b-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
     - /bin/sh
@@ -487,7 +487,7 @@ services:
       isoloom.environment: cisco-iol
     restart: unless-stopped
   isoloom-check-host-a:
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     profiles:
     - check
     entrypoint:
@@ -513,7 +513,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: cisco-iol
   isoloom-probe-amd64:
-    image: busybox:1.37.0-musl
+    image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
     platform: linux/amd64
     entrypoint:
     - /bin/cp

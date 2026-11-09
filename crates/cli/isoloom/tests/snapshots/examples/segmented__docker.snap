@@ -324,7 +324,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 name: segmented
 services:
   isoloom-router:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     sysctls:
       net.ipv4.ip_forward: '1'
     init: true
@@ -402,7 +402,7 @@ services:
       isoloom.environment: segmented
     restart: unless-stopped
   cache-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
     - /bin/sh
@@ -469,7 +469,7 @@ services:
       isoloom.environment: segmented
     restart: unless-stopped
   web-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     init: true
     entrypoint:
     - /bin/sh
@@ -515,7 +515,7 @@ services:
       isoloom.environment: segmented
     restart: unless-stopped
   user-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - access
     init: true
@@ -543,7 +543,7 @@ services:
       isoloom.environment: segmented
     restart: unless-stopped
   isoloom-access:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
     init: true
@@ -561,7 +561,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: segmented
   isoloom-access-routes:
-    image: alpine:3.20
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
     init: true
@@ -589,7 +589,7 @@ services:
       isoloom.environment: segmented
     restart: unless-stopped
   isoloom-check:
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     profiles:
     - check
     entrypoint:
@@ -615,7 +615,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: segmented
   isoloom-check-cache:
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     profiles:
     - check
     entrypoint:
@@ -637,7 +637,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: segmented
   isoloom-check-web:
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     profiles:
     - check
     entrypoint:
@@ -659,7 +659,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: segmented
   isoloom-probe-amd64:
-    image: busybox:1.37.0-musl
+    image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
     platform: linux/amd64
     entrypoint:
     - /bin/cp

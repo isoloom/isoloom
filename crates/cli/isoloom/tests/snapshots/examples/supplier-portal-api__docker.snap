@@ -418,7 +418,7 @@ services:
       isoloom.environment: supplier-portal-api
     restart: unless-stopped
   isoloom-check:
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     profiles:
     - check
     entrypoint:
@@ -440,7 +440,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
   isoloom-check-database:
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     profiles:
     - check
     entrypoint:
@@ -460,7 +460,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
   isoloom-check-web:
-    image: curlimages/curl:8.11.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     profiles:
     - check
     entrypoint:
@@ -480,7 +480,7 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
   isoloom-probe-amd64:
-    image: busybox:1.37.0-musl
+    image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
     platform: linux/amd64
     entrypoint:
     - /bin/cp
