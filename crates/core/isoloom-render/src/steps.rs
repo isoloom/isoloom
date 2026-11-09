@@ -119,6 +119,15 @@ fi"#
     )
 }
 
+/// The root script trusting the spec's certificate authorities from the unpacked project
+/// ([`isoloom_plan::lifecycle::ca_certificates`]) on one of Isoloom's own VMs (a Docker host, the
+/// controller, the router), before it installs Docker or packages, which a TLS-inspecting proxy
+/// would fail otherwise. `None` when the spec names none.
+#[must_use]
+pub fn trust_authorities(env: &Environment) -> Option<String> {
+    isoloom_plan::lifecycle::ca_certificates(env.spec()).and_then(|step| linux(env, "", &step))
+}
+
 /// A shell loop waiting for the file `mark`, the runner's sign that it delivered something,
 /// looking every 5 seconds: it says `waiting` once, and gives up with `missing` (on stderr, exit
 /// 1) after `timeout_s` seconds. One line, without its newline.

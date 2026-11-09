@@ -319,6 +319,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`constraints.ca_certificates` reaches Isoloom's own VMs**: the containers' Docker host
+  (`docker-vm` on Vagrant and Proxmox, `cloud-docker`, the hybrid host), the controller (Vagrant,
+  Proxmox, the clouds, ESXi), the router and the `shell` tool's VM trust the site's authorities
+  from the project before they install Docker, Ansible or packages; behind a TLS-inspecting proxy
+  their downloads failed. The Docker host gets the project first now: `docker-vm`'s and
+  `cloud-docker`'s run manifests copy it before the `docker` step (`archive`, `project`,
+  `docker`), and the `docker-vm` Vagrantfile provisions `project` (then `ca-certificates`)
+  before `docker`.
 - **A Kubernetes pod keeps `SYS_CHROOT`**, the one capability of the runtime's default set
   besides `NET_RAW` it dropped, though `baseline` allows it: sshd's privilege separation needs it.
 - **A network appliance keeps the spec's `volumes`, `host_folders` and `environment`** on the

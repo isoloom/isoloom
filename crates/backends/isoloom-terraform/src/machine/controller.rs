@@ -160,7 +160,8 @@ pub(crate) struct Ssh<'a> {
 }
 
 /// Its set-up over SSH (`terraform_data.isoloom_controller`), once every VM is set up: the
-/// project, its key and the inventory uploaded, Ansible installed, `waits` run (as root) before
+/// project, its key and the inventory uploaded, the spec's certificate authorities trusted,
+/// Ansible installed, `waits` run (as root) before
 /// the playbooks (what the machines Terraform doesn't set up need: a Windows machine's ready
 /// marker, over WinRM), the playbooks run (ESXi).
 pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
@@ -170,6 +171,7 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     let root = |s: Option<String>| s.map(|s| Template::from(Shell::Sudo.command(&s)));
     cmds.extend(root(steps::linux(env, "", &Step::Prelude)));
     cmds.extend(root(steps::linux(env, "", &Step::Project)));
+    cmds.extend(root(steps::trust_authorities(env)));
     cmds.extend(root(hosts(env)));
     let install = format!(
         "mkdir -p /etc/isoloom && install -m 0600 {KEY_UPLOAD} /etc/isoloom/id_ed25519 && install -m 0644 {INVENTORY_UPLOAD} /etc/isoloom/inventory.ini && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"

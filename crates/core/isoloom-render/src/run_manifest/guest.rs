@@ -281,10 +281,11 @@ pub fn ssh_run(host: Template, user: &str) -> impl Fn(&Template) -> Result<Run, 
 /// How long the set-up script may take: cloud-init's end, then Docker's install.
 const SETUP_S: u32 = 1800;
 
-/// A VM Terraform made, readied for Compose through `way_in`: `setup` (the generated
-/// [`setup_script`], beside the manifest) piped into `sudo sh -s`, then the project archived
+/// A VM Terraform made, readied for Compose through `way_in`: the project archived
 /// (`project.archive`, `root` its folder from the manifest's) and piped into `tar` in the VM's
-/// project folder, replacing what an earlier copy left.
+/// project folder, replacing what an earlier copy left, then `setup` (the generated
+/// [`setup_script`], beside the manifest) piped into `sudo sh -s`, which trusts the project's
+/// certificate authorities before it downloads Docker.
 ///
 /// # Errors
 ///
@@ -313,18 +314,20 @@ pub fn into_vm(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, setup: 
     };
     let mut copy = copy.step(way_in)?;
     copy.stdin = Some(PathTemplate::in_state_dir(&RelPath::parse("project.tgz")?));
-    Ok(vec![docker, archive, copy])
+    Ok(vec![archive, copy, docker])
 }
 
-/// The Docker host's set-up script for `env`, run as root (`sudo sh -s`): once cloud-init is done,
-/// the spec's constraints (proxy, mirrors, NTP), then Docker from Docker's own script unless it is
-/// there, and published ports answering whatever the containers' routes
-/// ([`PUBLISHED_FROM_OUTSIDE`]). Running it again changes nothing.
+/// The Docker host's set-up script for `env`, run as root (`sudo sh -s`) once the project is
+/// in: once cloud-init is done, the spec's constraints (proxy, mirrors, NTP) and certificate
+/// authorities, then Docker from Docker's own script unless it is there, and published ports
+/// answering whatever the containers' routes ([`PUBLISHED_FROM_OUTSIDE`]). Running it again
+/// changes nothing.
 #[must_use]
 pub fn setup_script(env: &Environment) -> String {
     let prelude = crate::steps::linux(env, "", &isoloom_plan::Step::Prelude).unwrap_or_default();
+    let trust = crate::steps::trust_authorities(env).unwrap_or_default();
     format!(
-        "#!/bin/sh\n{}# The Docker host's set-up, piped into `sudo sh -s` over SSH by its run manifest.\nset -e\n{CLOUD_INIT_WAIT}\n{prelude}{}\n{PUBLISHED_FROM_OUTSIDE}",
+        "#!/bin/sh\n{}# The Docker host's set-up, piped into `sudo sh -s` over SSH by its run manifest.\nset -e\n{CLOUD_INIT_WAIT}\n{prelude}{trust}{}\n{PUBLISHED_FROM_OUTSIDE}",
         crate::header("#"),
         install_docker()
     )
@@ -388,18 +391,18 @@ mod tests {
     }
 
     #[test]
-    fn a_vm_terraform_made_gets_docker_then_the_project_over_ssh() {
+    fn a_vm_terraform_made_gets_the_project_then_docker_over_ssh() {
         let way_in = ssh_run(Template::text("10.0.0.9"), "isoloom");
         let steps = into_vm(&way_in, &RelPath::parse("setup.sh").unwrap(), "../../..").unwrap();
         let ids: Vec<&str> = steps.iter().map(|s| s.id.as_str()).collect();
-        assert_eq!(ids, ["docker", "archive", "project"]);
-        assert_eq!(steps[0].stdin.as_ref().map(ToString::to_string).as_deref(), Some("setup.sh"));
+        assert_eq!(ids, ["archive", "project", "docker"]);
+        assert_eq!(steps[2].stdin.as_ref().map(ToString::to_string).as_deref(), Some("setup.sh"));
         assert_eq!(
-            steps[2].stdin.as_ref().map(ToString::to_string).as_deref(),
+            steps[1].stdin.as_ref().map(ToString::to_string).as_deref(),
             Some("${run.state_dir}/project.tgz")
         );
-        let Run::Action { action: Action::SshRun, with } = &steps[2].run else {
-            panic!("{:?}", steps[2].run)
+        let Run::Action { action: Action::SshRun, with } = &steps[1].run else {
+            panic!("{:?}", steps[1].run)
         };
         let pairs: Vec<(String, String)> = with.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
         assert_eq!(
@@ -416,7 +419,7 @@ mod tests {
         let Run::Action {
             action: Action::ProjectArchive,
             with: root,
-        } = &steps[1].run
+        } = &steps[0].run
         else {
             panic!()
         };
@@ -427,7 +430,7 @@ mod tests {
     fn the_old_copy_cleared_is_always_the_fixed_project_folder() {
         let way_in = ssh_run(Template::text("10.0.0.9"), "isoloom");
         let steps = into_vm(&way_in, &RelPath::parse("setup.sh").unwrap(), "../../..").unwrap();
-        let Run::Action { with, .. } = &steps[2].run else { panic!() };
+        let Run::Action { with, .. } = &steps[1].run else { panic!() };
         let command = with.iter().find(|(k, _)| k.as_str() == "command").map(|(_, v)| v.to_string()).unwrap();
         // A literal path, nothing a shell expands: no variable can turn it into `rm -rf /`.
         assert!(command.starts_with("sudo rm -rf /opt/isoloom && "), "{command}");

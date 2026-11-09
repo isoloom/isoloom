@@ -590,24 +590,12 @@ output "ssh_user" {
         "timeout_s": 3600
       },
       {
-        "id": "docker",
-        "note": "Installing Docker in the VM…",
-        "action": "ssh.run",
-        "with": {
-          "command": "sudo sh -s",
-          "host": "${outputs.ip}",
-          "user": "admin",
-          "wait_s": "300"
-        },
-        "stdin": "setup.sh",
-        "timeout_s": 1800
-      },
-      {
         "id": "archive",
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
-          "root": "../../.."
+          "root": "../../..",
+          "wait_s": "300"
         }
       },
       {
@@ -621,6 +609,18 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "docker",
+        "note": "Installing Docker in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo sh -s",
+          "host": "${outputs.ip}",
+          "user": "admin"
+        },
+        "stdin": "setup.sh",
+        "timeout_s": 1800
       },
       {
         "id": "start",
@@ -1432,24 +1432,12 @@ output "ssh_user" {
         "timeout_s": 3600
       },
       {
-        "id": "docker",
-        "note": "Installing Docker in the VM…",
-        "action": "ssh.run",
-        "with": {
-          "command": "sudo sh -s",
-          "host": "${outputs.ip}",
-          "user": "isoloom",
-          "wait_s": "300"
-        },
-        "stdin": "setup.sh",
-        "timeout_s": 1800
-      },
-      {
         "id": "archive",
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
-          "root": "../../.."
+          "root": "../../..",
+          "wait_s": "300"
         }
       },
       {
@@ -1463,6 +1451,18 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "docker",
+        "note": "Installing Docker in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo sh -s",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "stdin": "setup.sh",
+        "timeout_s": 1800
       },
       {
         "id": "start",
@@ -2159,24 +2159,12 @@ output "ssh_user" {
         "timeout_s": 3600
       },
       {
-        "id": "docker",
-        "note": "Installing Docker in the VM…",
-        "action": "ssh.run",
-        "with": {
-          "command": "sudo sh -s",
-          "host": "${outputs.ip}",
-          "user": "root",
-          "wait_s": "300"
-        },
-        "stdin": "setup.sh",
-        "timeout_s": 1800
-      },
-      {
         "id": "archive",
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
-          "root": "../../.."
+          "root": "../../..",
+          "wait_s": "300"
         }
       },
       {
@@ -2190,6 +2178,18 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "docker",
+        "note": "Installing Docker in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo sh -s",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "stdin": "setup.sh",
+        "timeout_s": 1800
       },
       {
         "id": "start",
@@ -2990,24 +2990,12 @@ output "ssh_user" {
         "timeout_s": 3600
       },
       {
-        "id": "docker",
-        "note": "Installing Docker in the VM…",
-        "action": "ssh.run",
-        "with": {
-          "command": "sudo sh -s",
-          "host": "${outputs.ip}",
-          "user": "admin",
-          "wait_s": "300"
-        },
-        "stdin": "setup.sh",
-        "timeout_s": 1800
-      },
-      {
         "id": "archive",
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
-          "root": "../../.."
+          "root": "../../..",
+          "wait_s": "300"
         }
       },
       {
@@ -3021,6 +3009,18 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "docker",
+        "note": "Installing Docker in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo sh -s",
+          "host": "${outputs.ip}",
+          "user": "admin"
+        },
+        "stdin": "setup.sh",
+        "timeout_s": 1800
       },
       {
         "id": "start",
@@ -3698,24 +3698,12 @@ output "ssh_user" {
         "timeout_s": 3600
       },
       {
-        "id": "docker",
-        "note": "Installing Docker in the VM…",
-        "action": "ssh.run",
-        "with": {
-          "command": "sudo sh -s",
-          "host": "${outputs.ip}",
-          "user": "root",
-          "wait_s": "300"
-        },
-        "stdin": "setup.sh",
-        "timeout_s": 1800
-      },
-      {
         "id": "archive",
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
-          "root": "../../.."
+          "root": "../../..",
+          "wait_s": "300"
         }
       },
       {
@@ -3729,6 +3717,18 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "docker",
+        "note": "Installing Docker in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo sh -s",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "stdin": "setup.sh",
+        "timeout_s": 1800
       },
       {
         "id": "start",
@@ -4472,24 +4472,12 @@ output "ssh_user" {
         "timeout_s": 3600
       },
       {
-        "id": "docker",
-        "note": "Installing Docker in the VM…",
-        "action": "ssh.run",
-        "with": {
-          "command": "sudo sh -s",
-          "host": "${outputs.ip}",
-          "user": "ubuntu",
-          "wait_s": "300"
-        },
-        "stdin": "setup.sh",
-        "timeout_s": 1800
-      },
-      {
         "id": "archive",
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
-          "root": "../../.."
+          "root": "../../..",
+          "wait_s": "300"
         }
       },
       {
@@ -4503,6 +4491,18 @@ output "ssh_user" {
         },
         "stdin": "${run.state_dir}/project.tgz",
         "timeout_s": 600
+      },
+      {
+        "id": "docker",
+        "note": "Installing Docker in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "sudo sh -s",
+          "host": "${outputs.ip}",
+          "user": "ubuntu"
+        },
+        "stdin": "setup.sh",
+        "timeout_s": 1800
       },
       {
         "id": "start",

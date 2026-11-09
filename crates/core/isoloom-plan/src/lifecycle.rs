@@ -185,6 +185,16 @@ pub enum RunKind {
     PowerShell,
 }
 
+/// The step trusting the spec's certificate authorities (`constraints.ca_certificates`) from the
+/// unpacked project, which comes after [`Step::Project`] and before anything downloads: on a
+/// lab machine and on Isoloom's own VMs (a Docker host, the controller, the router) alike. None
+/// when the spec names none.
+#[must_use]
+pub fn ca_certificates(spec: &Spec) -> Option<Step> {
+    let files = spec.constraints.as_ref().map(|c| c.ca_certificates.clone()).filter(|f| !f.is_empty())?;
+    Some(Step::CaCertificates { files })
+}
+
 /// The set-up steps of VM `name`, its configuration resolved as `recipe`.
 #[must_use]
 pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) -> MachineLifecycle {
@@ -198,9 +208,7 @@ pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) 
         });
     }
     steps.push(Step::Project);
-    if let Some(files) = spec.constraints.as_ref().map(|c| c.ca_certificates.clone()).filter(|f| !f.is_empty()) {
-        steps.push(Step::CaCertificates { files });
-    }
+    steps.extend(ca_certificates(spec));
     steps.push(hosts(spec, name));
     steps.push(Step::Settings);
     steps.extend(shared_volumes(spec, name, m));

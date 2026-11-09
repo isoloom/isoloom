@@ -48,6 +48,13 @@ fn steps_of(r: &mut Ruby, env: &Environment, vm: &str, steps: &[Step]) {
     }
 }
 
+/// What one of Isoloom's own VMs that otherwise has no use for the project takes to trust the
+/// spec's certificate authorities before it installs anything: the project, then them. Nothing
+/// when the spec names none.
+fn trusting(env: &Environment) -> Vec<Step> {
+    isoloom_plan::lifecycle::ca_certificates(env.spec()).map_or_else(Vec::new, |ca| vec![Step::Project, ca])
+}
+
 /// Every machine by name, at its address on its first network (Isoloom's own VMs are on all).
 fn every_machine(env: &Environment) -> Step {
     let entries = env
@@ -127,7 +134,7 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
         }
         let at = routed.iter().map(|(net, ip)| (net.as_str(), *ip)).collect();
         providers::blocks(r, &helper(env, "router", Size::HELPER, at, link));
-        steps_of(r, env, router::NAME, &[Step::Prelude]);
+        steps_of(r, env, router::NAME, &[vec![Step::Prelude], trusting(env)].concat());
         shell(r, "router", &script);
     });
 }
@@ -158,7 +165,7 @@ fn tool_shell(r: &mut Ruby, ctx: &Ctx, index: usize) {
         networks(r, env, |c| c.tool(index));
         let at = addresses(env, |c| c.tool(index));
         providers::blocks(r, &helper(env, "tool shell", Size::HELPER, at, link));
-        steps_of(r, env, TOOL_SHELL, &[Step::Prelude, every_machine(env)]);
+        steps_of(r, env, TOOL_SHELL, &[vec![Step::Prelude, every_machine(env)], trusting(env)].concat());
         shell(
             r,
             "toolbox",
@@ -197,6 +204,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let mut steps = vec![Step::Prelude];
     steps.extend(size.disk.map(|_| Step::DiskGrow));
     steps.extend([every_machine(env), Step::Project]);
+    steps.extend(isoloom_plan::lifecycle::ca_certificates(env.spec()));
     let on_controller = &ctx.checks.controller;
     define(r, CONTROLLER, false, |r| {
         controller_box_line(r, bx, version);

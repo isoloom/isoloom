@@ -7,7 +7,7 @@ use isoloom_spec::model::Constraints;
 use isoloom_spec::{Target, load, parse};
 use isoloom_targets::{Lab, generate};
 
-use crate::testing::{Outcome, examples, generated as file, valid};
+use crate::testing::{Outcome, between, examples, generated as file, valid};
 
 const CONSTRAINTS: &str = "
 constraints:
@@ -199,16 +199,16 @@ constraints:
 
 /// segmented with the site's certificate authority, `certs/corp-ca.pem`.
 fn with_ca() -> Outcome<Lab> {
-    let text = std::fs::read_to_string(examples().join("segmented/isoloom.yml"))?;
-    valid(&format!("{text}\nconstraints:\n  ca_certificates: [certs/corp-ca.pem]\n"))
+    example_with_ca("segmented")
 }
 
 #[test]
 fn every_vm_trusts_the_sites_certificate_authority_once_the_project_is_in() -> Outcome {
     let lab = with_ca()?;
     let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
-    // cache, web and user: each spec VM, from the unpacked project, after it and before its steps.
-    assert_eq!(vf.matches("name: \"certificate authorities\"").count(), 3, "{vf}");
+    // cache, web and user: each spec VM, from the unpacked project, after it and before its
+    // steps; and the router, before it installs nftables.
+    assert_eq!(vf.matches("name: \"certificate authorities\"").count(), 4, "{vf}");
     assert!(
         vf.contains("install -m 0644 '/opt/isoloom/certs/corp-ca.pem' /usr/local/share/ca-certificates/isoloom-0.crt"),
         "{vf}"
@@ -225,10 +225,54 @@ fn every_vm_trusts_the_sites_certificate_authority_once_the_project_is_in() -> O
     Ok(())
 }
 
+/// `text` has each of `names`, each after the one before it.
+fn in_order(text: &str, names: &[&str]) {
+    let at: Vec<Option<usize>> = names.iter().map(|n| text.find(n)).collect();
+    assert!(at.iter().all(Option::is_some), "{names:?} not all in:\n{text}");
+    assert!(at.is_sorted(), "{names:?} out of order in:\n{text}");
+}
+
+/// `example` with the site's certificate authority, `certs/corp-ca.pem`.
+fn example_with_ca(example: &str) -> Outcome<Lab> {
+    let text = std::fs::read_to_string(examples().join(example).join("isoloom.yml"))?;
+    valid(&format!("{text}\nconstraints:\n  ca_certificates: [certs/corp-ca.pem]\n"))
+}
+
+#[test]
+fn isoloom_s_own_vms_trust_the_certificate_authority_before_they_install_anything() -> Outcome {
+    const TRUST: &str = "/opt/isoloom/certs/corp-ca.pem";
+    let lab = with_ca()?;
+    let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
+    let router = between(&vf, "define \"isoloom-router\"", "config.vm.define")?;
+    in_order(router, &["name: \"project\"", TRUST, "apt-get install -y -qq nftables"]);
+    // The containers' Docker host: on Vagrant, and as the set-up script a cloud's or Proxmox's
+    // run manifest pipes in once the project is copied.
+    let docker_vm = file(&lab, Target::DockerVm, "docker-vm/Vagrantfile")?;
+    in_order(&docker_vm, &["\"project\", type: \"isoloom_project\"", TRUST, "download.docker.com"]);
+    let setup = file(&lab, Target::CloudDocker, "cloud-docker/aws/setup.sh")?;
+    in_order(&setup, &[TRUST, "download.docker.com"]);
+    let hybrid = file(&example_with_ca("mixed-office")?, Target::Hybrid, "hybrid/Vagrantfile")?;
+    in_order(&hybrid, &["\"isoloom_project\", name: \"project\"", TRUST, "download.docker.com"]);
+    // The controller, before Ansible: on Vagrant and on the clouds.
+    let paired = example_with_ca("ansible-pair")?;
+    let vagrant = file(&paired, Target::Vagrant, "vagrant/Vagrantfile")?;
+    in_order(
+        between(&vagrant, "define \"isoloom-controller\"", "\nend\n")?,
+        &["name: \"project\"", TRUST, "python3"],
+    );
+    let aws = file(&paired, Target::CloudVm, "cloud-vm/aws/main.tf")?;
+    in_order(
+        between(&aws, "resource \"aws_instance\" \"isoloom_controller\"", "\n}\n")?,
+        &["project-delivered", TRUST, "python3"],
+    );
+    let proxmox = file(&paired, Target::Proxmox, "proxmox/main.tf")?;
+    in_order(between(&proxmox, "The controller: runs", "\n}\n")?, &[TRUST, "installing Ansible"]);
+    Ok(())
+}
+
 #[test]
 fn a_windows_vm_imports_the_certificate_authority_into_its_root_store() -> Outcome {
-    let text = std::fs::read_to_string(examples().join("windows-hello/isoloom.yml"))?;
-    let lab = valid(&format!("{text}\nconstraints:\n  ca_certificates: [certs/corp-ca.pem]\n"))?;
+    let lab = example_with_ca("windows-hello")?;
     let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
     assert!(
         vf.contains("Import-Certificate -FilePath 'C:\\\\isoloom\\\\certs\\\\corp-ca.pem' -CertStoreLocation Cert:\\\\LocalMachine\\\\Root"),

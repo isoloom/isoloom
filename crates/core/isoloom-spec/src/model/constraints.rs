@@ -49,9 +49,11 @@ pub struct Constraints {
     pub ntp: Vec<String>,
     /// Certificate authorities every machine trusts beside the public ones (PEM files in the
     /// project, one certificate each): a TLS-inspecting proxy's, an internal registry's. Each
-    /// Linux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`), each
-    /// Windows VM to its root store, each image Isoloom builds at build time, and each container
-    /// has them at `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
+    /// Linux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`) once
+    /// the project is in, Isoloom's own too (the containers' Docker host before it installs
+    /// Docker, the controller and the router before their packages), each Windows VM to its root
+    /// store, each image Isoloom builds at build time, and each container has them at
+    /// `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ca_certificates: Vec<String>,
 }

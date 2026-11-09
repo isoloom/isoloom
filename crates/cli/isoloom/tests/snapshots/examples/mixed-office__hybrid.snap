@@ -936,6 +936,7 @@ Vagrant.configure("2") do |config|
       v.memory = 2048
       v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
     end
+    m.vm.provision "isoloom_project", name: "project", extra: [".isoloom/hybrid/compose.yml"]
     m.vm.provision "shell", name: "docker", inline: "command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   set -e
   export DEBIAN_FRONTEND=noninteractive
@@ -964,7 +965,6 @@ Vagrant.configure("2") do |config|
 else
   curl -fsSL https://get.docker.com | VERSION=29.9.0 sh
 fi"
-    m.vm.provision "isoloom_project", name: "project", extra: [".isoloom/hybrid/compose.yml"]
     m.vm.provision "shell", name: "networks", inline: <<~'SH'
       set -e
       IF=$(ip -o link | grep -i '0a:15:57:4b:b3:00' | awk -F': ' '{print $2}')

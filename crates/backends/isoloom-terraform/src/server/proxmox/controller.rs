@@ -1,7 +1,8 @@
 //! The controller on Proxmox: the core's controller as a cloud-init VM. It sits on the uplink
 //! bridge (DHCP: internet, to install Ansible) and on every network at the controller address.
-//! Its cloud-init carries the project, its key and the inventory; it then waits for each
-//! machine's ready marker (over SSH, over WinRM on Windows) and runs the playbooks.
+//! Its cloud-init carries the project, its key and the inventory; it trusts the site's
+//! certificate authorities and installs Ansible, then waits for each machine's ready marker
+//! (over SSH, over WinRM on Windows) and runs the playbooks.
 
 use crate::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
@@ -15,36 +16,9 @@ use crate::module::ident;
 
 /// The controller's snippet and VM.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let mut config = CloudConfig::new(controller::NAME, reference("local.users"));
-    config.packages = controller::PACKAGES.map(String::from).to_vec();
-    config.bootcmd.extend(cloud_init::prelude(env));
-    config.file_lists.push(reference("local.project_files"));
-    let inventory = controller::inventory_template(env, isoloom_render::inventory::Access::proxmox).into_expression();
-    config.files = vec![
-        file(
-            "/etc/isoloom/id_ed25519",
-            Some("0600"),
-            reference("tls_private_key.controller.private_key_openssh"),
-        ),
-        file("/etc/isoloom/inventory.ini", Some("0644"), inventory),
-    ];
-    if let Some(hosts) = controller::hosts(env) {
-        config.track("hosts file", &Shell::Root.command(&hosts));
-    }
-    config.track("installing Ansible", &Shell::Root.command(controller::ANSIBLE));
-    for (name, wait) in controller::linux_waits(env, &|_| crate::machine::USER.to_owned()) {
-        config.track(&format!("waiting for {name}"), &wait);
-    }
-    for wait in controller::windows_waits(env) {
-        config.track("waiting for the Windows machines", &Shell::Root.command(&wait));
-    }
-    config.track("the playbooks", &Shell::Root.command(&controller::playbooks(env)));
-    if let Some(ready) = steps::linux(env, "", &Step::Ready) {
-        config.track("health check", &Shell::Root.command(&ready));
-    }
     m.commented(
         "The controller: runs the environment's playbooks once every machine is up.",
-        snippet("controller", "controller", config.document()),
+        snippet("controller", "controller", cloud_config(env).document()),
     );
     // The uplink (DHCP, its route out) first, then every network at the controller address.
     let mut nics = vec![nic("var.uplink_bridge", None)];
@@ -76,4 +50,41 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         folders: Vec::new(),
     };
     m.block(vm.block(env));
+}
+
+/// Its cloud-init: the packages, the constraints, the project, its key and the inventory, then
+/// the site's certificate authorities, the hosts file, Ansible, each machine's set-up awaited, the
+/// playbooks and the health check, each tracked in its ready file.
+fn cloud_config(env: &Environment) -> CloudConfig {
+    let mut config = CloudConfig::new(controller::NAME, reference("local.users"));
+    config.packages = controller::PACKAGES.map(String::from).to_vec();
+    config.bootcmd.extend(cloud_init::prelude(env));
+    config.file_lists.push(reference("local.project_files"));
+    let inventory = controller::inventory_template(env, isoloom_render::inventory::Access::proxmox).into_expression();
+    config.files = vec![
+        file(
+            "/etc/isoloom/id_ed25519",
+            Some("0600"),
+            reference("tls_private_key.controller.private_key_openssh"),
+        ),
+        file("/etc/isoloom/inventory.ini", Some("0644"), inventory),
+    ];
+    if let Some(trust) = steps::trust_authorities(env) {
+        config.track("certificate authorities", &Shell::Root.command(&trust));
+    }
+    if let Some(hosts) = controller::hosts(env) {
+        config.track("hosts file", &Shell::Root.command(&hosts));
+    }
+    config.track("installing Ansible", &Shell::Root.command(controller::ANSIBLE));
+    for (name, wait) in controller::linux_waits(env, &|_| crate::machine::USER.to_owned()) {
+        config.track(&format!("waiting for {name}"), &wait);
+    }
+    for wait in controller::windows_waits(env) {
+        config.track("waiting for the Windows machines", &Shell::Root.command(&wait));
+    }
+    config.track("the playbooks", &Shell::Root.command(&controller::playbooks(env)));
+    if let Some(ready) = steps::linux(env, "", &Step::Ready) {
+        config.track("health check", &Shell::Root.command(&ready));
+    }
+    config
 }

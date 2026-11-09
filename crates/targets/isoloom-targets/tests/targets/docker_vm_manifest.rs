@@ -49,7 +49,7 @@ fn vagrant_brings_the_vm_up_then_compose_starts_in_it_over_vagrant_ssh() -> Outc
     let Run::Argv(HostArgv::Every(argv)) = &vm.run else { panic!() };
     let up_args: Vec<String> = argv.args().iter().map(ToString::to_string).collect();
     // Every provisioner but the lab's start: Compose is the next steps'.
-    assert_eq!(up_args[up_args.len() - 2..], ["--provision-with", "nat-route,docker,accept-env,project"]);
+    assert_eq!(up_args[up_args.len() - 2..], ["--provision-with", "nat-route,project,docker,accept-env"]);
     let start = m.lifecycle.up.iter().find(|s| s.id.as_str() == "start").unwrap();
     let Run::Argv(HostArgv::Every(start_argv)) = &start.run else { panic!() };
     let piped: Vec<String> = start_argv.args().iter().map(ToString::to_string).collect();
@@ -81,11 +81,11 @@ fn vagrant_brings_the_vm_up_then_compose_starts_in_it_over_vagrant_ssh() -> Outc
 }
 
 #[test]
-fn proxmox_makes_the_vm_then_sets_it_up_copies_the_project_and_starts_compose_over_ssh() -> Outcome {
+fn proxmox_makes_the_vm_then_copies_the_project_sets_it_up_and_starts_compose_over_ssh() -> Outcome {
     let (_, _, m) = manifests()?;
     assert_eq!(
         up(&m),
-        ["clear-lock", "init", "apply", "docker", "archive", "project", "start", "job-isoloom-init-web-1"]
+        ["clear-lock", "init", "apply", "archive", "project", "docker", "start", "job-isoloom-init-web-1"]
     );
     let step = |id: &str| m.lifecycle.up.iter().find(|s| s.id.as_str() == id).unwrap();
     assert_eq!(step("docker").stdin.as_ref().map(ToString::to_string).as_deref(), Some("setup.sh"));

@@ -58,22 +58,28 @@ pub fn manifest(env: &Environment, guest: &GuestCompose) -> crate::Result<Manife
 }
 
 /// The VM's own provisioners, in order: everything `vagrant up` runs but the lab's start (UTM's
-/// default route, a no-op elsewhere; the constraints, when the spec has some; Docker; SSH
-/// accepting the forwarded values, when there are some; the project).
+/// default route, a no-op elsewhere; the constraints, when the spec has some; the project; its
+/// certificate authorities trusted, when the spec names some; Docker; SSH accepting the
+/// forwarded values, when there are some).
 pub(crate) fn prepares(env: &Environment, guest: &GuestCompose) -> Vec<&'static str> {
     let constraints = steps::linux(env, "", &isoloom_plan::Step::Prelude).map(|_| vagrantfile::CONSTRAINTS);
+    let authorities = steps::trust_authorities(env).map(|_| CA_CERTIFICATES);
     let accept = (!guest.forwarded().is_empty()).then_some(ACCEPT_ENV);
     [crate::vms::utm::NAT_ROUTE]
         .into_iter()
         .chain(constraints)
+        .chain([PROJECT])
+        .chain(authorities)
         .chain([vagrantfile::DOCKER])
         .chain(accept)
-        .chain([PROJECT])
         .collect()
 }
 
 /// The project provisioner.
 const PROJECT: &str = "project";
+
+/// The provisioner trusting the spec's certificate authorities, from the project's copy.
+const CA_CERTIFICATES: &str = "ca-certificates";
 
 /// `config.vm.provision "<name>", type: "<kind>"`: a provisioner named at the top level, which
 /// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
@@ -182,6 +188,12 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
     if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
         r.provision(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
     }
+    // The project, its generated Compose file included: first, so the certificate authorities
+    // it holds are trusted before Docker downloads.
+    r.provision(named(PROJECT, "isoloom_project").kw("generated", true));
+    if let Some(sh) = steps::trust_authorities(env) {
+        r.provision(named(CA_CERTIFICATES, "shell").kw("inline", Value::str(&sh)));
+    }
     let docker = format!("{}\n{}", steps::install_docker(), steps::PUBLISHED_FROM_OUTSIDE);
     r.provision(named(vagrantfile::DOCKER, "shell").kw("inline", Value::str(&docker)));
     if !forwarded.is_empty() {
@@ -191,8 +203,6 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
         );
         r.provision(named(ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
     }
-    // The project, its generated Compose file included.
-    r.provision(named(PROJECT, "isoloom_project").kw("generated", true));
     environment(r, env, guest);
     checks(r, env);
 }

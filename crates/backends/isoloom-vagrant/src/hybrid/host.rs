@@ -60,10 +60,14 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     }
     virtualbox(r, env, nics.len());
     vagrantfile::prelude(r, env, "m");
-    vagrantfile::install_docker(r, "m");
-    // The project, with this Compose file from Isoloom's outputs.
+    // The project, with this Compose file from Isoloom's outputs: before Docker, so the
+    // certificate authorities it holds are trusted first.
     let extra = Value::array([Value::str(".isoloom/hybrid/compose.yml")]);
     r.provision(Provision::new("m", "isoloom_project").kw("name", Value::str("project")).kw("extra", extra));
+    if let Some(sh) = isoloom_render::steps::trust_authorities(env) {
+        r.provision(shell("m", "certificate authorities").kw("inline", Value::str(&sh)));
+    }
+    vagrantfile::install_docker(r, "m");
     r.provision(shell("m", "networks").heredoc("inline", "SH", &networks_script(nics)));
     let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
     let files = host_environment(env);
