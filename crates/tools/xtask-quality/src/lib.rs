@@ -58,8 +58,8 @@ pub struct Args {
     table: bool,
 }
 
-/// What a repository's `xtask` tells the ratchet about itself: the two strings that differ
-/// between repositories.
+/// What a repository's `xtask` tells the ratchet about itself: what differs between
+/// repositories.
 #[derive(Debug, Clone, Copy)]
 pub struct QualityConfig {
     /// The prefix of the jscpd temporary folder (`<slug>-jscpd-<pid>`), kept per repository so two
@@ -68,7 +68,7 @@ pub struct QualityConfig {
     /// The command a "went down" message tells the maintainer to run (`--update` is appended),
     /// e.g. `cargo xtask quality` or `cargo run -p xtask -- quality`.
     pub update_hint: &'static str,
-    /// The baseline file, relative to the root with `/` (`quality-baseline.json`).
+    /// The baseline file, relative to the root with `/` (`xtask/baselines/quality-baseline.json`).
     pub baseline: &'static str,
 }
 

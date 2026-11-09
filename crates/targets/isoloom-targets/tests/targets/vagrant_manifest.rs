@@ -10,7 +10,7 @@ use isoloom_targets::generate;
 
 use crate::testing::{Outcome, file, lab, matches_fixture};
 
-/// run-manifest-v0.md §10's `mini-ad`: two Windows machines (the secret a file on `dc01`), a
+/// A small Active Directory lab, `mini-ad`: two Windows machines (the secret a file on `dc01`), a
 /// domain built by the environment's playbook from the controller, checks with long waits.
 const MINI_AD: &str = "
 version: 1

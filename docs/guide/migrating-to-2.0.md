@@ -24,7 +24,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 ## Behavior that changed
 
 - **Published Kubernetes ports** are ClusterIP Services by default (a LoadBalancer before), and
-  pods run with a restricted security context. Expose a port outside the cluster in your own
+  pods run under the Pod Security Standards' `baseline` level, which their namespace enforces. Expose a port outside the cluster in your own
   overlay ([Kubernetes](targets/kubernetes.md)).
 - **Images built from the project** are named under `localhost/isoloom/` by default.
 - **Terraform**: the generated modules require Terraform 1.11 or later.

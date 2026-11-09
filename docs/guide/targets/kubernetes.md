@@ -59,9 +59,12 @@ policy allows.
 
 ## Pod security
 
-The pods run with a restricted security context by default. A machine that asks for `privileged`
-or for capabilities in the spec gets them, and a namespace enforcing the `restricted` Pod Security
-Standard then refuses its pod. Isoloom labels every object `app.kubernetes.io/managed-by: isoloom`.
+The pods run under the Pod Security Standards' `baseline` level, which the namespace enforces: the
+runtime's seccomp filter, no privilege escalation, every capability dropped but those a root
+process of a stock image needs (`NET_RAW` among the dropped), Isoloom's own helpers as `nobody`. A
+machine that is `privileged`, or sets a sysctl outside the safe set, makes the namespace
+`privileged` instead. A cluster that admits only `restricted` pods refuses them (a stock image
+runs as root). Isoloom labels every object `app.kubernetes.io/managed-by: isoloom`.
 
 ## Teardown
 

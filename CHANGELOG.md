@@ -19,8 +19,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   a runner built for 1.x's version 0 refuses it.
 - **Breaking:** the `dvwa` and `juice-shop` catalogue entries are removed, and machine names
   starting with `isoloom-` are refused.
-- **Breaking:** Kubernetes publishes a port as a ClusterIP Service by default, with a restricted
-  security context for the pods.
+- **Breaking:** Kubernetes publishes a port as a ClusterIP Service by default, and its pods run
+  under the Pod Security Standards' `baseline` level, which their namespace enforces.
 - **Breaking:** the generated Terraform modules require Terraform 1.11 or later.
 - **Breaking (library):** many items of every crate are removed or crate-internal; the supported
   API is `isoloom-spec`, `isoloom-targets` and `isoloom-manifest`.
@@ -210,8 +210,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Every Kubernetes object carries `app.kubernetes.io/managed-by: isoloom`**, as Compose's
   containers carry `isoloom.managed` and the clouds' resources `managed-by`. Google Cloud's project
   of its own and Linode's firewalls carry the environment's labels and tags.
-- **The controller is `isoloom-controller` in Proxmox's and ESXi's run manifests and `checks`
-  output** (was `controller`), as on the clouds.
+- **The controller is `isoloom-controller` in Proxmox's run manifests and in Proxmox's and ESXi's
+  `checks` output** (was `controller`), as on the clouds.
 - **`docker-vm`'s `up` provisions `nat-route` first** (`--provision-with nat-route,docker,...`),
   and every Linux VM of the Vagrant target has that provisioner first: see Fixed.
 - The run manifest's `entry` output role is "the address a user opens first", and a dormant port
@@ -517,7 +517,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Run manifest values Isoloom never writes**: the `vagrant_ssh` and `winrm` transports of a
   guest delivery, the `dotenv` state-file format, the `generated` slot kind, the `ssh` and
   `credential` output roles, the `static` output source and the `minutes_from_now` expiry unit
-  (`schemas/run-manifest-v0.schema.json` regenerated). A manifest holding one is refused.
+  (`schemas/run-manifest-v1.schema.json` regenerated). A manifest holding one is refused.
 - **`isoloom_compose::start_plan`**, which read a Compose file's start plan back from its text
   for a parity test, and `isoloom_compose::Error::Unreadable` with it; `StartPlan` is internal
   now (the run manifest's `up` is how to start the file). Also out of the public API, as nothing

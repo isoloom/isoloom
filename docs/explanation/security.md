@@ -46,9 +46,9 @@ Two exceptions are by design, and worth knowing:
 
 `reach` and `internet: false` become NetworkPolicies, which only a network plugin that enforces
 them (egress included) applies: on a cluster without one they are silently ignored, and the
-derived checks fail. The pods run with a restricted security context unless a machine asks for
-`privileged` or capabilities; a namespace enforcing the `restricted` Pod Security Standard refuses
-those. Every object is labelled `app.kubernetes.io/managed-by: isoloom`.
+derived checks fail. The pods run under the Pod Security Standards' `baseline` level, which the
+namespace enforces (`privileged` when a machine is privileged or sets a sysctl outside the safe
+set); a cluster that admits only `restricted` pods refuses them. Every object is labelled `app.kubernetes.io/managed-by: isoloom`.
 
 ## Public IP addresses on cloud VMs
 
