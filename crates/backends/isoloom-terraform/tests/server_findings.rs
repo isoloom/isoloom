@@ -23,7 +23,7 @@ fn proxmox(name: &str) -> Outcome<String> {
 ///
 /// When the status step's id isn't one (it is fixed, so this never fails).
 fn no_guest() -> Outcome<GuestCompose> {
-    Ok(GuestCompose::empty(GuestCommand {
+    Ok(isoloom_render::test_support::empty_guest(GuestCommand {
         id: isoloom_manifest::StepId::parse("ps")?,
         note: None,
         command: isoloom_manifest::Template::text("true"),

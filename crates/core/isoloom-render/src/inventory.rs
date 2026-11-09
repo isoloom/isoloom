@@ -41,7 +41,7 @@ use isoloom_spec::model::{Target, Winrm};
 pub type Vars = Vec<(String, String)>;
 
 /// The controller's own private key, which every Linux VM it provisions trusts.
-pub const CONTROLLER_KEY: &str = "/etc/isoloom/id_ed25519";
+const CONTROLLER_KEY: &str = "/etc/isoloom/id_ed25519";
 
 /// One host of the inventory: a machine Ansible reaches on this target.
 #[derive(Debug, Clone)]
@@ -89,7 +89,7 @@ const WINRM_PATIENCE: [(&str, &str); 3] = [
 
 /// The WinRM port, scheme and transport of a Windows machine that answers `winrm` that way.
 #[must_use]
-pub fn winrm_vars(winrm: Winrm) -> Vars {
+fn winrm_vars(winrm: Winrm) -> Vars {
     match winrm {
         Winrm::Ssl => vars(&[("ansible_port", "5986"), ("ansible_winrm_scheme", "https"), ("ansible_winrm_transport", "ntlm")]),
         Winrm::Plaintext => vars(&[("ansible_port", "5985"), ("ansible_winrm_scheme", "http"), ("ansible_winrm_transport", "basic")]),
@@ -292,7 +292,7 @@ fn single_quoted(v: &str) -> String {
 /// quoted (so `"10"` stays a string), `True`, `False` and `None`, lists and dicts as Python
 /// spells them.
 #[must_use]
-pub fn python_literal(v: &serde_json::Value) -> String {
+fn python_literal(v: &serde_json::Value) -> String {
     use serde_json::Value;
     match v {
         Value::Null => "None".into(),
@@ -312,7 +312,7 @@ pub fn python_literal(v: &serde_json::Value) -> String {
 
 /// The `host_vars` of one machine as ` key='value'` pairs, the way its inventory line ends.
 #[must_use]
-pub fn host_vars_suffix(host_vars: &IndexMap<String, serde_json::Value>) -> String {
+fn host_vars_suffix(host_vars: &IndexMap<String, serde_json::Value>) -> String {
     host_vars
         .iter()
         .map(|(k, v)| format!(" {k}={}", single_quoted(&python_literal(v))))

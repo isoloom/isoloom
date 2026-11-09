@@ -28,7 +28,7 @@ pub enum FileSource {
 impl FileSource {
     /// Whether the value is only known at run time (an input or a secret).
     #[must_use]
-    pub fn is_value(&self) -> bool {
+    fn is_value(&self) -> bool {
         matches!(self, FileSource::Input(_) | FileSource::Secret(_))
     }
 

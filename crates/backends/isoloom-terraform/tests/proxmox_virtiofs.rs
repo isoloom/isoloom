@@ -22,7 +22,8 @@ fn render(spec: &Spec) -> Outcome<String> {
 
 /// The problems an author sees in `yaml`, one line each.
 fn problems(yaml: &str) -> String {
-    let found: Vec<String> = isoloom_plan::problems_in(yaml).iter().map(isoloom_spec::syntax::Problem::line).collect();
+    let found = isoloom_plan::Lab::parse(yaml).map_or_else(|refused| refused, |lab| lab.problems());
+    let found: Vec<String> = found.iter().map(isoloom_spec::syntax::Problem::line).collect();
     found.join("\n")
 }
 

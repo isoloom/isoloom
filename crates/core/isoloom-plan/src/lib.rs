@@ -61,7 +61,7 @@ pub use environment::{
     Build, Controller, Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Size, Volume, VolumeKind,
 };
 pub use error::{Error, Result};
-pub use lab::{Lab, problems_in};
+pub use lab::Lab;
 pub use lifecycle::{MachineLifecycle, Step};
 pub use outside::{Join, OutsideAddress, OutsideNetwork};
 pub use private_dns::PrivateDns;

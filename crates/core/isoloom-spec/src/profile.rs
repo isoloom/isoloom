@@ -75,7 +75,7 @@ struct File {
 
 /// A profile name: kebab-case, as a spec's name.
 #[must_use]
-pub fn valid_name(name: &str) -> bool {
+fn valid_name(name: &str) -> bool {
     !name.is_empty() && !name.starts_with('-') && !name.ends_with('-') && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 

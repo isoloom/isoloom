@@ -115,7 +115,8 @@ stable spec format.
   removed too. The unreleased `hostname:` and `image:` of `IsoloomAdHoc.define` go with it.
 - **`Spec::with_cloud_outputs`, `Spec::cloud_message` and `Copy::is_folder`**, which nothing in
   Isoloom called but their own tests, and the public `secrets::windows::command_line` (now
-  test-only). `GuestCompose::empty` is hidden from the docs.
+  test-only). `GuestCompose::empty` left the API: tests of the crates above build an empty
+  guest with `isoloom_render::test_support::empty_guest`, behind the `test-support` feature.
 - **`isoloom_plan::configure::{Configure, Handoff, OutPath}` and the plan's `Error::UnknownTool`
   and `Error::Unpaired`.** They described choosing a CM tool per target (`--configure`,
   `overrides.<target>.configure`), which no command or spec key ever offered: each target renders
@@ -124,6 +125,18 @@ stable spec format.
   guest delivery, the `dotenv` state-file format, the `generated` slot kind, the `ssh` and
   `credential` output roles, the `static` output source and the `minutes_from_now` expiry unit
   (`schemas/run-manifest-v0.schema.json` regenerated). A manifest holding one is refused.
+- **`isoloom_compose::start_plan`**, which read a Compose file's start plan back from its text
+  for a parity test, and `isoloom_compose::Error::Unreadable` with it; `StartPlan` is internal
+  now (the run manifest's `up` is how to start the file). Also out of the public API, as nothing
+  outside their crate used them: `isoloom_compose::{ENVIRONMENT_LABEL, MANAGED_LABEL}`,
+  `isoloom_kubernetes::SECRETS`, `isoloom_catalogue::fill_contract`, `isoloom_spec::load_with`
+  (`load_profiled(dir, None, sets)` does the same), `isoloom_plan::problems_in` (tests compose
+  `Lab::parse` and `Lab::problems`), and `isoloom_render::steps::{DOCKER_VERSION,
+  COMPOSE_VERSION, DOCKER_APT_KEY_SHA256}`, whose `INSTALL_DOCKER` is now `install_docker()`,
+  built from them. Items only their own file used are private: `inventory::{CONTROLLER_KEY,
+  winrm_vars, python_literal, host_vars_suffix}`, `container::host_folders::VM_ROOT`,
+  `secrets::windows::{PLACE_SCRIPT, PLACE_TASK}`, `isoloom_spec::windows::expects_tpm`,
+  `profile::valid_name`, `syntax::placeholder::Reference::allowed_in` and `FileSource::is_value`.
 - **`isoloom_targets::matrix::Row::is_field`**, which only the matrix's own tests called.
 - **`isoloom_manifest::access::DEFAULT_IMAGE`** (Kali's image), which nothing could reach: an
   access machine's Compose service always has its planned image to fall back on.

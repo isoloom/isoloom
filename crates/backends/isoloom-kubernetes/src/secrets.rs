@@ -17,7 +17,7 @@ use crate::machine::Machine;
 use crate::objects::{Container, EmptyDir, Image, KeyToPath, Volume, VolumeMount, VolumeSource};
 
 /// The Secret holding the secrets' values, one key per secret.
-pub const SECRETS: &str = "isoloom-secrets";
+pub(crate) const SECRETS: &str = "isoloom-secrets";
 /// The pod volume a machine's secrets are mounted from.
 const VOLUME: &str = "isoloom-secrets";
 /// The memory-backed `emptyDir` holding the secrets with an owner, and the init container

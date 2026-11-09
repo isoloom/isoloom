@@ -1,7 +1,6 @@
 //! The `docker` target's Compose file: addresses, health, init jobs, routes through the router or a
 //! gateway, Docker's blocks and the start plan.
 
-use isoloom_compose::{StartPlan, start_plan};
 use isoloom_render::container::{leaf_jobs, start_commands};
 use isoloom_spec::Target;
 use isoloom_targets::generate;
@@ -187,14 +186,11 @@ machines:
     app: { image: "nginx:1.27-alpine" }
     setup: [setup.sh, warm.sh]
 "#)?;
-    // db's job is waited for by web; web's two jobs by nothing.
-    assert_eq!(leaf_jobs(&spec.for_target(Target::Docker)), ["web-init-1", "web-init-2"]);
-    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
-    let plan = start_plan(compose).unwrap();
-    assert_eq!(plan.jobs, ["web-init-1", "web-init-2"]);
-    assert!(plan.wait.contains(&"web".to_owned()) && plan.wait.contains(&"db-init-1".to_owned()));
-    assert!(!plan.wait.iter().any(|w| w.starts_with("isoloom-check")), "profile services aren't started");
-    let cmd = start_commands("docker compose", &plan.jobs, Some(900));
+    // db's job is waited for by web; web's two jobs by nothing (the Compose backend's start plan
+    // says the same of the file it renders).
+    let jobs = leaf_jobs(&spec.for_target(Target::Docker));
+    assert_eq!(jobs, ["web-init-1", "web-init-2"]);
+    let cmd = start_commands("docker compose", &jobs, Some(900));
     assert_eq!(
         cmd,
         "{ set --; for w in $(docker compose config --services | grep -vx -e web-init-1 -e web-init-2); do set -- \"$@\" \"$w\"; done; } \
@@ -204,8 +200,7 @@ machines:
     );
     // Nothing left over: the one command it always was.
     assert_eq!(start_commands("docker compose", &[], None), "docker compose up -d --build --wait");
-    let hello = &generate(&example("hello-stack")?, Target::Docker).unwrap()[0].contents;
-    assert_eq!(start_plan(hello).unwrap(), StartPlan::default());
+    assert_eq!(leaf_jobs(&example("hello-stack")?.for_target(Target::Docker)), Vec::<String>::new());
     Ok(())
 }
 

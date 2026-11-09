@@ -166,7 +166,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
     if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
         r.call(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
     }
-    let docker = format!("{}\n{}", steps::INSTALL_DOCKER, steps::PUBLISHED_FROM_OUTSIDE);
+    let docker = format!("{}\n{}", steps::install_docker(), steps::PUBLISHED_FROM_OUTSIDE);
     r.call(named(vagrantfile::DOCKER, "shell").kw("inline", Value::str(&docker)));
     if !forwarded.is_empty() {
         let accept = format!(

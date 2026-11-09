@@ -154,7 +154,7 @@ fn fill_json(v: &serde_json::Value, values: &CheckValues<'_>) -> Result<serde_js
 /// # Errors
 ///
 /// A placeholder that names anything else, or a setting the case leaves without a value.
-pub fn fill(text: &str, values: &CheckValues<'_>) -> Result<String, String> {
+fn fill(text: &str, values: &CheckValues<'_>) -> Result<String, String> {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some((before, after)) = rest.split_once("{{") {

@@ -34,13 +34,12 @@
 //! It sits with the other backends, above the rendering layer (`isoloom-render`) and below the
 //! targets' registry (`isoloom-targets`), and depends on no other backend: [`ComposeBackend`]
 //! renders a planned [`Environment`](isoloom_plan::Environment), purely, into files, through
-//! typed Compose structs. [`hybrid`] adapts the same file to the `hybrid` target's Docker host,
-//! and [`start_plan`] reads back how to start a file an embedder holds.
+//! typed Compose structs. [`hybrid`] adapts the same file to the `hybrid` target's Docker host.
 //!
 //! # Example
 //!
 //! ```
-//! use isoloom_compose::{ComposeBackend, start_plan};
+//! use isoloom_compose::ComposeBackend;
 //! use isoloom_plan::{Environment, Lab};
 //! use isoloom_render::backend::Backend;
 //! use isoloom_spec::model::Target;
@@ -57,8 +56,6 @@
 //! let files = ComposeBackend(Target::Docker).render(&env)?;
 //! let compose = files.iter().find(|f| f.path == ".isoloom/docker/compose.yml").ok_or("no Compose file")?;
 //! assert!(compose.contents.contains("ipv4_address: 10.9.0.10"));
-//! // Nothing runs once and exits: everything is waited for.
-//! assert_eq!(start_plan(&compose.contents)?.jobs, Vec::<String>::new());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -88,6 +85,4 @@ mod testing;
 
 pub use backend::{ComposeBackend, capabilities_on_a_vm, guest};
 pub use error::{Error, Result};
-pub use labels::{ENVIRONMENT_LABEL, MANAGED_LABEL};
 pub use render::render;
-pub use start::{StartPlan, start_plan};

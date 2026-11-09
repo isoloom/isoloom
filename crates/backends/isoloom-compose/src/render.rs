@@ -202,21 +202,3 @@ fn volumes(env: &Environment, archs: &[Arch]) -> IndexMap<String, Volume> {
     out.extend(archs.iter().map(|a| (probe_service(*a), Volume::default())));
     out
 }
-
-#[cfg(test)]
-mod tests {
-    use isoloom_plan::Environment;
-    use isoloom_spec::model::Target;
-
-    use crate::start::{StartPlan, start_plan};
-
-    #[test]
-    fn the_start_plan_reads_the_same_from_the_text_as_from_the_typed_file() {
-        for example in crate::testing::examples() {
-            let env = Environment::build(&example.spec, Target::Docker, None);
-            let Ok(rendered) = super::compose_file(Target::Docker, &env) else { continue };
-            let yaml = super::to_yaml(Target::Docker, &rendered.file).expect("writes");
-            assert_eq!(StartPlan::of(&rendered.file), start_plan(&yaml).expect("reads back"), "{}", example.name);
-        }
-    }
-}

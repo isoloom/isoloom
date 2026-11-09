@@ -50,25 +50,17 @@ pub fn find(dir: &Path) -> Result<PathBuf> {
 ///
 /// [`Error`]: no spec file (or two), one that can't be read, or its problems.
 pub fn load(dir: &Path) -> Result<syntax::Spec> {
-    load_with(dir, &[])
-}
-
-/// Reads the spec in `dir` with `-s key=value` overrides applied first (see
-/// [`defaults::override_spec`]); keys prefixed `defaults.` are left to the defaults.
-///
-/// # Errors
-///
-/// [`Error`], as [`load`], or an override that doesn't apply.
-pub fn load_with(dir: &Path, sets: &[String]) -> Result<syntax::Spec> {
-    load_profiled(dir, None, sets)
+    load_profiled(dir, None, &[])
 }
 
 /// Reads the spec in `dir` with a profile's `spec` merged in (checked against the spec first:
-/// see [`profile::Profile::check`]), then `-s key=value` overrides.
+/// see [`profile::Profile::check`]), then `-s key=value` overrides (see
+/// [`defaults::override_spec`]; keys prefixed `defaults.` are left to the defaults).
 ///
 /// # Errors
 ///
-/// [`Error`], as [`load_with`], or a profile that names what the spec doesn't have.
+/// [`Error`], as [`load`], an override that doesn't apply, or a profile that names what the spec
+/// doesn't have.
 pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[String]) -> Result<syntax::Spec> {
     let path = find(dir)?;
     let file = path.file_name().map_or_else(|| SPEC_FILE.to_owned(), |f| f.to_string_lossy().into_owned());
@@ -127,9 +119,9 @@ mod tests {
     fn a_folder_reads_into_its_spec_and_overrides_apply_first() {
         let dir = folder("overrides", &[("isoloom.yml", SPEC)]);
         assert_eq!(load(&dir).unwrap().machines["web"].os.map(|os| os.to_string()), Some("debian@12".to_owned()));
-        let set = load_with(&dir, &["machines.web.os=alpine".to_owned(), "defaults.cloud.aws.region=x".to_owned()]).unwrap();
+        let set = load_profiled(&dir, None, &["machines.web.os=alpine".to_owned(), "defaults.cloud.aws.region=x".to_owned()]).unwrap();
         assert_eq!(set.machines["web"].os.map(|os| os.to_string()), Some("alpine@3.19".to_owned()));
-        assert!(matches!(load_with(&dir, &["nonsense".to_owned()]), Err(Error::SetShape { .. })));
+        assert!(matches!(load_profiled(&dir, None, &["nonsense".to_owned()]), Err(Error::SetShape { .. })));
     }
 
     #[test]

@@ -8,9 +8,9 @@ use isoloom_spec::model;
 use crate::file::ComposeFile;
 
 /// On everything an environment creates on Docker: `isoloom gc` collects only what has it.
-pub const MANAGED_LABEL: &str = "isoloom.managed";
+const MANAGED_LABEL: &str = "isoloom.managed";
 /// The environment a Docker resource belongs to.
-pub const ENVIRONMENT_LABEL: &str = "isoloom.environment";
+const ENVIRONMENT_LABEL: &str = "isoloom.environment";
 /// On a volume the runner's `down` keeps (`down --volumes` removes it too).
 pub(crate) const PERSISTENT_LABEL: &str = "isoloom.persistent";
 

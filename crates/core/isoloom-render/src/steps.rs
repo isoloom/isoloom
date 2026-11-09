@@ -57,26 +57,31 @@ systemctl enable --now isoloom-published.service
 
 /// The Docker Engine a Docker host gets (`docker-vm`, `cloud-docker`, `hybrid`), exactly: the
 /// version Isoloom's Compose files are proven with, so two runs of one lab get the same engine.
-pub const DOCKER_VERSION: &str = "29.9.0";
+const DOCKER_VERSION: &str = "29.9.0";
 
 /// The Compose plugin a Docker host gets, exactly (on hosts with `apt`: Debian and Ubuntu).
-pub const COMPOSE_VERSION: &str = "5.6.0";
+const COMPOSE_VERSION: &str = "5.6.0";
 
 /// Docker's apt signing key, pinned by SHA-256 (the same armored key for Debian and Ubuntu,
 /// `download.docker.com/linux/<id>/gpg`); verified against download.docker.com on 2026-10-16.
-pub const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570";
+const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570";
 
 /// Installs Docker, unless it is there, as a root script. On the apt family (Debian, Ubuntu) it
-/// adds Docker's own repository with the signing key pinned by SHA-256 ([`DOCKER_APT_KEY_SHA256`],
-/// no `curl | sh`), then installs the engine at [`DOCKER_VERSION`] (the exact package resolved from
+/// adds Docker's own repository with the signing key pinned by SHA-256 (`DOCKER_APT_KEY_SHA256`,
+/// no `curl | sh`), then installs the engine at `DOCKER_VERSION` (the exact package resolved from
 /// the repository, so its epoch and build suffix are the repo's) and the Compose plugin at
-/// [`COMPOSE_VERSION`]. The RPM family (Rocky, AlmaLinux, CentOS, Fedora) uses Docker's own
-/// install script, pinned to [`DOCKER_VERSION`] only: its repository key isn't checked against a
+/// `COMPOSE_VERSION`. The RPM family (Rocky, AlmaLinux, CentOS, Fedora) uses Docker's own
+/// install script, pinned to `DOCKER_VERSION` only: its repository key isn't checked against a
 /// pinned SHA-256 as the apt branch's is. The apt branch fails closed (a `set -e` subshell, the
-/// key verified before use). On a non-x86 host (an Apple Silicon Mac's VM,
-/// an Arm cloud VM) the apt branch adds QEMU's user-mode emulation (`qemu-user-static`, registered
-/// with binfmt for every container), since a lab's images are x86 unless its spec says otherwise.
-pub const INSTALL_DOCKER: &str = r#"command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
+/// key verified before use). On a non-x86 host (an Apple Silicon Mac's VM, an Arm cloud VM) the
+/// apt branch adds QEMU's user-mode emulation (`qemu-user-static`, registered with binfmt for
+/// every container), since a lab's images are x86 unless its spec says otherwise.
+#[must_use]
+pub fn install_docker() -> String {
+    // The engine's version as `apt-cache madison` writes it, after an optional epoch.
+    let madison = DOCKER_VERSION.replace('.', "[.]");
+    format!(
+        r#"command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   set -e
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
@@ -88,22 +93,24 @@ pub const INSTALL_DOCKER: &str = r#"command -v docker >/dev/null || if command -
   # shellcheck disable=SC1091,SC2154
   _cn=$(. /etc/os-release && printf %s "$VERSION_CODENAME")
   curl -fsSL "https://download.docker.com/linux/$_id/gpg" -o "$k"
-  echo "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570  $k" | sha256sum -c -
+  echo "{DOCKER_APT_KEY_SHA256}  $k" | sha256sum -c -
   install -m 0644 "$k" /etc/apt/keyrings/docker.asc
   rm -f "$k"
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$_id $_cn stable" > /etc/apt/sources.list.d/docker.list
   apt-get update -qq
-  v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
-  [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
-  apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
+  v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:){madison}/ {{ print $3; exit }}')
+  [ -n "$v" ] || {{ echo "docker-ce {DOCKER_VERSION} is not in Docker's apt repository" >&2; exit 1; }}
+  apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin={COMPOSE_VERSION}-*"
   # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
   # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
   # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
-  curl -fsSL https://get.docker.com | VERSION=29.9.0 sh
-fi"#;
+  curl -fsSL https://get.docker.com | VERSION={DOCKER_VERSION} sh
+fi"#
+    )
+}
 
 /// A shell loop waiting for the file `mark`, the runner's sign that it delivered something,
 /// looking every 5 seconds: it says `waiting` once, and gives up with `missing` (on stderr, exit

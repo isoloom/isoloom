@@ -127,7 +127,7 @@ pub(crate) fn esxi_host(r: &mut Ruby) {
 
 /// Docker from Docker's own install script, unless the box has it.
 pub(crate) fn install_docker(r: &mut Ruby, var: &str) {
-    r.call(shell(var, DOCKER).kw("inline", Value::str(steps::INSTALL_DOCKER)));
+    r.call(shell(var, DOCKER).kw("inline", Value::str(&steps::install_docker())));
 }
 
 #[cfg(test)]

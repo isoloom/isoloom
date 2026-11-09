@@ -25,6 +25,10 @@ thiserror.workspace = true
 # The cloud-init carrier compresses a recipe's script for `write_files` (`encoding: gz+b64`).
 flate2.workspace = true
 
+[features]
+# Builders for the tests of the crates above (a dev-dependency turns it on): not a backend's API.
+test-support = []
+
 [dev-dependencies]
 proptest.workspace = true
 serde_yaml_ng.workspace = true

@@ -22,9 +22,9 @@ pub const KEPT_DIR: &str = "C:\\ProgramData\\isoloom\\secrets";
 /// The mark delivery leaves once every secret is kept.
 pub const DELIVERED: &str = "C:\\ProgramData\\isoloom\\secrets\\.delivered";
 /// The script putting the files in place, run by the startup task and before the process.
-pub const PLACE_SCRIPT: &str = "C:\\ProgramData\\isoloom\\apply-secrets.ps1";
+const PLACE_SCRIPT: &str = "C:\\ProgramData\\isoloom\\apply-secrets.ps1";
 /// The startup task running [`PLACE_SCRIPT`] at every boot.
-pub const PLACE_TASK: &str = "isoloom-apply-secrets";
+const PLACE_TASK: &str = "isoloom-apply-secrets";
 
 /// What the runner starts on the machine (as `powershell -EncodedCommand`): it reads the
 /// first line of its standard input, the receiving script in base64, and runs it. The script

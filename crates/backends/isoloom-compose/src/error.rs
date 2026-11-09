@@ -34,13 +34,6 @@ pub enum Error {
         #[source]
         source: ManifestError,
     },
-    /// A Compose file's text isn't YAML (reading its start plan back).
-    #[error("the Compose file isn't YAML")]
-    Unreadable {
-        /// What the YAML reader reported.
-        #[source]
-        source: serde_yaml_ng::Error,
-    },
 }
 
 /// A result whose error is this crate's [`Error`].
@@ -60,7 +53,6 @@ impl From<Error> for RenderError {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
             Error::Unwritable { target, source } => unsupported(target, source.to_string()),
             Error::Manifest { source } => unsupported(Target::Docker, format!("the run manifest: {source}")),
-            Error::Unreadable { source } => unsupported(Target::Docker, format!("the Compose file isn't YAML: {source}")),
         }
     }
 }

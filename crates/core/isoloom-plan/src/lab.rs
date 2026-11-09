@@ -270,13 +270,6 @@ impl Lab {
     }
 }
 
-/// Every problem an author sees in `yaml`: the parser's when it can't read it, else the lab's
-/// (what `isoloom validate` shows, files aside).
-#[must_use]
-pub fn problems_in(yaml: &str) -> Problems {
-    Lab::parse(yaml).map_or_else(|refused| refused, |lab| lab.problems())
-}
-
 /// `found` added to `out`, unless a problem at the same field is already there (the authored
 /// spec's own check says it better).
 fn add(out: &mut Problems, found: impl IntoIterator<Item = Problem>) {

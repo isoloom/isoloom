@@ -17,7 +17,7 @@ pub enum Tpm {
 
 /// Whether an OS expects a TPM 2.0: Windows 11 refuses to install or upgrade without one.
 #[must_use]
-pub fn expects_tpm(os: &str) -> bool {
+fn expects_tpm(os: &str) -> bool {
     os == "windows-11"
 }
 

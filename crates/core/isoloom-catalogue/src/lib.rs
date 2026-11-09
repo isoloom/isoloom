@@ -60,7 +60,7 @@ mod version;
 
 pub use catalogue::{Catalogue, Entry};
 pub use collections::{Collection, Collections};
-pub use contract::{Case, CheckValues, Contract, ContractCheck, Fact, fill as fill_contract};
+pub use contract::{Case, CheckValues, Contract, ContractCheck, Fact};
 pub use entry::{
     Daemon, Definition, EntryPort, EntryStep, ImageStart, ImageUse, Licence, LogStream, OsFamily, Pattern, PerFamily, PortNumber, Recipe, Release, Setting,
     SettingType, Source, When,

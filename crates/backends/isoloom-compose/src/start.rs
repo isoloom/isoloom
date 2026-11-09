@@ -1,20 +1,16 @@
 //! How to start a Compose file: `wait` for everything but its leaf jobs (`up -d --wait`), then
 //! run each of those jobs attached, in order, failing on its exit code. Computed from the typed
-//! file this backend renders, and read back from a file's text the same way, so an embedder
-//! holding only `.isoloom/docker/compose.yml` gets the plan Isoloom has.
+//! file this backend renders.
 
-use serde_yaml_ng::{Mapping, Value};
-
-use crate::error::{Error, Result};
 use crate::file::ComposeFile;
 
 /// How to start a Compose file: the services to wait for, then the jobs to run.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct StartPlan {
+pub(crate) struct StartPlan {
     /// Services to bring up with `docker compose up -d --wait` (empty: all of them).
-    pub wait: Vec<String>,
+    pub(crate) wait: Vec<String>,
     /// One-shot jobs nothing running waits for, to run after `wait`, in order.
-    pub jobs: Vec<String>,
+    pub(crate) jobs: Vec<String>,
 }
 
 /// A service as the start plan reads it: its name, what it waits for, whether it runs once
@@ -25,43 +21,9 @@ struct Started {
     one_shot: bool,
 }
 
-/// The [`StartPlan`] of a Compose file's text: one-shots (`restart: "no"`) outside profiles that
-/// no other started service depends on are jobs; when there are none, `wait` is empty (start
-/// all).
-///
-/// # Errors
-///
-/// [`Error::Unreadable`] when the text isn't YAML. A file without services starts nothing
-/// special: the default plan.
-pub fn start_plan(compose_yaml: &str) -> Result<StartPlan> {
-    let doc: Value = serde_yaml_ng::from_str(compose_yaml).map_err(|source| Error::Unreadable { source })?;
-    let Some(Value::Mapping(services)) = doc.get("services") else {
-        return Ok(StartPlan::default());
-    };
-    let started: Vec<Started> = services
-        .iter()
-        .filter_map(|(k, v)| Some((k.as_str()?, v.as_mapping()?)))
-        .filter(|(_, v)| v.get("profiles").is_none())
-        .map(|(name, v)| Started {
-            name: name.to_owned(),
-            deps: dependencies(v),
-            one_shot: v.get("restart").and_then(Value::as_str) == Some("no"),
-        })
-        .collect();
-    Ok(plan_of(&started))
-}
-
-/// What a service of a file's text waits for: `depends_on` as a map or as a list.
-fn dependencies(service: &Mapping) -> Vec<String> {
-    match service.get("depends_on") {
-        Some(Value::Mapping(d)) => d.keys().filter_map(|k| k.as_str().map(String::from)).collect(),
-        Some(Value::Sequence(d)) => d.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
-        _ => Vec::new(),
-    }
-}
-
 impl StartPlan {
-    /// The plan of a typed Compose file: what [`start_plan`] reads from its text.
+    /// The plan of a Compose file: one-shots (`restart: "no"`) outside profiles that no other
+    /// started service depends on are jobs; when there are none, `wait` is empty (start all).
     pub(crate) fn of(file: &ComposeFile) -> StartPlan {
         let started: Vec<Started> = file
             .services
@@ -105,66 +67,62 @@ fn plan_of(started: &[Started]) -> StartPlan {
 
 #[cfg(test)]
 mod tests {
-    use proptest::prelude::*;
+    use isoloom_spec::model::Target;
 
     use super::*;
     use crate::file::{Condition, Restart, Service};
 
-    const FILE: &str = "
-services:
-  web: { restart: unless-stopped, depends_on: { db: { condition: service_healthy }, web-init-1: { condition: service_completed_successfully } } }
-  web-init-1: { restart: 'no' }
-  db: { restart: unless-stopped }
-  seed: { restart: 'no', depends_on: [db] }
-  isoloom-check: { profiles: [check], restart: 'no' }
-";
+    /// A service that runs once (`restart: "no"`) or keeps running, in `profiles`, after `deps`.
+    fn service(once: bool, profiles: &[&str], deps: &[&str]) -> Service {
+        let mut s = Service {
+            restart: Some(if once { Restart::No } else { Restart::UnlessStopped }),
+            profiles: profiles.iter().map(|p| (*p).to_owned()).collect(),
+            ..Service::default()
+        };
+        for d in deps {
+            s.after(*d, Condition::Started);
+        }
+        s
+    }
+
+    fn file(services: &[(&str, Service)]) -> ComposeFile {
+        let mut f = ComposeFile::default();
+        f.services.extend(services.iter().map(|(n, s)| ((*n).to_owned(), s.clone())));
+        f
+    }
 
     #[test]
     fn a_job_nothing_waits_for_runs_after_the_rest_is_up() {
-        let plan = start_plan(FILE).expect("reads");
+        let plan = StartPlan::of(&file(&[
+            ("web", service(false, &[], &["db", "web-init-1"])),
+            ("web-init-1", service(true, &[], &[])),
+            ("db", service(false, &[], &[])),
+            ("seed", service(true, &[], &["db"])),
+            ("isoloom-check", service(true, &["check"], &[])),
+        ]));
         assert_eq!(plan.jobs, ["seed"]);
         assert_eq!(plan.wait, ["web", "web-init-1", "db"]);
     }
 
     #[test]
     fn without_leaf_jobs_everything_is_waited_for() {
-        assert_eq!(
-            start_plan("services: { web: { restart: unless-stopped } }\n").expect("reads"),
-            StartPlan::default()
-        );
-        assert_eq!(start_plan("name: empty\n").expect("reads"), StartPlan::default());
+        assert_eq!(StartPlan::of(&file(&[("web", service(false, &[], &[]))])), StartPlan::default());
+        assert_eq!(StartPlan::of(&ComposeFile::default()), StartPlan::default());
     }
 
     #[test]
-    fn text_that_is_not_yaml_is_refused() {
-        assert!(matches!(start_plan("services: [unclosed"), Err(Error::Unreadable { .. })));
-    }
-
-    /// A service of a generated file: whether it runs once, whether it is in a profile, and
-    /// the services it waits for (by index; one out of range or its own is left out).
-    fn service() -> impl Strategy<Value = (bool, bool, Vec<usize>)> {
-        (any::<bool>(), any::<bool>(), prop::collection::vec(0usize..6, 0..3))
-    }
-
-    proptest! {
-        #[test]
-        fn the_text_and_the_typed_file_give_the_same_plan(services in prop::collection::vec(service(), 1..6)) {
-            let mut file = ComposeFile::default();
-            for (i, (once, profiled, deps)) in services.iter().enumerate() {
-                let mut svc = Service {
-                    restart: Some(if *once { Restart::No } else { Restart::UnlessStopped }),
-                    ..Service::default()
-                };
-                if *profiled {
-                    svc.profiles = vec!["check".into()];
-                }
-                for d in deps.iter().filter(|d| **d < services.len() && **d != i) {
-                    svc.after(format!("s{d}"), Condition::Started);
-                }
-                file.services.insert(format!("s{i}"), svc);
-            }
-            let yaml = serde_yaml_ng::to_string(&file).expect("writes");
-            prop_assert_eq!(StartPlan::of(&file), start_plan(&yaml).expect("reads back"));
-        }
+    fn a_rendered_file_waits_for_what_runs_and_runs_its_leaf_init_jobs_after() {
+        // The store's init job is waited for by the app; the app's by nothing.
+        let env = crate::testing::environment(
+            "version: 1\nname: leaves\nnetworks: { net: { cidr: 10.71.0.0/24 } }\nmachines:\n  store: { networks: { net: 5 }, app: { image: redis }, setup: [fill.sh] }\n  app: { networks: { net: 6 }, depends_on: [store], app: { image: nginx }, setup: [prime.sh] }\n",
+        );
+        let rendered = crate::render::compose_file(Target::Docker, &env).expect("renders");
+        let plan = StartPlan::of(&rendered.file);
+        assert_eq!(plan.jobs, ["app-init-1"]);
+        assert!(
+            plan.wait.contains(&"app".to_owned()) && plan.wait.contains(&"store-init-1".to_owned()),
+            "{plan:?}"
+        );
+        assert!(!plan.wait.iter().any(|w| w.starts_with("isoloom-check")), "profile services aren't started");
     }
 }

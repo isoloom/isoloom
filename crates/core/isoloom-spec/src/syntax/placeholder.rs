@@ -135,7 +135,7 @@ impl Reference {
     /// # Errors
     ///
     /// Why the place can't name it: a run-time value in a file, an entry's path outside an entry.
-    pub fn allowed_in(&self, place: Place) -> Result<(), &'static str> {
+    fn allowed_in(&self, place: Place) -> Result<(), &'static str> {
         let entry = matches!(place, Place::Entry | Place::EntryItem);
         match self {
             Reference::MachineName | Reference::OwnAddress { .. } if place == Place::Message => Err("the message names machines by `machines.<m>`"),

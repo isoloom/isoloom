@@ -7,7 +7,7 @@ use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_spec::model::{HostFolder, HostPath};
 
 /// Where Compose in a VM finds the host folders: `<VM_ROOT>/<machine>/<n>`.
-pub const VM_ROOT: &str = "/mnt/isoloom";
+const VM_ROOT: &str = "/mnt/isoloom";
 
 /// One container's host folder: whose, which, and its names on each side.
 #[derive(Debug, Clone, PartialEq, Eq)]

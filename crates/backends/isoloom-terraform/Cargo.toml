@@ -23,6 +23,7 @@ indexmap.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+isoloom-render = { workspace = true, features = ["test-support"] }
 insta.workspace = true
 proptest.workspace = true
 

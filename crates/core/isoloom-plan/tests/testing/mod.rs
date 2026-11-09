@@ -27,7 +27,8 @@ pub fn refused(yaml: &str) -> Vec<Problem> {
 /// one line each.
 #[must_use]
 pub fn problems(yaml: &str) -> Vec<String> {
-    isoloom_plan::problems_in(yaml).iter().map(Problem::line).collect()
+    let found = isoloom_plan::Lab::parse(yaml).map_or_else(|refused| refused, |lab| lab.problems());
+    found.iter().map(Problem::line).collect()
 }
 
 /// Some problem of `yaml` is at `at` and its reason contains `fragment`.
