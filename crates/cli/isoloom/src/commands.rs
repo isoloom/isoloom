@@ -41,6 +41,7 @@ pub(crate) struct Project {
 pub(crate) struct Listing {
     #[command(flatten)]
     pub(crate) project: Project,
+    /// JSON instead of text.
     #[arg(long)]
     pub(crate) json: bool,
 }

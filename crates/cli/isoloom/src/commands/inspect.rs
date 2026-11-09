@@ -13,8 +13,8 @@ pub(crate) struct Args {
     /// YAML instead of JSON.
     #[arg(long)]
     yaml: bool,
-    /// Run as instance N (1-99) of the spec: its own names, Docker blocks and published
-    /// ports, files under .isoloom-N/. For several copies on one host.
+    /// The snapshot of instance N (1-99) of the spec: its own names, Docker blocks and published
+    /// ports, as a runner makes them for several copies on one host.
     #[arg(long, value_name = "N")]
     instance: Option<u8>,
     /// Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec,

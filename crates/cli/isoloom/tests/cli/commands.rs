@@ -159,6 +159,12 @@ fn a_target_that_refuses_is_left_out_and_check_still_passes() -> Outcome {
     assert!(generated.stdout.contains("· kubernetes: "), "{}", generated.stdout);
     let checked = isoloom(&dir, &[&"check", &dir])?;
     assert_eq!(checked.code, Some(0), "{checked:?}");
+    let one = isoloom(&dir, &[&"check", &dir, &"--target", &"docker"])?;
+    assert_eq!(one.code, Some(0), "{one:?}");
+    assert!(one.stdout.contains("compose.yml") && !one.stdout.contains("Vagrantfile"), "{one:?}");
+    let refused = isoloom(&dir, &[&"check", &dir, &"--target", &"kubernetes"])?;
+    assert_eq!(refused.code, Some(1), "nothing to vouch for: {refused:?}");
+    assert!(refused.stdout.contains("✗ kubernetes: "), "{refused:?}");
     Ok(())
 }
 
@@ -258,6 +264,17 @@ fn a_profile_applies_to_every_command_and_pins_its_target() -> Outcome {
     let other = isoloom(&home, &[&"generate", &dir, &"--profile", &"big", &"--target", &"docker"])?;
     assert_eq!(other.code, Some(2), "{other:?}");
     assert!(other.stderr.contains("profile `big` runs on `vagrant`, not `docker`"), "{other:?}");
+
+    // `check` compares what `generate` wrote: the pinned target's files only.
+    let checked = isoloom(&home, &[&"--profile", &"big", &"check", &dir])?;
+    assert_eq!(checked.code, Some(0), "{checked:?}");
+    assert!(
+        checked.stdout.contains("✓ .isoloom/vagrant/Vagrantfile") && !checked.stdout.contains("compose.yml"),
+        "{checked:?}"
+    );
+    let unpinned = isoloom(&home, &[&"check", &dir, &"--profile", &"big", &"--target", &"docker"])?;
+    assert_eq!(unpinned.code, Some(2), "{unpinned:?}");
+    assert!(unpinned.stderr.contains("profile `big` runs on `vagrant`, not `docker`"), "{unpinned:?}");
 
     let unknown = isoloom(&home, &[&"validate", &dir, &"--profile", &"small"])?;
     assert_eq!(unknown.code, Some(2), "{unknown:?}");
