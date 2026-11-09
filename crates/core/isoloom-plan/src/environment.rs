@@ -8,6 +8,7 @@
 //! (appliance wiring, trunk scripts) a backend still reads from [`Environment::spec`], the spec
 //! as laid out for the target.
 
+use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
@@ -73,6 +74,9 @@ pub struct Environment {
     pub inventory_groups: IndexMap<String, Vec<String>>,
     /// The private DNS zone, when `dns.private` is on: its domain and records.
     pub private_dns: Option<crate::private_dns::PrivateDns>,
+    /// The region each cloud's module defaults to, by the cloud's id (`aws`), when the person's
+    /// defaults set one ([`crate::Lab::with_regions`]); a cloud left out keeps its own.
+    pub regions: BTreeMap<String, String>,
     spec: Spec,
 }
 
@@ -376,6 +380,7 @@ impl Environment {
             inventory_groups: ansible::groups(&laid_out),
             private_dns: crate::private_dns::plan(&laid_out),
             spec: laid_out,
+            regions: BTreeMap::new(),
         }
     }
 

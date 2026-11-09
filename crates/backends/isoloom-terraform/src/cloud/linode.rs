@@ -8,24 +8,19 @@ use crate::hcl_builder::{Block, Expression, attr, call, index, reference, string
 
 use super::{Base, operator};
 use crate::cloud::instance;
-use crate::module::variable::Variable;
 
 /// What Linode's modules share: its token and who may reach the machines, the region, the
 /// provider (its token read from the environment), and the user its images sign in as.
 pub(crate) const BASE: Base = Base {
+    cloud: crate::cloud::Cloud::Linode,
     usage: |folder| operator::with_token(folder, "# Auth:   export LINODE_TOKEN=<token> (the provider reads it).\n"),
-    variables: || vec![region()],
+    variables: |region| vec![crate::cloud::region_variable(region)],
     provider: |_, m| {
         operator::bare_provider(m, "linode");
         Vec::new()
     },
     user: |_| vm::USER,
 };
-
-/// The `region` variable: Paris by default.
-pub(crate) fn region() -> Variable {
-    Variable::new("region", "string").default(string("fr-par"))
-}
 
 /// An instance's `metadata` block: its user data (base64), which cloud-init reads from Linode's
 /// metadata service.

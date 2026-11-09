@@ -16,7 +16,6 @@ pub mod appliance;
 mod clones;
 pub mod defaults;
 mod error;
-pub mod files;
 pub mod groups;
 pub mod host;
 pub mod images;

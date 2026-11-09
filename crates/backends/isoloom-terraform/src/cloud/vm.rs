@@ -81,7 +81,7 @@ fn required(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<P
 /// A cloud's own variables for `env`: the driver's, then the seal's switch when a machine has
 /// anything to seal.
 pub(crate) fn own_variables(env: &Environment, driver: &Driver) -> Vec<Variable> {
-    let mut v = (driver.base.variables)();
+    let mut v = driver.base.variables(env);
     v.extend(seal::variable(env));
     // cloud-vm reads the launch-time inputs in its machines' user data (the plain ones); the
     // cloud-docker host never does (its containers get them over SSH), so only cloud-vm declares

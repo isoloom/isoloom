@@ -23,6 +23,7 @@ mod templates;
 pub struct Lab {
     source: syntax::Spec,
     images: Table,
+    regions: BTreeMap<String, String>,
     templates: templates::Texts,
     catalogue: &'static Catalogue,
     memo: Memo,
@@ -72,6 +73,7 @@ impl Lab {
         Lab {
             source,
             images: Table::default(),
+            regions: BTreeMap::new(),
             templates: templates::Texts::new(),
             catalogue: built_in(),
             memo: Memo::default(),
@@ -93,6 +95,25 @@ impl Lab {
     pub fn with_images(mut self, images: Table) -> Lab {
         self.images = images;
         self
+    }
+
+    /// The lab with the region each cloud's module defaults to, by the cloud's id (`aws`), as the
+    /// person's defaults set it (`isoloom_spec::defaults::Defaults::regions`): written into the
+    /// module's `region` variable and the run manifest's `region` param alike. A cloud left out
+    /// keeps its own.
+    #[must_use]
+    pub fn with_regions(mut self, regions: BTreeMap<String, String>) -> Lab {
+        self.regions = regions;
+        self
+    }
+
+    /// The lab planned for `target` (as instance `instance` of `spec`, the lab as that target runs
+    /// it): the plan with the lab's regions.
+    #[must_use]
+    pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> crate::Environment {
+        let mut env = crate::Environment::build(spec, target, instance);
+        env.regions.clone_from(&self.regions);
+        env
     }
 
     /// The lab with the texts of its project's templates (read by the caller that generates,

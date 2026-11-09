@@ -30,10 +30,10 @@ pub(crate) struct Args {
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
     let target = spec::pinned(profile, dir, a.target.as_deref())?;
-    let (lab, settings) = spec::with_settings(profile, dir, a.images.as_deref(), &a.sets)?;
+    let (lab, _) = spec::with_settings(profile, dir, a.images.as_deref(), &a.sets)?;
     let lab = spec::checked(lab, dir)?;
     let (files, skipped) = files(&lab, target.as_deref())?;
-    let files = generated::finish(files, &settings.defaults, dir)?;
+    let files = generated::finish(files, dir)?;
     for f in &files {
         generated::write_file(dir, f)?;
         console.line(format_args!("✓ {}", f.path))?;

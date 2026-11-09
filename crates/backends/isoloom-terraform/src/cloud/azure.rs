@@ -5,7 +5,7 @@
 pub(crate) mod docker;
 pub(crate) mod vm;
 
-use crate::hcl_builder::{Block, Expression, Module, null, reference, string};
+use crate::hcl_builder::{Block, Expression, Module, null, reference};
 use isoloom_plan::Environment;
 
 use super::{Base, operator};
@@ -16,20 +16,21 @@ use crate::module::variable::Variable;
 /// What Azure's modules share: who may reach the machines and their key, the subscription and
 /// the region, the provider with the tags, and the one user every VM is given.
 pub(crate) const BASE: Base = Base {
+    cloud: crate::cloud::Cloud::Azure,
     usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
-    variables: || variables().into(),
+    variables: |region| variables(region).into(),
     provider,
     user: |_| vm::USER,
 };
 
-/// The `subscription_id` and `region` variables: the operator's default subscription, Sweden
+/// The `subscription_id` and `region` variables: the operator's default subscription, `region`
 /// by default.
-pub(crate) fn variables() -> [Variable; 2] {
+pub(crate) fn variables(region: &str) -> [Variable; 2] {
     [
         Variable::new("subscription_id", "string")
             .default(null())
             .describe("Default: ARM_SUBSCRIPTION_ID from the environment"),
-        Variable::new("region", "string").default(string("swedencentral")),
+        crate::cloud::region_variable(region),
     ]
 }
 

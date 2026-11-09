@@ -281,3 +281,33 @@ fn a_profile_applies_to_every_command_and_pins_its_target() -> Outcome {
     assert!(unknown.stderr.contains("no profile `small` (profiles here: big)"), "{unknown:?}");
     Ok(())
 }
+
+#[test]
+fn a_users_default_region_reaches_the_module_and_the_run_manifest() -> Outcome {
+    // The region the run manifest's `region` param defaulted to was the built-in one, which a
+    // runner gives Terraform (TF_VAR_region), undoing the person's.
+    let home = scratch("default-region-home")?;
+    std::fs::write(home.join("defaults.yml"), "cloud: { aws: { region: eu-north-1 } }\n")?;
+    let dir = scratch("default-region")?;
+    for f in ["isoloom.yml", "build/web/Dockerfile", "provision/web.sh", "checks/web-answers.sh"] {
+        let to = dir.join(f);
+        std::fs::create_dir_all(to.parent().ok_or("a file at the root")?)?;
+        std::fs::copy(example("solo-web").join(f), to)?;
+    }
+    let o = isoloom(&home, &[&"generate", &dir, &"--target", &"cloud-vm"])?;
+    assert_eq!(o.code, Some(0), "{o:?}");
+    let module = std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/main.tf"))?;
+    assert!(module.contains("default = \"eu-north-1\""), "{module}");
+    let manifest: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/run.json"))?)?;
+    let region = manifest["params"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|p| p["name"] == "region")
+        .ok_or("no region param")?;
+    assert_eq!(region["default"], "eu-north-1", "{region}");
+    // `isoloom check` sees the same files.
+    let checked = isoloom(&home, &[&"check", &dir, &"--target", &"cloud-vm"])?;
+    assert_eq!(checked.code, Some(0), "{checked:?}");
+    Ok(())
+}

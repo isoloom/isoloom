@@ -21,7 +21,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     if !a.system {
         return in_effect(profile, &a.project.dir, a.json, console);
     }
-    let value = isoloom_spec::defaults::builtin();
+    let value = builtin();
     if a.json {
         console.json(&serde_json::to_value(&value)?)?;
     } else {
@@ -35,7 +35,7 @@ fn in_effect(profile: &spec::Profile, dir: &Path, json: bool, console: &mut Cons
     let profile = profile.load(dir)?;
     let host = spec::host();
     let r = isoloom_spec::defaults::load(&spec::defaults_of(dir, None, profile.as_ref(), &[])).map_err(CliError::Defaults)?;
-    let mut merged = isoloom_spec::defaults::builtin();
+    let mut merged = builtin();
     isoloom_spec::defaults::merge(&mut merged, &r.merged);
     let project_file = dir.join(isoloom_spec::defaults::PROJECT_FILE);
     if json {
@@ -57,7 +57,7 @@ fn in_effect(profile: &spec::Profile, dir: &Path, json: bool, console: &mut Cons
 
 /// One line per value: its key, the value and where it comes from, in aligned columns.
 fn source_lines(merged: &serde_yaml_ng::Value, sources: &[(String, String)]) -> Vec<String> {
-    let builtin_leaves = isoloom_spec::defaults::leaves(&isoloom_spec::defaults::builtin(), "");
+    let builtin_leaves = isoloom_spec::defaults::leaves(&builtin(), "");
     let width = sources
         .iter()
         .map(|(k, _)| k.len())
@@ -77,6 +77,21 @@ fn source_lines(merged: &serde_yaml_ng::Value, sources: &[(String, String)]) -> 
             format!("{leaf:<width$}  {value:<24}  {source}")
         })
         .collect()
+}
+
+/// The built-in layer: each cloud's region, as its modules default to it (the image table is
+/// documented on its own page and read from the code).
+fn builtin() -> serde_yaml_ng::Value {
+    use serde_yaml_ng::{Mapping, Value};
+    let mut cloud = Mapping::new();
+    for (c, r) in isoloom_targets::default_regions() {
+        let mut m = Mapping::new();
+        m.insert(Value::String("region".into()), Value::String(r.into()));
+        cloud.insert(Value::String(c.into()), Value::Mapping(m));
+    }
+    let mut top = Mapping::new();
+    top.insert(Value::String("cloud".into()), Value::Mapping(cloud));
+    Value::Mapping(top)
 }
 
 #[cfg(test)]

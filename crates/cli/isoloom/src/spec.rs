@@ -69,12 +69,15 @@ pub(crate) fn defaults_of<'a>(
     }
 }
 
-/// The lab with `-s` overrides and the image table applied, and the defaults in effect.
+/// The lab with `-s` overrides, the image table and the clouds' regions applied, and the
+/// defaults in effect.
 pub(crate) fn with_settings(profile: &Profile, dir: &Path, images: Option<&Path>, sets: &[String]) -> Result<(Lab, Resolved)> {
     let profile = profile.load(dir)?;
     let spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
     let settings = isoloom_spec::defaults::load(&defaults_of(dir, images, profile.as_ref(), sets)).map_err(CliError::Defaults)?;
-    let lab = Lab::new(spec).with_images(settings.defaults.images.clone());
+    let lab = Lab::new(spec)
+        .with_images(settings.defaults.images.clone())
+        .with_regions(settings.defaults.regions());
     let templates = templates(&lab, dir);
     Ok((lab.with_templates(templates), settings))
 }

@@ -1,7 +1,8 @@
 //! Defaults: settings that aren't the spec's business but a person's or a team's, in layers,
 //! the last one winning:
 //!
-//! 1. built in (the image table in [`crate::images`], each cloud's region in its generator),
+//! 1. built in (the image table in [`crate::images`], each cloud's region in its generator,
+//!    which the lab writes into its module and run manifest: `Lab::with_regions`),
 //! 2. the user's file, `$ISOLOOM_HOME/defaults.yml` (`~/.isoloom/defaults.yml`),
 //! 3. the project's file, `isoloom.defaults.yml` next to the spec (committed: the team's),
 //! 4. environment variables `ISOLOOM_<KEY>`, `__` standing for a dot (`ISOLOOM_CLOUD__AWS__REGION`),
@@ -28,7 +29,6 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use serde_yaml_ng::{Mapping, Value};
 
-use crate::files::GeneratedFile;
 use crate::host::Host;
 use crate::images::Table;
 use crate::{Error, Result};
@@ -51,6 +51,15 @@ pub struct Defaults {
     pub cloud: IndexMap<String, Cloud>,
 }
 
+impl Defaults {
+    /// The region each cloud's modules default to, by the cloud's id (`aws`), where this sets one
+    /// (what `Lab::with_regions` takes).
+    #[must_use]
+    pub fn regions(&self) -> std::collections::BTreeMap<String, String> {
+        self.cloud.iter().filter_map(|(c, v)| Some((c.clone(), v.region.clone()?))).collect()
+    }
+}
+
 /// The defaults' `vagrant:` section.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -69,16 +78,6 @@ pub struct Cloud {
     #[serde(default)]
     pub region: Option<String>,
 }
-
-/// Each cloud's built-in region, as its generator writes it. A test keeps them equal.
-pub const BUILTIN_REGIONS: &[(&str, &str)] = &[
-    ("aws", "eu-west-3"),
-    ("azure", "swedencentral"),
-    ("gcp", "europe-west9"),
-    ("digitalocean", "fra1"),
-    ("linode", "fr-par"),
-    ("oci", "eu-paris-1"),
-];
 
 /// One layer's contribution: where it came from, and what it set.
 #[derive(Debug, Clone, PartialEq)]
@@ -322,55 +321,6 @@ pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> 
     Ok(serde_yaml_ng::to_string(&doc)?)
 }
 
-/// Applies the defaults that change generated files: each cloud module's region default.
-/// (Images are applied to the spec before generating; `vagrant.provider` at run time.)
-#[must_use]
-pub fn apply_to_files(files: Vec<GeneratedFile>, d: &Defaults) -> Vec<GeneratedFile> {
-    files
-        .into_iter()
-        .map(|mut f| {
-            // .isoloom[-n]/cloud-vm/<cloud>/main.tf, .isoloom[-n]/cloud-docker/<cloud>/main.tf
-            let parts: Vec<&str> = f.path.split('/').collect();
-            if let [_, target, cloud, "main.tf"] = parts.as_slice()
-                && target.starts_with("cloud-")
-                && let Some(region) = d.cloud.get(*cloud).and_then(|c| c.region.as_deref())
-            {
-                f.contents = set_region(&f.contents, region);
-            }
-            f
-        })
-        .collect()
-}
-
-/// The module text with its `variable "region"` default replaced.
-#[must_use]
-pub fn set_region(tf: &str, region: &str) -> String {
-    const VARIABLE: &str = "variable \"region\"";
-    let replaced = tf.split_once(VARIABLE).and_then(|(before, rest)| {
-        let (block, after) = rest.split_once("\n}")?;
-        let (head, from_default) = block.split_once("default")?;
-        let (to_quote, quoted) = from_default.split_once('"')?;
-        let (_, past_quote) = quoted.split_once('"')?;
-        Some(format!("{before}{VARIABLE}{head}default{to_quote}\"{region}\"{past_quote}\n}}{after}"))
-    });
-    replaced.unwrap_or_else(|| tf.to_owned())
-}
-
-/// What the built-in layer holds, for `isoloom defaults --system`: the clouds' regions (the
-/// image table is documented on its own page and read from the code).
-#[must_use]
-pub fn builtin() -> Value {
-    let mut cloud = Mapping::new();
-    for (c, r) in BUILTIN_REGIONS {
-        let mut m = Mapping::new();
-        m.insert(Value::String("region".into()), Value::String((*r).into()));
-        cloud.insert(Value::String((*c).into()), Value::Mapping(m));
-    }
-    let mut top = Mapping::new();
-    top.insert(Value::String("cloud".into()), Value::Mapping(cloud));
-    Value::Mapping(top)
-}
-
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
@@ -477,56 +427,6 @@ mod tests {
     fn an_empty_mapping_is_a_leaf_of_its_own() -> Outcome {
         let v: Value = serde_yaml_ng::from_str("cloud: { aws: {} }\nvagrant: { provider: qemu }\n")?;
         assert_eq!(leaves(&v, ""), ["cloud.aws", "vagrant.provider"]);
-        Ok(())
-    }
-
-    /// A cloud module whose region defaults to `region`, between two other variables.
-    fn module(region: &str) -> String {
-        format!(
-            "variable \"zone\" {{\n  default = \"a\"\n}}\nvariable \"region\" {{\n  type    = string\n  default = \"{region}\"\n}}\nvariable \"size\" {{\n  default = \"s\"\n}}\n"
-        )
-    }
-
-    #[test]
-    fn a_region_replaces_only_the_region_variables_default() {
-        assert_eq!(set_region(&module("eu-west-3"), "eu-north-1"), module("eu-north-1"));
-        assert_eq!(
-            set_region("variable \"zone\" {}\n", "eu-north-1"),
-            "variable \"zone\" {}\n",
-            "no region, no change"
-        );
-    }
-
-    #[test]
-    fn regions_reach_each_clouds_module_and_nothing_else() {
-        let file = |path: &str| GeneratedFile {
-            path: path.to_owned(),
-            contents: module("old"),
-        };
-        let d = Defaults {
-            cloud: [("aws".to_owned(), Cloud { region: Some("new".into()) })].into_iter().collect(),
-            ..Defaults::default()
-        };
-        let paths = [
-            ".isoloom/cloud-vm/aws/main.tf",
-            ".isoloom-2/cloud-docker/aws/main.tf",
-            ".isoloom/cloud-vm/gcp/main.tf",
-            ".isoloom/cloud-vm/aws/variables.tf",
-            ".isoloom/vagrant/aws/main.tf",
-            ".isoloom/cloud-vm/aws/extra/main.tf",
-        ];
-        let regions: Vec<bool> = apply_to_files(paths.iter().map(|p| file(p)).collect(), &d)
-            .iter()
-            .map(|f| f.contents == module("new"))
-            .collect();
-        assert_eq!(regions, [true, true, false, false, false, false]);
-    }
-
-    #[test]
-    fn the_built_in_layer_holds_every_clouds_region() -> Outcome {
-        let d: Defaults = serde_yaml_ng::from_value(builtin())?;
-        let regions: Vec<(&str, &str)> = d.cloud.iter().filter_map(|(c, r)| Some((c.as_str(), r.region.as_deref()?))).collect();
-        assert_eq!(regions, BUILTIN_REGIONS);
         Ok(())
     }
 }

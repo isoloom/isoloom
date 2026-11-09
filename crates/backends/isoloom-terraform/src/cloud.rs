@@ -63,6 +63,26 @@ impl Cloud {
         }
     }
 
+    /// The region its modules default to when the person's defaults set none (`isoloom defaults
+    /// --system` shows them): Paris where the cloud has one, else the nearest.
+    #[must_use]
+    pub const fn default_region(self) -> &'static str {
+        match self {
+            Cloud::Aws => "eu-west-3",
+            Cloud::Azure => "swedencentral",
+            Cloud::Gcp => "europe-west9",
+            Cloud::DigitalOcean => "fra1",
+            Cloud::Linode => "fr-par",
+            Cloud::Oci => "eu-paris-1",
+        }
+    }
+
+    /// Its modules' region for `env`: the one the person's defaults set
+    /// (`Environment::regions`), else its own.
+    pub(crate) fn region(self, env: &Environment) -> &str {
+        env.regions.get(self.id()).map_or(self.default_region(), String::as_str)
+    }
+
     /// Its name, as a sentence says it (`Google Cloud`).
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -89,13 +109,28 @@ pub(crate) struct Base {
     /// How to start its module (the settings `apply` takes, how it authenticates), from its
     /// folder.
     pub(crate) usage: for<'a> fn(&'a str) -> Usage<'a>,
-    /// Its variables before the operator's: where it runs, which account.
-    pub(crate) variables: fn() -> Vec<Variable>,
+    /// The cloud.
+    pub(crate) cloud: Cloud,
+    /// Its variables before the operator's: where it runs (defaulting to the region given),
+    /// which account.
+    pub(crate) variables: fn(&str) -> Vec<Variable>,
     /// Its provider's configuration.
     pub(crate) provider: ProviderConfig,
     /// The user the runner's key logs in as on a machine of this OS, from the cloud's image
     /// table (it has `sudo`, or is root).
     pub(crate) user: fn(&str) -> &'static str,
+}
+
+/// A cloud module's `region` variable, defaulting to `region` ([`Cloud::region`]).
+pub(crate) fn region_variable(region: &str) -> Variable {
+    Variable::new("region", "string").default(crate::hcl_builder::string(region))
+}
+
+impl Base {
+    /// Its variables for `env`: the region defaulting to [`Cloud::region`].
+    pub(crate) fn variables(&self, env: &Environment) -> Vec<Variable> {
+        (self.variables)(self.cloud.region(env))
+    }
 }
 
 /// A cloud module's start after its `terraform` block, the same on every cloud and target: the

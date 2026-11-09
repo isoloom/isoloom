@@ -1,7 +1,7 @@
 //! Defaults: layers merge leaf by leaf, the last one winning; `-s` overrides the spec or the
 //! defaults; the clouds' built-in regions are what the generators write.
 
-use isoloom_spec::defaults::{self, BUILTIN_REGIONS, Layer, apply_to_files, from_env, override_spec, resolve, set_region};
+use isoloom_spec::defaults::{self, Layer, from_env, override_spec, resolve};
 use isoloom_spec::{Target, load, parse};
 use isoloom_targets::{Lab, generate};
 
@@ -81,33 +81,47 @@ fn sets_override_the_spec_before_it_is_parsed() {
     assert_eq!(override_spec(&text, &["defaults.cloud.aws.region=eu-west-1".into()]).unwrap(), text);
 }
 
+/// The default of `cloud-vm/<cloud>/main.tf`'s `region` variable, and of its run manifest's
+/// `region` param (what a runner gives Terraform when nobody sets it).
+fn regions(files: &[isoloom_targets::GeneratedFile], cloud: &str) -> Outcome<(String, String)> {
+    let module = crate::testing::file(files, &format!("cloud-vm/{cloud}/main.tf"))?;
+    let block = module
+        .split("variable \"region\"")
+        .nth(1)
+        .and_then(|b| b.split("\n}").next())
+        .unwrap_or_default();
+    let variable = block.split("default").nth(1).and_then(|d| d.split('"').nth(1)).unwrap_or_default();
+    let manifest = isoloom_manifest::parse(crate::testing::file(files, &format!("cloud-vm/{cloud}/run.json"))?)?;
+    let param = manifest
+        .params
+        .iter()
+        .find(|p| p.name.as_str() == "region")
+        .and_then(|p| p.default.clone())
+        .unwrap_or_default();
+    Ok((variable.to_owned(), param))
+}
+
 #[test]
-fn builtin_regions_are_what_the_generators_write_and_can_be_replaced() -> Outcome {
-    let lab = Lab::new(load(&crate::testing::examples().join("solo-web")).unwrap());
-    let files = generate(&lab, Target::CloudVm).unwrap();
-    for (cloud, region) in BUILTIN_REGIONS {
-        let Some(f) = files.iter().find(|f| f.path == format!(".isoloom/cloud-vm/{cloud}/main.tf")) else {
-            continue;
-        };
-        let block = f
-            .contents
-            .split("variable \"region\"")
-            .nth(1)
-            .and_then(|b| b.split("\n}").next())
-            .unwrap_or_default();
-        assert!(block.contains(&format!("\"{region}\"")), "{cloud}: {block}");
+fn a_defaults_region_reaches_the_module_and_the_run_manifest_alike() -> Outcome {
+    let lab = Lab::new(load(&crate::testing::examples().join("solo-web"))?);
+    let files = generate(&lab, Target::CloudVm)?;
+    for (cloud, region) in isoloom_targets::default_regions() {
+        assert_eq!(regions(&files, cloud)?, (region.to_owned(), region.to_owned()), "{cloud}");
     }
+    // The person's region, from their defaults: the run manifest's param defaulted to the
+    // built-in one, which the runner gave Terraform, undoing it.
     let r = resolve(&[Layer {
         source: "t".into(),
         value: yaml("cloud: { aws: { region: eu-west-1 } }\n")?,
-    }])
-    .unwrap();
-    let out = apply_to_files(files, &r.defaults);
-    let aws = out.iter().find(|f| f.path == ".isoloom/cloud-vm/aws/main.tf").unwrap();
-    assert!(aws.contents.contains("default = \"eu-west-1\"") && !aws.contents.contains("\"eu-west-3\""));
-    // Other clouds untouched.
-    let az = out.iter().find(|f| f.path == ".isoloom/cloud-vm/azure/main.tf").unwrap();
-    assert!(az.contents.contains("default = \"swedencentral\""));
-    assert_eq!(set_region("no region here", "x"), "no region here");
+    }])?;
+    let mine = generate(&lab.clone().with_regions(r.defaults.regions()), Target::CloudVm)?;
+    assert_eq!(regions(&mine, "aws")?, ("eu-west-1".to_owned(), "eu-west-1".to_owned()));
+    assert_eq!(
+        regions(&files, "azure")?,
+        ("swedencentral".to_owned(), "swedencentral".to_owned()),
+        "other clouds keep theirs"
+    );
+    let docker = generate(&lab, Target::CloudDocker)?;
+    assert!(crate::testing::file(&docker, "cloud-docker/aws/main.tf")?.contains("default = \"eu-west-3\""));
     Ok(())
 }

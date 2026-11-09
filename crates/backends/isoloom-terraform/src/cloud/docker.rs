@@ -62,7 +62,7 @@ impl Driver {
 
     /// The cloud's variables, then its size variable sized for `env`'s containers.
     pub(crate) fn variables(&self, env: &Environment) -> Vec<Variable> {
-        let mut variables = (self.base.variables)();
+        let mut variables = self.base.variables(env);
         if let Some(SizeVariable { name, default }) = self.size {
             variables.push(Variable::new(name, "string").default(string(default(HostSize::of(env)))));
         }

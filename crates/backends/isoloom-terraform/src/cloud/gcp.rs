@@ -15,8 +15,9 @@ use crate::module::{Usage, resource};
 /// What Google Cloud's modules share: a billing account (or a project) and who may reach the
 /// machines, the project and region, the provider and project, and its images' users.
 pub(crate) const BASE: Base = Base {
+    cloud: crate::cloud::Cloud::Gcp,
     usage: |folder| Usage::with_runner_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
-    variables: || variables().into(),
+    variables: |region| variables(region).into(),
     provider: |env, m| {
         let mut locals = provider_and_project(env, m);
         locals.push(("zone", Template::new().with_expr(reference("var.region")).with_text("-a").into_expression()));
@@ -26,8 +27,8 @@ pub(crate) const BASE: Base = Base {
 };
 
 /// The `project`, `billing_account`, `org_id` and `region` variables: an existing project, or a
-/// billing account for a project of its own; Paris by default.
-pub(crate) fn variables() -> [Variable; 4] {
+/// billing account for a project of its own; `region` by default.
+pub(crate) fn variables(region: &str) -> [Variable; 4] {
     [
         Variable::new("project", "string")
             .default(string(""))
@@ -36,7 +37,7 @@ pub(crate) fn variables() -> [Variable; 4] {
             .default(string(""))
             .describe("With no project: create one for this environment, billed here, deleted with it"),
         Variable::new("org_id", "string").default(string("")),
-        Variable::new("region", "string").default(string("europe-west9")),
+        crate::cloud::region_variable(region),
     ]
 }
 

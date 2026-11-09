@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use isoloom_plan::{Environment, Lab};
+use isoloom_plan::Lab;
 use isoloom_render::backend::Placed;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::{Spec, Target};
@@ -107,7 +107,7 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     }
     let backend = backend(target).ok_or(GenerateError::NoGenerator(target))?;
     let spec = lowered(lab, target, instance)?;
-    let env = Environment::build(&spec, target, instance);
+    let env = lab.plan(&spec, target, instance);
     let mut files = backend.render(&env)?;
     // The configuration renderers' own files (the libraries a VM's set-up embeds, a container's
     // runner and templates), once each: a backend may have written some already.
@@ -138,4 +138,11 @@ fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, placed: Placed)
         path: format!("{OUTPUT_DIR}/{folder}/run.json"),
         contents: isoloom_manifest::to_json(&manifest).map_err(refused)?,
     })
+}
+
+/// Each cloud's id and the region its modules default to when the person's defaults set none
+/// (`isoloom defaults --system`), in the order the modules are written.
+#[must_use]
+pub fn default_regions() -> Vec<(&'static str, &'static str)> {
+    isoloom_terraform::Cloud::ALL.iter().map(|c| (c.id(), c.default_region())).collect()
 }

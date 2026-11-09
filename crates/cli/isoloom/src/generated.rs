@@ -1,18 +1,16 @@
-//! A target's generated files on their way to disk: the defaults applied, the project files
-//! they copy added, then written under the project folder.
+//! A target's generated files on their way to disk: the project files they copy added, then
+//! written under the project folder.
 
 use std::path::Path;
 
-use isoloom_spec::defaults::Defaults;
 use isoloom_targets::GeneratedFile;
 
 use crate::error::{CliError, Result};
 
-/// The generator's files with the defaults in effect applied, plus the project's own files
-/// they copy into the output.
-pub(crate) fn finish(files: Vec<GeneratedFile>, defaults: &Defaults, dir: &Path) -> Result<Vec<GeneratedFile>> {
-    let mut files = isoloom_spec::defaults::apply_to_files(files, defaults);
-    files.extend(isoloom_targets::project_copies(&files, dir)?);
+/// The generator's files plus the project's own files they copy into the output.
+pub(crate) fn finish(mut files: Vec<GeneratedFile>, dir: &Path) -> Result<Vec<GeneratedFile>> {
+    let copies = isoloom_targets::project_copies(&files, dir)?;
+    files.extend(copies);
     Ok(files)
 }
 

@@ -1,6 +1,14 @@
-//! The generated files: where they go in the project, and the lines each starts with.
+//! The generated files: what one is, where they go in the project, and the lines each starts
+//! with.
 
-pub use isoloom_spec::files::GeneratedFile;
+/// One generated file: its path relative to the project folder, and its contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedFile {
+    /// Where the file goes, relative to the project folder (`.isoloom/docker/compose.yml`).
+    pub path: String,
+    /// The file's text.
+    pub contents: String,
+}
 
 /// Where generated files go, relative to the project folder.
 pub const OUTPUT_DIR: &str = ".isoloom";

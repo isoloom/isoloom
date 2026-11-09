@@ -74,7 +74,9 @@ fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile) -> Vec<String> {
     };
     let lab = match isoloom_spec::defaults::load(&crate::spec::defaults_of(dir, None, Some(p), &[])) {
         Err(e) => return vec![e.to_string()],
-        Ok(r) => isoloom_targets::Lab::new(spec).with_images(r.defaults.images),
+        Ok(r) => isoloom_targets::Lab::new(spec)
+            .with_regions(r.defaults.regions())
+            .with_images(r.defaults.images),
     };
     let mut problems: Vec<String> = lab.problems().iter().map(|e| format!("the spec it makes: {}", e.line())).collect();
     if let Some(t) = p.target

@@ -29,7 +29,7 @@ pub(crate) struct Args {
 /// committed files can't be vouched for.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let target = spec::pinned(profile, &a.project.dir, a.target.as_deref())?;
-    let (lab, settings) = spec::with_settings(profile, &a.project.dir, a.images.as_deref(), &a.sets)?;
+    let (lab, _) = spec::with_settings(profile, &a.project.dir, a.images.as_deref(), &a.sets)?;
     let lab = spec::checked(lab, &a.project.dir)?;
     let (files, skipped) = super::generate::files(&lab, target.as_deref())?;
     if target.is_some() && files.is_empty() {
@@ -38,7 +38,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
         }
         return Ok(Verdict::of(false));
     }
-    let files = generated::finish(files, &settings.defaults, &a.project.dir)?;
+    let files = generated::finish(files, &a.project.dir)?;
     let mut stale = 0;
     for f in &files {
         match std::fs::read_to_string(a.project.dir.join(&f.path)) {

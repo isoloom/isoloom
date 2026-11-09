@@ -3,8 +3,8 @@
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
-use isoloom_spec::files::GeneratedFile;
 use isoloom_spec::model::Target;
+use isoloom_targets::GeneratedFile;
 use isoloom_targets::{DockerVmBackend, HybridBackend, Lab};
 
 /// A test's outcome: a failure is the report.

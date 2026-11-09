@@ -8,25 +8,20 @@ pub(crate) mod vm;
 use crate::hcl_builder::{Block, BlockBuilder, Expression, boolean, index, list, number, reference, string};
 
 use super::{Base, instance, operator};
-use crate::module::variable::Variable;
 use crate::module::{Usage, resource};
 
 /// What AWS's modules share: who may reach the machines and their key, the region, the provider
 /// tagging every resource ([`instance::tags`]), and its images' users.
 pub(crate) const BASE: Base = Base {
+    cloud: crate::cloud::Cloud::Aws,
     usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
-    variables: || vec![region()],
+    variables: |region| vec![crate::cloud::region_variable(region)],
     provider: |env, m| {
         m.block(provider(instance::tags(env)));
         Vec::new()
     },
     user: vm::image_user,
 };
-
-/// The `region` variable: Paris by default.
-pub(crate) fn region() -> Variable {
-    Variable::new("region", "string").default(string("eu-west-3"))
-}
 
 /// The provider in the region, every resource tagged with `tags`.
 pub(crate) fn provider(tags: Expression) -> Block {
