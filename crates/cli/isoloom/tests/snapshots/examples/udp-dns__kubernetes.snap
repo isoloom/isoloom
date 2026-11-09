@@ -237,6 +237,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -292,6 +294,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: dns
@@ -308,6 +312,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: dns-published
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   type: LoadBalancer
   selector:
@@ -322,6 +328,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: publish-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -338,6 +346,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -361,6 +371,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: client
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -396,6 +408,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-client
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -419,6 +433,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -428,6 +444,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -442,6 +460,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-users
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -456,6 +476,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-0-users-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -475,6 +497,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -498,6 +522,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -525,6 +551,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-scripts
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   checks__resolve.sh: '{{ required "files/project/checks/resolve.sh is missing: run isoloom generate" (.Files.Get "files/project/checks/resolve.sh") | b64enc }}'
 
@@ -537,6 +565,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   client.sh: '{{ .Files.Get "files/checks/client.sh" | b64enc }}'
   dns.sh: '{{ .Files.Get "files/checks/dns.sh" | b64enc }}'
@@ -548,6 +578,7 @@ metadata:
   labels:
     net.isoloom.com/users: member
     isoloom.com/check: isoloom-check
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -581,6 +612,7 @@ metadata:
   labels:
     net.isoloom.com/servers: member
     isoloom.com/check: isoloom-check-dns
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -833,6 +865,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -867,6 +901,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -922,11 +958,15 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: isoloom-udp-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -982,6 +1022,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: dns
@@ -998,6 +1040,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: dns-published
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   type: LoadBalancer
   selector:
@@ -1012,6 +1056,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: publish-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1028,6 +1074,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1051,6 +1099,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: client
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1086,6 +1136,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-client
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1109,6 +1161,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -1118,6 +1172,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1132,6 +1188,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-users
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1146,6 +1204,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-0-users-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1165,6 +1225,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1188,6 +1250,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-dns
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:

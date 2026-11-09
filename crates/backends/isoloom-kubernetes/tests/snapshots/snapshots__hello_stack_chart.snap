@@ -62,6 +62,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -156,6 +158,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: cache-data
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   accessModes:
   - ReadWriteOnce
@@ -167,6 +171,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: cache
@@ -179,6 +185,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -202,6 +210,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -261,6 +271,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: web
@@ -273,6 +285,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web-published
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   type: LoadBalancer
   selector:
@@ -286,6 +300,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: publish-web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -301,6 +317,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -324,6 +342,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -333,6 +353,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-app
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -347,6 +369,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -370,6 +394,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -393,6 +419,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -420,6 +448,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-scripts
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   build__cache__seed.sh: '{{ required "files/project/build/cache/seed.sh is missing: run isoloom generate" (.Files.Get "files/project/build/cache/seed.sh") | b64enc }}'
   checks__cache-seeded.sh: '{{ required "files/project/checks/cache-seeded.sh is missing: run isoloom generate" (.Files.Get "files/project/checks/cache-seeded.sh") | b64enc }}'
@@ -433,6 +463,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   networks.sh: '{{ .Files.Get "files/checks/networks.sh" | b64enc }}'
   cache.sh: '{{ .Files.Get "files/checks/cache.sh" | b64enc }}'
@@ -445,6 +477,7 @@ metadata:
   labels:
     net.isoloom.com/app: member
     isoloom.com/check: isoloom-check
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -478,6 +511,7 @@ metadata:
   labels:
     net.isoloom.com/app: member
     isoloom.com/check: isoloom-check-cache
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -505,6 +539,7 @@ metadata:
   labels:
     net.isoloom.com/app: member
     isoloom.com/check: isoloom-check-web
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation

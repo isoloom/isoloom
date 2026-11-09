@@ -28,6 +28,7 @@ mod hardware;
 mod host_folders;
 mod instance;
 mod machine_settings;
+mod managed;
 mod message;
 mod own_image_boot;
 mod project_copy;

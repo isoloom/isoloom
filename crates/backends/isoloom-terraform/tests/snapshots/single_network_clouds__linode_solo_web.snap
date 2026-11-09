@@ -70,6 +70,7 @@ resource "linode_vpc_subnet" "app" {
 # Machine `web` on `app`: what may reach it, and where it may not go.
 resource "linode_firewall" "web" {
   label           = "${local.name}-web"
+  tags            = concat(["isoloom", "solo-web", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
   inbound {

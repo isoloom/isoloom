@@ -2137,6 +2137,12 @@ resource "google_project" "env" {
   org_id              = var.org_id == "" ? null : var.org_id
   deletion_policy     = "DELETE"
   auto_create_network = false
+  labels = {
+    isoloom-environment = "udp-dns"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "google_project_service" "compute" {
@@ -3112,6 +3118,7 @@ resource "linode_vpc_subnet" "users" {
 # Machine `dns` on `servers`: what may reach it, and where it may not go.
 resource "linode_firewall" "dns" {
   label           = "${local.name}-dns"
+  tags            = concat(["isoloom", "udp-dns", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = var.isoloom_sealed ? "DROP" : "ACCEPT"
   inbound {
@@ -3208,6 +3215,7 @@ resource "linode_firewall" "dns" {
 # Machine `client` on `users`: what may reach it, and where it may not go.
 resource "linode_firewall" "client" {
   label           = "${local.name}-client"
+  tags            = concat(["isoloom", "udp-dns", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = var.isoloom_sealed ? "DROP" : "ACCEPT"
   inbound {

@@ -171,8 +171,9 @@ impl Manifest {
         Manifest::new("batch/v1", "Job", name, Some(Spec::Job(spec)))
     }
 
-    /// A bare pod (the chart's `helm test` hooks).
-    pub(crate) fn pod(metadata: Metadata, spec: PodSpec) -> Manifest {
+    /// A bare pod (the chart's `helm test` hooks), labelled as Isoloom's ([`MANAGED_BY`]).
+    pub(crate) fn pod(mut metadata: Metadata, spec: PodSpec) -> Manifest {
+        metadata.labels.insert(MANAGED_BY.0.to_owned(), MANAGED_BY.1.to_owned());
         Manifest {
             metadata,
             ..Manifest::new("v1", "Pod", "", Some(Spec::Pod(spec)))
@@ -223,6 +224,10 @@ pub(crate) enum Spec {
     Pod(PodSpec),
 }
 
+/// The label every object Isoloom writes carries (Kubernetes' recommended key), as Compose's
+/// containers carry `isoloom.managed` and the clouds' resources `managed-by`.
+pub(crate) const MANAGED_BY: (&str, &str) = ("app.kubernetes.io/managed-by", "isoloom");
+
 /// An object's name, labels and annotations.
 #[derive(Debug, Clone, Default, Serialize)]
 pub(crate) struct Metadata {
@@ -238,10 +243,11 @@ pub(crate) struct Metadata {
 }
 
 impl Metadata {
-    /// Just a name.
+    /// An object's name, and the label saying Isoloom wrote it ([`MANAGED_BY`]).
     pub(crate) fn named(name: &str) -> Metadata {
         Metadata {
             name: name.to_owned(),
+            labels: Labels::from([(MANAGED_BY.0.to_owned(), MANAGED_BY.1.to_owned())]),
             ..Metadata::default()
         }
     }

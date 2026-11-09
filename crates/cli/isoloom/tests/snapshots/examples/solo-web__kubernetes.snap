@@ -133,6 +133,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -186,6 +188,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: web
@@ -198,6 +202,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web-published
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   type: LoadBalancer
   selector:
@@ -211,6 +217,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: publish-web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -226,6 +234,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -235,6 +245,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-app
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -253,6 +265,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-scripts
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   checks__web-answers.sh: '{{ required "files/project/checks/web-answers.sh is missing: run isoloom generate" (.Files.Get "files/project/checks/web-answers.sh") | b64enc }}'
 
@@ -265,6 +279,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   networks.sh: '{{ .Files.Get "files/checks/networks.sh" | b64enc }}'
 ---
@@ -275,6 +291,7 @@ metadata:
   labels:
     net.isoloom.com/app: member
     isoloom.com/check: isoloom-check
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -348,6 +365,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -492,11 +511,15 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: isoloom-solo-web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -550,6 +573,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: web
@@ -562,6 +587,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web-published
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   type: LoadBalancer
   selector:
@@ -575,6 +602,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: publish-web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -590,6 +619,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -599,6 +630,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-app
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:

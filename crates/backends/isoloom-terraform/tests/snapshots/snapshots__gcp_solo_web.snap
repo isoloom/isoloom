@@ -69,6 +69,12 @@ resource "google_project" "env" {
   org_id              = var.org_id == "" ? null : var.org_id
   deletion_policy     = "DELETE"
   auto_create_network = false
+  labels = {
+    isoloom-environment = "solo-web"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "google_project_service" "compute" {

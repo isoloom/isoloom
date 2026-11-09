@@ -318,6 +318,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -397,6 +399,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: cache-data
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   accessModes:
   - ReadWriteOnce
@@ -408,6 +412,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: cache
@@ -420,6 +426,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -443,6 +451,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -503,6 +513,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: web
@@ -518,6 +530,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: user
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -546,6 +560,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -555,6 +571,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-front
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -569,6 +587,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-back
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -583,6 +603,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-access
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -597,6 +619,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-0-access-front
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -611,6 +635,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-1-front-back
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -630,6 +656,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -658,6 +686,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   user.sh: '{{ .Files.Get "files/checks/user.sh" | b64enc }}'
   cache.sh: '{{ .Files.Get "files/checks/cache.sh" | b64enc }}'
@@ -670,6 +700,7 @@ metadata:
   labels:
     net.isoloom.com/access: member
     isoloom.com/check: isoloom-check
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -697,6 +728,7 @@ metadata:
   labels:
     net.isoloom.com/back: member
     isoloom.com/check: isoloom-check-cache
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -724,6 +756,7 @@ metadata:
   labels:
     net.isoloom.com/front: member
     isoloom.com/check: isoloom-check-web
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -897,6 +930,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -925,6 +960,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -953,6 +990,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -1188,11 +1227,15 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: isoloom-segmented
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1272,6 +1315,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: cache-data
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   accessModes:
   - ReadWriteOnce
@@ -1283,6 +1328,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: cache
@@ -1295,6 +1342,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1318,6 +1367,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1378,6 +1429,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: web
@@ -1393,6 +1446,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: user
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1421,6 +1476,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -1430,6 +1487,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-front
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1444,6 +1503,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-back
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1458,6 +1519,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-access
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1472,6 +1535,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-0-access-front
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1486,6 +1551,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-1-front-back
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1505,6 +1572,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-cache
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:

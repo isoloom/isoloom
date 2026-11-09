@@ -2574,6 +2574,12 @@ resource "google_project" "env" {
   org_id              = var.org_id == "" ? null : var.org_id
   deletion_policy     = "DELETE"
   auto_create_network = false
+  labels = {
+    isoloom-environment = "cisco-switch"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "google_project_service" "compute" {
@@ -3420,6 +3426,7 @@ resource "linode_instance" "env" {
 
 resource "linode_firewall" "env" {
   label           = local.name
+  tags            = concat(["isoloom", "cisco-switch", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
   inbound {

@@ -30,11 +30,15 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: isoloom-shared-files
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: writer
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -122,6 +126,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: shared
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   accessModes:
   - ReadWriteOnce
@@ -133,6 +139,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: writer-data
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   accessModes:
   - ReadWriteOnce
@@ -145,6 +153,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: reader
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -215,6 +225,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -224,6 +236,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-app
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -577,6 +591,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-writer
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -605,6 +621,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-reader
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:

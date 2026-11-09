@@ -61,6 +61,7 @@ fn inbound(label: &str, protocol: &str, ports: &[u16]) -> Block {
 fn firewall(env: &Environment) -> Block {
     let udp = published(env, Protocol::Udp);
     let mut b = resource("linode_firewall")
+        .add_attribute(("tags", tag_list(env)))
         .add_attribute(("inbound_policy", string("DROP")))
         .add_attribute(("outbound_policy", string("ACCEPT")))
         .add_block(inbound("ssh-and-published", "TCP", &tcp_ports(env)));

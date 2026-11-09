@@ -9,7 +9,7 @@ use crate::hcl_builder::{Block, Expression, Module, Template, list, reference, s
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_spec::validate::Cidr;
 
-use crate::cloud::instance::name_with;
+use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::linode::{Action, Way, rule};
 use crate::cloud::vm::reach::{self, Rule};
 use crate::cloud::vm::{published, seal};
@@ -90,6 +90,7 @@ fn firewall(env: &Environment, (name, mp): (&str, &MachinePlan), (net, cidr): (&
     let allowed = || list([reference("var.allowed_cidr")]);
     let mut b = resource("linode_firewall", &ident(name))
         .add_attribute(("label", name_with(&format!("-{name}"))))
+        .add_attribute(("tags", tag_list(env)))
         .add_attribute(("inbound_policy", string("DROP")))
         .add_attribute(("outbound_policy", outbound_policy(env, mp)))
         .add_block(rule((Way::In, Action::Accept), "ssh", "TCP", Some("22".to_owned()), allowed()));

@@ -400,6 +400,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -453,6 +455,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: intranet
@@ -465,6 +469,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -488,6 +494,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: staff
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -516,6 +524,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-staff
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -539,6 +549,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guest
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -567,6 +579,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: admin
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -596,6 +610,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -605,6 +621,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-office-vlan10
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -619,6 +637,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-office-vlan20
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -633,6 +653,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -647,6 +669,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-0-office-vlan10-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -666,6 +690,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -689,6 +715,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -717,6 +745,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   staff.sh: '{{ .Files.Get "files/checks/staff.sh" | b64enc }}'
   intranet.sh: '{{ .Files.Get "files/checks/intranet.sh" | b64enc }}'
@@ -730,6 +760,7 @@ metadata:
   labels:
     net.isoloom.com/office-vlan10: member
     isoloom.com/check: isoloom-check
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -757,6 +788,7 @@ metadata:
   labels:
     net.isoloom.com/servers: member
     isoloom.com/check: isoloom-check-intranet
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -784,6 +816,7 @@ metadata:
   labels:
     net.isoloom.com/office-vlan20: member
     isoloom.com/check: isoloom-check-guest
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -812,6 +845,7 @@ metadata:
     net.isoloom.com/office-vlan10: member
     net.isoloom.com/office-vlan20: member
     isoloom.com/check: isoloom-check-admin
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -1159,6 +1193,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -1187,6 +1223,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -1215,6 +1253,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-guest
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -1243,6 +1283,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: isoloom-check-admin
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   backoffLimit: 0
   template:
@@ -1389,11 +1431,15 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: isoloom-vlan-office
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1447,6 +1493,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   selector:
     isoloom.com/machine: intranet
@@ -1459,6 +1507,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1482,6 +1532,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: staff
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1510,6 +1562,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-staff
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1533,6 +1587,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guest
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1561,6 +1617,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: admin
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -1590,6 +1648,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -1599,6 +1659,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-office-vlan10
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1613,6 +1675,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-office-vlan20
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1627,6 +1691,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1641,6 +1707,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: reach-0-office-vlan10-servers
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1660,6 +1728,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -1683,6 +1753,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: offline-isoloom-check-intranet
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:

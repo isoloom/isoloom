@@ -2298,6 +2298,12 @@ resource "google_project" "env" {
   org_id              = var.org_id == "" ? null : var.org_id
   deletion_policy     = "DELETE"
   auto_create_network = false
+  labels = {
+    isoloom-environment = "hello-stack"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "google_project_service" "compute" {
@@ -3277,6 +3283,7 @@ resource "linode_vpc_subnet" "app" {
 # Machine `cache` on `app`: what may reach it, and where it may not go.
 resource "linode_firewall" "cache" {
   label           = "${local.name}-cache"
+  tags            = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = var.isoloom_sealed ? "DROP" : "ACCEPT"
   inbound {
@@ -3332,6 +3339,7 @@ resource "linode_firewall" "cache" {
 # Machine `web` on `app`: what may reach it, and where it may not go.
 resource "linode_firewall" "web" {
   label           = "${local.name}-web"
+  tags            = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = var.isoloom_sealed ? "DROP" : "ACCEPT"
   inbound {

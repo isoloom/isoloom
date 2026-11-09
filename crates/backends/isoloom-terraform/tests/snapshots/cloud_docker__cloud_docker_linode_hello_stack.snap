@@ -75,6 +75,7 @@ resource "linode_instance" "env" {
 
 resource "linode_firewall" "env" {
   label           = local.name
+  tags            = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
   inbound {

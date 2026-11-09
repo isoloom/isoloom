@@ -62,6 +62,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: writer
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -149,6 +151,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: shared
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   accessModes:
   - ReadWriteOnce
@@ -160,6 +164,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: writer-data
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   accessModes:
   - ReadWriteOnce
@@ -172,6 +178,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: reader
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   replicas: 1
   strategy:
@@ -242,6 +250,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: isoloom-default-deny
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector: {}
   policyTypes:
@@ -251,6 +261,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: net-app
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 spec:
   podSelector:
     matchLabels:
@@ -269,6 +281,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-scripts
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   steps__look.sh: '{{ required "files/project/steps/look.sh is missing: run isoloom generate" (.Files.Get "files/project/steps/look.sh") | b64enc }}'
   steps__write.sh: '{{ required "files/project/steps/write.sh is missing: run isoloom generate" (.Files.Get "files/project/steps/write.sh") | b64enc }}'
@@ -282,6 +296,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: isoloom-check-runners
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 binaryData:
   writer.sh: '{{ .Files.Get "files/checks/writer.sh" | b64enc }}'
   reader.sh: '{{ .Files.Get "files/checks/reader.sh" | b64enc }}'
@@ -293,6 +309,7 @@ metadata:
   labels:
     net.isoloom.com/app: member
     isoloom.com/check: isoloom-check-writer
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation
@@ -320,6 +337,7 @@ metadata:
   labels:
     net.isoloom.com/app: member
     isoloom.com/check: isoloom-check-reader
+    app.kubernetes.io/managed-by: isoloom
   annotations:
     helm.sh/hook: test
     helm.sh/hook-delete-policy: before-hook-creation

@@ -70,7 +70,7 @@ fn objects(env: &Environment) -> Rendered {
     let namespace = format!("isoloom-{}", env.name);
     let machines = Machine::all(env);
     let mut ns = Manifest::namespace(&namespace);
-    ns.metadata.labels = crate::storage::namespace_labels(&machines);
+    ns.metadata.labels.extend(crate::storage::namespace_labels(&machines));
     let mut objects = vec![ns];
     objects.extend(machines.iter().flat_map(machine::objects));
     objects.extend(network::policies(env));
