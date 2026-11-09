@@ -13,7 +13,7 @@ use super::SERVICE_OS;
 use super::guest::{Guest, Nic};
 use crate::machine::cloud_init::CloudConfig;
 use crate::machine::controller::{self, Ssh};
-use crate::machine::linux::{self, Hooks};
+use crate::machine::linux;
 use crate::machine::{Remote, cloudbase_init, vms};
 use crate::module::ident;
 use crate::server::router::is_default_gateway;
@@ -118,7 +118,6 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut 
             host: string(address.to_string()),
         },
         user: crate::machine::USER.to_owned(),
-        hooks: Hooks::default(),
     });
     m.commented(
         "Its set-up: its steps from the plan, over SSH through the router.",

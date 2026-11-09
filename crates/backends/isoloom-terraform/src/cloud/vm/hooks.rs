@@ -18,7 +18,6 @@ use crate::machine::user_data::{self, Capped};
 pub(crate) fn of(mp: &MachinePlan, at_boot: Vec<Template>) -> Hooks {
     Hooks {
         at_boot,
-        after_reboot: Vec::new(),
         before_egress: redirects(mp),
         skip: network_does,
     }

@@ -39,8 +39,8 @@ fn text(e: &Expression) -> String {
     e.to_string()
 }
 
-/// Machine `name`'s set-up over SSH as `admin` at `host`, with `hooks`.
-fn provisioner(env: &Environment, name: &str, host: Expression, hooks: Hooks) -> Provisioner {
+/// Machine `name`'s set-up over SSH as `admin` at `host`.
+fn provisioner(env: &Environment, name: &str, host: Expression) -> Provisioner {
     linux::provisioner(linux::Machine {
         remote: Remote {
             env,
@@ -50,36 +50,52 @@ fn provisioner(env: &Environment, name: &str, host: Expression, hooks: Hooks) ->
             host,
         },
         user: "admin".to_owned(),
-        hooks,
     })
 }
 
 #[test]
-fn remote_exec_splits_at_the_reboot_and_runs_the_hooks() {
+fn remote_exec_splits_at_the_reboot() {
     let env = env();
-    let hooks = Hooks {
-        at_boot: vec![Template::text("echo boot")],
-        after_reboot: vec![Template::text("echo again")],
-        before_egress: vec![Template::text("echo redirect")],
-        skip: |s| matches!(s, Step::Routes { .. }),
-    };
-    let p = provisioner(&env, "a", string("host"), hooks);
+    let p = provisioner(&env, "a", string("host"));
     assert_eq!(p.parts.len(), 2);
     let first: Vec<String> = p.parts[0].iter().map(text).collect();
     let second: Vec<String> = p.parts[1].iter().map(text).collect();
-    assert!(first.iter().any(|c| c.contains("echo boot")) && first.iter().any(|c| c.contains("one.sh")));
+    assert!(first.iter().any(|c| c.contains("one.sh")) && !first.iter().any(|c| c.contains("two.sh")));
     assert!(first.last().unwrap().contains("boot-id"), "{first:?}");
     assert!(
-        second[1].contains("did not restart") && second[2].contains("echo again") && second[3].contains("echo boot"),
+        second[1].contains("did not restart") && second.iter().any(|c| c.contains("two.sh")),
         "{second:?}"
     );
-    let redirect = second.iter().position(|c| c.contains("echo redirect")).unwrap();
-    let egress = second.iter().position(|c| c.contains("isoloom-egress")).unwrap();
-    assert!(second.iter().position(|c| c.contains("two.sh")).unwrap() < redirect && redirect < egress);
     // The inputs are uploaded with the project; `b` waits for `a`'s set-up.
     assert_eq!(p.uploads.len(), 2);
     let b = linux::depends_on(&env, &env.machines["b"]);
     assert_eq!(b.iter().map(text).collect::<Vec<_>>(), ["terraform_data.a"]);
+}
+
+#[test]
+fn the_user_data_set_up_splits_at_the_reboot_and_runs_the_hooks() {
+    let env = env();
+    let hooks = Hooks {
+        at_boot: vec![Template::text("echo boot")],
+        before_egress: vec![Template::text("echo redirect")],
+        skip: |s| matches!(s, Step::Routes { .. }),
+    };
+    let set_up = linux::set_up(&env, ("a", &env.machines["a"]), "admin", &hooks);
+    assert_eq!(set_up.parts.len(), 2);
+    let commands = |part: &[super::user_data::Tracked]| part.iter().map(|t| text(&t.command.clone().into_expression())).collect::<Vec<_>>();
+    let (first, second) = (commands(&set_up.parts[0]), commands(&set_up.parts[1]));
+    assert!(
+        first.iter().any(|c| c.contains("echo boot")) && first.iter().any(|c| c.contains("one.sh")),
+        "{first:?}"
+    );
+    assert!(
+        set_up.again.iter().any(|c| text(&c.clone().into_expression()).contains("echo boot")),
+        "after each restart"
+    );
+    assert!(!first.iter().chain(&second).any(|c| c.contains("ip route replace")), "the cloud routes");
+    let redirect = second.iter().position(|c| c.contains("echo redirect")).unwrap();
+    let egress = second.iter().position(|c| c.contains("isoloom-egress")).unwrap();
+    assert!(second.iter().position(|c| c.contains("two.sh")).unwrap() < redirect && redirect < egress);
 }
 
 #[test]
@@ -120,7 +136,7 @@ fn a_machine_waiting_for_secrets_announces_its_address_first() {
         "    environment: { TOKEN: { input: TOKEN } }\n    files: [{ path: /run/secrets/db, secret: db }]\n",
     );
     let env = environment(&spec, Target::CloudVm);
-    let machine = |name| provisioner(&env, name, reference("aws_instance.a.public_ip"), Hooks::default());
+    let machine = |name| provisioner(&env, name, reference("aws_instance.a.public_ip"));
     let a = machine("a");
     assert_eq!(a.announce.as_deref(), Some("a"));
     assert!(machine("b").announce.is_none());

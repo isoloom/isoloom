@@ -18,29 +18,16 @@ use crate::module::{ident, inputs};
 
 pub(crate) use isoloom_render::steps::CLOUD_INIT_WAIT;
 
-/// What a target adds to the steps on its platform.
+/// What a cloud adds to a machine's set-up from its user data ([`set_up`]).
 #[derive(Debug, Clone)]
 pub(crate) struct Hooks {
     /// Run before the steps, and again after each restart (extra interfaces, found by MAC).
     pub(crate) at_boot: Vec<Template>,
-    /// Run after each restart, before `at_boot` (the auto-stop, scheduled again).
-    pub(crate) after_reboot: Vec<Template>,
     /// Run before the machine closes itself off: before its `Egress`, `Tc` or `Ready` step,
     /// whichever comes first (published-port redirects).
     pub(crate) before_egress: Vec<Template>,
     /// The steps the platform does itself, left out (a cloud's network routes between subnets).
     pub(crate) skip: fn(&Step) -> bool,
-}
-
-impl Default for Hooks {
-    fn default() -> Hooks {
-        Hooks {
-            at_boot: Vec::new(),
-            after_reboot: Vec::new(),
-            before_egress: Vec::new(),
-            skip: |_| false,
-        }
-    }
 }
 
 /// A Linux machine, as Terraform reaches it over SSH.
@@ -50,8 +37,6 @@ pub(crate) struct Machine<'a> {
     pub(crate) remote: Remote<'a>,
     /// The SSH user (it has `sudo`).
     pub(crate) user: String,
-    /// The target's additions.
-    pub(crate) hooks: Hooks,
 }
 
 /// The machine's set-up: `terraform_data.<machine>`.
@@ -116,23 +101,21 @@ fn walk<'a>(steps: impl IntoIterator<Item = &'a Step>) -> impl Iterator<Item = A
 
 /// The commands, one list per part between `reboot` steps.
 fn parts(m: &Machine) -> Vec<Vec<Expression>> {
-    let (Remote { env, name, plan, .. }, hooks) = (&m.remote, &m.hooks);
+    let Remote { env, name, plan, .. } = &m.remote;
     let mut first: Vec<Template> = vec!["set -e".into(), CLOUD_INIT_WAIT.into()];
     // The ready file's folder, before the first step's progress mark (`tracked_step`).
     first.push(Shell::Sudo.command(&format!("mkdir -p {}", cloud_init::READY_DIR)).into());
     if controller::needed(env) {
         first.push(controller::authorize());
     }
-    first.extend(hooks.at_boot.iter().cloned());
     let (mut done, mut part) = (Vec::new(), first);
     let mut again: Vec<Template> = Vec::new();
-    for at in walk(plan.lifecycle.iter().filter(|s| !(hooks.skip)(s))) {
+    for at in walk(&plan.lifecycle) {
         match at {
-            At::Closing => part.extend(hooks.before_egress.iter().cloned()),
+            At::Closing => {}
             At::Reboot => {
                 part.push(Shell::Sudo.command(&steps::record_boot()).into());
                 let mut next: Vec<Template> = vec!["set -e".into(), Shell::Sudo.command(&steps::reboot_check()).into()];
-                next.extend(hooks.after_reboot.iter().chain(&hooks.at_boot).cloned());
                 next.extend(again.iter().cloned());
                 done.push(std::mem::replace(&mut part, next));
             }
