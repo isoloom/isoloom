@@ -28,6 +28,9 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   overlay ([Kubernetes](targets/kubernetes.md)).
 - **Images built from the project** are named under `localhost/isoloom/` by default.
 - **Terraform**: the generated modules require Terraform 1.11 or later.
+- **Proxmox verifies the API's TLS certificate**: `proxmox_insecure` defaults to `false`. A
+  server with a self-signed certificate needs `proxmox_insecure=true` (or a certificate its
+  clients trust).
 - **`.isoloom/.gitignore`** is written by `isoloom generate`, ignoring the tools' state
   ([commit the generated files](commit-generated-files.md)).
 - **`isoloom generate` removes the files it wrote before and no longer writes** (listed in
@@ -65,6 +68,10 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   (was `<machine>-init-<n>`) and its step `job-isoloom-init-<machine>-<n>`.
 - The controller is `isoloom-controller` in Proxmox's manifests and check output (was
   `controller`).
+- `docker-vm`'s VM is `isoloom-docker-host` in its run manifests (Vagrant's and Proxmox's; was
+  `docker`), as `cloud-docker`'s is: read it from `guest.machine` and `machines[]`. On QEMU, the
+  VM's SSH port is `ISOLOOM_HOSTPORTS`' `isoloom-docker-host/ssh` key (was `docker/ssh`). The
+  Vagrant define stays `default`.
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.
 
 ## Library users
@@ -89,5 +96,9 @@ among others (the CHANGELOG's **Removed** section lists every item):
   hidden, outside the supported API: generate with `isoloom_targets::generate`.
 - `isoloom_manifest::access::{DEFAULT_BOX, DEFAULT_ARM64_BOX, DEFAULT_IMAGE}` and
   `isoloom_manifest::SUPPORTED_VERSION` (now crate-internal).
+- The spec model's growing structs are `#[non_exhaustive]` (`Spec`, `Machine`, `Network`,
+  `DockerImpl`, `VmImpl`, `VmImage`, `Constraints`, `Proxy`, `Mirrors`): build them with
+  `Spec::new`, `VmImpl::new` or `Default`, then set fields, or parse a spec, and match them
+  with `..`.
 - In the building-block crates (`isoloom-plan`, `isoloom-render`, the backends,
   `isoloom-catalogue`), many items became crate-internal; those crates' API is not a promise.
