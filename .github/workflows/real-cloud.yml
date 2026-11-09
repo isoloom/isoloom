@@ -14,7 +14,7 @@
 # `down` and the reaper still run inside the budget.
 #
 # Manual only (`workflow_dispatch`): no push, pull_request or schedule. Skipped, not failed, without
-# the AWS credentials. Enabling this, the OIDC/role option and the budget cap: docs/ci-real-hosts.md.
+# the AWS credentials. Enabling this, the OIDC/role option and the budget cap: docs/dev/ci-real-hosts.md.
 name: Cert — real cloud (AWS)
 
 on:
@@ -70,7 +70,7 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=AWS skipped::no credentials: set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY, or REAL_AWS_ROLE_ARN for OIDC (docs/ci-real-hosts.md)"
+            echo "::notice title=AWS skipped::no credentials: set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY, or REAL_AWS_ROLE_ARN for OIDC (docs/dev/ci-real-hosts.md)"
           fi
 
   aws:
@@ -189,7 +189,7 @@ jobs:
           DOWN: ${{ steps.down.outcome }}
         run: |
           if [ -z "$HOST" ]; then
-            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/ci-real-hosts.md)"
+            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/dev/ci-real-hosts.md)"
             exit 0
           fi
           if [ "$UP" = success ] && [ "$CHECK" = success ] && [ "$DOWN" = success ]; then

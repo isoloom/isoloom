@@ -7,7 +7,7 @@
 #
 # Manual only (`workflow_dispatch`): no push, pull_request or schedule. Skipped, not failed, without
 # the PROXMOX_* secrets or without REAL_PROXMOX_RUNNER, so a job never sits queued for a runner that
-# does not exist. Enabling this: docs/ci-real-hosts.md.
+# does not exist. Enabling this: docs/dev/ci-real-hosts.md.
 name: Cert — real server (Proxmox)
 
 on:
@@ -52,9 +52,9 @@ jobs:
         run: |
           enabled=false
           if [ "$RUNNER" != true ]; then
-            echo "::notice title=Proxmox skipped::no runner declared (REAL_PROXMOX_RUNNER; docs/ci-real-hosts.md)"
+            echo "::notice title=Proxmox skipped::no runner declared (REAL_PROXMOX_RUNNER; docs/dev/ci-real-hosts.md)"
           elif [ "$SECRETS" != true ]; then
-            echo "::notice title=Proxmox skipped::PROXMOX_VE_ENDPOINT, PROXMOX_VE_API_TOKEN or PROXMOX_SSH_PRIVATE_KEY missing (docs/ci-real-hosts.md)"
+            echo "::notice title=Proxmox skipped::PROXMOX_VE_ENDPOINT, PROXMOX_VE_API_TOKEN or PROXMOX_SSH_PRIVATE_KEY missing (docs/dev/ci-real-hosts.md)"
           else
             enabled=true
           fi
@@ -179,7 +179,7 @@ jobs:
           DOWN: ${{ steps.down.outcome }}
         run: |
           if [ -z "$HOST" ]; then
-            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/ci-real-hosts.md)"
+            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/dev/ci-real-hosts.md)"
             exit 0
           fi
           if [ "$UP" = success ] && [ "$CHECK" = success ] && [ "$DOWN" = success ]; then

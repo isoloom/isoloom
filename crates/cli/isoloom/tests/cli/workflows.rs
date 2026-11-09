@@ -1,7 +1,8 @@
 //! The CI workflow runs what exists: every `cargo` command names a package of the workspace
 //! (`-p`), a test target it names (`--test`) is one of that package's, every `isoloom`
 //! subcommand it calls is one the command line has, a crate list it compares is the
-//! workspace's, and no generation is let fail quietly.
+//! workspace's, no generation is let fail quietly, and every document the workflows point to is
+//! there.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -177,5 +178,41 @@ fn ci_runs_every_gate_the_release_gate_runs() -> Outcome {
     for c in gate {
         assert!(ci.contains(&c), "ci.yml doesn't run the gate `{c}`");
     }
+    Ok(())
+}
+
+/// The repository's Markdown files a workflow points its reader to (`docs/dev/releasing.md`,
+/// `SECURITY.md`): each word ending in `.md` in its comments and in the notices it prints, from
+/// the root. Its commands' own files (release notes it writes) aren't pointers.
+fn named_documents(text: &str) -> BTreeSet<String> {
+    text.lines()
+        .map(str::trim)
+        .filter(|l| l.starts_with('#') || l.contains("::notice") || l.contains("::warning"))
+        .flat_map(|l| l.split(|c: char| c.is_whitespace() || matches!(c, '(' | ')' | ';' | ',' | '"' | '`')))
+        .map(|w| w.trim_end_matches(['.', ':']))
+        .filter(|w| Path::new(w).extension().is_some_and(|e| e == "md") && !w.contains("://"))
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn every_document_the_workflows_point_to_is_there() -> Outcome {
+    let github = root().join(".github");
+    let mut files: Vec<PathBuf> = std::fs::read_dir(github.join("workflows"))?
+        .map(|e| e.map(|e| e.path()))
+        .collect::<Result<_, _>>()?;
+    files.push(github.join("actionlint.yaml"));
+    let mut missing = Vec::new();
+    for file in &files {
+        let text = std::fs::read_to_string(file)?;
+        // What the workflow writes itself (`-o THIRD-PARTY-LICENSES.md`) is no pointer.
+        let written = |doc: &str| text.contains(&format!("-o {doc}")) || text.contains(&format!("> {doc}"));
+        for doc in named_documents(&text) {
+            if !written(&doc) && !root().join(&doc).is_file() {
+                missing.push(format!("{}: {doc}", file.display()));
+            }
+        }
+    }
+    assert!(missing.is_empty(), "{missing:#?}");
     Ok(())
 }

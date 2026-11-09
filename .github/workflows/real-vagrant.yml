@@ -9,7 +9,7 @@
 # Manual only. `workflow_dispatch` is the sole trigger, matching the "manual-only cross-platform
 # check" decision: no push, pull_request or schedule. A provider without a self-hosted runner is
 # skipped, not failed: the repository variable REAL_VAGRANT_PROVIDERS names the providers that have
-# one, so a job never sits queued for a runner that does not exist. Enabling this: docs/ci-real-hosts.md.
+# one, so a job never sits queued for a runner that does not exist. Enabling this: docs/dev/ci-real-hosts.md.
 name: Cert — real local VMs (Vagrant)
 
 on:
@@ -67,7 +67,7 @@ jobs:
             esac
           done
           if [ "${#pairs[@]}" -eq 0 ]; then
-            echo "::notice title=Vagrant skipped::no runner declared (REAL_VAGRANT_PROVIDERS; docs/ci-real-hosts.md)"
+            echo "::notice title=Vagrant skipped::no runner declared (REAL_VAGRANT_PROVIDERS; docs/dev/ci-real-hosts.md)"
           fi
           echo "matrix=$(printf '%s\n' "${pairs[@]}" | jq -Rsc 'split("\n") | map(select(. != "") | split(" ") | {provider: .[0], example: .[1]})')" >> "$GITHUB_OUTPUT"
           if [ "${#pairs[@]}" -gt 0 ]; then echo any=true; else echo any=false; fi >> "$GITHUB_OUTPUT"
@@ -156,7 +156,7 @@ jobs:
           DOWN: ${{ steps.down.outcome }}
         run: |
           if [ -z "$HOST" ]; then
-            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/ci-real-hosts.md)"
+            echo "::warning title=Not recorded::set the repository variable REAL_TIERS_HOST to record tier evidence (docs/dev/ci-real-hosts.md)"
             exit 0
           fi
           if [ "$UP" = success ] && [ "$CHECK" = success ] && [ "$DOWN" = success ]; then

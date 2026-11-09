@@ -9,7 +9,7 @@ name: Publish crates
 # Setup (per crate, done once by the maintainer): add a Trusted Publisher on crates.io for the
 # crate, pointing at repository `isoloom/isoloom`, this workflow file (`publish-crates.yml`) and
 # the `crates-io` environment. A brand-new crate name must be created by one manual `cargo publish`
-# first (trusted publishing cannot create a crate that does not exist). See PUBLISHING.md.
+# first (trusted publishing cannot create a crate that does not exist). See docs/dev/releasing.md.
 on:
   push:
     tags: ["v*"]
