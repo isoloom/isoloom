@@ -137,7 +137,7 @@ mod tests {
             ("library/nginx".into(), "1.30.6-trixie".into())
         );
         assert_eq!(split("nginx:1.30").unwrap(), ("library/nginx".into(), "1.30".into()));
-        assert_eq!(split("bkimminich/juice-shop:v17").unwrap(), ("bkimminich/juice-shop".into(), "v17".into()));
+        assert_eq!(split("example/web-app:v17").unwrap(), ("example/web-app".into(), "v17".into()));
         assert!(split("ghcr.io/x/y:1").unwrap_err().contains("Docker Hub images only"));
         assert!(split("docker.io/library/nginx").unwrap_err().contains("give the image's tag"));
     }

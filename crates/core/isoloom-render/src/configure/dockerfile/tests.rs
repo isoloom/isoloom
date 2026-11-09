@@ -132,13 +132,9 @@ fn each_container_built_from_steps_gets_its_dockerfile_and_a_vm_none() {
 fn a_bare_official_image_keeps_its_own_working_folder() {
     // A catalogue entry that is only an official image, with no install or configure steps and
     // the image's own entrypoint, must not have its working folder overridden: an app may rely on
-    // it to find its files (OWASP Juice Shop reads `encryptionkeys/` from its image's WORKDIR).
-    let d = built("os: debian@12, service: juice-shop", &[])
-        .into_iter()
-        .next()
-        .expect("a Dockerfile")
-        .contents;
-    assert!(d.contains("FROM docker.io/bkimminich/juice-shop"), "{d}");
+    // it to find its files relative to its image's WORKDIR.
+    let d = built("os: debian@12, service: mongodb", &[]).into_iter().next().expect("a Dockerfile").contents;
+    assert!(d.contains("FROM docker.io/library/mongo"), "{d}");
     assert!(!d.contains("WORKDIR"), "a bare image keeps its own working folder: {d}");
     assert!(!d.contains("ENTRYPOINT"), "the image's own entrypoint runs: {d}");
 }

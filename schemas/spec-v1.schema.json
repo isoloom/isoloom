@@ -696,54 +696,6 @@
             "properties": {
               "service": {
                 "type": "string",
-                "pattern": "^dvwa(@.+)?$"
-              }
-            },
-            "required": [
-              "service"
-            ]
-          },
-          "then": {
-            "properties": {
-              "with": {
-                "type": "object",
-                "description": "dvwa's settings.",
-                "properties": {},
-                "required": [],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "service": {
-                "type": "string",
-                "pattern": "^juice-shop(@.+)?$"
-              }
-            },
-            "required": [
-              "service"
-            ]
-          },
-          "then": {
-            "properties": {
-              "with": {
-                "type": "object",
-                "description": "juice-shop's settings.",
-                "properties": {},
-                "required": [],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "service": {
-                "type": "string",
                 "pattern": "^mariadb(@.+)?$"
               }
             },

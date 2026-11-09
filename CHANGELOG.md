@@ -201,6 +201,9 @@ stable spec format.
 
 ### Removed
 
+- **The dvwa and juice-shop catalogue entries** (security-training apps: a lab names their images
+  itself). A spec with `service: dvwa` or `service: juice-shop` is refused with
+  `unknown-reference`; `app: { image: ... }` gives the same container.
 - **The Vagrantfile's hook for the runner's ad-hoc VM.** A Vagrantfile no longer carries
   `IsoloomAdHoc` (its `ADHOC_*` constants and the loader of `<VAGRANT_DOTFILE_PATH>/adhoc/*.rb`),
   and on QEMU a network's hub no longer keeps a spare port for that VM (`isoloom-access` is gone
