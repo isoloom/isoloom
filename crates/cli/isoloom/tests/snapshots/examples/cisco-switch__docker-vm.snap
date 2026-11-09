@@ -827,7 +827,7 @@ resource "proxmox_virtual_environment_vm" "env" {
   lifecycle {
     postcondition {
       condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1"]) > 0
-      error_message = "The Docker host got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+      error_message = "The Docker host got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address (an IPv6 address alone isn't enough: the uplink needs IPv4 from DHCP). Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
     }
   }
 }

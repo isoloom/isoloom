@@ -438,7 +438,7 @@ resource "proxmox_virtual_environment_file" "router" {
         "systemctl restart systemd-networkd",
         "systemctl enable --now nftables",
         "nft -f /etc/nftables.conf",
-        "systemctl enable --now qemu-guest-agent"
+        "i=0; while [ \"$i\" -lt 84 ] && ! ip -4 -o addr show scope global | awk '{split($4, a, \"/\"); print a[1]}' | grep -qvxF -e 10.86.0.254; do i=$((i + 1)); sleep 5; done; systemctl enable --now qemu-guest-agent"
       ]
     }))
   }
@@ -462,7 +462,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   lifecycle {
     postcondition {
       condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.86.0.254"], a)]) > 0
-      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address (an IPv6 address alone isn't enough: the uplink needs IPv4 from DHCP). Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
     }
   }
   cpu {

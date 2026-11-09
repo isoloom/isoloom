@@ -27,10 +27,10 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         "systemctl restart systemd-networkd",
         "systemctl enable --now nftables",
         "nft -f /etc/nftables.conf",
-        "systemctl enable --now qemu-guest-agent",
     ]
     .map(String::from)
     .to_vec();
+    config.runcmd.push(super::uplink::start_agent_after_uplink(&own_addresses(env)));
     if let Some((files, start)) = super::lxc::router_dns(env) {
         // The LXC containers' resolver: the environment's names.
         config.packages.push("dnsmasq".to_owned());

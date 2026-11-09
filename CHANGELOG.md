@@ -197,6 +197,13 @@ stable spec format.
 
 ### Fixed
 
+- **A Proxmox router waits for its uplink address, as its check says.** The provider's wait for an
+  address ended at the first IPv4 address the guest agent reported, whichever card had it: the
+  router's environment addresses, set statically, came first, so on an uplink whose DHCP was slow
+  or absent the check failed after about a minute instead of waiting up to 8. The router now
+  starts its agent once its uplink has an IPv4 address (or after 7 minutes), and the failure says
+  that an IPv6 address alone isn't enough.
+
 - **A default region reached `main.tf` but not the run**: `isoloom generate` rewrote a cloud
   module's text for the region in the person's defaults while `run.json`'s `region` param kept the
   built-in one, which a runner hands Terraform. The lab now writes the region into the module's

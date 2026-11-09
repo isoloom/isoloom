@@ -20,6 +20,24 @@ pub(super) fn agent() -> Block {
         .build()
 }
 
+/// How long a VM with environment addresses waits for its uplink address before it starts the
+/// agent anyway: within [`AGENT_WAIT`], so the check below still sees the outcome.
+const UPLINK_WAIT_STEPS: u32 = 84;
+
+/// The command that starts the guest agent once the VM has an IPv4 address on its uplink: one
+/// that is none of `own` (its environment addresses), waited for at most [`UPLINK_WAIT_STEPS`]
+/// times 5 s. The provider's `wait_for_ip` ends at the first IPv4 address the agent reports,
+/// whichever card has it: started at once, the agent reports the environment addresses (set
+/// statically) before a slow DHCP answers on the uplink, and the check failed after a minute
+/// instead of waiting. `own` must not be empty (a VM without environment addresses starts it at
+/// once).
+pub(super) fn start_agent_after_uplink(own: &[String]) -> String {
+    let excluded = own.iter().map(|a| format!("-e {a}")).collect::<Vec<_>>().join(" ");
+    format!(
+        "i=0; while [ \"$i\" -lt {UPLINK_WAIT_STEPS} ] && ! ip -4 -o addr show scope global | awk '{{split($4, a, \"/\"); print a[1]}}' | grep -qvxF {excluded}; do i=$((i + 1)); sleep 5; done; systemctl enable --now qemu-guest-agent"
+    )
+}
+
 /// The first address of [`addresses`], or `""` when it reported none (a destroy after a failed
 /// apply evaluates it too).
 pub(super) fn first_address(vm: &str, own: &[String]) -> Expression {
@@ -45,7 +63,67 @@ pub(super) fn checked(what: &str, own: &[String]) -> Block {
     let message = Template::text(format!("{what} got no IPv4 address on its uplink bridge `"))
         .with_expr(reference("var.uplink_bridge"))
         .with_text(format!(
-            "` within {AGENT_WAIT}: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address. Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+            "` within {AGENT_WAIT}: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address (an IPv6 address alone isn't enough: the uplink needs IPv4 from DHCP). Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
         ));
     crate::server::router::postcondition(condition, message)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    use super::start_agent_after_uplink;
+
+    /// The command run with a stand-in `ip` printing `addresses` (one `ip -o` line each), a
+    /// `sleep` that counts, and a `systemctl` that logs: the waits, then the calls.
+    fn run(addresses: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+        let dir = std::env::temp_dir().join(format!("isoloom-uplink-{}-{}", std::process::id(), addresses.len()));
+        let bin = dir.join("bin");
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir)?;
+        }
+        std::fs::create_dir_all(&bin)?;
+        let log = dir.join("log");
+        let lines = addresses
+            .iter()
+            .map(|a| format!("echo '2: eth0    inet {a}/24 brd x scope global eth0'"))
+            .collect::<Vec<_>>()
+            .join(
+                "
+",
+            );
+        let stand_ins = [
+            ("ip", lines),
+            ("sleep", format!("echo sleep >> {}\n", log.display())),
+            ("systemctl", format!("echo \"systemctl $*\" >> {}\n", log.display())),
+        ];
+        for (name, body) in stand_ins {
+            std::fs::write(bin.join(name), format!("#!/bin/sh\n{body}"))?;
+            Command::new("chmod").arg("+x").arg(bin.join(name)).status()?;
+        }
+        for tool in ["awk", "grep"] {
+            let found = Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
+            std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), bin.join(tool))?;
+        }
+        let script = start_agent_after_uplink(&["10.254.250.254".to_owned()]);
+        let out = Command::new("/bin/sh").arg("-c").arg(script).env_clear().env("PATH", &bin).output()?;
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        Ok(std::fs::read_to_string(log)?)
+    }
+
+    #[test]
+    fn the_agent_starts_at_once_when_the_uplink_has_an_address() -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(run(&["10.254.250.254", "192.168.1.20"])?, "systemctl enable --now qemu-guest-agent\n");
+        Ok(())
+    }
+
+    /// The environment address alone (set statically, before any DHCP answer) isn't the uplink's:
+    /// the agent waits, then starts anyway so the check reports the missing address.
+    #[test]
+    fn the_environment_address_alone_doesnt_start_the_agent() -> Result<(), Box<dyn std::error::Error>> {
+        let log = run(&["10.254.250.254"])?;
+        assert_eq!(log.matches("sleep").count(), 84, "{log}");
+        assert!(log.ends_with("systemctl enable --now qemu-guest-agent\n"));
+        Ok(())
+    }
 }
