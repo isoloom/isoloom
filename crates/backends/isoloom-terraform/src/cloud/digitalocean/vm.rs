@@ -132,7 +132,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
     let id = ident(name);
     let os = mp.os.as_deref().unwrap_or_default();
     let slug = own_image::of(mp, own_image::digitalocean).unwrap_or_else(|| image(os).unwrap_or_default());
-    m.blocks(disks::digitalocean(name, &mp.disks));
+    m.blocks(disks::digitalocean(env, name, &mp.disks));
     let mut droplet = resource("digitalocean_droplet", &id)
         .add_attribute(("name", name_with(&format!("-{name}"))))
         .add_attribute(("region", reference("var.region")))

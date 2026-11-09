@@ -2,14 +2,16 @@
 //! (at its creation where the cloud can: AWS, Google Cloud, DigitalOcean, Oracle Cloud).
 //! The machine's `Disks` step finds each attached disk by its size and formats and mounts it
 //! (see `isoloom_render::disks`), so the resources here only create and attach them. A cloud's
-//! smallest volume is a refusal of its own ([`too_small`]).
+//! smallest volume is a refusal of its own ([`too_small`]). A volume that is a resource of its own
+//! carries the environment's tags (labels on Google Cloud), as its instance does, for a reaper to
+//! find.
 
 use isoloom_plan::{DataDisk, Environment};
 use isoloom_render::hcl_builder::{Block, Expression, boolean, call, list, number, reference, string};
 
 use super::rules::Volumes;
 use crate::cloud::Cloud;
-use crate::cloud::instance::name_with;
+use crate::cloud::instance::{name_with, tag_list, tags};
 use crate::machine::vms;
 use crate::module::{ident, resource};
 
@@ -72,7 +74,7 @@ pub(crate) fn azure(name: &str, vm: &str, disks: &[DataDisk]) -> Vec<Block> {
 
 /// Google Cloud: a balanced persistent disk per disk in the module's zone (the instance's
 /// `attached_disk` blocks attach them, see [`gcp_attached`]).
-pub(crate) fn gcp(name: &str, disks: &[DataDisk]) -> Vec<Block> {
+pub(crate) fn gcp(env: &Environment, name: &str, disks: &[DataDisk]) -> Vec<Block> {
     let id = ident(name);
     disks
         .iter()
@@ -83,6 +85,7 @@ pub(crate) fn gcp(name: &str, disks: &[DataDisk]) -> Vec<Block> {
                 .add_attribute(("type", string("pd-balanced")))
                 .add_attribute(("zone", reference("local.zone")))
                 .add_attribute(("size", number(d.size_gb.into())))
+                .add_attribute(("labels", tags(env)))
                 .build()
         })
         .collect()
@@ -104,7 +107,7 @@ pub(crate) fn gcp_attached(name: &str, disks: &[DataDisk]) -> Vec<Block> {
 
 /// DigitalOcean: a volume per disk in the module's region (the droplet's `volume_ids` attach
 /// them, see [`digitalocean_ids`]).
-pub(crate) fn digitalocean(name: &str, disks: &[DataDisk]) -> Vec<Block> {
+pub(crate) fn digitalocean(env: &Environment, name: &str, disks: &[DataDisk]) -> Vec<Block> {
     let id = ident(name);
     disks
         .iter()
@@ -113,6 +116,7 @@ pub(crate) fn digitalocean(name: &str, disks: &[DataDisk]) -> Vec<Block> {
                 .add_attribute(("name", cloud_name(name, d)))
                 .add_attribute(("region", reference("var.region")))
                 .add_attribute(("size", number(d.size_gb.into())))
+                .add_attribute(("tags", tag_list(env)))
                 .build()
         })
         .collect()
@@ -126,7 +130,7 @@ pub(crate) fn digitalocean_ids(name: &str, disks: &[DataDisk]) -> Expression {
 
 /// Linode: a volume in the module's region, attached to the instance. Its label is at most 32
 /// characters: the environment's id, shortened, then the machine and the disk.
-pub(crate) fn linode(name: &str, disks: &[DataDisk]) -> Vec<Block> {
+pub(crate) fn linode(env: &Environment, name: &str, disks: &[DataDisk]) -> Vec<Block> {
     let id = ident(name);
     disks
         .iter()
@@ -138,6 +142,7 @@ pub(crate) fn linode(name: &str, disks: &[DataDisk]) -> Vec<Block> {
                 .add_attribute(("region", reference("var.region")))
                 .add_attribute(("size", number(d.size_gb.into())))
                 .add_attribute(("linode_id", reference(&format!("linode_instance.{id}.id"))))
+                .add_attribute(("tags", tag_list(env)))
                 .build()
         })
         .collect()

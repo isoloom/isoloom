@@ -161,5 +161,5 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
             .add_block(super::set_up_once())
             .build(),
     );
-    m.blocks(disks::linode(name, &mp.disks));
+    m.blocks(disks::linode(env, name, &mp.disks));
 }

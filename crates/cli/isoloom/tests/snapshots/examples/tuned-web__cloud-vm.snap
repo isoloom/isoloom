@@ -1559,6 +1559,12 @@ resource "google_compute_disk" "web_cache" {
   type    = "pd-balanced"
   zone    = local.zone
   size    = 50
+  labels = {
+    isoloom-environment = "tuned-web"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
 }
 
 resource "google_compute_instance" "web" {
