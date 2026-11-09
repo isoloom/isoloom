@@ -1,0 +1,16 @@
+# Third-party licences
+
+`isoloom` is built from the crates below, its own included. Each licence is listed with the
+crates it covers, then its text.
+
+{{#each licenses}}
+## {{{name}}}
+
+{{#each used_by}}- {{{crate.name}}} {{{crate.version}}}
+{{/each}}
+
+```text
+{{{text}}}
+```
+
+{{/each}}

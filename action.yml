@@ -1,11 +1,11 @@
 name: Set up Isoloom
-description: Installs the isoloom CLI (a release binary) and puts it on the PATH.
+description: Installs the isoloom CLI (a release binary, checked against the release's SHA256SUMS) and puts it on the PATH.
 branding:
   icon: layers
   color: orange
 inputs:
   version:
-    description: A release tag (e.g. v0.6.0), or latest.
+    description: A release tag (e.g. v2.0.0), or latest.
     default: latest
 runs:
   using: composite
@@ -16,18 +16,41 @@ runs:
       env:
         ISOLOOM_VERSION: ${{ inputs.version }}
         ISOLOOM_INSTALL_DIR: ${{ runner.temp }}/isoloom-bin
-      run: |
-        sh "${{ github.action_path }}/packaging/install.sh"
+        ACTION_PATH: ${{ github.action_path }}
+      # Writes the install folder (under the runner's temporary folder) to GITHUB_PATH.
+      run: | # zizmor: ignore[github-env]
+        sh "$ACTION_PATH/packaging/install.sh"
         echo "$ISOLOOM_INSTALL_DIR" >> "$GITHUB_PATH"
     - name: Install isoloom (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
-      run: |
-        $v = "${{ inputs.version }}"
-        $asset = "isoloom-x86_64-pc-windows-msvc.zip"
-        $url = if ($v -eq "latest") { "https://github.com/isoloom/isoloom/releases/latest/download/$asset" } else { "https://github.com/isoloom/isoloom/releases/download/$v/$asset" }
-        $dir = Join-Path "${{ runner.temp }}" "isoloom-bin"
+      env:
+        ISOLOOM_VERSION: ${{ inputs.version }}
+        ISOLOOM_INSTALL_DIR: ${{ runner.temp }}/isoloom-bin
+      # Writes the install folder (under the runner's temporary folder) to GITHUB_PATH.
+      run: | # zizmor: ignore[github-env]
+        $ErrorActionPreference = 'Stop'
+        $ProgressPreference = 'SilentlyContinue'
+        $v = $env:ISOLOOM_VERSION
+        $name = "isoloom-x86_64-pc-windows-msvc"
+        $asset = "$name.zip"
+        $base = if ($v -eq "latest") { "https://github.com/isoloom/isoloom/releases/latest/download" }
+                elseif ($v.StartsWith("v")) { "https://github.com/isoloom/isoloom/releases/download/$v" }
+                else { "https://github.com/isoloom/isoloom/releases/download/v$v" }
+        $dir = $env:ISOLOOM_INSTALL_DIR
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
-        Invoke-WebRequest $url -OutFile (Join-Path $dir $asset)
-        Expand-Archive -Force (Join-Path $dir $asset) $dir
-        $dir | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+        $zip = Join-Path $dir $asset
+        $sums = Join-Path $dir "SHA256SUMS"
+        Write-Host "Downloading $base/$asset"
+        Invoke-WebRequest "$base/$asset" -OutFile $zip
+        Invoke-WebRequest "$base/SHA256SUMS" -OutFile $sums
+        # The archive's line of SHA256SUMS, checked; a missing line is a failure, not a skip.
+        $line = Get-Content $sums | Where-Object { $_ -match "^[0-9a-f]{64}  $([regex]::Escape($asset))$" }
+        if (-not $line) { throw "isoloom: $asset isn't in the release's SHA256SUMS" }
+        $expected = ($line -split '\s+')[0]
+        $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+        if ($actual -ne $expected) { throw "isoloom: $asset doesn't match SHA256SUMS ($actual, expected $expected)" }
+        Expand-Archive -Force $zip $dir
+        $bin = Join-Path $dir $name
+        & (Join-Path $bin "isoloom.exe") --version
+        $bin | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
