@@ -1569,7 +1569,18 @@ output "ssh_user" {
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name edge-firewall --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 120
+      }
+    ]
   },
   "guest": {
     "machine": "docker",
@@ -2543,7 +2554,20 @@ systemctl enable --now isoloom-published.service
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "argv": [
+          "vagrant",
+          "ssh",
+          "--no-tty",
+          "--command",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name edge-firewall --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "default"
+        ],
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "stale_markers": [

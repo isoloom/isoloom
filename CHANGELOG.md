@@ -10,6 +10,16 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A lab's own access machine can start after its checks ran.** The checks that run from the
+  access machine's seat run from a stand-in at its addresses (`isoloom-access`, check profile),
+  which nothing took down: once checked, the lab's access machine couldn't come up (Docker:
+  "Address already in use"). Every container target's run manifest now takes the stand-ins down
+  in `checks.teardown` (`stand-ins-down`), after the checks whatever happened: the docker target,
+  and Compose in a VM (docker-vm, Proxmox, cloud-docker). `GuestCompose::empty` builds an empty
+  guest for tests.
+
 ### Removed
 
 - **The Vagrantfile's hook for the runner's ad-hoc VM.** A Vagrantfile no longer carries

@@ -106,6 +106,9 @@ pub struct GuestCompose {
     pub ready: Vec<Condition>,
     /// Before the check runners (the access machine's stand-in).
     pub check_setup: Vec<GuestCommand>,
+    /// After the check runners, whatever happened: the stand-in taken down, so the access
+    /// machine it stands in for can take its addresses.
+    pub check_teardown: Vec<GuestCommand>,
     /// The check runners.
     pub runners: Vec<GuestRunner>,
     /// Reads the containers: `docker compose ps --all --format json`, nothing before Docker is in.
@@ -113,6 +116,23 @@ pub struct GuestCompose {
 }
 
 impl GuestCompose {
+    /// A guest with nothing in it but `status`: no machines, slots, steps or checks.
+    #[must_use]
+    pub fn empty(status: GuestCommand) -> Self {
+        GuestCompose {
+            machines: Vec::new(),
+            networks: Vec::new(),
+            slots: Vec::new(),
+            params: Vec::new(),
+            start: Vec::new(),
+            ready: Vec::new(),
+            check_setup: Vec::new(),
+            check_teardown: Vec::new(),
+            runners: Vec::new(),
+            status,
+        }
+    }
+
     /// The variables the start steps read from their environment, which the VM's way in must
     /// forward into it (SSH's `SendEnv`, accepted by the VM's `AcceptEnv`): sorted, each once.
     #[must_use]
@@ -267,15 +287,8 @@ mod tests {
     /// A guest compose carrying only `slots`: everything else empty, with a plain `ps` status.
     fn guest(slots: Vec<SecretSlot>) -> GuestCompose {
         GuestCompose {
-            machines: Vec::new(),
-            networks: Vec::new(),
             slots,
-            params: Vec::new(),
-            start: Vec::new(),
-            ready: Vec::new(),
-            check_setup: Vec::new(),
-            runners: Vec::new(),
-            status: command("ps", "docker compose ps"),
+            ..GuestCompose::empty(command("ps", "docker compose ps"))
         }
     }
 

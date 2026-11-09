@@ -319,3 +319,38 @@ fn secrets_project_files_kept_volumes_and_tools_reach_the_manifest() -> Outcome 
     assert_eq!(params, ["ISOLOOM_PUBLISH_ADDRESS", "ISOLOOM_PUBLISH_FIXED"]);
     Ok(())
 }
+
+/// A lab with an access machine of its own, checked from its seat: the checks run from a
+/// stand-in at its address, started before them. After them, whatever happened, the stand-in is
+/// taken down, or the access machine (brought up on demand) finds its address taken.
+const ACCESS_SEAT: &str = "
+version: 1
+name: seat
+networks:
+  lab: { cidr: 10.9.0.0/24 }
+machines:
+  web: { networks: { lab: 10 }, ports: { web: { port: 80, protocol: http } }, app: { image: nginx } }
+  user: { access: true, networks: { lab: 20 } }
+checks:
+  - { name: the page answers from the seat, from: user, http: \"http://web/\" }
+";
+
+#[test]
+fn the_check_stand_in_is_taken_down_after_the_checks_on_every_container_target() -> Outcome {
+    for (target, path) in [
+        (Target::Docker, ".isoloom/docker/run.json"),
+        (Target::DockerVm, ".isoloom/docker-vm/run.json"),
+        (Target::CloudDocker, ".isoloom/cloud-docker/aws/run.json"),
+    ] {
+        let m = run_json(&generate(&lab(ACCESS_SEAT)?, target)?, path)?;
+        let ids = |steps: &[isoloom_manifest::Step]| steps.iter().map(|s| s.id.as_str().to_owned()).collect::<Vec<_>>();
+        assert_eq!(ids(&m.checks.setup), ["stand-ins"], "{target:?}");
+        assert_eq!(ids(&m.checks.teardown), ["stand-ins-down"], "{target:?}");
+        let down = serde_json::to_string(&m.checks.teardown[0])?;
+        assert!(
+            down.contains("rm") && down.contains("--stop") && down.contains("isoloom-access"),
+            "{target:?}: {down}"
+        );
+    }
+    Ok(())
+}

@@ -69,7 +69,7 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup: steps(&guest.check_setup, &way_in)?,
             runners,
-            teardown: Vec::new(),
+            teardown: steps(&guest.check_teardown, &way_in)?,
         },
         recovery: Some(recovery()?),
         expiry: None,

@@ -794,7 +794,18 @@ output "ssh_user" {
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name udp-dns --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "admin"
+        },
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "retries": 0,
@@ -1649,7 +1660,18 @@ output "ssh_user" {
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name udp-dns --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "retries": 0,
@@ -2380,7 +2402,18 @@ output "ssh_user" {
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name udp-dns --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "retries": 0,
@@ -3217,7 +3250,18 @@ output "ssh_user" {
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name udp-dns --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "retries": 0,
@@ -3934,7 +3978,18 @@ output "ssh_user" {
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name udp-dns --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "retries": 0,
@@ -4717,7 +4772,18 @@ output "ssh_user" {
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name udp-dns --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "host": "${outputs.ip}",
+          "user": "ubuntu"
+        },
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "retries": 0,

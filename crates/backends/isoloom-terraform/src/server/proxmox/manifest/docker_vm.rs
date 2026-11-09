@@ -77,7 +77,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup: steps_of(&guest.check_setup, &way_in)?,
             runners: guest.runners.iter().map(|r| r.runner(&way_in)).collect::<Result<_, _>>()?,
-            teardown: Vec::new(),
+            teardown: steps_of(&guest.check_teardown, &way_in)?,
         },
         recovery: None,
         expiry: None,

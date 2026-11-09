@@ -135,16 +135,55 @@ pub(super) fn stand_ins(file: &ComposeFile) -> Vec<String> {
         .collect()
 }
 
+/// What is done to the access machine's stand-ins around the checks.
+pub(super) struct StandInStep {
+    /// The step's id.
+    pub(super) id: &'static str,
+    /// What `docker compose --profile check` does to them.
+    pub(super) verb: &'static str,
+    /// What the step says it is doing.
+    pub(super) note: Option<&'static str>,
+    pub(super) timeout_s: u32,
+}
+
+/// Before the runners: the stand-ins started.
+pub(super) const STAND_INS_UP: StandInStep = StandInStep {
+    id: "stand-ins",
+    verb: "up --detach --wait --no-deps",
+    note: Some("Starting the access machine's stand-in…"),
+    timeout_s: 600,
+};
+
+/// After the runners, whatever happened: the stand-ins taken down, so the access machine they
+/// stand in for (brought up on demand) can take its addresses.
+pub(super) const STAND_INS_DOWN: StandInStep = StandInStep {
+    id: "stand-ins-down",
+    verb: "rm --stop --force",
+    note: None,
+    timeout_s: 120,
+};
+
 /// Before the runners: the stand-ins started.
 pub(super) fn setup(file: &ComposeFile) -> Result<Vec<Step>> {
+    stand_in_step(file, &STAND_INS_UP)
+}
+
+/// After the runners: the stand-ins taken down.
+pub(super) fn teardown(file: &ComposeFile) -> Result<Vec<Step>> {
+    stand_in_step(file, &STAND_INS_DOWN)
+}
+
+/// `docker compose --profile check <verb> <stand-ins>`, when the file has stand-ins.
+fn stand_in_step(file: &ComposeFile, what: &StandInStep) -> Result<Vec<Step>> {
     let stand_ins = stand_ins(file);
     if stand_ins.is_empty() {
         return Ok(Vec::new());
     }
-    let mut args = vec!["--profile", "check", "up", "--detach", "--wait", "--no-deps"];
+    let mut args = vec!["--profile", "check"];
+    args.extend(what.verb.split(' '));
     args.extend(stand_ins.iter().map(String::as_str));
-    let mut step = Step::argv(StepId::parse("stand-ins")?, compose(&args)?);
-    step.note = Some("Starting the access machine's stand-in…".into());
-    step.timeout_s = NonZeroU32::new(600);
+    let mut step = Step::argv(StepId::parse(what.id)?, compose(&args)?);
+    step.note = what.note.map(str::to_owned);
+    step.timeout_s = NonZeroU32::new(what.timeout_s);
     Ok(vec![step])
 }

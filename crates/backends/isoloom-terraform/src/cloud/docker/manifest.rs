@@ -44,7 +44,8 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
     let mut machines = vec![host(env)?];
     machines.extend(guest_machines.iter().cloned());
     let runners = guest.runners.iter().map(|r| r.runner(&way_in)).collect::<Result<Vec<_>, _>>()?;
-    let setup = guest.check_setup.iter().map(|c| c.step(&way_in)).collect::<Result<Vec<_>, _>>()?;
+    let over_ssh = |commands: &[isoloom_render::run_manifest::guest::GuestCommand]| commands.iter().map(|c| c.step(&way_in)).collect::<Result<Vec<_>, _>>();
+    let (setup, teardown) = (over_ssh(&guest.check_setup)?, over_ssh(&guest.check_teardown)?);
     let mut params = connection::params(&driver_variables(env, driver), cloud)?;
     params.extend(guest.params.iter().cloned());
     let mut secrets = connection::slots(cloud, connection::terraform_steps(false))?;
@@ -83,7 +84,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup,
             runners,
-            teardown: Vec::new(),
+            teardown,
         },
         recovery: manifest::recovery()?,
         expiry: manifest::expiry()?,

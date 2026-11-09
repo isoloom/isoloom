@@ -811,7 +811,29 @@ volumes:
         ]
       }
     ],
-    "teardown": []
+    "teardown": [
+      {
+        "id": "stand-ins-down",
+        "argv": [
+          "docker",
+          "compose",
+          "--project-name",
+          "${run.name}",
+          "--file",
+          "compose.yml",
+          "--file",
+          "${run.state_dir}/ports.yml",
+          "--profile",
+          "check",
+          "rm",
+          "--stop",
+          "--force",
+          "isoloom-access",
+          "isoloom-access-routes"
+        ],
+        "timeout_s": 120
+      }
+    ]
   },
   "recovery": {
     "stale_markers": [

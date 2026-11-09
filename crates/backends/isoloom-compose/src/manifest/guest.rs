@@ -14,7 +14,7 @@ use isoloom_render::run_manifest::{DERIVED, check, derived_switch, networks, tim
 use isoloom_render::{OUTPUT_DIR, steps};
 
 use super::Project;
-use super::checks::{Planned, planned, stand_ins};
+use super::checks::{Planned, STAND_INS_DOWN, STAND_INS_UP, StandInStep, planned, stand_ins};
 use super::lifecycle::{job_step, owner, publishes_a_built_image, ready};
 use super::machines::{Member, classify, machines};
 use super::slots::{Starts, slots};
@@ -86,7 +86,8 @@ pub(crate) fn guest(env: &Environment, file: &ComposeFile) -> Result<GuestCompos
         params: derived_switch(derived)?.into_iter().collect(),
         start: start(env, &vm, &plan, &members)?,
         ready: ready(&plan, &members, START)?,
-        check_setup: check_setup(file, &vm)?,
+        check_setup: stand_in_command(file, &vm, &STAND_INS_UP)?,
+        check_teardown: stand_in_command(file, &vm, &STAND_INS_DOWN)?,
         status: command("ps", None, vm.status(), 60)?,
         runners,
     })
@@ -172,15 +173,20 @@ fn compose_runner(vm: &InVm, p: &Planned<'_>) -> Result<GuestRunner> {
     })
 }
 
-/// The access machine's stand-ins, when the file has them.
-fn check_setup(file: &ComposeFile, vm: &InVm) -> Result<Vec<GuestCommand>> {
+/// What is done to the access machine's stand-ins in the VM around the checks (`what`), when the
+/// file has them.
+fn stand_in_command(file: &ComposeFile, vm: &InVm, what: &StandInStep) -> Result<Vec<GuestCommand>> {
     let stand_ins = stand_ins(file);
     if stand_ins.is_empty() {
         return Ok(Vec::new());
     }
-    let up = format!("--profile check up --detach --wait --no-deps {}", stand_ins.join(" "));
-    let note = Some("Starting the access machine's stand-in…".to_owned());
-    Ok(vec![command("stand-ins", note, vm.compose("", &text(&up)), 600)?])
+    let args = format!("--profile check {} {}", what.verb, stand_ins.join(" "));
+    Ok(vec![command(
+        what.id,
+        what.note.map(str::to_owned),
+        vm.compose("", &text(&args)),
+        what.timeout_s,
+    )?])
 }
 
 #[cfg(test)]

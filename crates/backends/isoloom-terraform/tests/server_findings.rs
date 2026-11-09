@@ -23,22 +23,12 @@ fn proxmox(name: &str) -> Outcome<String> {
 ///
 /// When the status step's id isn't one (it is fixed, so this never fails).
 fn no_guest() -> Outcome<GuestCompose> {
-    Ok(GuestCompose {
-        machines: Vec::new(),
-        networks: Vec::new(),
-        slots: Vec::new(),
-        params: Vec::new(),
-        start: Vec::new(),
-        ready: Vec::new(),
-        check_setup: Vec::new(),
-        runners: Vec::new(),
-        status: GuestCommand {
-            id: isoloom_manifest::StepId::parse("ps")?,
-            note: None,
-            command: isoloom_manifest::Template::text("true"),
-            timeout_s: 60,
-        },
-    })
+    Ok(GuestCompose::empty(GuestCommand {
+        id: isoloom_manifest::StepId::parse("ps")?,
+        note: None,
+        command: isoloom_manifest::Template::text("true"),
+        timeout_s: 60,
+    }))
 }
 
 /// The docker-vm Proxmox module's `main.tf` for `env`.

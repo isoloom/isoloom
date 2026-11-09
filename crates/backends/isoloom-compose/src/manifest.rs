@@ -59,7 +59,7 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup: checks::setup(file)?,
             runners: runners.runners,
-            teardown: Vec::new(),
+            teardown: checks::teardown(file)?,
         },
         recovery: Some(lifecycle::recovery()?),
         expiry: None,
