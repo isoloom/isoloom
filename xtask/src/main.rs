@@ -4,7 +4,8 @@
 //! - `verify`: the official validators on every generated file, in the pinned image;
 //! - `tf-test`: the cloud and server modules' logic, `terraform test` with mocked providers;
 //! - `generate-all`: every example generated into one tree, for `verify`;
-//! - `quality`: the ratchet, the clean-code counts per crate against `quality-baseline.json`;
+//! - `quality`: the ratchet, the clean-code counts per crate against
+//!   `xtask/baselines/quality-baseline.json`;
 //! - `test`: the tests under cargo-nextest, then the doctests;
 //! - `msrv` and `features`: every crate checked with its declared minimum Rust, and with every
 //!   combination of its features (cargo-hack);
@@ -14,7 +15,7 @@
 //! - `conformance`: the configuration renderers' resource conformance, each step kind applied
 //!   twice in each Linux family's container image;
 //! - `mutants`: mutation testing of the core crates (cargo-mutants);
-//! - `bench`: the generation benchmarks against `bench-baseline.json`;
+//! - `bench`: the generation benchmarks against `xtask/baselines/bench-baseline.json`;
 //! - `tiers record`: a real run added to the tier list, the evidence the tiers are worked out
 //!   from;
 //! - `catalogue refresh` and `catalogue check`: the catalogue's pins, and an entry's parity
@@ -64,8 +65,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Task {
-    /// The official validators on generated files, in the pinned image (tools/verify), against
-    /// the baseline (tools/verify/baseline.json); exits 1 on a failure the baseline doesn't know.
+    /// The official validators on generated files, in the pinned image (xtask/src/verify),
+    /// against the baseline (xtask/src/verify/baseline.json); exits 1 on a failure the baseline
+    /// doesn't know.
     Verify(verify::Args),
     /// The cloud and server modules' routing, gateways, firewalls, published ports, private
     /// names and ready file, asserted by `terraform test` with mocked providers in the pinned
@@ -74,7 +76,8 @@ enum Task {
     /// Every example (or the spec folders given) generated for every target it can be, into one
     /// tree that `verify` checks.
     GenerateAll(generate_all::Args),
-    /// The ratchet: every clean-code count per crate against quality-baseline.json; fails when
+    /// The ratchet: every clean-code count per crate against
+    /// xtask/baselines/quality-baseline.json; fails when
     /// one goes up (`--update` writes them when they only went down).
     Quality(quality::Args),
     /// The workspace's tests under cargo-nextest (`.config/nextest.toml`), then the doctests.
@@ -96,8 +99,8 @@ enum Task {
     Conformance(conformance::Args),
     /// Mutation testing of the core crates (cargo-mutants): exits 1 when a mutant survives.
     Mutants(mutants::Args),
-    /// The generation benchmarks (criterion) against bench-baseline.json; exits 1 when one is
-    /// slower than the threshold allows.
+    /// The generation benchmarks (criterion) against xtask/baselines/bench-baseline.json; exits 1
+    /// when one is slower than the threshold allows.
     Bench(bench::Args),
     /// The tier list (crates/targets/isoloom-targets/tiers.json): `record <entry> <host>
     /// <result>` adds a real run, the evidence a tier is worked out from.

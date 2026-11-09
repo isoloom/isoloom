@@ -1,4 +1,4 @@
-# cargo xtask tf-test, inside the validator image (tools/verify/Dockerfile): `terraform test` in
+# cargo xtask tf-test, inside the validator image (xtask/src/verify/Dockerfile): `terraform test` in
 # each module /work/modules lists, TF_TEST_JOBS at once, the providers from the cache volume
 # (/cache, shared with `cargo xtask verify`). For each module, in the list's order, it prints a
 # `@@module <folder>` line, a `@@status <terraform test's exit status, or init-failed>` line,

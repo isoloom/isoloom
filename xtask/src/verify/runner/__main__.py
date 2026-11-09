@@ -113,7 +113,7 @@ def summary(found: Found, results: list[Result], new: list[Result], stale: list[
     if stale:
         lines.append(f"stale baseline entries (no longer failing, drop them with --update-baseline): {len(stale)}")
     if unexplained:
-        lines.append(f"baseline causes without a reason (tools/verify/baseline.json): {unexplained}")
+        lines.append(f"baseline causes without a reason (xtask/src/verify/baseline.json): {unexplained}")
     return "\n".join(lines) + "\n"
 
 

@@ -61,10 +61,10 @@ sha2 = "0.11"
 sha1 = "0.11"
 flate2 = "1"
 
-# Every crate inherits these (`[lints] workspace = true`): the strictest set (PLAN 1c). A lint is at
-# "deny" once its count is zero; while it isn't, it is at "warn", and `cargo xtask quality` counts
-# its warnings per crate against quality-baseline.json, where a count can only go down. An
-# exception is a local `#[expect(lint, reason = "...")]`, which the ratchet counts too; never an
+# Every crate inherits these (`[lints] workspace = true`): the strictest set. A lint is at "deny"
+# once its count is zero; while it isn't, it is at "warn", and `cargo xtask quality` counts its
+# warnings per crate against xtask/baselines/quality-baseline.json, where a count can only go down.
+# An exception is a local `#[expect(lint, reason = "...")]`, which the ratchet counts too; never an
 # entry here.
 [workspace.lints.rust]
 # No exception: a profile's inputs reach the tools through `Command::envs`, not `set_var`.

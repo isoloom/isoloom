@@ -1,7 +1,7 @@
 //! `cargo xtask tf-test`: the cloud and server modules' logic proven without clouds. The
 //! examples the suites name (`tests/terraform/`, see [`suite`]) are generated into
 //! `target/tf-test/tree`, and `terraform test` runs against each suite's module, inside the
-//! pinned validator image (`tools/verify/Dockerfile`, Terraform 1.7 or later for mocked
+//! pinned validator image (`xtask/src/verify/Dockerfile`, Terraform 1.7 or later for mocked
 //! providers): every provider is mocked (`mock_provider`) and every run plans only, so there are
 //! no credentials, no cloud and no provisioner. The assertions read the planned values: each
 //! network's routes, the gateways, the firewalls, the published ports and their outputs, the

@@ -1,4 +1,4 @@
-# The fuzz targets (cargo-fuzz, PLAN 3d), run by `cargo xtask fuzz`. A workspace of its own: they
+# The fuzz targets (cargo-fuzz), run by `cargo xtask fuzz`. A workspace of its own: they
 # build with nightly and libFuzzer, which the main workspace's gates (stable, three platforms)
 # don't. Each crash a run finds becomes a regression test in the crate it belongs to.
 [package]
@@ -14,8 +14,8 @@ cargo-fuzz = true
 
 # The inputs each target starts from (folders, relative to this one), besides its own corpus.
 [package.metadata.seeds]
-spec_syntax = ["../tests/spec-examples", "../examples"]
-spec_model = ["../tests/spec-examples", "../examples"]
+spec_syntax = ["../crates/core/isoloom-plan/tests/spec-examples", "../examples"]
+spec_model = ["../crates/core/isoloom-plan/tests/spec-examples", "../examples"]
 manifest = ["../crates/core/isoloom-manifest/fixtures", "seeds/manifest"]
 quoting = []
 

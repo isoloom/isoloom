@@ -1,6 +1,6 @@
 //! `cargo xtask quality`: the engineering-standard ratchet. The measuring lives in the shared
 //! `xtask-quality` crate (Isoloom and Isothrum run the same ratchet); this wrapper gives it this
-//! repository's root and the two strings that differ between repositories.
+//! repository's root and what differs between repositories (its baseline among them).
 
 use std::process::ExitCode;
 
@@ -13,7 +13,11 @@ use crate::{Res, repo};
 const CONFIG: QualityConfig = QualityConfig {
     jscpd_slug: "isoloom",
     update_hint: "cargo xtask quality",
+    baseline: BASELINE,
 };
+
+/// The baseline, relative to the repository's root.
+pub(crate) const BASELINE: &str = "xtask/baselines/quality-baseline.json";
 
 /// Measures, then checks against (or with `--update`, rewrites) the baseline.
 pub(crate) fn run(a: &Args) -> Res<ExitCode> {

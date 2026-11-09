@@ -15,7 +15,7 @@
 .isoloom/
 .isoloom-*/
 
-# Python bytecode (tools/verify/runner, when run outside its image).
+# Python bytecode (xtask/src/verify/runner, when run outside its image).
 __pycache__/
 
 # A `cargo mutants` report written in the tree (`cargo xtask mutants` writes under target/).

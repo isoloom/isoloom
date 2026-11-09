@@ -1,4 +1,4 @@
-# cargo-nextest, the test runner (`cargo xtask test`, PLAN 3d): each test runs in its own process.
+# cargo-nextest, the test runner (`cargo xtask test`): each test runs in its own process.
 
 [profile.default]
 # A flaky test fails loudly: nothing is retried.

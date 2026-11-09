@@ -2,7 +2,7 @@
 //! lowering it into the plan of every target it is generated for, and rendering those plans into
 //! files; and generating every example on every target, the generation-time budget's measure.
 //! `cargo xtask bench` runs them, compares each one's median with the stored baseline
-//! (`bench-baseline.json`), and holds `generate/every-example` to its budget.
+//! (`xtask/baselines/bench-baseline.json`), and holds `generate/every-example` to its budget.
 
 use std::hint::black_box;
 use std::path::{Path, PathBuf};

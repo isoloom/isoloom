@@ -1,8 +1,8 @@
 //! The shared `cargo xtask quality` ratchet, used by Isoloom and the repositories that build on it.
 //!
-//! It is the ratchet of the engineering standard: every count of a clean-code rule,
-//! per crate, against `quality-baseline.json`. A count that goes up fails; one that goes down is
-//! written down with `--update`, which never raises one.
+//! It is the ratchet of the engineering standard: every count of a clean-code rule, per crate,
+//! against a baseline file ([`QualityConfig::baseline`]). A count that goes up fails; one that goes
+//! down is written down with `--update`, which never raises one.
 //!
 //! What is counted, per crate:
 //! - every warning `cargo clippy --workspace --all-targets` gives (`clippy/<lint>`,
@@ -16,8 +16,8 @@
 //!   new one raises a count too.
 //!
 //! Each repository's `xtask` is a thin wrapper that calls [`run`] with its own root and a
-//! [`QualityConfig`]: the two things that differ between the repositories (the jscpd temporary
-//! folder's prefix, and the command named in the "went down" hint).
+//! [`QualityConfig`]: what differs between the repositories (the jscpd temporary folder's
+//! prefix, the command named in the "went down" hint, and where the baseline lives).
 
 mod baseline;
 mod clippy;
@@ -68,6 +68,8 @@ pub struct QualityConfig {
     /// The command a "went down" message tells the maintainer to run (`--update` is appended),
     /// e.g. `cargo xtask quality` or `cargo run -p xtask -- quality`.
     pub update_hint: &'static str,
+    /// The baseline file, relative to the root with `/` (`quality-baseline.json`).
+    pub baseline: &'static str,
 }
 
 /// A crate of the workspace: its name and folder, relative to the root with `/`.
@@ -100,7 +102,7 @@ pub(crate) fn path_in(root: &Path, dir: &str) -> PathBuf {
 }
 
 /// Measures the `root` workspace, then checks against (or with `--update`, rewrites) its
-/// `quality-baseline.json`, as `config` describes the repository. Returns what to show and
+/// baseline ([`QualityConfig::baseline`]), as `config` describes the repository. Returns what to show and
 /// whether it passed; it prints nothing itself.
 ///
 /// # Errors
@@ -114,7 +116,7 @@ pub fn run(a: &Args, root: &Path, config: &QualityConfig) -> Res<Outcome> {
     sources::measure(root, &crates, &mut counts)?;
     dup::measure(root, &crates, &mut counts, config.jscpd_slug)?;
     machete::measure(root, &crates, &mut counts)?;
-    let file = root.join("quality-baseline.json");
+    let file = path_in(root, config.baseline);
     let mut out = String::new();
     let Some(before) = baseline::read(&file)? else {
         // The first measure is the baseline.

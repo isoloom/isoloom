@@ -1,4 +1,4 @@
-# The Python side of the verify toolchain image (tools/verify/Dockerfile): ansible-core and
+# The Python side of the verify toolchain image (xtask/src/verify/Dockerfile): ansible-core and
 # ansible-lint, and cloud-init's runtime dependencies (cloud-init itself is copied from its
 # release tarball: it isn't on PyPI). Every package is pinned, dependencies included, and pip
 # installs them with --no-deps, so the image holds exactly this list.

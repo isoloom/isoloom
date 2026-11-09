@@ -1,6 +1,6 @@
 //! `cargo xtask verify`: the official validators on generated files, inside the pinned toolchain
-//! image (`tools/verify/Dockerfile`), and the failures compared with the baseline
-//! (`tools/verify/baseline.json`): a failure the baseline doesn't know fails the run.
+//! image (`xtask/src/verify/Dockerfile`), and the failures compared with the baseline
+//! (`xtask/src/verify/baseline.json`): a failure the baseline doesn't know fails the run.
 //!
 //! TREE is a folder of generated files, such as `cargo xtask generate-all` writes. When it holds
 //! `.isoloom/` folders, only the files under them are checked (the rest is the projects' own
@@ -11,8 +11,8 @@
 //! `vagrant validate`, kubeconform and helm, cloud-init, hadolint, ansible-lint, shellcheck,
 //! `PSScriptAnalyzer`), and the shell scripts inside Vagrantfiles, Terraform modules and
 //! cloud-config documents to shellcheck too (`shellcheck-embedded`); the runner that does this is
-//! `tools/verify/runner`, handed to the image with the tree. Written to `$VERIFY_OUT` (default `target/verify`): `results.jsonl`,
-//! `new.jsonl` (the failures the baseline doesn't know), `stale.jsonl` (baseline entries no
+//! `xtask/src/verify/runner`, handed to the image with the tree. Written to `$VERIFY_OUT` (default
+//! `target/verify`): `results.jsonl`, `new.jsonl` (the failures the baseline doesn't know), `stale.jsonl` (baseline entries no
 //! failure matches any more) and `summary.txt`, also printed. `--update-baseline` rewrites the
 //! baseline with today's failures instead, keeping the reasons already written.
 //!
@@ -46,6 +46,10 @@ pub(crate) struct Args {
     /// A folder of generated files (default: every example, generated now).
     tree: Option<PathBuf>,
 }
+
+/// The validator image's folder (its Dockerfile, the runner and the baseline), relative to the
+/// repository's root.
+const DIR: &str = "xtask/src/verify";
 
 /// Folder names never sent to the validators: tool state and caches.
 const SKIPPED: [&str; 4] = [".terraform", ".vagrant", ".git", "__pycache__"];
@@ -85,14 +89,14 @@ fn verify(a: &Args) -> Res<ExitCode> {
 /// The image, tagged with a checksum (POSIX `cksum`) of what it is built from, so a changed
 /// Dockerfile builds a new one and an unchanged one is built once per host.
 pub(crate) fn image(root: &Path) -> Res<String> {
-    let dir = root.join("tools/verify");
+    let dir = root.join(DIR);
     let mut inputs = std::fs::read(dir.join("Dockerfile"))?;
     inputs.extend(std::fs::read(dir.join("requirements.txt"))?);
     let image = format!("isoloom-verify:{}", cksum(&inputs));
     if process::quiet(Command::new("docker").args(["image", "inspect", &image])).is_ok() {
         return Ok(image);
     }
-    eprintln!("verify: building {image} (tools/verify/Dockerfile)");
+    eprintln!("verify: building {image} ({DIR}/Dockerfile)");
     // The build context goes as a tar stream too, so no host path reaches Docker.
     let mut context = tar::Builder::new(Vec::new());
     for name in ["Dockerfile", "requirements.txt"] {
@@ -161,7 +165,7 @@ fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) ->
     let mut input = tar::Builder::new(File::create(work.join("in.tar"))?);
     input.follow_symlinks(false);
     add_tree(&mut input, tree, Path::new("tree"))?;
-    add_tree(&mut input, &root.join("tools/verify"), Path::new("verify"))?;
+    add_tree(&mut input, &root.join(DIR), Path::new("verify"))?;
     input.into_inner()?;
     let id = process::output(Command::new("docker").args(["image", "inspect", "-f", "{{.Id}}", image]))?;
     let cache = std::env::var("VERIFY_CACHE").unwrap_or_else(|_| "isoloom-verify-cache".into());
@@ -243,8 +247,8 @@ fn finish(out: &Path, root: &Path, update: bool, status: i32) -> Res<ExitCode> {
     let summary = std::fs::read_to_string(out.join("summary.txt")).map_err(|_| format!("the run failed (exit status {status}), no results"))?;
     print!("{summary}");
     if update {
-        std::fs::copy(out.join("baseline.json"), root.join("tools/verify/baseline.json"))?;
-        eprintln!("verify: baseline rewritten (tools/verify/baseline.json)");
+        std::fs::copy(out.join("baseline.json"), root.join(DIR).join("baseline.json"))?;
+        eprintln!("verify: baseline rewritten ({DIR}/baseline.json)");
     }
     repo::remove(&out.join(".work"))?;
     match status {

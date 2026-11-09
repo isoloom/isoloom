@@ -1,7 +1,7 @@
 //! `cargo xtask bench`: the generation benchmarks (criterion, in
 //! `crates/targets/isoloom-targets/benches/pipeline.rs`: parsing, lowering and rendering
 //! representative examples, and generating every example on every target), each median
-//! compared with the stored baseline, `bench-baseline.json`.
+//! compared with the stored baseline, `xtask/baselines/bench-baseline.json`.
 //!
 //! A benchmark more than `--threshold` percent slower than its baseline fails the run; one the
 //! baseline doesn't know, or one gone, is only reported. A benchmark with a budget
@@ -74,7 +74,7 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
         println!("bench: {} benchmark(s) over budget", over.len());
         return Ok(ExitCode::FAILURE);
     }
-    let file = root.join("bench-baseline.json");
+    let file = root.join("xtask/baselines/bench-baseline.json");
     let stored = match std::fs::read_to_string(&file) {
         Ok(text) => Some(serde_json::from_str::<Value>(&text)?),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,

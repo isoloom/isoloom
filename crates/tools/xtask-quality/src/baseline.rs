@@ -1,4 +1,4 @@
-//! `quality-baseline.json`: each rule's count per crate, the crates at zero left out. Read, compared
+//! The baseline file: each rule's count per crate, the crates at zero left out. Read, compared
 //! with today's counts, and written back when they only went down.
 
 use std::path::Path;

@@ -1,6 +1,6 @@
 """shell_find's and hcl's readers, on small made-up inputs. In the image (it has PyYAML):
 
-    docker run --rm -v "$PWD/tools/verify/runner:/r" -w /r <image> python3 -m unittest test_shell_find
+    docker run --rm -v "$PWD/xtask/src/verify/runner:/r" -w /r <image> python3 -m unittest test_shell_find
 """
 
 from __future__ import annotations
