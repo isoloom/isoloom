@@ -77,11 +77,7 @@ pub fn place(files: &[SecretFile]) -> String {
 #[must_use]
 pub fn wait(who: &str) -> String {
     let (waiting, missing) = messages(who);
-    let (waiting, missing) = (quote(&waiting), quote(&missing));
-    let tries = DELIVERY_TIMEOUT / 5;
-    format!(
-        "n=0; until [ -f {DELIVERED} ]; do [ \"$n\" -gt 0 ] || echo {waiting}; n=$((n+1)); if [ \"$n\" -gt {tries} ]; then echo {missing} >&2; exit 1; fi; sleep 5; done\n"
-    )
+    format!("{}\n", crate::steps::wait_for_mark(DELIVERED, DELIVERY_TIMEOUT, &waiting, &missing))
 }
 
 /// What the wait says while it waits, and when it gives up: who delivers (the runner; the

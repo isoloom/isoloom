@@ -16,6 +16,7 @@
 use isoloom_render::configure::cloud_init::{Limit, gzip};
 use isoloom_render::hcl_builder::{Expression, Piece, Template, reference};
 use isoloom_render::run_manifest::RUNNER;
+use isoloom_render::steps::wait_for_mark;
 use isoloom_spec::model::Target;
 use isoloom_spec::shell::quote;
 
@@ -92,9 +93,11 @@ pub(crate) fn expiry_shutdown() -> Template {
 pub(crate) fn project_wait() -> Tracked {
     Tracked::new(
         "waiting for the project (the runner delivers it over SSH)",
-        format!(
-            "i=0; until [ -f {DELIVERED} ]; do i=$((i+5)); if [ $i -gt {DELIVERY_WAIT_S} ]; then echo {} >&2; exit 1; fi; sleep 5; done",
-            quote(&format!("the project never came: start the lab through {RUNNER}, which delivers it over SSH"))
+        wait_for_mark(
+            DELIVERED,
+            DELIVERY_WAIT_S,
+            &format!("waiting for the project, which {RUNNER} delivers over SSH"),
+            &format!("the project never came: start the lab through {RUNNER}, which delivers it over SSH"),
         ),
     )
 }

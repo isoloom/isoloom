@@ -3,7 +3,7 @@ use isoloom_plan::environment::Route;
 use isoloom_plan::lifecycle::{RunKind, Step};
 use isoloom_spec::model::Target;
 
-use super::{linux, reboot_check, record_boot, windows};
+use super::{linux, reboot_check, record_boot, wait_for_mark, windows};
 use crate::testing;
 
 const SPEC: &str = r"
@@ -278,7 +278,7 @@ fn windows_secrets_wait_for_their_delivery() {
     let ps = windows(&env, "win", &Step::Secrets).expect("a secret to place");
     assert!(ps.contains("Set-IsoloomSecret") && ps.contains("isoloom-apply-secrets"), "{ps}");
     let sh = linux(&env, "win", &Step::Secrets).expect("the Linux form too");
-    assert!(sh.starts_with("set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
+    assert!(sh.starts_with("set -e\ni=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
 }
 
 #[test]
@@ -386,4 +386,26 @@ fn a_docker_host_gets_the_engine_and_compose_at_their_pinned_versions() {
     assert!(!apt.contains("get.docker.com"), "the apt family no longer pipes get.docker.com into sh: {apt}");
     // The RPM family keeps Docker's pinned install script for now.
     assert!(rpm.contains(&format!("VERSION={DOCKER_VERSION} sh")), "{rpm}");
+}
+
+#[test]
+fn a_mark_wait_ends_when_the_mark_is_there_and_gives_up_with_its_message_after_the_timeout() {
+    let dir = std::env::temp_dir().join(format!("isoloom-mark-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mark = dir.join("delivered");
+    let mark = mark.to_str().unwrap();
+    let run = |timeout_s| {
+        let line = wait_for_mark(mark, timeout_s, "waiting for it", "it never came");
+        std::process::Command::new("sh").args(["-c", &line]).output().unwrap()
+    };
+    // No mark, no time: it says it waits, then gives up at once with its message.
+    let missing = run(0);
+    assert!(!missing.status.success());
+    assert_eq!(String::from_utf8_lossy(&missing.stdout), "waiting for it\n");
+    assert_eq!(String::from_utf8_lossy(&missing.stderr), "it never came\n");
+    // The mark there: it ends at once, saying nothing.
+    std::fs::write(mark, "").unwrap();
+    let there = run(0);
+    assert!(there.status.success() && there.stdout.is_empty(), "{there:?}");
+    std::fs::remove_dir_all(&dir).ok();
 }

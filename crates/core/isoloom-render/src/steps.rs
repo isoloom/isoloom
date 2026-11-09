@@ -105,6 +105,17 @@ else
   curl -fsSL https://get.docker.com | VERSION=29.9.0 sh
 fi"#;
 
+/// A shell loop waiting for the file `mark`, the runner's sign that it delivered something,
+/// looking every 5 seconds: it says `waiting` once, and gives up with `missing` (on stderr, exit
+/// 1) after `timeout_s` seconds. One line, without its newline.
+#[must_use]
+pub fn wait_for_mark(mark: &str, timeout_s: u32, waiting: &str, missing: &str) -> String {
+    let (waiting, missing) = (quote(waiting), quote(missing));
+    format!(
+        "i=0; until [ -f {mark} ]; do [ \"$i\" -gt 0 ] || echo {waiting}; i=$((i+5)); if [ \"$i\" -gt {timeout_s} ]; then echo {missing} >&2; exit 1; fi; sleep 5; done"
+    )
+}
+
 /// Where the project is unpacked on a Windows VM, and the machine's own scripts with it; where
 /// a Windows recipe runs from too (see [`crate::configure::powershell`]).
 pub(crate) const WINDOWS_PROJECT_DIR: &str = "C:\\isoloom";

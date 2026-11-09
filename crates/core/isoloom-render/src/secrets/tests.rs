@@ -117,7 +117,7 @@ fn no_value_is_in_a_script() {
 #[test]
 fn the_step_waits_then_places_at_every_boot() {
     let sh = step("web", &[file("db", "/run/secrets/db", None, None)]);
-    assert!(sh.starts_with("set -e\nn=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
+    assert!(sh.starts_with("set -e\ni=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
     assert!(sh.contains("systemctl enable isoloom-apply-secrets.service"), "{sh}");
     assert!(sh.contains("install -D -o 0 -g 0 -m 0400"), "{sh}");
     let check = std::process::Command::new("sh").arg("-n").arg("-c").arg(&sh).status().unwrap();
@@ -154,7 +154,7 @@ fn a_docker_host_reads_each_kept_value_into_its_variable() {
 #[test]
 fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
     let sh = wait("web");
-    assert!(sh.contains("if [ \"$n\" -gt 360 ]; then echo"), "{sh}");
+    assert!(sh.contains("if [ \"$i\" -gt 1800 ]; then echo"), "{sh}");
     assert!(sh.ends_with("sleep 5; done\n"), "{sh}");
     assert!(sh.contains("'web: waiting for its secrets, which the runner (run.json) delivers'"), "{sh}");
     assert!(!sh.contains('`'), "no backquote, which shellcheck reads as an expansion left unexpanded: {sh}");
