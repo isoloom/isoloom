@@ -1,6 +1,5 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 62
 expression: example(&name).unwrap().spec()
 ---
 version: 1
@@ -42,7 +41,7 @@ machines:
       image: ~
     external:
       address: 192.168.1.20
-      user: florian
+      user: admin
       key: ~/.ssh/id_ed25519
   cache:
     networks:
@@ -74,7 +73,7 @@ machines:
       image: ~
     external:
       address: 192.168.1.21
-      user: florian
+      user: admin
       key: ~/.ssh/id_ed25519
 common: ~
 groups: {}

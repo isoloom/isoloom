@@ -30,8 +30,8 @@ machines:
 overrides:
   external:
     machines:
-      web: { ssh: { address: 192.168.1.20, user: florian, key: ~/.ssh/id_ed25519 } }
-      cache: { ssh: { address: 192.168.1.21, user: florian, key: ~/.ssh/id_ed25519 } }
+      web: { ssh: { address: 192.168.1.20, user: admin, key: ~/.ssh/id_ed25519 } }
+      cache: { ssh: { address: 192.168.1.21, user: admin, key: ~/.ssh/id_ed25519 } }
 
 checks:
   - name: the cache came back with transparent hugepages off

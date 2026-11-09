@@ -19,7 +19,7 @@ fn a_spec_with_addresses_on_every_machine_gets_the_external_target() -> Outcome 
     let files = generate(&spec, Target::External).unwrap();
     let inv = &files.iter().find(|f| f.path == ".isoloom/external/inventory.ini").unwrap().contents;
     assert!(
-        inv.contains("web ansible_host=192.168.1.20 ansible_user=florian ansible_ssh_private_key_file=~/.ssh/id_ed25519"),
+        inv.contains("web ansible_host=192.168.1.20 ansible_user=admin ansible_ssh_private_key_file=~/.ssh/id_ed25519"),
         "{inv}"
     );
     let machines = &files.iter().find(|f| f.path == ".isoloom/external/machines.json").unwrap().contents;
