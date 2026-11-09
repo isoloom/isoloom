@@ -81,19 +81,20 @@ jobs:
       TF_VAR_proxmox_api_token: ${{ secrets.PROXMOX_VE_API_TOKEN }}
     steps:
       - name: Check out Isoloom
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Check out Isothrum (the runner)
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Check out Isothrum (the runner)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
           repository: Isothrum/isothrum
           ref: ${{ env.ISOTHRUM_REF }}
           path: .isothrum-src
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_wrapper: false
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
-        with:
-          toolchain: stable
+      - run: rustup toolchain install --profile minimal
 
       - name: Build Isoloom and the Isothrum runner
         id: build
@@ -202,7 +203,7 @@ jobs:
         run: rm -f "$RUNNER_TEMP/proxmox_node_key" "$RUNNER_TEMP"/id_ed25519*
       - name: Upload the record and the regenerated tier files
         if: always() && steps.build.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cert-proxmox-${{ matrix.example }}
           path: ${{ runner.temp }}/record
