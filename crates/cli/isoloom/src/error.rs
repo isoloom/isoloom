@@ -48,6 +48,9 @@ pub(crate) enum CliError {
     /// A diagram format `isoloom graph` doesn't write.
     #[error("unknown format `{0}`; `d2` or `dot`")]
     UnknownFormat(String),
+    /// The catalogue built into this Isoloom doesn't load (a broken build).
+    #[error("this Isoloom's catalogue doesn't load: {0}")]
+    Catalogue(&'static isoloom_catalogue::Error),
     /// A dotted path points at nothing in the resolved snapshot.
     #[error("nothing at `{0}` in the snapshot; try `isoloom inspect` to see it all")]
     NothingAt(String),

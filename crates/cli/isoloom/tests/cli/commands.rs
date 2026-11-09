@@ -449,3 +449,17 @@ fn generating_one_target_leaves_the_others_files_alone() -> Outcome {
     assert!(out.join("docker/compose.yml").is_file(), "another target's stay until it is generated");
     Ok(())
 }
+
+#[test]
+fn schema_prints_the_committed_schema_with_the_catalogues_rules() -> Outcome {
+    let home = scratch("schema-home")?;
+    let run = isoloom(&home, &[&"schema"])?;
+    assert_eq!(run.code, Some(0), "{run:?}");
+    let printed: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let committed: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/spec-v1.schema.json"),
+    )?)?;
+    assert_eq!(printed, committed);
+    assert!(printed.pointer("/$defs/Machine/allOf").is_some(), "each entry's `with:` rule");
+    Ok(())
+}

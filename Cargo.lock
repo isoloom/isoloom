@@ -607,6 +607,7 @@ version = "1.0.9"
 dependencies = [
  "clap",
  "insta",
+ "isoloom-catalogue",
  "isoloom-import",
  "isoloom-spec",
  "isoloom-targets",

@@ -28,6 +28,7 @@ pkg-fmt = "zip"
 
 [dependencies]
 isoloom-spec.workspace = true
+isoloom-catalogue.workspace = true
 isoloom-targets.workspace = true
 isoloom-import.workspace = true
 clap.workspace = true
