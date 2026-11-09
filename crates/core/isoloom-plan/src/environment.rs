@@ -12,7 +12,9 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_spec::images;
-use isoloom_spec::model::{Arch, Boot, Constraints, External, Machine, MachineFile, Network, Protocol, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm};
+use isoloom_spec::model::{
+    Arch, Boot, Constraints, External, HostFolder, Machine, MachineFile, Network, Protocol, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
+};
 use isoloom_spec::validate::docker_cidrs;
 use isoloom_spec::windows::{self, Tpm};
 
@@ -146,6 +148,9 @@ pub struct MachinePlan {
     pub files: Vec<MachineFile>,
     /// Its data disks, in spec order.
     pub disks: Vec<DataDisk>,
+    /// The folders of the computer that runs the lab it mounts both ways (`host_folders`), in
+    /// spec order.
+    pub host_folders: Vec<HostFolder>,
     /// The settings a container gets from its runtime and a VM from its set-up.
     pub settings: Settings,
     /// The inputs it reads (environment variables given at run time).
@@ -492,9 +497,10 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         offline: routing::offline(spec, name, m),
         seal: m.seal,
         ports: published(m),
-        volumes: volumes(spec, name, m),
+        volumes: storage::volumes(spec, name, m),
         files: m.files.clone(),
         disks: storage::disks(name, m),
+        host_folders: m.host_folders.clone(),
         settings: Settings {
             environment: m.environment.clone(),
             sysctls: m.sysctls.clone(),
@@ -554,27 +560,6 @@ fn published(m: &Machine) -> Vec<PublishedPort> {
                 protocol: s.protocol,
                 fixed: s.fixed,
             })
-        })
-        .collect()
-}
-
-fn volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Volume> {
-    m.volumes
-        .iter()
-        .map(|(v, mount)| Volume {
-            name: v.clone(),
-            path: mount.path().to_owned(),
-            subpath: mount.subpath().map(String::from),
-            key: spec.volume_key(name, v),
-            lifetime: storage::lifetime(spec, v),
-            // Only a shared volume of the spec's `volumes:` has an owner.
-            kind: match spec.volume_owner(v) {
-                Some(owner) => VolumeKind::Shared {
-                    owner: owner.to_owned(),
-                    users: spec.volume_users(v).into_iter().map(String::from).collect(),
-                },
-                None => VolumeKind::Own,
-            },
         })
         .collect()
 }

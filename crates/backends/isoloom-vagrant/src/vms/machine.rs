@@ -63,12 +63,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
             ));
         }
         providers::blocks(r, &guest(env, name, mp, &image, link));
-        let shares: Vec<Share> = env
-            .spec()
-            .machines
-            .get(name)
-            .map(|m| m.host_folders.iter().map(Share::of).collect())
-            .unwrap_or_default();
+        let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
         crate::host_folders::render(r, "m", &shares);
         transport::provisioners(r, env, name, os);
         if let Some(g) = group {

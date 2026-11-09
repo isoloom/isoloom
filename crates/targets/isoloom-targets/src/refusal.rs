@@ -74,7 +74,14 @@ pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<S
             let spec = lab.for_target(target);
             isoloom_vagrant::provider_refusal(&spec, p).or_else(|| isoloom_vagrant::disk_refusal(&spec, p))
         }
-        (Target::DockerVm, Some(p)) => isoloom_vagrant::docker_vm_refusal(&lab.for_target(target), p),
+        (Target::DockerVm, Some(p)) => {
+            let env = Environment::build(&lab.for_target(target), target, None);
+            if p == crate::composite::PROXMOX {
+                crate::composite::docker_vm_proxmox_refusal(&env)
+            } else {
+                isoloom_vagrant::docker_vm_refusal(&env, p)
+            }
+        }
         _ => None,
     })
 }

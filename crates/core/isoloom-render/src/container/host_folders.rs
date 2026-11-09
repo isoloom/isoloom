@@ -3,7 +3,7 @@
 //! VM's shared folder puts it, which the commands run there say through one variable per folder,
 //! so both run the same Compose file.
 
-use isoloom_plan::{Environment, MachineShape};
+use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_spec::model::{HostFolder, HostPath};
 
 /// Where Compose in a VM finds the host folders: `<VM_ROOT>/<machine>/<n>`.
@@ -44,12 +44,7 @@ pub fn on_this_computer(f: &HostFolder, root: &str) -> String {
 /// The host folders of the containers of `env`, machine by machine in the spec's order.
 #[must_use]
 pub fn of_containers(env: &Environment) -> Vec<ContainerFolder<'_>> {
-    let containers = env
-        .spec()
-        .machines
-        .iter()
-        .filter(|(name, _)| env.machines.get(*name).is_some_and(|m| m.shape == MachineShape::Container));
-    containers
+    containers_with_folders(env)
         .flat_map(|(name, m)| {
             m.host_folders.iter().enumerate().map(move |(n, folder)| ContainerFolder {
                 machine: name,
@@ -59,6 +54,22 @@ pub fn of_containers(env: &Environment) -> Vec<ContainerFolder<'_>> {
             })
         })
         .collect()
+}
+
+/// The first container of `env` that mounts a folder of the computer that runs the lab, if one
+/// does: the VM its Compose runs in (`docker-vm`, `cloud-docker`) must then run on that computer,
+/// to share the folder into it.
+#[must_use]
+pub fn needing_a_local_vm(env: &Environment) -> Option<&str> {
+    containers_with_folders(env).map(|(name, _)| name).next()
+}
+
+/// The containers of `env` with a host folder, in the spec's order.
+fn containers_with_folders(env: &Environment) -> impl Iterator<Item = (&str, &MachinePlan)> {
+    env.machines
+        .iter()
+        .filter(|(_, m)| m.shape == MachineShape::Container && !m.host_folders.is_empty())
+        .map(|(name, m)| (name.as_str(), m))
 }
 
 #[cfg(test)]
@@ -96,5 +107,15 @@ mod tests {
                 ("db", "ISOLOOM_HOST_FOLDER_DB_0".into(), "/mnt/isoloom/db/0".into()),
             ]
         );
+        assert_eq!(needing_a_local_vm(&env), Some("web-1"));
+    }
+
+    #[test]
+    fn containers_without_a_host_folder_run_on_any_vm() {
+        let env = crate::testing::env(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n",
+            Target::Docker,
+        );
+        assert_eq!(needing_a_local_vm(&env), None);
     }
 }

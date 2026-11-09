@@ -5,6 +5,7 @@
 use isoloom_spec::images;
 use isoloom_spec::model::{Filesystem, Machine, Spec};
 
+use crate::environment::{Volume, VolumeKind};
 use crate::requirements::Requirement;
 
 /// How long a volume lives.
@@ -150,6 +151,28 @@ pub(crate) fn no_host_folders(f: &mut std::fmt::Formatter<'_>, machine: &str) ->
         f,
         "machine `{machine}` mounts a folder of the computer that runs the lab (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them yet"
     )
+}
+
+/// Machine `name`'s (`m`) volumes, in spec order.
+pub(crate) fn volumes(spec: &Spec, name: &str, m: &Machine) -> Vec<Volume> {
+    m.volumes
+        .iter()
+        .map(|(v, mount)| Volume {
+            name: v.clone(),
+            path: mount.path().to_owned(),
+            subpath: mount.subpath().map(String::from),
+            key: spec.volume_key(name, v),
+            lifetime: lifetime(spec, v),
+            // Only a shared volume of the spec's `volumes:` has an owner.
+            kind: match spec.volume_owner(v) {
+                Some(owner) => VolumeKind::Shared {
+                    owner: owner.to_owned(),
+                    users: spec.volume_users(v).into_iter().map(String::from).collect(),
+                },
+                None => VolumeKind::Own,
+            },
+        })
+        .collect()
 }
 
 #[cfg(test)]

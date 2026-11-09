@@ -55,9 +55,8 @@ pub(crate) fn tmpfs(machine: &Machine) -> (Vec<String>, Vec<Mount>) {
 /// A machine's host folders, each bound from `${<its variable>:-<where it is on this computer>}`:
 /// the folder itself on this computer's Docker, where the VM shares it when Compose runs in one
 /// (the commands there set the variable). Created when missing.
-pub(crate) fn host_folders(name: &str, machine: &Machine) -> Vec<Mount> {
-    machine
-        .host_folders
+pub(crate) fn host_folders(name: &str, mp: &MachinePlan) -> Vec<Mount> {
+    mp.host_folders
         .iter()
         .enumerate()
         .map(|(n, f)| {

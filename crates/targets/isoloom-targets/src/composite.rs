@@ -14,6 +14,7 @@
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{self, Backend, Files, Placed};
+use isoloom_render::container::host_folders;
 use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_spec::model::Target;
 use isoloom_vagrant::{docker_vm, hybrid};
@@ -87,7 +88,7 @@ impl Backend for DockerVmBackend {
 
     /// Compose's but existing networks, as for `cloud-docker`: the VM runs the Compose file. And
     /// folders of the computer that runs the lab, which a local VM shares (`docker_vm_refusal`
-    /// says which providers can't).
+    /// says which providers can't, `docker_vm_proxmox_refusal` that the server can't).
     fn capabilities(&self) -> Capabilities {
         isoloom_compose::capabilities_on_a_vm().with(Feature::HostFolders)
     }
@@ -118,14 +119,23 @@ impl Backend for DockerVmBackend {
     }
 }
 
-/// Whether `docker-vm` writes its Proxmox module: unless a container mounts a folder of the
-/// computer that runs the lab, which the server's VM can't share.
+/// Whether `docker-vm` writes its Proxmox module: unless the containers need a VM on the computer
+/// that runs the lab (`docker_vm_proxmox_refusal`).
 fn on_proxmox(env: &Environment) -> bool {
-    isoloom_vagrant::docker_vm_refusal(env.spec(), PROXMOX).is_none()
+    docker_vm_proxmox_refusal(env).is_none()
+}
+
+/// Why `docker-vm` can't run on the Proxmox server, if it can't: a container mounts a folder of the
+/// computer that runs the lab, which the server's VM, running on the server, can't share.
+pub(crate) fn docker_vm_proxmox_refusal(env: &Environment) -> Option<String> {
+    let name = host_folders::needing_a_local_vm(env)?;
+    Some(format!(
+        "machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): the Proxmox server's VM runs on the server, not on this computer"
+    ))
 }
 
 /// The Proxmox server, as `docker-vm`'s variants name it.
-const PROXMOX: &str = "proxmox";
+pub(crate) const PROXMOX: &str = "proxmox";
 
 /// The `hybrid` backend: Vagrant VMs, and the containers on one more VM beside them.
 #[derive(Debug, Clone, Copy, Default)]

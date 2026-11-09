@@ -49,7 +49,7 @@ pub(super) fn docker_vm_identity(env: &Environment, dotfile: &PathTemplate) -> R
     let providers = Vagrant::ALL
         .iter()
         .filter(|k| k.manifest != Provider::Hyperv)
-        .map(|k| provider(k, Elevation::None, crate::host_folders::docker_vm_refusal(env.spec(), k.provider.id())))
+        .map(|k| provider(k, Elevation::None, crate::host_folders::docker_vm_refusal(env, k.provider.id())))
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {
         providers,

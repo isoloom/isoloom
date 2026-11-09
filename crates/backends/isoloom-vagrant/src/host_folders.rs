@@ -16,7 +16,8 @@
 //! - ESXi: none: its VMs run on the ESXi host, not on the computer that runs the lab.
 
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_spec::model::{HostFolder, Spec, Target};
+use isoloom_render::container::host_folders;
+use isoloom_spec::model::HostFolder;
 
 use crate::ruby::{Call, Ruby, Value};
 use crate::vms::provider::Provider;
@@ -135,36 +136,27 @@ fn refuse_elsewhere(r: &mut Ruby, scope: &str, read_only: bool) {
 /// read-only).
 #[must_use]
 pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
-    env.spec().machines.iter().find_map(|(name, m)| {
-        let vm = env.machines.get(name).is_some_and(|mp| mp.shape == MachineShape::Vm);
-        if !vm || m.host_folders.is_empty() {
-            return None;
-        }
-        let why = why_not(provider, m.host_folders.iter().any(|f| f.read_only))?;
-        Some(format!(
-            "machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): {why}"
-        ))
-    })
+    env.machines
+        .iter()
+        .filter(|(_, mp)| mp.shape == MachineShape::Vm && !mp.host_folders.is_empty())
+        .find_map(|(name, mp)| {
+            let why = why_not(provider, mp.host_folders.iter().any(|f| f.read_only))?;
+            Some(refused(name, &why))
+        })
 }
 
-/// Why `docker-vm`'s VM (`provider`, or `proxmox` for the Proxmox server's) can't share its
-/// containers' host folders, if it can't. The VM shares them read-write (a read-only one is bound
-/// read-only into its container), so only the providers with no shared folder refuse.
+/// Why `docker-vm`'s VM, under Vagrant's `provider`, can't share its containers' host folders, if
+/// it can't. The VM shares them read-write (a read-only one is bound read-only into its
+/// container), so only the providers with no shared folder refuse.
 #[must_use]
-pub fn docker_vm_refusal(spec: &Spec, provider: &str) -> Option<String> {
-    let env = Environment::build(spec, Target::Docker, None);
-    let (name, _) = spec
-        .machines
-        .iter()
-        .find(|(n, m)| !m.host_folders.is_empty() && env.machines.get(*n).is_some_and(|mp| mp.shape == MachineShape::Container))?;
-    let why = if provider == "proxmox" {
-        "the Proxmox server's VM runs on the server, not on this computer".to_owned()
-    } else {
-        why_not(Provider::from(provider), false)?
-    };
-    Some(format!(
-        "machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): {why}"
-    ))
+pub fn docker_vm_refusal(env: &Environment, provider: &str) -> Option<String> {
+    let name = host_folders::needing_a_local_vm(env)?;
+    Some(refused(name, &why_not(Provider::from(provider), false)?))
+}
+
+/// Machine `name`'s host folders refused, `why`.
+fn refused(name: &str, why: &str) -> String {
+    format!("machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): {why}")
 }
 
 #[cfg(test)]
