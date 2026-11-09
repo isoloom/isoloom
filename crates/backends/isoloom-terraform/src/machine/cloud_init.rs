@@ -11,17 +11,12 @@ use isoloom_plan::{DataDisk, Environment, MachinePlan, Step};
 use isoloom_render::configure::Configured;
 use isoloom_render::configure::cloud_init as cloud_init_carrier;
 use isoloom_render::hcl_builder::{Expression, boolean, call, list, object, string};
-use isoloom_render::steps;
+use isoloom_render::steps::{self, READY_FILE};
 
 use isoloom_spec::shell::quote;
 
 use super::{Shell, at_every_boot};
 use crate::module::inputs;
-
-/// Where a machine's set-up says how far it got, in the `isoloom-ready/1` grammar: `running:
-/// <step>` while a step runs, `failed: <step>` once one failed (nothing after it runs), `ready`
-/// once it is done. No file yet: still booting.
-pub(crate) const READY_FILE: &str = "/var/lib/isoloom/ready";
 
 /// Where a machine with `reboot` steps keeps its continuation: `next-boot` (the part to run at the
 /// next boot), `steps.sh` and `boot-<n>.sh`.

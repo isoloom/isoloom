@@ -193,7 +193,7 @@ pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&isoloom_plan::Machin
         .filter_map(|(name, mp)| {
             let a = mp.addresses.values().next()?;
             let u = user(mp);
-            let ready = super::cloud_init::READY_FILE;
+            let ready = isoloom_render::steps::READY_FILE;
             // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
             let wait = format!(
                 "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 {u}@{a} head -n 1 {ready} 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"

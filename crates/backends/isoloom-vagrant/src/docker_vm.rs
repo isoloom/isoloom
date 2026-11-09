@@ -274,8 +274,9 @@ fn environment(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
     let start: Vec<String> = guest.start.iter().map(|c| c.command.to_string()).collect();
     let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
     let script = format!(
-        "{secrets}{} && mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready",
-        start.join(" && ")
+        "{secrets}{} && mkdir -p /var/lib/isoloom && echo ready > {}",
+        start.join(" && "),
+        steps::READY_FILE
     );
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
     r.call(shell("config", "environment").kw("inline", Value::str(&script)).kw_opt("env", inputs));

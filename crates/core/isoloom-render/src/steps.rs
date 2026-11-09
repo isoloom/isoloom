@@ -27,6 +27,9 @@ pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
 pub const INPUTS_FILE: &str = "/tmp/isoloom-inputs.env";
 /// Where the inputs are kept when a reboot comes (`/tmp` is emptied at boot).
 pub const KEPT_INPUTS_FILE: &str = "/var/lib/isoloom/inputs.env";
+/// Where a Linux VM's set-up says how far it got, for the runner to poll (the `isoloom-ready/1`
+/// grammar: `running: <step>`, `failed: <step>`, then `ready`; no file yet: still booting).
+pub const READY_FILE: &str = "/var/lib/isoloom/ready";
 /// Waits for cloud-init to be done (its packages in, `apt` free): the first command of a set-up
 /// run over SSH on a VM cloud-init boots. Its failure doesn't stop the set-up.
 pub const CLOUD_INIT_WAIT: &str = "cloud-init status --wait >/dev/null 2>&1 || true";
@@ -165,7 +168,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Command => process::command(env, machine),
         Step::Setup { paths } => process::setup(env, machine, paths),
         Step::Ready => Some(format!(
-            "{}mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\n",
+            "{}mkdir -p /var/lib/isoloom && echo ready > {READY_FILE}\n",
             process::healthy(env, machine).unwrap_or_default()
         )),
     }

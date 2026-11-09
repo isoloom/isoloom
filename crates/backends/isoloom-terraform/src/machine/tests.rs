@@ -139,7 +139,7 @@ fn a_machine_waiting_for_secrets_announces_its_address_first() {
 /// ready file says after.
 #[cfg(unix)]
 fn run_tracked(command: &str, ready: &std::path::Path) -> (bool, String) {
-    let script = cloud_init::tracked("step", command).replace(cloud_init::READY_FILE, &ready.display().to_string());
+    let script = cloud_init::tracked("step", command).replace(isoloom_render::steps::READY_FILE, &ready.display().to_string());
     let status = std::process::Command::new("sh").arg("-c").arg(&script).status().expect("sh runs");
     (status.success(), std::fs::read_to_string(ready).unwrap_or_default())
 }

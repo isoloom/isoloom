@@ -130,7 +130,7 @@ impl Shell {
     pub(crate) fn tracked_step(self, env: &Environment, machine: &str, step: &Step) -> Option<String> {
         let label = cloud_init::label(step);
         steps::linux(env, machine, step).map(|sh| {
-            let mark = |word: &str| self.command(&format!("echo {} > {}", quote(&format!("{word}: {label}")), cloud_init::READY_FILE));
+            let mark = |word: &str| self.command(&format!("echo {} > {}", quote(&format!("{word}: {label}")), isoloom_render::steps::READY_FILE));
             format!("{}; {} || {{ {}; exit 1; }}", mark("running"), self.command(&sh), mark("failed"))
         })
     }

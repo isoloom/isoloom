@@ -136,7 +136,7 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
     );
     m.commented(
         "Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).",
-        output("ready_file", string(crate::machine::cloud_init::READY_FILE)),
+        output("ready_file", string(isoloom_render::steps::READY_FILE)),
     );
     let published: Vec<(String, Expression)> = env
         .spec()

@@ -20,8 +20,8 @@ use isoloom_render::steps::wait_for_mark;
 use isoloom_spec::model::Target;
 use isoloom_spec::shell::quote;
 
-use super::cloud_init::READY_FILE;
 use crate::{Error, Result};
+use isoloom_render::steps::READY_FILE;
 
 /// Where the set-up writes its output: the runner shows its tail when a step failed.
 pub(crate) const SETUP_LOG: &str = "/var/log/isoloom-setup.log";
