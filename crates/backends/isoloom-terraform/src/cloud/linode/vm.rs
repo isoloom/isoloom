@@ -81,11 +81,6 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
     IMAGES.of(os)
 }
 
-/// The smallest Linode plan with a machine's memory and disk.
-fn plan(mp: &MachinePlan) -> &'static str {
-    fit_disk(PLANS, mp.size().memory_mb, mp.size().disk_gb)
-}
-
 /// The plans, smallest first: each one's memory and disk come with it.
 const PLANS: &[DiskSize] = &[
     DiskSize {
@@ -162,7 +157,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
         resource("linode_instance", &id)
             .add_attribute(("label", name_with(&format!("-{name}"))))
             .add_attribute(("region", reference("var.region")))
-            .add_attribute(("type", string(RULES.gpus.of(mp).unwrap_or(plan(mp)))))
+            .add_attribute(("type", string(RULES.gpus.of(mp).unwrap_or_else(|| fit_disk(PLANS, mp)))))
             .add_attribute((
                 "image",
                 string(own_image::of(mp, own_image::linode).unwrap_or_else(|| image(os).unwrap_or_default())),

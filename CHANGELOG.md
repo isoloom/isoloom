@@ -326,8 +326,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   VM (`isoloom_render::steps::MAKE_STATE_DIR`) and on a Windows one
   (`isoloom_spec::windows::ISOLOOM_DIR`, `READY_FILE`), the containers' VM in a run manifest
   (`run_manifest::guest::GuestCompose::docker_host`, `docker_host_outputs`), Proxmox's server
-  variables, and a name's DNS-label rule (`isoloom_spec::validate::dns_label`, which the catalogue
-  shares). The `docker-vm` Proxmox module's variables read as the `proxmox` module's.
+  variables, a name's DNS-label rule (`isoloom_spec::validate::dns_label`, which the catalogue
+  shares), and a step file's kind by its extension (`isoloom_spec::syntax::has_extension`;
+  `isoloom_plan::lifecycle::has_extension` is gone). The `docker-vm` Proxmox module's variables read as the `proxmox` module's.
 
 ### Fixed
 

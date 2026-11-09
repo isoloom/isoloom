@@ -393,13 +393,6 @@ fn runs(m: &Machine, recipe: Option<&Recipe>) -> Vec<Step> {
     steps
 }
 
-/// Whether a provisioning step's file has this extension, in any case (`setup.SH` is a shell
-/// script): how the plan and the backends tell a step's kind.
-#[must_use]
-pub fn has_extension(path: &str, extension: &str) -> bool {
-    std::path::Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(extension))
-}
-
 /// Whether a machine is a Windows VM.
 fn windows(m: &Machine) -> bool {
     m.vm.as_ref().is_some_and(|vm| isoloom_spec::images::is_windows(&vm.os))

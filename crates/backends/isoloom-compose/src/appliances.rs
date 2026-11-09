@@ -73,7 +73,10 @@ fn iol_pid(spec: &Spec, name: &str) -> usize {
 /// The OS's name for the `k`th data interface (from 1, `eth<k>` in the container).
 fn interface(kind: Appliance, k: usize) -> String {
     match kind {
-        Appliance::CiscoIol | Appliance::CiscoIolL2 => format!("Ethernet{}/{}", k / 4, k % 4),
+        Appliance::CiscoIol | Appliance::CiscoIolL2 => {
+            let (slot, port) = iol_port(k);
+            format!("Ethernet{slot}/{port}")
+        }
         Appliance::CiscoVios | Appliance::CiscoViosL2 => format!("GigabitEthernet0/{k}"),
         Appliance::CiscoCsr1000v | Appliance::CiscoC8000v => format!("GigabitEthernet{}", k + 1),
         Appliance::CiscoDynamips => {
@@ -81,6 +84,12 @@ fn interface(kind: Appliance, k: usize) -> String {
             format!("FastEthernet{slot}/{port}")
         }
     }
+}
+
+/// IOL's slot and port for the `k`th data interface: four ports a slot, `0/0` the management
+/// one.
+fn iol_port(k: usize) -> (usize, usize) {
+    (k / 4, k % 4)
 }
 
 /// A 7200's port for the `k`th data interface: the I/O card's `0/0`, then two a PA-2FE-TX.
@@ -287,7 +296,12 @@ pub(crate) fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, addr
 
 /// IOL: the interfaces mapped by `/iol/NETMAP` and `/iol/iouyap.ini`, the instance in `IOL_PID`.
 fn iol_wiring(pid: usize, ports: Vec<Port>, cfg: String) -> Wiring {
-    let slots: Vec<(usize, usize, usize)> = (1..=ports.len()).map(|k| (k, k / 4, k % 4)).collect();
+    let slots: Vec<(usize, usize, usize)> = (1..=ports.len())
+        .map(|k| {
+            let (slot, port) = iol_port(k);
+            (k, slot, port)
+        })
+        .collect();
     let iouyap: Vec<String> = slots.iter().map(|(k, slot, port)| format!("[513:{slot}/{port}]\neth_dev = eth{k}\n")).collect();
     let netmap: Vec<String> = slots.iter().map(|(_, slot, port)| format!("{pid}:{slot}/{port} 513:{slot}/{port}\n")).collect();
     Wiring {

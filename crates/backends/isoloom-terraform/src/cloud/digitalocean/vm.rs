@@ -106,11 +106,6 @@ const SIZES: &[DiskSize] = &[
     },
 ];
 
-/// The smallest droplet size with a machine's memory and disk.
-fn size(mp: &MachinePlan) -> &'static str {
-    fit_disk(SIZES, mp.size().memory_mb, mp.size().disk_gb)
-}
-
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
 pub(crate) const DRIVER: Driver = Driver {
     base: super::BASE,
@@ -156,7 +151,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
     let mut droplet = resource("digitalocean_droplet", &id)
         .add_attribute(("name", name_with(&format!("-{name}"))))
         .add_attribute(("region", reference("var.region")))
-        .add_attribute(("size", string(RULES.gpus.of(mp).unwrap_or(size(mp)))))
+        .add_attribute(("size", string(RULES.gpus.of(mp).unwrap_or_else(|| fit_disk(SIZES, mp)))))
         .add_attribute(("image", string(slug)))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))

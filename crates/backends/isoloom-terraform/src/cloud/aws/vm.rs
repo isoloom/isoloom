@@ -195,20 +195,15 @@ pub(super) fn image_user(os: &str) -> &'static str {
     image(os).map_or("admin", |i| i.user)
 }
 
-/// Why AWS can't run this environment, if it can't: its limits, then its address rules and
-/// images (a machine's own AMI stands in for its OS's), then its other features.
+/// Why AWS can't run this environment, if it can't: the features every cloud checks
+/// ([`Rules::features`](crate::cloud::vm::rules::Rules::features)), then its address rules and
+/// images (a machine's own AMI stands in for its OS's).
 fn refusal(env: &Environment) -> Option<String> {
     RULES
-        .limits
-        .refusal(env)
+        .features(env)
         .or_else(|| networks_refusal(env))
         .or_else(|| routing::refusal(env))
-        .or_else(|| RULES.mtu(env))
         .or_else(|| machines_refusal(env))
-        .or_else(|| RULES.gpus(env))
-        .or_else(|| RULES.nesting(env))
-        .or_else(|| RULES.memory(env))
-        .or_else(|| RULES.volumes(env))
 }
 
 fn networks_refusal(env: &Environment) -> Option<String> {

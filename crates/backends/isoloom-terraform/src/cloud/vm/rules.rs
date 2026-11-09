@@ -4,7 +4,7 @@
 
 use std::ops::RangeInclusive;
 
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, MachinePlan};
 use isoloom_spec::model::{Ipv6Addresses, Machine};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::windows::Tpm;
@@ -114,13 +114,14 @@ pub(crate) struct DiskSize {
     pub(crate) name: &'static str,
 }
 
-/// The smallest of `table` (smallest first) with `memory_mb` and `disk_gb` or more; the largest
-/// when none has as much, which the cloud's refusal ([`Rules::memory`], [`Rules::disk`]) rules
-/// out.
-pub(crate) fn fit_disk(table: &[DiskSize], memory_mb: u32, disk_gb: u32) -> &'static str {
+/// The smallest of `table` (smallest first) with machine `mp`'s memory and disk or more; the
+/// largest when none has as much, which the cloud's refusal ([`Rules::memory`], [`Rules::disk`])
+/// rules out.
+pub(crate) fn fit_disk(table: &[DiskSize], mp: &MachinePlan) -> &'static str {
+    let size = mp.size();
     table
         .iter()
-        .find(|s| s.memory_mb >= memory_mb && s.disk_gb >= disk_gb)
+        .find(|s| s.memory_mb >= size.memory_mb && s.disk_gb >= size.disk_gb)
         .or(table.last())
         .map_or("", |s| s.name)
 }

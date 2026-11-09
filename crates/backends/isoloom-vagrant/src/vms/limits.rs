@@ -3,10 +3,10 @@
 //! have yet (the set-up steps it has no PowerShell for). Found from the plan, without rendering.
 
 use crate::boxes;
-use isoloom_plan::lifecycle::has_extension;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::images;
 use isoloom_spec::model::{Machine, is_reboot};
+use isoloom_spec::syntax::has_extension;
 
 /// Why Vagrant can't render `env`, if it can't: the first machine it can't build.
 pub(crate) fn refusal(env: &Environment) -> Option<String> {

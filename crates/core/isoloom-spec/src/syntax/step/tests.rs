@@ -256,3 +256,9 @@ fn only_reboot_playbook_and_powershell_lack_a_container_form() {
         assert_eq!(step(yaml).container_refusal().is_none(), none, "{yaml}");
     }
 }
+
+#[test]
+fn an_extension_matches_in_any_case_and_only_whole() {
+    assert!(has_extension("setup.sh", "sh") && has_extension("setup.SH", "sh") && has_extension("a/b.Ps1", "ps1"));
+    assert!(!has_extension("setup.shx", "sh") && !has_extension("sh", "sh") && !has_extension("setup.ps1", "sh"));
+}

@@ -7,9 +7,9 @@
 //! ready marker over WinRM before running the playbooks (`controller::windows_waits`).
 
 use crate::hcl_builder::{Expression, Template, call, for_list, reference, string};
-use isoloom_plan::lifecycle::has_extension;
 use isoloom_plan::{Environment, MachinePlan, Step};
 use isoloom_render::steps;
+use isoloom_spec::syntax::has_extension;
 
 use super::{vms, windows};
 
