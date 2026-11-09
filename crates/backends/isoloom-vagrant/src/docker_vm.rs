@@ -282,8 +282,10 @@ fn checks(r: &mut Ruby, env: &Environment) {
     // The stand-ins go once the checks ran, whatever they found, so the access machine they
     // stand in for can take its addresses; failing to take them down fails no check.
     let script = format!(
-        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} up -d --wait --no-deps \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}[ $# -eq 0 ] || {profile} rm --stop --force \"$@\" || true; exit \"$failed\"",
-        exec_runs(env)
+        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} {up} \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}[ $# -eq 0 ] || {profile} {down} \"$@\" || true; exit \"$failed\"",
+        exec_runs(env),
+        up = docker::STAND_INS_UP.verb.join(" "),
+        down = docker::STAND_INS_DOWN.verb.join(" "),
     );
     let derived = crate::vagrantfile::derived_from_host();
     let vars = if env.spec().inputs.is_empty() {

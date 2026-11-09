@@ -384,7 +384,7 @@ fn the_vagrantfiles_checks_take_the_stand_ins_down_after_them() -> Outcome {
     let files = generate(&lab(ACCESS_SEAT)?, Target::DockerVm)?;
     let vf = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
     let checks = vf.lines().find(|l| l.contains("name: \"checks\"")).ok_or("no checks provisioner")?;
-    let (up, down) = (at(checks, "up -d --wait --no-deps")?, at(checks, "rm --stop --force \\\"$@\\\"")?);
+    let (up, down) = (at(checks, "up --detach --wait --no-deps")?, at(checks, "rm --stop --force \\\"$@\\\"")?);
     assert!(up < at(checks, "isoloom-check")? && at(checks, "isoloom-check")? < down, "{checks}");
     assert!(checks.contains("grep -x -e isoloom-access -e isoloom-access-routes"), "{checks}");
     // The checks' own result, not the stand-ins' removal, is the provisioner's.

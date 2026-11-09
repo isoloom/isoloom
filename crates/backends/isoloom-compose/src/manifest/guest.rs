@@ -14,7 +14,9 @@ use isoloom_render::run_manifest::{DERIVED, check, derived_switch, networks, tim
 use isoloom_render::{OUTPUT_DIR, steps};
 
 use super::Project;
-use super::checks::{Planned, STAND_INS_DOWN, STAND_INS_UP, StandInStep, planned, stand_ins};
+use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
+
+use super::checks::{Planned, planned, stand_ins};
 use super::lifecycle::{WAIT_TIMEOUT, job_step, owner, publishes_a_built_image, ready};
 use super::machines::{Member, classify, machines};
 use super::slots::{Starts, slots};
