@@ -21,29 +21,6 @@ use isoloom_spec::model::{HostFolder, Spec, Target};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vms::provider::Provider;
 
-/// The providers whose block shares a folder, in the order the Vagrantfile writes them.
-const SHARING: [Provider<'static>; 6] = [
-    Provider::VirtualBox,
-    Provider::VmwareDesktop,
-    Provider::Parallels,
-    Provider::Utm,
-    Provider::Qemu,
-    Provider::Libvirt,
-];
-
-/// How `provider` shares a folder both ways (Vagrant's synced folder `type:`), if it does.
-fn kind(provider: Provider<'_>) -> Option<&'static str> {
-    match provider {
-        Provider::VirtualBox => Some("virtualbox"),
-        Provider::VmwareDesktop => Some("vmware"),
-        Provider::Parallels => Some("parallels"),
-        Provider::Utm => Some("utm"),
-        Provider::Qemu => Some("qemu_virtiofs"),
-        Provider::Libvirt => Some("virtiofs"),
-        Provider::HyperV | Provider::VmwareEsxi | Provider::Other(_) => None,
-    }
-}
-
 /// Why `provider` can't share a folder of the computer that runs the lab into a VM, if it can't:
 /// it has no two-way shared folder Isoloom uses, or (`read_only`) it can't make one read-only.
 fn why_not(provider: Provider<'_>, read_only: bool) -> Option<String> {
@@ -53,12 +30,21 @@ fn why_not(provider: Provider<'_>, read_only: bool) -> Option<String> {
             "the `{id}` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`"
         )),
         Provider::VmwareEsxi => Some(format!("the `{id}` provider's VMs run on the ESXi host, not on this computer")),
-        Provider::Other(_) => Some(format!("Isoloom knows no two-way shared folder of the `{id}` provider")),
         Provider::Qemu if read_only => Some(format!(
             "one is read-only (`read_only`), and the `{id}` provider (vagrant-qemu) mounts its VirtioFS shares read-write"
         )),
-        _ => None,
+        _ if provider.known().is_some_and(|k| k.share.is_some()) => None,
+        _ => Some(format!("Isoloom knows no two-way shared folder of the `{id}` provider")),
     }
+}
+
+/// The providers that share the folders (`read_only`: one is read-only), with their kind, in the
+/// order the Vagrantfile writes them.
+fn sharing(read_only: bool) -> impl Iterator<Item = (Provider<'static>, &'static str)> {
+    Provider::ALL
+        .into_iter()
+        .filter_map(|k| Some((k.provider, k.share?)))
+        .filter(move |(p, _)| why_not(*p, read_only).is_none())
 }
 
 /// One folder shared into a VM.
@@ -91,8 +77,7 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share]) {
     }
     r.comment("This computer's folders (`host_folders`), both ways: each provider's own shared folder.");
     let read_only = shares.iter().any(|s| s.read_only);
-    for p in SHARING.into_iter().filter(|p| why_not(*p, read_only).is_none()) {
-        let Some(kind) = kind(p) else { continue };
+    for (p, kind) in sharing(read_only) {
         let head = Call::new(format!("{scope}.vm.provider")).arg(Value::str(p.id()));
         let params = if p == Provider::Libvirt { "v, o" } else { "_, o" };
         r.block(head, params, |r| {
@@ -128,28 +113,18 @@ fn synced_folder(p: Provider<'_>, kind: &str, s: &Share) -> Call {
 /// provider that doesn't share the folders: the ones with no block above (Hyper-V, ESXi, QEMU for
 /// a read-only one) and any provider Isoloom doesn't know.
 fn refuse_elsewhere(r: &mut Ruby, scope: &str, read_only: bool) {
-    let all = [
-        Provider::VirtualBox,
-        Provider::VmwareDesktop,
-        Provider::Parallels,
-        Provider::Utm,
-        Provider::Qemu,
-        Provider::Libvirt,
-        Provider::HyperV,
-        Provider::VmwareEsxi,
-    ];
     let reason = |why: &str| format!("host folders (`host_folders`): {why}");
-    let refused = all
+    let refused = Provider::ALL
         .into_iter()
-        .filter_map(|p| Some((Value::sym(p.id()), Value::str(&reason(&why_not(p, read_only)?)))));
+        .filter_map(|k| Some((Value::sym(k.provider.id()), Value::str(&reason(&why_not(k.provider, read_only)?)))));
     let why = Value::hash(refused);
-    let sharing = Value::array(SHARING.into_iter().filter(|p| why_not(*p, read_only).is_none()).map(|p| Value::sym(p.id())));
+    let shared = Value::array(sharing(read_only).map(|(p, _)| Value::sym(p.id())));
     // Any other provider: its name is Vagrant's, a symbol, never the spec's text.
     let unknown = reason("Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider");
     r.block(Call::new(format!("{scope}.trigger.before")).arg(Value::sym("up")), "t", |r| {
         r.block("t.ruby", "_, machine", |r| {
             r.assign("why", Value::raw(format!("{why}[machine.provider_name]")));
-            r.line(format!("why ||= \"{unknown}\" unless {sharing}.include?(machine.provider_name)"));
+            r.line(format!("why ||= \"{unknown}\" unless {shared}.include?(machine.provider_name)"));
             r.line("abort(\"#{machine.name}: \" + why) if why");
         });
     });
@@ -249,14 +224,14 @@ mod tests {
         let out = ruby(&[share("shared", "/srv/shared", false)]);
         assert!(
             out.contains(
-                "why ||= \"host folders (`host_folders`): Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider\" unless [:virtualbox, :vmware_desktop, :parallels, :utm, :qemu, :libvirt].include?(machine.provider_name)\n"
+                "why ||= \"host folders (`host_folders`): Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider\" unless [:virtualbox, :vmware_desktop, :parallels, :libvirt, :qemu, :utm].include?(machine.provider_name)\n"
             ),
             "{out}"
         );
         // A read-only folder: QEMU shares none, so it is refused like an unknown provider.
         let read_only = ruby(&[share("/srv/a", "/a", true)]);
         assert!(
-            read_only.contains("unless [:virtualbox, :vmware_desktop, :parallels, :utm, :libvirt].include?"),
+            read_only.contains("unless [:virtualbox, :vmware_desktop, :parallels, :libvirt, :utm].include?"),
             "{read_only}"
         );
     }

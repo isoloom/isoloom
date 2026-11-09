@@ -2,6 +2,7 @@
 //! is in one Vagrantfile, so a provider that can't run the VMs as the spec asks says so here
 //! (`refusal_on` with the provider) instead of ignoring it.
 
+use isoloom_manifest::{HostOs, Provider as ManifestProvider};
 use isoloom_plan::Environment;
 use isoloom_spec::model::{Spec, Target};
 
@@ -30,19 +31,96 @@ pub(crate) enum Provider<'a> {
     Other(&'a str),
 }
 
+/// What Isoloom knows of one provider beyond its name: one row of [`Provider::ALL`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Known {
+    /// The provider.
+    pub(crate) provider: Provider<'static>,
+    /// Its id in the run manifest.
+    pub(crate) manifest: ManifestProvider,
+    /// How it shares a folder of the computer that runs the lab both ways (Vagrant's synced
+    /// folder `type:`), if it has a way Isoloom uses (`host_folders`).
+    pub(crate) share: Option<&'static str>,
+    /// The hosts it exists on.
+    pub(crate) hosts: &'static [HostOs],
+    /// Its Vagrant plugin, if it needs one.
+    pub(crate) plugin: Option<&'static str>,
+}
+
+const EVERY_HOST: &[HostOs] = &[HostOs::Linux, HostOs::Macos, HostOs::Windows];
+
+impl Provider<'static> {
+    /// Every provider the Vagrantfile has a block for, in the order a runner offers them (the
+    /// run manifest's) and the Vagrantfile writes their shared folders.
+    pub(crate) const ALL: [Known; 8] = [
+        Known {
+            provider: Provider::VirtualBox,
+            manifest: ManifestProvider::Virtualbox,
+            share: Some("virtualbox"),
+            hosts: EVERY_HOST,
+            plugin: None,
+        },
+        Known {
+            provider: Provider::VmwareDesktop,
+            manifest: ManifestProvider::VmwareDesktop,
+            share: Some("vmware"),
+            hosts: EVERY_HOST,
+            plugin: Some("vagrant-vmware-desktop"),
+        },
+        // Its only two-way shared folder is SMB, which asks for a password at every `vagrant up`.
+        Known {
+            provider: Provider::HyperV,
+            manifest: ManifestProvider::Hyperv,
+            share: None,
+            hosts: &[HostOs::Windows],
+            plugin: None,
+        },
+        Known {
+            provider: Provider::Parallels,
+            manifest: ManifestProvider::Parallels,
+            share: Some("parallels"),
+            hosts: &[HostOs::Macos],
+            plugin: Some("vagrant-parallels"),
+        },
+        Known {
+            provider: Provider::Libvirt,
+            manifest: ManifestProvider::Libvirt,
+            share: Some("virtiofs"),
+            hosts: &[HostOs::Linux],
+            plugin: Some("vagrant-libvirt"),
+        },
+        Known {
+            provider: Provider::Qemu,
+            manifest: ManifestProvider::Qemu,
+            share: Some("qemu_virtiofs"),
+            hosts: &[HostOs::Linux, HostOs::Macos],
+            plugin: Some("vagrant-qemu"),
+        },
+        Known {
+            provider: Provider::Utm,
+            manifest: ManifestProvider::Utm,
+            share: Some("utm"),
+            hosts: &[HostOs::Macos],
+            plugin: Some("vagrant_utm"),
+        },
+        // Its VMs run on the ESXi host, not on the computer that runs the lab: nothing to share.
+        Known {
+            provider: Provider::VmwareEsxi,
+            manifest: ManifestProvider::VmwareEsxi,
+            share: None,
+            hosts: EVERY_HOST,
+            plugin: Some("vagrant-vmware-esxi"),
+        },
+    ];
+}
+
 impl<'a> From<&'a str> for Provider<'a> {
     fn from(name: &'a str) -> Provider<'a> {
-        match name {
-            "virtualbox" => Provider::VirtualBox,
-            "vmware_desktop" => Provider::VmwareDesktop,
-            "vmware_esxi" => Provider::VmwareEsxi,
-            "parallels" => Provider::Parallels,
-            "utm" => Provider::Utm,
-            "qemu" => Provider::Qemu,
-            "libvirt" => Provider::Libvirt,
-            "hyperv" => Provider::HyperV,
-            other => Provider::Other(other),
-        }
+        Provider::ALL
+            .into_iter()
+            .map(|k| k.provider)
+            .find(|p| p.id() == name)
+            .unwrap_or(Provider::Other(name))
     }
 }
 
@@ -60,6 +138,11 @@ impl<'a> Provider<'a> {
             Provider::HyperV => "hyperv",
             Provider::Other(name) => name,
         }
+    }
+
+    /// Its row of [`Provider::ALL`]; `None` for one Isoloom doesn't know.
+    pub(crate) fn known(self) -> Option<Known> {
+        Provider::ALL.into_iter().find(|k| k.provider == self)
     }
 
     /// Whether it gives a VM a virtual TPM 2.0.
@@ -143,6 +226,8 @@ mod tests {
             assert_eq!(Provider::from(id).id(), id);
         }
         assert_eq!(Provider::from("docker"), Provider::Other("docker"));
+        assert!(Provider::Other("docker").known().is_none());
+        assert!(Provider::ALL.iter().all(|k| k.provider.known().is_some()));
     }
 
     #[test]

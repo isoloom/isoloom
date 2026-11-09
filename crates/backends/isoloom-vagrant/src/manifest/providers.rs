@@ -10,78 +10,16 @@ use isoloom_render::run_manifest;
 
 use super::vagrant_argv;
 use crate::error::Result;
-use crate::vms::provider::{disk_refusal, provider_refusal};
-
-/// A provider: its id, the hosts it exists on, its plugin.
-struct Known {
-    id: Provider,
-    name: &'static str,
-    hosts: &'static [HostOs],
-    plugin: Option<&'static str>,
-}
-
-const EVERY_HOST: &[HostOs] = &[HostOs::Linux, HostOs::Macos, HostOs::Windows];
-
-/// Every provider the Vagrantfile has a block for, in the order a runner offers them.
-const PROVIDERS: [Known; 8] = [
-    Known {
-        id: Provider::Virtualbox,
-        name: "virtualbox",
-        hosts: EVERY_HOST,
-        plugin: None,
-    },
-    Known {
-        id: Provider::VmwareDesktop,
-        name: "vmware_desktop",
-        hosts: EVERY_HOST,
-        plugin: Some("vagrant-vmware-desktop"),
-    },
-    Known {
-        id: Provider::Hyperv,
-        name: "hyperv",
-        hosts: &[HostOs::Windows],
-        plugin: None,
-    },
-    Known {
-        id: Provider::Parallels,
-        name: "parallels",
-        hosts: &[HostOs::Macos],
-        plugin: Some("vagrant-parallels"),
-    },
-    Known {
-        id: Provider::Libvirt,
-        name: "libvirt",
-        hosts: &[HostOs::Linux],
-        plugin: Some("vagrant-libvirt"),
-    },
-    Known {
-        id: Provider::Qemu,
-        name: "qemu",
-        hosts: &[HostOs::Linux, HostOs::Macos],
-        plugin: Some("vagrant-qemu"),
-    },
-    Known {
-        id: Provider::Utm,
-        name: "utm",
-        hosts: &[HostOs::Macos],
-        plugin: Some("vagrant_utm"),
-    },
-    Known {
-        id: Provider::VmwareEsxi,
-        name: "vmware_esxi",
-        hosts: EVERY_HOST,
-        plugin: Some("vagrant-vmware-esxi"),
-    },
-];
+use crate::vms::provider::{Known, Provider as Vagrant, disk_refusal, provider_refusal};
 
 /// Known provider `k` as a manifest provider, with `elevation` and this lab's `refusal` on it.
 fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<VagrantProvider> {
     Ok(VagrantProvider {
-        id: k.id,
+        id: k.manifest,
         hosts: k.hosts.iter().copied().collect(),
         plugin: k.plugin.map(ToolName::parse).transpose()?,
         elevation,
-        remote: k.id == Provider::VmwareEsxi,
+        remote: k.manifest == Provider::VmwareEsxi,
         refusal,
     })
 }
@@ -89,12 +27,13 @@ fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<
 /// The providers, with this lab's refusal on each, and Vagrant's state folder for the run.
 pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
     let spec = env.spec();
-    let providers = PROVIDERS
+    let providers = Vagrant::ALL
         .iter()
         .map(|k| {
             // Hyper-V takes management commands from an administrator only.
-            let elevation = if k.id == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None };
-            provider(k, elevation, provider_refusal(spec, k.name).or_else(|| disk_refusal(spec, k.name)))
+            let elevation = if k.manifest == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None };
+            let name = k.provider.id();
+            provider(k, elevation, provider_refusal(spec, name).or_else(|| disk_refusal(spec, name)))
         })
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {
@@ -107,10 +46,10 @@ pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Iden
 /// Debian one, so only the containers' host folders rule a provider out (one that shares none);
 /// and Vagrant's state folder for the run.
 pub(super) fn docker_vm_identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
-    let providers = PROVIDERS
+    let providers = Vagrant::ALL
         .iter()
-        .filter(|k| k.id != Provider::Hyperv)
-        .map(|k| provider(k, Elevation::None, crate::host_folders::docker_vm_refusal(env.spec(), k.name)))
+        .filter(|k| k.manifest != Provider::Hyperv)
+        .map(|k| provider(k, Elevation::None, crate::host_folders::docker_vm_refusal(env.spec(), k.provider.id())))
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {
         providers,

@@ -15,24 +15,24 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
     o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "parallels", create: true
     o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "parallels", create: true
   end
-  config.vm.provider "utm" do |_, o|
-    o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "utm", create: true
-    o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "utm", create: true
-  end
-  config.vm.provider "qemu" do |_, o|
-    o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "qemu_virtiofs", create: true
-    o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "qemu_virtiofs", create: true
-  end
   config.vm.provider "libvirt" do |v, o|
     v.memorybacking :access, mode: "shared"
     v.memorybacking :source, type: "memfd"
     o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "virtiofs", create: true
     o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "virtiofs", create: true
   end
+  config.vm.provider "qemu" do |_, o|
+    o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "qemu_virtiofs", create: true
+    o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "qemu_virtiofs", create: true
+  end
+  config.vm.provider "utm" do |_, o|
+    o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "utm", create: true
+    o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "utm", create: true
+  end
   config.trigger.before :up do |t|
     t.ruby do |_, machine|
       why = { :hyperv => "host folders (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`", :vmware_esxi => "host folders (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer" }[machine.provider_name]
-      why ||= "host folders (`host_folders`): Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider" unless [:virtualbox, :vmware_desktop, :parallels, :utm, :qemu, :libvirt].include?(machine.provider_name)
+      why ||= "host folders (`host_folders`): Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider" unless [:virtualbox, :vmware_desktop, :parallels, :libvirt, :qemu, :utm].include?(machine.provider_name)
       abort("#{machine.name}: " + why) if why
     end
   end
