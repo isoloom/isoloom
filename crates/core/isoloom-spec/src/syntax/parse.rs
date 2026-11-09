@@ -124,7 +124,10 @@ impl Reader {
         self.set(&mut top, "targets", &mut spec.targets);
         self.set(&mut top, "constraints", &mut spec.constraints);
         self.set(&mut top, "cloud", &mut spec.cloud);
-        self.set(&mut top, "tags", &mut spec.tags);
+        let mut tags: indexmap::IndexMap<String, super::tags::TagValue> = indexmap::IndexMap::new();
+        if self.set(&mut top, "tags", &mut tags) {
+            spec.tags = super::tags::text(tags);
+        }
         if let Some(machines) = top.remove("machines") {
             self.machines(machines, &mut spec);
         }

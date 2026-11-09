@@ -50,8 +50,9 @@ pub struct Defaults {
     #[serde(default)]
     pub cloud: IndexMap<String, Cloud>,
     /// Tags every cloud resource and Kubernetes object carries (a team's cost centre), under the
-    /// spec's own `tags:` ([`Defaults::tags_under`]).
-    #[serde(default)]
+    /// spec's own `tags:` ([`Defaults::tags_under`]); a number or `true`/`false` is read as its
+    /// text, as in the spec.
+    #[serde(default, deserialize_with = "crate::syntax::tags::deserialize")]
     pub tags: IndexMap<String, String>,
 }
 
@@ -220,15 +221,16 @@ pub fn resolve(layers: &[Layer]) -> Result<Resolved> {
     Ok(Resolved { defaults, merged, sources })
 }
 
-/// `ISOLOOM_CLOUD__AWS__REGION=x` -> `("cloud.aws.region", "x")`. Only the defaults' sections
-/// are read (`ISOLOOM_HOME`, `ISOLOOM_DERIVED` and the publish variables mean other things).
+/// `ISOLOOM_CLOUD__AWS__REGION=x` -> `("cloud.aws.region", "x")`, `ISOLOOM_TAGS__TEAM=ops` ->
+/// `("tags.team", "ops")`. Only the defaults' sections are read (`ISOLOOM_HOME`,
+/// `ISOLOOM_DERIVED` and the publish variables mean other things).
 pub fn from_env(vars: impl Iterator<Item = (String, String)>) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = vars
         .filter_map(|(k, v)| {
             let rest = k.strip_prefix("ISOLOOM_")?;
             let key = rest.to_lowercase().replace("__", ".");
             let section = key.split('.').next().unwrap_or("");
-            ["images", "vagrant", "cloud"].contains(&section).then_some((key, v))
+            ["images", "vagrant", "cloud", "tags"].contains(&section).then_some((key, v))
         })
         .collect();
     out.sort();
@@ -416,14 +418,30 @@ mod tests {
             ("ISOLOOM_HOME", "/x"),
             ("PATH", "/bin"),
             ("ISOLOOM_IMAGES__ACCESS__VM", "ubuntu@24.04"),
+            ("ISOLOOM_TAGS__TEAM", "ops"),
         ];
         assert_eq!(
             from_env(vars.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))),
             [
                 ("images.access.vm".to_owned(), "ubuntu@24.04".to_owned()),
+                ("tags.team".to_owned(), "ops".to_owned()),
                 ("vagrant.provider".to_owned(), "qemu".to_owned())
             ]
         );
+    }
+
+    #[test]
+    fn a_tag_set_as_a_number_or_a_flag_is_its_text() {
+        let layer = |key: &str, value: &str| Layer {
+            source: format!("-s defaults.{key}"),
+            value: at_path(key, scalar(value)),
+        };
+        let resolved = resolve(&[layer("tags.cost", "12"), layer("tags.billable", "true"), layer("tags.team", "ops")]).unwrap();
+        let tags: Vec<(&str, &str)> = resolved.defaults.tags.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        assert_eq!(tags, [("cost", "12"), ("billable", "true"), ("team", "ops")]);
+        let file: Defaults = serde_yaml_ng::from_str("tags: { cost-center: 1234, ratio: 1.5 }").unwrap();
+        assert_eq!((file.tags["cost-center"].as_str(), file.tags["ratio"].as_str()), ("1234", "1.5"));
+        assert!(serde_yaml_ng::from_str::<Defaults>("tags: { team: [a, b] }").is_err(), "a list is no tag");
     }
 
     #[test]

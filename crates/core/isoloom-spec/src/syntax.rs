@@ -24,6 +24,7 @@ mod process;
 mod shared;
 mod spans;
 mod step;
+pub(crate) mod tags;
 mod warning;
 
 pub use app::{App, ApplianceRecipe, Build, Recipe};
@@ -110,11 +111,12 @@ pub struct Spec {
     /// and `cloud.outputs.<name>`, each checked at validation.
     pub message: Option<String>,
     /// Tags every cloud resource and Kubernetes object carries, beside Isoloom's own
-    /// (`cost-center: "1234"`, `team: platform`): AWS's default tags, Azure's tags, Oracle
+    /// (`cost-center: 1234`, `team: platform`): AWS's default tags, Azure's tags, Oracle
     /// Cloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those
     /// can't hold lowercased, its other characters `_`), DigitalOcean's and Linode's
-    /// `key:value` tags. The defaults' `tags:` add theirs under these.
-    #[schemars(default)]
+    /// `key:value` tags. A value is text; a number or `true`/`false` is read as its text (quote
+    /// one whose form matters: `"007"`). The defaults' `tags:` add theirs under these.
+    #[schemars(default, schema_with = "tags::schema")]
     pub tags: IndexMap<String, String>,
     /// Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `proxmox`,
     /// `aws`, ...).

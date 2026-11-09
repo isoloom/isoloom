@@ -7,7 +7,7 @@ each value comes from.
 ## Defaults
 
 The defaults hold what belongs to the person or the site rather than to the environment: the
-images, the Vagrant provider, and each cloud's region. They are read in layers, each one
+images, the Vagrant provider, each cloud's region, and the tags every resource carries. They are read in layers, each one
 overriding the one before:
 
 | Layer | Where |
@@ -27,9 +27,13 @@ The keys:
 | `images` | The image table: the image each OS boots from on each target ([below](#the-image-table)) |
 | `vagrant.provider` | The Vagrant provider to use |
 | `cloud.<cloud>.region` | The region a cloud's modules default to (`aws`, `azure`, `gcp`, `digitalocean`, `linode`, `oci`) |
+| `tags.<key>` | A tag every cloud resource and Kubernetes object carries, under the spec's own [`tags`](../spec.md#tags) (a team, a cost centre) |
 
-An unknown key is an error. Only the `images`, `vagrant` and `cloud` sections are read from the
-environment.
+An unknown key is an error. Only the `images`, `vagrant`, `cloud` and `tags` sections are read
+from the environment (`ISOLOOM_TAGS__TEAM=platform`; a variable's name is read lowercased, so a
+tag key with capitals or a dot is set in a file). A tag's value is text; a number or
+`true`/`false` is read as its text (`-s defaults.tags.cost-center=1234`), so quote one whose form
+matters in a file (`"007"`).
 
 ```sh
 $ isoloom defaults
@@ -50,6 +54,9 @@ cloud:
   azure: { region: westeurope }
 vagrant:
   provider: libvirt
+tags:
+  team: platform
+  cost-center: 1234
 ```
 
 ## Environment variables
@@ -60,7 +67,7 @@ Read by `isoloom`:
 |---|---|
 | `ISOLOOM_HOME` | Isoloom's home folder (default `~/.isoloom`), where your `defaults.yml` lives |
 | `ISOLOOM_PROFILE` | The profile to use when `--profile` isn't given |
-| `ISOLOOM_IMAGES__*`, `ISOLOOM_VAGRANT__*`, `ISOLOOM_CLOUD__*` | A defaults layer ([above](#defaults)) |
+| `ISOLOOM_IMAGES__*`, `ISOLOOM_VAGRANT__*`, `ISOLOOM_CLOUD__*`, `ISOLOOM_TAGS__*` | A defaults layer ([above](#defaults)) |
 
 Read by the generated files when they run (a runner sets them; set them yourself when you run the
 files by hand):

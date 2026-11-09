@@ -102,9 +102,13 @@
     "tags": {
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
       },
-      "description": "Tags every cloud resource and Kubernetes object carries, beside Isoloom's own\n(`cost-center: \"1234\"`, `team: platform`): AWS's default tags, Azure's tags, Oracle\nCloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those\ncan't hold lowercased, its other characters `_`), DigitalOcean's and Linode's\n`key:value` tags. The defaults' `tags:` add theirs under these.",
+      "description": "Tags every cloud resource and Kubernetes object carries, beside Isoloom's own\n(`cost-center: 1234`, `team: platform`): AWS's default tags, Azure's tags, Oracle\nCloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those\ncan't hold lowercased, its other characters `_`), DigitalOcean's and Linode's\n`key:value` tags. A value is text; a number or `true`/`false` is read as its text (quote\none whose form matters: `\"007\"`). The defaults' `tags:` add theirs under these.",
       "default": {}
     },
     "overrides": {

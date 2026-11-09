@@ -99,3 +99,16 @@ fn a_tag_is_one_every_cloud_takes_and_not_isoloom_s_own() {
         assert!(found.iter().any(|p| p.starts_with(at)), "{at}: {found:?}");
     }
 }
+
+#[test]
+fn a_tag_written_as_a_number_or_a_flag_is_its_text() -> Outcome {
+    let numbered = valid(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\ntags: { cost-center: 1234, billable: true }\n",
+    )?;
+    let tags = numbered.spec().tags;
+    assert_eq!((tags["cost-center"].as_str(), tags["billable"].as_str()), ("1234", "true"));
+    let refused = Lab::parse("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\ntags: { team: [a, b] }\n")
+        .expect_err("a list is no tag");
+    assert!(refused.iter().any(|p| p.path.as_str() == "tags.team"), "{refused:?}");
+    Ok(())
+}
