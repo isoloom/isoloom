@@ -16,8 +16,8 @@ pub struct CloudServices {
     /// A Terraform root module in the project (a folder holding `.tf` files), used as is.
     pub terraform: String,
     /// The module's variables: any value (a string, number, boolean, list or map). A string
-    /// holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the
-    /// launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:
+    /// holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.OPERATOR_IP }}/32"]`), takes the
+    /// launch-time input `NAME` (declared in `inputs`), e.g. an operator's IP for an allow-list:
     /// required when a runner brings the environment up, kept for taking it down.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[schemars(with = "IndexMap<String, serde_json::Value>")]
@@ -144,28 +144,28 @@ mod tests {
 
     #[test]
     fn a_variable_takes_an_input_when_it_is_exactly_one() {
-        assert_eq!(CloudServices::input_of(&json!(" {{ inputs.PLAYER_IP }} ")), Some("PLAYER_IP"));
-        assert_eq!(CloudServices::input_of(&json!("{{ inputs.PLAYER_IP }}/32")), None);
+        assert_eq!(CloudServices::input_of(&json!(" {{ inputs.OPERATOR_IP }} ")), Some("OPERATOR_IP"));
+        assert_eq!(CloudServices::input_of(&json!("{{ inputs.OPERATOR_IP }}/32")), None);
         assert_eq!(CloudServices::input_of(&json!(3)), None);
     }
 
     /// A module variable holding inputs at every depth, beside other placeholders.
     fn variable() -> serde_json::Value {
         json!({
-            "allow": ["{{ inputs.PLAYER_IP }}/32", 22],
-            "name": "{{inputs.TEAM}}-{{ inputs.PLAYER_IP }}",
+            "allow": ["{{ inputs.OPERATOR_IP }}/32", 22],
+            "name": "{{inputs.TEAM}}-{{ inputs.OPERATOR_IP }}",
             "other": "{{ cloud.outputs.url }} {{ inputs.TEAM",
         })
     }
 
     #[test]
     fn inputs_are_found_at_any_depth_in_order() {
-        assert_eq!(CloudServices::inputs_in(&variable()), ["PLAYER_IP", "TEAM", "PLAYER_IP"]);
+        assert_eq!(CloudServices::inputs_in(&variable()), ["OPERATOR_IP", "TEAM", "OPERATOR_IP"]);
     }
 
     #[test]
     fn inputs_are_filled_and_everything_else_stays_as_written() {
-        let filled = CloudServices::fill_inputs(&variable(), &mut |name| (name == "PLAYER_IP").then(|| "198.51.100.7".to_owned()));
+        let filled = CloudServices::fill_inputs(&variable(), &mut |name| (name == "OPERATOR_IP").then(|| "198.51.100.7".to_owned()));
         assert_eq!(
             filled,
             json!({

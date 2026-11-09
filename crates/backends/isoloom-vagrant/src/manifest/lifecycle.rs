@@ -1,7 +1,7 @@
 //! The operations of a Vagrant run (run-manifest-v0.md §10), when it counts as ready, and how a
 //! start that tripped over a previous run's leftovers is retried. The controller is powered off
 //! once the lab is built (it comes back for provisioning and checks), except on QEMU, where it is
-//! the player's position on the lab network, and when the spec keeps it running.
+//! the access position on the lab network, and when the spec keeps it running.
 
 use std::num::NonZeroU32;
 

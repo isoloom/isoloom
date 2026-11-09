@@ -15,7 +15,7 @@ use crate::path::RelPath;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum SetBy {
-    /// The runner decides it (a relay's proxy command, the player's public IP).
+    /// The runner decides it (a relay's proxy command, an operator's IP).
     Runner,
     /// The app driving the runner passes it.
     Embedder,
@@ -124,7 +124,7 @@ pub struct Param {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum SlotKind {
-    /// A launch-time value of the lab (`inputs:`: a flag, a launch token).
+    /// A launch-time value of the lab (`inputs:`: an access token, a password).
     Input,
     /// The spec's `secrets:`, and the project files Compose takes from its environment.
     Secret,
@@ -166,7 +166,7 @@ pub struct SecretSlot {
     pub kind: SlotKind,
     /// The run can't start without it.
     pub required: bool,
-    /// Masked in every event and log line. A flag, a token and a password always are.
+    /// Masked in every event and log line. A token or a password always is.
     pub sensitive: bool,
     /// The machines (and their init jobs) that receive it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

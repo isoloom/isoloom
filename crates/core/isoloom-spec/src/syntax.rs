@@ -73,7 +73,7 @@ pub struct Spec {
     pub reach: Vec<Reach>,
     /// The environment's names in a private DNS zone: off unless `private: true`.
     pub dns: Option<EnvironmentDns>,
-    /// Values given at each start (a flag, a launch token): a list of names, or a map of name to
+    /// Values given at each start (an access token, a password): a list of names, or a map of name to
     /// `{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a
     /// machine as a file (`files: [{ path, input }]`), never as an environment variable.
     #[schemars(default)]

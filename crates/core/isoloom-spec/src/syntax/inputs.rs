@@ -1,5 +1,5 @@
 //! The spec's `inputs`: values the runner, CI or the command line provides at each start.
-//! `inputs: [FLAG]` is short for `inputs: { FLAG: {} }`. An input is sensitive unless it says
+//! `inputs: [TOKEN]` is short for `inputs: { TOKEN: {} }`. An input is sensitive unless it says
 //! otherwise, and a sensitive one can only reach a machine as a file (or a catalogue setting).
 
 use std::borrow::Cow;
@@ -74,7 +74,7 @@ impl<'de> Deserialize<'de> for InputsInput {
                 Vec::<InputName>::deserialize(de::value::SeqAccessDeserializer::new(seq)).map(InputsInput::Names)
             }
             fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<InputsInput, A::Error> {
-                // `FLAG:` alone (null) is an input with every default.
+                // `TOKEN:` alone (null) is an input with every default.
                 let raw = IndexMap::<InputName, Option<Input>>::deserialize(de::value::MapAccessDeserializer::new(map))?;
                 Ok(InputsInput::Full(raw.into_iter().map(|(k, v)| (k, v.unwrap_or_default())).collect()))
             }

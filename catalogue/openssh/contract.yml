@@ -8,7 +8,7 @@
 cases:
   default: {}
   login:
-    with: { username: ctf, password: "s3cret-pw" }
+    with: { username: tester, password: "s3cret-pw" }
 
 checks:
   - name: the ssh port answers

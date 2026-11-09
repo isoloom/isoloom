@@ -104,11 +104,11 @@ macro_rules! pattern_type {
 }
 
 pattern_type!(
-    /// An environment's name: kebab-case (`flag-portal`, `shop-2`), as the spec's `name:`.
+    /// An environment's name: kebab-case (`my-lab`, `shop-2`), as the spec's `name:`.
     EnvironmentName,
     "environment name",
     "^[a-z0-9]+(-[a-z0-9]+)*$",
-    "lowercase letters and digits in words joined by single dashes (`flag-portal`)",
+    "lowercase letters and digits in words joined by single dashes (`my-lab`)",
     |v| v.split('-').all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
 );
 
@@ -136,17 +136,17 @@ pattern_type!(
     EnvName,
     "environment variable name",
     "^[A-Za-z_][A-Za-z0-9_]*$",
-    "a letter or `_`, then letters, digits or `_` (`CTF_FLAG_MAIN`)",
+    "a letter or `_`, then letters, digits or `_` (`APP_TOKEN`)",
     |v| first_then(v, |c| c.is_ascii_alphabetic() || c == '_', |c| c.is_ascii_alphanumeric() || c == '_')
 );
 
 pattern_type!(
-    /// A slot's name (an input as the spec names it, `CTF_FLAG_MAIN`; a secret, `db-password`),
+    /// A slot's name (an input as the spec names it, `APP_TOKEN`; a secret, `db-password`),
     /// and a Terraform output's.
     Identifier,
     "identifier",
     "^[A-Za-z_][A-Za-z0-9_-]*$",
-    "a letter or `_`, then letters, digits, `_` or `-` (`CTF_FLAG_MAIN`, `db-password`)",
+    "a letter or `_`, then letters, digits, `_` or `-` (`APP_TOKEN`, `db-password`)",
     |v| first_then(v, |c| c.is_ascii_alphabetic() || c == '_', |c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
 );
 

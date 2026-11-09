@@ -75,7 +75,7 @@ fn shared(at: &FieldPath, m: &Mapping, out: &mut Vec<Problem>) {
         (
             "inputs",
             "an input reaches a machine as a file or an environment value",
-            "`files: [{ path: /ctf/flag, input: <NAME> }]`, or `environment: { <NAME>: { input: <NAME> } }` for a non-sensitive input".to_owned(),
+            "`files: [{ path: /etc/app/token, input: <NAME> }]`, or `environment: { <NAME>: { input: <NAME> } }` for a non-sensitive input".to_owned(),
         ),
         (
             "secrets",
@@ -134,7 +134,7 @@ fn docker_fix(name: &str, d: &Mapping) -> String {
         parts.push(format!("`app: {{ image: {i} }}`"));
     }
     if d.contains_key("init") {
-        parts.push("`init` → `setup: [...]`, and a flag script becomes `files: [{ path, input }]`".to_owned());
+        parts.push("`init` → `setup: [...]`, and a script writing an input to a file becomes `files: [{ path, input }]`".to_owned());
     }
     if d.get("lxc").and_then(Value::as_bool) == Some(true) {
         parts.push(format!("`overrides: {{ proxmox: {{ machines: {{ {name}: {{ lxc: true }} }} }} }}`"));

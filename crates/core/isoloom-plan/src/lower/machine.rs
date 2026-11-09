@@ -23,8 +23,8 @@ pub(super) struct LoweredMachine {
     pub problems: Vec<Problem>,
 }
 
-/// The secret an input's file becomes: `input-<name>`, kebab-case (`CTF_FLAG` is
-/// `input-ctf-flag`).
+/// The secret an input's file becomes: `input-<name>`, kebab-case (`APP_TOKEN` is
+/// `input-app-token`).
 pub(super) fn input_secret(input: &str) -> String {
     format!("input-{}", input.to_ascii_lowercase().replace('_', "-"))
 }

@@ -244,7 +244,7 @@ impl JsonSchema for Native {
     }
 }
 
-/// A named volume of a machine. `down` removes it; `park` and `resume` keep it (a flag written
+/// A named volume of a machine. `down` removes it; `park` and `resume` keep it (a file written
 /// once by an init job lives in one).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -253,7 +253,7 @@ pub struct Volume {
     pub name: Name,
     /// Where the machine mounts it.
     pub path: GuestPath,
-    /// Its name where the target creates it (`${run.name}_web-ctf`).
+    /// Its name where the target creates it (`${run.name}_web-data`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native: Option<Template>,
 }

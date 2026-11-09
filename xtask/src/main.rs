@@ -118,7 +118,7 @@ enum Task {
     /// <result>` adds a real run, the evidence a tier is worked out from.
     Tiers(tiers::Args),
     /// The catalogue: `refresh` pins what the entries fetch (lock.yml); `check <entry>` runs an
-    /// entry's parity contract in both forms through the Isothrum CLI.
+    /// entry's parity contract in both forms through a runner's command line.
     Catalogue(catalogue::Args),
 }
 

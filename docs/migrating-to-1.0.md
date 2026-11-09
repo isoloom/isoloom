@@ -97,7 +97,7 @@ placeholders. Message interpolation changes accordingly:
 
 ## 3. Inputs and secrets: `inputs:` + `files: [{ input }]`
 
-Values given at each start (a flag, a launch token) are declared under `inputs:` and are
+Values given at each start (an access token, a password) are declared under `inputs:` and are
 **sensitive by default**. A sensitive input reaches a machine as a *file*, never as an
 environment variable. A non-secret input can be placed in `environment:` explicitly.
 Values never appear in a generated file.
@@ -118,7 +118,7 @@ machines:
     setup: [build/database/seed.sh]         # reads /run/lab/launch-token
 ```
 
-If a 0.x lab delivered a flag or token through the environment, move it to a
+If a 0.x lab delivered a token or password through the environment, move it to a
 `files: [{ path, input }]` entry and read it from that path.
 
 ## 4. The egress seal

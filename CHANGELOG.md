@@ -102,6 +102,14 @@ stable spec format.
   exec -i deploy/<machine> -- sh -s`) and its Secret's usage how to create it; ESXi's
   `ssh_public_key` says Terraform signs in with it. A check runner's header says what it prints
   ("each prints a PASS or FAIL line"), not who runs it.
+- **The `openssh` catalogue entry's login account defaults to `user`** (was `ctf`). A lab that
+  relied on the default and signs in as `ctf` sets `with: { username: ctf }`.
+- **Generated text, schemas and the tier list name no particular kind of lab or host.** The run
+  manifest's name hints are `my-lab` and `APP_TOKEN`, a runner-set param is "an operator's IP",
+  an input "an access token, a password"; Vagrant's `ISOLOOM_SSH_PROXY_COMMAND` describes the
+  param itself; the spec's examples, messages and the matrix say token where they said flag. The
+  tier list's hosts are `linux-1`, `linux-2`, `macos-arm64` and `windows-11`, and its notes
+  (`isoloom targets --json`, `isoloom matrix`) name no private lab or app.
 
 ### Fixed
 

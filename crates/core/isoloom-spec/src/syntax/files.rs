@@ -142,7 +142,7 @@ impl File {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct FileInput {
-    /// Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\app\flag.txt`)
+    /// Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\app\token.txt`)
     /// on Windows. Its folders are created when missing.
     path: String,
     /// A file of the project to copy (`config/app.ini`). Exactly one of `source`, `content`,

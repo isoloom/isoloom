@@ -195,7 +195,7 @@ impl JsonSchema for PathTemplate {
     }
 }
 
-/// An absolute path inside a machine (`/ctf`): where a volume is mounted.
+/// An absolute path inside a machine (`/srv/data`): where a volume is mounted.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GuestPath(String);
 

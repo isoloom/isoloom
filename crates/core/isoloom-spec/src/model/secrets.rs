@@ -41,7 +41,7 @@ pub enum SecretSource {
     #[serde(skip_deserializing)]
     #[schemars(skip)]
     Input {
-        /// The input's name (`CTF_FLAG_MAIN`): the runner's variable holding the value.
+        /// The input's name (`APP_TOKEN`): the runner's variable holding the value.
         input: String,
     },
 }

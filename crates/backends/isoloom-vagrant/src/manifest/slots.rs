@@ -75,7 +75,7 @@ pub(super) fn params(runners: &[CheckRunner]) -> Result<Vec<Param>> {
 }
 
 /// Whether each published port takes its own `publish:` number on the host instead of a free one
-/// the runner picks at the first start (the player's "use the lab's own ports" choice). Unset, the
+/// the runner picks at the first start (an embedder's "use the lab's own ports" choice). Unset, the
 /// runner picks free ports, so two VM labs forwarding one number never collide.
 fn publish_fixed() -> Result<Param> {
     param(
@@ -116,7 +116,7 @@ pub(super) fn remote_params() -> Result<Vec<Param>> {
     let mut out = vec![param(
         &Wanted {
             name: "ISOLOOM_SSH_PROXY_COMMAND",
-            description: "The command Vagrant's SSH to the VMs goes through when this host can't reach them directly (an ESXi host through the runner's relay on macOS).",
+            description: "The command Vagrant's SSH to the VMs goes through (an SSH `ProxyCommand`), when this computer can't reach them directly; unset, it connects straight to them.",
             default: None,
             values: &[],
             required: false,

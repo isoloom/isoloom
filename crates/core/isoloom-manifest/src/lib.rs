@@ -28,7 +28,7 @@
 //! // What Isoloom writes reads back as the same manifest.
 //! assert_eq!(isoloom_manifest::parse(&isoloom_manifest::to_json(&manifest)?)?, manifest);
 //! // A template can't hold a secret: it reaches a tool only through its slot.
-//! let refused = "--flag=${secrets.FLAG}".parse::<Template>().unwrap_err();
+//! let refused = "--token=${secrets.TOKEN}".parse::<Template>().unwrap_err();
 //! assert_eq!(refused.code(), "secret_placeholder");
 //! # Ok::<(), isoloom_manifest::Error>(())
 //! ```

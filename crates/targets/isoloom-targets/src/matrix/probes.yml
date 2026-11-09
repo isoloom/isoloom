@@ -226,8 +226,8 @@ rows:
     features: [owned-project-files]
     patch: { machines: { m: { files: [{ path: /etc/probe.conf, source: files/probe.conf, uid: 101, mode: "0400" }] } } }
   - field: machines.*.files[].input
-    about: an input's value as a file (a flag)
-    patch: { inputs: [FLAG], machines: { m: { files: [{ path: /flag.txt, input: FLAG }] } } }
+    about: an input's value as a file (a token)
+    patch: { inputs: [TOKEN], machines: { m: { files: [{ path: /token.txt, input: TOKEN }] } } }
   - field: machines.*.files[].secret
     about: a secret's value as a file
     features: [secrets]

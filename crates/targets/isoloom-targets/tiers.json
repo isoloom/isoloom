@@ -1,9 +1,9 @@
 {
   "hosts": {
-    "friday": "linux",
-    "jarvis": "linux",
-    "karen": "windows",
-    "mac": "macos"
+    "linux-1": "linux",
+    "linux-2": "linux",
+    "macos-arm64": "macos",
+    "windows-11": "windows"
   },
   "entries": [
     {
@@ -16,22 +16,22 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "hello-stack, segmented and an API lab not in this repository: up, checks, park, resume and down, through the runner (Docker Desktop 29.8.1)"
+          "note": "hello-stack, segmented and a third lab: up, checks, park, resume and down, through the runner (Docker Desktop 29.8.1)"
         },
         {
-          "host": "jarvis",
+          "host": "linux-1",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the runner (Debian 13, Docker 29.9.0, Compose 5.6.0). Flag proof: each file holds the input with its owner and mode (0:0 0400 by default, 999:1000 0440 as asked), after up and after resume; the flag is in no env, container config, generated file or run state"
+          "note": "hello-stack (12/12 checks), segmented (8/8) and hello-stack with an input delivered as files (14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the runner (Debian 13, Docker 29.9.0, Compose 5.6.0). Input proof: each file holds the input with its owner and mode (0:0 0400 by default, 999:1000 0440 as asked), after up and after resume; the value is in no env, container config, generated file or run state"
         },
         {
-          "host": "karen",
+          "host": "windows-11",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the runner over SSH (Windows 11, Docker Desktop 29.8.2 on WSL 2, Compose 5.6.0; the session's Docker CLI without Docker Desktop's credential helper, which fails without a logon session). Flag proof: as on jarvis, after up and after resume"
+          "note": "hello-stack (12/12 checks), segmented (8/8) and hello-stack with an input delivered as files (14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the runner over SSH (Windows 11, Docker Desktop 29.8.2 on WSL 2, Compose 5.6.0; the session's Docker CLI without Docker Desktop's credential helper, which fails without a logon session). Input proof: as on the Linux host, after up and after resume"
         }
       ]
     },
@@ -55,7 +55,7 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-16",
           "result": "pass",
           "note": "hello-stack up, 12 checks, down through the runner on VirtualBox 7.2 (bento/debian-12, Docker inside); no VM or container left behind"
@@ -135,7 +135,7 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "pass",
           "note": "solo-web through the runner: up (Docker in the VM over SSH, Compose), web check, down, reap; zero AWS leftovers"
@@ -222,27 +222,27 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "the full cycle through an app's runner path, VirtualBox 7.2.20"
+          "note": "the full cycle through a runner, VirtualBox 7.2.20"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-16",
           "result": "pass",
           "note": "configured-app (the configuration renderers): every step kind through the shell library on Debian 12 and Ubuntu 24.04 (nginx from packages with a template, a user and group, files, a guarded command, the firewall, two services Isoloom defines as systemd units): up, 5/5 checks, a second and third provision changing nothing, down, through the runner (VirtualBox 7.2)"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "bridged LAN VM on 10.0.0.101+ (public_network) through an app's runner path: web boots a fixed 10.0.0.101 on en0, reachable from the host (ping + curl the page), full cycle up/checks/pause+resume/shutdown+resume/provision/down, no VM left; VirtualBox 7.2.20, bento/debian-12"
+          "note": "bridged LAN VM on 10.0.0.101+ (public_network) through a runner: web boots a fixed 10.0.0.101 on en0, reachable from the host (ping + curl the page), full cycle up/checks/pause+resume/shutdown+resume/provision/down, no VM left; VirtualBox 7.2.20, bento/debian-12"
         }
       ]
     },
@@ -264,25 +264,25 @@
       ],
       "runs": [
         {
-          "host": "karen",
+          "host": "windows-11",
           "date": "2026-10-15",
           "result": "partial",
           "note": "up, status and checks; park, resume and down pending"
         },
         {
-          "host": "karen",
+          "host": "windows-11",
           "date": "2026-10-15",
           "result": "pass",
           "note": "the full cycle through the runner (up, checks, pause and shutdown with their resumes, provision, down), Vagrant 2.4.9 on Windows 11"
         },
         {
-          "host": "karen",
+          "host": "windows-11",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "full cycle through an app's VM runner path (the runner 0.11.1) on published 0.11.1: up (Hyper-V relay 127.0.0.1:8080->guest:80), http 200, checks pass, pause+resume, shutdown+resume, provision, down; Get-VM clean, no VM left. Elevated-Vagrant path OK via the already-elevated branch (UAC off, so no prompt raised). Vagrant 2.4.9, solo-web, Windows 11"
+          "note": "full cycle through a runner (0.11.1) on published 0.11.1: up (Hyper-V relay 127.0.0.1:8080->guest:80), http 200, checks pass, pause+resume, shutdown+resume, provision, down; Get-VM clean, no VM left. Elevated-Vagrant path OK via the already-elevated branch (UAC off, so no prompt raised). Vagrant 2.4.9, solo-web, Windows 11"
         },
         {
-          "host": "karen",
+          "host": "windows-11",
           "date": "2026-10-17",
           "result": "pass",
           "note": "re-validated end to end through a runner: full cycle via the runner (up/check/pause+resume/shutdown+resume/provision/down), Hyper-V relay 127.0.0.1:8080->guest:80, http 200, Get-VM clean, no VM left (already-elevated branch, UAC off). Vagrant 2.4.9, solo-web, Windows 11."
@@ -305,19 +305,19 @@
       ],
       "runs": [
         {
-          "host": "friday",
+          "host": "linux-2",
           "date": "2026-10-15",
           "result": "pass",
           "note": "the full cycle, with Vagrant 2.4.9 and vagrant-libvirt 0.12.2 on Debian 13"
         },
         {
-          "host": "friday",
+          "host": "linux-2",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "full cycle through an app's VM runner path (the runner 0.11.1) on published 0.11.1: up, http 200, checks pass, pause+resume, shutdown+resume, provision, down; virsh clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13"
+          "note": "full cycle through a runner (0.11.1) on published 0.11.1: up, http 200, checks pass, pause+resume, shutdown+resume, provision, down; virsh clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13"
         },
         {
-          "host": "friday",
+          "host": "linux-2",
           "date": "2026-10-17",
           "result": "pass",
           "note": "re-validated end to end through a runner: full cycle via the runner (up/check/pause+resume/shutdown+resume/provision/down), http 200, virsh + vagrant global-status clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13."
@@ -351,21 +351,21 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass",
           "server": "esxi-lab",
-          "note": "ESXi 8.0U3e with promiscuous mode on: nested DHCP and an app's Vagrant self-test"
+          "note": "ESXi 8.0U3e with promiscuous mode on: nested DHCP and a Vagrant self-test"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass",
           "server": "esxi-lab",
           "note": "up, status, checks, park, resume and down through the runner"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-16",
           "result": "pass",
           "server": "esxi-lab",
@@ -383,35 +383,35 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass",
           "server": "pve-lab",
           "note": "Proxmox VE 9.2: a generated lab applied, served, passed its check and was destroyed (Terraform in a container)"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass",
           "server": "pve-lab",
           "note": "up, status, checks and down through the runner"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "partial",
           "server": "pve-lab",
           "note": "pve-lab VE9.2: /etc/hosts self-name PASS and full segmentation verified on real VMs (back internet:false egress cut, front->back:6379 reach kept, user->back blocked); but seal recreated the router VM (isoloom_sealed makes the nftables.conf snippet/user_data force replacement), so seal-reload raced the router reboot (banner timeout) -> run ended not_sealed and the router uplink IP changed"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "pass",
           "server": "pve-lab",
           "note": "seal live-reload, no router recreate, verified ad45f56d"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "pass",
           "server": "pve-lab",
@@ -429,14 +429,14 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-15",
           "result": "pass",
           "server": "esxi-lab",
           "note": "ESXi 8.0U3e: the module serves and passes its check, finished from a container"
         },
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "partial",
           "server": "esxi-lab",
@@ -454,7 +454,7 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "pass",
           "note": "solo-web and segmented through the runner: up, seal, checks (segmented: no-internet-from-cache plus reachability), down, reap; zero AWS leftovers"
@@ -530,7 +530,7 @@
       ],
       "runs": [
         {
-          "host": "mac",
+          "host": "macos-arm64",
           "date": "2026-10-17",
           "result": "pass",
           "note": "cloud-bucket (S3 site) through the runner: up, the site answers 200 'hello from isoloom', down; no bucket left"

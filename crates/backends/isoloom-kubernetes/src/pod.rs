@@ -239,7 +239,7 @@ fn seed_container(m: &Machine, v: &str, path: &str) -> Container {
 }
 
 /// The seed's copy, as Docker does for a named volume the first time it is mounted: a machine
-/// declaring `volumes: { ctf: /chroot }` keeps the image's `/chroot` and its init jobs add to
+/// declaring `volumes: { data: /chroot }` keeps the image's `/chroot` and its init jobs add to
 /// it. Empty means nothing in the claim but a `lost+found` (ext4 claims have one); a path the
 /// image doesn't have leaves the claim empty. Once seeded, or written by the machine, a claim
 /// is never seeded again (its data survives restarts).

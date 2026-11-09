@@ -97,10 +97,10 @@ fn scripts(c: &CloudServices, p: &mut Problems) {
 mod tests {
     use crate::testing::problems;
 
-    /// The problems of a cloud-services environment written as `cloud`, its input `PLAYER_IP`
+    /// The problems of a cloud-services environment written as `cloud`, its input `OPERATOR_IP`
     /// declared.
     fn of(cloud: &str) -> Vec<String> {
-        problems(&format!("version: 1\nname: t\ninputs: [PLAYER_IP]\ncloud: {cloud}\n"))
+        problems(&format!("version: 1\nname: t\ninputs: [OPERATOR_IP]\ncloud: {cloud}\n"))
     }
 
     /// The problems of `cloud.<field>` added to a sound module.
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn sound_cloud_services_pass() {
         let ok = with(
-            "vars: { region: eu, ip-list_2: ['{{ inputs.PLAYER_IP }}/32'] }, outputs: { site: site_url, api-2_x: api }, hourly_usd: 0, env: { REGION: x, _TOKEN: y, A_1: z }, apply_retries: 5, requires: [jq]",
+            "vars: { region: eu, ip-list_2: ['{{ inputs.OPERATOR_IP }}/32'] }, outputs: { site: site_url, api-2_x: api }, hourly_usd: 0, env: { REGION: x, _TOKEN: y, A_1: z }, apply_retries: 5, requires: [jq]",
         );
         assert_eq!(ok, Vec::<String>::new());
         assert_eq!(with("hourly_usd: 1000"), Vec::<String>::new());

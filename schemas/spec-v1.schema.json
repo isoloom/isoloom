@@ -35,7 +35,7 @@
     },
     "inputs": {
       "$ref": "#/$defs/Inputs",
-      "description": "Values given at each start (a flag, a launch token): a list of names, or a map of name to\n`{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a\nmachine as a file (`files: [{ path, input }]`), never as an environment variable.",
+      "description": "Values given at each start (an access token, a password): a list of names, or a map of name to\n`{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a\nmachine as a file (`files: [{ path, input }]`), never as an environment variable.",
       "default": {}
     },
     "secrets": {
@@ -1039,8 +1039,8 @@
                   "username": {
                     "type": "string",
                     "pattern": "^(?:[a-z_][a-z0-9_-]{0,31})$",
-                    "description": "The login account the entry creates (`ctf`).",
-                    "default": "ctf"
+                    "description": "The login account the entry creates (`user`).",
+                    "default": "user"
                   },
                   "password": {
                     "anyOf": [
@@ -2191,7 +2191,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\\app\\flag.txt`)\non Windows. Its folders are created when missing."
+          "description": "Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\\app\\token.txt`)\non Windows. Its folders are created when missing."
         },
         "source": {
           "type": "string",
@@ -3895,7 +3895,7 @@
         "vars": {
           "type": "object",
           "additionalProperties": true,
-          "description": "The module's variables: any value (a string, number, boolean, list or map). A string\nholding `{{ inputs.NAME }}`, at any depth (`[\"{{ inputs.PLAYER_IP }}/32\"]`), takes the\nlaunch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:\nrequired when a runner brings the environment up, kept for taking it down."
+          "description": "The module's variables: any value (a string, number, boolean, list or map). A string\nholding `{{ inputs.NAME }}`, at any depth (`[\"{{ inputs.OPERATOR_IP }}/32\"]`), takes the\nlaunch-time input `NAME` (declared in `inputs`), e.g. an operator's IP for an allow-list:\nrequired when a runner brings the environment up, kept for taking it down."
         },
         "outputs": {
           "type": "object",

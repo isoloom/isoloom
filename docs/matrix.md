@@ -10,9 +10,9 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 | Target | Tier | Exists on | Evidence |
 |---|---|---|---|
-| `docker` | 1 | linux, macos, windows | real runs: linux (jarvis, 2026-10-15), macos (mac, 2026-10-15), windows (karen, 2026-10-15) |
+| `docker` | 1 | linux, macos, windows | real runs: linux (linux-1, 2026-10-15), macos (macos-arm64, 2026-10-15), windows (windows-11, 2026-10-15) |
 | `hosted` | 2 | linux, macos, windows | validated only |
-| `docker-vm/virtualbox` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-16); tier 1 pending: linux, windows |
+| `docker-vm/virtualbox` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-16); tier 1 pending: linux, windows |
 | `docker-vm/vmware_desktop` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `docker-vm/parallels` | 2 | macos | validated only; tier 1 pending: macos |
 | `docker-vm/utm` | 2 | macos | validated only; tier 1 pending: macos |
@@ -20,7 +20,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `docker-vm/libvirt` | 2 | linux | validated only; tier 1 pending: linux |
 | `docker-vm/vmware_esxi` | 2 | linux, macos, windows | validated only |
 | `docker-vm/proxmox` | 2 | linux, macos, windows | validated only |
-| `cloud-docker/aws` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
+| `cloud-docker/aws` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
 | `cloud-docker/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/digitalocean` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
@@ -28,24 +28,24 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `cloud-docker/oci` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `kubernetes` | 2 | linux, macos, windows | validated only |
 | `hybrid` | 2 | linux, macos, windows | validated only |
-| `vagrant/virtualbox` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
+| `vagrant/virtualbox` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
 | `vagrant/vmware_desktop` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
-| `vagrant/hyperv` | 1 | windows | real runs: windows (karen, 2026-10-17) |
+| `vagrant/hyperv` | 1 | windows | real runs: windows (windows-11, 2026-10-17) |
 | `vagrant/parallels` | 2 | macos | validated only; tier 1 pending: macos |
-| `vagrant/libvirt` | 1 | linux | real runs: linux (friday, 2026-10-17) |
+| `vagrant/libvirt` | 1 | linux | real runs: linux (linux-2, 2026-10-17) |
 | `vagrant/qemu` | 2 | linux, macos | validated only; tier 1 pending: linux, macos |
 | `vagrant/utm` | 2 | macos | validated only; tier 1 pending: macos |
-| `vagrant/vmware_esxi` | 2 | linux, macos, windows | real runs: macos (mac, esxi-lab, 2026-10-16); tier 1 pending: linux, windows |
-| `proxmox` | 2 | linux, macos, windows | real runs: macos (mac, pve-lab, 2026-10-17); tier 1 pending: linux, windows |
-| `esxi` | 2 | linux, macos, windows | real runs: partial macos (mac, esxi-lab, 2026-10-17) |
-| `cloud-vm/aws` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
+| `vagrant/vmware_esxi` | 2 | linux, macos, windows | real runs: macos (macos-arm64, esxi-lab, 2026-10-16); tier 1 pending: linux, windows |
+| `proxmox` | 2 | linux, macos, windows | real runs: macos (macos-arm64, pve-lab, 2026-10-17); tier 1 pending: linux, windows |
+| `esxi` | 2 | linux, macos, windows | real runs: partial macos (macos-arm64, esxi-lab, 2026-10-17) |
+| `cloud-vm/aws` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
 | `cloud-vm/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/digitalocean` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/linode` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/oci` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `external` | 2 | linux, macos | validated only |
-| `cloud-services/aws` | 2 | linux, macos, windows | real runs: macos (mac, 2026-10-17); tier 1 pending: linux, windows |
+| `cloud-services/aws` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
 | `cloud-services/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-services/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 
@@ -96,7 +96,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.files[].source` | a project file placed on the machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.files[].content` | a file written in the spec | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.files[].mode` | a project file with its own owner or mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].input` | an input's value as a file (a flag) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.volumes` | data kept until the environment is destroyed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |

@@ -1807,7 +1807,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "ISOLOOM_SSH_PROXY_COMMAND",
-      "description": "The command Vagrant's SSH to the VMs goes through when this host can't reach them directly (an ESXi host through the runner's relay on macOS).",
+      "description": "The command Vagrant's SSH to the VMs goes through (an SSH `ProxyCommand`), when this computer can't reach them directly; unset, it connects straight to them.",
       "providers": [
         "vmware_esxi"
       ],

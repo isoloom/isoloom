@@ -81,7 +81,7 @@ fn files(spec: &Spec, at: &FieldPath, m: &Machine, out: &mut Problems) {
             f.path.starts_with('/')
         };
         if !absolute {
-            let want = if windows { "a drive path (`C:\\app\\flag.txt`)" } else { "an absolute path" };
+            let want = if windows { "a drive path (`C:\\app\\token.txt`)" } else { "an absolute path" };
             out.push(Problem::new(Code::InvalidValue, at.key("path"), format!("`{}`: a file goes at {want}", f.path)));
         }
         if windows {

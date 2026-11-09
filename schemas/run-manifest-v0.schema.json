@@ -246,7 +246,7 @@
     "EnvironmentName": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-      "description": "lowercase letters and digits in words joined by single dashes (`flag-portal`)"
+      "description": "lowercase letters and digits in words joined by single dashes (`my-lab`)"
     },
     "Instance": {
       "type": "integer",
@@ -876,14 +876,14 @@
     "EnvName": {
       "type": "string",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "description": "a letter or `_`, then letters, digits or `_` (`CTF_FLAG_MAIN`)"
+      "description": "a letter or `_`, then letters, digits or `_` (`APP_TOKEN`)"
     },
     "SetBy": {
       "oneOf": [
         {
           "type": "string",
           "const": "runner",
-          "description": "The runner decides it (a relay's proxy command, the player's public IP)."
+          "description": "The runner decides it (a relay's proxy command, an operator's IP)."
         },
         {
           "type": "string",
@@ -1097,7 +1097,7 @@
         },
         "sensitive": {
           "type": "boolean",
-          "description": "Masked in every event and log line. A flag, a token and a password always are."
+          "description": "Masked in every event and log line. A token or a password always is."
         },
         "machines": {
           "type": "array",
@@ -1153,14 +1153,14 @@
     "Identifier": {
       "type": "string",
       "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$",
-      "description": "a letter or `_`, then letters, digits, `_` or `-` (`CTF_FLAG_MAIN`, `db-password`)"
+      "description": "a letter or `_`, then letters, digits, `_` or `-` (`APP_TOKEN`, `db-password`)"
     },
     "SlotKind": {
       "oneOf": [
         {
           "type": "string",
           "const": "input",
-          "description": "A launch-time value of the lab (`inputs:`: a flag, a launch token)."
+          "description": "A launch-time value of the lab (`inputs:`: an access token, a password)."
         },
         {
           "type": "string",
@@ -1536,14 +1536,14 @@
               "type": "null"
             }
           ],
-          "description": "Its name where the target creates it (`${run.name}_web-ctf`)."
+          "description": "Its name where the target creates it (`${run.name}_web-data`)."
         }
       },
       "required": [
         "name",
         "path"
       ],
-      "description": "A named volume of a machine. `down` removes it; `park` and `resume` keep it (a flag written once by an init job lives in one)."
+      "description": "A named volume of a machine. `down` removes it; `park` and `resume` keep it (a file written once by an init job lives in one)."
     },
     "GuestPath": {
       "description": "An absolute path inside a machine.",

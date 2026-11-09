@@ -72,7 +72,7 @@ impl fmt::Display for Tier {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct Run {
-    /// The machine that ran the tools (`mac`, `jarvis`, `karen`).
+    /// The machine that ran the tools (`macos-arm64`, `linux-1`, `windows-11`).
     pub host: String,
     /// Its operating system.
     pub os: HostOs,
@@ -161,7 +161,7 @@ impl TierEntry {
         self.exists_on.difference(&self.proven()).copied().collect()
     }
 
-    /// What proves it, in a line: the latest run on each host OS (`real runs: linux (friday,
+    /// What proves it, in a line: the latest run on each host OS (`real runs: linux (linux-2,
     /// 2026-10-15)`), or `validated only`; then the host OSes tier 1 waits for.
     #[must_use]
     pub fn evidence(&self) -> String {
@@ -217,7 +217,7 @@ impl TierEntry {
     }
 }
 
-/// A run in a line: `macos (mac, pve-lab, 2026-10-15)`, after `failed` or `partial` when it
+/// A run in a line: `macos (macos-arm64, pve-lab, 2026-10-15)`, after `failed` or `partial` when it
 /// was.
 fn shown(run: &Run) -> String {
     let server = run.server.as_deref().map(|s| format!(", {s}")).unwrap_or_default();

@@ -174,8 +174,8 @@ impl Builder {
     /// The top-level `inputs` and `secrets`, declared before any machine references them.
     fn declarations(&mut self, out: &mut String) {
         if self.rng.chance(55) {
-            out.push_str("inputs:\n  FLAG: {}\n  API_URL: { sensitive: false }\n");
-            self.inputs.push("FLAG".to_owned());
+            out.push_str("inputs:\n  TOKEN: {}\n  API_URL: { sensitive: false }\n");
+            self.inputs.push("TOKEN".to_owned());
             self.inputs.push("API_URL".to_owned());
         }
         if self.rng.chance(40) {
@@ -331,13 +331,13 @@ impl Builder {
         writeln!(out, "    ports: {{ {} }}", entries.join(", ")).ok();
     }
 
-    /// `files` reading declared inputs and secrets. Machine `m0` places `FLAG` and every secret,
+    /// `files` reading declared inputs and secrets. Machine `m0` places `TOKEN` and every secret,
     /// so each declaration is used; later machines may place them again.
     fn files(&mut self, out: &mut String, index: usize) {
         let first = index == 0;
         let mut files: Vec<String> = Vec::new();
-        if self.inputs.iter().any(|i| i == "FLAG") && (first || self.rng.chance(50)) {
-            files.push("{ path: /run/lab/flag, input: FLAG }".to_owned());
+        if self.inputs.iter().any(|i| i == "TOKEN") && (first || self.rng.chance(50)) {
+            files.push("{ path: /run/lab/token, input: TOKEN }".to_owned());
         }
         if !self.secrets.is_empty() && (first || self.rng.chance(50)) {
             let names = self.secrets.clone();

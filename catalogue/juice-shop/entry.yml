@@ -1,12 +1,12 @@
 # yaml-language-server: $schema=../entry.schema.json
 #
-# The juice-shop entry: OWASP Juice Shop, a deliberately insecure web application for CTF and
+# The juice-shop entry: OWASP Juice Shop, a deliberately insecure web application for security
 # training, delivered as its maintainer's own prebuilt image (there is no package or VM install
 # form). lock.yml beside it is written only by `cargo xtask catalogue refresh juice-shop`, which
 # pins the image's digest.
 name: juice-shop
 description: >-
-  OWASP Juice Shop, a deliberately insecure web application for security training and CTF labs,
+  OWASP Juice Shop, a deliberately insecure web application for security training labs,
   run from its maintainer's official prebuilt image.
 upstream: https://owasp.org/www-project-juice-shop/
 licence:

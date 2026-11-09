@@ -41,7 +41,7 @@ The environment's id, in kebab case (`supplier-portal`): it names its containers
 
 ### `inputs`
 
-Values given at each start (a flag, a launch token): a list of names, or a map of name to `{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a machine as a file (`files: [{ path, input }]`), never as an environment variable.
+Values given at each start (an access token, a password): a list of names, or a map of name to `{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a machine as a file (`files: [{ path, input }]`), never as an environment variable.
 
 - **Type:** list of strings or map of name to mapping
 
@@ -999,7 +999,7 @@ Files placed on the machine, each from a project `source`, inline `content`, an 
 
 ### `machines.*.files[].path`
 
-Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\app\flag.txt`) on Windows. Its folders are created when missing.
+Where the file goes: an absolute path (`/etc/app/app.ini`), or a drive path (`C:\app\token.txt`) on Windows. Its folders are created when missing.
 
 - **Type:** string
 
@@ -2150,7 +2150,7 @@ A Terraform root module in the project (a folder holding `.tf` files), used as i
 
 ### `cloud.vars`
 
-The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list: required when a runner brings the environment up, kept for taking it down.
+The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.OPERATOR_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. an operator's IP for an allow-list: required when a runner brings the environment up, kept for taking it down.
 
 - **Type:** mapping
 

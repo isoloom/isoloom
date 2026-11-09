@@ -23,9 +23,9 @@ default: "9.2"
 settings:
   username:
     type: string
-    default: ctf
+    default: user
     pattern: "[a-z_][a-z0-9_-]{0,31}"
-    description: The login account the entry creates (`ctf`).
+    description: The login account the entry creates (`user`).
   password:
     type: password
     description: >-
