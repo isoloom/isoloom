@@ -82,6 +82,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     out.docker = docker;
     out.external = overrides::external(l.source, name);
     out.configuration = configuration(l, m, service, official);
+    problems.extend(unresolved(&at, out.configuration.as_ref(), &out.ports, service));
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
         out.vm = None;
@@ -132,6 +133,31 @@ fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, of
     }
     let (os, steps) = (m.os?, &m.app()?.steps);
     (!steps.is_empty()).then(|| model::Configuration::app(os, steps.clone()))
+}
+
+/// The steps of a service machine's configuration (its entries' phases) that its OS's family
+/// can't carry at all, at its `service`, so the plan resolves every configuration of a lab that
+/// lowered clean ([`crate::configure::Recipe::of`]). An app's own steps are refused per target,
+/// at each step (`super::refusals`).
+fn unresolved(at: &FieldPath, c: Option<&model::Configuration>, ports: &[model::Port], service: Service<'_>) -> Vec<Problem> {
+    let (Some(c), Some(Ok(resolved))) = (c, service) else {
+        return Vec::new();
+    };
+    let Err(unportable) = crate::configure::Recipe::of(c, ports, &crate::configure::DaemonTable::common()) else {
+        return Vec::new();
+    };
+    let entries: Vec<&str> = resolved.iter().map(|r| r.entry.as_str()).collect();
+    unportable
+        .into_iter()
+        .map(|u| {
+            Problem::new(
+                Code::Conflict,
+                at.key("service"),
+                format!("{}'s recipe on {}: {}", entries.join(", "), c.os, u.reason),
+            )
+            .fix(u.fix)
+        })
+        .collect()
 }
 
 /// Whether the machine's configuration starts a service (in a container, its supervisor runs it).

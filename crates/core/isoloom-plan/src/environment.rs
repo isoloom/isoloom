@@ -475,7 +475,9 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
 /// Machine `name` (`m`), planned for `target`.
 fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan {
     let shape = shape(target, m);
-    // Lowering refuses a step the machine's family can't carry, so its configuration resolves.
+    // Lowering reports a configuration that doesn't resolve (an app's steps per target, a
+    // service's for the lab), so a lab that lowered clean has its recipe; a plan of one that
+    // didn't (its problems already said why) has none.
     let recipe = m.configuration.as_ref().and_then(|c| Recipe::of(c, &m.ports, &DaemonTable::common()).ok());
     MachinePlan {
         shape,

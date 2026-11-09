@@ -168,26 +168,26 @@ fn a_setting_naming_a_project_folder_it_lacks_is_a_problem_with_files() {
     assert!(found.contains(&"machines.web.with.root".to_owned()), "{found:?}");
 }
 
+/// nginx's entry, each of its files as `edit` (its path, its text) writes it.
+fn edited_nginx(edit: impl Fn(&str, &str) -> String) -> isoloom_catalogue::Catalogue {
+    let nginx = isoloom_catalogue::Catalogue::embedded().unwrap().entry("nginx").unwrap();
+    let files: Vec<(String, String)> = nginx.files().iter().map(|(path, text)| (format!("nginx/{path}"), edit(path, text))).collect();
+    isoloom_catalogue::Catalogue::from_files(files.iter().map(|(p, t)| (p.as_str(), t.as_str()))).unwrap()
+}
+
 /// nginx's entry, its `start` a guarded command that Isoloom's supervisor runs before the official
 /// image's own process (`image.start: run`).
 fn started_catalogue() -> isoloom_catalogue::Catalogue {
-    let nginx = isoloom_catalogue::Catalogue::embedded().unwrap().entry("nginx").unwrap();
-    let files: Vec<(String, String)> = nginx
-        .files()
-        .iter()
-        .map(|(path, text)| {
-            let text = if path == "entry.yml" {
-                text.replace(
-                    "  start: []",
-                    "  start:\n    - command: [touch, /run/isoloom-started]\n      creates: /run/isoloom-started",
-                ) + "\nimage: { start: run }\n"
-            } else {
-                text.clone()
-            };
-            (format!("nginx/{path}"), text)
-        })
-        .collect();
-    isoloom_catalogue::Catalogue::from_files(files.iter().map(|(p, t)| (p.as_str(), t.as_str()))).unwrap()
+    edited_nginx(|path, text| {
+        if path == "entry.yml" {
+            text.replace(
+                "  start: []",
+                "  start:\n    - command: [touch, /run/isoloom-started]\n      creates: /run/isoloom-started",
+            ) + "\nimage: { start: run }\n"
+        } else {
+            text.to_owned()
+        }
+    })
 }
 
 #[test]
@@ -222,5 +222,37 @@ fn an_image_whose_start_the_runner_runs_runs_it_then_its_own_process() {
     assert!(
         recipe.install.is_empty() && recipe.start.len() == 1,
         "the image is install; its start is the supervisor's"
+    );
+}
+
+/// nginx's entry, offered on Windows Server too (its packages pinned there, as a refresh would),
+/// where its recipe has steps with no carrier.
+fn windows_nginx() -> isoloom_catalogue::Catalogue {
+    edited_nginx(|path, text| match path {
+        "entry.yml" => text.replace(
+            "os: [debian@12, debian@13, ubuntu@24.04, rocky@9, alpine@3.24]",
+            "os: [debian@12, debian@13, ubuntu@24.04, rocky@9, alpine@3.24, windows-server@2022]",
+        ),
+        "lock.yml" => ["1.30.6", "1.31.7"].iter().fold(text.to_owned(), |t, v| {
+            let debian = format!("      debian@12:\n        nginx: {v}-1~bookworm\n");
+            t.replace(&debian, &format!("{debian}      windows-server@2022:\n        nginx: {v}\n"))
+        }),
+        _ => text.to_owned(),
+    })
+}
+
+#[test]
+fn a_service_whose_recipe_its_os_cant_carry_is_a_problem_not_a_machine_left_unset() {
+    let source = isoloom_spec::syntax::parse(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: windows-server@2022, service: nginx, networks: { lab: 10 } }\n",
+    )
+    .unwrap();
+    let lowered = crate::lower::lower(&source, &windows_nginx(), crate::lower::Scope::Lab);
+    let found: Vec<(String, String)> = lowered.problems.iter().map(|p| (p.path.to_string(), p.reason.clone())).collect();
+    assert!(
+        found
+            .iter()
+            .any(|(path, why)| path == "machines.web.service" && why.starts_with("nginx's recipe on windows-server@2022: ")),
+        "{found:?}"
     );
 }

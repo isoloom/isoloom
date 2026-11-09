@@ -332,6 +332,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A service whose recipe the machine's OS can't carry is a problem of the spec** (`conflict`
+  at `machines.<m>.service`), as an app's own steps are a target's refusal: the plan dropped
+  such a configuration and set the machine up without it. No entry of the built-in catalogue
+  offers such an OS today; one that did would have been left unconfigured, silently.
 - **`docker-vm`'s Vagrantfile runs the run manifest's commands, with their failure policy.** Its
   `environment` provisioner chained the start steps with `&&`, so a tolerated one (the pull of
   the lab's published images) stopped the start when it failed; each step now ends the script
