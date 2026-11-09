@@ -6,7 +6,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list,
 use isoloom_spec::model::Protocol;
 
 use super::{Way, region, rule, ssh_key, vpc};
-use crate::cloud::docker::{Driver, Host, SizeVariable};
+use crate::cloud::docker::{Driver, SizeVariable};
 use crate::cloud::instance::tag_list;
 use crate::docker_host::published;
 use crate::module::providers;
@@ -25,17 +25,14 @@ pub(crate) const DRIVER: Driver = Driver {
     user: "root",
 };
 
-/// The cloud's resources, after the module's head, `user_data` in the droplet; the host they
-/// make.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
+/// The cloud's resources, after the module's head, `user_data` in the droplet; the Docker
+/// host's address.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
     m.block(vpc("10.42.1.0/24"));
     m.block(ssh_key());
     m.block(droplet(env, user_data));
     m.block(firewall(env));
-    Host {
-        address: reference("digitalocean_droplet.env.ipv4_address"),
-        user: "root",
-    }
+    reference("digitalocean_droplet.env.ipv4_address")
 }
 
 /// `resource "<kind>" "env"`, named after the environment.

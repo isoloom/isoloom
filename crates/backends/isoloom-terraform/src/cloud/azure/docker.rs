@@ -7,7 +7,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call,
 use isoloom_spec::model::Protocol;
 
 use super::{provider, variables};
-use crate::cloud::docker::{Driver, Host, SizeVariable};
+use crate::cloud::docker::{Driver, SizeVariable};
 use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
 
@@ -25,16 +25,13 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The cloud's resources, after the module's head, `custom_data` in the VM (read by
-/// cloud-init); the host they make.
-fn resources(env: &Environment, m: &mut Module, custom_data: Expression) -> Host {
+/// cloud-init); the Docker host's address.
+fn resources(env: &Environment, m: &mut Module, custom_data: Expression) -> Expression {
     m.blocks(network());
     m.block(security_group(env));
     m.blocks(interface());
     m.block(vm(HostSize::of(env), custom_data));
-    Host {
-        address: reference("azurerm_public_ip.env.ip_address"),
-        user: "isoloom",
-    }
+    reference("azurerm_public_ip.env.ip_address")
 }
 
 /// `resource "<kind>" "env"`, named after the environment.

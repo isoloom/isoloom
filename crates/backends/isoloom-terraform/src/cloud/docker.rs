@@ -44,18 +44,9 @@ pub(crate) struct Driver {
     /// Its provider's configuration.
     pub(crate) provider: ProviderConfig,
     /// Its resources, after the module's head, the host's user data (the expiry shutdown) in its
-    /// VM; the host they make.
-    pub(crate) resources: fn(&Environment, &mut Module, Expression) -> Host,
+    /// VM; the public address of the Docker host they make, where the runner reaches it over SSH.
+    pub(crate) resources: fn(&Environment, &mut Module, Expression) -> Expression,
     /// The SSH user the runner's key logs in as (it has `sudo`).
-    pub(crate) user: &'static str,
-}
-
-/// The Docker host a cloud's resources make: where the runner reaches it over SSH.
-#[derive(Debug, Clone)]
-pub(crate) struct Host {
-    /// Its public address.
-    pub(crate) address: Expression,
-    /// The SSH user the operator's key logs in as (it has `sudo`).
     pub(crate) user: &'static str,
 }
 
@@ -116,9 +107,9 @@ pub(crate) fn module(cloud: Cloud, env: &Environment) -> Result<GeneratedFile> {
         variables.push(Variable::new(name, "string").default(string(default(HostSize::of(env)))));
     }
     super::head(env, &mut m, variables, driver.provider, ProjectCopy::Runner);
-    let host = (driver.resources)(env, &mut m, crate::machine::user_data::expiry_only());
-    m.block(output("ip", host.address.clone()));
-    m.block(output("ssh_user", string(host.user)));
+    let address = (driver.resources)(env, &mut m, crate::machine::user_data::expiry_only());
+    m.block(output("ip", address));
+    m.block(output("ssh_user", string(driver.user)));
     module::file(Target::CloudDocker, &folder, m, ProjectCopy::Runner)
 }
 

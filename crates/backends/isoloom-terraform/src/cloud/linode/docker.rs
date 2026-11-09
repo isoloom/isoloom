@@ -6,7 +6,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call,
 use isoloom_spec::model::Protocol;
 
 use super::{Action, Way, region, rule};
-use crate::cloud::docker::{Driver, Host, SizeVariable};
+use crate::cloud::docker::{Driver, SizeVariable};
 use crate::cloud::instance::tag_list;
 use crate::docker_host::{published, tcp_ports};
 use crate::module::providers;
@@ -26,8 +26,8 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
-/// by cloud-init); the host they make.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
+/// by cloud-init); the Docker host's address.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
     m.block(
         resource("linode_instance")
             .add_attribute(("region", reference("var.region")))
@@ -39,10 +39,7 @@ fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
             .build(),
     );
     m.block(firewall(env));
-    Host {
-        address: call("one", [reference("linode_instance.env.ipv4")]),
-        user: "root",
-    }
+    call("one", [reference("linode_instance.env.ipv4")])
 }
 
 /// `resource "<kind>" "env"`, labelled after the environment.

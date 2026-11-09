@@ -7,7 +7,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boole
 use isoloom_spec::model::Protocol;
 
 use super::{ami, egress, first_zone, ingress, instance_type, key_pair, provider, region, route_out, zones};
-use crate::cloud::docker::{Driver, Host, SizeVariable};
+use crate::cloud::docker::{Driver, SizeVariable};
 use crate::docker_host::published;
 use crate::module::providers;
 
@@ -28,19 +28,16 @@ pub(crate) const DRIVER: Driver = Driver {
     user: "admin",
 };
 
-/// The cloud's resources, after the module's head, `user_data` in the instance; the host they
-/// make.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
+/// The cloud's resources, after the module's head, `user_data` in the instance; the Docker
+/// host's address.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
     let size = HostSize::of(env);
     m.block(zones());
     m.block(ami("debian", "136693071363", "debian-12-amd64-*").build());
     m.blocks(network());
     m.block(security_group(env));
     m.block(vm(size, user_data));
-    Host {
-        address: reference("aws_instance.env.public_ip"),
-        user: "admin",
-    }
+    reference("aws_instance.env.public_ip")
 }
 
 /// The tags on every resource: the environment's, who manages it, its expiry.

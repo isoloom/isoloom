@@ -7,7 +7,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Templ
 use isoloom_spec::model::Protocol;
 
 use super::{provider_and_project, public_ip, variables};
-use crate::cloud::docker::{Driver, Host, SizeVariable};
+use crate::cloud::docker::{Driver, SizeVariable};
 use crate::cloud::instance;
 use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
@@ -26,14 +26,11 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The cloud's resources, after the module's head, `setup` as the instance's startup script;
-/// the host they make.
-fn resources(env: &Environment, m: &mut Module, setup: Expression) -> Host {
+/// the Docker host's address.
+fn resources(env: &Environment, m: &mut Module, setup: Expression) -> Expression {
     m.blocks(network(env));
     m.block(vm(env, HostSize::of(env), setup));
-    Host {
-        address: public_ip("env"),
-        user: "isoloom",
-    }
+    public_ip("env")
 }
 
 /// `resource "<kind>" "env"` in the project, named after the environment.

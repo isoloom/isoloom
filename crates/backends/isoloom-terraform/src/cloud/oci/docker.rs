@@ -8,7 +8,7 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr,
 use isoloom_spec::model::Protocol;
 
 use super::{SHAPE, availability_domain, availability_domains, owned, provider, route_out, ubuntu_images};
-use crate::cloud::docker::{Driver, Host};
+use crate::cloud::docker::Driver;
 use crate::docker_host::published;
 use crate::module::providers;
 use crate::module::variable::Variable;
@@ -30,16 +30,13 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
-/// by cloud-init); the host they make.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Host {
+/// by cloud-init); the Docker host's address.
+fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
     m.block(availability_domains());
     m.block(ubuntu_images("ubuntu", "24.04"));
     m.blocks(network(env));
     m.block(vm(env, user_data));
-    Host {
-        address: reference("oci_core_instance.env.public_ip"),
-        user: "ubuntu",
-    }
+    reference("oci_core_instance.env.public_ip")
 }
 
 /// `resource "<kind>" "env"` in the compartment, with its tags.
