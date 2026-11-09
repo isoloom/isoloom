@@ -785,7 +785,7 @@ output "checks" {
   value = [
     {
       position = "user"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = "10.40.10.253"
       user     = "isoloom"
       script   = ".isoloom/esxi/checks/user.sh"

@@ -620,7 +620,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = "10.67.0.253"
       user     = "isoloom"
       script   = ".isoloom/proxmox/checks/networks.sh"
@@ -1093,7 +1093,7 @@ locals {
     "runners": [
       {
         "id": "networks",
-        "from": "from controller",
+        "from": "from isoloom-controller",
         "checks": [
           {
             "name": "checks/iis-answers.sh",

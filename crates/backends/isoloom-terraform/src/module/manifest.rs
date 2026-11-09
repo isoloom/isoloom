@@ -186,3 +186,25 @@ pub(crate) fn input_readers(env: &Environment, name: &str) -> Result<Vec<Name>, 
         .map(|(n, _)| Name::parse(n))
         .collect()
 }
+
+/// A check runner per position, on the machine `crate::machine::check_machine` says, its step
+/// from `step` (given the position, that machine and its checks; `None`: no runner there): the
+/// one loop of every Terraform target's run manifest.
+pub(crate) fn check_runners(
+    env: &Environment,
+    step: impl Fn(&isoloom_plan::checks::Position, &str, &[&isoloom_plan::checks::Resolved]) -> Result<Option<isoloom_manifest::Step>, ManifestError>,
+) -> Result<Vec<isoloom_manifest::CheckRunner>, ManifestError> {
+    let mut out = Vec::new();
+    for (pos, group) in isoloom_plan::checks::by_position(env.spec(), &env.checks) {
+        let Some(machine) = crate::machine::check_machine(env, &pos) else { continue };
+        let Some(step) = step(&pos, machine, &group)? else { continue };
+        out.push(isoloom_manifest::CheckRunner {
+            id: Name::parse(pos.id())?,
+            from: format!("from {machine}"),
+            checks: group.iter().map(|c| isoloom_render::run_manifest::check(c)).collect(),
+            step,
+            on_timeout: Vec::new(),
+        });
+    }
+    Ok(out)
+}

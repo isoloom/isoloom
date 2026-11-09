@@ -693,8 +693,8 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "files01"
-      host     = "192.168.58.10"
+      machine  = "intranet"
+      host     = "192.168.58.20"
       user     = "isoloom"
       script   = ".isoloom/proxmox/checks/networks.sh"
     },
@@ -1184,7 +1184,7 @@ locals {
     "runners": [
       {
         "id": "networks",
-        "from": "from files01",
+        "from": "from intranet",
         "checks": [
           {
             "name": "checks/both-answer.sh",
@@ -1198,7 +1198,7 @@ locals {
           "action": "ssh.run",
           "with": {
             "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
-            "host": "192.168.58.10",
+            "host": "192.168.58.20",
             "user": "isoloom",
             "via": "isoloom@${outputs.ip}"
           },

@@ -4,12 +4,11 @@
 //! SSH through the router.
 
 use isoloom_manifest::{
-    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, Name, NonEmpty, Part, PathTemplate, Placeholder, ReadyGrammar, RelPath, RunVar,
-    Seal, SnakeName, Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Part, PathTemplate, Placeholder, ReadyGrammar, RelPath, RunVar, Seal,
+    SnakeName, Step, Template,
 };
 use isoloom_plan::Environment;
-use isoloom_plan::checks::by_position;
-use isoloom_render::run_manifest::{action_with, check, timeout_s};
+use isoloom_render::run_manifest::{action_with, timeout_s};
 
 use super::slots::SEALED;
 use crate::machine::{controller, vms};
@@ -132,12 +131,12 @@ fn through_router() -> Result<Template, ManifestError> {
     ]))
 }
 
-/// A check runner per position: its script piped to its machine's `sh -s` through the router,
-/// the derived checks' switch in its environment, for its checks' waits plus a margin.
+/// A check runner per position (`crate::machine::check_machine`): its script piped to its
+/// machine's `sh -s` through the router, the derived checks' switch in its environment, for its
+/// checks' waits plus a margin.
 pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestError> {
-    let mut out = Vec::new();
-    for (pos, group) in by_position(env.spec(), &env.checks) {
-        let Some((machine, host)) = check_host(env, &pos) else { continue };
+    manifest::check_runners(env, |pos, _, group| {
+        let Some((_, host)) = check_host(env, pos) else { return Ok(None) };
         let derived = Template::from_parts([
             Part::Text(format!("{}=", isoloom_render::run_manifest::DERIVED)),
             Part::Placeholder(Placeholder::Param(EnvName::parse(isoloom_render::run_manifest::DERIVED)?)),
@@ -152,14 +151,7 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
         let mut step = Step::action(id(&format!("check-{}", pos.id()))?, Action::SshRun);
         step.run = action_with(Action::SshRun, with)?;
         step.stdin = Some(PathTemplate::relative(&RelPath::parse(&format!("checks/{}.sh", pos.id()))?));
-        step.timeout_s = secs(timeout_s(&group));
-        out.push(CheckRunner {
-            id: Name::parse(pos.id())?,
-            from: format!("from {machine}"),
-            checks: group.iter().map(|c| check(c)).collect(),
-            step,
-            on_timeout: Vec::new(),
-        });
-    }
-    Ok(out)
+        step.timeout_s = secs(timeout_s(group));
+        Ok(Some(step))
+    })
 }

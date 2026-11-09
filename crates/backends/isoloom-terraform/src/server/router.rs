@@ -13,7 +13,7 @@ use isoloom_spec::validate::Cidr;
 
 use crate::checks::{Invocation, Runner, output_block};
 use crate::cloud::vm::seal;
-use crate::machine::{controller, vms};
+use crate::machine::controller;
 use crate::module::output;
 
 /// Forwarding on: IPv4, and IPv6 when a network is IPv6.
@@ -179,19 +179,15 @@ fn first_address(env: &Environment, name: &str) -> Option<String> {
     env.machines.get(name)?.addresses.values().next().map(ToString::to_string)
 }
 
-/// Where a position's checks run, as the machine's name and address: on its machine when it is a
-/// VM, else from the controller, else from the first machine.
+/// Where a position's checks run (`crate::machine::check_machine`), as the machine's name and
+/// address: the controller at its address on the first network.
 pub(crate) fn check_host(env: &Environment, p: &Position) -> Option<(String, String)> {
-    if let Position::Machine(m) = p
-        && env.spec().machines.get(m).is_some_and(|x| x.vm.is_some())
-    {
-        return first_address(env, m).map(|a| (m.clone(), a));
-    }
-    if controller::needed(env) {
+    let machine = crate::machine::check_machine(env, p)?;
+    if machine == controller::NAME {
         let first = env.networks.values().next().and_then(|n| Cidr::parse(&n.cidr))?;
-        return Some(("controller".to_owned(), first.controller().to_string()));
+        return Some((machine.to_owned(), first.controller().to_string()));
     }
-    vms(env).find_map(|(n, _)| first_address(env, n).map(|a| (n.to_owned(), a)))
+    first_address(env, machine).map(|a| (machine.to_owned(), a))
 }
 
 /// [`check_host`], as the `checks` output's runner (the `isoloom` user).

@@ -519,7 +519,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = "192.168.57.253"
       user     = "isoloom"
       script   = ".isoloom/proxmox/checks/networks.sh"

@@ -8,10 +8,9 @@
 use std::net::IpAddr;
 
 use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SecretSlot, SnakeName, Template};
-use isoloom_plan::checks::{Position, by_position};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::OUTPUT_DIR;
-use isoloom_render::run_manifest::{check, outputs_with, terraform_output as state, timeout_s};
+use isoloom_render::run_manifest::{outputs_with, terraform_output as state, timeout_s};
 use isoloom_spec::model::Target;
 
 use super::{Driver, vms};
@@ -133,29 +132,17 @@ fn outputs(env: &Environment, machines: &[Machine]) -> Result<Vec<Output>, Manif
     Ok(out)
 }
 
-/// A runner per position: on its machine when that is a Linux VM, else on the controller, else
-/// on the first Linux machine, as on Proxmox (an environment with no Linux machine and no
-/// controller has no runner here).
+/// A runner per position, on the machine `crate::machine::check_machine` says (one of the
+/// guests: the Linux VMs and the controller). An environment with no Linux machine and no
+/// controller has no runner here.
 fn runners(env: &Environment, guests: &[Guest]) -> Result<Vec<CheckRunner>, ManifestError> {
-    let mut out = Vec::new();
-    for (pos, group) in by_position(env.spec(), &env.checks) {
-        let on = match &pos {
-            Position::Machine(m) => guests.iter().find(|g| &g.machine == m),
-            Position::Networks => None,
-        }
-        .or_else(|| guests.iter().find(|g| g.machine == CONTROLLER))
-        .or_else(|| guests.first());
-        let Some(guest) = on else { continue };
+    manifest::check_runners(env, |pos, machine, group| {
+        let Some(guest) = guests.iter().find(|g| g.machine == machine) else {
+            return Ok(None);
+        };
         let script = format!("{OUTPUT_DIR}/{}/checks/{}.sh", Target::CloudVm.id(), pos.id());
-        out.push(CheckRunner {
-            id: Name::parse(pos.id())?,
-            from: format!("from {}", guest.machine),
-            checks: group.iter().map(|c| check(c)).collect(),
-            step: steps::check_step(pos.id(), guest, &script, timeout_s(&group))?,
-            on_timeout: Vec::new(),
-        });
-    }
-    Ok(out)
+        steps::check_step(pos.id(), guest, &script, timeout_s(group)).map(Some)
+    })
 }
 
 /// The launch's values (inputs), each one slot: an entry of the module's `inputs` for the

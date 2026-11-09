@@ -468,3 +468,22 @@ fn proxmox_refuses_values_as_files_it_could_never_deliver() -> Outcome {
     assert!(m.secrets.iter().any(|s| s.name.as_str() == "API_URL"), "{:?}", m.secrets);
     Ok(())
 }
+
+#[test]
+fn checks_run_from_a_linux_vm_or_the_controller_on_proxmox_as_on_the_clouds() -> Outcome {
+    // A Windows machine has no `sh` to pipe its checks into: on Proxmox they ran there.
+    let lab = isoloom_targets::Lab::new(load(&crate::testing::examples().join("mixed-office"))?);
+    let from = |m: &Manifest| -> Vec<(String, String)> { m.checks.runners.iter().map(|r| (r.id.to_string(), r.from.clone())).collect() };
+    let pve = from(&run_json(&generate(&lab, Target::Proxmox)?, ".isoloom/proxmox/run.json")?);
+    let azure = from(&run_json(&generate(&lab, Target::CloudVm)?, ".isoloom/cloud-vm/azure/run.json")?);
+    assert_eq!(pve, azure);
+    assert!(pve.iter().all(|(_, f)| f != "from files01"), "{pve:?}");
+    // With no Linux machine, the controller, named alike.
+    let windows = isoloom_targets::Lab::new(load(&crate::testing::examples().join("windows-hello"))?);
+    let only_windows = from(&run_json(&generate(&windows, Target::Proxmox)?, ".isoloom/proxmox/run.json")?);
+    assert!(
+        !only_windows.is_empty() && only_windows.iter().all(|(_, f)| f == "from isoloom-controller"),
+        "{only_windows:?}"
+    );
+    Ok(())
+}

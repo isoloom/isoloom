@@ -1128,7 +1128,7 @@ output "checks" {
   value = [
     {
       position = "user"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = "10.40.10.253"
       user     = "isoloom"
       script   = ".isoloom/proxmox/checks/user.sh"
@@ -1696,7 +1696,7 @@ locals {
     "runners": [
       {
         "id": "user",
-        "from": "from controller",
+        "from": "from isoloom-controller",
         "checks": [
           {
             "name": "checks/domain-up.sh",

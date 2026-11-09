@@ -442,7 +442,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = "10.63.0.253"
       user     = "isoloom"
       script   = ".isoloom/esxi/checks/networks.sh"

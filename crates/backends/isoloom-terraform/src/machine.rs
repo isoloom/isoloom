@@ -82,6 +82,23 @@ pub(crate) fn vms(env: &Environment) -> impl Iterator<Item = (&str, &MachinePlan
         .map(|(n, mp)| (n.as_str(), mp))
 }
 
+/// Where a position's checks run, the one rule of every Terraform target: on its machine when
+/// that is a Linux VM (a Windows one has no `sh` for the runner to pipe the checks into), else on
+/// the controller when there is one, else on the first Linux VM. `None` when there is none of
+/// them.
+pub(crate) fn check_machine<'a>(env: &'a Environment, p: &isoloom_plan::checks::Position) -> Option<&'a str> {
+    let linux = || vms(env).filter(|(_, mp)| !mp.is_windows());
+    if let isoloom_plan::checks::Position::Machine(m) = p
+        && let Some((own, _)) = linux().find(|(n, _)| n == m)
+    {
+        return Some(own);
+    }
+    if controller::needed(env) {
+        return Some(controller::NAME);
+    }
+    linux().next().map(|(n, _)| n)
+}
+
 /// Whether a step sets up something a restart undoes (interfaces and routes are not kept): a
 /// transport runs it again after each `reboot` step.
 pub(crate) fn at_every_boot(step: &Step) -> bool {
