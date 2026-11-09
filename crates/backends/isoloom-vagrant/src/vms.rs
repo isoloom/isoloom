@@ -206,7 +206,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
 
 /// QEMU's helpers ([`qemu::QEMU_RB`]) and its networks' hubs, when a VM needs them.
 fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu::Link>) {
-    let machines = env.machines.values().any(|m| m.shape == MachineShape::Vm && m.size.disk_gb.is_some());
+    let machines = env.machines.values().any(|m| m.shape == MachineShape::Vm && m.resources.disk_gb.is_some());
     let controller = links.contains_key(CONTROLLER) && Controller::of(env.spec()).disk_gb.is_some();
     let sized = machines || controller;
     if !qemu::needs_ruby(links, sized) {

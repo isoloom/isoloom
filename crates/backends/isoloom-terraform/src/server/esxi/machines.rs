@@ -8,7 +8,6 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::inventory::Access;
 use isoloom_render::router;
 use isoloom_spec::validate::Cidr;
-use isoloom_spec::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::SERVICE_OS;
 use super::guest::{Guest, Nic};
@@ -83,11 +82,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut 
         name: name.to_owned(),
         index: CONTROLLER_INDEX + 1 + i,
         os: os.to_owned(),
-        size: (
-            mp.size.cpus.unwrap_or(DEFAULT_CPUS),
-            mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
-            mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB),
-        ),
+        size: (mp.size().cpus, mp.size().memory_mb, mp.size().disk_gb),
         nics: nics(env, mp),
         // Its own domain, else the private zone's (`dns.private`), whose names its hosts file
         // carries: ESXi has no DNS of its own to serve them.

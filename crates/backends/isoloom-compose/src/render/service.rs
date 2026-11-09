@@ -305,8 +305,8 @@ fn waits(env: &Environment, m: Machine<'_>, svc: &mut Service, archs: &mut Vec<m
 /// The machine's CPU and memory limits, when it has some.
 fn limits(plan: &isoloom_plan::MachinePlan) -> Option<Deploy> {
     let limits = Limits {
-        cpus: plan.size.cpus.map(|c| c.to_string()),
-        memory: plan.size.memory_mb.map(|mb| format!("{mb}M")),
+        cpus: plan.resources.cpus.map(|c| c.to_string()),
+        memory: plan.resources.memory_mb.map(|mb| format!("{mb}M")),
     };
     (limits.cpus.is_some() || limits.memory.is_some()).then_some(Deploy {
         resources: Resources {

@@ -1,17 +1,15 @@
 //! A machine's size as it runs: its own, each field left out the default of its form.
 
-use super::Size;
+use isoloom_spec::MachineSize;
 
-impl Size {
-    /// The machine's size as it runs as a container or as a VM: these, each left out the
-    /// default of that form ([`isoloom_spec::MachineSize`]).
+use super::{MachinePlan, MachineShape};
+
+impl MachinePlan {
+    /// The machine's size as it runs: its `resources`, each field left out the default of the
+    /// form it runs as, a container's or a VM's ([`MachineSize`]). The one rule every backend
+    /// sizes a lab machine by.
     #[must_use]
-    pub fn effective(self, container: bool) -> isoloom_spec::MachineSize {
-        let r = isoloom_spec::model::Resources {
-            cpus: self.cpus,
-            memory_mb: self.memory_mb,
-            disk_gb: self.disk_gb,
-        };
-        isoloom_spec::MachineSize::of(Some(r), container)
+    pub fn size(&self) -> MachineSize {
+        MachineSize::of(Some(self.resources), self.shape == MachineShape::Container)
     }
 }

@@ -6,7 +6,6 @@
 
 use crate::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::{Way, rule, ssh_key, vpc};
 use crate::cloud::Cloud;
@@ -109,11 +108,7 @@ const SIZES: &[DiskSize] = &[
 
 /// The smallest droplet size with a machine's memory and disk.
 fn size(mp: &MachinePlan) -> &'static str {
-    fit_disk(
-        SIZES,
-        mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
-        mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB),
-    )
+    fit_disk(SIZES, mp.size().memory_mb, mp.size().disk_gb)
 }
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.

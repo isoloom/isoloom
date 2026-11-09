@@ -90,7 +90,7 @@ fn too_big(env: &Environment) -> Option<String> {
         .machines
         .iter()
         .filter(|(_, m)| m.shape == isoloom_plan::MachineShape::Container)
-        .map(|(n, m)| (n, m.size.memory_mb.unwrap_or(isoloom_spec::CONTAINER_MEMORY_MB)))
+        .map(|(n, m)| (n, m.size().memory_mb))
         .max_by_key(|(_, mb)| *mb)?;
     Some(format!(
         "the containers' host needs {} MB of memory (Docker's 1024 MB and the containers', machine `{name}` asking for the most, {most} MB): the largest Docker host here has {} MB",

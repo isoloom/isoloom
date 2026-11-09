@@ -8,7 +8,6 @@ use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, bool
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
 use isoloom_render::inventory::WinrmAuth;
-use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::vpc;
 use super::{NESTING, RULES, for_nics, image, machine_type, user};
@@ -29,7 +28,7 @@ const CAP: Capped = Capped {
 /// A machine's machine type: its GPUs', else a nesting one, else by its memory, with room for an
 /// interface per network.
 pub(super) fn machine_type_of(mp: &MachinePlan) -> &'static str {
-    let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
+    let memory = mp.size().memory_mb;
     let t = RULES.gpus.of(mp).or_else(|| nested::size(mp, memory, NESTING)).unwrap_or(machine_type(memory));
     for_nics(t, mp.addresses.len())
 }
@@ -69,7 +68,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         machine_type: machine_type_of(mp),
         gpus: RULES.gpus.of(mp).is_some(),
         nested: nested::wanted(mp),
-        disk: Some(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB)),
+        disk: Some(mp.size().disk_gb),
         on: (&mp.addresses, mp.is_gateway || mp.addresses.len() > 1),
         more: &mp.more_addresses,
         tpm: mp.tpm.is_some(),

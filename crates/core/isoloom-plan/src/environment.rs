@@ -14,7 +14,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use indexmap::IndexMap;
 use isoloom_spec::images;
 use isoloom_spec::model::{
-    Arch, Boot, Constraints, External, HostFolder, Machine, MachineFile, Network, Protocol, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
+    Arch, Boot, Constraints, External, HostFolder, Machine, MachineFile, Network, Protocol, Resources, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
 };
 use isoloom_spec::validate::docker_cidrs;
 use isoloom_spec::windows::{self, Tpm};
@@ -162,8 +162,9 @@ pub struct MachinePlan {
     pub inputs: Vec<String>,
     /// The secrets it gets as files, delivered at run time (never their values).
     pub secrets: Vec<SecretFile>,
-    /// Its size.
-    pub size: Size,
+    /// Its size as the spec gives it (`resources`, each field it leaves out `None`); the size
+    /// it runs at is [`MachinePlan::size`].
+    pub resources: Resources,
     /// Its CPU architecture.
     pub arch: Arch,
     /// The bandwidth cap on each of its links (`rate_limit`, a `tc` rate such as `10mbit`).
@@ -282,17 +283,6 @@ impl Settings {
     pub fn is_empty(&self) -> bool {
         self.environment.is_empty() && self.sysctls.is_empty() && self.ulimits.is_empty()
     }
-}
-
-/// A machine's or the controller's size; `None` leaves the target's default.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Size {
-    /// CPUs.
-    pub cpus: Option<u32>,
-    /// Memory, in MB.
-    pub memory_mb: Option<u32>,
-    /// Disk, in GB.
-    pub disk_gb: Option<u32>,
 }
 
 /// The controller VM, which runs the environment's playbooks and Ansible checks: its size.
@@ -514,14 +504,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         },
         inputs: m.inputs.clone(),
         secrets: m.secrets.iter().map(|s| SecretFile::of(spec, s)).collect(),
-        size: m
-            .resources
-            .map(|r| Size {
-                cpus: r.cpus,
-                memory_mb: r.memory_mb,
-                disk_gb: r.disk_gb,
-            })
-            .unwrap_or_default(),
+        resources: m.resources.unwrap_or_default(),
         arch: m.arch,
         rate_limit: m.rate_limit.clone(),
         image: image::of(spec, shape, name, m, recipe.as_ref()),

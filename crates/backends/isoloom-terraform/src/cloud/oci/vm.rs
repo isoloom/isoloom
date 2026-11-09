@@ -26,7 +26,6 @@ use std::net::Ipv4Addr;
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::{SHAPE, availability_domain, availability_domains, owned, ubuntu_images};
 use crate::cloud::Cloud;
@@ -207,7 +206,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
     // A gateway forwards traffic that isn't its own; a machine on several networks answers from
     // the interface its default route leaves by.
     let forwards = mp.is_gateway || mp.addresses.len() > 1;
-    let (ocpus, memory_gb) = sizing(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB));
+    let (ocpus, memory_gb) = sizing(mp.size().memory_mb);
     let shape = Block::builder("shape_config")
         .add_attribute(("ocpus", number(u64::from(ocpus))))
         .add_attribute(("memory_in_gbs", number(u64::from(memory_gb))))
@@ -217,7 +216,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
         image_source(ubuntu(mp.os.as_deref().unwrap_or_default()))
     ));
     // OCI boot volumes start at 50 GB.
-    let boot = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50);
+    let boot = mp.size().disk_gb.max(50);
     let source = Block::builder("source_details")
         .add_attribute(("source_type", string("image")))
         .add_attribute((

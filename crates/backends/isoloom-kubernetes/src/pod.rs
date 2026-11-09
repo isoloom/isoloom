@@ -124,8 +124,8 @@ const FLOOR_MEMORY_MB: u32 = 128;
 /// default size, `isoloom_spec::MachineSize`); the scheduler reserves what its `resources`
 /// declare, else a small floor.
 fn resources(m: &Machine) -> Resources {
-    let size = isoloom_spec::MachineSize::of(m.spec.resources, true);
-    let declared = m.plan.size;
+    let size = m.plan.size();
+    let declared = m.plan.resources;
     Resources {
         requests: Limits {
             cpu: Some(declared.cpus.map_or_else(|| format!("{FLOOR_MILLICPU}m"), |c| c.to_string())),

@@ -276,7 +276,7 @@ pub fn port(label: &str, p: &model::Port, published: &[PublishedPort], address: 
 /// (`isoloom_spec::MachineSize`).
 #[must_use]
 pub fn resources(mp: &MachinePlan) -> isoloom_manifest::Resources {
-    let size = mp.size.effective(mp.shape == isoloom_plan::MachineShape::Container);
+    let size = mp.size();
     isoloom_manifest::Resources {
         cpus: Some(size.cpus),
         memory_mb: Some(size.memory_mb),

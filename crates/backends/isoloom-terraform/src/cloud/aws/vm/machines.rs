@@ -5,7 +5,6 @@ use crate::cloud::user_data_limit::Limit;
 use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::inventory::WinrmAuth;
-use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::{controller_group, security_group};
 use super::{addresses, image_user, machine_type, nesting};
@@ -53,7 +52,7 @@ fn ami(mp: &MachinePlan) -> Expression {
 pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
-    let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
+    let mem = mp.size().memory_mb;
     let instance = ec2_instance(&id)
         .add_attribute(("ami", ami(mp)))
         .add_attribute(("instance_type", string(machine_type(mp, mem))))
@@ -76,7 +75,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
 /// A Linux machine's root disk: what its spec asks for (the default otherwise), at least what its
 /// image needs (AWS refuses a volume smaller than the image's snapshot).
 fn root_disk_gb(mp: &MachinePlan) -> u32 {
-    let wanted = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB);
+    let wanted = mp.size().disk_gb;
     let image = own_image::of(mp, own_image::aws).map_or_else(|| super::image_min_disk_gb(mp.os.as_deref().unwrap_or_default()), |_| 0);
     wanted.max(image)
 }
@@ -204,7 +203,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
     );
     let Some((net, addr)) = mp.addresses.first() else { return };
     // Windows wants 2 GB and more.
-    let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).max(2048);
+    let mem = mp.size().memory_mb.max(2048);
     let instance = ec2_instance(&id)
         .add_attribute(("ami", ami(mp)))
         .add_attribute(("instance_type", string(machine_type(mp, mem))))
@@ -214,7 +213,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
         .add_attribute(("user_data", windows_user_data()))
         .add_block(lifecycle("user_data", None))
-        .add_block(root_disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
+        .add_block(root_disk(mp.size().disk_gb.max(50)))
         .add_blocks(disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));
     let instance = nesting(addresses::on_instance(instance, mp, net), mp).build();

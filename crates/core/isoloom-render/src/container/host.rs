@@ -32,10 +32,11 @@ impl HostSize {
     pub fn of(env: &Environment) -> HostSize {
         let containers = env.machines.values().filter(|m| m.shape == MachineShape::Container);
         let (cpus, memory_mb, disk_gb) = containers.fold((0_u32, 1024_u32, 0_u32), |(cpus, memory, disk), m| {
+            let size = m.size();
             (
-                cpus.saturating_add(m.size.cpus.unwrap_or(isoloom_spec::DEFAULT_CPUS)),
-                memory.saturating_add(m.size.memory_mb.unwrap_or(isoloom_spec::CONTAINER_MEMORY_MB)),
-                disk.saturating_add(m.size.disk_gb.unwrap_or(isoloom_spec::CONTAINER_DISK_GB)),
+                cpus.saturating_add(size.cpus),
+                memory.saturating_add(size.memory_mb),
+                disk.saturating_add(size.disk_gb),
             )
         });
         HostSize {

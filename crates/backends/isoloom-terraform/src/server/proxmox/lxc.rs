@@ -16,7 +16,6 @@ use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_render::router;
 use isoloom_spec::model::{Arch, Machine};
 use isoloom_spec::validate::Cidr;
-use isoloom_spec::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::firewall::{self, Guest};
 use crate::machine::cloud_init::file;
@@ -153,6 +152,7 @@ fn oci_reference(image: &str) -> String {
 /// The container: its size, its devices and addresses, its entrypoint and environment.
 fn container(env: &Environment, c: Container) -> Block {
     let Container { name, plan: mp, machine: m } = c;
+    let size = mp.size();
     let mut b = Block::builder("resource")
         .add_label("proxmox_virtual_environment_container")
         .add_label(ident(name))
@@ -161,20 +161,12 @@ fn container(env: &Environment, c: Container) -> Block {
         .add_attribute(("pool_id", reference(super::base::POOL)))
         .add_attribute(("unprivileged", boolean(!m.privileged)))
         .add_attribute(("start_on_boot", boolean(false)))
-        .add_block(
-            Block::builder("cpu")
-                .add_attribute(("cores", number(mp.size.cpus.unwrap_or(DEFAULT_CPUS).into())))
-                .build(),
-        )
-        .add_block(
-            Block::builder("memory")
-                .add_attribute(("dedicated", number(mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).into())))
-                .build(),
-        )
+        .add_block(Block::builder("cpu").add_attribute(("cores", number(size.cpus.into()))).build())
+        .add_block(Block::builder("memory").add_attribute(("dedicated", number(size.memory_mb.into()))).build())
         .add_block(
             Block::builder("disk")
                 .add_attribute(("datastore_id", reference("var.datastore")))
-                .add_attribute(("size", number(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).into())))
+                .add_attribute(("size", number(size.disk_gb.into())))
                 .build(),
         );
     for (i, net) in mp.addresses.keys().enumerate() {

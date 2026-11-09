@@ -319,6 +319,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A Proxmox LXC container is a container's size** (1 CPU, 512 MB, 5 GB unless its `resources`
+  say), as its run manifest said; `main.tf` gave it a VM's (1024 MB, 20 GB). Every backend sizes a
+  lab machine by one rule now (library: `isoloom_plan::MachinePlan::size`, its `resources` the
+  spec's; `isoloom_plan::Size` and `Size::effective` are removed).
 - **`constraints.ca_certificates` reaches Isoloom's own VMs**: the containers' Docker host
   (`docker-vm` on Vagrant and Proxmox, `cloud-docker`, the hybrid host), the controller (Vagrant,
   Proxmox, the clouds, ESXi), the router and the `shell` tool's VM trust the site's authorities

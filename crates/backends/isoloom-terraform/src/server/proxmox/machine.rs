@@ -7,7 +7,6 @@ use isoloom_plan::checks::{Position, Probe, by_position};
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_render::router;
 use isoloom_spec::validate::Cidr;
-use isoloom_spec::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::windows;
 use crate::machine::cloud_init::{self, CloudConfig};
@@ -62,11 +61,7 @@ fn vm(env: &Environment, name: &str, mp: &MachinePlan, boot: Boot) -> Vm {
         id: ident(name),
         snippet: ident(name),
         name: name.to_owned(),
-        size: (
-            mp.size.cpus.unwrap_or(DEFAULT_CPUS),
-            mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
-            mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB),
-        ),
+        size: (mp.size().cpus, mp.size().memory_mb, mp.size().disk_gb),
         boot,
         tpm: mp.tpm.is_some(),
         own_boot: mp.boot.clone(),

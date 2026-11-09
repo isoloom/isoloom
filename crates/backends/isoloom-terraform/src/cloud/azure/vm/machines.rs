@@ -8,7 +8,6 @@ use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, bool
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::inventory::WinrmAuth;
-use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{USER, image, machine_size, public_ip as address_of, size};
@@ -32,8 +31,8 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
     m.block(public_ip(&id, name));
     m.blocks(nics(&id, name, mp));
-    let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
-    let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(30);
+    let memory = mp.size().memory_mb;
+    let disk = mp.size().disk_gb.max(30);
     let ids = mp
         .addresses
         .keys()
@@ -221,8 +220,8 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
 fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
     let id = ident(name);
     // Windows wants 2 GB and more, and Azure's images a 127 GB disk.
-    let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).max(2048);
-    let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(127);
+    let memory = mp.size().memory_mb.max(2048);
+    let disk = mp.size().disk_gb.max(127);
     let ids = mp
         .addresses
         .keys()

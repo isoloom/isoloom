@@ -11,7 +11,6 @@ use std::net::Ipv4Addr;
 
 use crate::hcl_builder::{Block, Expression, Module, Template, boolean, call, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
@@ -84,11 +83,7 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
 
 /// The smallest Linode plan with a machine's memory and disk.
 fn plan(mp: &MachinePlan) -> &'static str {
-    fit_disk(
-        PLANS,
-        mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB),
-        mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB),
-    )
+    fit_disk(PLANS, mp.size().memory_mb, mp.size().disk_gb)
 }
 
 /// The plans, smallest first: each one's memory and disk come with it.

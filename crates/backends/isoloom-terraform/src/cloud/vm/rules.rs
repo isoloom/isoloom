@@ -8,7 +8,6 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::{Ipv6Addresses, Machine};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::windows::Tpm;
-use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::gpus::{self, GpuSizes};
 use super::{disks, gateways, nested, own_image};
@@ -330,7 +329,7 @@ impl Rules {
                 return None;
             }
             let largest = if nested::wanted(mp) { self.largest_nesting } else { self.largest }?;
-            let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
+            let memory = mp.size().memory_mb;
             (memory > largest.memory_mb).then(|| {
                 format!(
                     "machine `{name}` asks for {} of memory: the largest {} size here, `{}`, has {}",
@@ -353,7 +352,7 @@ impl Rules {
             return None;
         };
         vms(env).filter(|(_, mp)| self.gpus.of(mp).is_none()).find_map(|(name, mp)| {
-            let disk = mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB);
+            let disk = mp.size().disk_gb;
             (disk > largest).then(|| {
                 format!(
                     "machine `{name}` asks for a {disk} GB disk: the largest {} size here, `{size}`, has {largest} GB",

@@ -357,7 +357,7 @@ impl Machine {
 }
 
 /// What a machine is given to run on; each left out takes its default.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resources {
     /// CPUs (default 1).

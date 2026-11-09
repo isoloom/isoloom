@@ -48,6 +48,6 @@ pub(crate) fn boot(mp: &MachinePlan) -> Boot {
     Boot::Template {
         variable: template_variable(o),
         ostype: ostype(o),
-        disk: mp.size.disk_gb,
+        disk: mp.resources.disk_gb,
     }
 }
