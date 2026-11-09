@@ -23,13 +23,7 @@ jobs:
       - run: cargo test --workspace
       - name: Examples validate
         run: |
-          for e in examples/*/; do cargo run -q -- validate "$e" --skip-files; cargo run -q -- targets "$e"; done
-      - name: Generated files are up to date
-        run: |
-          # Every example with committed outputs (a stale one fails here, not in someone's run).
-          for e in examples/*/; do
-            if [ -d "$e.isoloom" ]; then cargo run -q -- check "$e"; fi
-          done
+          for e in examples/*/; do cargo run -q -p isoloom -- validate "$e" --skip-files; cargo run -q -p isoloom -- targets "$e"; done
 
   # The declared rust-version (Cargo.toml) builds and passes, so it can't drift again.
   msrv:
@@ -246,6 +240,12 @@ jobs:
           cluster_name: isoloom
           config: .github/kind-calico.yaml
           wait: 0s
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Generate the Kubernetes files
+        run: cargo run -q -p isoloom -- generate --target kubernetes .
       - name: Calico (enforces NetworkPolicies, egress included)
         working-directory: .
         run: |
@@ -264,12 +264,12 @@ jobs:
           ns=$(awk '/^kind: Namespace/{getline; getline; print $2; exit}' .isoloom/kubernetes/environment.yaml)
           echo "NS=$ns" >> "$GITHUB_ENV"
           kubectl -n "$ns" wait --for=condition=Available deployment --all --timeout=600s
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Checks (the spec's and the derived ones, from every machine)
-        run: cargo run -q -- test kubernetes .
+        # As .isoloom/kubernetes/checks says to run them: a Job per position, then their logs.
+        run: |
+          kubectl apply -k .isoloom/kubernetes/checks
+          kubectl -n "$NS" wait --for=condition=complete job --all --timeout=300s
+          kubectl -n "$NS" logs -l isoloom.com/check --tail=-1
       # The Helm chart of the same environment, in a namespace of its own beside it: linted,
       # installed, Available, and its checks as `helm test`. (No `helm --wait`: it would wait
       # for the published LoadBalancer's address, which kind never gives.)
@@ -281,7 +281,7 @@ jobs:
           helm test env -n "helm-$NS" --logs --timeout 5m
       - name: Package the chart
         run: |
-          cargo run -q -- chart . --version 1.2.3 -o "$RUNNER_TEMP"
+          helm package .isoloom/kubernetes/chart --version 1.2.3 -d "$RUNNER_TEMP"
           ls "$RUNNER_TEMP"/*-1.2.3.tgz
       - name: State
         if: failure()
@@ -301,9 +301,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Import, generate
         run: |
-          mkdir -p /tmp/shop && cp crates/isoloom-import/tests/fixtures/compose-shop/docker-compose.yml /tmp/shop/
-          cargo run -q -- import compose /tmp/shop/docker-compose.yml
-          cargo run -q -- generate /tmp/shop --target docker
+          mkdir -p /tmp/shop && cp crates/tools/isoloom-import/tests/fixtures/compose-shop/docker-compose.yml /tmp/shop/
+          cargo run -q -p isoloom -- import compose /tmp/shop/docker-compose.yml
+          cargo run -q -p isoloom -- generate /tmp/shop --target docker
       - name: Start
         working-directory: /tmp/shop
         run: API_TOKEN=t0k docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 180
@@ -323,8 +323,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Generate every example (the targets each can be generated for)
+        run: |
+          cargo build -q -p isoloom
+          for e in examples/*/; do target/debug/isoloom generate "$e" > /dev/null; done
       - name: Validate
         run: |
+          shopt -s nullglob
           for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
             echo "== $d"
             terraform -chdir="$d" init -backend=false -input=false >/dev/null
