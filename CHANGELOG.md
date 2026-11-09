@@ -46,6 +46,16 @@ stable spec format.
 
 ### Changed
 
+- **`isoloom check` checks what `isoloom generate` writes**: a profile's pinned target, or the one
+  `--target` names (new), else every target. A target asked for that refuses the lab fails.
+- **A cloud refuses a machine bigger than its largest size**, naming the machine, the memory it
+  asks for and that size (DigitalOcean 8 GB; AWS, Google Cloud and Linode 16 GB; AWS and Google
+  Cloud 32 GB for a machine that nests; Azure 128 GB). It used to get the largest size silently.
+- **The controller's disk is the spec's `controller.resources.disk_gb`, else 10 GB, on every
+  target** (AWS ignored the spec's; Proxmox gave 8 GB, AWS and Google Cloud the image's). Azure
+  keeps its image's 30 GB floor. ESXi's controller installs the SSH client, as the others do.
+- **`terraform init` may take 900 s on every target** (Proxmox's run manifests gave it 600 s).
+- **`cargo xtask catalogue check` requires `--runner`**: there is no default runner.
 - **Machine names and aliases starting with `isoloom-` are refused.** They are Isoloom's own (its
   controller, the check stand-in, the check runners): a machine named `isoloom-access` collided
   with the stand-in, and `isoloom-web` shared `web`'s check step. `docs/spec.md` says so.
@@ -147,6 +157,23 @@ stable spec format.
 
 ### Fixed
 
+- **A cloud VM keeps its set-up across every reboot**: its set-up unit stays enabled, and at
+  every boot it schedules the run's expiry again and brings back what a restart undoes (extra
+  interfaces, routes, the inputs file); it used to stop first once the set-up was done. A
+  cloud-docker host schedules its expiry from a boot unit too (its user data runs once).
+- **Published ports moved inside a cloud VM survive a reboot**: the redirects are an nftables
+  ruleset loaded at every boot, nft installed with the machine's package manager (no `sudo`
+  or `apt-get` in the root set-up).
+- **On `docker`, a gateway machine keeps the spec's `sysctls`** beside the forwarding ones; they
+  were replaced.
+- **Oracle Cloud's cloud-docker host gets the disk its containers need**
+  (`boot_volume_size_in_gbs`, 50 GB at least).
+- **Data volumes carry the environment's tags** on Google Cloud (labels), DigitalOcean and Linode,
+  so a reaper finds them.
+- **`docker-vm`'s run manifest names its VM only under the providers it offers** (no `hyperv`
+  entry in `native.vm_names`).
+- **Chart.yaml names the real packaging command** (`helm package .isoloom/kubernetes/chart
+  --version <v>`).
 - **`isoloom import vagrant` says what it changed in a private network**: an address that isn't
   IPv4 was dropped silently, and a netmask wider than /24 (`255.255.0.0`) narrowed to the
   address's /24 silently; each is a note now ("isn't a /24 to /29; re-addressed to ..."), as the
@@ -201,6 +228,14 @@ stable spec format.
 
 ### Removed
 
+- **Library items nothing outside their crate used** (this round): the HCL builder moved from
+  `isoloom-render` into `isoloom-terraform` (`isoloom_terraform::hcl_builder`), Ruby's quoting
+  into `isoloom-vagrant` (`isoloom_vagrant::ruby_quote`); `isoloom_render::configure::{powershell,
+  shell}`, `boot::{service, Kind}` and further render, plan, spec, ansible and targets functions
+  are crate-internal; `isoloom_plan`'s `lab`, `outside`, `requirements` and `storage` modules
+  and `isoloom_spec`'s `clones` and `error` modules are private (their types stay at the crate
+  root); `isoloom_spec` no longer re-exports `Declared`, `Dns`, `KNOWN_OS`, `Network`, `Port`,
+  `Reach`, `Resources`, `Shape` or `Vlan` at its root (`isoloom_spec::model` has them).
 - **The dvwa and juice-shop catalogue entries** (security-training apps: a lab names their images
   itself). A spec with `service: dvwa` or `service: juice-shop` is refused with
   `unknown-reference`; `app: { image: ... }` gives the same container.
