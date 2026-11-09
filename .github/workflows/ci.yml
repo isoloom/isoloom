@@ -177,9 +177,10 @@ jobs:
           # shellcheck disable=SC2086 # RELEASE_ARGS is empty or one flag and its value.
           cargo semver-checks --workspace --exclude isoloom --exclude xtask --exclude xtask-quality $RELEASE_ARGS
 
-  # The declared rust-version (1.88, Cargo.toml) builds. `+1.88` overrides the rust-toolchain.toml
-  # pin for this check only (without it the pinned toolchain would build, and the job would prove
-  # nothing).
+  # The published crates build with their declared rust-version (1.88, Cargo.toml). `+1.88`
+  # overrides the rust-toolchain.toml pin for this check only (without it the pinned toolchain
+  # would build, and the job would prove nothing). The development tasks (xtask, xtask-quality)
+  # are not published and build with the pinned toolchain only.
   msrv:
     name: MSRV (Rust 1.88)
     runs-on: ubuntu-24.04
@@ -191,7 +192,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo +1.88 check --workspace --all-targets --locked
+      - run: cargo +1.88 check --workspace --exclude xtask --exclude xtask-quality --all-targets --locked
 
   # Generation is deterministic: every example rendered twice in one process (the test), then
   # generated twice by the command line in the same folder, gives the same files.
