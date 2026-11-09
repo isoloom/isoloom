@@ -35,13 +35,13 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
           toolchain: stable
 
       # Mints a short-lived crates.io token over OIDC and exports it for the publish step.
-      - uses: rust-lang/crates-io-auth-action@v1
+      - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
         id: auth
 
       - name: Publish in dependency order
