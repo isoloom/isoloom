@@ -10,8 +10,69 @@ stable spec format.
 
 ## [Unreleased]
 
+### Breaking
+
+- **Breaking: the run manifest is version 1, and stable.** `manifest_version` is `1`; a reader
+  refuses `0`. The schema is `schemas/run-manifest-v1.schema.json`, its `$id` (and each
+  manifest's `$schema`) the committed file on `main`
+  (`https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json`).
+  The schema and the crate state the compatibility policy (`isoloom_manifest::COMPATIBILITY`):
+  within a version only optional fields are added; removing or renaming a field, changing its
+  meaning, or adding a value a runner must act on bumps the version.
+- **Breaking: images the project builds are tagged `localhost/isoloom/<environment>-<machine>`**
+  (was `isoloom/<environment>-<machine>`, a name in someone else's Docker Hub namespace)
+  (`isoloom_plan::images::BUILT_IMAGE_PREFIX`).
+- **Breaking: a Kubernetes published port is a cluster-internal Service** (`<machine>-published`),
+  reached with the `kubectl port-forward` the manifests' header and the chart's notes give; no
+  public `LoadBalancer` is opened. Pods run under the Pod Security Standards' `baseline` level,
+  which the namespace enforces (`privileged` when a machine is privileged or sets a sysctl
+  outside the safe set): the runtime's seccomp filter, no privilege escalation, capabilities
+  dropped but those a root process of a stock image needs (no `NET_RAW`), Isoloom's busybox
+  helpers as `nobody`. Each machine's CPU and memory are limited to its size (a container's
+  default, 1 CPU and 512 MiB, when it declares none), and it reserves what it declares, else
+  100m and 128 MiB.
+- **Breaking: `proxmox_insecure` defaults to `false`**: the Proxmox API's certificate is
+  verified unless the operator passes `proxmox_insecure=true`.
+- **Breaking: the cloud modules require Terraform 1.11** (`required_version = ">= 1.11.0"`, what
+  their write-only attributes need, and what their run manifests already said); the server
+  modules `>= 1.6.0`. Proxmox on macOS runs Terraform from `hashicorp/terraform:1.16.7`, pinned
+  by digest (was 1.9.8).
+- **Breaking: renamed examples and fixtures, neutral words.** `examples/pivot-dmz` is
+  `examples/dmz-jump` (its user machine Debian 12, not Kali); the run-manifest fixtures'
+  `flag-portal` and `flag-vm` are `web-portal` and `web-vm`, their `CTF_FLAG_MAIN` input
+  `DEMO_SECRET`; `fixtures/invalid/version-1` is `version-0`, beside a new `version-2`.
+- **Breaking (library): the model's growing structs are `#[non_exhaustive]`** (`Spec`, `Machine`,
+  `Network`, `DockerImpl`, `VmImpl`, `VmImage`, `Constraints`, `Proxy`, `Mirrors`), so a new
+  spec key is a minor change: build them with `Spec::new`, `VmImpl::new` or `Default`, then set
+  fields. `isoloom_render::configure::Configured::env` is new.
+- **Breaking (repository): the development tasks that span repositories moved out**:
+  `cargo xtask check-all`, `dev-link` and `host-setup` are the workspace repository's. The
+  baselines are under `xtask/baselines/`, the validator image under `xtask/src/verify/`, the
+  design examples under `crates/core/isoloom-plan/tests/spec-examples/`, the spelling list is
+  `.typos.toml`.
+
 ### Added
 
+- **`constraints.ca_certificates`**: the site's certificate authorities (PEM files in the
+  project), trusted by every Linux VM (`update-ca-certificates`, `update-ca-trust`, else the
+  OpenSSL bundle) and Windows VM (its root store) once the project is in, by every image
+  Isoloom builds (before its steps), and mounted into every container at
+  `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
+- **`tags:`** in the spec and the defaults: cost tags on every cloud resource (AWS default tags,
+  Azure tags, Oracle Cloud free-form tags, Google Cloud labels, DigitalOcean and Linode
+  `key:value` tags) and every Kubernetes object (labels).
+- **`.isoloom/.gitignore`**, written and listed like every generated file: Terraform's state,
+  backups, cache, lock info and crash logs, Vagrant's machine folders and the runner's reach
+  files stay out of version control; `.terraform.lock.hcl` is meant to be committed.
+- **`isoloom check --quiet`** (only what fails) **and `--json`** (one result per file, then a
+  summary).
+- **`isoloom docs --cli`**: the command-line reference, `docs/reference/cli.md`, kept current by
+  a test.
+- **`isoloom schema` prints the committed schema**, the catalogue's `with:` rules included.
+- **Tier evidence records the Isoloom version** whose files ran (`cargo xtask tiers record
+  --isoloom`, this checkout's by default; `Run::isoloom`).
+- Each published crate ships `LICENSE` and `NOTICE`; `cargo binstall isoloom` finds the release
+  archives; the crates' homepage is the docs on GitHub.
 - **`isoloom generate` removes the files it no longer writes, and `isoloom check` reports them.**
   A lab that stopped allowing a target (a Debian machine made Windows: `docker`, `docker-vm`,
   `cloud-docker`, `kubernetes` and four clouds' `cloud-vm`) kept that target's old files and
@@ -61,6 +122,13 @@ stable spec format.
 
 ### Changed
 
+- **Step timeouts count time without progress**: the manifest's `timeout_s` and
+  `provider_timeout_s` say so (a step stops after that long without new output, or at six
+  hours, or the limit when longer), as Isothrum runs them.
+- **Helper images pinned by digest**: `curlimages/curl:8.22.0`, `busybox:1.37.0-musl`, and
+  `alpine:3.24` in place of the unsupported 3.20.
+- The ESXi module's header takes the password from `TF_VAR_esxi_password`, never a command line.
+- Examples, fixtures and tests use neutral words (`DEMO_SECRET`, `web-portal`, `admin`).
 - **A machine's size follows one rule everywhere**: its `resources`, each field left out the
   default of the form it runs as (a container 1 CPU, 512 MB, 5 GB; a VM 1 CPU, 1024 MB, 20 GB).
   Every lab machine of a run manifest carries `machines[].resources` as it runs on that target
