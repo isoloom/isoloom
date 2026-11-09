@@ -50,6 +50,8 @@ struct RunFile {
     server: Option<String>,
     #[serde(default)]
     note: Option<String>,
+    #[serde(default)]
+    isoloom: Option<String>,
 }
 
 /// Whether a real run passed: only a whole cycle that passed proves a host OS.
@@ -150,6 +152,7 @@ fn run(hosts: &BTreeMap<String, HostOs>, r: RunFile) -> std::result::Result<Run,
         result: r.result,
         server: r.server,
         note: r.note,
+        isoloom: r.isoloom,
     })
 }
 

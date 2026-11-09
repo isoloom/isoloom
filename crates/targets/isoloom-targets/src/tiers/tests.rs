@@ -83,6 +83,15 @@ fn a_server_run_names_its_server() {
 }
 
 #[test]
+fn a_run_says_the_isoloom_version_whose_files_ran_when_it_was_recorded() {
+    let runs = r#"{ "host": "macos-arm64", "date": "2026-11-09", "result": "pass", "isoloom": "2.0.0" }, { "host": "macos-arm64", "date": "2026-10-15", "result": "pass" }"#;
+    let docker = one("docker", 1, EVERY_OS, runs).unwrap();
+    assert_eq!(docker.runs[0].isoloom.as_deref(), Some("2.0.0"));
+    assert_eq!(docker.runs[1].isoloom, None, "an older run has none");
+    assert_eq!(docker.json()["runs"][0]["isoloom"], "2.0.0");
+}
+
+#[test]
 fn an_experimental_entry_is_tier_3_whatever_its_runs() {
     let json = r#"{ "hosts": { "macos-arm64": "macos" }, "entries": [{ "entry": "vagrant/utm", "goal": 2, "exists_on": ["macos"], "experimental": true,
         "runs": [{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass" }] }] }"#;

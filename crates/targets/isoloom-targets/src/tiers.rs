@@ -84,6 +84,8 @@ pub struct Run {
     pub server: Option<String>,
     /// What ran, in a few words.
     pub note: Option<String>,
+    /// The Isoloom version whose files ran (recorded from 2.0 on).
+    pub isoloom: Option<String>,
 }
 
 /// A target, or one of its providers or clouds, with its tier's evidence.
@@ -199,6 +201,7 @@ impl TierEntry {
                     "result": r.result.id(),
                     "server": r.server,
                     "note": r.note,
+                    "isoloom": r.isoloom,
                 })
             })
             .collect();

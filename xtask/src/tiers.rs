@@ -57,6 +57,9 @@ struct Record {
     /// The host's OS, to add a host the list doesn't name yet (`linux`, `macos`, `windows`).
     #[arg(long)]
     os: Option<String>,
+    /// The Isoloom version whose files ran (default: this checkout's).
+    #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
+    isoloom: String,
 }
 
 /// A run's result.
@@ -158,12 +161,14 @@ fn record(doc: &mut Value, r: &Record, date: &str) -> Res<bool> {
     Ok(true)
 }
 
-/// The run as the list writes it: the host, date and result, and the server and note when set.
+/// The run as the list writes it: the host, date, result and Isoloom version, and the server and
+/// note when set.
 fn run_object(r: &Record, date: &str) -> Map<String, Value> {
     let mut run = Map::new();
     run.insert("host".to_owned(), json!(r.host));
     run.insert("date".to_owned(), json!(date));
     run.insert("result".to_owned(), json!(result_id(r.result)));
+    run.insert("isoloom".to_owned(), json!(r.isoloom));
     for (key, value) in [("server", &r.server), ("note", &r.note)] {
         if let Some(v) = value {
             run.insert(key.to_owned(), json!(v));
@@ -229,6 +234,7 @@ mod tests {
             server: Some("pve-lab".to_owned()),
             note: None,
             os: os.map(str::to_owned),
+            isoloom: "2.0.0".to_owned(),
         }
     }
 
@@ -248,7 +254,7 @@ mod tests {
         assert!(record(&mut doc, &asked("proxmox", "macos-arm64", None), "2026-10-15").unwrap(), "added");
         assert_eq!(
             doc["entries"][1]["runs"],
-            json!([{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass", "server": "pve-lab" }])
+            json!([{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass", "isoloom": "2.0.0", "server": "pve-lab" }])
         );
         assert_eq!(doc["entries"][0]["runs"], json!([]));
     }
