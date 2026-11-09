@@ -20,12 +20,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // packages the crate). Prefer the repository copy, fall back to the vendored one.
     let repo_root = manifest.join("../../../catalogue");
     let root = if repo_root.is_dir() { repo_root } else { manifest.join("catalogue") };
+    // Without it the crate would embed an empty catalogue: every service would fail to resolve
+    // at run time, far from the cause.
+    if !root.is_dir() {
+        return Err(format!("no catalogue folder to embed: {} isn't one", root.display()).into());
+    }
     // Cargo's protocol: its instructions go on standard output.
     writeln!(std::io::stdout(), "cargo:rerun-if-changed={}", root.display())?;
     let mut files = Vec::new();
-    if root.is_dir() {
-        walk(&root, &root, &mut files)?;
-    }
+    walk(&root, &root, &mut files)?;
     files.sort();
     let mut out =
         String::from("/// Every file of `catalogue/`, by its path in the folder (`nginx/entry.yml`).\npub(crate) static FILES: &[(&str, &str)] = &[\n");
