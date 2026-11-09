@@ -1,9 +1,10 @@
 //! Numbers derived from names that stay the same on every build and platform (unlike std's
-//! hasher): the QEMU links' ports and the MAC addresses of the Hyper-V and Docker hosts'
-//! adapters.
+//! hasher): a VLAN trunk's MAC addresses, and in a Vagrantfile the QEMU links' ports and the MAC
+//! addresses of the Hyper-V and Docker hosts' adapters.
 
-/// FNV-1a of `text`.
-pub(crate) fn of(text: &str) -> u32 {
+/// FNV-1a (32 bits) of `text`.
+#[must_use]
+pub fn of(text: &str) -> u32 {
     text.bytes().fold(0x811c_9dc5, |h, b| (h ^ u32::from(b)).wrapping_mul(0x0100_0193))
 }
 

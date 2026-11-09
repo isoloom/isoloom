@@ -10,7 +10,7 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::router;
 
 use super::{CONTROLLER, TOOL_SHELL};
-use crate::stable_hash;
+use isoloom_render::stable_hash;
 
 /// The Ruby the QEMU provider's hubs and disk sizes use (`vagrant_qemu.rb`): the
 /// `IsoloomQemu` module, in the preamble of a Vagrantfile that needs it ([`needs_ruby`]).

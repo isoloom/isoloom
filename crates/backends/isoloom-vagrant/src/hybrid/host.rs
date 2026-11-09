@@ -10,8 +10,8 @@ use isoloom_spec::validate::Cidr;
 
 use crate::error::{Error, Result};
 use crate::ruby::{Call, Ruby, Value};
-use crate::stable_hash;
 use crate::vagrantfile::{self, shell};
+use isoloom_render::stable_hash;
 
 const HOST: &str = "isoloom-docker";
 
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn the_mac_prefix_is_stable() {
-        assert_eq!(format!("{:06X}", crate::stable_hash::of("mixed-office") & 0xFF_FFFF), "574BB3");
+        assert_eq!(format!("{:06X}", isoloom_render::stable_hash::of("mixed-office") & 0xFF_FFFF), "574BB3");
     }
 
     #[test]

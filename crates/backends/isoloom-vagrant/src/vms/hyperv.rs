@@ -26,7 +26,7 @@ use isoloom_spec::windows::Tpm;
 
 use super::providers::Size;
 use crate::ruby::{Call, Ruby, Value};
-use crate::stable_hash;
+use isoloom_render::stable_hash;
 
 /// The Ruby that gives VMs their networks on Hyper-V (`vagrant_hyperv.rb`): `HYPERV_SWITCH`
 /// and the `IsoloomHyperV` module the triggers call.

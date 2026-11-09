@@ -129,10 +129,7 @@ pub enum End {
 /// whatever Docker names it: FNV-1a of `<lan>/<machine>`, the last bit telling the ends apart.
 #[must_use]
 pub fn mac(t: &Trunk, end: End) -> String {
-    let hash = format!("{}/{}", t.lan, t.machine)
-        .bytes()
-        .fold(2_166_136_261_u32, |hash, byte| (hash ^ u32::from(byte)).wrapping_mul(16_777_619));
-    let [first, second, third, last] = hash.to_be_bytes();
+    let [first, second, third, last] = crate::stable_hash::of(&format!("{}/{}", t.lan, t.machine)).to_be_bytes();
     let side = match end {
         End::Machine => 0,
         End::Switch => 1,

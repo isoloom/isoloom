@@ -20,6 +20,7 @@
 //! - **The containers' shared parts:** [`container`]; where a check reaches its host:
 //!   [`checks`].
 //! - **The run manifest's pieces** every target's `run.json` is built from: [`run_manifest`].
+//! - **Numbers from names** that are the same on every build: [`stable_hash`].
 //!
 //! Everything here is a pure function of the plan: no I/O, no clock, no environment.
 //!
@@ -53,6 +54,7 @@ pub mod project;
 pub mod ruby;
 pub mod run_manifest;
 pub mod secrets;
+pub mod stable_hash;
 pub mod steps;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
