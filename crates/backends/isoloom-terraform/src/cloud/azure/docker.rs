@@ -58,12 +58,12 @@ fn network() -> Vec<Block> {
             .add_attribute(("tags", reference("local.tags")))
             .build(),
         placed("azurerm_virtual_network")
-            .add_attribute(("address_space", list([string("10.42.0.0/16")])))
+            .add_attribute(("address_space", list([string(crate::cloud::docker::HOST_NETWORK)])))
             .build(),
         resource("azurerm_subnet")
             .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
             .add_attribute(("virtual_network_name", reference("azurerm_virtual_network.env.name")))
-            .add_attribute(("address_prefixes", list([string("10.42.1.0/24")])))
+            .add_attribute(("address_prefixes", list([string(crate::cloud::docker::HOST_SUBNET)])))
             .build(),
         placed("azurerm_public_ip")
             .add_attribute(("allocation_method", string("Static")))

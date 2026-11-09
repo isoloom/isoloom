@@ -122,6 +122,13 @@ pub fn modules(env: &Environment) -> Result<Files> {
     Cloud::ALL.into_iter().map(|cloud| module(cloud, env)).collect()
 }
 
+/// The Docker host's network on every cloud that makes one: its block, outside the lab's own
+/// (the containers' networks live inside the host).
+pub(crate) const HOST_NETWORK: &str = "10.42.0.0/16";
+
+/// The Docker host's subnet in [`HOST_NETWORK`], where its one interface is.
+pub(crate) const HOST_SUBNET: &str = "10.42.1.0/24";
+
 /// A cloud's VM size variable.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SizeVariable {

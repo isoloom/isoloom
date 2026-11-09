@@ -65,7 +65,7 @@ fn network(env: &Environment) -> Vec<Block> {
             .build(),
         resource("google_compute_subnetwork")
             .add_attribute(("network", reference("google_compute_network.env.id")))
-            .add_attribute(("ip_cidr_range", string("10.42.1.0/24")))
+            .add_attribute(("ip_cidr_range", string(crate::cloud::docker::HOST_SUBNET)))
             .add_attribute(("region", reference("var.region")))
             .build(),
         firewall.build(),

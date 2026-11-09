@@ -25,7 +25,7 @@ pub(crate) const DRIVER: Driver = Driver {
 /// The cloud's resources, after the module's head, `user_data` in the droplet; the Docker
 /// host's address.
 fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
-    m.block(vpc("10.42.1.0/24"));
+    m.block(vpc(crate::cloud::docker::HOST_SUBNET));
     m.block(ssh_key());
     m.block(droplet(env, user_data));
     m.block(firewall(env));

@@ -81,7 +81,7 @@ fn network(env: &Environment) -> Vec<Block> {
     vec![
         resource("oci_core_vcn")
             .add_attribute(("display_name", reference("local.name")))
-            .add_attribute(("cidr_blocks", list([string("10.42.0.0/16")])))
+            .add_attribute(("cidr_blocks", list([string(crate::cloud::docker::HOST_NETWORK)])))
             .build(),
         in_vcn("oci_core_internet_gateway")
             .add_attribute(("display_name", reference("local.name")))
@@ -89,7 +89,7 @@ fn network(env: &Environment) -> Vec<Block> {
         in_vcn("oci_core_route_table").add_block(route_out()).build(),
         security_list(env),
         in_vcn("oci_core_subnet")
-            .add_attribute(("cidr_block", string("10.42.1.0/24")))
+            .add_attribute(("cidr_block", string(crate::cloud::docker::HOST_SUBNET)))
             .add_attribute(("display_name", reference("local.name")))
             .add_attribute(("route_table_id", reference("oci_core_route_table.env.id")))
             .add_attribute(("security_list_ids", list([reference("oci_core_security_list.env.id")])))

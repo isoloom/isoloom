@@ -51,7 +51,7 @@ fn named() -> Expression {
 fn network() -> Vec<Block> {
     vec![
         resource("aws_vpc")
-            .add_attribute(("cidr_block", string("10.42.0.0/16")))
+            .add_attribute(("cidr_block", string(crate::cloud::docker::HOST_NETWORK)))
             .add_attribute(("tags", named()))
             .build(),
         resource("aws_internet_gateway")
@@ -60,7 +60,7 @@ fn network() -> Vec<Block> {
             .build(),
         resource("aws_subnet")
             .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
-            .add_attribute(("cidr_block", string("10.42.1.0/24")))
+            .add_attribute(("cidr_block", string(crate::cloud::docker::HOST_SUBNET)))
             .add_attribute(("availability_zone", first_zone()))
             .add_attribute(("map_public_ip_on_launch", boolean(true)))
             .add_attribute(("tags", named()))
