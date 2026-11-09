@@ -1,115 +1,216 @@
 name: CI
 
-# Manual only for now: CI is re-enabled at the squash, so the push/pull_request triggers stay off
-# until the maintainer turns them on. `workflow_dispatch` lets a run be started by hand meanwhile.
+# Every push to main and every pull request: formatting, clippy and the tests on Linux, macOS and
+# Windows, the quality ratchet, the API docs, the supply chain (cargo-deny, unused dependencies),
+# spelling, the links between the docs, SemVer against the last release, the declared minimum
+# Rust, deterministic generation, the generated Terraform validated, and the generated Compose and
+# Kubernetes files run for real. The release gate (gate.yml) runs the core of it again on the tag.
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          toolchain: stable
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+          persist-credentials: false
+      # The toolchain (its channel, rustfmt and clippy) is pinned by rust-toolchain.toml.
+      - run: rustup toolchain install --profile minimal
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
-      # The engineering-standard ratchet (clean-code counts per crate against xtask/baselines/quality-baseline.json).
-      - run: cargo run -p xtask -- quality
-      - name: Examples validate
-        run: |
-          for e in examples/*/; do cargo run -q -p isoloom -- validate "$e" --skip-files; cargo run -q -p isoloom -- targets "$e"; done
 
-  # The declared rust-version (Cargo.toml) builds and passes, so it can't drift again.
-  msrv:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
-        with:
-          toolchain: "1.88"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: cargo test --workspace --locked
-
-  # macOS and Windows binaries are released (release.yml), and host.rs has Windows-only code.
-  platforms:
+  # macOS and Windows binaries are released (release.yml), and the CLI has Windows-only code.
+  test:
+    name: Clippy and tests (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what main builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
 
-  # The locked dependencies (deny.toml): known vulnerabilities (RustSec), licenses on the
+  # The engineering-standard ratchet (clean-code counts per crate against quality-baseline.json),
+  # the API docs, and every example validating.
+  quality:
+    name: Quality ratchet, API docs and examples
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The ratchet counts what cargo-machete reports, so it needs it installed.
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-machete@0.9.2
+      - run: cargo run -p xtask --locked -- quality
+      # The API docs build without a warning (broken intra-doc links, bare URLs).
+      - run: cargo doc --workspace --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - name: Every example validates
+        run: |
+          set -euo pipefail
+          cargo build -q --locked -p isoloom
+          for e in examples/*/; do
+            target/debug/isoloom validate "$e" --skip-files
+            target/debug/isoloom targets "$e"
+          done
+
+  # The locked dependencies (deny.toml): known vulnerabilities (RustSec), licences on the
   # allow-list, banned crates, and crates.io as the only source.
   deny:
-    runs-on: ubuntu-latest
+    name: cargo-deny
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check
 
-  # The API docs build without a warning (broken intra-doc links, bare URLs).
-  doc:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: cargo doc --workspace --no-deps
-        env:
-          RUSTDOCFLAGS: -Dwarnings
-
   # Every declared dependency is used.
   machete:
-    runs-on: ubuntu-latest
+    name: Unused dependencies
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          tool: cargo-machete
+          persist-credentials: false
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-machete@0.9.2
       - run: cargo machete
 
   # Spelling, in code and docs (.typos.toml lists the words that are right here).
   typos:
-    runs-on: ubuntu-latest
+    name: Spelling
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          tool: typos
-      - run: typos
+          persist-credentials: false
+      - uses: crate-ci/typos@4c8b7f51ca60df14e3c5ca82770dfbbe6c3dae85 # v1.52.0
+
+  # Every link between the Markdown pages reaches a file (offline: no request leaves the runner).
+  # The docs test (`cargo test -p isoloom-spec --test docs`) checks the headings links point at.
+  links:
+    name: Links between the docs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --offline --no-progress
+            README.md CHANGELOG.md ARCHITECTURE.md '.github/*.md' 'docs/**/*.md'
+          fail: true
+          jobSummary: true
+
+  # The public API of the library crates, compared by cargo-semver-checks with each crate's latest
+  # version on crates.io. The release type comes from the workspace version: when it is still the
+  # published one, the changes are checked as a patch, so a breaking change fails until the version
+  # is raised on purpose. One exception, decided for the release after 1.x: while crates.io's
+  # latest is a 1.x, the unreleased changes are checked as the 2.0.0 major they are (they remove
+  # public API). Once 2.0.0 is published the exception no longer matches and the rule is strict.
+  semver:
+    name: SemVer against the last release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-semver-checks@0.51.0
+      - name: Release type
+        id: release
+        run: |
+          set -euo pipefail
+          published="$(curl -fsS -A "isoloom-ci (https://github.com/isoloom/isoloom)" \
+            https://crates.io/api/v1/crates/isoloom-spec | jq -r .crate.max_stable_version)"
+          echo "Latest isoloom-spec on crates.io: ${published}"
+          case "$published" in
+            1.*) echo "args=--release-type major" >> "$GITHUB_OUTPUT" ;;
+            *) echo "args=" >> "$GITHUB_OUTPUT" ;;
+          esac
+      # `isoloom` is the command line (its library API is not a promise); xtask and xtask-quality
+      # are not published.
+      - name: cargo semver-checks
+        env:
+          RELEASE_ARGS: ${{ steps.release.outputs.args }}
+        run: |
+          # shellcheck disable=SC2086 # RELEASE_ARGS is empty or one flag and its value.
+          cargo semver-checks --workspace --exclude isoloom --exclude xtask --exclude xtask-quality $RELEASE_ARGS
+
+  # The declared rust-version (1.88, Cargo.toml) builds. `+1.88` overrides the rust-toolchain.toml
+  # pin for this check only (without it the pinned toolchain would build, and the job would prove
+  # nothing).
+  msrv:
+    name: MSRV (Rust 1.88)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.88 --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo +1.88 check --workspace --all-targets --locked
 
   # Generation is deterministic: every example rendered twice in one process (the test), then
   # generated twice by the command line in the same folder, gives the same files.
   determinism:
-    runs-on: ubuntu-latest
+    name: Deterministic generation
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: cargo test -p isoloom-targets --test targets determinism
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo test --locked -p isoloom-targets --test targets determinism
       - name: The command line, twice
         run: |
-          cargo build -q -p isoloom
+          set -euo pipefail
+          cargo build -q --locked -p isoloom
           for e in examples/*/; do
             n=$(basename "$e")
             for run in 1 2; do
@@ -121,87 +222,111 @@ jobs:
           done
           diff -r "$RUNNER_TEMP/1" "$RUNNER_TEMP/2"
 
-  # The public API of the crates tools embed (isoloom-spec, isoloom-plan, isoloom-targets:
-  # README, "Using the library"), compared by cargo-semver-checks: with the pull
-  # request's base (what this change does to the API) and with the last release tag (what the
-  # next release must bump for), when the crate exists there. Reported in the job summary, with a
-  # warning annotation; not enforced: the model's structs mirror the spec and are public with
-  # public fields, so every new spec key reads as a breaking change, and only the supported
-  # modules are a promise. A reviewer decides whether a change needs a "Breaking (library)" line
-  # and a minor bump.
-  api:
-    runs-on: ubuntu-latest
+  # The generated Terraform (Proxmox, ESXi, docker-vm on Proxmox, cloud-docker, cloud-vm,
+  # cloud-services) is valid for its providers, with the latest Terraform.
+  terraform:
+    name: Terraform validate
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+          terraform_wrapper: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          tool: cargo-semver-checks@0.51.0
-      - name: API changes (reported, not enforced)
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Generate every example (the targets each can be generated for)
         run: |
-          tag=$(git describe --tags --abbrev=0 --match 'v*')
-          compare() { # $1: crate, $2: baseline rev, $3: its label
-            # Crates sit in group folders (crates/core/, crates/targets/, ...).
-            if ! git ls-tree -r --name-only "$2" -- crates | grep -E "^crates/([^/]+/)?$1/Cargo.toml\$" > /dev/null; then
-              echo "### $1: not in $3, nothing to compare" >> "$GITHUB_STEP_SUMMARY"
-              return
-            fi
-            echo "### $1 since $3" >> "$GITHUB_STEP_SUMMARY"
-            if cargo semver-checks check-release -p "$1" --baseline-rev "$2" --color never > "$RUNNER_TEMP/semver.txt" 2>&1; then
-              echo "No breaking change." >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "::warning title=$1 API::breaking changes since $3; see the job summary. Supported surface changed? Add a \"Breaking (library)\" line to the CHANGELOG."
-              { echo '```'; grep -vE '^ *(Building|Built|Parsing|Parsed|Checking|Checked|Finished|Compiling) ' "$RUNNER_TEMP/semver.txt" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-            fi
-            cat "$RUNNER_TEMP/semver.txt"
+          set -euo pipefail
+          cargo build -q --locked -p isoloom
+          for e in examples/*/; do target/debug/isoloom generate "$e" > /dev/null; done
+      - name: Validate
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          validate() {
+            echo "== $1"
+            terraform -chdir="$1" init -backend=false -input=false >/dev/null
+            terraform -chdir="$1" validate
           }
-          for crate in isoloom-spec isoloom-plan isoloom-targets; do
-            if [ -n "$BASE" ]; then compare "$crate" "$BASE" "the pull request's base"; fi
-            compare "$crate" "$tag" "$tag"
+          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
+            validate "$d"
+          done
+          # cloud-services runs the lab's own module, which its run manifest copies (`from`).
+          for d in examples/*/.isoloom/cloud-services; do
+            validate "$d/$(jq -r '.lifecycle.up[] | select(.action == "terraform.copy_module") | .with.from' "$d/run.json")"
           done
 
-  # The generated Compose files, run for real through the Isothrum runner: Isoloom generates the
-  # files, `isothrum up` brings the example up, `isothrum check` passes (the spec's checks and the
-  # ones derived from its services and reach rules), and `isothrum down` leaves nothing behind.
-  # Isoloom converts, Isothrum runs — there is no `isoloom run`.
-  docker:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, tuned-web, shared-files]
+  # The binaries the real-run jobs below share: isoloom, and the Isothrum runner built from its
+  # repository at ISOTHRUM_REF (a repository variable; main by default), so each job doesn't build
+  # both again.
+  binaries:
+    name: Build isoloom and the Isothrum runner
+    runs-on: ubuntu-24.04
     env:
-      # The Isothrum runner is a separate repository; this ref is built to get the `isothrum` binary.
       ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
-    defaults:
-      run:
-        working-directory: examples/${{ matrix.example }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Check out Isothrum (the runner)
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Isothrum/isothrum
           ref: ${{ env.ISOTHRUM_REF }}
           path: .isothrum-src
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Build Isoloom and the Isothrum runner
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          workspaces: |
+            . -> target
+            .isothrum-src -> target
+      - name: Build
+        run: |
+          set -euo pipefail
+          cargo build -q --locked -p isoloom
+          cargo build -q --locked -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
+          mkdir -p bin
+          cp target/debug/isoloom .isothrum-src/target/debug/isothrum bin/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: binaries
+          path: bin/
+          if-no-files-found: error
+          retention-days: 3
+
+  # The generated Compose files, run for real through the Isothrum runner: Isoloom generates the
+  # files, `isothrum up` brings the example up, `isothrum check` passes (the spec's checks and the
+  # ones derived from its services and reach rules), and `isothrum down` leaves nothing behind.
+  docker:
+    name: Compose, run for real (${{ matrix.example }})
+    needs: binaries
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, tuned-web, shared-files]
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: binaries
+          path: ${{ runner.temp }}/bin
+      - name: Put the binaries on the PATH
         working-directory: .
         run: |
-          cargo build -q -p isoloom
-          cargo build -q -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
-          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
-          echo "$GITHUB_WORKSPACE/.isothrum-src/target/debug" >> "$GITHUB_PATH"
+          chmod +x "$RUNNER_TEMP/bin/"*
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Generate the Compose files
         run: isoloom generate --target docker .
       - name: Up
@@ -227,7 +352,9 @@ jobs:
   # applied and Available, then its checks as a Job (segmented's "cache is blocked" proves the
   # network policies are enforced).
   kubernetes:
-    runs-on: ubuntu-latest
+    name: Kubernetes on kind (${{ matrix.example }})
+    needs: binaries
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -236,18 +363,25 @@ jobs:
       run:
         working-directory: examples/${{ matrix.example }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
         with:
           cluster_name: isoloom
           config: .github/kind-calico.yaml
           wait: 0s
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+          name: binaries
+          path: ${{ runner.temp }}/bin
+      - name: Put the binaries on the PATH
+        working-directory: .
+        run: |
+          chmod +x "$RUNNER_TEMP/bin/"*
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Generate the Kubernetes files
-        run: cargo run -q -p isoloom -- generate --target kubernetes .
+        run: isoloom generate --target kubernetes .
       - name: Calico (enforces NetworkPolicies, egress included)
         working-directory: .
         run: |
@@ -273,8 +407,8 @@ jobs:
           kubectl -n "$NS" wait --for=condition=complete job --all --timeout=300s
           kubectl -n "$NS" logs -l isoloom.com/check --tail=-1
       # The Helm chart of the same environment, in a namespace of its own beside it: linted,
-      # installed, Available, and its checks as `helm test`. (No `helm --wait`: it would wait
-      # for the published LoadBalancer's address, which kind never gives.)
+      # installed, Available, and its checks as `helm test`. (No `helm --wait`: a published port
+      # rendered as a LoadBalancer would wait for an address, which kind never gives.)
       - name: Helm chart (lint, install, helm test)
         run: |
           helm lint .isoloom/kubernetes/chart
@@ -295,58 +429,32 @@ jobs:
 
   # A Compose file, imported, generated and started: the draft runs.
   import:
-    runs-on: ubuntu-latest
+    name: Import a Compose file, then run it
+    needs: binaries
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: binaries
+          path: ${{ runner.temp }}/bin
       - name: Import, generate
         run: |
-          mkdir -p /tmp/shop && cp crates/tools/isoloom-import/tests/fixtures/compose-shop/docker-compose.yml /tmp/shop/
-          cargo run -q -p isoloom -- import compose /tmp/shop/docker-compose.yml
-          cargo run -q -p isoloom -- generate /tmp/shop --target docker
+          set -euo pipefail
+          chmod +x "$RUNNER_TEMP/bin/"*
+          shop="$RUNNER_TEMP/shop"
+          echo "SHOP=$shop" >> "$GITHUB_ENV"
+          mkdir -p "$shop" && cp crates/tools/isoloom-import/tests/fixtures/compose-shop/docker-compose.yml "$shop/"
+          "$RUNNER_TEMP/bin/isoloom" import compose "$shop/docker-compose.yml"
+          "$RUNNER_TEMP/bin/isoloom" generate "$shop" --target docker
       - name: Start
-        working-directory: /tmp/shop
-        run: API_TOKEN=t0k docker compose -f .isoloom/docker/compose.yml up -d --wait --wait-timeout 180
+        run: API_TOKEN=t0k docker compose -f "$SHOP/.isoloom/docker/compose.yml" up -d --wait --wait-timeout 180
       - name: Behaves like the original
-        working-directory: /tmp/shop
         run: |
-          docker compose -f .isoloom/docker/compose.yml exec -T cache wget -qO- http://web/ | grep -q "Welcome to nginx"
-          test "$(docker compose -f .isoloom/docker/compose.yml exec -T web printenv API_TOKEN)" = t0k
+          docker compose -f "$SHOP/.isoloom/docker/compose.yml" exec -T cache wget -qO- http://web/ | grep -q "Welcome to nginx"
+          test "$(docker compose -f "$SHOP/.isoloom/docker/compose.yml" exec -T web printenv API_TOKEN)" = t0k
       - name: Stop
         if: always()
-        working-directory: /tmp/shop
-        run: docker compose -f .isoloom/docker/compose.yml down -v
-
-  # The generated Terraform (Proxmox, ESXi, docker-vm on Proxmox, cloud-docker, cloud-vm,
-  # cloud-services) is valid for its providers.
-  terraform:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: Generate every example (the targets each can be generated for)
-        run: |
-          cargo build -q -p isoloom
-          for e in examples/*/; do target/debug/isoloom generate "$e" > /dev/null; done
-      - name: Validate
-        run: |
-          shopt -s nullglob
-          validate() {
-            echo "== $1"
-            terraform -chdir="$1" init -backend=false -input=false >/dev/null
-            terraform -chdir="$1" validate
-          }
-          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
-            validate "$d"
-          done
-          # cloud-services runs the lab's own module, which its run manifest copies (`from`).
-          for d in examples/*/.isoloom/cloud-services; do
-            validate "$d/$(jq -r '.lifecycle.up[] | select(.action == "terraform.copy_module") | .with.from' "$d/run.json")"
-          done
+        run: docker compose -f "$SHOP/.isoloom/docker/compose.yml" down -v
