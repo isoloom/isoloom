@@ -78,10 +78,10 @@ fn named(name: &str, kind: &str) -> Provision {
 /// The Compose file the VM runs, from the project's copy.
 const COMPOSE: &str = ".isoloom/docker/compose.yml";
 
-/// The CPUs and memory (MB) of the VM: the containers' host's, at least 2 GB.
+/// The CPUs and memory (MB) of the VM: the containers' host's.
 pub(crate) fn host_size(env: &Environment) -> (u32, u32) {
     let size = docker::HostSize::of(env);
-    (size.cpus, size.memory_mb.max(2048))
+    (size.cpus, size.memory_mb)
 }
 
 /// `.isoloom/docker-vm/Vagrantfile`: the VM, Docker, then the Compose file up as `guest` starts it,

@@ -8,7 +8,8 @@ use isoloom_plan::{Environment, MachineShape};
 pub struct HostSize {
     /// CPUs: one per container unless it says, at least 2, at most 16.
     pub cpus: u32,
-    /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself.
+    /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself, at least
+    /// [`HostSize::MIN_MEMORY_MB`].
     pub memory_mb: u32,
     /// Disk in GB: 5 per container unless it says, at least [`HostSize::MIN_DISK_GB`].
     pub disk_gb: u32,
@@ -21,6 +22,10 @@ impl HostSize {
     /// unpacks to about 12 GB, and an access machine's image may be one the runner is given
     /// (`ISOLOOM_ACCESS_IMAGE`), which the spec doesn't size. 20 GB filled up.
     pub const MIN_DISK_GB: u32 = 40;
+
+    /// The smallest memory of a containers' host: Debian, Docker and a small lab's containers
+    /// together, which 1.5 GB (one container and Docker's own gigabyte) leaves short.
+    pub const MIN_MEMORY_MB: u32 = 2048;
 
     /// The host's size for the environment's containers.
     #[must_use]
@@ -35,7 +40,7 @@ impl HostSize {
         });
         HostSize {
             cpus: cpus.clamp(2, 16),
-            memory_mb,
+            memory_mb: memory_mb.max(Self::MIN_MEMORY_MB),
             disk_gb: disk_gb.max(Self::MIN_DISK_GB),
         }
     }
@@ -83,7 +88,8 @@ mod tests {
     fn a_few_small_containers_take_the_smallest_host() {
         let size =
             host_size("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: nginx } }\n");
-        assert_eq!((size.cpus, size.memory_mb, size.disk_gb), (2, 1536, 40));
+        // 1.5 GB (512 MB and Docker's gigabyte) is lifted to the floor, on every target alike.
+        assert_eq!((size.cpus, size.memory_mb, size.disk_gb), (2, HostSize::MIN_MEMORY_MB, 40));
         assert_eq!(size.pick(["small", "medium", "large"]), "small");
     }
 

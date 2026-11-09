@@ -79,6 +79,10 @@ stable spec format.
   and an access machine's may be one the runner is given) beside the lab's own. GCP had 30 GB fixed, Azure the image's default,
   and docker-vm on QEMU its own 40 GB whatever the containers needed; the size follows the
   containers beyond that, from the spec's defaults.
+  `docker-vm` on Proxmox now follows it too (its VM's disk was 30 GB whatever the containers
+  asked), and every containers' host has at least 2 GB of memory (`HostSize::MIN_MEMORY_MB`), as
+  only `docker-vm`'s Vagrant VM had: a small lab's host on Proxmox and the clouds' run manifests
+  had 1.5 GB.
 - The run manifests' and the spec's docs no longer name a particular program running them.
 - **The process Isoloom gives a container that runs services is its "supervisor"**, not its
   "runner", which is what runs a run manifest: the generated script's header ("run by Isoloom's

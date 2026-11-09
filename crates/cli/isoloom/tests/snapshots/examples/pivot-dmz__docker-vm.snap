@@ -736,7 +736,7 @@ resource "proxmox_virtual_environment_vm" "env" {
     datastore_id = var.datastore
     file_id      = proxmox_download_file.debian.id
     interface    = "virtio0"
-    size         = 30
+    size         = 40
   }
   network_device {
     bridge = var.uplink_bridge

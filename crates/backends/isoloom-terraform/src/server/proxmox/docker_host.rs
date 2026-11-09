@@ -151,7 +151,7 @@ fn vm(env: &Environment) -> Block {
                 ("datastore_id", reference("var.datastore")),
                 ("file_id", reference("proxmox_download_file.debian.id")),
                 ("interface", string("virtio0")),
-                ("size", number(30)),
+                ("size", number(size.disk_gb.into())),
             ],
         ))
         .add_block(settings("network_device", vec![("bridge", reference("var.uplink_bridge"))]))
@@ -166,4 +166,31 @@ fn vm(env: &Environment) -> Block {
         .add_block(Block::builder("serial_device").build())
         .add_block(super::uplink::checked("The Docker host", &[]))
         .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_render::container::HostSize;
+    use isoloom_render::hcl_builder::Module;
+    use isoloom_spec::model::Target;
+
+    /// The VM's disk is the containers' host's (`HostSize`): at least its floor, more when the
+    /// containers ask for it. It was 30 GB whatever they asked.
+    #[test]
+    fn the_disk_is_the_containers_hosts_at_least_its_floor() {
+        let spec = |disk: u32| {
+            format!(
+                "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, resources: {{ disk_gb: {disk} }}, app: {{ image: nginx }} }}\n"
+            )
+        };
+        let size = |disk: u32| {
+            let mut m = Module::new("");
+            m.block(super::vm(&crate::testing::environment(&spec(disk), Target::DockerVm)));
+            let vm = m.render().unwrap();
+            let line = vm.lines().find(|l| l.trim_start().starts_with("size ")).unwrap_or_default();
+            line.split_once('=').map(|(_, v)| v.trim().to_owned()).unwrap_or_default()
+        };
+        assert_eq!(size(5), HostSize::MIN_DISK_GB.to_string());
+        assert_eq!(size(60), "60");
+    }
 }

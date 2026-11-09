@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ cloud-docker
@@ -391,7 +390,7 @@ output "ssh_user" {
       "role": "infra",
       "resources": {
         "cpus": 2,
-        "memory_mb": 1536
+        "memory_mb": 2048
       },
       "addresses": {}
     },
@@ -1097,7 +1096,7 @@ output "ssh_user" {
       "role": "infra",
       "resources": {
         "cpus": 2,
-        "memory_mb": 1536
+        "memory_mb": 2048
       },
       "addresses": {}
     },
@@ -1690,7 +1689,7 @@ output "ssh_user" {
       "role": "infra",
       "resources": {
         "cpus": 2,
-        "memory_mb": 1536
+        "memory_mb": 2048
       },
       "addresses": {}
     },
@@ -2382,7 +2381,7 @@ output "ssh_user" {
       "role": "infra",
       "resources": {
         "cpus": 2,
-        "memory_mb": 1536
+        "memory_mb": 2048
       },
       "addresses": {}
     },
@@ -2954,7 +2953,7 @@ output "ssh_user" {
       "role": "infra",
       "resources": {
         "cpus": 2,
-        "memory_mb": 1536
+        "memory_mb": 2048
       },
       "addresses": {}
     },
@@ -3599,7 +3598,7 @@ output "ssh_user" {
       "role": "infra",
       "resources": {
         "cpus": 2,
-        "memory_mb": 1536
+        "memory_mb": 2048
       },
       "addresses": {}
     },
