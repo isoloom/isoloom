@@ -1,7 +1,6 @@
 //! Isoloom's targets: the composition root above the backends. It holds the registry of every
-//! target's backend ([`backend`]), puts together the targets made of two backends
-//! ([`CloudDockerBackend`], [`DockerVmBackend`], [`HybridBackend`]), and works out what spans
-//! them: a lab's files for a target ([`generate`]), why a target refuses a lab ([`refusal()`], and
+//! target's backend, puts together the targets made of two backends (`cloud-docker`,
+//! `docker-vm`, `hybrid`), and works out what spans them: a lab's files for a target ([`generate`]), why a target refuses a lab ([`refusal()`], and
 //! typed, at which step: `decision`), the resolved snapshot ([`resolved`]), the tables and
 //! diagram drawn from it ([`report`], [`graph`]), the tiers ([`tiers`]) and the capability matrix
 //! ([`matrix`]). It holds no backend's logic: each backend renders its own files.
@@ -44,10 +43,14 @@ pub mod report;
 pub mod resolved;
 pub mod tiers;
 
+// The backends themselves are the building-block crates' port (`isoloom_render::backend`), so
+// they are this crate's tests' and benches', not the supported API.
+#[doc(hidden)]
 pub use composite::{CloudDockerBackend, DockerVmBackend, HybridBackend};
 pub use error::{Error, GenerateError, Result};
 pub use generation::{default_regions, generate, generate_all, generate_instance, project_copies};
 pub use isoloom_plan::Lab;
 pub use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 pub use refusal::{CloudRefusal, Clouds, cloud_refusals, not_possible_reason, refusal, refusal_on};
+#[doc(hidden)]
 pub use registry::backend;

@@ -18,9 +18,9 @@
 
 use std::net::Ipv4Addr;
 
+use crate::boxes::{self, HyperVBox};
 use isoloom_plan::addressing::netmask;
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_spec::images::{self, HyperVBox};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::windows::Tpm;
 
@@ -85,8 +85,8 @@ impl<'a> HyperV<'a> {
         HyperV {
             env: &env.name,
             boxed: HyperVBox::Other {
-                name: images::HYPERV_DEBIAN_12.0.into(),
-                version: Some(images::HYPERV_DEBIAN_12.1.into()),
+                name: boxes::HYPERV_DEBIAN_12.0.into(),
+                version: Some(boxes::HYPERV_DEBIAN_12.1.into()),
             },
             nics: at.into_iter().map(|(net, ip)| Nic::on(env, net, ip)).collect(),
             windows: false,
@@ -272,7 +272,7 @@ pub(crate) fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
     env.machines.iter().filter(|(_, mp)| mp.shape == MachineShape::Vm).find_map(|(name, _)| {
         let vm = spec.machines.get(name)?.vm.as_ref()?;
-        let b = images::vagrant(vm)?;
+        let b = boxes::vagrant(vm)?;
         (b.hyperv == HyperVBox::Missing).then(|| {
             format!(
                 "machine `{name}`: `{}` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.{name}.boxes.hyperv`",

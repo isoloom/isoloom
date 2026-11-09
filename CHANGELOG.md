@@ -131,11 +131,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   through a symbolic link, is an error before anything is removed, so a removal never leaves
   `.isoloom/`.
 - **The library takes the person's regions like the image table** (`Lab::with_regions`, from
-  `Defaults::regions`; `Lab::plan`, `Environment::regions`), and says each cloud's built-in one
+  `Defaults::regions`; `Environment::regions`), and says each cloud's built-in one
   (`isoloom_targets::default_regions`). Also: `isoloom_spec::MachineSize` (a machine's size in a
   form), `isoloom_render::run_manifest::{machine, resources, secret_source}`,
   `MachinePlan::{reads_input, reads_input_file}`, `isoloom_plan::routing::{forwarding,
-  routes_ipv6}`, `isoloom_spec::windows::esxi_guest_os`, `isoloom_terraform::hcl_quote` and
+  routes_ipv6}`, `isoloom_render::esxi::guest_os`, `isoloom_terraform::hcl_quote` and
   `isoloom_targets::Error::Instance`.
 - **`isoloom validate` shows the spec's warnings**: a daemon a recipe installs with no `service`
   step for it, a `seal: best-effort` machine. Each reads `! warning: <field>` with its reason and
@@ -447,6 +447,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Removed
 
+- **The supported crates hold only the supported API.** `isoloom_spec::images::{VagrantBox,
+  HyperVBox, vagrant, HYPERV_DEBIAN_12, QEMU_DEBIAN_12}`, the Vagrant boxes each OS boots, are the
+  Vagrant backend's own; `isoloom_spec::windows::esxi_guest_os` is
+  `isoloom_render::esxi::guest_os`, which the Vagrant and ESXi backends share. Items of the
+  supported crates that hand out a building-block crate's types are `#[doc(hidden)]`, so not a
+  promise: `Lab::plan` and `Lab::catalogue`, and `isoloom_targets::{backend,
+  CloudDockerBackend, DockerVmBackend, HybridBackend}` (`isoloom_targets::generate` renders a
+  target).
 - **Library items replaced or nothing outside their crate used**:
   `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}` (the lab takes
   the regions: `Lab::with_regions`) and `isoloom_spec::files` (`GeneratedFile` is

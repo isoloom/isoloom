@@ -108,7 +108,9 @@ impl Lab {
     }
 
     /// The lab planned for `target` (as instance `instance` of `spec`, the lab as that target runs
-    /// it): the plan with the lab's regions.
+    /// it): the plan with the lab's regions. Hidden: it returns a building-block crate's type,
+    /// outside the supported API `isoloom-targets` re-exports [`Lab`] in.
+    #[doc(hidden)]
     #[must_use]
     pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> crate::Environment {
         let mut env = crate::Environment::build(spec, target, instance);
@@ -142,7 +144,9 @@ impl Lab {
         &self.source
     }
 
-    /// The catalogue its services resolve in: Isoloom's own.
+    /// The catalogue its services resolve in: Isoloom's own. Hidden: it returns a building-block
+    /// crate's type, outside the supported API `isoloom-targets` re-exports [`Lab`] in.
+    #[doc(hidden)]
     #[must_use]
     pub fn catalogue(&self) -> &'static Catalogue {
         self.catalogue

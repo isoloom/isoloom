@@ -83,6 +83,10 @@ among others (the CHANGELOG's **Removed** section lists every item):
   `isoloom_spec::model`).
 - `isoloom_targets::resolved::{render_message_at, HostPort, with_published}`,
   `isoloom_targets::decision`, the matrix's `columns`, `rows`, `Row` and `Cell`.
+- `isoloom_spec::images::{VagrantBox, HyperVBox, vagrant, HYPERV_DEBIAN_12, QEMU_DEBIAN_12}` and
+  `isoloom_spec::windows::esxi_guest_os` (the backends' own now). `Lab::plan`, `Lab::catalogue`
+  and `isoloom_targets::{backend, CloudDockerBackend, DockerVmBackend, HybridBackend}` are
+  hidden, outside the supported API: generate with `isoloom_targets::generate`.
 - `isoloom_manifest::access::{DEFAULT_BOX, DEFAULT_ARM64_BOX, DEFAULT_IMAGE}` and
   `isoloom_manifest::SUPPORTED_VERSION` (now crate-internal).
 - In the building-block crates (`isoloom-plan`, `isoloom-render`, the backends,

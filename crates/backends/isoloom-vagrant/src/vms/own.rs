@@ -4,6 +4,7 @@
 
 use std::net::Ipv4Addr;
 
+use crate::boxes::HyperVBox;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
 use isoloom_plan::{Controller, Environment};
@@ -11,7 +12,6 @@ use isoloom_render::boot::{self, Trigger};
 use isoloom_render::inventory::{self, Access};
 use isoloom_render::router;
 use isoloom_render::{GeneratedFile, controller};
-use isoloom_spec::images::HyperVBox;
 use isoloom_spec::model::Spec;
 use isoloom_spec::validate::Cidr;
 

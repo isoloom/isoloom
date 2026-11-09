@@ -46,6 +46,7 @@ pub mod constraints;
 pub mod container;
 pub mod controller;
 mod error;
+pub mod esxi;
 pub mod inventory;
 mod network;
 mod output;

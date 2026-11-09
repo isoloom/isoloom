@@ -3,7 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use isoloom_spec::images;
+use crate::boxes;
 use isoloom_spec::model::{Arch, Boot};
 use isoloom_spec::windows::Tpm;
 
@@ -58,8 +58,8 @@ impl<'a> Qemu<'a> {
     /// Isoloom's own Debian VMs (router, controller, tool shell): the host's CPU.
     pub(crate) fn helper(link: &'a Link) -> Self {
         Qemu {
-            boxed: Some(images::QEMU_DEBIAN_12),
-            main: images::QEMU_DEBIAN_12,
+            boxed: Some(boxes::QEMU_DEBIAN_12),
+            main: boxes::QEMU_DEBIAN_12,
             arch: None,
             link,
             windows_address: None,

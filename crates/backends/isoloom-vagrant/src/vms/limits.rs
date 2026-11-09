@@ -2,6 +2,7 @@
 //! Vagrant box, a provisioning step Vagrant has no way to run, and what a Windows machine can't
 //! have yet (the set-up steps it has no PowerShell for). Found from the plan, without rendering.
 
+use crate::boxes;
 use isoloom_plan::lifecycle::has_extension;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::images;
@@ -18,7 +19,7 @@ pub(crate) fn refusal(env: &Environment) -> Option<String> {
 
 fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
     let vm = m.vm.as_ref()?;
-    if images::vagrant(vm).is_none() {
+    if boxes::vagrant(vm).is_none() {
         return Some(format!(
             "machine `{name}`: no Vagrant box for `{}` yet; give one with `overrides.vagrant.machines.{name}.box`",
             vm.os

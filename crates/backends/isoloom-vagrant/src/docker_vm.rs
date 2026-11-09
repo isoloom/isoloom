@@ -24,6 +24,7 @@
 //! `docker` target's Compose file (first) and the Proxmox module, and refuses what the Compose
 //! file can't run: its capabilities are Compose's.
 
+use crate::boxes;
 use isoloom_manifest::Manifest;
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Environment, MachineShape};
@@ -31,7 +32,6 @@ use isoloom_render::container::{self as docker, DOCKER_HOST as VM};
 use isoloom_render::run_manifest::DERIVED;
 use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
-use isoloom_spec::images;
 use isoloom_spec::model::Target;
 
 use crate::host_folders::Share;
@@ -242,7 +242,7 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
         // vagrant-qemu boots the Debian cloud image, as the VMs of the Vagrant target do on QEMU
         // (generic/debian12's libvirt build never comes up under it: the box is found, the VM
         // starts, SSH never answers). The main box's version pin isn't one of this box's.
-        r.assign("o.vm.box", Value::str(images::QEMU_DEBIAN_12));
+        r.assign("o.vm.box", Value::str(boxes::QEMU_DEBIAN_12));
         r.assign("o.vm.box_version", Value::str(">= 0"));
         r.assign("v.smp", Value::str(&format!("cpus={cpus}")));
         r.assign("v.memory", Value::str(&format!("{mem}M")));
@@ -253,7 +253,7 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
         // that is already larger.
         r.assign(
             "v.disk_resize",
-            Value::raw(format!("IsoloomQemu.disk({}, {disk_gb})", Value::str(images::QEMU_DEBIAN_12))),
+            Value::raw(format!("IsoloomQemu.disk({}, {disk_gb})", Value::str(boxes::QEMU_DEBIAN_12))),
         );
         // vagrant-qemu forwards the VM's SSH (guest 22) to one fixed host port (50022) with weak
         // auto-correct, so two local docker-vm labs — or a half-created VM left by a failed start —

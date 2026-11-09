@@ -3,12 +3,12 @@
 
 use std::net::Ipv4Addr;
 
+use crate::boxes::{self, VagrantBox};
 use isoloom_manifest as manifest;
 use isoloom_plan::addressing::netmask;
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::GeneratedFile;
-use isoloom_spec::images::{self, VagrantBox};
 use isoloom_spec::model::Arch;
 use isoloom_spec::validate::Cidr;
 
@@ -25,7 +25,7 @@ use crate::vagrantfile;
 pub(crate) fn has_vm(env: &Environment, name: &str) -> bool {
     let vm = env.machines.get(name).filter(|mp| mp.shape == isoloom_plan::MachineShape::Vm);
     let spec = env.spec().machines.get(name).and_then(|m| m.vm.as_ref());
-    vm.is_some() && spec.and_then(images::vagrant).is_some()
+    vm.is_some() && spec.and_then(boxes::vagrant).is_some()
 }
 
 /// Lab machine `name`'s VM, and the check runner it uploads, if it has checks. Nothing when it
@@ -34,7 +34,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let env = ctx.env;
     let mp = env.machines.get(name)?;
     let vm = env.spec().machines.get(name)?.vm.as_ref()?;
-    let image = images::vagrant(vm)?;
+    let image = boxes::vagrant(vm)?;
     let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
@@ -170,7 +170,7 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         },
         hyperv,
         tpm: mp.tpm,
-        esxi_guestos: mp.os.as_deref().and_then(isoloom_spec::windows::esxi_guest_os),
+        esxi_guestos: mp.os.as_deref().and_then(isoloom_render::esxi::guest_os),
         esxi_box: None,
         nested: mp.hardware.nested_virtualization,
         disks: mp.disks.iter().map(|d| (d.name.as_str(), d.size_gb)).collect(),
