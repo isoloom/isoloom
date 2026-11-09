@@ -1,12 +1,16 @@
 //! The manifest's JSON Schema, generated from the types (committed at
-//! `schemas/run-manifest-v0.schema.json`; a test keeps the file current).
+//! `schemas/run-manifest-v1.schema.json`; a test keeps the file current), and the compatibility
+//! policy it states.
 
 use serde_json::{Map, Value, json};
 
 use crate::Manifest;
 
-/// Where the schema is published.
-pub const SCHEMA_URL: &str = "https://www.isoloom.com/schema/run-manifest/v0.json";
+/// Where the schema is published: the committed file on the `main` branch.
+pub const SCHEMA_URL: &str = "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json";
+
+/// What may change within one `manifest_version`, and what bumps it.
+pub const COMPATIBILITY: &str = "Within a version, changes are additive: a new optional field comes in a minor release and the version stays. Removing or renaming a field, changing what a field holds or means, making a field required, or adding a value a runner must act on (a step action, a delivery, a condition) bumps the version. A reader is strict: it refuses a field or value it doesn't know, so a manifest that uses a field added in a minor release needs a runner built with that release.";
 
 /// The schema of a [`Manifest`], with its URL and description.
 #[must_use]
@@ -20,7 +24,9 @@ pub fn schema() -> Value {
     out.insert(
         "description".into(),
         json!(
-            "What Isoloom writes next to one target's generated files (`.isoloom[-<n>]/<target>[/<cloud>]/run.json`) and a runner executes. Declarative and deterministic: no secret values, no absolute paths, no timestamps, no host shell. It carries its own version (`version`): a reader takes the versions it knows."
+            format!(
+                "What Isoloom writes next to one target's generated files (`.isoloom[-<n>]/<target>[/<cloud>]/run.json`) and a runner executes. Declarative and deterministic: no secret values, no absolute paths, no timestamps, no host shell. It carries its own version (`manifest_version`): a reader takes the versions it knows.\n\n{COMPATIBILITY}"
+            )
         ),
     );
     if let Value::Object(rest) = generated {

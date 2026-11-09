@@ -1,4 +1,4 @@
-//! The run manifest, version 0: the contract between Isoloom and a runner.
+//! The run manifest, version 1: the contract between Isoloom and a runner.
 //!
 //! Isoloom writes one `run.json` next to a target's generated files; the runner executes it and
 //! reads nothing else. The manifest holds the native commands in order (argv, never a shell), the
@@ -7,11 +7,20 @@
 //!
 //! The types parse, they don't validate: a [`Manifest`] that parsed holds no shell as a program,
 //! no `${secrets.…}` placeholder, no absolute or climbing path, no port name with a dot, no UDP
-//! port that speaks HTTP and no other version than 0. [`Manifest::validate`] then checks what
+//! port that speaks HTTP and no other version than 1. [`Manifest::validate`] then checks what
 //! spans fields (step references, machines, placeholders).
 //! The JSON Schema ([`schema()`]) is generated from the types and committed at
-//! `schemas/run-manifest-v0.schema.json`; runners can test against the fixtures under
-//! `fixtures/`.
+//! `schemas/run-manifest-v1.schema.json`, published at [`SCHEMA_URL`]; runners can test against
+//! the fixtures under `fixtures/`.
+//!
+//! # Compatibility
+//!
+//! Version 1 is stable. Within a version, changes are additive: a new optional field comes in a
+//! minor release and the version stays. Removing or renaming a field, changing what a field holds
+//! or means, making a field required, or adding a value a runner must act on (a step action, a
+//! delivery, a condition) bumps the version. A reader is strict: it refuses a field or value it
+//! doesn't know, so a manifest that uses a field added in a minor release needs a runner built
+//! with that release. The policy is [`COMPATIBILITY`], which the schema states too.
 //!
 //! The crate is pure: it reads and writes text, and touches no file, process or clock. Its enums
 //! are exhaustive on purpose: the manifest is a closed, versioned contract, so a runner must handle
@@ -70,7 +79,7 @@ pub use outputs::{Check, CheckKind, CheckProtocol, CheckRunner, Checks, Output, 
 pub use path::{GuestPath, PathTemplate, RelPath};
 pub use port::{Port, PortKind, Protocol, Publish, PublishMode};
 pub use provenance::{EnvironmentRef, Generator, GeneratorName, Instance, ManifestVersion};
-pub use schema::{SCHEMA_URL, schema};
+pub use schema::{COMPATIBILITY, SCHEMA_URL, schema};
 pub use slots::{Delivery, Param, SecretSlot, SecretSource, SetBy, SlotKind, StateFileFormat, Store, TfVarShape, Transport};
 pub use step::{Action, Failure, Run, Step, When};
 pub use template::{Part, Placeholder, RunVar, Template};

@@ -840,8 +840,8 @@ output "ssh_user" {
 
 ## .isoloom/docker-vm/proxmox/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"
@@ -1503,8 +1503,8 @@ systemctl enable --now isoloom-published.service
 
 ## .isoloom/docker-vm/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"

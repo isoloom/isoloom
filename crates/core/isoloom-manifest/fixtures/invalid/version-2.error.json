@@ -1,0 +1,5 @@
+{
+  "code": "version",
+  "message": "manifest_version 2: this reader understands version 1 only; generate the files with an Isoloom whose run manifest is version 1",
+  "schema": true
+}

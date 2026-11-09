@@ -1,5 +1,5 @@
 {
-  "manifest_version": 1,
+  "manifest_version": 2,
   "generator": {
     "name": "isoloom",
     "version": "0.10.1"

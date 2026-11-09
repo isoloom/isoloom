@@ -8,13 +8,14 @@ use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::names::{EnvironmentName, Version};
+use crate::schema::COMPATIBILITY;
 use crate::template::Template;
 use crate::{Error, Result};
 
 /// The manifest version this crate reads and writes.
-pub(crate) const SUPPORTED_VERSION: u64 = 0;
+pub(crate) const SUPPORTED_VERSION: u64 = 1;
 
-/// The contract's version: 0, read only by a runner built for exactly 0.
+/// The contract's version: 1, stable. See [`crate::COMPATIBILITY`] for what may change within it.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct ManifestVersion;
 
@@ -41,7 +42,7 @@ impl JsonSchema for ManifestVersion {
     }
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
-        json_schema!({ "description": "The contract's version. 0: unstable, read only by a runner built for exactly 0.", "const": SUPPORTED_VERSION })
+        json_schema!({ "description": format!("The contract's version: 1, stable. {COMPATIBILITY}"), "const": SUPPORTED_VERSION })
     }
 }
 
@@ -164,11 +165,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_version_0_is_read() {
-        assert_eq!(serde_json::from_str::<ManifestVersion>("0").unwrap(), ManifestVersion);
-        let other = serde_json::from_str::<ManifestVersion>("1").unwrap_err().to_string();
-        assert!(other.starts_with("manifest_version 1: this reader understands version 0 only"), "{other}");
-        assert_eq!(serde_json::to_string(&ManifestVersion).unwrap(), "0");
+    fn only_version_1_is_read() {
+        assert_eq!(serde_json::from_str::<ManifestVersion>("1").unwrap(), ManifestVersion);
+        for other in ["0", "2"] {
+            let refused = serde_json::from_str::<ManifestVersion>(other).unwrap_err().to_string();
+            assert!(
+                refused.starts_with(&format!("manifest_version {other}: this reader understands version 1 only")),
+                "{refused}"
+            );
+        }
+        assert_eq!(serde_json::to_string(&ManifestVersion).unwrap(), "1");
     }
 
     #[test]

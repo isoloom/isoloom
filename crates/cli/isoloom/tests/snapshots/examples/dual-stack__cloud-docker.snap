@@ -224,8 +224,8 @@ output "ssh_user" {
 
 ## .isoloom/cloud-docker/aws/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"
@@ -1070,8 +1070,8 @@ output "ssh_user" {
 
 ## .isoloom/cloud-docker/azure/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"
@@ -1851,8 +1851,8 @@ output "ssh_user" {
 
 ## .isoloom/cloud-docker/digitalocean/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"
@@ -2625,8 +2625,8 @@ output "ssh_user" {
 
 ## .isoloom/cloud-docker/gcp/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"
@@ -3390,8 +3390,8 @@ output "ssh_user" {
 
 ## .isoloom/cloud-docker/linode/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"
@@ -4174,8 +4174,8 @@ output "ssh_user" {
 
 ## .isoloom/cloud-docker/oci/run.json
 {
-  "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "manifest_version": 0,
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
   "generator": {
     "name": "isoloom",
     "version": "1.0.9"

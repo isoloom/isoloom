@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://www.isoloom.com/schema/run-manifest/v0.json",
-  "description": "What Isoloom writes next to one target's generated files (`.isoloom[-<n>]/<target>[/<cloud>]/run.json`) and a runner executes. Declarative and deterministic: no secret values, no absolute paths, no timestamps, no host shell. It carries its own version (`version`): a reader takes the versions it knows.",
+  "$id": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "description": "What Isoloom writes next to one target's generated files (`.isoloom[-<n>]/<target>[/<cloud>]/run.json`) and a runner executes. Declarative and deterministic: no secret values, no absolute paths, no timestamps, no host shell. It carries its own version (`manifest_version`): a reader takes the versions it knows.\n\nWithin a version, changes are additive: a new optional field comes in a minor release and the version stays. Removing or renaming a field, changing what a field holds or means, making a field required, or adding a value a runner must act on (a step action, a delivery, a condition) bumps the version. A reader is strict: it refuses a field or value it doesn't know, so a manifest that uses a field added in a minor release needs a runner built with that release.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -168,8 +168,8 @@
   "title": "Isoloom run manifest, version 0",
   "$defs": {
     "ManifestVersion": {
-      "description": "The contract's version. 0: unstable, read only by a runner built for exactly 0.",
-      "const": 0
+      "description": "The contract's version: 1, stable. Within a version, changes are additive: a new optional field comes in a minor release and the version stays. Removing or renaming a field, changing what a field holds or means, making a field required, or adding a value a runner must act on (a step action, a delivery, a condition) bumps the version. A reader is strict: it refuses a field or value it doesn't know, so a manifest that uses a field added in a minor release needs a runner built with that release.",
+      "const": 1
     },
     "Generator": {
       "type": "object",
@@ -1825,7 +1825,7 @@
           ],
           "format": "uint32",
           "minimum": 1,
-          "description": "How long it may run, in seconds."
+          "description": "How long it may go without progress, in seconds, before the runner stops it. Progress is an output line, on either stream, that isn't blank and isn't one it printed just before; a step that prints nothing has the limit from its start. A step that keeps making progress still stops at a ceiling: six hours from its start, or this limit when it is longer."
         },
         "provider_timeout_s": {
           "type": "object",
@@ -1834,7 +1834,7 @@
             "format": "uint32",
             "minimum": 1
           },
-          "description": "How long it may run on these Vagrant providers, in seconds, in place of `timeout_s` there only (`{\"vmware_esxi\": 120}`)."
+          "description": "The same limit on these Vagrant providers, in seconds, in place of `timeout_s` there only (`{\"vmware_esxi\": 120}`), counted the same way."
         },
         "when": {
           "$ref": "#/$defs/When",

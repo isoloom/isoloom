@@ -137,10 +137,15 @@ pub struct Step {
     /// of the run's state folder (`${run.state_dir}/project.tgz`). A shell runs in the guest, never
     /// on the host.
     pub stdin: Option<PathTemplate>,
-    /// How long it may run.
+    /// How long it may go without progress before the runner stops it. Progress is an output
+    /// line, on either stream, that isn't blank and isn't one it printed just before (a stuck
+    /// download repeating its line makes none); a step that prints nothing has the limit from its
+    /// start. A step that keeps making progress still stops at a ceiling: six hours from its
+    /// start, or this limit when it is longer.
     pub timeout_s: Option<NonZeroU32>,
-    /// How long it may run on these Vagrant providers, in place of `timeout_s` (only there): a
-    /// provider whose tool is slower (`vmware_esxi` asks the ESXi host once per VM).
+    /// The same limit on these Vagrant providers, in place of `timeout_s` (only there), counted
+    /// the same way: a provider whose tool is slower (`vmware_esxi` asks the ESXi host once per
+    /// VM).
     pub provider_timeout_s: BTreeMap<Provider, NonZeroU32>,
     /// When it runs.
     pub when: When,
@@ -227,11 +232,14 @@ struct StepFields {
     /// host.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     stdin: Option<PathTemplate>,
-    /// How long it may run, in seconds.
+    /// How long it may go without progress, in seconds, before the runner stops it. Progress is
+    /// an output line, on either stream, that isn't blank and isn't one it printed just before; a
+    /// step that prints nothing has the limit from its start. A step that keeps making progress
+    /// still stops at a ceiling: six hours from its start, or this limit when it is longer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     timeout_s: Option<NonZeroU32>,
-    /// How long it may run on these Vagrant providers, in seconds, in place of `timeout_s`
-    /// there only (`{"vmware_esxi": 120}`).
+    /// The same limit on these Vagrant providers, in seconds, in place of `timeout_s` there only
+    /// (`{"vmware_esxi": 120}`), counted the same way.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     provider_timeout_s: BTreeMap<Provider, NonZeroU32>,
     /// `if_ok` (default): skipped once a step of the operation failed. `always`: a clean-up that

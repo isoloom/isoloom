@@ -6,7 +6,7 @@ use std::path::PathBuf;
 const WRITE: &str = "cargo test -p isoloom-manifest --test schema -- --ignored write_the_committed_schema";
 
 fn committed() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/run-manifest-v0.schema.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/run-manifest-v1.schema.json")
 }
 
 /// The schema the types generate, as the committed file holds it.
@@ -19,11 +19,11 @@ fn the_committed_schema_is_current() {
     let on_disk = std::fs::read_to_string(committed()).unwrap_or_default();
     assert!(
         on_disk == generated().unwrap(),
-        "schemas/run-manifest-v0.schema.json is out of date: run `{WRITE}`"
+        "schemas/run-manifest-v1.schema.json is out of date: run `{WRITE}`"
     );
 }
 
-/// Writes the schema the types generate to `schemas/run-manifest-v0.schema.json`.
+/// Writes the schema the types generate to `schemas/run-manifest-v1.schema.json`.
 #[test]
 #[ignore = "writes the committed schema; run it after changing the types"]
 fn write_the_committed_schema() {

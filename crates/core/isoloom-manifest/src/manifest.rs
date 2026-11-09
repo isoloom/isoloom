@@ -120,10 +120,10 @@ mod tests {
 
     #[test]
     fn another_version_is_refused_before_its_fields() {
-        let err = parse(r#"{ "manifest_version": 1, "renamed": true }"#).unwrap_err();
+        let err = parse(r#"{ "manifest_version": 0, "renamed": true }"#).unwrap_err();
         assert_eq!(err.code(), "version");
         assert_eq!(parse("{ not json").unwrap_err().code(), "syntax");
-        let field = parse(r#"{ "manifest_version": 0 }"#).unwrap_err();
+        let field = parse(r#"{ "manifest_version": 1 }"#).unwrap_err();
         assert!(matches!(&field, Error::Field { path, .. } if path == "."), "{field}");
     }
 
@@ -131,7 +131,7 @@ mod tests {
     fn a_written_manifest_ends_with_a_newline_and_reads_back() {
         let manifest = parse(include_str!("../fixtures/minimal.run.json")).unwrap();
         let written = to_json(&manifest).unwrap();
-        assert!(written.ends_with("}\n") && written.starts_with("{\n  \"manifest_version\": 0,"), "{written}");
+        assert!(written.ends_with("}\n") && written.starts_with("{\n  \"manifest_version\": 1,"), "{written}");
         assert_eq!(parse(&written).unwrap(), manifest);
     }
 }
