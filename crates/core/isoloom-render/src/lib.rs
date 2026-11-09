@@ -55,6 +55,7 @@ pub mod run_manifest;
 pub mod secrets;
 pub mod stable_hash;
 pub mod steps;
+pub mod tags;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 #[cfg(test)]

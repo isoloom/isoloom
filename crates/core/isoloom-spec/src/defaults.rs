@@ -49,9 +49,21 @@ pub struct Defaults {
     /// Per cloud (`aws`, `azure`, `gcp`, `digitalocean`, `linode`, `oci`).
     #[serde(default)]
     pub cloud: IndexMap<String, Cloud>,
+    /// Tags every cloud resource and Kubernetes object carries (a team's cost centre), under the
+    /// spec's own `tags:` ([`Defaults::tags_under`]).
+    #[serde(default)]
+    pub tags: IndexMap<String, String>,
 }
 
 impl Defaults {
+    /// These defaults' tags with `own` (the spec's) over them: a key both set keeps the spec's.
+    #[must_use]
+    pub fn tags_under(&self, own: &IndexMap<String, String>) -> IndexMap<String, String> {
+        let mut tags = self.tags.clone();
+        tags.extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
+        tags
+    }
+
     /// The region each cloud's modules default to, by the cloud's id (`aws`), where this sets one
     /// (what `Lab::with_regions` takes).
     #[must_use]
@@ -412,6 +424,15 @@ mod tests {
                 ("vagrant.provider".to_owned(), "qemu".to_owned())
             ]
         );
+    }
+
+    #[test]
+    fn the_specs_tags_go_over_the_defaults() {
+        let defaults: Defaults = serde_yaml_ng::from_str("tags: { cost-center: \"1\", team: ops }").unwrap();
+        let own: IndexMap<String, String> = [("team".to_owned(), "platform".to_owned())].into_iter().collect();
+        let merged = defaults.tags_under(&own);
+        assert_eq!(merged["cost-center"], "1");
+        assert_eq!(merged["team"], "platform");
     }
 
     #[test]

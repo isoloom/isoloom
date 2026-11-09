@@ -75,7 +75,7 @@ pub(crate) fn project(env: &Environment, m: &mut Module) -> Expression {
             .add_attribute(("org_id", org))
             .add_attribute(("deletion_policy", string("DELETE")))
             .add_attribute(("auto_create_network", boolean(false)))
-            .add_attribute(("labels", crate::cloud::instance::tags(env)))
+            .add_attribute(("labels", crate::cloud::instance::labels(env)))
             .build(),
     );
     m.block(

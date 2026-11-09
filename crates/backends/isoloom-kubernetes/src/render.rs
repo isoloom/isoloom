@@ -79,6 +79,11 @@ fn objects(env: &Environment) -> Rendered {
     objects.extend(network::policies(env));
     let checks = checks::plan(env);
     objects.extend(checks.policies.iter().cloned());
+    // The spec's tags, as labels on every object.
+    let tags = isoloom_render::tags::labels(env.spec());
+    for o in &mut objects {
+        o.metadata.labels.extend(tags.iter().cloned());
+    }
     let mut scripts: Vec<String> = machines.iter().flat_map(|m| m.init().iter().cloned()).collect();
     scripts.extend(machines.iter().flat_map(crate::files::sources));
     scripts.extend(checks.scripts.iter().cloned());

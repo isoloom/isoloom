@@ -39,6 +39,7 @@ mod report;
 mod resolved;
 mod run_manifest;
 mod shared_volumes;
+mod tags;
 mod tc;
 mod testing;
 mod tiers;

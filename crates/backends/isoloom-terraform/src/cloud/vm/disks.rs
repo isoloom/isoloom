@@ -11,7 +11,7 @@ use isoloom_plan::{DataDisk, Environment};
 
 use super::rules::Volumes;
 use crate::cloud::Cloud;
-use crate::cloud::instance::{name_with, tag_list, tags};
+use crate::cloud::instance::{labels, name_with, tag_list};
 use crate::machine::vms;
 use crate::module::{ident, resource};
 
@@ -85,7 +85,7 @@ pub(crate) fn gcp(env: &Environment, name: &str, disks: &[DataDisk]) -> Vec<Bloc
                 .add_attribute(("type", string("pd-balanced")))
                 .add_attribute(("zone", reference("local.zone")))
                 .add_attribute(("size", number(d.size_gb.into())))
-                .add_attribute(("labels", tags(env)))
+                .add_attribute(("labels", labels(env)))
                 .build()
         })
         .collect()

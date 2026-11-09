@@ -84,7 +84,7 @@ fn host(env: &Environment, size: HostSize, setup: Expression) -> Block {
     resource("google_compute_instance")
         .add_attribute(("machine_type", reference("var.machine_type")))
         .add_attribute(("zone", reference("local.zone")))
-        .add_attribute(("labels", instance::tags(env)))
+        .add_attribute(("labels", instance::labels(env)))
         .add_block(
             Block::builder("boot_disk")
                 .add_block(

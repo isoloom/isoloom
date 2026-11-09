@@ -109,6 +109,7 @@ pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowe
         checks: source.checks.clone(),
         targets: source.targets.clone(),
         message: source.message.clone(),
+        tags: source.tags.clone(),
         tools: source.tools.clone(),
         clones: source.clones.clone(),
     };

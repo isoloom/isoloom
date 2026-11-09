@@ -108,6 +108,13 @@ pub struct Spec {
     /// `machines.<m>.ports.<name>.port`, `.published`, `.url`, `machines.<m>.addresses.<network>`
     /// and `cloud.outputs.<name>`, each checked at validation.
     pub message: Option<String>,
+    /// Tags every cloud resource and Kubernetes object carries, beside Isoloom's own
+    /// (`cost-center: "1234"`, `team: platform`): AWS's default tags, Azure's tags, Oracle
+    /// Cloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those
+    /// can't hold lowercased, its other characters `_`), DigitalOcean's and Linode's
+    /// `key:value` tags. The defaults' `tags:` add theirs under these.
+    #[schemars(default)]
+    pub tags: IndexMap<String, String>,
     /// Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `proxmox`,
     /// `aws`, ...).
     #[schemars(default)]

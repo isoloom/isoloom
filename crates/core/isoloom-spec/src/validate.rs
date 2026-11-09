@@ -124,6 +124,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     reach::check(spec, &mut p);
     outside::reach(spec, &mut p);
     top::inputs(spec, &mut p);
+    top::tags(spec, &mut p);
     secrets::check(spec, &mut p);
     machines::declared(spec, &mut p);
     machines::appliances(spec, &mut p);

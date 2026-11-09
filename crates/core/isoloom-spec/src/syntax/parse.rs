@@ -86,6 +86,7 @@ const FIELDS: &[&str] = &[
     "targets",
     "constraints",
     "cloud",
+    "tags",
 ];
 
 impl Reader {
@@ -123,6 +124,7 @@ impl Reader {
         self.set(&mut top, "targets", &mut spec.targets);
         self.set(&mut top, "constraints", &mut spec.constraints);
         self.set(&mut top, "cloud", &mut spec.cloud);
+        self.set(&mut top, "tags", &mut spec.tags);
         if let Some(machines) = top.remove("machines") {
             self.machines(machines, &mut spec);
         }

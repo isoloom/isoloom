@@ -99,6 +99,14 @@
       "type": "string",
       "description": "Shown once the environment is up, in Markdown, with `{{ path }}` placeholders:\n`machines.<m>.ports.<name>.port`, `.published`, `.url`, `machines.<m>.addresses.<network>`\nand `cloud.outputs.<name>`, each checked at validation."
     },
+    "tags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Tags every cloud resource and Kubernetes object carries, beside Isoloom's own\n(`cost-center: \"1234\"`, `team: platform`): AWS's default tags, Azure's tags, Oracle\nCloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those\ncan't hold lowercased, its other characters `_`), DigitalOcean's and Linode's\n`key:value` tags. The defaults' `tags:` add theirs under these.",
+      "default": {}
+    },
     "overrides": {
       "$ref": "#/$defs/Overrides",
       "description": "Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `proxmox`,\n`aws`, ...)."

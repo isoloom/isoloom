@@ -5,12 +5,25 @@
 use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Template, binary, call, conditional, list, number, object, reference, string};
 use isoloom_plan::Environment;
 
-/// The labels on every resource: the environment, who manages it, its instance and its expiry
-/// (what a reaper reads).
+/// The tags on every resource: the spec's own (`tags:`), then the environment, who manages it,
+/// its instance and its expiry (what a reaper reads).
 pub(crate) fn tags(env: &Environment) -> Expression {
     let mut tags = named(env);
     tags.push(("isoloom-expires-at", reference("var.expires_at")));
-    object(tags)
+    with_own(isoloom_render::tags::written(env.spec()), tags)
+}
+
+/// The same as labels (Google Cloud's): the spec's own made labels, then Isoloom's.
+pub(crate) fn labels(env: &Environment) -> Expression {
+    let mut tags = named(env);
+    tags.push(("isoloom-expires-at", reference("var.expires_at")));
+    with_own(isoloom_render::tags::labels(env.spec()), tags)
+}
+
+/// `own` (the spec's), then Isoloom's `tags`, as one object.
+fn with_own(own: Vec<(String, String)>, tags: Vec<(&'static str, Expression)>) -> Expression {
+    let own = own.into_iter().map(|(k, v)| (k, string(v)));
+    object(own.chain(tags.into_iter().map(|(k, v)| (k.to_owned(), v))).collect::<Vec<_>>())
 }
 
 /// The same for a cloud whose tag values can't be counted on to take an empty one (Oracle
@@ -18,7 +31,13 @@ pub(crate) fn tags(env: &Environment) -> Expression {
 pub(crate) fn tags_when_set(env: &Environment) -> Expression {
     let none = binary(reference("var.expires_at"), BinaryOperator::Eq, string(""));
     let expiry = object([("isoloom-expires-at", reference("var.expires_at"))]);
-    call("merge", [object(named(env)), conditional(none, object::<&str>([]), expiry)])
+    call(
+        "merge",
+        [
+            with_own(isoloom_render::tags::written(env.spec()), named(env)),
+            conditional(none, object::<&str>([]), expiry),
+        ],
+    )
 }
 
 /// The labels naming the environment, who manages it, and its instance.
@@ -71,7 +90,11 @@ pub(crate) fn tag_list(env: &Environment) -> Expression {
     call(
         "concat",
         [
-            list([string("isoloom"), string(env.name.as_str()), reference("local.name")]),
+            list(
+                [string("isoloom"), string(env.name.as_str()), reference("local.name")]
+                    .into_iter()
+                    .chain(isoloom_render::tags::words(env.spec()).into_iter().map(string)),
+            ),
             conditional(none, list(Vec::new()), list([expires])),
         ],
     )

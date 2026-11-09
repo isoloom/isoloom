@@ -18,6 +18,24 @@ pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
     }
 }
 
+/// The tags every cloud takes: a key of letters, digits and `_ . : -` (at most 63, the
+/// strictest cloud's limit), not one Isoloom writes itself; a value of at most 255 characters on
+/// one line.
+pub(super) fn tags(spec: &Spec, p: &mut Problems) {
+    for (key, value) in &spec.tags {
+        let at = format!("tags.{key}");
+        let allowed = |c: char| c.is_ascii_alphanumeric() || "_.:-".contains(c);
+        if key.is_empty() || key.len() > 63 || !key.chars().all(allowed) {
+            p.add(at.clone(), "a key of at most 63 letters, digits and `_ . : -`, e.g. cost-center");
+        } else if key.starts_with("isoloom") || key == "managed-by" {
+            p.add(at.clone(), format!("`{key}` is Isoloom's own tag: name yours otherwise"));
+        }
+        if value.len() > 255 || value.chars().any(char::is_control) {
+            p.add(at, "a value of at most 255 characters, on one line");
+        }
+    }
+}
+
 /// Inputs are environment variables: their names must be ones a shell accepts.
 pub(super) fn inputs(spec: &Spec, p: &mut Problems) {
     for (i, input) in spec.inputs.iter().enumerate() {
