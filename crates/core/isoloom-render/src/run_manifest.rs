@@ -297,7 +297,7 @@ pub fn terraform_output(name: &str, role: OutputRole, description: &str) -> Resu
 }
 
 /// An output per published port of the lab's machines and tools: an HTTP port is an entry (the
-/// Open button), the others information; each shown at the host's loopback.
+/// address a user opens first), the others information; each shown at the host's loopback.
 ///
 /// # Errors
 ///

@@ -282,7 +282,7 @@ pub struct Port {
     /// environment can't start while another holds that port.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fixed: bool,
-    /// Only answers later, once something wakes it (the bind shell an exploit opens): declared,
+    /// Only answers later: nothing listens on it until something in the machine starts it. Declared,
     /// published and opened by `reach` like any port, but nothing waits for it (healthcheck,
     /// readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

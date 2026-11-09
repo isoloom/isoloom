@@ -131,8 +131,8 @@ pub struct Port {
     pub protocol: PortProtocol,
     /// Whether it is published on the user's machine, and how.
     pub publish: Option<Publish>,
-    /// It only answers later, once something wakes it (the bind shell an exploit opens):
-    /// nothing waits for it and no derived check expects it to answer.
+    /// It only answers later: nothing listens on it until something in the machine starts it.
+    /// Nothing waits for it and no derived check expects it to answer.
     pub dormant: bool,
 }
 

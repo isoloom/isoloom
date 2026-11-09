@@ -12,7 +12,7 @@ use crate::template::Template;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputRole {
-    /// Where to start: the Open button.
+    /// Where to start: the address a user opens first.
     Entry,
     /// An address.
     Address,

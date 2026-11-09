@@ -2307,7 +2307,7 @@
         {
           "type": "string",
           "const": "entry",
-          "description": "Where to start: the Open button."
+          "description": "Where to start: the address a user opens first."
         },
         {
           "type": "string",

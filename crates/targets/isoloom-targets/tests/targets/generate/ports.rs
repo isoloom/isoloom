@@ -8,7 +8,7 @@ use crate::testing::{Outcome, generated, lab, problems};
 
 #[test]
 fn a_dormant_service_is_declared_but_never_waited_for() -> Outcome {
-    // 4444 is the shell an exploit opens: `shell` has nothing else, `web` serves 80 too.
+    // 4444 answers only once something in the machine starts it: `shell` has nothing else, `web` serves 80 too.
     let source = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
          shell: { os: debian@12, networks: { lab: 5 }, ports: { shell: { port: 4444, dormant: true, publish: 4444 } }, app: { image: x, steps: [{ run: p.sh }] } }\n  \
