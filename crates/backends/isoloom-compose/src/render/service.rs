@@ -125,18 +125,14 @@ fn dns(spec: &model::Machine, svc: &mut Service) {
 
 /// The access machine: brought up on demand, never by the initial `up`. It sits in the `access`
 /// Compose profile (so `up` skips it) and stays up idle for the user to work from. A lab that
-/// builds its own image for it (a `build`) keeps it; otherwise it runs a stock image the runner
-/// can override with one it is given.
+/// builds its own image for it (a `build`) keeps it; otherwise it runs its planned image, which
+/// the runner can override with one it is given.
 fn access_box(plan: &isoloom_plan::MachinePlan, svc: &mut Service) {
     svc.profiles = vec![manifest::access::PROFILE.to_owned()];
     svc.init = true;
     svc.entrypoint = vec!["sleep".into(), "infinity".into()];
-    if svc.build.is_none() {
-        let default = match &plan.image {
-            Some(Image::Container { reference, .. }) => reference.clone(),
-            _ => manifest::access::DEFAULT_IMAGE.to_owned(),
-        };
-        svc.image = Some(format!("${{{}:-{default}}}", manifest::access::IMAGE_ENV));
+    if let (None, Some(Image::Container { reference, .. })) = (&svc.build, &plan.image) {
+        svc.image = Some(format!("${{{}:-{reference}}}", manifest::access::IMAGE_ENV));
     }
 }
 

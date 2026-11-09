@@ -53,8 +53,8 @@ stable spec format.
   from its own image table, so they can't drift (`Windows Server 2016/2019/2022/2025`; Oracle
   Cloud's `Debian 12/13 on Ubuntu 24.04` from the Ubuntu each OS runs on there).
 - **A containers' host VM has at least 40 GB of disk** (`HostSize::MIN_DISK_GB`) on every cloud
-  and on QEMU: room for a large image started on it while the lab runs (a full tools image
-  unpacks to about 12 GB) beside the lab's own. GCP had 30 GB fixed, Azure the image's default,
+  and on QEMU: room for a large image pulled on it (a full tools image unpacks to about 12 GB,
+  and an access machine's may be one the runner is given) beside the lab's own. GCP had 30 GB fixed, Azure the image's default,
   and docker-vm on QEMU its own 40 GB whatever the containers needed; the size follows the
   containers beyond that, from the spec's defaults.
 - The run manifests' and the spec's docs no longer name a particular program running them.
@@ -103,6 +103,8 @@ stable spec format.
   `credential` output roles, the `static` output source and the `minutes_from_now` expiry unit
   (`schemas/run-manifest-v0.schema.json` regenerated). A manifest holding one is refused.
 - **`isoloom_targets::matrix::Row::is_field`**, which only the matrix's own tests called.
+- **`isoloom_manifest::access::DEFAULT_IMAGE`** (Kali's image), which nothing could reach: an
+  access machine's Compose service always has its planned image to fall back on.
 
 ## [1.0.9] — 2026-11-08
 

@@ -10,15 +10,16 @@ pub struct HostSize {
     pub cpus: u32,
     /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself.
     pub memory_mb: u32,
-    /// Disk in GB: 5 per container unless it says, at least [`HostSize::MIN_DISK_GB`] (an
-    /// on-demand access machine runs on this host too).
+    /// Disk in GB: 5 per container unless it says, at least [`HostSize::MIN_DISK_GB`].
     pub disk_gb: u32,
 }
 
 impl HostSize {
-    /// The smallest disk of a containers' host: room for the system, Docker and the lab's own
-    /// images, and for a large image started on it while the lab runs (an on-demand access
-    /// machine's: a full desktop or tools image unpacks to about 12 GB). 20 GB filled up.
+    /// The smallest disk of a containers' host: room for the system, Docker, and the lab's images
+    /// while they are pulled (each download beside its unpacked layers), which the 5 GB a
+    /// container counts by default don't cover for a large one: a full desktop or tools image
+    /// unpacks to about 12 GB, and an access machine's image may be one the runner is given
+    /// (`ISOLOOM_ACCESS_IMAGE`), which the spec doesn't size. 20 GB filled up.
     pub const MIN_DISK_GB: u32 = 40;
 
     /// The host's size for the environment's containers.

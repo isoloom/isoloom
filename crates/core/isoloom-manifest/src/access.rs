@@ -20,6 +20,3 @@ pub const IMAGE_ENV: &str = "ISOLOOM_ACCESS_IMAGE";
 /// The environment variable the access Vagrant box reads its box name from (its default is the
 /// `ENV.fetch` fallback). The runner sets it to the box it was given when it hot-adds.
 pub const BOX_ENV: &str = "ISOLOOM_ACCESS_BOX";
-
-/// The image an access Compose service runs when the runner is given none.
-pub const DEFAULT_IMAGE: &str = "kalilinux/kali-rolling";
