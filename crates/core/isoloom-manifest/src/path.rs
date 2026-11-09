@@ -294,14 +294,14 @@ mod tests {
         let relative = PathTemplate::relative(&rel);
         assert_eq!(relative.template(), &Template::text("checks/web.sh"));
         assert_eq!("${run.dir}/a".parse::<PathTemplate>().unwrap().template().placeholders().count(), 1);
-        let guest: GuestPath = "/ctf".parse().unwrap();
-        assert_eq!((guest.as_str(), guest.to_string()), ("/ctf", "/ctf".to_owned()));
+        let guest: GuestPath = "/data".parse().unwrap();
+        assert_eq!((guest.as_str(), guest.to_string()), ("/data", "/data".to_owned()));
     }
 
     #[test]
     fn a_guest_path_is_absolute() {
-        assert!(GuestPath::parse("/ctf").is_ok());
+        assert!(GuestPath::parse("/data").is_ok());
         assert_eq!(GuestPath::parse("/a\0b").unwrap_err().code(), "relative_guest_path");
-        assert_eq!(GuestPath::parse("ctf").unwrap_err().code(), "relative_guest_path");
+        assert_eq!(GuestPath::parse("data").unwrap_err().code(), "relative_guest_path");
     }
 }

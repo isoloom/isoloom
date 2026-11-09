@@ -15,7 +15,7 @@
 //! ```yaml
 //! images:                 # the image table (see Images): OS images, the access machine
 //!   os: { debian-12: { vagrant: my-org/debian-12 } }
-//!   access: { docker: kalilinux/kali-rolling, vm: kali }
+//!   access: { docker: registry.example.com/workstation:1, vm: ubuntu@24.04 }
 //! vagrant:
 //!   provider: libvirt     # a runner passes --provider
 //! cloud:
@@ -403,12 +403,12 @@ mod tests {
             ("ISOLOOM_VAGRANT__PROVIDER", "qemu"),
             ("ISOLOOM_HOME", "/x"),
             ("PATH", "/bin"),
-            ("ISOLOOM_IMAGES__ACCESS__VM", "kali"),
+            ("ISOLOOM_IMAGES__ACCESS__VM", "ubuntu@24.04"),
         ];
         assert_eq!(
             from_env(vars.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))),
             [
-                ("images.access.vm".to_owned(), "kali".to_owned()),
+                ("images.access.vm".to_owned(), "ubuntu@24.04".to_owned()),
                 ("vagrant.provider".to_owned(), "qemu".to_owned())
             ]
         );

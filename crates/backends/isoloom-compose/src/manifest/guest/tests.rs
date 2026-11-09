@@ -4,11 +4,11 @@ use super::*;
 use crate::render::compose_file;
 use crate::testing::environment;
 
-/// A web machine with a flag file, a published port and a set-up script nothing waits for, and a
+/// A web machine with a secret file, a published port and a set-up script nothing waits for, and a
 /// cache.
 const FLAGGED: &str = "version: 1
 name: shop
-inputs: { FLAG: { description: the flag } }
+inputs: { DEMO_SECRET: { description: the secret } }
 networks: { app: { cidr: 10.60.0.0/24, internet: false } }
 machines:
   cache:
@@ -19,7 +19,7 @@ machines:
     networks: { app: 10 }
     ports: { web: { port: 80, protocol: http, publish: 8080 } }
     depends_on: [cache]
-    files: [{ path: /run/lab/flag, input: FLAG }]
+    files: [{ path: /run/lab/secret, input: DEMO_SECRET }]
     app: { image: nginx }
     setup: [seed.sh]
 checks:
@@ -73,19 +73,19 @@ fn a_published_build_pulls_first_in_the_vm_as_on_the_host_its_failure_tolerated(
 #[test]
 fn the_flag_reaches_only_the_start_steps_and_is_forwarded_into_the_vm() {
     let g = guest_of(FLAGGED);
-    let flag = g.slots.iter().find(|s| s.name.as_str() == "FLAG").unwrap();
-    assert_eq!(flag.kind, SlotKind::Input);
+    let secret = g.slots.iter().find(|s| s.name.as_str() == "DEMO_SECRET").unwrap();
+    assert_eq!(secret.kind, SlotKind::Input);
     let Some(Delivery::Env {
         var,
         steps: StepSelection::Only(steps),
-    }) = flag.deliver.iter().next()
+    }) = secret.deliver.iter().next()
     else {
-        panic!("{:?}", flag.deliver)
+        panic!("{:?}", secret.deliver)
     };
-    assert_eq!(var.as_str(), "FLAG");
+    assert_eq!(var.as_str(), "DEMO_SECRET");
     let steps: Vec<&str> = steps.iter().map(StepId::as_str).collect();
     assert_eq!(steps, ["start", "job-web-init-1"]);
-    assert_eq!(g.forwarded(), ["FLAG"]);
+    assert_eq!(g.forwarded(), ["DEMO_SECRET"]);
 }
 
 #[test]

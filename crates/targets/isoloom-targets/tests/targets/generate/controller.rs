@@ -8,8 +8,7 @@ use crate::testing::{Outcome, example, from, generated, lab, problems, source};
 
 #[test]
 fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() -> Outcome {
-    // As it is: its Kali user runs Kali's own AWS image.
-    let tf = generated(&Lab::new(source("pivot-dmz")?), Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
+    let tf = generated(&Lab::new(source("dmz-jump")?), Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
     assert!(tf.contains("resource \"aws_network_interface\" \"gateway_dmz\""), "{tf}");
     assert!(tf.contains("resource \"aws_network_interface\" \"gateway_internal\""));
     assert!(tf.contains("source_dest_check = false"));

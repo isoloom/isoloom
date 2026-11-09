@@ -2,7 +2,7 @@
 # A segmented network: a gateway in the DMZ, an app and a database behind it, and the
 # user's machine that only sees the DMZ.
 version: 1
-name: pivot-dmz
+name: dmz-jump
 
 networks:
   dmz: { cidr: 10.30.10.0/24 }
@@ -41,7 +41,7 @@ machines:
       steps: [{ playbook: provision/db.yml }]
 
   user:
-    os: kali
+    os: debian@12
     access: true
     networks: { access: 10 }
 

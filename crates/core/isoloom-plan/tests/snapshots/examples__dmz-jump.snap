@@ -1,10 +1,9 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 44
-expression: example(&name).spec()
+expression: example(&name).unwrap().spec()
 ---
 version: 1
-name: pivot-dmz
+name: dmz-jump
 networks:
   dmz:
     cidr: 10.30.10.0/24
@@ -130,7 +129,7 @@ machines:
   user:
     networks:
       access: 10
-    os: kali@rolling
+    os: debian@12
     arch: amd64
     privileged: false
     read_only: false
@@ -144,12 +143,12 @@ machines:
     volumes: {}
     access: true
     docker:
-      image: "kalilinux/kali-rolling@sha256:02f5d6c019e549b0f55da58e835cad5355ef1030c6b2645265a324e37dfc4acc"
+      image: "debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858"
       build: ~
       init: []
       idle: true
     vm:
-      os: kali
+      os: debian-12
       provision: []
       image: ~
 common: ~

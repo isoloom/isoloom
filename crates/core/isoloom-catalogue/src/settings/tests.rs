@@ -34,7 +34,7 @@ database: { type: string, pattern: "[a-z]+", required: true, description: The da
 /// A lab of `web` (with `with`) and its peers, read.
 fn lab(with: &str) -> syntax::Spec {
     let yaml = format!(
-        "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }}, other: {{ cidr: 10.8.0.0/24 }} }}\nsecrets: {{ db: {{ env: DB }} }}\ninputs: [FLAG]\nmachines:\n  web: {{ os: debian@12, service: x, with: {with}, networks: {{ lab: 10 }} }}\n  app: {{ os: debian@12, networks: {{ other: 5, lab: 20 }} }}\n  far: {{ os: debian@12, networks: {{ other: 6 }} }}\n"
+        "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }}, other: {{ cidr: 10.8.0.0/24 }} }}\nsecrets: {{ db: {{ env: DB }} }}\ninputs: [DEMO_SECRET]\nmachines:\n  web: {{ os: debian@12, service: x, with: {with}, networks: {{ lab: 10 }} }}\n  app: {{ os: debian@12, networks: {{ other: 5, lab: 20 }} }}\n  far: {{ os: debian@12, networks: {{ other: 6 }} }}\n"
     );
     syntax::parse(&yaml).unwrap_or_else(|p| panic!("{yaml}: {p:?}"))
 }
@@ -143,7 +143,7 @@ fn a_secret_or_an_input_goes_only_to_a_password() {
     assert_eq!((secret.0, secret.1.as_str()), (Code::UnknownReference, "machines.web.with.password.secret"));
     let input = problem("{ database: shop, password: { input: NOPE } }");
     assert_eq!((input.0, input.1.as_str()), (Code::UnknownReference, "machines.web.with.password.input"));
-    assert!(read_with("{ database: shop, password: { input: FLAG } }").is_ok());
+    assert!(read_with("{ database: shop, password: { input: DEMO_SECRET } }").is_ok());
 }
 
 #[test]

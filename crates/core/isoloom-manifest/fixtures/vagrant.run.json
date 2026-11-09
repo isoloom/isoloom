@@ -3,7 +3,7 @@
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.8"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "mini-ad",
@@ -335,7 +335,7 @@
   ],
   "secrets": [
     {
-      "name": "CTF_FLAG_MAIN",
+      "name": "DEMO_SECRET",
       "kind": "input",
       "required": false,
       "sensitive": true,
@@ -346,7 +346,7 @@
       "deliver": [
         {
           "via": "env",
-          "var": "CTF_FLAG_MAIN",
+          "var": "DEMO_SECRET",
           "steps": [
             "up",
             "provision",

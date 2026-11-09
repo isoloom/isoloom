@@ -28,7 +28,7 @@ fn rendered(yaml: &str) -> String {
 #[test]
 fn an_old_docker_block() {
     insta::assert_snapshot!(rendered(&spec(
-        "machines:\n  web:\n    networks: { lab: 10 }\n    docker: { build: build/web, init: [ctf/flag.sh] }\n"
+        "machines:\n  web:\n    networks: { lab: 10 }\n    docker: { build: build/web, init: [data/secret.sh] }\n"
     )));
 }
 
@@ -56,14 +56,14 @@ fn ports_as_a_list() {
 #[test]
 fn a_machines_inputs() {
     insta::assert_snapshot!(rendered(&spec(
-        "inputs: [CTF_FLAG_MAIN]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    inputs: [CTF_FLAG_MAIN]\n"
+        "inputs: [DEMO_SECRET]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    inputs: [DEMO_SECRET]\n"
     )));
 }
 
 #[test]
 fn a_sensitive_input_in_the_environment() {
     insta::assert_snapshot!(rendered(&spec(
-        "inputs: [FLAG]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { FLAG: { input: FLAG } }\n"
+        "inputs: [DEMO_SECRET]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { DEMO_SECRET: { input: DEMO_SECRET } }\n"
     )));
 }
 
@@ -110,7 +110,7 @@ fn an_index_in_the_message() {
 #[test]
 fn a_file_with_two_sources() {
     insta::assert_snapshot!(rendered(&spec(
-        "inputs: [FLAG]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    files: [{ path: /ctf/flag, source: flag.txt, input: FLAG }]\n"
+        "inputs: [DEMO_SECRET]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    files: [{ path: /srv/demo/secret, source: secret.txt, input: DEMO_SECRET }]\n"
     )));
 }
 
@@ -140,7 +140,7 @@ fn a_container_only_machine_on_a_vm_target() {
 #[test]
 fn problems_read_as_json_too() {
     let found = problems(&spec(
-        "inputs: [FLAG]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { FLAG: { input: FLAG } }\n    dns: { servers: [wbe] }\n",
+        "inputs: [DEMO_SECRET]\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { DEMO_SECRET: { input: DEMO_SECRET } }\n    dns: { servers: [wbe] }\n",
     ));
     insta::assert_snapshot!(serde_json::to_string_pretty(&found).unwrap_or_else(|e| panic!("{e}")));
 }

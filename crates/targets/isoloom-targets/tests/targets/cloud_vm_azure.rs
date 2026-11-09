@@ -4,7 +4,7 @@
 use isoloom_spec::{Spec, Target};
 use isoloom_targets::Lab;
 
-use crate::testing::{Outcome, generated, kali_as_debian, source as example};
+use crate::testing::{Outcome, generated, source as example};
 
 /// The Azure module of `spec`.
 fn azure(spec: &Spec) -> Outcome<String> {
@@ -46,10 +46,7 @@ fn azure_has_the_shared_outputs() -> Outcome {
 
 #[test]
 fn azure_gives_a_machine_on_several_networks_an_interface_on_each() -> Outcome {
-    let mut spec = example("pivot-dmz")?;
-    // Azure has no Kali image yet: the user lands on Debian here.
-    kali_as_debian(&mut spec)?;
-    let tf = azure(&spec)?;
+    let tf = azure(&example("dmz-jump")?)?;
     // The multi-homed gateway gets a NIC per network, forwarding on (AWS source/dest check off).
     assert!(tf.contains("resource \"azurerm_network_interface\" \"gateway_dmz\""), "{tf}");
     assert!(tf.contains("resource \"azurerm_network_interface\" \"gateway_internal\""));

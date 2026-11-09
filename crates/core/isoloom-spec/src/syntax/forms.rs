@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(container(&windows).unwrap_err().field, "os");
         let supplied = machine("{ access: true }");
         assert_eq!((container(&supplied), vm(&supplied)), (Ok(Form::Supplied), Ok(Form::Supplied)));
-        let kali = machine("{ access: true, os: kali }");
-        assert_eq!(container(&kali), Ok(Form::Os));
+        let with_os = machine("{ access: true, os: debian@12 }");
+        assert_eq!(container(&with_os), Ok(Form::Os));
     }
 }

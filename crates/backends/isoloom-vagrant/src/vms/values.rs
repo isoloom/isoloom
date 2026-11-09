@@ -127,7 +127,7 @@ mod tests {
     const SPEC: &str = r"
 version: 1
 name: t
-inputs: { FLAG: {}, MODE: { sensitive: false } }
+inputs: { DEMO_SECRET: {}, MODE: { sensitive: false } }
 secrets: { db-password: { env: DB_PASSWORD } }
 networks: { lab: { cidr: 10.84.0.0/24 } }
 machines:
@@ -136,14 +136,14 @@ machines:
     os: debian@12
     environment: { MODE: { input: MODE } }
     files:
-      - { path: /srv/flag, input: FLAG }
+      - { path: /srv/secret, input: DEMO_SECRET }
       - { path: /srv/db, secret: db-password }
     app: { steps: [{ run: a.sh }] }
   dc:
     networks: { lab: 20 }
     os: windows-server@2019
     environment: { MODE: { input: MODE } }
-    files: [{ path: C:/flag.txt, input: FLAG }]
+    files: [{ path: C:/secret.txt, input: DEMO_SECRET }]
     setup: [s.ps1]
     app: { steps: [{ run: dc.ps1 }] }
 ";
@@ -161,23 +161,26 @@ machines:
         let head = s.lines().next().unwrap_or_default();
         assert_eq!(
             head,
-            "m.vm.provision \"shell\", name: \"secrets\", env: { \"ISOLOOM_SECRET_INPUT_FLAG\" => isoloom_b64(INPUTS[\"FLAG\"]), \"ISOLOOM_SECRET_DB_PASSWORD\" => isoloom_b64(ENV.fetch(\"ISOLOOM_SECRET_DB_PASSWORD\", \"\")) }, inline: <<~'SH'"
+            "m.vm.provision \"shell\", name: \"secrets\", env: { \"ISOLOOM_SECRET_INPUT_DEMO_SECRET\" => isoloom_b64(INPUTS[\"DEMO_SECRET\"]), \"ISOLOOM_SECRET_DB_PASSWORD\" => isoloom_b64(ENV.fetch(\"ISOLOOM_SECRET_DB_PASSWORD\", \"\")) }, inline: <<~'SH'"
         );
         assert!(!s.contains("isoloom run"), "nothing waits for the old runtime: {s}");
         assert!(
             // An input's file is kept under the input's own name, the slot a run manifest gives it.
-            s.contains("install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/FLAG '/srv/flag'"),
+            s.contains("install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/DEMO_SECRET '/srv/secret'"),
             "{s}"
         );
         let w = text(|r| secret_files(r, &env, "dc", Os::Windows));
-        assert!(w.contains("'FLAG' = 'ISOLOOM_SECRET_INPUT_FLAG'") && !w.contains("isoloom run"), "{w}");
+        assert!(
+            w.contains("'DEMO_SECRET' = 'ISOLOOM_SECRET_INPUT_DEMO_SECRET'") && !w.contains("isoloom run"),
+            "{w}"
+        );
     }
 
     #[test]
     fn a_secret_value_reaches_its_file_as_given_whatever_it_holds() {
         // Vagrant writes `NAME="value"` into the shell that runs the script: only base64 keeps a
-        // `$(...)` in a flag from running as root in the guest.
-        let script = isoloom_render::secrets::from_environment(&[("input-flag".into(), "V".into())], &[]);
+        // `$(...)` in a secret from running as root in the guest.
+        let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[]);
         let dir = std::env::temp_dir().join(format!("isoloom-values-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("a temporary folder");
         // The kept folder as a relative path, the shell in the test's folder: a Windows path in a
@@ -188,7 +191,7 @@ machines:
             .take_while(|l| !l.starts_with("touch"))
             .collect::<Vec<_>>()
             .join("\n");
-        let tricky = "flag{$(touch pwned)`id`\"'}\n";
+        let tricky = "secret{$(touch injected)`id`\"'}\n";
         let encoded = isoloom_spec::shell::base64(tricky.as_bytes());
         // As Vagrant runs it: the value in double quotes on the command line.
         let status = std::process::Command::new("sh")
@@ -197,17 +200,17 @@ machines:
             .current_dir(&dir)
             .status()
             .expect("sh runs");
-        let kept = std::fs::read_to_string(dir.join("input-flag")).unwrap_or_default();
-        let pwned = dir.join("pwned").exists();
+        let kept = std::fs::read_to_string(dir.join("input-demo-secret")).unwrap_or_default();
+        let injected = dir.join("injected").exists();
         std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
-        assert!(status.success() && !pwned);
+        assert!(status.success() && !injected);
         assert_eq!(kept, tricky);
     }
 
     #[test]
     fn a_reprovision_given_no_value_keeps_the_value_kept() {
         // A runner re-provisions a VM lab without its launch values (it keeps none).
-        let script = isoloom_render::secrets::from_environment(&[("input-flag".into(), "V".into())], &[]);
+        let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[]);
         let dir = std::env::temp_dir().join(format!("isoloom-values-keep-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("a temporary folder");
         let script: String = script
@@ -226,12 +229,12 @@ machines:
                 .expect("sh runs")
                 .success()
         };
-        let first = run("flag{1}");
+        let first = run("secret{1}");
         let again = run("");
-        let kept = std::fs::read_to_string(dir.join("input-flag")).unwrap_or_default();
+        let kept = std::fs::read_to_string(dir.join("input-demo-secret")).unwrap_or_default();
         std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
         assert!(first && again);
-        assert_eq!(kept, "flag{1}");
+        assert_eq!(kept, "secret{1}");
     }
 
     #[test]

@@ -3,7 +3,7 @@
   "manifest_version": 0,
   "generator": { "name": "isoloom", "version": "0.10.1" },
   "lab": {
-    "name": "flag-portal",
+    "name": "web-portal",
     "instance": null,
     "message": "The portal answers at http://localhost:${published.web.80}/."
   },
@@ -48,12 +48,12 @@
   ],
   "secrets": [
     {
-      "name": "CTF_FLAG_MAIN",
+      "name": "DEMO_SECRET",
       "kind": "input",
       "required": false,
       "sensitive": true,
       "machines": ["web", "web-init-1"],
-      "deliver": [{ "via": "env", "var": "CTF_FLAG_MAIN", "steps": ["up", "job-web-init-1"] }]
+      "deliver": [{ "via": "env", "var": "DEMO_SECRET", "steps": ["up", "job-web-init-1"] }]
     }
   ],
   "networks": [
@@ -76,7 +76,7 @@
       "resources": { "cpus": 1, "memory_mb": 512 },
       "addresses": { "lab": "10.30.0.10" },
       "native": { "service": "web" },
-      "volumes": [{ "name": "ctf", "path": "/ctf", "native": "${run.name}_web-ctf" }],
+      "volumes": [{ "name": "data", "path": "/data", "native": "${run.name}_web-data" }],
       "ports": [
         {
           "name": "portal",
@@ -163,7 +163,7 @@
   },
   "ready": [
     { "kind": "step_ok", "step": "up", "means": "every long-running service is healthy (`--wait`: the TCP probe on each declared port, the route keepers)" },
-    { "kind": "step_ok", "step": "job-web-init-1", "means": "web's init script (the flag into the `ctf` volume) exited 0" }
+    { "kind": "step_ok", "step": "job-web-init-1", "means": "web's init script (the secret into the `data` volume) exited 0" }
   ],
   "outputs": [
     {

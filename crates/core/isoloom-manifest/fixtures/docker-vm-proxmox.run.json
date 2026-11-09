@@ -3,10 +3,10 @@
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.10.1"
+    "version": "1.0.9"
   },
   "environment": {
-    "name": "flag-portal",
+    "name": "web-portal",
     "instance": null,
     "message": "The portal answers at http://localhost:${published.web.portal}/.\n"
   },
@@ -217,7 +217,7 @@
       ]
     },
     {
-      "name": "CTF_FLAG_MAIN",
+      "name": "DEMO_SECRET",
       "kind": "input",
       "required": false,
       "sensitive": true,
@@ -229,7 +229,7 @@
       "deliver": [
         {
           "via": "env",
-          "var": "CTF_FLAG_MAIN",
+          "var": "DEMO_SECRET",
           "steps": [
             "start",
             "job-web-init-1"
@@ -243,7 +243,7 @@
       "name": "lab",
       "cidr": "10.30.0.0/24",
       "internet": false,
-      "native": "flag-portal_lab"
+      "native": "web-portal_lab"
     }
   ],
   "machines": [
@@ -304,9 +304,9 @@
       },
       "volumes": [
         {
-          "name": "ctf",
-          "path": "/srv/ctf",
-          "native": "flag-portal_web-ctf"
+          "name": "data",
+          "path": "/srv/data",
+          "native": "web-portal_web-data"
         }
       ],
       "ports": [
@@ -459,7 +459,7 @@
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -470,7 +470,7 @@
         "note": "Running web's set-up script…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --no-deps --exit-code-from web-init-1 web-init-1",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --no-deps --exit-code-from web-init-1 web-init-1",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -611,7 +611,7 @@
           "id": "check-networks",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -622,7 +622,7 @@
             "id": "rm-check-networks",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=web-portal --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "isoloom"
             },
@@ -651,7 +651,7 @@
           "id": "check-db",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -662,7 +662,7 @@
             "id": "rm-check-db",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=web-portal --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "isoloom"
             },
@@ -691,7 +691,7 @@
           "id": "check-web",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-web",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-web",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -702,7 +702,7 @@
             "id": "rm-check-web",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check-web --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=web-portal --filter label=com.docker.compose.service=isoloom-check-web --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "isoloom"
             },
@@ -720,7 +720,7 @@
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name flag-portal ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name web-portal ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "isoloom"
       },

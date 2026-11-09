@@ -18,7 +18,7 @@ networks: { lan: { cidr: 10.70.0.0/24 } }
 secrets:
   db-password: { env: SECRET_LAB_DB_PASSWORD }
   api-key: { file: api.key }
-inputs: [SECRET_LAB_FLAG]
+inputs: [DEMO_SECRET_LAB]
 machines:
   app:
     networks: { lan: 10 }
@@ -27,7 +27,7 @@ machines:
     files:
       - { path: /run/secrets/db-password, secret: db-password }
       - { path: /etc/app/api.key, secret: api-key, mode: 0400 }
-      - { path: /ctf/flag, input: SECRET_LAB_FLAG, mode: 0444 }
+      - { path: /srv/demo/secret, input: DEMO_SECRET_LAB, mode: 0444 }
 ";
 
 /// VMs, one of them a container on hybrid.
@@ -74,13 +74,13 @@ machines:
     command: [app.exe]
 ";
 
-/// A CTF lab as a runner feeds it: one input per objective (`CTF_FLAG_<KEY>`), each
+/// An environment whose runner issues one secret value per input (`DEMO_SECRET_<KEY>`), each
 /// a file, on containers and on a VM.
-const FLAGS: &str = "
+const ISSUED: &str = "
 version: 1
-name: flag-lab
+name: issued-secrets
 networks: { lan: { cidr: 10.73.0.0/24 } }
-inputs: [CTF_FLAG_MAIN, CTF_FLAG_SSRF_TO_METADATA, CTF_FLAG_CTF_KEY]
+inputs: [DEMO_SECRET, DEMO_SECRET_API, DEMO_SECRET_KEY]
 machines:
   web:
     os: debian@12
@@ -88,13 +88,13 @@ machines:
     ports: { web: 80 }
     app: { image: nginx:alpine, steps: [{ run: db.sh }] }
     files:
-      - { path: /ctf/flag, input: CTF_FLAG_MAIN, mode: 0444 }
-      - { path: /ctf/ssrf-flag, input: CTF_FLAG_SSRF_TO_METADATA, mode: 0444 }
-      - { path: /srv/app/ctf.key, input: CTF_FLAG_CTF_KEY }
+      - { path: /srv/demo/secret, input: DEMO_SECRET, mode: 0444 }
+      - { path: /srv/demo/api-secret, input: DEMO_SECRET_API, mode: 0444 }
+      - { path: /srv/app/demo.key, input: DEMO_SECRET_KEY }
 ";
 
-/// The flags of [`FLAGS`].
-const FLAG_INPUTS: [&str; 3] = ["CTF_FLAG_MAIN", "CTF_FLAG_SSRF_TO_METADATA", "CTF_FLAG_CTF_KEY"];
+/// The inputs of [`ISSUED`].
+const SECRET_INPUTS: [&str; 3] = ["DEMO_SECRET", "DEMO_SECRET_API", "DEMO_SECRET_KEY"];
 
 /// A project holding `spec` and the files it names, the file secret's value among them.
 fn secret_project(spec: &str, tag: &str) -> Outcome<PathBuf> {
@@ -126,10 +126,10 @@ fn generated(spec: &str, tag: &str) -> Outcome<Vec<(PathBuf, String)>> {
     let home = dir.join("home");
     let env = [
         ("SECRET_LAB_DB_PASSWORD", ENV_VALUE),
-        ("SECRET_LAB_FLAG", INPUT_VALUE),
-        ("CTF_FLAG_MAIN", INPUT_VALUE),
-        ("CTF_FLAG_SSRF_TO_METADATA", INPUT_VALUE),
-        ("CTF_FLAG_CTF_KEY", INPUT_VALUE),
+        ("DEMO_SECRET_LAB", INPUT_VALUE),
+        ("DEMO_SECRET", INPUT_VALUE),
+        ("DEMO_SECRET_API", INPUT_VALUE),
+        ("DEMO_SECRET_KEY", INPUT_VALUE),
     ];
     let o = isoloom_with(&home, &[&"generate", &dir], &env)?;
     if o.code != Some(0) {
@@ -219,8 +219,8 @@ fn no_secret_value_reaches_a_windows_machines_file() -> Outcome {
 }
 
 #[test]
-fn every_flag_is_an_optional_sensitive_slot_and_a_file_never_an_environment_value() -> Outcome {
-    let generated = generated(FLAGS, "flags")?;
+fn every_issued_input_is_an_optional_sensitive_slot_and_a_file_never_an_environment_value() -> Outcome {
+    let generated = generated(ISSUED, "issued")?;
     // The targets whose runner delivers a machine's inputs: Compose's secrets, Vagrant's guest
     // delivery. (Proxmox's manifest has no input slot yet: its VMs wait for a delivery no step
     // makes; the clouds have no manifest yet.)
@@ -229,41 +229,41 @@ fn every_flag_is_an_optional_sensitive_slot_and_a_file_never_an_environment_valu
         let text = find(&generated, &format!("{target}/run.json"))?;
         let manifest: serde_json::Value = serde_json::from_str(text)?;
         let slots = manifest["secrets"].as_array().ok_or_else(|| format!("{} has no slots", path.display()))?;
-        for flag in FLAG_INPUTS {
+        for input in SECRET_INPUTS {
             let slot = slots
                 .iter()
-                .find(|s| s["name"] == flag)
-                .ok_or_else(|| format!("{} has no slot {flag}", path.display()))?;
-            // A runner gives a flag only when the backend issues it: without one, the slot
+                .find(|s| s["name"] == input)
+                .ok_or_else(|| format!("{} has no slot {input}", path.display()))?;
+            // A runner gives a value only when the backend issues it: without one, the slot
             // is empty (the lab's development value), never refused, never shown.
             assert_eq!(
                 (&slot["kind"], &slot["required"], &slot["sensitive"], &slot["default"]),
                 (&"input".into(), &false.into(), &true.into(), &"".into()),
-                "{} {flag}",
+                "{} {input}",
                 path.display()
             );
             assert!(
                 slot["deliver"].as_array().is_some_and(|d| !d.is_empty()),
-                "{} {flag} isn't delivered",
+                "{} {input} isn't delivered",
                 path.display()
             );
         }
     }
-    // On containers, each flag is a secret file read from the runner's environment, never one of
+    // On containers, each input is a secret file read from the runner's environment, never one of
     // the container's variables; on a VM, a secret file the guest delivery writes, never a line of
     // the inputs file the machine's scripts read.
     let compose = find(&generated, "docker/compose.yml")?;
     let vagrantfile = find(&generated, "vagrant/Vagrantfile")?;
-    for flag in FLAG_INPUTS {
-        assert!(compose.contains(&format!("environment: {flag}\n")), "{flag}: {compose}");
-        assert!(!compose.contains(&format!("${{{flag}")), "{flag} is interpolated: {compose}");
+    for input in SECRET_INPUTS {
+        assert!(compose.contains(&format!("environment: {input}\n")), "{input}: {compose}");
+        assert!(!compose.contains(&format!("${{{input}")), "{input} is interpolated: {compose}");
         assert!(
-            vagrantfile.contains(&format!("\"ISOLOOM_SECRET_INPUT_{flag}\" => isoloom_b64(INPUTS[\"{flag}\"])")),
-            "{flag}: {vagrantfile}"
+            vagrantfile.contains(&format!("\"ISOLOOM_SECRET_INPUT_{input}\" => isoloom_b64(INPUTS[\"{input}\"])")),
+            "{input}: {vagrantfile}"
         );
         assert!(
-            !vagrantfile.contains(&format!("\"{flag}\" => isoloom_b64")),
-            "{flag} is a plain input: {vagrantfile}"
+            !vagrantfile.contains(&format!("\"{input}\" => isoloom_b64")),
+            "{input} is a plain input: {vagrantfile}"
         );
     }
     Ok(())

@@ -3,7 +3,7 @@
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.10.1"
+    "version": "1.0.9"
   },
   "environment": {
     "name": "solo-web",

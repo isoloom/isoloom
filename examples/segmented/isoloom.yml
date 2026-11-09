@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # Three networks and a router: the user lands on `access`, may reach the web server on
 # `front`, and nothing on `back`; only `front` may reach the cache, and only on 6379.
-# The web server's port 4444 is the shell an exploit of its page would open: dormant, so
+# The web server's port 4444 is an admin console started only on demand: dormant, so
 # nothing waits for it or expects it to answer, but `reach` still applies to it.
 version: 1
 name: segmented

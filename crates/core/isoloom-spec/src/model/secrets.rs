@@ -186,14 +186,14 @@ mod tests {
             let source: SecretSource = serde_yaml_ng::from_str(yaml)?;
             read.push((source.store(), source.reference().to_owned()));
         }
-        let input = SecretSource::Input { input: "FLAG".into() };
+        let input = SecretSource::Input { input: "DEMO_SECRET".into() };
         read.push((input.store(), input.reference().to_owned()));
         let expected = [
             ("env", "DB_PASSWORD"),
             ("file", "~/db.txt"),
             ("vault", "secret/app#db"),
             ("sops", "s.enc.yaml#db.pw"),
-            ("input", "FLAG"),
+            ("input", "DEMO_SECRET"),
         ];
         assert_eq!(read, expected.map(|(s, r)| (s, r.to_owned())));
         Ok(())

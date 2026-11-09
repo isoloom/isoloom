@@ -63,7 +63,7 @@ fn every_example_lowers_as_snapshotted() {
 
 #[test]
 fn a_lab_with_both_forms_on_every_machine_runs_everywhere() {
-    for name in ["supplier-portal-api", "pivot-dmz", "edge-firewall"] {
+    for name in ["supplier-portal-api", "dmz-jump", "edge-firewall"] {
         assert_eq!(ids(example(name).unwrap().possible()), ALL, "{name}");
     }
 }

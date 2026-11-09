@@ -6,11 +6,11 @@
       ansible.builtin.copy: { src: "{{ playbook_dir }}/../build/app/www/", dest: /srv/app/, mode: "0644" }
     - name: Its service
       ansible.builtin.copy:
-        dest: /etc/systemd/system/pivot-app.service
+        dest: /etc/systemd/system/internal-app.service
         mode: "0644"
         content: |
           [Unit]
-          Description=The pivot-dmz app
+          Description=The dmz-jump app
           After=network-online.target
 
           [Service]
@@ -19,4 +19,4 @@
           [Install]
           WantedBy=multi-user.target
     - name: Started at boot
-      ansible.builtin.systemd: { name: pivot-app, state: started, enabled: true, daemon_reload: true }
+      ansible.builtin.systemd: { name: internal-app, state: started, enabled: true, daemon_reload: true }

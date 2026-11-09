@@ -61,12 +61,12 @@
   ],
   "secrets": [
     {
-      "name": "CTF_FLAG_MAIN",
+      "name": "DEMO_SECRET",
       "kind": "input",
       "required": false,
       "sensitive": true,
       "machines": ["dc01"],
-      "deliver": [{ "via": "env", "var": "CTF_FLAG_MAIN", "steps": ["up", "provision-machine"] }]
+      "deliver": [{ "via": "env", "var": "DEMO_SECRET", "steps": ["up", "provision-machine"] }]
     },
     {
       "name": "ESXI_PASSWORD",

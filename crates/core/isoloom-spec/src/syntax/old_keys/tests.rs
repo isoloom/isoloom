@@ -6,7 +6,7 @@ fn scanned(yaml: &str) -> Vec<Problem> {
 
 #[test]
 fn a_docker_block_gets_its_app() {
-    let p = scanned("machines:\n  web:\n    docker: { build: build/web, init: [flag.sh] }\n");
+    let p = scanned("machines:\n  web:\n    docker: { build: build/web, init: [secret.sh] }\n");
     assert_eq!((p[0].code, p[0].path.as_str()), (Code::RemovedField, "machines.web.docker"));
     let fix = p[0].fix.as_deref().unwrap();
     assert!(
@@ -39,7 +39,7 @@ fn a_list_of_ports_becomes_a_map() {
 #[test]
 fn moved_keys_name_their_new_place() {
     let p = scanned(
-        "networks:\n  lab: { cidr: 192.168.1.0/24, docker: { cidr: 10.1.0.0/24 } }\nvolumes:\n  data: { external: shared }\ncommon:\n  vm: { os: debian }\n  inputs: [FLAG]\ncontroller: { image: { vagrant: x } }\nmachines:\n  web: { arch: arm64, inputs: [FLAG], external: { address: 1.2.3.4 } }\n",
+        "networks:\n  lab: { cidr: 192.168.1.0/24, docker: { cidr: 10.1.0.0/24 } }\nvolumes:\n  data: { external: shared }\ncommon:\n  vm: { os: debian }\n  inputs: [DEMO_SECRET]\ncontroller: { image: { vagrant: x } }\nmachines:\n  web: { arch: arm64, inputs: [DEMO_SECRET], external: { address: 1.2.3.4 } }\n",
     );
     let paths: Vec<&str> = p.iter().map(|p| p.path.as_str()).collect();
     for path in [

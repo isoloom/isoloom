@@ -3,10 +3,10 @@
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.10.1"
+    "version": "1.0.9"
   },
   "environment": {
-    "name": "flag-portal",
+    "name": "web-portal",
     "instance": null,
     "message": "The portal answers at http://localhost:${published.web.portal}/.\n"
   },
@@ -291,7 +291,7 @@
   ],
   "secrets": [
     {
-      "name": "CTF_FLAG_MAIN",
+      "name": "DEMO_SECRET",
       "kind": "input",
       "required": false,
       "sensitive": true,
@@ -303,7 +303,7 @@
       "deliver": [
         {
           "via": "env",
-          "var": "CTF_FLAG_MAIN",
+          "var": "DEMO_SECRET",
           "steps": [
             "start",
             "job-web-init-1"
@@ -335,7 +335,7 @@
       "name": "lab",
       "cidr": "10.30.0.0/24",
       "internet": false,
-      "native": "flag-portal_lab"
+      "native": "web-portal_lab"
     }
   ],
   "machines": [
@@ -350,14 +350,14 @@
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "flag-portal · docker",
-          "vmware_desktop": "flag-portal · docker",
-          "parallels": "flag-portal · docker",
-          "libvirt": "flag-portal_default",
-          "utm": "flag-portal · docker",
-          "vmware_esxi": "flag-portal-docker"
+          "virtualbox": "web-portal · docker",
+          "vmware_desktop": "web-portal · docker",
+          "parallels": "web-portal · docker",
+          "libvirt": "web-portal_default",
+          "utm": "web-portal · docker",
+          "vmware_esxi": "web-portal-docker"
         },
-        "boot_digest": "sha256:9c8be5edc003c6ba11b928ad0a1c451bedf24001425ebf23f6e6fb28730c768a"
+        "boot_digest": "sha256:71edc375270830a2a92e5908973881c36f83f39dcca42eb93bf74a5485e493b2"
       }
     },
     {
@@ -408,9 +408,9 @@
       },
       "volumes": [
         {
-          "name": "ctf",
-          "path": "/srv/ctf",
-          "native": "flag-portal_web-ctf"
+          "name": "data",
+          "path": "/srv/data",
+          "native": "web-portal_web-data"
         }
       ],
       "ports": [
@@ -528,7 +528,7 @@
           "ssh",
           "--no-tty",
           "--command",
-          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db db-routes web web-routes isoloom-probe-amd64",
           "default"
         ],
         "timeout_s": 1800
@@ -541,7 +541,7 @@
           "ssh",
           "--no-tty",
           "--command",
-          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml up --no-deps --exit-code-from web-init-1 web-init-1",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --no-deps --exit-code-from web-init-1 web-init-1",
           "default"
         ],
         "timeout_s": 600
@@ -704,7 +704,7 @@
             "ssh",
             "--no-tty",
             "--command",
-            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "default"
           ],
           "timeout_s": 465
@@ -717,7 +717,7 @@
               "ssh",
               "--no-tty",
               "--command",
-              "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "sudo docker ps -aq --filter label=com.docker.compose.project=web-portal --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "default"
             ],
             "timeout_s": 60
@@ -748,7 +748,7 @@
             "ssh",
             "--no-tty",
             "--command",
-            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "default"
           ],
           "timeout_s": 120
@@ -761,7 +761,7 @@
               "ssh",
               "--no-tty",
               "--command",
-              "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "sudo docker ps -aq --filter label=com.docker.compose.project=web-portal --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "default"
             ],
             "timeout_s": 60
@@ -792,7 +792,7 @@
             "ssh",
             "--no-tty",
             "--command",
-            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name flag-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-web",
+            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-web",
             "default"
           ],
           "timeout_s": 120
@@ -805,7 +805,7 @@
               "ssh",
               "--no-tty",
               "--command",
-              "sudo docker ps -aq --filter label=com.docker.compose.project=flag-portal --filter label=com.docker.compose.service=isoloom-check-web --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "sudo docker ps -aq --filter label=com.docker.compose.project=web-portal --filter label=com.docker.compose.service=isoloom-check-web --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "default"
             ],
             "timeout_s": 60
@@ -863,7 +863,7 @@
         "ssh",
         "--no-tty",
         "--command",
-        "if command -v docker >/dev/null; then sudo docker compose --project-name flag-portal ps --all --format json; fi",
+        "if command -v docker >/dev/null; then sudo docker compose --project-name web-portal ps --all --format json; fi",
         "default"
       ],
       "timeout_s": 60

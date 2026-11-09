@@ -9,17 +9,17 @@ use isoloom_targets::{GeneratedFile, generate, refusal};
 
 use crate::testing::{Outcome, file, lab};
 
-/// A web container with a flag file and a published port, and a set-up job nothing waits for.
+/// A web container with a secret file and a published port, and a set-up job nothing waits for.
 const FLAGGED: &str = "
 version: 1
 name: flagged
-inputs: [FLAG]
+inputs: [DEMO_SECRET]
 networks: { lab: { cidr: 10.31.0.0/24, internet: false } }
 machines:
   web:
     networks: { lab: 10 }
     ports: { site: { port: 80, protocol: http, publish: 8080 } }
-    files: [{ path: /ctf/flag, input: FLAG }]
+    files: [{ path: /srv/demo/secret, input: DEMO_SECRET }]
     app: { image: nginx }
     setup: [seed.sh]
 checks:
@@ -131,15 +131,15 @@ fn proxmox_makes_the_vm_then_sets_it_up_copies_the_project_and_starts_compose_ov
 fn the_flag_reaches_the_start_steps_and_is_accepted_in_the_vm_never_written() -> Outcome {
     let (files, local, server) = manifests()?;
     for m in [&local, &server] {
-        let flag = m.secrets.iter().find(|s| s.name.as_str() == "FLAG").unwrap();
+        let secret = m.secrets.iter().find(|s| s.name.as_str() == "DEMO_SECRET").unwrap();
         let Some(Delivery::Env {
             var,
             steps: StepSelection::Only(steps),
-        }) = flag.deliver.iter().next()
+        }) = secret.deliver.iter().next()
         else {
             panic!()
         };
-        assert_eq!(var.as_str(), "FLAG");
+        assert_eq!(var.as_str(), "DEMO_SECRET");
         assert_eq!(
             steps.iter().map(isoloom_manifest::StepId::as_str).collect::<Vec<_>>(),
             ["start", "job-web-init-1"]
@@ -149,13 +149,13 @@ fn the_flag_reaches_the_start_steps_and_is_accepted_in_the_vm_never_written() ->
         assert!(m.machines.iter().any(|x| x.name.as_str() == "isoloom-docker-host"));
     }
     let vagrantfile = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
-    assert!(vagrantfile.contains("config.ssh.forward_env = [\"FLAG\"]"), "{vagrantfile}");
+    assert!(vagrantfile.contains("config.ssh.forward_env = [\"DEMO_SECRET\"]"), "{vagrantfile}");
     assert!(
-        vagrantfile.contains("echo 'AcceptEnv FLAG' > /etc/ssh/sshd_config.d/isoloom-env.conf"),
+        vagrantfile.contains("echo 'AcceptEnv DEMO_SECRET' > /etc/ssh/sshd_config.d/isoloom-env.conf"),
         "{vagrantfile}"
     );
     let main = file(&files, ".isoloom/docker-vm/proxmox/main.tf")?;
-    assert!(main.contains("AcceptEnv FLAG"), "{main}");
+    assert!(main.contains("AcceptEnv DEMO_SECRET"), "{main}");
     // Terraform only makes the VM: nothing of it reaches the guest.
     assert!(
         !main.contains("terraform_data") && !main.contains("local-exec") && !main.contains("remote-exec"),

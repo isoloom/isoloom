@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn a_delivery_is_tagged_by_its_way() {
-        let env: Delivery = serde_json::from_str(r#"{"via": "env", "var": "CTF_FLAG_MAIN", "steps": ["up"]}"#).unwrap();
+        let env: Delivery = serde_json::from_str(r#"{"via": "env", "var": "DEMO_SECRET", "steps": ["up"]}"#).unwrap();
         assert!(matches!(env, Delivery::Env { .. }));
         let tf: Delivery = serde_json::from_str(r#"{"via": "tf_var", "var": "inputs", "shape": "map_entry"}"#).unwrap();
         assert!(matches!(

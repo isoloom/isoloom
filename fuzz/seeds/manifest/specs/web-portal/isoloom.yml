@@ -1,8 +1,8 @@
 version: 1
-name: flag-portal
+name: web-portal
 networks:
   lab: { cidr: 10.30.0.0/24, internet: false }
-inputs: [CTF_FLAG_MAIN]
+inputs: [DEMO_SECRET]
 machines:
   db:
     networks: { lab: 20 }
@@ -11,13 +11,13 @@ machines:
   web:
     networks: { lab: 10 }
     ports: [{ port: 80, name: portal, http: true, publish: 8080 }]
-    inputs: [CTF_FLAG_MAIN]
-    volumes: { ctf: /ctf }
+    inputs: [DEMO_SECRET]
+    volumes: { data: /data }
     depends_on: [db]
     resources: { cpus: 1, memory_mb: 512 }
     docker:
       build: build/web
-      init: [ctf/flag.sh]
+      init: [data/secret.sh]
 checks:
   - { http: "http://web/", wait: 60 }
   - { tcp: "db:3306", wait: 120 }

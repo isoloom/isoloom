@@ -15,8 +15,8 @@ use crate::{Error, Result};
 /// os:                     # an OS's image, instead of the built-in one
 ///   debian@12: { vagrant: my-org/debian-12, vagrant_version: "1.2.0" }
 /// access:                 # the access machine, when the spec leaves it to the runner
-///   docker: kalilinux/kali-rolling
-///   vm: kali
+///   docker: registry.example.com/workstation:1
+///   vm: ubuntu@24.04
 /// ```
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -37,7 +37,7 @@ pub struct Access {
     /// A container image (kept running idle) for container targets.
     #[serde(default)]
     pub docker: Option<String>,
-    /// An OS for VM targets, written as a spec writes it (`kali`, `debian@12`), held by the
+    /// An OS for VM targets, written as a spec writes it (`ubuntu@24.04`, `debian@12`), held by the
     /// image table's name for it (its image from this table or the built-in one).
     #[serde(default, deserialize_with = "access_os")]
     pub vm: Option<String>,
@@ -321,7 +321,7 @@ mod tests {
     use crate::model::KNOWN_OS;
 
     /// A table with Debian 12's box and an access machine of each form.
-    const TABLE: &str = "os:\n  debian@12: { vagrant: my-org/debian-12 }\naccess: { docker: kalilinux/kali-rolling, vm: debian }\n";
+    const TABLE: &str = "os:\n  debian@12: { vagrant: my-org/debian-12 }\naccess: { docker: registry.example.com/workstation:1, vm: debian }\n";
 
     #[test]
     fn a_table_holds_each_os_by_its_image_table_name() {
@@ -331,7 +331,7 @@ mod tests {
         let access = table.access.unwrap();
         assert_eq!(
             (access.docker.as_deref(), access.vm.as_deref()),
-            (Some("kalilinux/kali-rolling"), Some("debian-12"))
+            (Some("registry.example.com/workstation:1"), Some("debian-12"))
         );
         assert!(
             Table::parse("access: { vm: windows-95 }")
@@ -361,7 +361,10 @@ mod tests {
         let spec = crate::testing::model(&crate::testing::lab("machines:\n  user: { networks: { lan: 10 }, access: true }\n")).unwrap();
         let user = &table.apply(&spec).machines["user"];
         assert!(user.supplied);
-        assert_eq!(user.docker.as_ref().and_then(|d| d.image.as_deref()), Some("kalilinux/kali-rolling"));
+        assert_eq!(
+            user.docker.as_ref().and_then(|d| d.image.as_deref()),
+            Some("registry.example.com/workstation:1")
+        );
         let vm = user.vm.as_ref().unwrap();
         assert_eq!(
             (vm.os.as_str(), vm.image.as_ref().and_then(|i| i.vagrant.as_deref())),

@@ -424,7 +424,7 @@ fn tool_named_like_a_machine() {
 
 #[test]
 fn tool_without_image() {
-    assert_problem(&with_web_and("tools:\n  kali: {}\n"), "tools.kali.image", "use a recipe");
+    assert_problem(&with_web_and("tools:\n  toolbox: {}\n"), "tools.toolbox.image", "use a recipe");
 }
 
 #[test]
@@ -439,8 +439,8 @@ fn recipe_with_an_image() {
 #[test]
 fn tool_publish_without_port() {
     assert_problem(
-        &with_web_and("tools:\n  kali: { image: alpine, publish: 9000 }\n"),
-        "tools.kali.publish",
+        &with_web_and("tools:\n  toolbox: { image: alpine, publish: 9000 }\n"),
+        "tools.toolbox.publish",
         "which `port`",
     );
 }
@@ -448,10 +448,10 @@ fn tool_publish_without_port() {
 #[test]
 fn tool_publish_taken_by_a_machine() {
     let yaml = format!(
-        "{}tools:\n  kali: {{ image: alpine, port: 80, publish: 8080 }}\n",
+        "{}tools:\n  toolbox: {{ image: alpine, port: 80, publish: 8080 }}\n",
         with_machine("{ networks: { lab: 5 }, ports: { web: { port: 80, publish: 8080 } }, app: { image: nginx } }")
     );
-    assert_problem(&yaml, "tools.kali.publish", "already published by a machine");
+    assert_problem(&yaml, "tools.toolbox.publish", "already published by a machine");
 }
 
 #[test]

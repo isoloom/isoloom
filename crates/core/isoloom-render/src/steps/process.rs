@@ -183,25 +183,25 @@ mod tests {
     const SPEC: &str = r"
 version: 1
 name: own-process
-inputs: { FLAG: { sensitive: false } }
+inputs: { DEMO_SECRET: { sensitive: false } }
 networks:
   lan: { cidr: 10.84.0.0/24 }
 machines:
   web:
     networks: { lan: 10 }
     os: debian@12
-    environment: { MODE: lab, FLAG: { input: FLAG } }
+    environment: { MODE: lab, DEMO_SECRET: { input: DEMO_SECRET } }
     ports: { web: 8000 }
     app: { steps: [{ run: setup.sh }] }
     command: { run: [python3, -m, http.server, '8000'], cwd: /srv/site }
-    setup: [flag.sh]
+    setup: [secret.sh]
     healthcheck: { http: { port: 8000, path: /health }, interval: 2s, retries: 30, start_period: 0s }
   win:
     networks: { lan: 11 }
     os: windows-server@2022
     app: { steps: [{ run: setup.ps1 }] }
     command: 'python -m http.server 80'
-    setup: [flag.ps1]
+    setup: [secret.ps1]
     healthcheck: { test: [python, check.py] }
 ";
 
@@ -235,7 +235,7 @@ machines:
         let sh = super::super::linux(&env, "web", &setup).expect("renders");
         assert!(
             sh.contains(
-                "set -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /var/lib/isoloom/inputs.env\nset +a\nexport MODE='lab'\nmkdir -p '/srv/site' && cd '/srv/site'\nsh '/opt/isoloom/flag.sh'\n"
+                "set -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /var/lib/isoloom/inputs.env\nset +a\nexport MODE='lab'\nmkdir -p '/srv/site' && cd '/srv/site'\nsh '/opt/isoloom/secret.sh'\n"
             ),
             "{sh}"
         );
@@ -268,7 +268,7 @@ machines:
         let setup = step(&env, "win", |s| matches!(s, Step::Setup { .. }));
         let once = super::super::windows(&env, "win", &setup).expect("renders");
         assert!(
-            once.contains("flag.ps1") && once.contains("C:\\isoloom\\setup.done") && !once.contains("Register-ScheduledTask"),
+            once.contains("secret.ps1") && once.contains("C:\\isoloom\\setup.done") && !once.contains("Register-ScheduledTask"),
             "run once, not a startup task: {once}"
         );
         let command = super::super::windows(&env, "win", &Step::Command).expect("renders");

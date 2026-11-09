@@ -1,6 +1,6 @@
 # An intranet whose uploads a scanner watches, with a status board beside it: portable recipes
-# for every machine, and the rare per-target facts in `overrides:`. Made up for the syntax design
-# (plan/phase2/spec.md); the project files it names aren't part of the example.
+# for every machine, and the rare per-target facts in `overrides:`. Made up for the syntax design;
+# the project files it names aren't part of the example.
 #
 # Targets: every machine target. Each override applies to one target, and is refused if nothing on
 # that target uses it.

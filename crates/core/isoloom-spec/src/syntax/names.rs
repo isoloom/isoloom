@@ -225,7 +225,7 @@ mod tests {
     fn a_name_that_breaks_its_rule_is_refused_with_the_rule() {
         assert!("dns-udp".parse::<PortName>().is_ok() && "80".parse::<PortName>().is_err() && "Web".parse::<PortName>().is_err());
         assert!("a".repeat(31).parse::<PortName>().is_ok() && "a".repeat(32).parse::<PortName>().is_err());
-        assert!("CTF_FLAG_MAIN".parse::<InputName>().is_ok() && "1FLAG".parse::<InputName>().is_err());
+        assert!("DEMO_SECRET".parse::<InputName>().is_ok() && "1FLAG".parse::<InputName>().is_err());
         assert!("ISOLOOM_X".parse::<InputName>().unwrap_err().to_string().contains("ISOLOOM_"));
         assert_eq!("postgres@16".parse::<ServiceRef>().unwrap().name(), "postgres");
         assert!("postgres@".parse::<ServiceRef>().is_err() && "Nginx".parse::<ServiceRef>().is_err());

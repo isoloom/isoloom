@@ -1,4 +1,4 @@
-//! The Compose file of specs written in the new syntax, through lowering: a flag delivered as a
+//! The Compose file of specs written in the new syntax, through lowering: a secret delivered as a
 //! file from its input (and its value to the steps that need it), and an image built from
 //! portable steps.
 
@@ -55,12 +55,12 @@ fn file<'a>(files: &'a [GeneratedFile], path: &str) -> Outcome<&'a str> {
 fn a_flag_is_a_secret_file_read_from_its_input_never_the_environment() -> Outcome {
     let files = render("help-desk")?;
     let c = file(&files, ".isoloom/docker/compose.yml")?;
-    assert!(c.contains("secrets:\n  input-flag:\n    environment: FLAG\n"), "{c}");
+    assert!(c.contains("secrets:\n  input-demo-secret:\n    environment: DEMO_SECRET\n"), "{c}");
     assert!(
-        c.contains("- source: input-flag\n      target: /srv/archive/flag.txt\n      uid: '1000'\n      mode: '0400'"),
+        c.contains("- source: input-demo-secret\n      target: /srv/archive/secret.txt\n      uid: '1000'\n      mode: '0400'"),
         "{c}"
     );
-    assert!(!c.contains("FLAG: ${FLAG"), "{c}");
+    assert!(!c.contains("DEMO_SECRET: ${DEMO_SECRET"), "{c}");
     assert!(c.contains("isoloom.port.site"), "{c}");
     Ok(())
 }
@@ -71,7 +71,11 @@ fn a_flag_is_a_secret_file_read_from_its_input_never_the_environment() -> Outcom
 fn a_flag_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
     let backend = isoloom_compose::ComposeBackend(Target::Docker);
     let manifest = isoloom_render::backend::Backend::run_manifest(&backend, &plan("help-desk")?)?.ok_or("no run manifest")?;
-    let slot = manifest.secrets.iter().find(|s| s.name.to_string() == "FLAG").ok_or("no FLAG slot")?;
+    let slot = manifest
+        .secrets
+        .iter()
+        .find(|s| s.name.to_string() == "DEMO_SECRET")
+        .ok_or("no DEMO_SECRET slot")?;
     let [
         isoloom_manifest::Delivery::Env {
             var,
@@ -81,7 +85,7 @@ fn a_flag_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
     else {
         return Err(format!("{:?}", slot.deliver).into());
     };
-    assert_eq!(var.to_string(), "FLAG");
+    assert_eq!(var.to_string(), "DEMO_SECRET");
     assert_eq!(steps.iter().map(ToString::to_string).collect::<Vec<_>>(), ["up", "start"]);
     Ok(())
 }

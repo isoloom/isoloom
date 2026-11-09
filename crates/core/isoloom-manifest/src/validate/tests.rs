@@ -16,7 +16,7 @@ fn refused(patch: impl FnOnce(&mut Value)) -> &'static str {
 
 /// An input slot delivered as `delivery`.
 fn slot(delivery: &Value) -> Value {
-    json!([{ "name": "FLAG", "kind": "input", "required": true, "sensitive": true, "deliver": [delivery] }])
+    json!([{ "name": "DEMO_SECRET", "kind": "input", "required": true, "sensitive": true, "deliver": [delivery] }])
 }
 
 /// A param delivered as `delivery`.
@@ -102,7 +102,7 @@ fn machines_and_their_ports_are_named_once() {
 fn a_machine_reference_names_a_machine() {
     assert_eq!(refused(|d| d["machines"][0]["of"] = json!("db")), "unknown_machine");
     assert_eq!(read(|d| d["machines"][0]["of"] = json!("web")), Ok(()));
-    let mut with_machines = slot(&json!({ "via": "env", "var": "FLAG", "steps": ["up"] }));
+    let mut with_machines = slot(&json!({ "via": "env", "var": "DEMO_SECRET", "steps": ["up"] }));
     with_machines[0]["machines"] = json!(["db"]);
     let err = read(|d| d["secrets"] = with_machines).unwrap_err();
     assert!(matches!(&err, Error::UnknownMachine { at, .. } if at == "secrets[0].machines"), "{err}");

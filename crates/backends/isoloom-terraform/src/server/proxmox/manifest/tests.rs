@@ -12,14 +12,14 @@ fn env(yaml: &str) -> Environment {
 
 const LAB: &str = "version: 1
 name: shop
-inputs: { FLAG: { sensitive: false } }
+inputs: { DEMO_SECRET: { sensitive: false } }
 networks:
   lan: { cidr: 10.60.0.0/24 }
 machines:
   web:
     networks: { lan: 10 }
     os: debian@12
-    environment: { FLAG: { input: FLAG } }
+    environment: { DEMO_SECRET: { input: DEMO_SECRET } }
     ports: { site: { port: 80, protocol: http, publish: 8080 } }
     app: { steps: [{ run: web.sh }] }
 checks:
@@ -127,10 +127,10 @@ fn the_variables_are_params_and_the_secrets_slots() {
     let slot = |n: &str| m.secrets.iter().find(|s| s.name.as_str() == n).unwrap();
     assert_eq!(slot("proxmox_api_token").kind, SlotKind::Connection);
     assert!(slot("proxmox_password").sensitive);
-    let flag = slot("FLAG");
-    assert_eq!(flag.kind, SlotKind::Input);
-    assert!(!flag.sensitive, "the spec's word on it");
-    assert!(matches!(flag.deliver.as_slice(), [Delivery::TfVar { var, shape: TfVarShape::MapEntry }] if var.as_str() == "inputs"));
+    let secret = slot("DEMO_SECRET");
+    assert_eq!(secret.kind, SlotKind::Input);
+    assert!(!secret.sensitive, "the spec's word on it");
+    assert!(matches!(secret.deliver.as_slice(), [Delivery::TfVar { var, shape: TfVarShape::MapEntry }] if var.as_str() == "inputs"));
 }
 
 #[test]

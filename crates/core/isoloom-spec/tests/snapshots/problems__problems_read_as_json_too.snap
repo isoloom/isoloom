@@ -5,11 +5,11 @@ expression: "serde_json::to_string_pretty(&found).unwrap_or_else(|e| panic!(\"{e
 [
   {
     "code": "sensitive-value",
-    "path": "machines.web.environment.FLAG",
+    "path": "machines.web.environment.DEMO_SECRET",
     "line": 10,
     "column": 20,
-    "reason": "`FLAG` is sensitive and would show in `docker inspect`",
-    "fix": "`files: [{ path: <path>, input: FLAG }]`, or `inputs: { FLAG: { sensitive: false } }`"
+    "reason": "`DEMO_SECRET` is sensitive and would show in `docker inspect`",
+    "fix": "`files: [{ path: <path>, input: DEMO_SECRET }]`, or `inputs: { DEMO_SECRET: { sensitive: false } }`"
   },
   {
     "code": "unknown-reference",

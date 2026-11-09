@@ -420,7 +420,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Checks: the runner (run.json), or by hand: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check, and isoloom-check-<machine>
 # Stop:   docker compose -f .isoloom/docker/compose.yml down -v
 
-name: pivot-dmz
+name: dmz-jump
 services:
   isoloom-router:
     image: alpine:3.20
@@ -461,15 +461,15 @@ services:
       retries: 60
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   gateway:
     build:
       context: ../../build/gateway
       labels:
         isoloom.managed: 'true'
-        isoloom.environment: pivot-dmz
-    image: isoloom/pivot-dmz-gateway
+        isoloom.environment: dmz-jump
+    image: isoloom/dmz-jump-gateway
     platform: linux/amd64
     hostname: gateway
     networks:
@@ -499,7 +499,7 @@ services:
       isoloom.port.web: tcp:80
       isoloom.port.ssh: tcp:22
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   gateway-routes:
     image: alpine:3.20
@@ -525,15 +525,15 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   app:
     build:
       context: ../../build/app
       labels:
         isoloom.managed: 'true'
-        isoloom.environment: pivot-dmz
-    image: isoloom/pivot-dmz-app
+        isoloom.environment: dmz-jump
+    image: isoloom/dmz-jump-app
     platform: linux/amd64
     hostname: app
     networks:
@@ -560,7 +560,7 @@ services:
     labels:
       isoloom.port.api: tcp:8080
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   app-routes:
     image: alpine:3.20
@@ -586,7 +586,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   db:
     image: postgres:16
@@ -616,7 +616,7 @@ services:
     labels:
       isoloom.port.postgres: tcp:5432
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   db-routes:
     image: alpine:3.20
@@ -642,10 +642,10 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   user:
-    image: ${ISOLOOM_ACCESS_IMAGE:-kalilinux/kali-rolling@sha256:02f5d6c019e549b0f55da58e835cad5355ef1030c6b2645265a324e37dfc4acc}
+    image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858}
     platform: linux/amd64
     profiles:
     - access
@@ -663,7 +663,7 @@ services:
     - db:10.30.20.30
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   user-routes:
     image: alpine:3.20
@@ -691,7 +691,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   isoloom-access:
     image: alpine:3.20
@@ -711,7 +711,7 @@ services:
     - db:10.30.20.30
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
   isoloom-access-routes:
     image: alpine:3.20
     profiles:
@@ -738,7 +738,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: unless-stopped
   isoloom-check:
     image: curlimages/curl:8.11.1
@@ -770,7 +770,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
   isoloom-check-gateway:
     image: curlimages/curl:8.11.1
     profiles:
@@ -796,7 +796,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
   isoloom-check-app:
     image: curlimages/curl:8.11.1
     profiles:
@@ -822,7 +822,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
   isoloom-check-db:
     image: curlimages/curl:8.11.1
     profiles:
@@ -848,7 +848,7 @@ services:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl
     platform: linux/amd64
@@ -861,7 +861,7 @@ services:
     - isoloom-probe-amd64:/probe
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
     restart: no
 networks:
   dmz:
@@ -871,7 +871,7 @@ networks:
         gateway: 10.30.10.1
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
   internal:
     ipam:
       config:
@@ -879,7 +879,7 @@ networks:
         gateway: 10.30.20.1
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
   access:
     ipam:
       config:
@@ -887,12 +887,12 @@ networks:
         gateway: 10.30.99.1
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
 volumes:
   isoloom-probe-amd64:
     labels:
       isoloom.managed: 'true'
-      isoloom.environment: pivot-dmz
+      isoloom.environment: dmz-jump
 
 ## .isoloom/docker/run.json
 {
@@ -903,7 +903,7 @@ volumes:
     "version": "1.0.9"
   },
   "environment": {
-    "name": "pivot-dmz",
+    "name": "dmz-jump",
     "instance": null,
     "message": null
   },
@@ -1684,7 +1684,7 @@ volumes:
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
   "resolved_version": 4,
-  "name": "pivot-dmz",
+  "name": "dmz-jump",
   "instance": null,
   "inputs": [],
   "networks": {
@@ -1905,7 +1905,7 @@ volumes:
       ],
       "role": "target",
       "arch": "amd64",
-      "os": "kali",
+      "os": "debian-12",
       "windows": false,
       "addresses": {
         "access": "10.30.99.10"
@@ -1942,8 +1942,8 @@ volumes:
       ],
       "default_gateway": null,
       "offline": false,
-      "os_family": "kali",
-      "os_version": "rolling"
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [
@@ -1996,12 +1996,11 @@ volumes:
       "cloud-docker",
       "kubernetes",
       "vagrant",
+      "proxmox",
+      "esxi",
       "cloud-vm"
     ],
-    "refused": {
-      "proxmox": "machine `user`: no Proxmox image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)",
-      "esxi": "machine `user`: no ESXi image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)"
-    },
+    "refused": {},
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.gateway: the external target reaches machines that exist already, and `gateway` names no host",
@@ -2010,14 +2009,14 @@ volumes:
     "clouds": {
       "cloud-vm": {
         "generated": [
-          "aws"
+          "aws",
+          "azure",
+          "gcp",
+          "oci"
         ],
         "refused": {
-          "azure": "machine `user`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)",
-          "gcp": "machine `user`: no GCP image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04)",
           "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
-          "linode": "machine `gateway` is on several networks: a Linode instance has one VPC interface",
-          "oci": "machine `user`: no Oracle Cloud image for `kali` yet (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)"
+          "linode": "machine `gateway` is on several networks: a Linode instance has one VPC interface"
         }
       }
     }

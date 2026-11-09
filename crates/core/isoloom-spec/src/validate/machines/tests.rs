@@ -14,9 +14,9 @@ fn a_lab_has_a_machine_and_one_access_machine_at_most() {
         problems("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n"),
         Vec::<String>::new()
     );
-    let one = "  a: { networks: { lan: 11 }, docker: { image: kali }, access: true }\n";
+    let one = "  a: { networks: { lan: 11 }, docker: { image: debian }, access: true }\n";
     assert_eq!(of(&format!("{one}{WEB}")), Vec::<String>::new());
-    let two = "  b: { networks: { lan: 12 }, docker: { image: kali }, access: true }\n";
+    let two = "  b: { networks: { lan: 12 }, docker: { image: debian }, access: true }\n";
     assert_eq!(of(&format!("{one}{two}")), ["machines: only one machine can be the access machine (found 2)"]);
 }
 
@@ -44,7 +44,7 @@ fn a_network_appliance_runs_alone_on_docker() {
 #[test]
 fn a_machines_inputs_are_declared() {
     let found = problems(&lab(
-        "inputs: [FLAG]\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx }, inputs: [FLAG, TOKEN] }\n",
+        "inputs: [DEMO_SECRET]\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx }, inputs: [DEMO_SECRET, TOKEN] }\n",
     ));
     assert_eq!(found, ["machines.web.inputs[1]: `TOKEN` isn't declared in the spec's `inputs`"]);
 }

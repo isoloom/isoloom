@@ -12,10 +12,7 @@ fn built_in() -> &'static isoloom_catalogue::Catalogue {
 
 /// A design example of this crate's `tests/spec-examples`, parsed.
 fn example(name: &str) -> syntax::Spec {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/spec-examples")
-        .join(name)
-        .join("isoloom.yml");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/spec-examples").join(name).join("isoloom.yml");
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     syntax::parse(&text).unwrap_or_else(|p| panic!("{name}: {p:?}"))
 }
@@ -27,12 +24,12 @@ fn on(name: &str, target: Target) -> Lowered {
 #[test]
 fn a_flag_becomes_a_secret_file_read_from_its_input() {
     let l = on("help-desk", Target::Docker);
-    assert_eq!(l.spec.secrets["input-flag"], SecretSource::Input { input: "FLAG".into() });
+    assert_eq!(l.spec.secrets["input-demo-secret"], SecretSource::Input { input: "DEMO_SECRET".into() });
     let web = &l.spec.machines["web"];
     let MachineSecret::Mount(m) = &web.secrets[0] else { panic!() };
     assert_eq!(
         (m.source.as_str(), m.target.as_deref(), m.uid, m.mode.map(isoloom_spec::syntax::Mode::bits)),
-        ("input-flag", Some("/srv/archive/flag.txt"), Some(1000), Some(0o400))
+        ("input-demo-secret", Some("/srv/archive/secret.txt"), Some(1000), Some(0o400))
     );
     assert!(web.inputs.is_empty() && web.environment.is_empty());
     let d = web.docker.as_ref().unwrap();
@@ -101,7 +98,7 @@ fn a_windows_domain_lowers_onto_vms() {
     assert_eq!(l.refusals, []);
     let dc = &l.spec.machines["dc01"];
     let MachineSecret::Mount(m) = &dc.secrets[0] else { panic!() };
-    assert_eq!((m.source.as_str(), m.mode), ("input-flag-admin", None));
+    assert_eq!((m.source.as_str(), m.mode), ("input-demo-secret-admin", None));
     for server in ["dc01", "srv01"] {
         let image = l.spec.machines[server].vm.as_ref().and_then(|v| v.image.clone()).unwrap();
         assert_eq!(

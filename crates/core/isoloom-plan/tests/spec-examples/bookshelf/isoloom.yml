@@ -1,7 +1,6 @@
 # A web front and a database, both from the catalogue: nginx serves a documentation site that
-# leaks a read-only database login, and the flag sits in a table. Made up for the syntax design
-# (plan/phase2/spec.md). It validates once the nginx and postgres entries exist (Phase 4); until
-# then `service:` is refused with "no catalogue entry yet".
+# shows a read-only database login, and a per-run secret sits in a table. Made up for the syntax
+# design.
 #
 # Targets: every machine target. The catalogue gives each service a container form (the official
 # image, or a build from the OS image) and a VM form (a fresh Debian VM plus the entry's role).
@@ -14,7 +13,7 @@ networks:
 secrets:
   db-password: { env: BOOKSHELF_DB_PASSWORD }
 
-inputs: [FLAG]
+inputs: [DEMO_SECRET]
 
 machines:
   docs:
@@ -38,9 +37,9 @@ machines:
     ports:
       postgres: { publish: true }    # a free host port, 5432 when it is free
     files:
-      - { path: /run/lab/flag, input: FLAG }   # 0400, root: only the seed script reads it
+      - { path: /run/lab/secret, input: DEMO_SECRET }   # 0400, root: only the seed script reads it
     setup:
-      - db/seed.sh                   # loads the books, then stores the flag from /run/lab/flag
+      - db/seed.sh                   # loads the books, then stores the secret from /run/lab/secret
 
 checks:
   - name: the documentation answers
@@ -51,7 +50,7 @@ checks:
     exec: pg_isready -h 127.0.0.1 -U books -d books
     expect: accepting connections
     wait: 2m
-  - name: the leaked login reads the books but not the users
+  - name: the read-only login reads the books but not the users
     script: checks/read-only-login.sh
 
 message: |

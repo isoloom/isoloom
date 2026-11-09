@@ -1,35 +1,33 @@
-//! The run manifests the targets write (`.isoloom/<target>/run.json`): the design's flag-portal
+//! The run manifests the targets write (`.isoloom/<target>/run.json`): the design's web-portal
 //! spec and the solo-web example write the shared docker, docker-vm and proxmox fixtures the
 //! runner tests against, check runners get the time their waits need, and only `docker`,
 //! `vagrant`, `proxmox` and `docker-vm` (two: Vagrant's and Proxmox's) write one. Every example's manifest, on each, parses and matches the schema, and
 //! leaves the runner no slot it may skip.
 
-use std::path::{Path, PathBuf};
-
-use isoloom_manifest::{Manifest, OutputSource, Part, Placeholder, Version};
+use isoloom_manifest::{Manifest, OutputSource, Part, Placeholder};
 use isoloom_spec::{Target, load};
 use isoloom_targets::{GeneratedFile, Lab, generate, generate_instance};
 
-use crate::testing::{Outcome, file, lab};
+use crate::testing::{Outcome, file, lab, matches_fixture};
 
 /// The worked example of the design (run-manifest v0, §9): an input delivered as a file, a set-up
 /// job, a published HTTP port, checks with waits, a message pointing at the published port.
-const FLAG_PORTAL: &str = "
+const WEB_PORTAL: &str = "
 version: 1
-name: flag-portal
+name: web-portal
 networks:
   lab: { cidr: 10.30.0.0/24, internet: false }
-inputs: [CTF_FLAG_MAIN]
+inputs: [DEMO_SECRET]
 machines:
   db: { networks: { lab: 20 }, ports: { mysql: 3306 }, app: { image: \"mysql:8.0\" } }
   web:
     networks: { lab: 10 }
     ports: { portal: { port: 80, protocol: http, publish: 8080 } }
-    files: [{ path: /ctf/flag, input: CTF_FLAG_MAIN }]
-    volumes: { ctf: /srv/ctf }
+    files: [{ path: /srv/demo/secret, input: DEMO_SECRET }]
+    volumes: { data: /srv/data }
     depends_on: [db]
     resources: { cpus: 1, memory_mb: 512 }
-    setup: [ctf/flag.sh]
+    setup: [data/secret.sh]
     app: { build: build/web }
 checks:
   - { http: \"http://web/\", wait: 60 }
@@ -48,7 +46,7 @@ fn run_json(files: &[GeneratedFile], path: &str) -> Outcome<Manifest> {
 /// the runner reads it back at the host's address.
 #[test]
 fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
-    let files = generate(&lab(FLAG_PORTAL)?, Target::CloudDocker)?;
+    let files = generate(&lab(WEB_PORTAL)?, Target::CloudDocker)?;
     let m = run_json(&files, ".isoloom/cloud-docker/aws/run.json")?;
     let published: Vec<(&str, &str)> = m
         .outputs
@@ -71,41 +69,27 @@ fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
 /// guessed from the machines' addresses.
 #[test]
 fn cloud_docker_lists_the_labs_networks() -> Outcome {
-    let files = generate(&lab(FLAG_PORTAL)?, Target::CloudDocker)?;
+    let files = generate(&lab(WEB_PORTAL)?, Target::CloudDocker)?;
     let cloud = run_json(&files, ".isoloom/cloud-docker/aws/run.json")?;
-    let local = run_json(&generate(&lab(FLAG_PORTAL)?, Target::DockerVm)?, ".isoloom/docker-vm/run.json")?;
+    let local = run_json(&generate(&lab(WEB_PORTAL)?, Target::DockerVm)?, ".isoloom/docker-vm/run.json")?;
     assert!(!cloud.networks.is_empty(), "{:?}", cloud.networks);
     assert_eq!(cloud.networks, local.networks, "the same networks as docker-vm's");
     Ok(())
 }
 
-/// The shared run-manifest fixture `name`.
-fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core/isoloom-manifest/fixtures").join(name)
-}
-
-/// `generated` is the shared fixture `name`: a release changes the version, not the contract.
-fn is_the_fixture(mut generated: Manifest, name: &str) -> Outcome {
-    let mut fixture = isoloom_manifest::parse(&std::fs::read_to_string(fixture(name))?)?;
-    generated.generator.version = Version::parse("0.0.0")?;
-    fixture.generator.version = Version::parse("0.0.0")?;
-    assert_eq!(generated, fixture);
-    Ok(())
-}
-
 #[test]
-fn the_flag_portal_spec_writes_the_shared_docker_fixture() -> Outcome {
-    is_the_fixture(
-        run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker)?, ".isoloom/docker/run.json")?,
+fn the_web_portal_spec_writes_the_shared_docker_fixture() -> Outcome {
+    matches_fixture(
+        run_json(&generate(&lab(WEB_PORTAL)?, Target::Docker)?, ".isoloom/docker/run.json")?,
         "docker.run.json",
     )
 }
 
 #[test]
-fn the_flag_portal_spec_writes_the_shared_docker_vm_fixtures() -> Outcome {
-    let files = generate(&lab(FLAG_PORTAL)?, Target::DockerVm)?;
-    is_the_fixture(run_json(&files, ".isoloom/docker-vm/run.json")?, "docker-vm.run.json")?;
-    is_the_fixture(run_json(&files, ".isoloom/docker-vm/proxmox/run.json")?, "docker-vm-proxmox.run.json")
+fn the_web_portal_spec_writes_the_shared_docker_vm_fixtures() -> Outcome {
+    let files = generate(&lab(WEB_PORTAL)?, Target::DockerVm)?;
+    matches_fixture(run_json(&files, ".isoloom/docker-vm/run.json")?, "docker-vm.run.json")?;
+    matches_fixture(run_json(&files, ".isoloom/docker-vm/proxmox/run.json")?, "docker-vm-proxmox.run.json")
 }
 
 #[test]
@@ -115,7 +99,7 @@ fn the_solo_web_example_writes_the_shared_proxmox_fixture() -> Outcome {
         .find(|(name, _)| name == "solo-web")
         .ok_or("no solo-web")?
         .1;
-    is_the_fixture(
+    matches_fixture(
         run_json(&generate(&solo_web, Target::Proxmox)?, ".isoloom/proxmox/run.json")?,
         "proxmox.run.json",
     )
@@ -123,7 +107,7 @@ fn the_solo_web_example_writes_the_shared_proxmox_fixture() -> Outcome {
 
 #[test]
 fn check_runners_get_their_waits_plus_15_s_a_check_plus_60_s() -> Outcome {
-    let m = run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
+    let m = run_json(&generate(&lab(WEB_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
     let timeouts: Vec<(String, u32, u32)> = m
         .checks
         .runners
@@ -144,7 +128,7 @@ fn check_runners_get_their_waits_plus_15_s_a_check_plus_60_s() -> Outcome {
 
 #[test]
 fn the_message_leaves_published_ports_to_the_runner() -> Outcome {
-    let m = run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
+    let m = run_json(&generate(&lab(WEB_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
     let message = m.environment.message.unwrap();
     assert_eq!(message.to_string(), "The portal answers at http://localhost:${published.web.portal}/.\n");
     assert!(message.parts().iter().any(|p| matches!(p, Part::Placeholder(Placeholder::Published { .. }))));
@@ -185,8 +169,8 @@ fn examples(target: Target) -> Outcome<Vec<(String, Lab)>> {
 #[test]
 fn every_env_delivered_slot_has_a_value_or_a_default() -> Outcome {
     let mut manifests = vec![(
-        "flag-portal".to_owned(),
-        run_json(&generate(&lab(FLAG_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?,
+        "web-portal".to_owned(),
+        run_json(&generate(&lab(WEB_PORTAL)?, Target::Docker).unwrap(), ".isoloom/docker/run.json")?,
     )];
     for (target, path, _) in WRITERS {
         for (name, spec) in examples(target)? {
@@ -203,9 +187,9 @@ fn every_env_delivered_slot_has_a_value_or_a_default() -> Outcome {
             );
         }
     }
-    let flag = lab(FLAG_PORTAL)?;
-    let m = run_json(&generate(&flag, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
-    let slot = m.secrets.iter().find(|s| s.name.to_string() == "CTF_FLAG_MAIN").unwrap();
+    let portal = lab(WEB_PORTAL)?;
+    let m = run_json(&generate(&portal, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
+    let slot = m.secrets.iter().find(|s| s.name.to_string() == "DEMO_SECRET").unwrap();
     assert_eq!(
         (slot.required, slot.default.as_deref()),
         (false, Some("")),
@@ -219,12 +203,12 @@ fn every_env_delivered_slot_has_a_value_or_a_default() -> Outcome {
 #[test]
 fn an_input_keeps_the_sensitivity_the_spec_gives_it() -> Outcome {
     let spec = lab(
-        "version: 1\nname: s\nnetworks:\n  lab: { cidr: 10.30.0.0/24 }\ninputs: { API_URL: { sensitive: false }, FLAG: {} }\nmachines:\n  web:\n    networks: { lab: 10 }\n    environment: { API_URL: { input: API_URL } }\n    files: [{ path: /srv/flag, input: FLAG }]\n    app: { image: nginx }\n",
+        "version: 1\nname: s\nnetworks:\n  lab: { cidr: 10.30.0.0/24 }\ninputs: { API_URL: { sensitive: false }, DEMO_SECRET: {} }\nmachines:\n  web:\n    networks: { lab: 10 }\n    environment: { API_URL: { input: API_URL } }\n    files: [{ path: /srv/secret, input: DEMO_SECRET }]\n    app: { image: nginx }\n",
     )?;
     let m = run_json(&generate(&spec, Target::Docker).unwrap(), ".isoloom/docker/run.json")?;
     let sensitive = |name: &str| m.secrets.iter().find(|s| s.name.to_string() == name).map(|s| s.sensitive);
     assert_eq!(sensitive("API_URL"), Some(false));
-    assert_eq!(sensitive("FLAG"), Some(true));
+    assert_eq!(sensitive("DEMO_SECRET"), Some(true));
     Ok(())
 }
 
@@ -248,7 +232,7 @@ fn every_examples_manifest_parses_and_matches_the_schema() -> Outcome {
 
 #[test]
 fn only_docker_vagrant_proxmox_and_docker_vm_write_a_run_manifest_for_now() -> Outcome {
-    let spec = lab(FLAG_PORTAL)?;
+    let spec = lab(WEB_PORTAL)?;
     for target in [Target::Hosted, Target::Kubernetes] {
         let files = generate(&spec, target).unwrap_or_default();
         assert!(!files.iter().any(|f| f.path.ends_with("run.json")), "{}", target.id());
@@ -258,10 +242,10 @@ fn only_docker_vagrant_proxmox_and_docker_vm_write_a_run_manifest_for_now() -> O
 
 #[test]
 fn an_instance_writes_its_manifest_in_its_own_folder() -> Outcome {
-    let files = generate_instance(&lab(FLAG_PORTAL)?, Target::Docker, 2).unwrap();
+    let files = generate_instance(&lab(WEB_PORTAL)?, Target::Docker, 2).unwrap();
     let m = run_json(&files, ".isoloom-2/docker/run.json")?;
     assert_eq!(m.environment.instance.map(isoloom_manifest::Instance::get), Some(2));
-    assert_eq!(m.environment.name.as_str(), "flag-portal-2");
+    assert_eq!(m.environment.name.as_str(), "web-portal-2");
     Ok(())
 }
 

@@ -168,7 +168,7 @@ pub fn is_reboot(step: &str) -> bool {
 }
 
 /// How a Windows box answers WinRM. Most boxes (StefanScherer, gusztavvargadr) use plain HTTP
-/// on 5985 with basic auth; some (GOAD's Windows Server 2025 box) only listen on HTTPS 5986.
+/// on 5985 with basic auth; some (several Windows Server 2025 boxes) only listen on HTTPS 5986.
 /// Isoloom can't tell from the box name, so a non-default box declares it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]

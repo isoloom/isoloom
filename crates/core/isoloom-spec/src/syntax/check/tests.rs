@@ -15,7 +15,7 @@ fn has(found: &[(Code, String)], code: Code, path: &str) -> bool {
 #[test]
 fn a_well_formed_spec_has_no_problem() {
     let found = problems(
-        "inputs: { FLAG: {}, API_URL: { sensitive: false } }\nmachines:\n  web:\n    networks: { lab: 10 }\n    app: { build: build/web }\n    ports: { site: { port: 8000, protocol: http, publish: 8080 } }\n    files: [{ path: /ctf/flag, input: FLAG, uid: 1000 }]\n    environment: { API_URL: { input: API_URL }, MODE: prod }\n    healthcheck: { http: { port: site } }\nmessage: \"{{ machines.web.ports.site.url }} {{ machines.web.addresses.lab }}\"\n",
+        "inputs: { DEMO_SECRET: {}, API_URL: { sensitive: false } }\nmachines:\n  web:\n    networks: { lab: 10 }\n    app: { build: build/web }\n    ports: { site: { port: 8000, protocol: http, publish: 8080 } }\n    files: [{ path: /srv/demo/secret, input: DEMO_SECRET, uid: 1000 }]\n    environment: { API_URL: { input: API_URL }, MODE: prod }\n    healthcheck: { http: { port: site } }\nmessage: \"{{ machines.web.ports.site.url }} {{ machines.web.addresses.lab }}\"\n",
     );
     assert!(found.is_empty(), "{found:?}");
 }
@@ -43,9 +43,9 @@ fn a_catalogue_service_is_the_plans_to_resolve_and_its_port_numbers_the_entry_on
 #[test]
 fn sensitive_values_stay_out_of_the_environment() {
     let found = problems(
-        "inputs: [FLAG]\nsecrets: { db: { env: DB } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { FLAG: { input: FLAG }, DB: { secret: db }, X: { input: NOPE } }\n",
+        "inputs: [DEMO_SECRET]\nsecrets: { db: { env: DB } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    environment: { DEMO_SECRET: { input: DEMO_SECRET }, DB: { secret: db }, X: { input: NOPE } }\n",
     );
-    assert!(has(&found, Code::SensitiveValue, "machines.web.environment.FLAG"), "{found:?}");
+    assert!(has(&found, Code::SensitiveValue, "machines.web.environment.DEMO_SECRET"), "{found:?}");
     assert!(has(&found, Code::SensitiveValue, "machines.web.environment.DB"), "{found:?}");
     assert!(has(&found, Code::UnknownReference, "machines.web.environment.X"), "{found:?}");
 }
@@ -68,7 +68,7 @@ fn an_input_keeps_its_name_in_the_environment() {
 #[test]
 fn files_name_declared_values_once_each() {
     let found = problems(
-        "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    files: [{ path: /a, input: FLAG }, { path: /a, secret: db }, { path: rel, content: x }]\n",
+        "machines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    files: [{ path: /a, input: DEMO_SECRET }, { path: /a, secret: db }, { path: rel, content: x }]\n",
     );
     for (code, path) in [
         (Code::UnknownReference, "machines.web.files[0].input"),
@@ -83,7 +83,7 @@ fn files_name_declared_values_once_each() {
     );
     assert_eq!(declared, []);
     let windows = problems(
-        "inputs: [FLAG]\nmachines:\n  dc: { os: windows-server@2019, networks: { lab: 10 }, files: [{ path: 'C:\\flag.txt', input: FLAG, mode: \"0444\" }] }\n",
+        "inputs: [DEMO_SECRET]\nmachines:\n  dc: { os: windows-server@2019, networks: { lab: 10 }, files: [{ path: 'C:\\secret.txt', input: DEMO_SECRET, mode: \"0444\" }] }\n",
     );
     assert!(
         has(&windows, Code::InvalidValue, "machines.dc.files[0].mode") && windows.len() == 1,

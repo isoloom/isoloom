@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn secrets_are_refused_whatever_the_spacing() {
-        for text in ["${secrets.FLAG}", "a ${ secrets.x } b", "${secrets}"] {
+        for text in ["${secrets.DEMO_SECRET}", "a ${ secrets.x } b", "${secrets}"] {
             assert_eq!(Template::parse(text).unwrap_err().code(), "secret_placeholder", "{text}");
         }
     }

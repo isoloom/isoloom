@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn an_input_is_sensitive_unless_it_says_otherwise() {
-        let map: Inputs = serde_yaml_ng::from_str("{ FLAG: { description: the flag } }").unwrap();
+        let map: Inputs = serde_yaml_ng::from_str("{ DEMO_SECRET: { description: the secret } }").unwrap();
         assert!(map.0.values().all(|i| i.sensitive));
         let none: Inputs = serde_yaml_ng::from_str("~").unwrap();
         assert_eq!(none, Inputs::default());
@@ -132,12 +132,17 @@ mod tests {
 
     #[test]
     fn inputs_are_a_list_or_a_map() {
-        let list: Inputs = serde_yaml_ng::from_str("[FLAG, API_URL]").unwrap();
+        let list: Inputs = serde_yaml_ng::from_str("[DEMO_SECRET, API_URL]").unwrap();
         assert!(list.0.values().all(|i| i.sensitive));
-        let map: Inputs = serde_yaml_ng::from_str("{ FLAG: , API_URL: { sensitive: false } }").unwrap();
-        let flags: Vec<bool> = map.0.values().map(|i| i.sensitive).collect();
-        assert_eq!(flags, [true, false]);
-        assert!(serde_yaml_ng::from_str::<Inputs>("[FLAG, FLAG]").unwrap_err().to_string().contains("twice"));
-        assert!(serde_yaml_ng::from_str::<Inputs>("[1FLAG]").is_err());
+        let map: Inputs = serde_yaml_ng::from_str("{ DEMO_SECRET: , API_URL: { sensitive: false } }").unwrap();
+        let secrets: Vec<bool> = map.0.values().map(|i| i.sensitive).collect();
+        assert_eq!(secrets, [true, false]);
+        assert!(
+            serde_yaml_ng::from_str::<Inputs>("[DEMO_SECRET, DEMO_SECRET]")
+                .unwrap_err()
+                .to_string()
+                .contains("twice")
+        );
+        assert!(serde_yaml_ng::from_str::<Inputs>("[1SECRET]").is_err());
     }
 }

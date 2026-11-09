@@ -209,12 +209,12 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
     let shown = [
         web,
         job,
-        machine("kali", Role::Access, vec![lab_port("vnc", 5900, PortKind::Tcp, true)]),
+        machine("client", Role::Access, vec![lab_port("vnc", 5900, PortKind::Tcp, true)]),
         machine("shell", Role::Tool, vec![lab_port("ttyd", 7681, PortKind::Http, true)]),
     ];
     let out = outputs(&shown).unwrap();
     let names: Vec<String> = out.iter().map(|o| o.name.to_string()).collect();
-    assert_eq!(names, ["web_site", "web_plain", "web_dns", "kali_vnc", "shell_ttyd"]);
+    assert_eq!(names, ["web_site", "web_plain", "web_dns", "client_vnc", "shell_ttyd"]);
     let formats: Vec<String> = out.iter().map(|o| o.format.as_ref().map(ToString::to_string).unwrap_or_default()).collect();
     assert_eq!(formats[0], "https://127.0.0.1:${value}/");
     assert_eq!(formats[1], "http://127.0.0.1:${value}/");
@@ -222,7 +222,7 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
     assert_eq!((out[0].role, out[2].role), (OutputRole::Entry, OutputRole::Info));
     assert_eq!(out[2].description.as_deref(), Some("web's dns (port 53/udp)."));
     assert_eq!(out[0].description.as_deref(), Some("web's site (port 443)."));
-    assert!(matches!(&out[3].from, OutputSource::PublishedPort { machine, port } if machine.to_string() == "kali" && port.to_string() == "vnc"));
+    assert!(matches!(&out[3].from, OutputSource::PublishedPort { machine, port } if machine.to_string() == "client" && port.to_string() == "vnc"));
     let odd = machine("my-box", Role::Target, vec![lab_port("a-b", 1, PortKind::Tcp, true)]);
     assert_eq!(outputs(&[odd]).unwrap()[0].name.to_string(), "my_box_a_b");
     assert_eq!(Template::from_parts([Part::Placeholder(Placeholder::Value)]).to_string(), "${value}");
@@ -231,10 +231,10 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
 #[test]
 fn a_vm_lab_shows_each_published_port_at_its_machines_host() {
     let web = machine("web", Role::Target, vec![lab_port("site", 80, PortKind::Http, true)]);
-    let kali = machine("kali", Role::Access, vec![lab_port("vnc", 5900, PortKind::Tcp, true)]);
-    let out = outputs_on_their_hosts(&[web, kali]).unwrap();
+    let client = machine("client", Role::Access, vec![lab_port("vnc", 5900, PortKind::Tcp, true)]);
+    let out = outputs_on_their_hosts(&[web, client]).unwrap();
     let formats: Vec<String> = out.iter().map(|o| o.format.as_ref().map(ToString::to_string).unwrap_or_default()).collect();
-    assert_eq!(formats, ["http://${host.web}:${value}/", "${host.kali}:${value}"]);
+    assert_eq!(formats, ["http://${host.web}:${value}/", "${host.client}:${value}"]);
 }
 
 #[test]

@@ -6,7 +6,7 @@ use isoloom_spec::Target;
 use isoloom_targets::resolved::{lookup, resolve};
 use isoloom_targets::{Lab, generate};
 
-use crate::testing::{Outcome, example, file as contents, generated};
+use crate::testing::{Outcome, example, file as contents, generated, lab};
 
 #[test]
 fn addresses_and_routers_match_the_generators() -> Outcome {
@@ -42,8 +42,11 @@ fn targets_say_what_generates_and_why_the_others_dont() -> Outcome {
     let generated = lookup(&r, "targets.generated").unwrap().as_array().unwrap();
     assert!(generated.iter().any(|t| t == "docker") && generated.iter().any(|t| t == "vagrant"));
     assert!(generated.iter().any(|t| t == "cloud-vm"));
-    // pivot-dmz's Kali machine runs on AWS alone: the other clouds are refused, with the reason.
-    let p = resolve(&example("pivot-dmz")?);
+    // A Kali machine runs on AWS alone (its Marketplace image): the other clouds are refused,
+    // with the reason.
+    let p = resolve(&lab(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  box: { os: kali, networks: { lan: 10 } }\n",
+    )?);
     assert!(lookup(&p, "targets.clouds.cloud-vm.refused.azure").unwrap().as_str().unwrap().contains("kali"));
     // arm-vm runs on no cloud: cloud-vm is refused as a whole, with the reason.
     let a = resolve(&example("arm-vm")?);

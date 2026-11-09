@@ -98,7 +98,7 @@ fn an_arm64_access_machine_that_is_actually_built_is_still_refused_on_the_cloud(
     // An access machine with no implementation isn't instantiated, so its arch is moot. One that
     // declares a VM is built, so arm64 must still be caught (the cloud images are x86-64 only).
     let spec = lab(
-        "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  kali:\n    os: debian@12\n    networks: { lab: 10 }\n    access: true\n    hardware: { arch: arm64 }\n    app: { steps: [{ run: p.sh }] }\n",
+        "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  client:\n    os: debian@12\n    networks: { lab: 10 }\n    access: true\n    hardware: { arch: arm64 }\n    app: { steps: [{ run: p.sh }] }\n",
     )?;
     assert!(
         matches!(generate(&spec, Target::CloudVm), Err(Error::Generate(GenerateError::Unsupported { ref what, .. })) if what.contains("arm64")),

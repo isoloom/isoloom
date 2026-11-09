@@ -321,13 +321,13 @@ mod tests {
 
     #[test]
     fn names_follow_their_patterns() {
-        assert!(EnvironmentName::parse("flag-portal").is_ok());
-        assert!(EnvironmentName::parse("Flag").is_err());
+        assert!(EnvironmentName::parse("web-portal").is_ok());
+        assert!(EnvironmentName::parse("Portal").is_err());
         assert!(EnvironmentName::parse("a--b").is_err());
         assert!(Name::parse("isoloom-check-db").is_ok());
         assert!(Name::parse("-web").is_err());
-        assert!(EnvName::parse("CTF_FLAG_MAIN").is_ok());
-        assert!(EnvName::parse("ctf_flag").is_ok());
+        assert!(EnvName::parse("DEMO_SECRET").is_ok());
+        assert!(EnvName::parse("demo_secret").is_ok());
         assert!(EnvName::parse("1FLAG").is_err());
         assert!(Identifier::parse("db-password").is_ok());
         assert!(StepId::parse("job-web-init-1").is_ok());

@@ -11,7 +11,7 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
     // segmented's access machine without an `os` of its own: the runner supplies it.
     let mut supplied = source("segmented")?;
     supplied.machines["user"].os = None;
-    let table = isoloom_spec::images::Table::parse("access:\n  docker: kalilinux/kali-rolling\n  vm: kali\n").unwrap();
+    let table = isoloom_spec::images::Table::parse("access:\n  docker: registry.example.com/workstation:1\n  vm: ubuntu@24.04\n").unwrap();
     let applied = Lab::new(supplied).with_images(table.clone());
     let compose = generated(&applied, Target::Docker, ".isoloom/docker/compose.yml")?;
     // The access machine is a real container now, kept running idle under the engine's init, not
@@ -19,7 +19,7 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
     // (its table image the fallback) and it sits in the `access` profile, so the initial `up` skips it.
     assert!(
         compose
-            .contains("  user:\n    image: ${ISOLOOM_ACCESS_IMAGE:-kalilinux/kali-rolling}\n    platform: linux/amd64\n    profiles:\n    - access\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"),
+            .contains("  user:\n    image: ${ISOLOOM_ACCESS_IMAGE:-registry.example.com/workstation:1}\n    platform: linux/amd64\n    profiles:\n    - access\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"),
         "{compose}"
     );
     // A check that runs from its position can't depend on it (it is on demand, in the `access`
@@ -29,7 +29,7 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
     // Its VM too: defined but not started by `up` (`autostart: false`), its box overridable.
     let vagrant = generated(&applied, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     assert!(
-        vagrant.contains("config.vm.define \"user\", autostart: false do |m|\n    m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"kalilinux/rolling\")"),
+        vagrant.contains("config.vm.define \"user\", autostart: false do |m|\n    m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"bento/ubuntu-24.04\")"),
         "{vagrant}"
     );
     // An access machine with its own `os` is the spec's, which wins over the table.

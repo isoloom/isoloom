@@ -8,7 +8,7 @@ expression: "joined(&files, |p| p.ends_with(\"environment.yaml\"))"
 # Start:  kubectl apply -k .isoloom/kubernetes
 #         kubectl -n isoloom-own-process wait --for=condition=Available deployment --all --timeout=600s
 # Stop:   kubectl delete namespace isoloom-own-process
-# Inputs (optional, unset ones are empty): kubectl -n isoloom-own-process create secret generic isoloom-inputs --from-literal=FLAG=…
+# Inputs (optional, unset ones are empty): kubectl -n isoloom-own-process create secret generic isoloom-inputs --from-literal=DEMO_SECRET=…
 
 apiVersion: v1
 kind: Namespace
@@ -65,18 +65,18 @@ spec:
             - /.isoloom-probe/busybox
             - sh
             - -c
-            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/flag && echo $FLAG )
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $DEMO_SECRET )
           initialDelaySeconds: 10
           periodSeconds: 2
           timeoutSeconds: 3
           successThreshold: 1
           failureThreshold: 30
         env:
-        - name: FLAG
+        - name: DEMO_SECRET
           valueFrom:
             secretKeyRef:
               name: isoloom-inputs
-              key: FLAG
+              key: DEMO_SECRET
               optional: true
         volumeMounts:
         - name: isoloom-probe
@@ -88,13 +88,13 @@ spec:
         command:
         - sh
         - -c
-        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/flag && echo $FLAG ); do sleep 2; done && sh /isoloom/scripts/flag.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $DEMO_SECRET ); do sleep 2; done && sh /isoloom/scripts/secret.sh && exec sleep infinity
         env:
-        - name: FLAG
+        - name: DEMO_SECRET
           valueFrom:
             secretKeyRef:
               name: isoloom-inputs
-              key: FLAG
+              key: DEMO_SECRET
               optional: true
         volumeMounts:
         - name: isoloom-probe
@@ -286,18 +286,18 @@ spec:
             - /.isoloom-probe/busybox
             - sh
             - -c
-            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/flag && echo $FLAG )
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $DEMO_SECRET )
           initialDelaySeconds: 10
           periodSeconds: 2
           timeoutSeconds: 3
           successThreshold: 1
           failureThreshold: 30
         env:
-        - name: FLAG
+        - name: DEMO_SECRET
           valueFrom:
             secretKeyRef:
               name: isoloom-inputs
-              key: FLAG
+              key: DEMO_SECRET
               optional: true
         volumeMounts:
         - name: isoloom-probe
@@ -309,13 +309,13 @@ spec:
         command:
         - sh
         - -c
-        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/flag && echo $FLAG ); do sleep 2; done && sh /isoloom/scripts/flag.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $DEMO_SECRET ); do sleep 2; done && sh /isoloom/scripts/secret.sh && exec sleep infinity
         env:
-        - name: FLAG
+        - name: DEMO_SECRET
           valueFrom:
             secretKeyRef:
               name: isoloom-inputs
-              key: FLAG
+              key: DEMO_SECRET
               optional: true
         volumeMounts:
         - name: isoloom-probe

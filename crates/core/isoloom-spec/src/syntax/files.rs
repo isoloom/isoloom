@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn a_file_has_one_source_and_a_mode_by_kind() {
-        let value: File = serde_yaml_ng::from_str("{ path: /ctf/flag, input: FLAG }").unwrap();
+        let value: File = serde_yaml_ng::from_str("{ path: /srv/demo/secret, input: DEMO_SECRET }").unwrap();
         assert!(value.source.is_value());
         assert_eq!(value.mode_or_default().to_string(), "0400");
         let widened: File = serde_yaml_ng::from_str("{ path: /a, content: x, mode: 0444 }").unwrap();
@@ -236,7 +236,9 @@ mod tests {
 
     #[test]
     fn a_file_with_two_sources_or_none_is_refused() {
-        let two = serde_yaml_ng::from_str::<File>("{ path: /a, source: a, input: FLAG }").unwrap_err().to_string();
+        let two = serde_yaml_ng::from_str::<File>("{ path: /a, source: a, input: DEMO_SECRET }")
+            .unwrap_err()
+            .to_string();
         assert!(two.contains("`source` and `input`"), "{two}");
         let none = serde_yaml_ng::from_str::<File>("{ path: /a }").unwrap_err().to_string();
         assert!(none.contains("needs one of"), "{none}");

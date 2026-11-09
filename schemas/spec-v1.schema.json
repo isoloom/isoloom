@@ -3421,7 +3421,7 @@
           "description": "HTTPS on 5986, NTLM (certificate not verified)."
         }
       ],
-      "description": "How a Windows box answers WinRM. Most boxes (StefanScherer, gusztavvargadr) use plain HTTP\non 5985 with basic auth; some (GOAD's Windows Server 2025 box) only listen on HTTPS 5986.\nIsoloom can't tell from the box name, so a non-default box declares it."
+      "description": "How a Windows box answers WinRM. Most boxes (StefanScherer, gusztavvargadr) use plain HTTP\non 5985 with basic auth; some (several Windows Server 2025 boxes) only listen on HTTPS 5986.\nIsoloom can't tell from the box name, so a non-default box declares it."
     },
     "VagrantBox": {
       "type": "object",

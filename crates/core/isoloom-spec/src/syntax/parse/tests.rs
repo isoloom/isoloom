@@ -8,7 +8,7 @@ fn problems(yaml: &str) -> Vec<Problem> {
 #[test]
 fn a_spec_reads_into_its_types() {
     let spec = parse(
-        "version: 1\nname: help-desk\nnetworks:\n  lab: { cidr: 10.44.0.0/24, internet: false }\ninputs:\n  FLAG: { description: the flag }\nmachines:\n  web:\n    networks: { lab: 10 }\n    app: { build: build/web }\n    ports: { site: { port: 8000, protocol: http, publish: 8080 } }\n    files: [{ path: /srv/flag.txt, input: FLAG, uid: 1000, mode: \"0400\" }]\n",
+        "version: 1\nname: help-desk\nnetworks:\n  lab: { cidr: 10.44.0.0/24, internet: false }\ninputs:\n  DEMO_SECRET: { description: the secret }\nmachines:\n  web:\n    networks: { lab: 10 }\n    app: { build: build/web }\n    ports: { site: { port: 8000, protocol: http, publish: 8080 } }\n    files: [{ path: /srv/secret.txt, input: DEMO_SECRET, uid: 1000, mode: \"0400\" }]\n",
     )
     .unwrap();
     assert_eq!(spec.name, "help-desk");

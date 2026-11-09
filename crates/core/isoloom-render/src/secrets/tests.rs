@@ -10,7 +10,7 @@ use isoloom_spec::model::Target;
 const LAB: &str = r"
 version: 1
 name: s
-inputs: [FLAG]
+inputs: [DEMO_SECRET]
 secrets:
   api-key: { env: API_KEY }
   db-password: { env: DB_PASSWORD }
@@ -19,7 +19,7 @@ machines:
   web:
     networks: { lan: 10 }
     app: { image: nginx }
-    files: [{ path: /run/secrets/db, secret: db-password }, { path: /flag, input: FLAG }]
+    files: [{ path: /run/secrets/db, secret: db-password }, { path: /secret, input: DEMO_SECRET }]
   vm:
     networks: { lan: 11 }
     os: windows-server@2022
@@ -163,9 +163,13 @@ fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
 #[test]
 fn a_docker_host_gets_the_secrets_of_its_containers_in_the_spec_s_order() {
     let env = testing::env(LAB, Target::Hybrid);
-    assert_eq!(of_containers(&env), ["db-password", "input-flag"]);
+    assert_eq!(of_containers(&env), ["db-password", "input-demo-secret"]);
     assert_eq!(compose_variable(env.spec(), "db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
-    assert_eq!(compose_variable(env.spec(), "input-flag"), "FLAG", "an input's file reads the input itself");
+    assert_eq!(
+        compose_variable(env.spec(), "input-demo-secret"),
+        "DEMO_SECRET",
+        "an input's file reads the input itself"
+    );
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.

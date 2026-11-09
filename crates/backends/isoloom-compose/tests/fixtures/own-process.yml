@@ -2,17 +2,17 @@
 # healthcheck beside its port probe.
 version: 1
 name: own-process
-inputs: { FLAG: { sensitive: false } }
+inputs: { DEMO_SECRET: { sensitive: false } }
 networks: { lan: { cidr: 10.9.0.0/24 } }
 machines:
   web:
     networks: { lan: 10 }
-    environment: { FLAG: { input: FLAG } }
+    environment: { DEMO_SECRET: { input: DEMO_SECRET } }
     ports: { site: 8000 }
     app: { image: "python:3-alpine" }
     command: { run: [python3, -m, http.server, "8000"], cwd: /srv }
-    setup: [flag.sh]
-    healthcheck: { test: "test -s /srv/flag && echo $FLAG", interval: 2s, retries: 30 }
+    setup: [secret.sh]
+    healthcheck: { test: "test -s /srv/secret && echo $DEMO_SECRET", interval: 2s, retries: 30 }
   api:
     networks: { lan: 11 }
     ports: { api: 9000 }

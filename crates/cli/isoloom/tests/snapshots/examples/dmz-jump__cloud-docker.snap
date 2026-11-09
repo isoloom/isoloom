@@ -104,7 +104,7 @@ provider "aws" {
   region = var.region
   default_tags {
     tags = {
-      isoloom-environment = "pivot-dmz"
+      isoloom-environment = "dmz-jump"
       managed-by          = "isoloom"
       isoloom-instance    = local.name
       isoloom-expires-at  = var.expires_at
@@ -120,7 +120,7 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name = "isoloom-pivot-dmz-${terraform_data.id.output}"
+  name = "isoloom-dmz-jump-${terraform_data.id.output}"
 }
 
 data "aws_availability_zones" "available" {
@@ -235,7 +235,7 @@ output "ssh_user" {
     "version": "1.0.9"
   },
   "environment": {
-    "name": "pivot-dmz",
+    "name": "dmz-jump",
     "instance": null,
     "message": null
   },
@@ -416,19 +416,19 @@ output "ssh_user" {
       "name": "dmz",
       "cidr": "10.30.10.0/24",
       "internet": true,
-      "native": "pivot-dmz_dmz"
+      "native": "dmz-jump_dmz"
     },
     {
       "name": "internal",
       "cidr": "10.30.20.0/24",
       "internet": false,
-      "native": "pivot-dmz_internal"
+      "native": "dmz-jump_internal"
     },
     {
       "name": "access",
       "cidr": "10.30.99.0/24",
       "internet": true,
-      "native": "pivot-dmz_access"
+      "native": "dmz-jump_access"
     }
   ],
   "machines": [
@@ -725,7 +725,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -821,7 +821,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -874,7 +874,7 @@ output "ssh_user" {
           "id": "check-user",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -885,7 +885,7 @@ output "ssh_user" {
             "id": "rm-check-user",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -914,7 +914,7 @@ output "ssh_user" {
           "id": "check-gateway",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -925,7 +925,7 @@ output "ssh_user" {
             "id": "rm-check-gateway",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -966,7 +966,7 @@ output "ssh_user" {
           "id": "check-app",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -977,7 +977,7 @@ output "ssh_user" {
             "id": "rm-check-app",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -1018,7 +1018,7 @@ output "ssh_user" {
           "id": "check-db",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -1029,7 +1029,7 @@ output "ssh_user" {
             "id": "rm-check-db",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -1043,7 +1043,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -1068,7 +1068,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name pivot-dmz ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name dmz-jump ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "admin"
       },
@@ -1191,9 +1191,9 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name = "isoloom-pivot-dmz-${terraform_data.id.output}"
+  name = "isoloom-dmz-jump-${terraform_data.id.output}"
   tags = {
-    isoloom-environment = "pivot-dmz"
+    isoloom-environment = "dmz-jump"
     managed-by          = "isoloom"
     isoloom-instance    = local.name
     isoloom-expires-at  = var.expires_at
@@ -1313,7 +1313,7 @@ output "ssh_user" {
     "version": "1.0.9"
   },
   "environment": {
-    "name": "pivot-dmz",
+    "name": "dmz-jump",
     "instance": null,
     "message": null
   },
@@ -1490,19 +1490,19 @@ output "ssh_user" {
       "name": "dmz",
       "cidr": "10.30.10.0/24",
       "internet": true,
-      "native": "pivot-dmz_dmz"
+      "native": "dmz-jump_dmz"
     },
     {
       "name": "internal",
       "cidr": "10.30.20.0/24",
       "internet": false,
-      "native": "pivot-dmz_internal"
+      "native": "dmz-jump_internal"
     },
     {
       "name": "access",
       "cidr": "10.30.99.0/24",
       "internet": true,
-      "native": "pivot-dmz_access"
+      "native": "dmz-jump_access"
     }
   ],
   "machines": [
@@ -1799,7 +1799,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -1895,7 +1895,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -1948,7 +1948,7 @@ output "ssh_user" {
           "id": "check-user",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -1959,7 +1959,7 @@ output "ssh_user" {
             "id": "rm-check-user",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "isoloom"
             },
@@ -1988,7 +1988,7 @@ output "ssh_user" {
           "id": "check-gateway",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -1999,7 +1999,7 @@ output "ssh_user" {
             "id": "rm-check-gateway",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "isoloom"
             },
@@ -2040,7 +2040,7 @@ output "ssh_user" {
           "id": "check-app",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -2051,7 +2051,7 @@ output "ssh_user" {
             "id": "rm-check-app",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "isoloom"
             },
@@ -2092,7 +2092,7 @@ output "ssh_user" {
           "id": "check-db",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -2103,7 +2103,7 @@ output "ssh_user" {
             "id": "rm-check-db",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "isoloom"
             },
@@ -2117,7 +2117,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -2142,7 +2142,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name pivot-dmz ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name dmz-jump ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "isoloom"
       },
@@ -2257,7 +2257,7 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name = "isoloom-pivot-dmz-${terraform_data.id.output}"
+  name = "isoloom-dmz-jump-${terraform_data.id.output}"
 }
 
 resource "digitalocean_vpc" "env" {
@@ -2279,7 +2279,7 @@ resource "digitalocean_droplet" "env" {
   vpc_uuid  = digitalocean_vpc.env.id
   ssh_keys  = [digitalocean_ssh_key.env.id]
   user_data = "#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n"
-  tags      = concat(["isoloom", "pivot-dmz", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
+  tags      = concat(["isoloom", "dmz-jump", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   lifecycle {
     ignore_changes = [user_data]
   }
@@ -2326,7 +2326,7 @@ output "ssh_user" {
     "version": "1.0.9"
   },
   "environment": {
-    "name": "pivot-dmz",
+    "name": "dmz-jump",
     "instance": null,
     "message": null
   },
@@ -2449,19 +2449,19 @@ output "ssh_user" {
       "name": "dmz",
       "cidr": "10.30.10.0/24",
       "internet": true,
-      "native": "pivot-dmz_dmz"
+      "native": "dmz-jump_dmz"
     },
     {
       "name": "internal",
       "cidr": "10.30.20.0/24",
       "internet": false,
-      "native": "pivot-dmz_internal"
+      "native": "dmz-jump_internal"
     },
     {
       "name": "access",
       "cidr": "10.30.99.0/24",
       "internet": true,
-      "native": "pivot-dmz_access"
+      "native": "dmz-jump_access"
     }
   ],
   "machines": [
@@ -2758,7 +2758,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -2854,7 +2854,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -2907,7 +2907,7 @@ output "ssh_user" {
           "id": "check-user",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -2918,7 +2918,7 @@ output "ssh_user" {
             "id": "rm-check-user",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -2947,7 +2947,7 @@ output "ssh_user" {
           "id": "check-gateway",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -2958,7 +2958,7 @@ output "ssh_user" {
             "id": "rm-check-gateway",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -2999,7 +2999,7 @@ output "ssh_user" {
           "id": "check-app",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -3010,7 +3010,7 @@ output "ssh_user" {
             "id": "rm-check-app",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -3051,7 +3051,7 @@ output "ssh_user" {
           "id": "check-db",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -3062,7 +3062,7 @@ output "ssh_user" {
             "id": "rm-check-db",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -3076,7 +3076,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3101,7 +3101,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name pivot-dmz ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name dmz-jump ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "root"
       },
@@ -3229,14 +3229,14 @@ provider "google" {
 # A project of its own when none is given: everything goes when the environment is destroyed.
 resource "google_project" "env" {
   count               = var.project == "" ? 1 : 0
-  name                = "isoloom-pivot-dmz"
+  name                = "isoloom-dmz-jump"
   project_id          = "isoloom-${terraform_data.id.output}"
   billing_account     = var.billing_account
   org_id              = var.org_id == "" ? null : var.org_id
   deletion_policy     = "DELETE"
   auto_create_network = false
   labels = {
-    isoloom-environment = "pivot-dmz"
+    isoloom-environment = "dmz-jump"
     managed-by          = "isoloom"
     isoloom-instance    = local.name
     isoloom-expires-at  = var.expires_at
@@ -3258,7 +3258,7 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name    = "isoloom-pivot-dmz-${terraform_data.id.output}"
+  name    = "isoloom-dmz-jump-${terraform_data.id.output}"
   project = var.project != "" ? var.project : google_project_service.compute[0].project
   zone    = "${var.region}-a"
 }
@@ -3294,7 +3294,7 @@ resource "google_compute_instance" "env" {
   machine_type = var.machine_type
   zone         = local.zone
   labels = {
-    isoloom-environment = "pivot-dmz"
+    isoloom-environment = "dmz-jump"
     managed-by          = "isoloom"
     isoloom-instance    = local.name
     isoloom-expires-at  = var.expires_at
@@ -3332,7 +3332,7 @@ output "ssh_user" {
     "version": "1.0.9"
   },
   "environment": {
-    "name": "pivot-dmz",
+    "name": "dmz-jump",
     "instance": null,
     "message": null
   },
@@ -3512,19 +3512,19 @@ output "ssh_user" {
       "name": "dmz",
       "cidr": "10.30.10.0/24",
       "internet": true,
-      "native": "pivot-dmz_dmz"
+      "native": "dmz-jump_dmz"
     },
     {
       "name": "internal",
       "cidr": "10.30.20.0/24",
       "internet": false,
-      "native": "pivot-dmz_internal"
+      "native": "dmz-jump_internal"
     },
     {
       "name": "access",
       "cidr": "10.30.99.0/24",
       "internet": true,
-      "native": "pivot-dmz_access"
+      "native": "dmz-jump_access"
     }
   ],
   "machines": [
@@ -3821,7 +3821,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -3917,7 +3917,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -3970,7 +3970,7 @@ output "ssh_user" {
           "id": "check-user",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -3981,7 +3981,7 @@ output "ssh_user" {
             "id": "rm-check-user",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -4010,7 +4010,7 @@ output "ssh_user" {
           "id": "check-gateway",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -4021,7 +4021,7 @@ output "ssh_user" {
             "id": "rm-check-gateway",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -4062,7 +4062,7 @@ output "ssh_user" {
           "id": "check-app",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -4073,7 +4073,7 @@ output "ssh_user" {
             "id": "rm-check-app",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -4114,7 +4114,7 @@ output "ssh_user" {
           "id": "check-db",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -4125,7 +4125,7 @@ output "ssh_user" {
             "id": "rm-check-db",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "admin"
             },
@@ -4139,7 +4139,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -4164,7 +4164,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name pivot-dmz ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name dmz-jump ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "admin"
       },
@@ -4279,7 +4279,7 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name = "isoloom-pivot-dmz-${terraform_data.id.output}"
+  name = "isoloom-dmz-jump-${terraform_data.id.output}"
 }
 
 resource "linode_instance" "env" {
@@ -4291,7 +4291,7 @@ resource "linode_instance" "env" {
   metadata {
     user_data = base64encode("#!/bin/sh\nmkdir -p /var/lib/isoloom\necho ${var.expires_at} > /var/lib/isoloom/expires-at\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/expiry.sh <<'EXPIRY'\n#!/bin/sh\n# The run's end: the machine shuts itself down\ne=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\nexit 0\nEXPIRY\nchmod +x /etc/isoloom/expiry.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-expiry.service <<'UNIT'\n[Unit]\nDescription=The run's end: the machine shuts itself down\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/expiry.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-expiry.service\nsystemctl restart isoloom-expiry.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/expiry.sh /etc/local.d/isoloom-expiry.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/expiry.sh || true\nfi\n")
   }
-  tags = concat(["isoloom", "pivot-dmz", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
+  tags = concat(["isoloom", "dmz-jump", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   lifecycle {
     ignore_changes = [metadata[0].user_data]
   }
@@ -4299,7 +4299,7 @@ resource "linode_instance" "env" {
 
 resource "linode_firewall" "env" {
   label           = local.name
-  tags            = concat(["isoloom", "pivot-dmz", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
+  tags            = concat(["isoloom", "dmz-jump", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
   inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
   inbound {
@@ -4329,7 +4329,7 @@ output "ssh_user" {
     "version": "1.0.9"
   },
   "environment": {
-    "name": "pivot-dmz",
+    "name": "dmz-jump",
     "instance": null,
     "message": null
   },
@@ -4452,19 +4452,19 @@ output "ssh_user" {
       "name": "dmz",
       "cidr": "10.30.10.0/24",
       "internet": true,
-      "native": "pivot-dmz_dmz"
+      "native": "dmz-jump_dmz"
     },
     {
       "name": "internal",
       "cidr": "10.30.20.0/24",
       "internet": false,
-      "native": "pivot-dmz_internal"
+      "native": "dmz-jump_internal"
     },
     {
       "name": "access",
       "cidr": "10.30.99.0/24",
       "internet": true,
-      "native": "pivot-dmz_access"
+      "native": "dmz-jump_access"
     }
   ],
   "machines": [
@@ -4761,7 +4761,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -4857,7 +4857,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -4910,7 +4910,7 @@ output "ssh_user" {
           "id": "check-user",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -4921,7 +4921,7 @@ output "ssh_user" {
             "id": "rm-check-user",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -4950,7 +4950,7 @@ output "ssh_user" {
           "id": "check-gateway",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -4961,7 +4961,7 @@ output "ssh_user" {
             "id": "rm-check-gateway",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -5002,7 +5002,7 @@ output "ssh_user" {
           "id": "check-app",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -5013,7 +5013,7 @@ output "ssh_user" {
             "id": "rm-check-app",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -5054,7 +5054,7 @@ output "ssh_user" {
           "id": "check-db",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -5065,7 +5065,7 @@ output "ssh_user" {
             "id": "rm-check-db",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -5079,7 +5079,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -5104,7 +5104,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name pivot-dmz ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name dmz-jump ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "root"
       },
@@ -5230,8 +5230,8 @@ resource "terraform_data" "id" {
 }
 
 locals {
-  name = "isoloom-pivot-dmz-${terraform_data.id.output}"
-  tags = merge({ isoloom-environment = "pivot-dmz", managed-by = "isoloom", isoloom-instance = local.name }, var.expires_at == "" ? {} : { isoloom-expires-at = var.expires_at })
+  name = "isoloom-dmz-jump-${terraform_data.id.output}"
+  tags = merge({ isoloom-environment = "dmz-jump", managed-by = "isoloom", isoloom-instance = local.name }, var.expires_at == "" ? {} : { isoloom-expires-at = var.expires_at })
 }
 
 data "oci_identity_availability_domains" "ads" {
@@ -5345,7 +5345,7 @@ output "ssh_user" {
     "version": "1.0.9"
   },
   "environment": {
-    "name": "pivot-dmz",
+    "name": "dmz-jump",
     "instance": null,
     "message": null
   },
@@ -5458,19 +5458,19 @@ output "ssh_user" {
       "name": "dmz",
       "cidr": "10.30.10.0/24",
       "internet": true,
-      "native": "pivot-dmz_dmz"
+      "native": "dmz-jump_dmz"
     },
     {
       "name": "internal",
       "cidr": "10.30.20.0/24",
       "internet": false,
-      "native": "pivot-dmz_internal"
+      "native": "dmz-jump_internal"
     },
     {
       "name": "access",
       "cidr": "10.30.99.0/24",
       "internet": true,
-      "native": "pivot-dmz_access"
+      "native": "dmz-jump_access"
     }
   ],
   "machines": [
@@ -5767,7 +5767,7 @@ output "ssh_user" {
         "note": "Starting the lab's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
@@ -5863,7 +5863,7 @@ output "ssh_user" {
         "note": "Starting the access machine's stand-in…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check up --detach --wait --no-deps isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
@@ -5916,7 +5916,7 @@ output "ssh_user" {
           "id": "check-user",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
@@ -5927,7 +5927,7 @@ output "ssh_user" {
             "id": "rm-check-user",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "ubuntu"
             },
@@ -5956,7 +5956,7 @@ output "ssh_user" {
           "id": "check-gateway",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-gateway",
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
@@ -5967,7 +5967,7 @@ output "ssh_user" {
             "id": "rm-check-gateway",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-gateway --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "ubuntu"
             },
@@ -6008,7 +6008,7 @@ output "ssh_user" {
           "id": "check-app",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-app",
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
@@ -6019,7 +6019,7 @@ output "ssh_user" {
             "id": "rm-check-app",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-app --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "ubuntu"
             },
@@ -6060,7 +6060,7 @@ output "ssh_user" {
           "id": "check-db",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-db",
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
@@ -6071,7 +6071,7 @@ output "ssh_user" {
             "id": "rm-check-db",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=pivot-dmz --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=dmz-jump --filter label=com.docker.compose.service=isoloom-check-db --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
               "host": "${outputs.ip}",
               "user": "ubuntu"
             },
@@ -6085,7 +6085,7 @@ output "ssh_user" {
         "id": "stand-ins-down",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name pivot-dmz --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name dmz-jump --file .isoloom/docker/compose.yml --profile check rm --stop --force isoloom-access isoloom-access-routes",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
@@ -6110,7 +6110,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name pivot-dmz ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name dmz-jump ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "ubuntu"
       },

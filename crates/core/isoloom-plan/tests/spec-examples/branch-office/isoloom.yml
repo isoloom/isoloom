@@ -1,10 +1,9 @@
 # A routed branch office: an edge machine routes the DMZ, the inside network and the management
 # network, the reach rules say what its firewall must let through, and the checks prove it. Made
-# up for the syntax design (plan/phase2/spec.md); the project files it names aren't part of the
-# example.
+# up for the syntax design; the project files it names aren't part of the example.
 #
 # Targets: every machine target. `edge` and `web` have both forms from their steps; `db` comes
-# from the catalogue (Phase 4).
+# from the catalogue.
 version: 1
 name: branch-office
 
@@ -63,7 +62,7 @@ machines:
     networks: { mgmt: 10 }
 
   visitor:
-    os: kali
+    os: debian@12
     access: true
     networks: { outside: 10 }
 

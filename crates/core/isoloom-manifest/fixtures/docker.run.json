@@ -3,10 +3,10 @@
   "manifest_version": 0,
   "generator": {
     "name": "isoloom",
-    "version": "0.10.1"
+    "version": "1.0.9"
   },
   "environment": {
-    "name": "flag-portal",
+    "name": "web-portal",
     "instance": null,
     "message": "The portal answers at http://localhost:${published.web.portal}/.\n"
   },
@@ -105,7 +105,7 @@
   ],
   "secrets": [
     {
-      "name": "CTF_FLAG_MAIN",
+      "name": "DEMO_SECRET",
       "kind": "input",
       "required": false,
       "sensitive": true,
@@ -117,7 +117,7 @@
       "deliver": [
         {
           "via": "env",
-          "var": "CTF_FLAG_MAIN",
+          "var": "DEMO_SECRET",
           "steps": [
             "up",
             "start",
@@ -184,9 +184,9 @@
       },
       "volumes": [
         {
-          "name": "ctf",
-          "path": "/srv/ctf",
-          "native": "${run.name}_web-ctf"
+          "name": "data",
+          "path": "/srv/data",
+          "native": "${run.name}_web-data"
         }
       ],
       "ports": [
