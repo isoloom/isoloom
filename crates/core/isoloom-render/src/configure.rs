@@ -78,6 +78,22 @@ impl<'a> Configured<'a> {
         fill(text, &Context::new(self.env, self.machine)).map_err(|e| format!("the template {from}: {e}"))
     }
 
+    /// Each template of the recipe that can be filled in, as the file at `path(from)`; the
+    /// others are left to the recipe's own failure at apply.
+    #[must_use]
+    pub fn templates(&self, path: impl Fn(&ProjectPath) -> String) -> Vec<GeneratedFile> {
+        self.recipe
+            .resources()
+            .filter_map(|r| match r {
+                Resource::Template(t) => Some(GeneratedFile {
+                    path: path(&t.from),
+                    contents: self.template(&t.from).ok()?,
+                }),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// User `user`'s literal `password`, hashed as Linux keeps it (the same for the same lab).
     #[must_use]
     pub fn password(&self, user: &str, password: &str) -> String {

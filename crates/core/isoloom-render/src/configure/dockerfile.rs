@@ -157,16 +157,7 @@ fn template(c: &Configured<'_>, t: &TemplatePlan) -> String {
 /// The templates machine `c` builds with, filled in: one file each, at
 /// [`rendered_path`] (those that can't be filled in fail the build instead).
 fn templates(c: &Configured<'_>) -> Vec<GeneratedFile> {
-    c.recipe()
-        .resources()
-        .filter_map(|r| match r {
-            Resource::Template(t) => Some(GeneratedFile {
-                path: rendered_path(c.machine(), &t.from),
-                contents: c.template(&t.from).ok()?,
-            }),
-            _ => None,
-        })
-        .collect()
+    c.templates(|from| rendered_path(c.machine(), from))
 }
 
 #[cfg(test)]

@@ -70,16 +70,7 @@ fn handlers(enabled: &[(usize, String)]) -> Vec<serde_json::Value> {
 /// Each template of the recipe, filled in, at `files/rendered/<from>` under the role (those that
 /// can't be filled are left to the play's `fail` task).
 fn templates(c: &Configured<'_>, dir: &str) -> Vec<GeneratedFile> {
-    c.recipe()
-        .resources()
-        .filter_map(|r| match r {
-            Resource::Template(t) => Some(GeneratedFile {
-                path: format!("{dir}/files/{}", rendered(t.from.as_str())),
-                contents: c.template(&t.from).ok()?,
-            }),
-            _ => None,
-        })
-        .collect()
+    c.templates(|from| format!("{dir}/files/{}", rendered(from.as_str())))
 }
 
 /// A list of tasks as a generated YAML file, with the comment header every generated file has.
