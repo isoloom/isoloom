@@ -170,7 +170,7 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         },
         hyperv,
         tpm: mp.tpm,
-        esxi_guestos: mp.os.as_deref().and_then(windows::esxi_guestos),
+        esxi_guestos: mp.os.as_deref().and_then(isoloom_spec::windows::esxi_guest_os),
         esxi_box: None,
         nested: mp.hardware.nested_virtualization,
         disks: mp.disks.iter().map(|d| (d.name.as_str(), d.size_gb)).collect(),

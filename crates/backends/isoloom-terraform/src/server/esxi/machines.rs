@@ -104,7 +104,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut 
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],
         firmware: super::boot::firmware(mp),
-        guestos: windows.then(|| super::windows::guestos(os)),
+        guestos: isoloom_spec::windows::esxi_guest_os(os),
         disks: super::disks::blocks(name, &mp.disks, m),
         windows,
         lifecycle: None,

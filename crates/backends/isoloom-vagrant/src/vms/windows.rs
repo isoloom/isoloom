@@ -57,22 +57,6 @@ fn over_winssh(r: &mut Ruby) {
     r.assign("m.winssh.shell", Value::str("powershell"));
 }
 
-/// The guest OS ESXi registers a Windows VM as (its `guestOS`), so it offers the right virtual
-/// hardware and tools; a Linux box keeps the one it was built with.
-pub(crate) fn esxi_guestos(os: &str) -> Option<&'static str> {
-    Some(match os {
-        "windows-10" => "windows9-64",
-        "windows-11" => "windows11-64",
-        "windows-server-2008r2" => "windows7srv-64",
-        "windows-server-2012r2" => "windows8srv-64",
-        "windows-server-2016" => "windows9srv-64",
-        "windows-server-2019" => "windows2019srv-64",
-        "windows-server-2022" => "windows2019srvnext-64",
-        "windows-server-2025" => "windows2022srvnext-64",
-        _ => return None,
-    })
-}
-
 /// libvirt's emulated TPM 2.0 (swtpm on the host), on the CRB interface Windows 11 expects.
 pub(crate) fn libvirt_tpm(r: &mut Ruby) {
     r.assign("v.tpm_type", Value::str("emulator"));
@@ -105,14 +89,6 @@ pub(crate) fn tpm_refusal(env: &Environment, provider: Provider<'_>) -> Option<S
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn every_windows_os_has_an_esxi_guest_os_and_linux_keeps_its_box_s() {
-        for os in isoloom_spec::model::KNOWN_OS.iter().filter(|o| o.starts_with("windows")) {
-            assert!(esxi_guestos(os).is_some(), "{os}");
-        }
-        assert_eq!(esxi_guestos("debian-12"), None);
-    }
 
     #[test]
     fn virtualbox_s_tpm_is_a_modifyvm() {
