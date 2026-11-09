@@ -396,7 +396,7 @@
           "TF_VAR_slot": "${run.slot}",
           "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
         },
-        "timeout_s": 600
+        "timeout_s": 900
       },
       {
         "id": "apply",
@@ -496,7 +496,7 @@
           "TF_VAR_slot": "${run.slot}",
           "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
         },
-        "timeout_s": 600
+        "timeout_s": 900
       },
       {
         "id": "destroy",

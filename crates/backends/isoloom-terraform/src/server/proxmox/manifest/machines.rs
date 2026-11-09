@@ -17,7 +17,7 @@ use crate::module::manifest;
 /// The router, as the manifest names it.
 const ROUTER: &str = "isoloom-router";
 /// The controller, as the manifest names it.
-const CONTROLLER: &str = "isoloom-controller";
+use crate::machine::controller::NAME as CONTROLLER;
 /// The router's uplink address: every published port answers there.
 const IP: &str = "ip";
 

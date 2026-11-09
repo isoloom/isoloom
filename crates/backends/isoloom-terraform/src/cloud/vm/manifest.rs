@@ -21,7 +21,7 @@ use crate::machine::controller;
 use crate::module::{ident, manifest};
 
 /// The controller, as the manifest names it.
-const CONTROLLER: &str = "isoloom-controller";
+use crate::machine::controller::NAME as CONTROLLER;
 
 /// The output holding `machine`'s public address.
 pub(crate) fn address_output(machine: &str) -> String {

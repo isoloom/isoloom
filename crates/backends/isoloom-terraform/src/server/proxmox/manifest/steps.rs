@@ -4,37 +4,29 @@
 //! SSH through the router.
 
 use isoloom_manifest::{
-    Action, Argv, CheckRunner, Condition, EnvName, Error as ManifestError, HostArgv, Lifecycle, Name, NonEmpty, Part, PathTemplate, Placeholder, Program,
-    ReadyGrammar, RelPath, RunVar, Seal, SnakeName, Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, Name, NonEmpty, Part, PathTemplate, Placeholder, ReadyGrammar, RelPath, RunVar,
+    Seal, SnakeName, Step, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_plan::checks::by_position;
-use isoloom_render::run_manifest::{action_with, check, noted, run, timeout_s};
+use isoloom_render::run_manifest::{action_with, check, timeout_s};
 
 use super::slots::SEALED;
 use crate::machine::{controller, vms};
-use crate::module::manifest::{PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, run_var, secs, terraform_env, words};
+use crate::module::manifest::{self, PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, secs, terraform, words};
 use crate::server::router::check_host;
 
-/// The user every Linux VM and the router let in with the runner's key.
-const USER: &str = "isoloom";
+use crate::machine::USER;
 
 /// Where cloud-init writes the set-up's output: its tail explains a failed step.
 const SETUP_LOG: &str = "/var/log/cloud-init-output.log";
 
-/// A `terraform` step running `args` (`init`'s last one names the runner's state): its data
-/// folder in the run's state folder, no prompt, and the values the runner gives the module (its
-/// slot on the server, its key).
-fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &str) -> Result<Step, ManifestError> {
-    let command = HostArgv::Every(Argv::new(Program::parse("terraform")?, args));
-    let mut s = noted(run(step, command, timeout)?, note);
-    s.env = terraform_env(vec![
-        ("TF_VAR_slot", Template::from(Placeholder::Run(RunVar::Slot))),
-        ("TF_VAR_ssh_public_key", Template::from(Placeholder::Run(RunVar::SshPublicKey))),
-        ("TF_VAR_proxmox_ssh_private_key_file", Template::from(Placeholder::Run(RunVar::SshKey))),
-    ])?;
-    Ok(s)
-}
+/// The values the runner gives the module: its slot on the server, its key.
+const VARS: &[(&str, RunVar)] = &[
+    ("TF_VAR_slot", RunVar::Slot),
+    ("TF_VAR_ssh_public_key", RunVar::SshPublicKey),
+    ("TF_VAR_proxmox_ssh_private_key_file", RunVar::SshKey),
+];
 
 /// The seal reload over SSH: once the second apply has put the sealed snippet in place (for
 /// later boots), the runner reloads nftables on the already-booted router from its `SEALED_NFT`
@@ -58,13 +50,8 @@ fn seal_reload() -> Result<Step, ManifestError> {
 /// `isoloom_sealed` on (so later boots are sealed), then an `ssh.run` reload applying the sealed
 /// ruleset live to the running router, once the machines are ready (`crate::server::router`).
 pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
-    let lock = || Ok::<Step, ManifestError>(Step::action(id("clear-lock")?, Action::TerraformClearLock));
-    let init = || {
-        let mut args = words(&["init", "-input=false", "-no-color"]);
-        args.push(run_var("-backend-config=path=", RunVar::StateDir, "/terraform.tfstate"));
-        terraform("init", args, 600, "Preparing Terraform and its providers…")
-    };
-    let apply = |step, note| terraform(step, words(&["apply", "-auto-approve", "-input=false", "-no-color"]), 3600, note);
+    let (lock, init) = (manifest::clear_lock, || manifest::init(VARS));
+    let apply = |step, note| manifest::apply(step, note, VARS);
     // No refresh: the state names everything to remove, and a router whose guest agent never
     // ran would hold a refresh for the agent's whole wait.
     let destroy = terraform(
@@ -72,6 +59,7 @@ pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
         words(&["destroy", "-auto-approve", "-input=false", "-no-color", "-refresh=false"]),
         1800,
         "Removing the lab from the server…",
+        VARS,
     )?;
     let seal = sealed
         .then(|| {

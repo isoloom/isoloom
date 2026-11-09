@@ -162,7 +162,7 @@ fn write(env: &Environment, m: &mut Module) {
         machine(env, vm, at, m);
     }
     network::gateway_routes(env, m);
-    outputs::write_as(env, USER, &public_ip, m);
+    outputs::write_as(env, super::BASE.user, &public_ip, m);
 }
 
 /// An instance's public address.

@@ -94,6 +94,11 @@ resource "azurerm_subnet" "lab" {
   default_outbound_access_enabled = true
 }
 
+# The controller's own key: it runs the playbooks over SSH on every machine.
+resource "tls_private_key" "controller" {
+  algorithm = "ED25519"
+}
+
 # The Windows machines' administrator password (user isoloom), for WinRM.
 resource "random_password" "windows" {
   length      = 24
@@ -101,11 +106,6 @@ resource "random_password" "windows" {
   min_upper   = 2
   min_lower   = 2
   min_numeric = 2
-}
-
-# The controller's own key: it runs the playbooks over SSH on every machine.
-resource "tls_private_key" "controller" {
-  algorithm = "ED25519"
 }
 
 # Machine `web01` (Windows): what may reach it.

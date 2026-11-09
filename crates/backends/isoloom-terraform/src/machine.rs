@@ -35,6 +35,10 @@ use isoloom_render::hcl_builder::Expression;
 use isoloom_render::steps;
 use isoloom_spec::shell::quote;
 
+/// The user Isoloom makes on the machines it sets up itself (a server's VMs and its router, an
+/// Azure VM, a Windows machine's administrator): it has `sudo`, and the runner's key.
+pub(crate) const USER: &str = "isoloom";
+
 /// What every VM target renders through this core; a target refuses one on its own, with its
 /// own reason, where its platform can't give it.
 ///
@@ -134,4 +138,11 @@ impl Shell {
             format!("{}; {} || {{ {}; exit 1; }}", mark("running"), self.command(&sh), mark("failed"))
         })
     }
+}
+
+/// The credentials a module generates, on a server or a cloud: the controller's key, then the
+/// Windows machines' password.
+pub(crate) fn credentials(env: &Environment, m: &mut isoloom_render::hcl_builder::Module) {
+    controller::write_key(env, m);
+    windows::write_password(env, m);
 }

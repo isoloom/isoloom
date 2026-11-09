@@ -122,7 +122,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut 
             replace_on: reference(&format!("esxi_guest.{id}.id")),
             host: string(address.to_string()),
         },
-        user: "isoloom".to_owned(),
+        user: crate::machine::USER.to_owned(),
         hooks: Hooks::default(),
     });
     m.commented(
@@ -156,7 +156,7 @@ fn controller(env: &Environment, m: &mut Module) {
         size: (cpus, memory, disk),
         nics,
         dns: (vec![RESOLVER.to_owned()], None),
-        user_data: CloudConfig::new("isoloom-controller", reference("local.users")).document(),
+        user_data: CloudConfig::new(controller::NAME, reference("local.users")).document(),
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],
         firmware: None,
@@ -173,7 +173,7 @@ fn controller(env: &Environment, m: &mut Module) {
         env,
         replace_on: reference("esxi_guest.isoloom_controller.id"),
         host: string(host),
-        user: "isoloom".to_owned(),
+        user: crate::machine::USER.to_owned(),
         at_boot: Vec::new(),
         inventory: controller::inventory_template(env, Access::proxmox),
     };

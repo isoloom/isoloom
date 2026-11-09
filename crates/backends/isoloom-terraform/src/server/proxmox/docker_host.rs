@@ -67,7 +67,7 @@ pub fn module(env: &Environment, guest: &GuestCompose) -> Result<Vec<GeneratedFi
 }
 
 /// The SSH user the runner's key lets in (it has `sudo`).
-pub(super) const USER: &str = "isoloom";
+pub(super) use crate::machine::USER;
 
 /// `setup.sh`: the Docker host's set-up ([`guest::setup_script`]).
 fn setup(env: &Environment) -> GeneratedFile {

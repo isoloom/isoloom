@@ -6,15 +6,18 @@
 use std::collections::BTreeMap;
 
 use isoloom_manifest::{
-    Action, Argv, CheckRunner, Condition, EnvName, Error as ManifestError, HostArgv, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, Program,
-    ReadyGrammar, RelPath, Run, RunVar, Seal, SnakeName, Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, ReadyGrammar, RelPath, Run,
+    RunVar, Seal, SnakeName, Step, Template,
 };
-use isoloom_render::run_manifest::{noted, run};
+use isoloom_render::run_manifest::noted;
 use isoloom_render::steps::PROJECT_DIR;
 
 use super::connection::SEALED;
 use crate::machine::user_data::{DELIVERED, SETUP_LOG};
-use crate::module::manifest::{UNREACHABLE_S, id, output, run_var, secs, terraform_env, words};
+use crate::module::manifest::{self, UNREACHABLE_S, id, output, secs, terraform, words};
+
+/// The values the runner gives a cloud module: its key, which the machines let in.
+const VARS: &[(&str, RunVar)] = &[("TF_VAR_ssh_public_key", RunVar::SshPublicKey)];
 
 /// How long the runner retries a machine still booting before the delivery gives up, in
 /// seconds: within the time its set-up waits for the project.
@@ -47,15 +50,6 @@ impl Guest {
     fn id(&self) -> String {
         self.machine.to_ascii_lowercase().replace(['_', '.'], "-")
     }
-}
-
-/// A `terraform` step running `args` (`init`'s last one names the runner's state): its data
-/// folder in the run's state folder, no prompt, and the key the machines let in.
-fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &str) -> Result<Step, ManifestError> {
-    let command = HostArgv::Every(Argv::new(Program::parse("terraform")?, args));
-    let mut s = noted(run(step, command, timeout)?, note);
-    s.env = terraform_env(vec![("TF_VAR_ssh_public_key", Template::from(Placeholder::Run(RunVar::SshPublicKey)))])?;
-    Ok(s)
 }
 
 /// An `ssh.run` step to `guest`, running `command`, its `with` extended by `more`.
@@ -98,24 +92,16 @@ fn deliver(guest: &Guest) -> Result<Step, ManifestError> {
     Ok(noted(s, &format!("Copying the project into {}…", guest.machine)))
 }
 
-/// A stale lock of a crashed run cleared, then `init`, then `apply` and the project delivered to
-/// each machine (or `destroy`); when the run has anything to seal (`sealed`), the seal: a second
-/// apply once the machines are set up.
-/// A stale Terraform state lock cleared.
-pub(crate) fn clear_lock() -> Result<Step, ManifestError> {
-    Ok(Step::action(id("clear-lock")?, Action::TerraformClearLock))
-}
+pub(crate) use manifest::clear_lock;
 
 /// `init`, naming the runner's state.
 pub(crate) fn init_step() -> Result<Step, ManifestError> {
-    let mut args = words(&["init", "-input=false", "-no-color"]);
-    args.push(run_var("-backend-config=path=", RunVar::StateDir, "/terraform.tfstate"));
-    terraform("init", args, 900, "Preparing Terraform and its providers…")
+    manifest::init(VARS)
 }
 
 /// `apply`, under step id `step`, saying `note`.
 pub(crate) fn apply_step(step: &str, note: &str) -> Result<Step, ManifestError> {
-    terraform(step, words(&["apply", "-auto-approve", "-input=false", "-no-color"]), 3600, note)
+    manifest::apply(step, note, VARS)
 }
 
 /// `destroy`.
@@ -125,6 +111,7 @@ pub(crate) fn destroy_step() -> Result<Step, ManifestError> {
         words(&["destroy", "-auto-approve", "-input=false", "-no-color"]),
         3600,
         "Removing the lab from the cloud…",
+        VARS,
     )
 }
 

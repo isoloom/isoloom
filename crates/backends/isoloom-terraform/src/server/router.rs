@@ -165,7 +165,7 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
         "The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.",
         output("machines", object(machines)),
     );
-    m.block(output("ssh_user", string("isoloom")));
+    m.block(output("ssh_user", string(crate::machine::USER)));
     if let Some(checks) = output_block(env, dir, Invocation::Script, &|p| runner(env, p)) {
         m.commented(
             "The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).",
@@ -199,6 +199,6 @@ fn runner(env: &Environment, p: &Position) -> Option<Runner> {
     check_host(env, p).map(|(machine, host)| Runner {
         machine,
         host: string(host),
-        user: string("isoloom"),
+        user: string(crate::machine::USER),
     })
 }

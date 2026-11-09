@@ -17,7 +17,7 @@ use isoloom_render::hcl_builder::{Block, Expression, Module, Template, object, r
 use isoloom_spec::images::is_windows;
 use isoloom_spec::model::Target;
 
-use crate::machine::{self, controller, vms, windows};
+use crate::machine::{self, vms, windows};
 use crate::module::providers::{self, Provider};
 use crate::module::{ProjectCopy, Usage, inputs};
 use crate::{Result, checks};
@@ -159,16 +159,9 @@ pub(crate) fn slotted(suffix: &str) -> Expression {
 /// `keys`.
 pub(crate) fn user(keys: Expression) -> Expression {
     object([
-        ("name", string("isoloom")),
+        ("name", string(crate::machine::USER)),
         ("sudo", string("ALL=(ALL) NOPASSWD:ALL")),
         ("shell", string("/bin/bash")),
         ("ssh_authorized_keys", keys),
     ])
-}
-
-/// The credentials a server's module generates: the controller's key, then the Windows
-/// machines' password.
-pub(crate) fn credentials(env: &Environment, m: &mut Module) {
-    controller::write_key(env, m);
-    windows::write_password(env, m);
 }

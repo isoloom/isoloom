@@ -40,7 +40,7 @@ use crate::machine::controller;
 use crate::module::{ident, providers};
 
 /// Azure creates the administrator with the VM: a name it never reserves, on every machine.
-pub(super) const USER: &str = "isoloom";
+pub(super) use crate::machine::USER;
 
 /// What Azure takes.
 const RULES: Rules = Rules {
@@ -199,12 +199,12 @@ fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     network::blocks(env, m);
     routing::blocks(env, m);
     private_dns::write(env, m);
-    vm::credentials(env, m);
+    crate::machine::credentials(env, m);
     MACHINES.write(env, m)?;
     let reach = Reach {
         public_ip: &|n| public_ip(&ident(n)),
-        user: &|_| USER.to_owned(),
-        controller: Some((public_ip("isoloom_controller"), USER)),
+        user: super::BASE.user,
+        controller: Some(public_ip("isoloom_controller")),
     };
     outputs::write(env, &reach, m);
     Ok(())

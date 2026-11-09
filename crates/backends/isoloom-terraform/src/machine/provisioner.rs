@@ -118,7 +118,7 @@ impl Provisioner {
 fn announce(name: &str, c: &Connection) -> Block {
     let (host, user, suffix) = match c {
         Connection::Ssh { host, user } | Connection::SshVia { host, user, .. } => (host.clone(), user.as_str(), ""),
-        Connection::WinRm { host, ntlm, .. } => (host.clone(), "isoloom", if *ntlm { " winrm-ntlm" } else { " winrm" }),
+        Connection::WinRm { host, ntlm, .. } => (host.clone(), super::USER, if *ntlm { " winrm-ntlm" } else { " winrm" }),
     };
     let mut command = Template::text("mkdir -p \"");
     command.push_expr(reference("path.module"));
@@ -163,7 +163,7 @@ fn connection(c: &Connection) -> Block {
             let b = b
                 .add_attribute(("type", string("winrm")))
                 .add_attribute(("host", host.clone()))
-                .add_attribute(("user", string("isoloom")))
+                .add_attribute(("user", string(super::USER)))
                 .add_attribute(("password", password.clone()))
                 .add_attribute(("https", boolean(false)));
             let b = if *ntlm { b.add_attribute(("use_ntlm", boolean(true))) } else { b };

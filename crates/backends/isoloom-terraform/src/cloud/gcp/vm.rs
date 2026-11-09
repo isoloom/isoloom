@@ -214,12 +214,12 @@ fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated_with(env, &|e, n, _| relocate(e, n));
     network::blocks(env, m);
     private_dns::write(env, own_project(), m);
-    vm::credentials(env, m);
+    crate::machine::credentials(env, m);
     MACHINES.write(env, m)?;
     let reach = Reach {
         public_ip: &|n| public_ip(&ident(n)),
-        user: &|mp| user(mp.os.as_deref().unwrap_or_default()).to_owned(),
-        controller: Some((public_ip("isoloom_controller"), user(controller::OS))),
+        user: super::BASE.user,
+        controller: Some(public_ip("isoloom_controller")),
     };
     outputs::write(env, &reach, m);
     Ok(())

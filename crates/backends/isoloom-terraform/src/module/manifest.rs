@@ -8,11 +8,11 @@ use std::net::IpAddr;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Delivery, EnvName, Error as ManifestError, Machine, Name, NonEmpty, OsName, Param, Part, Placeholder, PublishMode, Role, RunVar, SetBy, SnakeName, StepId,
-    Template, TfVarShape,
+    Action, Argv, Delivery, EnvName, Error as ManifestError, HostArgv, Machine, Name, NonEmpty, OsName, Param, Part, Placeholder, Program, PublishMode, Role,
+    RunVar, SetBy, SnakeName, Step, StepId, Template, TfVarShape,
 };
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::run_manifest::{addresses, arch, port};
+use isoloom_render::run_manifest::{addresses, arch, noted, port, run};
 
 use crate::machine::vms;
 use crate::module::variable::Variable;
@@ -28,6 +28,39 @@ pub(crate) const PLAYBOOKS_S: u32 = 7200;
 
 /// How long a machine may stay out of reach over SSH, once it answered, before the run fails.
 pub(crate) const UNREACHABLE_S: u32 = 600;
+
+/// How long `terraform init` may take: its providers downloaded on a slow link.
+const INIT_S: u32 = 900;
+
+/// How long a `terraform apply` may take.
+const APPLY_S: u32 = 3600;
+
+/// A `terraform` step running `args` (`init`'s last one names the runner's state): its data
+/// folder in the run's state folder, no prompt, and `vars`, the values the runner gives the
+/// module (`TF_VAR_<name>`: its key, its slot on a server).
+pub(crate) fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &str, vars: &[(&str, RunVar)]) -> Result<Step, ManifestError> {
+    let command = HostArgv::Every(Argv::new(Program::parse("terraform")?, args));
+    let mut s = noted(run(step, command, timeout)?, note);
+    s.env = terraform_env(vars.iter().map(|(name, var)| (*name, Template::from(Placeholder::Run(*var)))).collect())?;
+    Ok(s)
+}
+
+/// A stale Terraform state lock cleared (a crashed run's).
+pub(crate) fn clear_lock() -> Result<Step, ManifestError> {
+    Ok(Step::action(id("clear-lock")?, Action::TerraformClearLock))
+}
+
+/// `init`, naming the runner's state, with `vars` ([`terraform`]).
+pub(crate) fn init(vars: &[(&str, RunVar)]) -> Result<Step, ManifestError> {
+    let mut args = words(&["init", "-input=false", "-no-color"]);
+    args.push(run_var("-backend-config=path=", RunVar::StateDir, "/terraform.tfstate"));
+    terraform("init", args, INIT_S, "Preparing Terraform and its providers…", vars)
+}
+
+/// `apply`, under step id `step`, saying `note`, with `vars` ([`terraform`]).
+pub(crate) fn apply(step: &str, note: &str, vars: &[(&str, RunVar)]) -> Result<Step, ManifestError> {
+    terraform(step, words(&["apply", "-auto-approve", "-input=false", "-no-color"]), APPLY_S, note, vars)
+}
 
 /// A step id.
 pub(crate) fn id(text: &str) -> Result<StepId, ManifestError> {

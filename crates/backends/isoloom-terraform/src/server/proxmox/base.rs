@@ -8,11 +8,12 @@ use isoloom_render::hcl_builder::{
 };
 
 use super::pinned;
+use crate::machine::credentials;
 use crate::machine::{controller, vms};
 use crate::module::providers;
 use crate::module::variable::{self, Variable};
 use crate::module::{ident, resource};
-use crate::server::{self, PinnedImage, credentials, slotted, user};
+use crate::server::{self, PinnedImage, slotted, user};
 
 /// The environment's pool, as a VM or a container names it.
 pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";

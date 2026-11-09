@@ -15,7 +15,7 @@ use crate::module::ident;
 
 /// The controller's snippet and VM.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let mut config = CloudConfig::new("isoloom-controller", reference("local.users"));
+    let mut config = CloudConfig::new(controller::NAME, reference("local.users"));
     config.packages = controller::PACKAGES.map(String::from).to_vec();
     config.bootcmd.extend(cloud_init::prelude(env));
     config.file_lists.push(reference("local.project_files"));
@@ -32,7 +32,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         config.track("hosts file", &Shell::Root.command(&hosts));
     }
     config.track("installing Ansible", &Shell::Root.command(controller::ANSIBLE));
-    for (name, wait) in controller::linux_waits(env, &|_| "isoloom".to_owned()) {
+    for (name, wait) in controller::linux_waits(env, &|_| crate::machine::USER.to_owned()) {
         config.track(&format!("waiting for {name}"), &wait);
     }
     for wait in controller::windows_waits(env) {

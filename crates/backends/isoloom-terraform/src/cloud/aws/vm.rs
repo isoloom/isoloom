@@ -153,19 +153,19 @@ const IMAGES: OsImages<Image> = OsImages(&[
     // Amazon's Windows Server images (license included, billed per hour).
     (
         "windows-server-2016",
-        Image::new("801119661308", "Windows_Server-2016-English-Full-Base-*", "isoloom"),
+        Image::new("801119661308", "Windows_Server-2016-English-Full-Base-*", crate::machine::USER),
     ),
     (
         "windows-server-2019",
-        Image::new("801119661308", "Windows_Server-2019-English-Full-Base-*", "isoloom"),
+        Image::new("801119661308", "Windows_Server-2019-English-Full-Base-*", crate::machine::USER),
     ),
     (
         "windows-server-2022",
-        Image::new("801119661308", "Windows_Server-2022-English-Full-Base-*", "isoloom"),
+        Image::new("801119661308", "Windows_Server-2022-English-Full-Base-*", crate::machine::USER),
     ),
     (
         "windows-server-2025",
-        Image::new("801119661308", "Windows_Server-2025-English-Full-Base-*", "isoloom"),
+        Image::new("801119661308", "Windows_Server-2025-English-Full-Base-*", crate::machine::USER),
     ),
     // Kali's own image, on the AWS Marketplace (free; an account may have to accept its terms
     // there once), pinned to its product; its snapshot is 25 GB.
@@ -249,7 +249,7 @@ fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     m.block(zones());
     network::blocks(env, m);
     private_dns::write(env, m);
-    vm::credentials(env, m);
+    crate::machine::credentials(env, m);
     m.blocks(amis(env));
     MACHINES.write(env, m)?;
     outputs::blocks(env, m);

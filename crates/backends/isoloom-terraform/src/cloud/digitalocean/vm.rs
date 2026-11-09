@@ -109,7 +109,7 @@ fn write(env: &Environment, m: &mut Module) {
     for (name, mp) in vms(env) {
         droplet(env, name, mp, m);
     }
-    outputs::write_as(env, USER, &public_ip, m);
+    outputs::write_as(env, super::BASE.user, &public_ip, m);
 }
 
 /// A droplet's public address.
@@ -142,7 +142,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         ))
         .add_attribute(("image", string(slug)))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
-        .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))
+        .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))
         .add_attribute(("user_data", hooks::user_data(env, (name, mp), USER, Vec::new())))
         .add_attribute(("tags", tag_list(env)))
         .add_block(instance::set_up_once(reference("user_data")).build());

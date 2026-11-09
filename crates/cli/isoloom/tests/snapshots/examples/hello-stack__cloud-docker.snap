@@ -2812,7 +2812,7 @@ resource "google_compute_instance" "env" {
   project      = local.project
   name         = local.name
   machine_type = var.machine_type
-  zone         = "${var.region}-a"
+  zone         = local.zone
   labels = {
     isoloom-environment = "hello-stack"
     managed-by          = "isoloom"

@@ -6,10 +6,11 @@ use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, for_list, list, number, object, reference, string};
 
 use super::{SERVICE_OS, default_image};
+use crate::machine::credentials;
 use crate::machine::{vms, windows};
 use crate::module::providers;
 use crate::module::variable::{self, Variable};
-use crate::server::{self, credentials, user};
+use crate::server::{self, user};
 
 /// The highest slot: it is the fourth byte of the VMs' MACs, which VMware keeps under 0x40 for
 /// addresses set by hand.

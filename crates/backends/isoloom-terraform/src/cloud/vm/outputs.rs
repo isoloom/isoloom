@@ -15,17 +15,25 @@ use crate::module::output;
 pub(crate) struct Reach<'a> {
     /// A machine's public address.
     pub(crate) public_ip: &'a dyn Fn(&str) -> Expression,
-    /// A machine's SSH user.
-    pub(crate) user: &'a dyn Fn(&MachinePlan) -> String,
-    /// The controller's public address and SSH user, when there is one.
-    pub(crate) controller: Option<(Expression, &'a str)>,
+    /// The SSH user on a machine of an OS: the cloud's (`crate::cloud::Base::user`), the one
+    /// its run manifest gives too.
+    pub(crate) user: fn(&str) -> &'static str,
+    /// The controller's public address, when there is one (its user: `user` of its OS).
+    pub(crate) controller: Option<Expression>,
 }
 
-/// The outputs of a cloud with no controller, whose machines all log in as `user`.
-pub(crate) fn write_as(env: &Environment, user: &str, public_ip: &dyn Fn(&str) -> Expression, m: &mut Module) {
+impl Reach<'_> {
+    /// The SSH user on machine `mp`.
+    fn user_of(&self, mp: &MachinePlan) -> &'static str {
+        (self.user)(mp.os.as_deref().unwrap_or_default())
+    }
+}
+
+/// The outputs of a cloud with no controller, its SSH users `user` (the cloud's).
+pub(crate) fn write_as(env: &Environment, user: fn(&str) -> &'static str, public_ip: &dyn Fn(&str) -> Expression, m: &mut Module) {
     let reach = Reach {
         public_ip,
-        user: &|_| user.to_owned(),
+        user,
         controller: None,
     };
     write(env, &reach, m);
@@ -36,15 +44,18 @@ pub(crate) fn write_as(env: &Environment, user: &str, public_ip: &dyn Fn(&str) -
 /// `terraform output`), `ip`, `ready_file`, `checks` and `published`.
 pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
     let machines: Vec<(&str, Expression)> = vms(env).map(|(n, _)| (n, (reach.public_ip)(n))).collect();
-    let users: Vec<(&str, Expression)> = vms(env).map(|(n, mp)| (n, string((reach.user)(mp)))).collect();
+    let users: Vec<(&str, Expression)> = vms(env).map(|(n, mp)| (n, string(reach.user_of(mp)))).collect();
     m.block(output("machines", object(machines)));
     for (n, mp) in vms(env) {
         m.block(output(&super::manifest::address_output(n), (reach.public_ip)(n)));
-        m.block(output(&super::manifest::ssh_user_output(n), string((reach.user)(mp))));
+        m.block(output(&super::manifest::ssh_user_output(n), string(reach.user_of(mp))));
     }
-    if let Some((address, user)) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
-        m.block(output(&super::manifest::address_output("isoloom-controller"), address.clone()));
-        m.block(output(&super::manifest::ssh_user_output("isoloom-controller"), string(*user)));
+    if let Some(address) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
+        m.block(output(&super::manifest::address_output(controller::NAME), address.clone()));
+        m.block(output(
+            &super::manifest::ssh_user_output(controller::NAME),
+            string((reach.user)(controller::OS)),
+        ));
     }
     m.block(output("ssh_users", object(users)));
     m.block(output("ip", stand_at(env, reach)));
@@ -81,7 +92,7 @@ fn stand_at(env: &Environment, reach: &Reach) -> Expression {
         .or(linux.first());
     match (access, &reach.controller) {
         (Some(n), _) => (reach.public_ip)(n),
-        (None, Some((c, _))) if controller::needed(env) => c.clone(),
+        (None, Some(c)) if controller::needed(env) => c.clone(),
         _ => null(),
     }
 }
@@ -97,12 +108,12 @@ fn runner(env: &Environment, reach: &Reach, p: &Position) -> Option<Runner> {
         Some((n, mp)) => Some(Runner {
             machine: n.to_owned(),
             host: (reach.public_ip)(n),
-            user: string((reach.user)(mp)),
+            user: string(reach.user_of(mp)),
         }),
-        None => reach.controller.clone().filter(|_| controller::needed(env)).map(|(host, user)| Runner {
+        None => reach.controller.clone().filter(|_| controller::needed(env)).map(|host| Runner {
             machine: "controller".to_owned(),
             host,
-            user: string(user),
+            user: string((reach.user)(controller::OS)),
         }),
     }
 }

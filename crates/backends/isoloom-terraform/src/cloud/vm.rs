@@ -132,13 +132,6 @@ impl Machines {
     }
 }
 
-/// The credentials a cloud's module generates: the Windows machines' password, then the
-/// controller's key.
-pub(crate) fn credentials(env: &Environment, m: &mut Module) {
-    machine::windows::write_password(env, m);
-    controller::write_key(env, m);
-}
-
 /// What the clouds of the target can render: the VM core's features (`machine::FEATURES`),
 /// each cloud refusing on its own, with its reason, what it can't give (a router in the path
 /// for `tc`, a network's MTU, a further address on DigitalOcean); and these.

@@ -114,7 +114,7 @@ fn write(env: &Environment, m: &mut Module) {
     for (vm, at) in vm::at_first_address(env) {
         machine(env, vm, at, m);
     }
-    outputs::write_as(env, USER, &public_ip, m);
+    outputs::write_as(env, super::BASE.user, &public_ip, m);
 }
 
 /// A Linode's public address.

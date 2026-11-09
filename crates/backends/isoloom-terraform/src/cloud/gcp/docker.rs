@@ -83,7 +83,7 @@ fn host(env: &Environment, size: HostSize, setup: Expression) -> Block {
     let (image, _) = vm::image(HOST_OS).unwrap_or_default();
     resource("google_compute_instance")
         .add_attribute(("machine_type", reference("var.machine_type")))
-        .add_attribute(("zone", Template::new().with_expr(reference("var.region")).with_text("-a").into_expression()))
+        .add_attribute(("zone", reference("local.zone")))
         .add_attribute(("labels", instance::tags(env)))
         .add_block(
             Block::builder("boot_disk")
