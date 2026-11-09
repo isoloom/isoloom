@@ -15,8 +15,8 @@ use crate::{Error, GenerateError, Result, resolved};
 ///
 /// # Errors
 ///
-/// [`Error::Refused`]: the target isn't possible for the lab, has no backend, or its backend
-/// refuses the lab.
+/// [`Error::Generate`]: the target isn't possible for the lab, has no backend, or its backend
+/// refuses the lab or fails.
 pub fn generate(lab: &Lab, target: Target) -> Result<Vec<GeneratedFile>> {
     Ok(with_snapshot(lab, target)?)
 }
@@ -34,7 +34,7 @@ fn with_snapshot(lab: &Lab, target: Target) -> std::result::Result<Vec<Generated
 ///
 /// # Errors
 ///
-/// As [`generate`], and [`Error::Refused`] when the instance can't be made.
+/// As [`generate`], and [`Error::Generate`] when the instance can't be made.
 pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<GeneratedFile>> {
     let mut files = target_files(lab, target, Some(n))?;
     files.push(resolved::file_with(lab, Some(n)));
@@ -48,7 +48,9 @@ pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<Generat
 }
 
 /// Every target the lab allows: the files (each once: `docker-vm` runs the `docker` target's
-/// Compose file), and why each target left out wasn't generated.
+/// Compose file), and why each target left out wasn't generated. A caller that writes or checks
+/// the files fails on any that isn't a refusal ([`GenerateError::is_refusal`]): a failed backend
+/// leaves its target's files out, which would otherwise read as a target the lab can't use.
 #[must_use]
 pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
     let mut files: Vec<GeneratedFile> = Vec::new();
@@ -123,9 +125,10 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
 /// A backend's run manifest as the file it is written to (`.isoloom/<target>/[<sub>/]run.json`),
 /// its message filled from the resolved snapshot, checked across its fields.
 fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, placed: Placed) -> std::result::Result<GeneratedFile, GenerateError> {
-    let refused = |e: isoloom_manifest::Error| GenerateError::Unsupported {
+    let refused = |e: isoloom_manifest::Error| GenerateError::Internal {
         target,
-        what: format!("the run manifest: {e}"),
+        what: "the run manifest refused a value of this backend".to_owned(),
+        source: std::sync::Arc::new(e),
     };
     let mut manifest = placed.manifest;
     manifest.environment.message = resolved::manifest_message(lab, instance, target);

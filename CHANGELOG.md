@@ -83,6 +83,18 @@ stable spec format.
 
 ### Fixed
 
+- **`isoloom generate` and `isoloom check` fail when a backend fails**, instead of leaving its
+  target out as if the target refused the lab. A failure (a run manifest value the manifest's own
+  types refuse, a file a writer couldn't write: a bug) printed a `·` line under `generate` and
+  nothing under `check`, which passed while that target's committed files went stale. Only a
+  refusal of the lab (the target can't run it, as `isoloom targets` says) leaves a target out
+  now; anything else stops both commands with the cause. The failure names the target being
+  generated (`docker-vm`, `cloud-docker`), not the backend's own (`vagrant`, `docker`).
+  `isoloom check` reports a file it can't read with the system's reason, not as missing. In the
+  library: `isoloom_render::Error::Internal` and `isoloom_targets::GenerateError::Internal` keep
+  the cause, `GenerateError::is_refusal` tells them apart, `isoloom_targets::Error::Refused` is
+  `Error::Generate`, and `isoloom_render::Error::reason` is `Error::refusal` (`None` for a
+  failure).
 - **Compose in a VM tolerates a failed pull of the lab's published images**, as on this
   computer: an unreachable registry falls back to building (docker-vm, cloud-docker), instead of
   failing the start. Both describe the start once now.

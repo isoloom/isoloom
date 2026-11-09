@@ -18,11 +18,14 @@ pub(crate) struct Args {
     sets: Vec<String>,
 }
 
-/// Generates every target in memory and compares each file with the one on disk.
+/// Generates every target in memory and compares each file with the one on disk. A target left
+/// out because it refuses the lab has no files to compare; one left out for any other reason (its
+/// backend failed) is an error, since its committed files can't be vouched for.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let (lab, settings) = spec::with_settings(profile, &a.project.dir, a.images.as_deref(), &a.sets)?;
     let lab = spec::checked(lab, &a.project.dir)?;
-    let (files, _) = isoloom_targets::generate_all(&lab);
+    let (files, skipped) = isoloom_targets::generate_all(&lab);
+    super::refusals(skipped)?;
     let files = generated::finish(files, &settings.defaults, &a.project.dir)?;
     let mut stale = 0;
     for f in &files {
@@ -32,8 +35,12 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
                 console.line(format_args!("✗ {} is out of date", f.path))?;
                 stale += 1;
             }
-            Err(_) => {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 console.line(format_args!("✗ {} is missing", f.path))?;
+                stale += 1;
+            }
+            Err(e) => {
+                console.line(format_args!("✗ {} can't be read: {e}", f.path))?;
                 stale += 1;
             }
         }

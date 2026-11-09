@@ -23,19 +23,22 @@ pub(crate) struct Args {
 }
 
 /// Writes the files, then says why each target left out wasn't generated. Asking for one target
-/// that can't be generated is a no; skipping some of all of them isn't.
+/// that can't be generated is a no; skipping some of all of them isn't, unless one was left out
+/// for a failure of its backend rather than a refusal of the lab: then nothing is written.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
     let target = spec::pinned(profile, dir, a.target.as_deref())?;
     let (lab, settings) = spec::with_settings(profile, dir, a.images.as_deref(), &a.sets)?;
     let lab = spec::checked(lab, dir)?;
-    let (files, skipped) = match &target {
-        Some(id) => match isoloom_targets::generate(&lab, target::by_id(id)?) {
+    let (files, skipped) = if let Some(id) = &target {
+        match isoloom_targets::generate(&lab, target::by_id(id)?) {
             Ok(f) => (f, vec![]),
-            Err(isoloom_targets::Error::Refused(e)) => (vec![], vec![e]),
+            Err(isoloom_targets::Error::Generate(e)) if e.is_refusal() => (vec![], vec![e]),
             Err(e) => return Err(e.into()),
-        },
-        None => isoloom_targets::generate_all(&lab),
+        }
+    } else {
+        let (files, skipped) = isoloom_targets::generate_all(&lab);
+        (files, super::refusals(skipped)?)
     };
     let files = generated::finish(files, &settings.defaults, dir)?;
     for f in &files {

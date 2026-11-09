@@ -2,16 +2,18 @@
 //! why a target's files weren't generated ([`GenerateError`], also what `generate_all` lists as
 //! skipped) and the backends' own errors kept whole as the cause.
 
+use std::sync::Arc;
+
 use isoloom_spec::model::Target;
 
 /// What stops a target's files, the message or a report.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// The target refuses the lab: it isn't possible for it, has no generator, or its backend
-    /// can't run something the lab asks for.
+    /// A target's files weren't generated: the target refuses the lab, has no generator, or its
+    /// backend failed.
     #[error(transparent)]
-    Refused(#[from] GenerateError),
+    Generate(#[from] GenerateError),
     /// A `{{ path }}` of the message points at nothing in the resolved snapshot.
     #[error("message: `{{{{ {path} }}}}` points at nothing in the snapshot (see `isoloom inspect`){hint}")]
     Placeholder {
@@ -58,8 +60,11 @@ pub enum Error {
 /// What the crate returns: a value, or why it can't be made.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// Why a target's files weren't generated.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+/// Why a target's files weren't generated: a refusal ([`GenerateError::is_refusal`]), the
+/// target leaving the lab out as `isoloom targets` says, or a failure, which no lab should
+/// cause.
+#[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
 pub enum GenerateError {
     /// The lab's machines have no form this target runs (see `isoloom targets`).
     #[error("{}: not possible for this spec (see `isoloom targets`)", .0.id())]
@@ -76,14 +81,42 @@ pub enum GenerateError {
     /// No generator exists for this target yet.
     #[error("{}: no generator yet", .0.id())]
     NoGenerator(Target),
+    /// The backend failed, not the lab (a bug: a value the run manifest's types refused, a file
+    /// its writer couldn't write), with the error it failed with.
+    #[error("{}: {what}", target.id())]
+    Internal {
+        /// The target being generated.
+        target: Target,
+        /// What failed.
+        what: String,
+        /// The error it failed with.
+        #[source]
+        source: Arc<dyn std::error::Error + Send + Sync>,
+    },
+}
+
+impl GenerateError {
+    /// Whether the target refuses the lab ([`GenerateError::NotPossible`],
+    /// [`GenerateError::Unsupported`]): the one reason a target may be left out of `generate`
+    /// and `check` without failing them. No generator, or a failed one, is never the lab's
+    /// doing.
+    #[must_use]
+    pub fn is_refusal(&self) -> bool {
+        matches!(self, GenerateError::NotPossible(_) | GenerateError::Unsupported { .. })
+    }
 }
 
 impl From<isoloom_render::Error> for GenerateError {
-    /// A backend's error as the target's: a refusal or a limit of its own, read the same way.
+    /// A backend's error as the target's: a refusal or a limit of its own, read the same way;
+    /// a failure kept with its cause.
     fn from(e: isoloom_render::Error) -> GenerateError {
-        GenerateError::Unsupported {
-            target: e.target(),
-            what: e.reason(),
+        let target = e.target();
+        match e {
+            isoloom_render::Error::Internal { what, source, .. } => GenerateError::Internal { target, what, source },
+            refused => GenerateError::Unsupported {
+                target,
+                what: refused.refusal().unwrap_or_default(),
+            },
         }
     }
 }
@@ -109,5 +142,23 @@ mod tests {
     fn a_refusal_reads_as_the_generator_wrote_it() {
         let e = Error::from(GenerateError::NoGenerator(Target::Docker));
         assert_eq!(e.to_string(), "docker: no generator yet");
+    }
+
+    #[test]
+    fn only_a_refusal_of_the_lab_is_a_refusal() {
+        let failed = GenerateError::from(isoloom_render::Error::internal(
+            Target::Vagrant,
+            "the run manifest refused a value of this backend",
+            std::io::Error::other("bad"),
+        ));
+        assert!(matches!(failed, GenerateError::Internal { target: Target::Vagrant, .. }));
+        assert!(std::error::Error::source(&failed).is_some());
+        let refused = GenerateError::from(isoloom_render::Error::Unsupported {
+            target: Target::Proxmox,
+            what: "machine `w`: no image".to_owned(),
+        });
+        assert_eq!(refused.to_string(), "proxmox: machine `w`: no image");
+        assert!(refused.is_refusal() && GenerateError::NotPossible(Target::Docker).is_refusal());
+        assert!(!failed.is_refusal() && !GenerateError::NoGenerator(Target::Docker).is_refusal());
     }
 }

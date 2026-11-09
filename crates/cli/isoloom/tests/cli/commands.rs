@@ -128,6 +128,38 @@ fn a_refusal_by_aws_drops_only_its_module() -> Outcome {
     Ok(())
 }
 
+/// A container with an alias, which Kubernetes refuses (`www` isn't a Service name it gives).
+const ALIASED: &str = "version: 1\nname: named\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lab: 10 }\n    aliases: [www]\n    app: { image: \"nginx:1.27\" }\n";
+
+#[test]
+fn a_target_that_refuses_is_left_out_and_check_still_passes() -> Outcome {
+    let dir = project("refusal-left-out", ALIASED)?;
+    let generated = isoloom(&dir, &[&"generate", &dir])?;
+    assert_eq!(generated.code, Some(0), "{generated:?}");
+    assert!(generated.stdout.contains("· kubernetes: "), "{}", generated.stdout);
+    let checked = isoloom(&dir, &[&"check", &dir])?;
+    assert_eq!(checked.code, Some(0), "{checked:?}");
+    Ok(())
+}
+
+#[test]
+fn check_tells_a_missing_file_from_one_it_cant_read() -> Outcome {
+    let dir = project("check-read-error", ALIASED)?;
+    let generated = isoloom(&dir, &[&"generate", &dir])?;
+    assert_eq!(generated.code, Some(0), "{generated:?}");
+    // A folder where the Compose file was: it exists, but can't be read as a file.
+    let compose = dir.join(".isoloom/docker/compose.yml");
+    std::fs::remove_file(&compose)?;
+    std::fs::create_dir(&compose)?;
+    std::fs::remove_file(dir.join(".isoloom/docker/run.json"))?;
+    let checked = isoloom(&dir, &[&"check", &dir])?;
+    assert_eq!(checked.code, Some(1), "{checked:?}");
+    assert!(checked.stdout.contains("✗ .isoloom/docker/compose.yml can't be read: "), "{}", checked.stdout);
+    assert!(!checked.stdout.contains("compose.yml is missing"), "{}", checked.stdout);
+    assert!(checked.stdout.contains("✗ .isoloom/docker/run.json is missing"), "{}", checked.stdout);
+    Ok(())
+}
+
 const PROFILED: &str = "version: 1
 name: shop
 networks:

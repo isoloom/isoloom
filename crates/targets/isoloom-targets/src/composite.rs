@@ -24,15 +24,16 @@ fn on_docker(env: &Environment) -> Environment {
     Environment::build(env.spec(), Target::Docker, env.instance)
 }
 
-/// The `docker` target's files for `env`: what a Docker host runs.
+/// The `docker` target's files for `env`: what a Docker host runs. A refusal or failure is
+/// `env`'s target's.
 fn docker_files(env: &Environment) -> Result<Files, RenderError> {
-    Ok(isoloom_compose::render(Target::Docker, &on_docker(env))?)
+    isoloom_compose::render(Target::Docker, &on_docker(env)).map_err(|e| RenderError::from(e).on(env.target))
 }
 
-/// What runs inside `docker-vm`'s VM for `env`: the `docker` target's Compose file, and the
-/// commands that start, check and read it there.
+/// What runs inside the VM for `env`: the `docker` target's Compose file, and the commands that
+/// start, check and read it there. A refusal or failure is `env`'s target's.
 fn guest(env: &Environment) -> Result<GuestCompose, RenderError> {
-    Ok(isoloom_compose::guest(&on_docker(env))?)
+    isoloom_compose::guest(&on_docker(env)).map_err(|e| RenderError::from(e).on(env.target))
 }
 
 /// The `cloud-docker` backend: Compose on one cloud VM per cloud, built by Terraform.
@@ -62,11 +63,9 @@ impl Backend for CloudDockerBackend {
     }
 
     /// A run manifest per cloud that can host the containers, built on the Compose-in-a-VM plan
-    /// (`isoloom_compose::guest`, from the `docker` target's environment).
+    /// (`guest`, from the `docker` target's environment).
     fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
-        let docker = Environment::build(env.spec(), Target::Docker, env.instance);
-        let guest = isoloom_compose::guest(&docker)?;
-        Ok(isoloom_terraform::cloud_docker_manifests(env, &guest)?)
+        Ok(isoloom_terraform::cloud_docker_manifests(env, &guest(env)?)?)
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
@@ -159,11 +158,12 @@ impl Backend for HybridBackend {
     }
 
     /// The plan's refusal; else, since the VMs are still the `vagrant` generator's, what it
-    /// refuses on rendering (a box it doesn't know, a Windows feature it lacks).
+    /// refuses on rendering (a box it doesn't know, a Windows feature it lacks). A failure of
+    /// the backend isn't a refusal: generating reports it.
     fn refusal(&self, env: &Environment) -> Option<String> {
         if let Some(r) = isoloom_plan::refusal(&env.requirements, &self.capabilities()) {
             return Some(r.to_string());
         }
-        self.render(env).err().map(|e| e.reason())
+        self.render(env).err().and_then(|e| e.refusal())
     }
 }

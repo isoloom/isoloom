@@ -13,7 +13,7 @@ fn a_lab_every_generator_refuses_is_refused_with_reasons() -> Outcome {
         lab("version: 1\nname: w\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\ntargets: [cloud-vm]\nmachines:\n  ws: { os: windows@11, networks: { lab: 10 } }\n")?;
     let (files, skipped) = generate_all(&spec);
     assert_eq!(files.iter().map(|f| &f.path).collect::<Vec<_>>(), Vec::<&String>::new());
-    assert_ne!(skipped, Vec::new());
+    assert!(!skipped.is_empty() && skipped.iter().all(GenerateError::is_refusal));
     Ok(())
 }
 
@@ -82,13 +82,13 @@ fn unsupported_features_are_refused_with_the_reason() -> Outcome {
     // Windows has no container form: the Docker target refuses it at the field that rules it out.
     assert!(matches!(
         generate(&ad, Target::Docker),
-        Err(Error::Refused(GenerateError::Unsupported { target: Target::Docker, ref what }))
+        Err(Error::Generate(GenerateError::Unsupported { target: Target::Docker, ref what }))
             if what == "machines.dc01.os: Windows has no container form in 1.0"
     ));
     // The domain's playbooks run from the controller: the VM targets generate it.
     assert!(generate(&ad, Target::Vagrant).is_ok() && generate(&ad, Target::Proxmox).is_ok());
     assert!(
-        matches!(generate(&ad, Target::CloudVm), Err(Error::Refused(GenerateError::Unsupported { ref what, .. })) if what.contains("no AWS image for `windows-11`"))
+        matches!(generate(&ad, Target::CloudVm), Err(Error::Generate(GenerateError::Unsupported { ref what, .. })) if what.contains("no AWS image for `windows-11`"))
     );
     Ok(())
 }
@@ -101,7 +101,7 @@ fn an_arm64_access_machine_that_is_actually_built_is_still_refused_on_the_cloud(
         "version: 1\nname: arm-access\nnetworks:\n  lab: { cidr: 10.60.0.0/24 }\nmachines:\n  kali:\n    os: debian@12\n    networks: { lab: 10 }\n    access: true\n    hardware: { arch: arm64 }\n    app: { steps: [{ run: p.sh }] }\n",
     )?;
     assert!(
-        matches!(generate(&spec, Target::CloudVm), Err(Error::Refused(GenerateError::Unsupported { ref what, .. })) if what.contains("arm64")),
+        matches!(generate(&spec, Target::CloudVm), Err(Error::Generate(GenerateError::Unsupported { ref what, .. })) if what.contains("arm64")),
         "an arm64 access machine with a VM must not slip past the cloud refusal"
     );
     Ok(())

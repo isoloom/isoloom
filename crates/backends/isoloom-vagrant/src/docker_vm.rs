@@ -32,6 +32,7 @@ use isoloom_render::run_manifest::DERIVED;
 use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::images;
+use isoloom_spec::model::Target;
 
 use crate::host_folders::Share;
 use crate::ruby::{BootStatements, Call, Ruby, Value};
@@ -55,7 +56,7 @@ const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
 ///
 /// [`crate::Error::Manifest`] for a value the manifest's types refuse (a bug of this backend).
 pub fn manifest(env: &Environment, guest: &GuestCompose) -> crate::Result<Manifest> {
-    crate::manifest::docker_vm::manifest(env, guest)
+    crate::manifest::docker_vm::manifest(env, guest).map_err(|e| e.on(Target::DockerVm))
 }
 
 /// The VM's own provisioners, in order: everything `vagrant up` runs but the lab's start (the

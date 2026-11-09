@@ -23,7 +23,7 @@ fn vm(hardware: &str) -> Outcome<Lab> {
 /// Why `target` refuses the lab.
 fn refusal(spec: &Lab, target: Target) -> Outcome<String> {
     match generate(spec, target) {
-        Err(Error::Refused(GenerateError::Unsupported { what, .. })) => Ok(what),
+        Err(Error::Generate(GenerateError::Unsupported { what, .. })) => Ok(what),
         other => Err(format!("{target:?} doesn't refuse it: {:?}", other.map(|f| f.len())).into()),
     }
 }

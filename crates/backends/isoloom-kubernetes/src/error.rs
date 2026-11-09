@@ -23,14 +23,14 @@ pub enum Error {
         reason: String,
     },
     /// An object couldn't be written as YAML.
-    #[error("{}: a manifest couldn't be written as YAML", Target::Kubernetes.id())]
+    #[error("{}: {UNWRITABLE}", Target::Kubernetes.id())]
     Unwritable {
         /// What the YAML writer reported.
         #[source]
         source: serde_yaml_ng::Error,
     },
     /// The chart's values schema couldn't be written as JSON.
-    #[error("{}: the values' schema couldn't be written as JSON", Target::Kubernetes.id())]
+    #[error("{}: {SCHEMA}", Target::Kubernetes.id())]
     Schema {
         /// What the JSON writer reported.
         #[source]
@@ -46,7 +46,7 @@ pub enum Error {
         source: std::io::Error,
     },
     /// A generated kustomization isn't one (it was edited by hand).
-    #[error("{path}: not a kustomization Isoloom reads: {source}")]
+    #[error("{path}: {NOT_A_KUSTOMIZATION}: {source}")]
     Kustomization {
         /// The kustomization, from the project folder.
         path: String,
@@ -60,27 +60,27 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl From<Error> for RenderError {
-    /// The error as every backend reports it: the plan's refusal, or what Kubernetes doesn't
-    /// support, its cause in its words.
+    /// The error as every backend reports it: the plan's refusal, what Kubernetes doesn't
+    /// support, or a failure of this backend (what it couldn't write or read), with its cause.
     fn from(e: Error) -> RenderError {
-        let what = match e {
-            Error::Refused { refusal } => {
-                return RenderError::Refused {
-                    target: Target::Kubernetes,
-                    refusal,
-                };
-            }
-            Error::Unsupported { reason } => reason,
-            Error::Unwritable { source } => format!("a manifest doesn't serialize: {source}"),
-            Error::Schema { source } => format!("the values' schema doesn't serialize: {source}"),
-            read @ (Error::Read { .. } | Error::Kustomization { .. }) => read.to_string(),
-        };
-        RenderError::Unsupported {
-            target: Target::Kubernetes,
-            what,
+        let target = Target::Kubernetes;
+        match e {
+            Error::Refused { refusal } => RenderError::Refused { target, refusal },
+            Error::Unsupported { reason } => RenderError::Unsupported { target, what: reason },
+            Error::Unwritable { source } => RenderError::internal(target, UNWRITABLE, source),
+            Error::Schema { source } => RenderError::internal(target, SCHEMA, source),
+            Error::Read { path, source } => RenderError::internal(target, format!("{path} (copied into the Helm chart) can't be read"), source),
+            Error::Kustomization { path, source } => RenderError::internal(target, format!("{path}: {NOT_A_KUSTOMIZATION}"), source),
         }
     }
 }
+
+/// What an [`Error::Unwritable`] is, after its target.
+const UNWRITABLE: &str = "a manifest couldn't be written as YAML";
+/// What an [`Error::Schema`] is, after its target.
+const SCHEMA: &str = "the values' schema couldn't be written as JSON";
+/// What an [`Error::Kustomization`] is, after its path.
+const NOT_A_KUSTOMIZATION: &str = "not a kustomization Isoloom reads";
 
 #[cfg(test)]
 mod tests {

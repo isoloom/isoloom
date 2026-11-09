@@ -19,6 +19,8 @@ pub(crate) mod validate;
 
 use std::path::PathBuf;
 
+use isoloom_targets::GenerateError;
+
 use crate::cli::Command;
 use crate::console::Console;
 use crate::error::{CliError, Result};
@@ -43,6 +45,17 @@ pub(crate) struct Listing {
     pub(crate) json: bool,
 }
 
+/// The targets `generate_all` left out, each a refusal of the lab; the first left out for any
+/// other reason (its backend failed, or it has no generator) as the error, so neither
+/// `generate` nor `check` passes over a target whose files it couldn't make.
+fn refusals(skipped: Vec<GenerateError>) -> Result<Vec<GenerateError>> {
+    let (refused, failed): (Vec<_>, Vec<_>) = skipped.into_iter().partition(GenerateError::is_refusal);
+    match failed.into_iter().next() {
+        Some(e) => Err(isoloom_targets::Error::Generate(e).into()),
+        None => Ok(refused),
+    }
+}
+
 /// Runs the subcommand asked for, with the profile `main` worked out.
 pub(crate) fn run(command: Command, profile: &Profile, console: &mut Console) -> Result<Verdict> {
     match command {
@@ -61,5 +74,53 @@ pub(crate) fn run(command: Command, profile: &Profile, console: &mut Console) ->
         Command::Import(i) => import::run(i, console),
         Command::Docs(a) => docs::run(&a, console),
         Command::Matrix(a) => matrix::run(&a, console),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use isoloom_spec::model::Target;
+    use isoloom_targets::GenerateError;
+
+    use super::refusals;
+    use crate::error::CliError;
+
+    #[test]
+    fn a_refusal_is_left_out_and_a_failure_is_an_error() {
+        let refused = GenerateError::Unsupported {
+            target: Target::Proxmox,
+            what: "machine `w`: no image".to_owned(),
+        };
+        let kept = refusals(vec![refused.clone(), GenerateError::NotPossible(Target::Kubernetes)]);
+        assert!(matches!(
+            kept.as_deref(),
+            Ok([GenerateError::Unsupported { .. }, GenerateError::NotPossible(_)])
+        ));
+        let failed = GenerateError::Internal {
+            target: Target::Vagrant,
+            what: "the run manifest refused a value of this backend".to_owned(),
+            source: Arc::new(std::io::Error::other("bad name")),
+        };
+        let stopped = refusals(vec![refused, failed]);
+        assert!(
+            matches!(
+                &stopped,
+                Err(CliError::Targets(isoloom_targets::Error::Generate(GenerateError::Internal {
+                    target: Target::Vagrant,
+                    ..
+                })))
+            ),
+            "{stopped:?}"
+        );
+        if let Err(e) = &stopped {
+            let rendered = crate::diagnostic::render(e);
+            assert!(
+                rendered.contains("error: vagrant: the run manifest refused a value of this backend\n  caused by: bad name"),
+                "{rendered}"
+            );
+        }
+        assert!(refusals(vec![GenerateError::NoGenerator(Target::Docker)]).is_err());
     }
 }

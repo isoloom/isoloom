@@ -18,7 +18,7 @@ pub enum Error {
         refusal: Refusal,
     },
     /// The Compose file couldn't be written as YAML.
-    #[error("{}: the Compose file couldn't be written as YAML", target.id())]
+    #[error("{}: {UNWRITABLE}", target.id())]
     Unwritable {
         /// The target whose file it is.
         target: Target,
@@ -28,7 +28,7 @@ pub enum Error {
     },
     /// A value of the run manifest was refused by the manifest's own types: a bug of this
     /// backend, which builds every one of them.
-    #[error("{}: the run manifest refused a value of this backend", Target::Docker.id())]
+    #[error("{}: {MANIFEST_REFUSED}", Target::Docker.id())]
     Manifest {
         /// What the manifest's types refused.
         #[source]
@@ -46,20 +46,22 @@ impl From<ManifestError> for Error {
 }
 
 impl From<Error> for RenderError {
-    /// The error as every backend reports it: the plan's refusal, or what the target doesn't
-    /// support, its cause in its words.
+    /// The error as every backend reports it: the plan's refusal, or a failure of this backend
+    /// with its cause. The manifest's is the `docker` target's: a target running the Compose
+    /// file inside its VM reports it as its own ([`RenderError::on`]).
     fn from(e: Error) -> RenderError {
         match e {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
-            Error::Unwritable { target, source } => unsupported(target, source.to_string()),
-            Error::Manifest { source } => unsupported(Target::Docker, format!("the run manifest: {source}")),
+            Error::Unwritable { target, source } => RenderError::internal(target, UNWRITABLE, source),
+            Error::Manifest { source } => RenderError::internal(Target::Docker, MANIFEST_REFUSED, source),
         }
     }
 }
 
-fn unsupported(target: Target, what: String) -> RenderError {
-    RenderError::Unsupported { target, what }
-}
+/// What an [`Error::Unwritable`] is, after its target.
+const UNWRITABLE: &str = "the Compose file couldn't be written as YAML";
+/// What an [`Error::Manifest`] is, after its target.
+const MANIFEST_REFUSED: &str = "the run manifest refused a value of this backend";
 
 #[cfg(test)]
 mod tests {
@@ -87,7 +89,9 @@ mod tests {
         let source = isoloom_manifest::EnvironmentName::parse("Not A Name").expect_err("refused");
         let e = Error::from(source);
         assert!(e.source().is_some());
-        let reported = RenderError::from(e).to_string();
-        assert!(reported.starts_with("docker: the run manifest: "), "{reported}");
+        let reported = RenderError::from(e);
+        assert_eq!(reported.to_string(), "docker: the run manifest refused a value of this backend");
+        assert!(reported.source().is_some());
+        assert_eq!(reported.refusal(), None);
     }
 }
