@@ -449,9 +449,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (office); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["office"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -604,7 +603,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "private-names-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -752,7 +751,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "private-names-client"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1407,7 +1406,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "private-names · web",
           "vmware_esxi": "private-names-web"
         },
-        "boot_digest": "sha256:9b7f7f5ccb1d6ec27ebaf3a3aa571778cbe7c9e5bb38344cd73f3f3faaa907f1"
+        "boot_digest": "sha256:66dc158d9c9489f11676a2e56b3022c6b565b6860fd65ef3e5077471574a2b23"
       },
       "ports": [
         {
@@ -1441,7 +1440,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "private-names · client",
           "vmware_esxi": "private-names-client"
         },
-        "boot_digest": "sha256:a380e4b952a6f5889778bc12112b907562d2dc32b5dabb0c9d7369c31bb0b46f"
+        "boot_digest": "sha256:30bfabaab0203e1260370ba998a51efdabf8dfe50d170a09c1c73a848d156d77"
       }
     }
   ],

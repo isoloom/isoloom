@@ -223,7 +223,8 @@ fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu:
 }
 
 /// ESXi's port groups: `ESXI_VIRTUAL_NETWORK` lists the management network's, then one per
-/// network in order.
+/// network in order. Each VM names its own by their indexes ([`port_groups`]), in its define:
+/// what a VM boots with is all in its own statements, so its boot digest follows it.
 fn esxi(r: &mut Ruby, env: &Environment) {
     let names = env.networks.keys().cloned().collect::<Vec<_>>().join(", ");
     r.comment(&format!(
@@ -233,8 +234,13 @@ fn esxi(r: &mut Ruby, env: &Environment) {
         "ESXI_NETWORKS",
         Value::raw("ENV.fetch(\"ESXI_VIRTUAL_NETWORK\", \"VM Network\").split(\",\").map(&:strip)"),
     );
-    r.assign("LAB_NETWORKS", Value::array(env.networks.keys().map(|n| Value::str(n))));
-    r.text("def esxi_networks(nets)\n  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }\nend\n");
+    r.text("def esxi_networks(indexes)\n  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }\nend\n");
+}
+
+/// The indexes in `ESXI_VIRTUAL_NETWORK` of the port groups of `nets`, networks of `env`: 0 is
+/// the management network's, then one per network in the spec's order.
+pub(crate) fn port_groups<'a>(env: &Environment, nets: impl IntoIterator<Item = &'a str>) -> Vec<usize> {
+    nets.into_iter().filter_map(|n| env.networks.get_index_of(n)).map(|i| i + 1).collect()
 }
 
 /// The settings every VM shares.

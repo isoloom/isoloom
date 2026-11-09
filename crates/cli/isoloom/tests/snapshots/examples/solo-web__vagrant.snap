@@ -451,9 +451,8 @@ ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (app); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["app"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -607,7 +606,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "solo-web-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -750,7 +749,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "solo-web-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -1338,7 +1337,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "solo-web · web",
           "vmware_esxi": "solo-web-web"
         },
-        "boot_digest": "sha256:e3c96864548056625587cd9dc3c7c85b1d1f2eed86e607c181eb5819da5b0a96"
+        "boot_digest": "sha256:1878b958d05c8a3777be7f2bc68ffd09c6d65ab75a8d8e8e5767b303522a2ca9"
       },
       "ports": [
         {
@@ -1375,7 +1374,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "solo-web · controller",
           "vmware_esxi": "solo-web-controller"
         },
-        "boot_digest": "sha256:40212fbf8269f8a214b9f5ef7809046ccecdf1ae453d8ebfe7845b4ce8a622ae"
+        "boot_digest": "sha256:9ffe80dddbcc3cb624f5f80d328b0ea5b0385c2beceab011582033068add53e0"
       }
     }
   ],

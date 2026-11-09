@@ -449,9 +449,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (dmz, corp, access); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["dmz", "corp", "access"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -591,7 +590,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["dmz", "corp", "access"])
+      v.esxi_virtual_network = esxi_networks([1, 2, 3])
       v.guest_name = "corp-ad-basics-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -768,7 +767,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["corp"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "corp-ad-basics-dc01"
       v.guest_guestos = "windows2019srvnext-64"
       v.guest_numvcpus = 2
@@ -889,7 +888,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["corp"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "corp-ad-basics-ws-01"
       v.guest_guestos = "windows11-64"
       v.guest_numvcpus = 2
@@ -1014,7 +1013,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["corp"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "corp-ad-basics-ws-02"
       v.guest_guestos = "windows11-64"
       v.guest_numvcpus = 2
@@ -1118,7 +1117,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["dmz", "corp"])
+      v.esxi_virtual_network = esxi_networks([1, 2])
       v.guest_name = "corp-ad-basics-web01"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1295,7 +1294,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["dmz", "corp", "access"])
+      v.esxi_virtual_network = esxi_networks([1, 2, 3])
       v.guest_name = "corp-ad-basics-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -2125,7 +2124,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · router",
           "vmware_esxi": "corp-ad-basics-router"
         },
-        "boot_digest": "sha256:56d30a2785ed34518d755ae6f2f6053ad631bf09fe6b2f6591cb78f2d5c6c26b"
+        "boot_digest": "sha256:f745ef81320a5ea6fc0d31b567e4059ea252c444503cf174e06d56672e790ce2"
       }
     },
     {
@@ -2152,7 +2151,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:460df6185345c5bc696f9805e29077fa200f095fb3d2626be7b87f01d5ace4a7"
+        "boot_digest": "sha256:523892cdbe8ef1e99718fbe1c560ef26761a4406f951d526da492fb686602c0b"
       },
       "ports": [
         {
@@ -2205,7 +2204,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:4cc359b7e159db627d4ba8a2cb0cb84c478ee9a9da7d57cdc778e0948d245e70"
+        "boot_digest": "sha256:80dcf53f35443b7ad383d1a2b145d010d4207ae9803d962b5bc495dff817d329"
       }
     },
     {
@@ -2232,7 +2231,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:8bb03330851b0e3a18c45dca4e6761efffbcd7005553ccc340bb9f7392f1b6c4"
+        "boot_digest": "sha256:ab0691463ba759b96df1010f329f49f07396d67713788965b98c1696c2f12b2a"
       }
     },
     {
@@ -2259,7 +2258,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · web01",
           "vmware_esxi": "corp-ad-basics-web01"
         },
-        "boot_digest": "sha256:512f7a2778715a151df4e5d105e6cc284e463e29fc6e50521c942638bd86b40b"
+        "boot_digest": "sha256:78d2060e7e653eaddeb7fbf3da14511cf833d177e498d79248e236043a313deb"
       },
       "ports": [
         {
@@ -2293,7 +2292,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · controller",
           "vmware_esxi": "corp-ad-basics-controller"
         },
-        "boot_digest": "sha256:9a0aae77f4e5b359059e4bf8ffe13d34a1e5b4bba4a188936a0fb721023add13"
+        "boot_digest": "sha256:0b9a2b71f2816b2cd273bba141df1db1a232c74bad9cb4871575cbd41c0eb03a"
       }
     }
   ],

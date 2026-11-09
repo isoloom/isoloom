@@ -65,7 +65,7 @@ pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step:
     let mut script = format!("umask 077\n: > {file}\n{lines}");
     script.push_str(&steps::linux(env, machine, step).unwrap_or_default());
     let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
-    r.script(call, "inline", &script);
+    r.provision(call.script("inline", &script));
 }
 
 /// A Windows machine's inputs, kept as machine-wide environment variables: its `setup`, `before`
@@ -81,7 +81,7 @@ pub(crate) fn windows_inputs(r: &mut Ruby, env: &Environment, machine: &str) {
         list(&mp.inputs)
     );
     let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
-    r.script(call, "inline", &script);
+    r.provision(call.script("inline", &script));
 }
 
 /// The variable a secret file's value travels in, and the Ruby reading it from the host's
@@ -110,7 +110,7 @@ pub(crate) fn secret_files(r: &mut Ruby, env: &Environment, machine: &str, os: O
         Os::Windows => secrets::windows::from_environment(&values, &mp.secrets),
     };
     let hash = Value::hash(read.into_iter().map(|(var, value)| (Value::str(&var), value)));
-    r.script(vagrantfile::shell("m", "secrets").kw("env", hash), "inline", &script);
+    r.provision(vagrantfile::shell("m", "secrets").kw("env", hash).script("inline", &script));
 }
 
 /// Whether a provisioner of `env`'s VMs reads a value from the host's environment: the

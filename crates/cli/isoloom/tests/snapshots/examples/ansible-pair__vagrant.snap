@@ -663,9 +663,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (lab); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["lab"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -818,7 +817,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "ansible-pair-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -965,7 +964,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "ansible-pair-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1107,7 +1106,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "ansible-pair-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 768
@@ -1984,7 +1983,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · web",
           "vmware_esxi": "ansible-pair-web"
         },
-        "boot_digest": "sha256:c8dfa35ed3753662a5d1ce768cc82768cd1f0727ef02deee30ede9f4401b628a"
+        "boot_digest": "sha256:bc80ef67ad5543296f25b32046d87eb2a2cfc6b18caa99e3f7e2a353ec7ffdf4"
       },
       "ports": [
         {
@@ -2018,7 +2017,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · cache",
           "vmware_esxi": "ansible-pair-cache"
         },
-        "boot_digest": "sha256:e814814e6d82085e2178f0930114db7fce867cc4f7d28e6bc9b7669f152f8097"
+        "boot_digest": "sha256:f2b3da5b68429a8e0a47f13f2733a5ab7822ea2b302a1b5d95359486bbeb9b0b"
       },
       "ports": [
         {
@@ -2050,7 +2049,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · controller",
           "vmware_esxi": "ansible-pair-controller"
         },
-        "boot_digest": "sha256:66c14b6a0ff1cd701dc03967840624e2a17aebe391f1176500226c4890c0543e"
+        "boot_digest": "sha256:dec2fe9b382dfdff6b0783c1272a4181033533ea42764cc6b904727c5bd48528"
       }
     }
   ],

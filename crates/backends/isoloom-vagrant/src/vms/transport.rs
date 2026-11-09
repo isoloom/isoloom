@@ -20,7 +20,7 @@ use isoloom_render::boot::{self, Trigger};
 use isoloom_render::steps;
 
 use super::values;
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Provision, Ruby, Value};
 use crate::vagrantfile;
 
 /// The operating system family of a VM: which rendering of a step it runs.
@@ -69,7 +69,7 @@ const FORWARDING: &str = "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloo
 pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &Step, os: Os) {
     match (os, step) {
         (_, Step::Project) => {
-            r.call(Call::new("m.vm.provision").arg(Value::str("isoloom_project")).kw("name", Value::str("project")));
+            r.provision(Provision::new("m", "isoloom_project").kw("name", Value::str("project")));
         }
         (Os::Linux, Step::Prelude) => vagrantfile::prelude(r, env, "m"),
         (Os::Linux, Step::Inputs { .. }) => values::linux_inputs(r, env, machine, step),
@@ -88,7 +88,7 @@ pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, 
         (Os::Windows, Step::Run { .. } | Step::Setup { .. }) => {
             if let Some(script) = steps::windows(env, machine, step) {
                 let call = vagrantfile::shell("m", &label(step)).kw_opt("env", values::inputs_env(env, machine));
-                r.script(call, "inline", &format!("{}{script}", values::windows_decode(env, machine)));
+                r.provision(call.script("inline", &format!("{}{script}", values::windows_decode(env, machine))));
             }
         }
         _ => {
@@ -139,14 +139,14 @@ fn label(step: &Step) -> String {
 
 /// `m.vm.provision "shell", name: ..., inline: ...`.
 pub(crate) fn shell(r: &mut Ruby, name: &str, script: &str) {
-    r.script(vagrantfile::shell("m", name), "inline", script);
+    r.provision(vagrantfile::shell("m", name).script("inline", script));
 }
 
 /// Vagrant restarts the machine and waits until it answers; the boot is recorded before and
 /// checked after, so a machine that didn't restart fails the step.
 fn reboot(r: &mut Ruby) {
     shell(r, "before reboot", &steps::record_boot());
-    r.call(vagrantfile::shell("m", "reboot").kw("reboot", true));
+    r.provision(vagrantfile::shell("m", "reboot").kw("reboot", true));
     shell(r, "after reboot", &steps::reboot_check());
 }
 

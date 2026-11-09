@@ -452,9 +452,8 @@ ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (servers, users); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["servers", "users"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -594,7 +593,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["servers", "users"])
+      v.esxi_virtual_network = esxi_networks([1, 2])
       v.guest_name = "udp-dns-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -759,7 +758,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["servers"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "udp-dns-dns"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -979,7 +978,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["users"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "udp-dns-client"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1719,7 +1718,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · router",
           "vmware_esxi": "udp-dns-router"
         },
-        "boot_digest": "sha256:0c981af6cc4ad88f5806866b54f32ebd013fc7c9e15070506f37c95f1890db2b"
+        "boot_digest": "sha256:01b712b1cef6b483e2b82cb40db7d01ebca42ee95faceab20ae6329b717c4ccd"
       }
     },
     {
@@ -1745,7 +1744,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · dns",
           "vmware_esxi": "udp-dns-dns"
         },
-        "boot_digest": "sha256:c36666614203055cd203d007c1900a484e482033238fa7ba667415d9e7ebbd7d"
+        "boot_digest": "sha256:11e66e0ba9900d5d12e7f05bb8b9c260da8202d10499e76778809df576bd0f81"
       },
       "ports": [
         {
@@ -1791,7 +1790,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · client",
           "vmware_esxi": "udp-dns-client"
         },
-        "boot_digest": "sha256:4949ccb68f0ee3412be92cb4d462481923fd0015d91be9f713e57ab7f25e06e9"
+        "boot_digest": "sha256:f6445b52cad6d3aa3ead5af9f77e128769840a73a100da8ed63f1f253f1fee36"
       }
     }
   ],

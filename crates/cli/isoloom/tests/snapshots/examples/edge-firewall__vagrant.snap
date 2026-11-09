@@ -451,9 +451,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (outside, dmz, lan); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["outside", "dmz", "lan"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -601,7 +600,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["outside", "dmz", "lan"])
+      v.esxi_virtual_network = esxi_networks([1, 2, 3])
       v.guest_name = "edge-firewall-fw"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -752,7 +751,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["dmz"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "edge-firewall-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -973,7 +972,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lan"])
+      v.esxi_virtual_network = esxi_networks([3])
       v.guest_name = "edge-firewall-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1194,7 +1193,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["outside"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "edge-firewall-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -2102,7 +2101,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · fw",
           "vmware_esxi": "edge-firewall-fw"
         },
-        "boot_digest": "sha256:214463480c61a9094a673d38a31478b166319d3156ae12cadf75784622ac0f01"
+        "boot_digest": "sha256:87688cf47df3a610a5217d6373b62df6d2722e5058f964599042a9c21c1e32c4"
       },
       "ports": [
         {
@@ -2136,7 +2135,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · web",
           "vmware_esxi": "edge-firewall-web"
         },
-        "boot_digest": "sha256:7e1c71f6293791f7cbb855d7ae18f32c2ef9a2b08a3e960e19d90c258ebfbc61"
+        "boot_digest": "sha256:ca035d0504ad31fb2a769857e29a626de0e44d4692650992a1f30c299cfabdb7"
       },
       "ports": [
         {
@@ -2170,7 +2169,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · cache",
           "vmware_esxi": "edge-firewall-cache"
         },
-        "boot_digest": "sha256:5f2e3dbfa9c94491d9fdec97b976fef7d7aa4eaa57217285219af38f5fd69cf2"
+        "boot_digest": "sha256:f1d79cc759021563a43d0239daae0f16e628ad5b8fc6c2643acdca02ca61d1a6"
       },
       "ports": [
         {
@@ -2205,7 +2204,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · user",
           "vmware_esxi": "edge-firewall-user"
         },
-        "boot_digest": "sha256:7966b96028525b16ca783906e50eaa4b20d25b19c007ce222abc55bc9c4445ed"
+        "boot_digest": "sha256:4bed363166b22bcb25d78061af17e77e171e96efd18fb45c7f525aa80a7b8748"
       }
     }
   ],

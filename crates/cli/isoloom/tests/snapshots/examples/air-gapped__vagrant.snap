@@ -449,9 +449,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (lab); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["lab"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -604,7 +603,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "air-gapped-store"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -788,7 +787,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "air-gapped-app"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1488,7 +1487,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "air-gapped · store",
           "vmware_esxi": "air-gapped-store"
         },
-        "boot_digest": "sha256:f5f79c9d60f84fb930f0ff1f7353726bb116aa5b59910b3629618e7d3772ccb0"
+        "boot_digest": "sha256:5811d106542984c450a07ece07e1a9a5baf4a13f8b66ae2224d4e97c68ef148b"
       },
       "ports": [
         {
@@ -1522,7 +1521,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "air-gapped · app",
           "vmware_esxi": "air-gapped-app"
         },
-        "boot_digest": "sha256:1c9f02fcffec1b66b6fd75be9ce765d2f522564f99f40b60ada17f3a79f4e7e9"
+        "boot_digest": "sha256:74d441ac4988a02b2604f278d75e69af154f23185d9b3286c1e53b5bbbfe2afd"
       },
       "ports": [
         {

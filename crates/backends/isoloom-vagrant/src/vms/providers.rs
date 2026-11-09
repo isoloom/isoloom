@@ -74,8 +74,9 @@ pub(crate) struct Guest<'a> {
     pub(crate) vm_name: String,
     /// Its size.
     pub(crate) size: Size,
-    /// The networks it is on, in order.
-    pub(crate) nets: Vec<&'a str>,
+    /// The ESXi port group of each network it is on, in order, by its index in
+    /// `ESXI_VIRTUAL_NETWORK` ([`super::port_groups`]).
+    pub(crate) port_groups: Vec<usize>,
     /// The box libvirt uses instead of the main one, if any.
     pub(crate) libvirt_box: Option<&'a str>,
     /// How it boots, when not the way its box does (libvirt and QEMU).
@@ -247,8 +248,7 @@ fn qemu(r: &mut Ruby, size: Size, q: &Qemu) {
         emulated(r, a, q.windows_address.is_some());
     }
     if let Some((ip, len)) = q.windows_address {
-        let call = Call::new("o.vm.provision").arg(Value::str("shell")).kw("name", Value::str("lab network"));
-        r.script(call, "inline", &windows_lab_address(ip, len));
+        r.provision(vagrantfile::shell("o", "lab network").script("inline", &windows_lab_address(ip, len)));
     }
 }
 
@@ -321,7 +321,7 @@ fn esxi(r: &mut Ruby, g: &Guest) {
     if let Some(b) = g.esxi_box {
         r.assign("o.vm.box", Value::str(b));
     }
-    let nets = Value::array(g.nets.iter().map(|n| Value::str(n)));
+    let nets = Value::array(g.port_groups.iter().map(|&i| Value::raw(i.to_string())));
     vagrantfile::esxi_host(r);
     r.assign("v.esxi_virtual_network", Value::raw(format!("esxi_networks({nets})")));
     r.assign("v.guest_name", Value::str(&g.vm_name));

@@ -5,13 +5,13 @@
 use isoloom_plan::Environment;
 use isoloom_render::container::{HostSize, HybridContainers as Containers, docker_net, host_environment};
 use isoloom_render::router;
+use isoloom_render::stable_hash;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::error::{Error, Result};
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Call, Provision, Ruby, Value};
 use crate::vagrantfile::{self, shell};
-use isoloom_render::stable_hash;
 
 const HOST: &str = "isoloom-docker";
 
@@ -65,18 +65,13 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     vagrantfile::install_docker(r, "m");
     // The project, with this Compose file from Isoloom's outputs.
     let extra = Value::array([Value::str(".isoloom/hybrid/compose.yml")]);
-    r.call(
-        Call::new("m.vm.provision")
-            .arg(Value::str("isoloom_project"))
-            .kw("name", Value::str("project"))
-            .kw("extra", extra),
-    );
-    r.heredoc(shell("m", "networks"), "inline", "SH", &networks_script(nics));
+    r.provision(Provision::new("m", "isoloom_project").kw("name", Value::str("project")).kw("extra", extra));
+    r.provision(shell("m", "networks").heredoc("inline", "SH", &networks_script(nics)));
     let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
     let files = host_environment(env);
     let up = format!("{secrets}cd /opt/isoloom && {files}docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900");
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
-    r.call(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", inputs));
+    r.provision(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", inputs));
 }
 
 /// Sized for every container at once plus Docker's own 1 GB (2 to 16 CPUs), every lab

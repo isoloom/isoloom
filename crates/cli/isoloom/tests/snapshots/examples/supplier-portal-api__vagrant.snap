@@ -462,9 +462,8 @@ ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (lab); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["lab"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -617,7 +616,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "supplier-portal-api-database"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -834,7 +833,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "supplier-portal-api-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -979,7 +978,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "supplier-portal-api-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -1784,7 +1783,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api · database",
           "vmware_esxi": "supplier-portal-api-database"
         },
-        "boot_digest": "sha256:01b6fdc21013f8974a4aa0baad0ed95c365e5889417e2908c247043284ed19d6"
+        "boot_digest": "sha256:dffaccb0c1a082767525ed561f89a66da06deec0257e7a243c83bad17c493d55"
       },
       "ports": [
         {
@@ -1818,7 +1817,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api · web",
           "vmware_esxi": "supplier-portal-api-web"
         },
-        "boot_digest": "sha256:6ac393f69d07c7d8cf9654a21c13a22c0de4246ef962c9f4f342025302630fee"
+        "boot_digest": "sha256:3429bd8477b7f3facb6746a37016f7cb5d44ed0f82442d9785991f5fedc80468"
       },
       "ports": [
         {
@@ -1855,7 +1854,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api · controller",
           "vmware_esxi": "supplier-portal-api-controller"
         },
-        "boot_digest": "sha256:b666043a51d0058e2b1fc47a4e3920df50fa5dedb3097f54304a6dd0b2ed8848"
+        "boot_digest": "sha256:f49d5a3538c896062c45b444499f6313aea308fb57317b7d54d6c6dcc30b785c"
       }
     }
   ],

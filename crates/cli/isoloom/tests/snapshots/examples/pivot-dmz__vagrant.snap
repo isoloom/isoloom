@@ -451,9 +451,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (dmz, internal, access); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["dmz", "internal", "access"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -594,7 +593,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["dmz", "internal", "access"])
+      v.esxi_virtual_network = esxi_networks([1, 2, 3])
       v.guest_name = "pivot-dmz-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -752,7 +751,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["dmz", "internal"])
+      v.esxi_virtual_network = esxi_networks([1, 2])
       v.guest_name = "pivot-dmz-gateway"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -941,7 +940,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["internal"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "pivot-dmz-app"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1166,7 +1165,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["internal"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "pivot-dmz-db"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1389,7 +1388,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["access"])
+      v.esxi_virtual_network = esxi_networks([3])
       v.guest_name = "pivot-dmz-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -2307,7 +2306,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · router",
           "vmware_esxi": "pivot-dmz-router"
         },
-        "boot_digest": "sha256:5030176a6293047ac61df18711a0bea2070763019d6cdb6a906c2314b39cb166"
+        "boot_digest": "sha256:595989c52d59963b8256cd18dfcf64c4366161c4a355f88c7b485789d0534beb"
       }
     },
     {
@@ -2334,7 +2333,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · gateway",
           "vmware_esxi": "pivot-dmz-gateway"
         },
-        "boot_digest": "sha256:121fe5e7f63b9180a576886ec2afa273669c8b5e793bd35d5251357348099330"
+        "boot_digest": "sha256:e271072865fc95896a06ded54de6aa827e4bf1630104aefa1a1319b26d745448"
       },
       "ports": [
         {
@@ -2374,7 +2373,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · app",
           "vmware_esxi": "pivot-dmz-app"
         },
-        "boot_digest": "sha256:d141a13647aa76ad66b1e2b99f18a06a3ffa6d8198447ca6855cc3a4223b8219"
+        "boot_digest": "sha256:695230b2a543a47a56a144ac82266c89728de5685b52c3c99bfd62b7690e81eb"
       },
       "ports": [
         {
@@ -2408,7 +2407,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · db",
           "vmware_esxi": "pivot-dmz-db"
         },
-        "boot_digest": "sha256:c05483c5b5a20157ed2e3627173274e9f9cd9b8c045c572db6fb6ad24069ab6d"
+        "boot_digest": "sha256:c5a527fbcf0596937d2ef630d86894f02523fca5611932bc96adc6b17d3833cb"
       },
       "ports": [
         {
@@ -2443,7 +2442,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · user",
           "vmware_esxi": "pivot-dmz-user"
         },
-        "boot_digest": "sha256:46550d9c5fec8d4ccc3e5f61eb909488880d62aa0ee539b084843930e59e3f7c"
+        "boot_digest": "sha256:f093c63056adf70f11134f1221f4d7e12d7b7212abe40a2363a7b63ec1cd661c"
       }
     }
   ],

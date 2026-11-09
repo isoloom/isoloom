@@ -452,9 +452,8 @@ ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (office); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["office"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -620,7 +619,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "mixed-office-files01"
       v.guest_guestos = "windows2019srv-64"
       v.guest_numvcpus = 2
@@ -734,7 +733,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "mixed-office-intranet"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -878,7 +877,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "mixed-office-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -1563,7 +1562,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · files01",
           "vmware_esxi": "mixed-office-files01"
         },
-        "boot_digest": "sha256:9e0ebdd29dd37b29c1e31d804d0b5349ab3ae1da606a088cd6c87c8ef3981756"
+        "boot_digest": "sha256:88b58dc78abb9385e186a6593527a36ad3929a4774100a013a32f14e720a1efa"
       },
       "ports": [
         {
@@ -1597,7 +1596,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · intranet",
           "vmware_esxi": "mixed-office-intranet"
         },
-        "boot_digest": "sha256:f8bd21e72d7102381736142c036a8209bf97648bd81a7a71e1e8dbb7dc9050a5"
+        "boot_digest": "sha256:55e81b7a8bde0e1219eb766dde6266aaca9c880d39ae1bdb6f8e98a61afe074d"
       },
       "ports": [
         {
@@ -1634,7 +1633,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · controller",
           "vmware_esxi": "mixed-office-controller"
         },
-        "boot_digest": "sha256:b6a0b2d11bd02aa544a1d51e3ad111c5d96ffc42accd870e56b2797c70e02da8"
+        "boot_digest": "sha256:b830dcfcb6a08356a3dff090ae804405256416a0dc6100ac3e1e539b91081282"
       }
     }
   ],

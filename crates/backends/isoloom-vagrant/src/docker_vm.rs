@@ -35,7 +35,7 @@ use isoloom_spec::images;
 use isoloom_spec::model::Target;
 
 use crate::host_folders::Share;
-use crate::ruby::{BootStatements, Call, Ruby, Value};
+use crate::ruby::{BootStatements, Call, Provision, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
 const DIR: &str = "docker-vm";
@@ -74,8 +74,8 @@ const PROJECT: &str = "project";
 /// `config.vm.provision "<name>", type: "<kind>"`: a provisioner named at the top level, which
 /// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
 /// provisioner's own `name:` option, and the project provisioner has no such option).
-fn named(name: &str, kind: &str) -> Call {
-    Call::new("config.vm.provision").arg(Value::str(name)).kw("type", Value::str(kind))
+fn named(name: &str, kind: &str) -> Provision {
+    Provision::new("config", name).kw("type", Value::str(kind))
 }
 /// The Compose file the VM runs, from the project's copy.
 const COMPOSE: &str = ".isoloom/docker/compose.yml";
@@ -176,19 +176,19 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
         .collect();
     crate::host_folders::render(r, "config", &shares);
     if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
-        r.call(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
+        r.provision(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
     }
     let docker = format!("{}\n{}", steps::install_docker(), steps::PUBLISHED_FROM_OUTSIDE);
-    r.call(named(vagrantfile::DOCKER, "shell").kw("inline", Value::str(&docker)));
+    r.provision(named(vagrantfile::DOCKER, "shell").kw("inline", Value::str(&docker)));
     if !forwarded.is_empty() {
         let accept = format!(
             "mkdir -p /etc/ssh/sshd_config.d && echo {} > {ACCEPT_ENV_FILE} && (systemctl reload ssh || systemctl reload sshd)",
             isoloom_spec::shell::quote(&format!("AcceptEnv {}", forwarded.join(" ")))
         );
-        r.call(named(ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
+        r.provision(named(ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
     }
     // The project, its generated Compose file included.
-    r.call(named(PROJECT, "isoloom_project").kw("generated", true));
+    r.provision(named(PROJECT, "isoloom_project").kw("generated", true));
     environment(r, env, guest);
     checks(r, env);
 }
@@ -279,7 +279,7 @@ fn environment(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
         steps::READY_FILE
     );
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
-    r.call(shell("config", "environment").kw("inline", Value::str(&script)).kw_opt("env", inputs));
+    r.provision(shell("config", "environment").kw("inline", Value::str(&script)).kw_opt("env", inputs));
 }
 
 /// Checks on demand: every runner of the Compose `check` profile (one per position), then the
@@ -307,7 +307,7 @@ fn checks(r: &mut Ruby, env: &Environment) {
         Value::raw(format!("INPUTS.merge({derived})"))
     };
     let call = shell("config", "checks").kw("run", Value::str("never"));
-    r.call(call.kw("inline", Value::str(&script)).kw("env", vars));
+    r.provision(call.kw("inline", Value::str(&script)).kw("env", vars));
 }
 
 /// The `exec` checks' runners, piped into their machines (see `docker::exec_runner`), one per

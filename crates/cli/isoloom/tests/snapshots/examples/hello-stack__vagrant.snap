@@ -453,9 +453,8 @@ ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (app); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["app"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -608,7 +607,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "hello-stack-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -802,7 +801,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "hello-stack-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -983,7 +982,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "hello-stack-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -1804,7 +1803,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · cache",
           "vmware_esxi": "hello-stack-cache"
         },
-        "boot_digest": "sha256:5ac56a5c69cb46086c31c8ce3a6e03e5bd206a2e753832852f627d1f17848481"
+        "boot_digest": "sha256:eab4680f6d473302c32707141d11179462da3c7eab0292e4c39095a5c6e18b2d"
       },
       "ports": [
         {
@@ -1838,7 +1837,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · web",
           "vmware_esxi": "hello-stack-web"
         },
-        "boot_digest": "sha256:78e1922d0e3b9fd9d8bcbd7dd2962574bb1a67d80cff19eff0a9e1fabe2d2941"
+        "boot_digest": "sha256:bfb02dee6b90d9df3ebbdbd602c303709213f68b315880d6aa8fdacb4e08f4c6"
       },
       "ports": [
         {
@@ -1875,7 +1874,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · controller",
           "vmware_esxi": "hello-stack-controller"
         },
-        "boot_digest": "sha256:09431de621e080195b18cb6113d13acb7a109ccfd05d08ec3dc7bd16ab3679f4"
+        "boot_digest": "sha256:51d7a2fa12e9536b19b9ecd12f41058f1f9ad221d366f374731e1c16c449a5f5"
       }
     }
   ],

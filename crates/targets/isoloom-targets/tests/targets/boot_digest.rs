@@ -79,6 +79,34 @@ fn a_vms_set_up_alone_changes_no_digest() -> Outcome {
     Ok(())
 }
 
+/// Two VMs on two networks, `web` on the first, `db` on the second.
+const TWO_NETWORKS: &str = "version: 1
+name: pair
+networks:
+  front: { cidr: 10.34.0.0/24 }
+  back: { cidr: 10.35.0.0/24 }
+machines:
+  web:
+    os: debian@12
+    networks: { front: 10 }
+  db:
+    os: debian@12
+    networks: { back: 10 }
+";
+
+#[test]
+fn a_network_inserted_ahead_changes_the_digest_of_each_vm_whose_port_group_moved() -> Outcome {
+    // On ESXi, a VM's port groups are picked by its networks' places in the spec's order: one
+    // inserted ahead of `back` moves db's port group, not web's.
+    let run = ".isoloom/vagrant/run.json";
+    let before = digests(TWO_NETWORKS, Target::Vagrant, run)?;
+    let inserted = TWO_NETWORKS.replace("  back: {", "  middle: { cidr: 10.36.0.0/24 }\n  back: {");
+    let after = digests(&inserted, Target::Vagrant, run)?;
+    assert_eq!(digest_of(&after, "web"), digest_of(&before, "web"), "web's port group is where it was");
+    assert_ne!(digest_of(&after, "db"), digest_of(&before, "db"), "db's port group moved");
+    Ok(())
+}
+
 #[test]
 fn docker_vms_vm_digest_changes_when_a_container_gets_a_host_folder() -> Outcome {
     let run = ".isoloom/docker-vm/run.json";

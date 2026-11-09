@@ -448,9 +448,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (branch, far); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["branch", "far"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -590,7 +589,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["branch", "far"])
+      v.esxi_virtual_network = esxi_networks([1, 2])
       v.guest_name = "slow-link-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -785,7 +784,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["far"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "slow-link-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1001,7 +1000,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["branch"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "slow-link-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1171,7 +1170,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["branch", "far"])
+      v.esxi_virtual_network = esxi_networks([1, 2])
       v.guest_name = "slow-link-tool-shell"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -1744,7 +1743,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link · router",
           "vmware_esxi": "slow-link-router"
         },
-        "boot_digest": "sha256:4a3130ba4125258b6419bc607060f37317a8f109f769ccd84f69877b325b8c4e"
+        "boot_digest": "sha256:0563d22dafb39be7488bfa338714715d9c8f9375a99262ad24dc5ac046f157e7"
       }
     },
     {
@@ -1770,7 +1769,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link · web",
           "vmware_esxi": "slow-link-web"
         },
-        "boot_digest": "sha256:1af9b2356287a98b9282353ca73b7e1c9dd27596774ca8264d8248abe436284d"
+        "boot_digest": "sha256:2c409bb12ecd43762921fdbed6b538fdeee4abfbd0e3031247490f636b379e87"
       },
       "ports": [
         {
@@ -1805,7 +1804,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link · user",
           "vmware_esxi": "slow-link-user"
         },
-        "boot_digest": "sha256:f48bf5acdc2a0d41bed28eb43778f032b7a5e0c5d4f4e860e946a4775fe65986"
+        "boot_digest": "sha256:cccde2b2d90cd74f6591be7cee4706feeba357809ed59b2ebdc68ab08ef1f72f"
       }
     },
     {
@@ -1830,7 +1829,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link · tool shell",
           "vmware_esxi": "slow-link-tool-shell"
         },
-        "boot_digest": "sha256:26e721acd1f0e43dec01dab5d60ddc28a76153eaf63c33f4e7cf8f48a235b785"
+        "boot_digest": "sha256:f48480efe069f769fc7e1087159cccfecdd490e2ca22d5aa462f4ed03a585d71"
       }
     }
   ],

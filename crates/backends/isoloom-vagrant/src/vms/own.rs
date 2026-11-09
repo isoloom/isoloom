@@ -65,7 +65,7 @@ fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ip
         label: super::label(env, what),
         vm_name: super::vm_name(env, what),
         size,
-        nets: at.iter().map(|(net, _)| *net).collect(),
+        port_groups: super::port_groups(env, at.iter().map(|(net, _)| *net)),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
         boot: None,
         qemu: Qemu::helper(link),

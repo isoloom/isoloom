@@ -456,9 +456,8 @@ ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (lab); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["lab"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -612,7 +611,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "configured-app-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1156,7 +1155,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "configured-app-api"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1552,7 +1551,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["lab"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "configured-app-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -2322,7 +2321,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · web",
           "vmware_esxi": "configured-app-web"
         },
-        "boot_digest": "sha256:d944fe9fc0f9505df77f00f4c2def9e3d8ff68ea8206f8196b88a41265cd5cfd"
+        "boot_digest": "sha256:bcb7812a7df3b3b837b2869b03fbbb7e44994cf9f01df609f55cca6f8c607698"
       },
       "ports": [
         {
@@ -2361,7 +2360,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · api",
           "vmware_esxi": "configured-app-api"
         },
-        "boot_digest": "sha256:ac8ef28f97f47b7f6d0b5afe9ecbeff0478bf3f31950ce12ef02701338d74d0f"
+        "boot_digest": "sha256:354943388c05a7a557a8ba1c2d100372d8408bd00718dcc5e65fa91261f51764"
       },
       "ports": [
         {
@@ -2399,7 +2398,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · controller",
           "vmware_esxi": "configured-app-controller"
         },
-        "boot_digest": "sha256:8a751e9e4682c903eab67d04832e65fece4b8f786b6452d0878f25d5e8d0db55"
+        "boot_digest": "sha256:8f966def580444c74b345c171cbe6a4522874a471a1ac4e87f51cff8f388ce69"
       }
     }
   ],

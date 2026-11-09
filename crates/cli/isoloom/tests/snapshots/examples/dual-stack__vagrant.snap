@@ -449,9 +449,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (front, back); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["front", "back"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -591,7 +590,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["front", "back"])
+      v.esxi_virtual_network = esxi_networks([1, 2])
       v.guest_name = "dual-stack-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -797,7 +796,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["back"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "dual-stack-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1056,7 +1055,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["front"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "dual-stack-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1792,7 +1791,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "dual-stack · router",
           "vmware_esxi": "dual-stack-router"
         },
-        "boot_digest": "sha256:7fcc69b8d29ff9aa203f9e7b0657b40c2e4b29e7a774c2c9b07760036da867a9"
+        "boot_digest": "sha256:41b05d7f8d38ae76d44145e596ee7bbe59941372aa3ee0f5a45817ac8f39db03"
       }
     },
     {
@@ -1818,7 +1817,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "dual-stack · web",
           "vmware_esxi": "dual-stack-web"
         },
-        "boot_digest": "sha256:1ff7e2561173d5e0630bcb17982ac222d60de448f023cad783b0696b2e64c607"
+        "boot_digest": "sha256:476149698c63c6f03743486caed8e944e72594f0407c9112624ab4be27ccf2a7"
       },
       "ports": [
         {
@@ -1853,7 +1852,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "dual-stack · user",
           "vmware_esxi": "dual-stack-user"
         },
-        "boot_digest": "sha256:04296f107df80af6efa8746b32e518e9bb8f7faea88a85aa8cced935961c4e66"
+        "boot_digest": "sha256:bb0b4288e3f4102dceba9c15895e28bbe264ce0db4e1a6d5b2b561d9b67e8088"
       }
     }
   ],

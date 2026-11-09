@@ -748,9 +748,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (office); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["office"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -903,7 +902,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "several-addresses-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1088,7 +1087,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "several-addresses-decoy"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1288,7 +1287,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "several-addresses-client"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1965,7 +1964,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "several-addresses · web",
           "vmware_esxi": "several-addresses-web"
         },
-        "boot_digest": "sha256:977e75db40aa7047e872285b35a5fa6a06b05e1211e96f11321e868243006f28"
+        "boot_digest": "sha256:0c384e161b1cd72263318bdb1e00a7142ffd0584772bb84ed354630fe2ee26e8"
       },
       "ports": [
         {
@@ -1999,7 +1998,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "several-addresses · decoy",
           "vmware_esxi": "several-addresses-decoy"
         },
-        "boot_digest": "sha256:650044b672c7aed3634ebbcbc755edf30531a4d0bc59a3170ba182faced800d3"
+        "boot_digest": "sha256:21a422c81f9fe153c24aa94faf8117d90a687932bd44744e7edb294d14866ade"
       }
     },
     {
@@ -2025,7 +2024,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "several-addresses · client",
           "vmware_esxi": "several-addresses-client"
         },
-        "boot_digest": "sha256:a8aabb48487050339080b1a71cd9f03c4028a9b995f017f264c2c55977f1f1bd"
+        "boot_digest": "sha256:c9361b177a44ab72cef3a72e5b3718cde814c99af46211bc942084f69a6ee412"
       }
     }
   ],

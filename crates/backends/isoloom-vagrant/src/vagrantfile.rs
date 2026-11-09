@@ -7,7 +7,7 @@ use isoloom_plan::{Environment, Step};
 use isoloom_render::steps;
 use isoloom_spec::model::Protocol;
 
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Call, Provision, Ruby, Value};
 
 /// Vagrant's host-port check, corrected for macOS 27 (`vagrant_port_check.rb`): Vagrant's own
 /// reads every port as in use there (Ruby bug #22223), so a VM's fixed forwarded ports fail as
@@ -22,8 +22,8 @@ pub(crate) fn derived_from_host() -> Value {
 }
 
 /// `<var>.vm.provision "shell", name: <name>`: a shell provisioner, its script still to add.
-pub(crate) fn shell(var: &str, name: &str) -> Call {
-    Call::new(format!("{var}.vm.provision")).arg(Value::str("shell")).kw("name", Value::str(name))
+pub(crate) fn shell(var: &str, name: &str) -> Provision {
+    Provision::new(var, "shell").kw("name", Value::str(name))
 }
 
 /// The values given at launch, read from the host's environment (empty when unset), as the
@@ -111,7 +111,7 @@ pub(crate) const DOCKER: &str = "docker";
 /// plan's [`Step::Prelude`]. Nothing when the spec has none.
 pub(crate) fn prelude(r: &mut Ruby, env: &Environment, var: &str) {
     if let Some(sh) = steps::linux(env, "", &Step::Prelude) {
-        r.call(shell(var, CONSTRAINTS).kw("inline", Value::str(&sh)));
+        r.provision(shell(var, CONSTRAINTS).kw("inline", Value::str(&sh)));
     }
 }
 
@@ -127,7 +127,7 @@ pub(crate) fn esxi_host(r: &mut Ruby) {
 
 /// Docker from Docker's own install script, unless the box has it.
 pub(crate) fn install_docker(r: &mut Ruby, var: &str) {
-    r.call(shell(var, DOCKER).kw("inline", Value::str(&steps::install_docker())));
+    r.provision(shell(var, DOCKER).kw("inline", Value::str(&steps::install_docker())));
 }
 
 #[cfg(test)]

@@ -449,9 +449,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (app); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["app"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -605,7 +604,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "shared-files-writer"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -796,7 +795,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "shared-files-reader"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1461,7 +1460,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "shared-files · writer",
           "vmware_esxi": "shared-files-writer"
         },
-        "boot_digest": "sha256:91fc0c982789c9673665f94bb5920175573c115c90ed977ec07136a86f06b89c"
+        "boot_digest": "sha256:8290866a9572b3be45b74a00a0bfe31c8b6619a47d0d85a81827b459a06fce30"
       }
     },
     {
@@ -1487,7 +1486,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "shared-files · reader",
           "vmware_esxi": "shared-files-reader"
         },
-        "boot_digest": "sha256:783bd02134a4bfac0404061a5d1efaa2b229fd35a5400b2c53f20d72a8ee75e0"
+        "boot_digest": "sha256:0b535103fef41f8b4d34c1a0cb48ce904cb755af5d8bd78cab7513b8defe813f"
       }
     }
   ],

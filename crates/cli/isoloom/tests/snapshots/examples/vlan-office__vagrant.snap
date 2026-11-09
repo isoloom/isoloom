@@ -451,9 +451,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (office-vlan10, office-vlan20, servers); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["office-vlan10", "office-vlan20", "servers"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -595,7 +594,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office-vlan10", "office-vlan20", "servers"])
+      v.esxi_virtual_network = esxi_networks([1, 2, 3])
       v.guest_name = "vlan-office-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -760,7 +759,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["servers"])
+      v.esxi_virtual_network = esxi_networks([3])
       v.guest_name = "vlan-office-intranet"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -981,7 +980,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office-vlan10"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "vlan-office-staff"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1201,7 +1200,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office-vlan20"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "vlan-office-guest"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1377,7 +1376,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["office-vlan10", "office-vlan20"])
+      v.esxi_virtual_network = esxi_networks([1, 2])
       v.guest_name = "vlan-office-admin"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -2300,7 +2299,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · router",
           "vmware_esxi": "vlan-office-router"
         },
-        "boot_digest": "sha256:1c2dcd4a8fa99ee3bec751ebb49cb8ac0a1632d581cc28f6fed175b894ea3fd1"
+        "boot_digest": "sha256:5886bcb39deaff0333557712b4ef060ce196a3812e94ad1112c7b71e82061a27"
       }
     },
     {
@@ -2326,7 +2325,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · intranet",
           "vmware_esxi": "vlan-office-intranet"
         },
-        "boot_digest": "sha256:e432fe1dee4fee869b51d939dc4d0b5d79334c22e12b970a5d1303ecad04bee4"
+        "boot_digest": "sha256:47423a49cf94ebfb9dbe061aad3ef20441babae04607f5db0c76a7568877b9d4"
       },
       "ports": [
         {
@@ -2361,7 +2360,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · staff",
           "vmware_esxi": "vlan-office-staff"
         },
-        "boot_digest": "sha256:c8dc20f0897fe67b416ce28d92f3671d302fe3609ac935f0a75606bc312f3bec"
+        "boot_digest": "sha256:da39227b6817c71eb785dc7c8262893e9780781b2f24f0db33be046a2c105643"
       }
     },
     {
@@ -2387,7 +2386,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · guest",
           "vmware_esxi": "vlan-office-guest"
         },
-        "boot_digest": "sha256:51f1c8c470f9ee780ddde7a140f83334abc4ce569b9706be4f8a59fc3cebce23"
+        "boot_digest": "sha256:8826de9e69b11b3488bbc7fda35e4c5fdef2a6f21eb431f6545c8729b8a838c6"
       }
     },
     {
@@ -2414,7 +2413,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · admin",
           "vmware_esxi": "vlan-office-admin"
         },
-        "boot_digest": "sha256:16de310f5fab71da08783b09f8c812dc52d12cbe958425e40cb91c9ef7e20b75"
+        "boot_digest": "sha256:c9b6e9dc83156b836217a13cac17ec27f1811e5528840432a18fd56ba7b1b826"
       }
     }
   ],

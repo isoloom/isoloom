@@ -1,5 +1,5 @@
 //! The one Ruby builder every Vagrantfile is written with: code is assembled from typed pieces,
-//! every string goes through [`rb`] (so no value can end a literal or interpolate), and the
+//! every string goes through [`ruby::quote`] (so no value can end a literal or interpolate), and the
 //! indentation follows the block nesting instead of being spelled out in format strings.
 //!
 //! - [`Value`]: one Ruby expression. [`Value::str`] quotes text, [`Value::raw`] takes code
@@ -11,14 +11,15 @@
 //!   ([`Call::comment`]) is allowed.
 //! - [`Ruby`]: the writer. [`Ruby::line`], [`Ruby::assign`] and [`Ruby::call`] write one
 //!   statement at the current depth; [`Ruby::block`] writes `head do |params|`, the body one level
-//!   deeper, and `end`; [`Ruby::heredoc`] passes a script as a squiggly heredoc (`<<~'SH'`,
-//!   nothing expanded, its tag never a line of the script); [`Ruby::hash`] writes a constant hash
-//!   one entry a line; [`Ruby::text`] adds prepared Ruby (a library such as the project copier) as
-//!   it is.
+//!   deeper, and `end`; [`Ruby::hash`] writes a constant hash one entry a line; [`Ruby::text`]
+//!   adds prepared Ruby (a library such as the project copier) as it is.
+//! - [`Provision`]: a provisioner, its script a string or a squiggly heredoc (`<<~'SH'`, nothing
+//!   expanded, its tag never a line of the script); [`Ruby::provision`] writes it.
 //! - [`Ruby::configure`] writes the `Vagrant.configure` block and [`Ruby::define`] a VM's
 //!   `config.vm.define` block in it; as they are written, the builder records what Vagrant
 //!   applies to each VM only when it boots ([`BootStatements`]): every statement of the configure
-//!   block but comments and provisioners, those of a define for its VM, the others for every VM.
+//!   block but comments and provisioners (known by their type, never by their text), those of a
+//!   define for its VM, the others for every VM.
 
 use std::fmt;
 
@@ -29,7 +30,7 @@ use isoloom_render::ruby;
 pub(crate) struct Value(String);
 
 impl Value {
-    /// A string literal holding `text`, quoted by [`rb`].
+    /// A string literal holding `text`, quoted by [`ruby::quote`].
     pub(crate) fn str(text: &str) -> Value {
         Value(ruby::quote(text))
     }
@@ -149,6 +150,62 @@ impl fmt::Display for Call {
     }
 }
 
+/// A provisioner: `<var>.vm.provision "<name>", key: value`, with its script as a keyword
+/// argument (a string, or a heredoc after the call). [`Ruby::provision`] writes it; being one by
+/// construction, it is never recorded as what a VM boots with (`vagrant up --provision` runs it on
+/// a running VM).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Provision {
+    call: Call,
+    /// The heredoc the call ends with: its keyword, its tag, the script.
+    heredoc: Option<(String, String, String)>,
+}
+
+impl Provision {
+    /// `<var>.vm.provision "<name>"` (`"shell"`, or a name `--provision-with` takes, with its
+    /// `type:`), no other argument yet.
+    pub(crate) fn new(var: &str, name: &str) -> Provision {
+        Provision {
+            call: Call::new(format!("{var}.vm.provision")).arg(Value::str(name)),
+            heredoc: None,
+        }
+    }
+
+    /// Adds a keyword argument (`key: value`).
+    #[must_use]
+    pub(crate) fn kw(mut self, key: &str, value: impl Into<Value>) -> Provision {
+        self.call = self.call.kw(key, value);
+        self
+    }
+
+    /// Adds a keyword argument when there is a value.
+    #[must_use]
+    pub(crate) fn kw_opt(mut self, key: &str, value: Option<Value>) -> Provision {
+        self.call = self.call.kw_opt(key, value);
+        self
+    }
+
+    /// `script` as the last keyword argument `key:`, as a squiggly heredoc tagged `tag` (`<<~'SH'`,
+    /// nothing expanded; its closing tag never a line of the script, see [`closing_tag`]).
+    #[must_use]
+    pub(crate) fn heredoc(mut self, key: &str, tag: &str, script: &str) -> Provision {
+        self.heredoc = Some((key.to_owned(), closing_tag(tag, script), script.to_owned()));
+        self
+    }
+
+    /// `script` as the last keyword argument `key:`: a quoted string when it is one line, else
+    /// a [heredoc](Provision::heredoc) tagged `SH`.
+    #[must_use]
+    pub(crate) fn script(self, key: &str, script: &str) -> Provision {
+        let body = script.trim_end_matches('\n');
+        if body.contains('\n') {
+            self.heredoc(key, "SH", body)
+        } else {
+            self.kw(key, Value::str(body))
+        }
+    }
+}
+
 /// Ruby source, written statement by statement at the depth of the enclosing blocks (two
 /// spaces a level).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -163,8 +220,14 @@ pub(crate) struct Ruby {
 
 /// The statements of a Vagrantfile's configure block that Vagrant applies to a VM only when it
 /// boots it (`vagrant up` of a stopped VM, `vagrant reload`): synced folders, networks, forwarded
-/// ports, size, provider settings. Comments and provisioners (which `vagrant up --provision` runs
-/// on a running VM) are left out; each statement is indented to its depth in its scope.
+/// ports, size, provider settings. Comments and provisioners ([`Provision`], which `vagrant up
+/// --provision` runs on a running VM) are left out; each statement is indented to its depth in
+/// its scope. Nothing outside the configure block is recorded: what a VM boots with must be
+/// written in it, never read from a constant the spec sets above it (the ESXi port groups are
+/// each define's own indexes, not a lookup in a list of the networks). The constants above it
+/// that boot settings read come from the host running Vagrant, not from the spec: `ROOT`,
+/// `HOST_ARCH`, `ESXI_NETWORKS`, `HYPERV_SWITCH` and the host ports the runner chose
+/// (`ISOLOOM_HOSTPORTS`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct BootStatements {
     /// The configure block's own statements, outside every define: what all its VMs share.
@@ -173,8 +236,7 @@ pub(crate) struct BootStatements {
     pub(crate) defines: Vec<(String, Vec<String>)>,
 }
 
-/// The configure block being written: the statements so far, the scope a statement lands in,
-/// and whether a provisioner's body is being written.
+/// The configure block being written: the statements so far and the scope a statement lands in.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct Recording {
     statements: BootStatements,
@@ -182,14 +244,6 @@ struct Recording {
     base: usize,
     /// The define being written, with the depth of its body.
     define: Option<(usize, usize)>,
-    /// Inside a provisioner's block or heredoc: nothing is recorded.
-    in_provisioner: bool,
-}
-
-/// Whether the statement `code` adds a provisioner (`<var>.vm.provision ...`).
-fn is_provisioner(code: &str) -> bool {
-    code.split_once('.')
-        .is_some_and(|(var, rest)| !var.contains(' ') && (rest.starts_with("vm.provision ") || rest == "vm.provision"))
 }
 
 impl Ruby {
@@ -222,11 +276,10 @@ impl Ruby {
     }
 
     /// `code`, a statement at the current depth, in the scope it is written in (a define, else
-    /// the configure block's own), unless no configure block is being written, it is in a
-    /// provisioner or it adds one.
+    /// the configure block's own), unless no configure block is being written.
     fn record(&mut self, code: &str) {
         let depth = self.depth;
-        let Some(rec) = self.recording.as_mut().filter(|r| !r.in_provisioner && !is_provisioner(code)) else {
+        let Some(rec) = self.recording.as_mut() else {
             return;
         };
         let (scope, at) = match rec.define {
@@ -235,23 +288,6 @@ impl Ruby {
         };
         if let Some(scope) = scope {
             scope.push(format!("{}{code}", "  ".repeat(depth.saturating_sub(at))));
-        }
-    }
-
-    /// Whether `head` opens a provisioner while a configure block is recorded; if so, nothing is
-    /// recorded until [`Ruby::provisioner_closed`].
-    fn provisioner_opens(&mut self, head: &str) -> bool {
-        let opens = is_provisioner(head) && self.recording.as_ref().is_some_and(|r| !r.in_provisioner);
-        if let (true, Some(rec)) = (opens, self.recording.as_mut()) {
-            rec.in_provisioner = true;
-        }
-        opens
-    }
-
-    /// The provisioner [`Ruby::provisioner_opens`] said opened is closed.
-    fn provisioner_closed(&mut self, opened: bool) {
-        if let (true, Some(rec)) = (opened, self.recording.as_mut()) {
-            rec.in_provisioner = false;
         }
     }
 
@@ -336,25 +372,24 @@ impl Ruby {
         } else {
             self.line(format_args!("{head} do |{params}|"));
         }
-        let provisioner = self.provisioner_opens(&head);
         self.depth += 1;
         body(self);
         self.depth -= 1;
-        self.line("end");
-        self.provisioner_closed(provisioner);
-        self
+        self.line("end")
     }
 
-    /// `call` with a last keyword argument `key: <<~'TAG'`, then `script` one level deeper and the
-    /// closing tag ([`closing_tag`] of `tag`). The quoted tag keeps Ruby from expanding anything
-    /// in the script.
-    pub(crate) fn heredoc(&mut self, call: Call, key: &str, tag: &str, script: &str) -> &mut Ruby {
-        let tag = closing_tag(tag, script);
-        let call = call.kw(key, Value::raw(format!("<<~'{tag}'")));
-        let provisioner = self.provisioner_opens(&call.to_string());
-        self.call(call);
-        self.heredoc_body(&tag, script);
-        self.provisioner_closed(provisioner);
+    /// A provisioner: its call, then its heredoc's lines one level deeper and its closing tag,
+    /// when it has one. Never recorded ([`BootStatements`]).
+    pub(crate) fn provision(&mut self, p: Provision) -> &mut Ruby {
+        let recording = self.recording.take();
+        match p.heredoc {
+            None => self.line(p.call),
+            Some((key, tag, script)) => {
+                self.line(p.call.kw(&key, Value::raw(format!("<<~'{tag}'"))));
+                self.heredoc_body(&tag, &script)
+            }
+        };
+        self.recording = recording;
         self
     }
 
@@ -379,16 +414,6 @@ impl Ruby {
         }
         self.depth -= 1;
         self.line(tag)
-    }
-
-    /// `call` with a last keyword argument `key:` holding `script`: a quoted string when it is
-    /// one line, else a [`heredoc`](Ruby::heredoc) tagged `SH`.
-    pub(crate) fn script(&mut self, call: Call, key: &str, script: &str) -> &mut Ruby {
-        let body = script.trim_end_matches('\n');
-        if !body.contains('\n') {
-            return self.call(call.kw(key, Value::str(body)));
-        }
-        self.heredoc(call, key, "SH", body)
     }
 
     /// `if condition`, `body` one level deeper, then `end`.
@@ -443,7 +468,7 @@ fn closing_tag(tag: &str, script: &str) -> String {
 mod tests {
     use proptest::prelude::*;
 
-    use super::{Call, Ruby, Value, closing_tag};
+    use super::{Call, Provision, Ruby, Value, closing_tag};
 
     #[test]
     fn a_vagrantfile_is_written_from_typed_pieces() {
@@ -453,7 +478,7 @@ mod tests {
             r.block(Call::new("config.vm.provider").arg(Value::str("virtualbox")), "v", |r| {
                 r.assign("v.cpus", 2u32);
             });
-            r.call(Call::new("config.vm.provision").arg(Value::str("shell")).kw("inline", Value::str("echo hi")));
+            r.provision(Provision::new("config", "shell").kw("inline", Value::str("echo hi")));
         });
         assert_eq!(
             r.finish(),
@@ -476,7 +501,7 @@ mod tests {
         fn a_heredoc_ends_only_at_its_own_closing_line(lines in prop::collection::vec("( *)(SH|ISOLOOM_SH|ISOLOOM_SH_2|[a-z]{1,6})", 2..8)) {
             let script = lines.join("\n");
             let mut r = Ruby::new();
-            r.script(Call::new("p"), "inline", &script);
+            r.provision(Provision::new("p", "shell").script("inline", &script));
             let written = r.finish();
             let rows: Vec<&str> = written.lines().collect();
             let (first, rest) = rows.split_first().expect("the call");
@@ -527,20 +552,20 @@ mod tests {
     #[test]
     fn a_heredoc_indents_its_script_and_keeps_blank_lines_empty() {
         let mut r = Ruby::new();
-        r.heredoc(Call::new("m.vm.provision").arg(Value::str("shell")), "inline", "SH", "set -e\n\necho hi\n");
+        r.provision(Provision::new("m", "shell").heredoc("inline", "SH", "set -e\n\necho hi\n"));
         assert_eq!(r.finish(), "m.vm.provision \"shell\", inline: <<~'SH'\n  set -e\n\n  echo hi\nSH\n");
     }
 
     #[test]
     fn a_script_is_a_string_on_one_line_and_a_heredoc_on_more() {
         let mut r = Ruby::new();
-        let p = || Call::new("p").arg(Value::str("shell"));
-        r.script(p(), "inline", "echo \"hi\"\n");
-        r.script(p(), "inline", "a\nb\n");
-        r.script(p(), "inline", "cat <<SH\nx\nSH\n");
+        let p = || Provision::new("p", "shell");
+        r.provision(p().script("inline", "echo \"hi\"\n"));
+        r.provision(p().script("inline", "a\nb\n"));
+        r.provision(p().script("inline", "cat <<SH\nx\nSH\n"));
         assert_eq!(
             r.finish(),
-            "p \"shell\", inline: \"echo \\\"hi\\\"\"\np \"shell\", inline: <<~'SH'\n  a\n  b\nSH\np \"shell\", inline: <<~'ISOLOOM_SH'\n  cat <<SH\n  x\n  SH\nISOLOOM_SH\n"
+            "p.vm.provision \"shell\", inline: \"echo \\\"hi\\\"\"\np.vm.provision \"shell\", inline: <<~'SH'\n  a\n  b\nSH\np.vm.provision \"shell\", inline: <<~'ISOLOOM_SH'\n  cat <<SH\n  x\n  SH\nISOLOOM_SH\n"
         );
     }
 
@@ -574,14 +599,12 @@ mod tests {
         r.configure(|r| {
             r.assign("config.vm.boot_timeout", 900u32);
             r.comment("shared");
-            r.heredoc(Call::new("config.vm.provision").arg(Value::str("shell")), "inline", "SH", "echo a\n");
+            r.provision(Provision::new("config", "shell").heredoc("inline", "SH", "echo a\n"));
             r.define("web", false, |r| {
                 r.block(Call::new("m.vm.provider").arg(Value::str("utm")), "_, o", |r| {
                     r.assign("o.memory", 512u32);
                 });
-                r.block(Call::new("m.vm.provision").arg(Value::str("shell")), "s", |r| {
-                    r.assign("s.inline", Value::str("b"));
-                });
+                r.provision(Provision::new("m", "shell").script("inline", "b"));
             });
         });
         let boot = r.boot().clone();

@@ -100,6 +100,12 @@ stable spec format.
   the cause, `GenerateError::is_refusal` tells them apart, `isoloom_targets::Error::Refused` is
   `Error::Generate`, and `isoloom_render::Error::reason` is `Error::refusal` (`None` for a
   failure).
+- **A VM's boot digest changes when its ESXi port groups move.** A Vagrantfile picked each VM's
+  port groups by its networks' places in a list above `Vagrant.configure` (`LAB_NETWORKS`), which
+  the digest didn't cover: a network inserted ahead of another moved a VM to other port groups
+  with its digest unchanged, so a runner didn't reload it. Each VM names its port groups by their
+  index in `ESXI_VIRTUAL_NETWORK` now (`esxi_networks([1, 2])`), in its own `config.vm.define`,
+  and `LAB_NETWORKS` is gone. Boot digests change.
 - **Compose in a VM tolerates a failed pull of the lab's published images**, as on this
   computer: an unreachable registry falls back to building (docker-vm, cloud-docker), instead of
   failing the start. Both describe the start once now.

@@ -158,7 +158,7 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         label: super::label(env, name),
         vm_name: super::vm_name(env, name),
         size: Size::of(mp.size, isoloom_spec::DEFAULT_CPUS, isoloom_spec::DEFAULT_MEMORY_MB),
-        nets: mp.addresses.keys().map(String::as_str).collect(),
+        port_groups: super::port_groups(env, mp.addresses.keys().map(String::as_str)),
         libvirt_box: image.libvirt.as_deref(),
         boot: mp.boot.as_ref(),
         qemu: Qemu {

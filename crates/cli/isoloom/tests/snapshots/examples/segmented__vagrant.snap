@@ -450,9 +450,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (front, back, access); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["front", "back", "access"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -594,7 +593,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["front", "back", "access"])
+      v.esxi_virtual_network = esxi_networks([1, 2, 3])
       v.guest_name = "segmented-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
@@ -762,7 +761,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["back"])
+      v.esxi_virtual_network = esxi_networks([2])
       v.guest_name = "segmented-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1006,7 +1005,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["front"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "segmented-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1192,7 +1191,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["access"])
+      v.esxi_virtual_network = esxi_networks([3])
       v.guest_name = "segmented-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1998,7 +1997,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · router",
           "vmware_esxi": "segmented-router"
         },
-        "boot_digest": "sha256:8ce5d20c944109e6f3dbdaf9440daef8d9f5afcb1bf7ff5974490ec8dacc0e1e"
+        "boot_digest": "sha256:8899d9857ea6e5a6c03c4e0d849cee55f3a8acc95a43617d97b4859ed624472d"
       }
     },
     {
@@ -2024,7 +2023,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · cache",
           "vmware_esxi": "segmented-cache"
         },
-        "boot_digest": "sha256:45afde34c129a0b8edd1039fd298e07c5858b2381158c1ca867cae5b2db0b6ad"
+        "boot_digest": "sha256:f68dcf0447131fd485e203dcc45a92a02b83e16eca956f6f4ac1b4d8a31cd32b"
       },
       "ports": [
         {
@@ -2058,7 +2057,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · web",
           "vmware_esxi": "segmented-web"
         },
-        "boot_digest": "sha256:b46ddd1b72d5ae16582bcdb47c087fd0c39108f1e8d872ea68383df4a74cc512"
+        "boot_digest": "sha256:69a9405d209066bcf9456a02bc8f4a05a71785febf3c5dcc872bc3c7ee4d82bf"
       },
       "ports": [
         {
@@ -2099,7 +2098,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · user",
           "vmware_esxi": "segmented-user"
         },
-        "boot_digest": "sha256:0b25f4900e975ac249963128a968f0bcb1a1b14d2f99fe870232f0e2a64d1e74"
+        "boot_digest": "sha256:ba42505dcb3d3207508dc16bf567631ba2e5974ab35e8931b81a383ab270b46b"
       }
     }
   ],

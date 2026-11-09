@@ -119,7 +119,7 @@ pub(crate) fn provisioner(r: &mut Ruby, file: &str, group: &[&Resolved]) {
         )
     };
     let derived = crate::vagrantfile::derived_from_host();
-    r.call(call.kw("env", derived));
+    r.provision(call.kw("env", derived));
 }
 
 /// Writes each listed check script (`p`) over the VM's copy, from the project on the host.

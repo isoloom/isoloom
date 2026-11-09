@@ -605,9 +605,8 @@ end
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (app); a missing one reuses the last.
 ESXI_NETWORKS = ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").map(&:strip)
-LAB_NETWORKS = ["app"]
-def esxi_networks(nets)
-  [ESXI_NETWORKS[0]] + nets.map { |n| ESXI_NETWORKS[1 + LAB_NETWORKS.index(n)] || ESXI_NETWORKS[-1] }
+def esxi_networks(indexes)
+  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
@@ -762,7 +761,7 @@ Vagrant.configure("2") do |config|
       v.esxi_username = ENV.fetch("ESXI_USERNAME", "root")
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
-      v.esxi_virtual_network = esxi_networks(["app"])
+      v.esxi_virtual_network = esxi_networks([1])
       v.guest_name = "tuned-web-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
@@ -1385,7 +1384,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "tuned-web · web",
           "vmware_esxi": "tuned-web-web"
         },
-        "boot_digest": "sha256:ae8642d61406ff46f06fa7ef230f44a53c5de57c33ca59a1ec738f5f917457f4"
+        "boot_digest": "sha256:828b29296b97fbefa6114d503152d527490cd06afcfbbe58ae1e4734e26a067f"
       },
       "ports": [
         {

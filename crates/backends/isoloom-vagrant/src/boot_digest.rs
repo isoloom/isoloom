@@ -50,7 +50,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::of;
-    use crate::ruby::{Call, Ruby, Value};
+    use crate::ruby::{Call, Provision, Ruby, Value};
 
     /// The words a test varies in [`two`]'s Vagrantfile.
     struct Words {
@@ -71,17 +71,13 @@ mod tests {
 
     /// A Vagrantfile of two VMs, `web` and `db`, written as the generators write theirs, with a
     /// shared setting and provisioner, and in `web` a comment, a synced folder in a provider block
-    /// and provisioners of every form; its digests.
+    /// and provisioners with a heredoc and a string; its digests.
     fn two(w: &Words) -> BTreeMap<String, String> {
         let mut r = Ruby::new();
         r.assign("ROOT", Value::raw("1"));
         r.configure(|r| {
             r.assign("config.vm.boot_timeout", Value::raw(w.timeout.to_string()));
-            r.call(
-                Call::new("config.vm.provision")
-                    .arg(Value::str("shell"))
-                    .kw("inline", Value::str(w.shared_script)),
-            );
+            r.provision(Provision::new("config", "shell").kw("inline", Value::str(w.shared_script)));
             r.define("web", true, |r| {
                 r.assign("m.vm.box", Value::str("debian"));
                 r.comment(w.comment);
@@ -90,15 +86,8 @@ mod tests {
                         r.line(format_args!("o.vm.synced_folder \"a\", \"{folder}\", type: \"utm\", create: true"));
                     });
                 }
-                r.heredoc(
-                    Call::new("m.vm.provision").arg(Value::str("shell")).kw("name", Value::str("one")),
-                    "inline",
-                    "SH",
-                    w.step,
-                );
-                r.block(Call::new("m.vm.provision").arg(Value::str("shell")), "s", |r| {
-                    r.assign("s.inline", Value::str(w.step));
-                });
+                r.provision(Provision::new("m", "shell").kw("name", Value::str("one")).heredoc("inline", "SH", w.step));
+                r.provision(Provision::new("m", "shell").script("inline", w.step));
             });
             r.define("db", true, |r| {
                 r.assign("m.vm.box", Value::str("debian"));
@@ -141,9 +130,8 @@ mod tests {
             let mut r = Ruby::new();
             r.configure(|r| {
                 r.assign("config.vm.box", Value::str(box_name));
-                r.call(
-                    Call::new("config.vm.provision")
-                        .arg(Value::str("docker"))
+                r.provision(
+                    Provision::new("config", "docker")
                         .kw("type", Value::str("shell"))
                         .kw("inline", Value::str(script)),
                 );
