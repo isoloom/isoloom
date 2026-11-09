@@ -173,8 +173,13 @@ jobs:
         env:
           RELEASE_ARGS: ${{ steps.release.outputs.args }}
         run: |
+          set -euo pipefail
+          packages=()
+          for crate in isoloom-spec isoloom-targets isoloom-manifest; do
+            packages+=(-p "$crate")
+          done
           # shellcheck disable=SC2086 # RELEASE_ARGS is empty or one flag and its value.
-          cargo semver-checks -p isoloom-spec -p isoloom-targets -p isoloom-manifest $RELEASE_ARGS
+          cargo semver-checks "${packages[@]}" $RELEASE_ARGS
 
   # The published crates build with their declared rust-version (1.88, Cargo.toml). `+1.88`
   # overrides the rust-toolchain.toml pin for this check only (without it the pinned toolchain
@@ -264,7 +269,7 @@ jobs:
   # repository at ISOTHRUM_REF (a repository variable; main by default), so each job doesn't build
   # both again.
   binaries:
-    name: Build isoloom and the Isothrum runner
+    name: Binaries for the real runs
     runs-on: ubuntu-24.04
     env:
       ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
