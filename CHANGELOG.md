@@ -250,7 +250,7 @@ stable spec format.
   resolved::with_published}`; `Row::used_by` is the matrix tests' only. The cloud user-data caps
   (`isoloom_render::configure::cloud_init::{Limit, TooBig}`) moved into `isoloom-terraform`,
   crate-internal.
-- **Library items nothing outside their crate used** (Isothrum and the launcher included):
+- **Library items nothing outside their crate used** (no dependent crate either):
   `Placeholder::root`, `isoloom_spec::syntax::reboots`, `Problem::section` (both the syntax's and
   validation's) are gone; `Lab::lowered`, the runner's side of secret delivery
   (`isoloom_render::secrets::receive`, `secrets::windows::{receive, powershell_args, input}`) and

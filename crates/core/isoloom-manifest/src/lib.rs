@@ -10,8 +10,8 @@
 //! port that speaks HTTP and no other version than 0. [`Manifest::validate`] then checks what
 //! spans fields (step references, machines, placeholders).
 //! The JSON Schema ([`schema()`]) is generated from the types and committed at
-//! `schemas/run-manifest-v0.schema.json`; the fixtures under `fixtures/` are shared with the
-//! runner, which tests against the same files.
+//! `schemas/run-manifest-v0.schema.json`; runners can test against the fixtures under
+//! `fixtures/`.
 //!
 //! The crate is pure: it reads and writes text, and touches no file, process or clock. Its enums
 //! are exhaustive on purpose: the manifest is a closed, versioned contract, so a runner must handle

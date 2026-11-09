@@ -62,9 +62,9 @@ Mapping:
 For a stock service, prefer the catalogue over a raw image:
 
 ```yaml
-store:
+web:
   os: debian@12
-  service: redis          # a container image on container targets, a role on VM targets
+  service: nginx          # a container image on container targets, a role on VM targets
 ```
 
 A `service:` can take typed settings through `with:`.
@@ -169,7 +169,8 @@ The runtime left Isoloom; a runner runs what Isoloom generates.
   files with `isoloom generate` and run them with a runner (or the native tools
   directly).
 - Removed crate: `isoloom-coverage`. Use `isoloom matrix` (the generated capability
-  matrix) and `isoloom verify` (conformance against official validators) instead.
+  matrix) and `cargo xtask verify` in the repository (conformance against the official
+  validators) instead.
 - Renamed crate: `isoloom-external` → `isoloom-ansible`.
 
 The CLI commands in 1.0 are `validate`, `generate`, `check`, `targets`, `resources`,

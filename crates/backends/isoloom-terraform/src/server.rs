@@ -1,4 +1,4 @@
-//! The targets on a server of your own (a runner's server mode): a Proxmox server
+//! The targets on a server of your own: a Proxmox server
 //! ([`proxmox`]) and a standalone ESXi host ([`esxi`]). Both put the environment behind a router
 //! VM of their own ([`router`]), boot a machine's disk through the hypervisor's firmware
 //! ([`boot`]), and name what they create after the environment's `slot` on the server
@@ -108,9 +108,9 @@ pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variable
 /// A base OS image pinned to a dated release, with the checksum that verifies the download.
 ///
 /// The server targets never emit a floating `latest`/`current` URL: an image is pinned to a
-/// dated snapshot so a lab generated today keeps booting the same OS build (reproducibility and
-/// supply-chain integrity, the C3/C4 security finding). A refresh changes the URL and its
-/// checksum together. Debian publishes SHA-512 sums, Ubuntu and the RPM families SHA-256.
+/// dated snapshot so a lab generated today keeps booting the same OS build, and every download is
+/// verified against the checksum published for that build before it boots. A refresh changes the
+/// URL and its checksum together. Debian publishes SHA-512 sums, Ubuntu and the RPM families SHA-256.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PinnedImage {
     /// The download URL, at a dated release (never `latest`/`current`).

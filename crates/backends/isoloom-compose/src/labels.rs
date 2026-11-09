@@ -7,7 +7,7 @@ use isoloom_spec::model;
 
 use crate::file::ComposeFile;
 
-/// On everything an environment creates on Docker: `isoloom gc` collects only what has it.
+/// On everything an environment creates on Docker: a clean-up collects only what has it.
 const MANAGED_LABEL: &str = "isoloom.managed";
 /// The environment a Docker resource belongs to.
 const ENVIRONMENT_LABEL: &str = "isoloom.environment";

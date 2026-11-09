@@ -32,8 +32,8 @@ machines:
       build: build/web
       steps: [{ run: provision/web.sh }]
 
-  # A published image on containers, a Debian VM its step sets up (the catalogue's
-  # `service: redis` does both).
+  # A published image on containers, a Debian VM its step sets up (Redis has no catalogue entry:
+  # the lab gives both forms itself).
   cache:
     os: debian@12
     networks: { lan: 20 }

@@ -84,8 +84,7 @@ Release binaries for macOS, Linux and Windows are on the
 |---|---|
 | `docker` | A Compose project for your Docker |
 | `hosted` | The same Compose file, for a hosting service |
-| `kubernetes` | Manifests for your cluster, with NetworkPolicies for `reach` |
-| `helm`, `kustomize` | The same manifests as a Helm chart or a Kustomize overlay |
+| `kubernetes` | Manifests for your cluster, with NetworkPolicies for `reach`, a Kustomize overlay and a Helm chart |
 | `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, ESXi |
 | `docker-vm` | The containers on one VM (Vagrant, or Proxmox) |
 | `hybrid` | Containers and VMs together on the same networks |
@@ -98,8 +97,8 @@ Release binaries for macOS, Linux and Windows are on the
 
 Targets are derived from the spec: a Windows machine has no container form, so that environment
 never gets a broken Compose file. `targets:` can only narrow the list. Each target's tier and the
-evidence behind it are in the [target matrix](docs/matrix.md); the local, server and cloud
-targets are Tier 1 for 1.0, the rest Tier 2 (generated and validated).
+evidence behind it are in the [target matrix](docs/matrix.md) (`isoloom matrix`): Tier 1 is
+proven by real runs on every host OS it exists on, Tier 2 generated and validated.
 
 ## Running what Isoloom generates
 
@@ -144,8 +143,8 @@ isoloom-targets = "1"
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files |
 | `isoloom` | The command line |
 
-- **Versions**: while Isoloom is at 0.x, a breaking change to the public surface bumps the minor
-  version (0.10 → 0.11), never the patch. Getting the model's types by parsing a spec, rather than
+- **Versions**: the crates share one version, following Semantic Versioning; the
+  [CHANGELOG](CHANGELOG.md) names every change to the public surface. Getting the model's types by parsing a spec, rather than
   writing struct literals, keeps you forward-compatible: a new spec key is not a breaking change.
 
 ## License

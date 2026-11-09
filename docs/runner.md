@@ -36,7 +36,7 @@ A run manifest holds only documented data — the driver does the work:
 
 The manifest is strict (`additionalProperties: false`) and carries its own version. Its JSON
 schema is committed at [`schemas/run-manifest-v0.schema.json`](../schemas/run-manifest-v0.schema.json),
-and `isoloom-manifest` holds the types and the fixtures both repositories test against.
+and `isoloom-manifest` holds the types and fixtures runners can test against.
 
 ## The lifecycle
 

@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1
 #
-# The verify toolchain: every official validator `scripts/verify.sh` runs on generated files,
+# The verify toolchain: every official validator `cargo xtask verify` runs on generated files,
 # at pinned versions, in one linux/amd64 image that behaves the same from macOS, Linux and
 # Windows hosts (Docker Desktop). Every download is checked against its SHA-256, the base image
 # is pinned by digest, and the Python packages are pinned in requirements.txt.
 #
 #   docker build --platform linux/amd64 -t isoloom-verify tools/verify
 #
-# scripts/verify.sh builds it when its tag is missing: the tag is a hash of this folder's
+# `cargo xtask verify` builds it when its tag is missing: the tag is a checksum of this folder's
 # image inputs, so a change here means a new image. The validation logic is not in the image:
-# verify.sh hands it the runner (tools/verify/runner) with each run.
+# the task hands it the runner (tools/verify/runner) with each run.
 #
 # Vagrant is installed without provider plugins on purpose: `vagrant validate --ignore-provider`
 # evaluates a provider block it has no plugin for with a permissive stand-in config, and skips

@@ -9,7 +9,8 @@
 *.tfstate.*
 .claude/
 
-# What `isoloom generate` and `isoloom run` write in a project folder, the examples included:
+# What `isoloom generate` (and a runner, for an instance: `.isoloom-<n>/`) writes in a project
+# folder, the examples included:
 # outputs are generated, never committed (the characterization snapshots hold the examples').
 .isoloom/
 .isoloom-*/

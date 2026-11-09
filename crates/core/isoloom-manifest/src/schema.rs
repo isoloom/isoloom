@@ -20,7 +20,7 @@ pub fn schema() -> Value {
     out.insert(
         "description".into(),
         json!(
-            "What Isoloom writes next to one target's generated files (`.isoloom[-<n>]/<target>[/<cloud>]/run.json`) and a runner executes. Declarative and deterministic: no secret values, no absolute paths, no timestamps, no host shell. Version 0 is unstable: Isoloom and the runner move together until 1.0."
+            "What Isoloom writes next to one target's generated files (`.isoloom[-<n>]/<target>[/<cloud>]/run.json`) and a runner executes. Declarative and deterministic: no secret values, no absolute paths, no timestamps, no host shell. It carries its own version (`version`): a reader takes the versions it knows."
         ),
     );
     if let Value::Object(rest) = generated {

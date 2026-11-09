@@ -11,9 +11,7 @@ is the prose around it.
 |---|---|
 | `docker` | A Compose project for your Docker |
 | `hosted` | The same Compose file, for a hosting service |
-| `kubernetes` | Manifests for your cluster, with NetworkPolicies for `reach` |
-| `helm` | The same manifests as a Helm chart |
-| `kustomize` | The same manifests as a Kustomize overlay |
+| `kubernetes` | Manifests for your cluster, with NetworkPolicies for `reach`; the same as a Kustomize overlay and as a Helm chart |
 | `vagrant` | One local VM per machine, through a Vagrant provider |
 | `docker-vm` | The containers on one VM (Vagrant, or Proxmox) |
 | `hybrid` | Containers and VMs together on the same networks |
@@ -66,18 +64,11 @@ evidence.
 A later failing run takes a target's Tier 1 back; a target aiming for Tier 1 lists the host OSes
 still pending.
 
-### What is proven at 0.11.0
+### What is proven
 
-- **Local** is proven: `docker` is Tier 1 (macOS, Linux and Windows, full cycle through the
-  runner); `vagrant/libvirt` is Tier 1 on Linux; `vagrant/virtualbox` and `docker-vm/virtualbox`
-  have real macOS runs; `vagrant/hyperv` has a partial Windows run.
-- **Server** (`proxmox`, `vagrant/vmware_esxi`, the `esxi` Terraform target) is proven against
-  real lab servers from macOS, through the runner. Tier 1 for server mode still
-  needs runs from Linux and Windows hosts, so these remain Tier 2 for now.
-- **Cloud** (`cloud-vm`, `cloud-docker`, `cloud-services`) ships **generated and validated**: the
-  modules are proven by `terraform validate` and by `terraform test` with mocked providers
-  (`cargo xtask tf-test`), not yet by a real run against a paid cloud account. Treat cloud mode as
-  Tier 2 until real-run evidence is recorded.
+`isoloom matrix` (and the [target matrix](matrix.md) generated from it) lists each target's tier
+with its evidence: the real runs recorded, from which host OS and when, and the host OSes a target
+aiming for Tier 1 still needs.
 
 Recording a real run (`cargo xtask tiers record`) updates `tiers.json` and regenerates the
 matrix, so the published tiers always reflect the evidence.
