@@ -1,7 +1,6 @@
-//! Where the checkouts are: this Isoloom one, and the consumers next to the main checkout.
+//! Where the checkout is, and its build folder.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 // `slashed` and `remove` are shared with Isothrum through the ratchet crate.
 pub(crate) use xtask_quality::repo::{remove, slashed};
@@ -12,29 +11,9 @@ pub(crate) fn root() -> PathBuf {
     xtask.parent().map_or_else(|| xtask.to_path_buf(), Path::to_path_buf)
 }
 
-/// The folder holding the main Isoloom checkout, so a worktree finds the same consumers: the
-/// parent of the repository's common git folder, else the parent of `root`.
-pub(crate) fn code_dir(root: &Path) -> PathBuf {
-    let common = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()));
-    let main = common.as_deref().and_then(Path::parent).unwrap_or(root);
-    main.parent().map_or_else(|| main.to_path_buf(), Path::to_path_buf)
-}
-
 /// The build folder: `CARGO_TARGET_DIR`, else the workspace's `target`.
 pub(crate) fn target_dir(root: &Path) -> PathBuf {
     std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from)
-}
-
-/// A consumer's checkout: `$<var>` when set, else `<code dir>/<name>`.
-pub(crate) fn consumer(var: &str, code_dir: &Path, name: &str) -> PathBuf {
-    std::env::var_os(var).map_or_else(|| code_dir.join(name), PathBuf::from)
 }
 
 /// A path as it is on disk (symlinks resolved), or as given when it doesn't exist. Windows'

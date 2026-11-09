@@ -1,4 +1,4 @@
-# cargo-deny (`cargo deny check`, a gate of `cargo xtask check-all`): the supply chain of PLAN 3d.
+# cargo-deny (`cargo deny check`, CI's `deny` job): the supply chain.
 # Advisories, licences, bans (duplicate versions, wildcard requirements) and sources (crates.io
 # only).
 

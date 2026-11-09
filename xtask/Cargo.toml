@@ -1,6 +1,6 @@
 [package]
 name = "xtask"
-description = "Isoloom's development tasks: cargo xtask check-all, verify, generate-all, dev-link, host-setup and quality."
+description = "Isoloom's development tasks: cargo xtask verify, tf-test, generate-all, quality and more."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -29,5 +29,3 @@ sha2.workspace = true
 [lints]
 workspace = true
 
-[dev-dependencies]
-proptest.workspace = true

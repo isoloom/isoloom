@@ -4,11 +4,11 @@
 //!
 //! A target that crashes (a panic, a failed assertion, an input that takes over 10 seconds) fails
 //! the run; libFuzzer leaves the input under `fuzz/artifacts/<target>/`. Each crash becomes a
-//! regression test in the crate it belongs to, then the fix. `cargo xtask check-all --deep` runs
+//! regression test in the crate it belongs to, then the fix. The deep gate, before a release, runs
 //! every target for the default time.
 //!
 //! `--check` builds nothing with nightly: it checks the fuzz crate's format and lints on the
-//! pinned toolchain instead, so a change to the APIs it calls shows in `check-all`.
+//! pinned toolchain instead, so a change to the APIs it calls shows in the everyday gate.
 //!
 //! A target's dictionary, `fuzz/dictionaries/<target>.dict` when there is one, gives libFuzzer
 //! the format's words to mutate toward (the spec parser's: every field and step kind).

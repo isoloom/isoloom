@@ -1,5 +1,5 @@
 # The toolchain every host builds Isoloom with (rustup installs it on first use). The two extra
-# targets are the full gate's cross-platform clippy legs (`cargo xtask check-all`).
+# targets let clippy check the Linux-only and Windows-only code from any host.
 [toolchain]
 channel = "1.99.0"
 profile = "minimal"

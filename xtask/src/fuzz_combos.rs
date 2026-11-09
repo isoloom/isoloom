@@ -5,7 +5,7 @@
 //! deterministic (render-twice is byte-identical), every refusal carries a reason, and no secret
 //! value reaches a generated file.
 //!
-//! The big run (`--count`, default [`DEEP`]) sits behind `cargo xtask check-all --deep`. A small
+//! The big run (`--count`, default [`DEEP`]) is a deep gate, run before a release. A small
 //! fast run is a normal test, so the gate catches a regression without the long run.
 //! A failing seed reproduces its spec exactly; the harness prints the seed and the spec, and any
 //! seed found to fail is pinned in `REGRESSION_SEEDS` (and its spec may be committed under

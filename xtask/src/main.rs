@@ -1,13 +1,9 @@
 //! Isoloom's development tasks, run as `cargo xtask <task>` (the alias is in
 //! `.cargo/config.toml`), the same way on macOS, Linux and Windows:
 //!
-//! - `check-all`: every repository's gates (Isoloom, Isothrum, the launcher) on this machine and
-//!   the test hosts, in one table;
 //! - `verify`: the official validators on every generated file, in the pinned image;
 //! - `tf-test`: the cloud and server modules' logic, `terraform test` with mocked providers;
 //! - `generate-all`: every example generated into one tree, for `verify`;
-//! - `dev-link`: the consumers built against this checkout, without touching their pins;
-//! - `host-setup`: a test host's tools, installed once;
 //! - `quality`: the ratchet, the clean-code counts per crate against `quality-baseline.json`;
 //! - `test`: the tests under cargo-nextest, then the doctests;
 //! - `msrv` and `features`: every crate checked with its declared minimum Rust, and with every
@@ -35,16 +31,13 @@
 
 mod bench;
 mod catalogue;
-mod check_all;
 mod conformance;
 #[cfg(test)]
 mod deps;
-mod dev_link;
 mod fuzz;
 mod fuzz_combos;
 mod generate_all;
 mod hack;
-mod host_setup;
 mod mutants;
 mod process;
 mod quality;
@@ -71,9 +64,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Task {
-    /// Every repository's gates on one or more hosts, then one summary table; exits 1 when a
-    /// gate fails.
-    CheckAll(check_all::Args),
     /// The official validators on generated files, in the pinned image (tools/verify), against
     /// the baseline (tools/verify/baseline.json); exits 1 on a failure the baseline doesn't know.
     Verify(verify::Args),
@@ -84,11 +74,6 @@ enum Task {
     /// Every example (or the spec folders given) generated for every target it can be, into one
     /// tree that `verify` checks.
     GenerateAll(generate_all::Args),
-    /// Point the consumers' Isoloom dependencies at this checkout (a git-ignored Cargo
-    /// `[patch]`), or back to their pins.
-    DevLink(dev_link::Args),
-    /// Install what a Linux or Windows test host needs (`--check` only reports).
-    HostSetup(host_setup::Args),
     /// The ratchet: every clean-code count per crate against quality-baseline.json; fails when
     /// one goes up (`--update` writes them when they only went down).
     Quality(quality::Args),
@@ -134,12 +119,9 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Res<ExitCode> {
     match cli.task {
-        Task::CheckAll(a) => check_all::run(&a),
         Task::Verify(a) => Ok(verify::run(&a)),
         Task::TfTest(a) => Ok(tf_test::run(&a)),
         Task::GenerateAll(a) => generate_all::run(&a),
-        Task::DevLink(a) => Ok(dev_link::run(&a)),
-        Task::HostSetup(a) => host_setup::run(&a),
         Task::Quality(a) => quality::run(&a),
         Task::Test(a) => test::run(&a),
         Task::Msrv => hack::msrv(),

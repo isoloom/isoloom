@@ -112,7 +112,32 @@ fn decode(text: &str) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::text::base64;
+
+    /// Standard base64 with padding: the armour's encoding, to read back.
+    fn base64(bytes: &[u8]) -> String {
+        const ABC: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+        for chunk in bytes.chunks(3) {
+            let n = chunk.iter().zip([16u32, 8, 0]).fold(0u32, |n, (b, shift)| n | (u32::from(*b) << shift));
+            for (i, shift) in [18u32, 12, 6, 0].into_iter().enumerate() {
+                let letter = usize::try_from((n >> shift) & 63).ok().and_then(|at| ABC.get(at));
+                out.push(match letter {
+                    Some(l) if i <= chunk.len() => char::from(*l),
+                    _ => '=',
+                });
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn base64_pads_as_the_standard_says() {
+        assert_eq!(base64(b""), "");
+        assert_eq!(base64(b"M"), "TQ==");
+        assert_eq!(base64(b"Ma"), "TWE=");
+        assert_eq!(base64(b"Man"), "TWFu");
+        assert_eq!(base64(b"Many"), "TWFueQ==");
+    }
 
     /// An armour block around `packets`.
     fn armored(packets: &[u8]) -> String {
