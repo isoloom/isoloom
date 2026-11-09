@@ -3,11 +3,14 @@
 //! `cloud-vm`. A target brings its own resources (networks, instances, images, firewall
 //! rules) and picks a transport for the machines' set-up; this module brings the rest:
 //!
-//! - [`linux`]: a Linux machine set up over SSH by Terraform (`remote-exec`): the connection,
-//!   the project's archive, the inputs file, then the machine's [`Step`]s from the plan, each
-//!   written once by `isoloom_render::steps` and run as root. A `reboot` step splits the steps:
-//!   Terraform restarts the machine between two `remote-exec` provisioners. A target adds its
-//!   own commands through [`linux::Hooks`] and leaves out the steps its platform does itself.
+//! - [`linux`]: a Linux machine's [`Step`]s from the plan, each written once by
+//!   `isoloom_render::steps` and run as root, in one of two transports: over SSH by Terraform
+//!   (`remote-exec`, ESXi: the project's archive and the inputs file uploaded, a `reboot` step
+//!   splitting the steps between two provisioners), or from the machine's own user data (the
+//!   clouds, [`user_data`]), where a cloud adds its own commands through [`linux::Hooks`] and
+//!   leaves out the steps its network does itself.
+//! - [`user_data`]: the set-up a cloud machine runs itself, part by part across its reboots,
+//!   its progress in its ready file.
 //! - [`cloud_init`]: the same steps as a cloud-init document (Proxmox, ESXi): the `Prelude` as
 //!   `bootcmd`, the others as `runcmd`, and after a `reboot` step a unit running the rest at
 //!   the next boot.

@@ -6,10 +6,11 @@
 //!   steps are left out); a network security group per machine does what the router does on
 //!   other targets: a machine's networks reach it, `reach` rules open one network to another
 //!   (on their ports), the rest is closed.
-//! - Each machine is a VM at its address with a static public IP, set up over SSH as `isoloom`
-//!   (Azure creates the administrator; it reserves `admin`) through the core's `remote-exec`
-//!   transport. A machine on several networks gets an interface on each (forwarding on, so
-//!   replies leave from the right one), brought up by MAC at every boot.
+//! - Each machine is a VM at its address with a static public IP that sets itself up from its
+//!   user data (`crate::cloud::vm::hooks::capped_user_data`), once the runner delivered the
+//!   project over SSH as `isoloom` (Azure creates the administrator; it reserves `admin`). A
+//!   machine on several networks gets an interface on each (forwarding on, so replies leave from
+//!   the right one), brought up by MAC at every boot.
 //! - A network a machine routes (`gateway:`): a route table per network sends it through that
 //!   machine's address (`routing`), the machine at the router's address (Azure keeps .1).
 //! - Windows (Azure's Server images): the `isoloom` administrator with a generated password,

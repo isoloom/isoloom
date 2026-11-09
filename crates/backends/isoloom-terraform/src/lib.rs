@@ -10,9 +10,9 @@
 //!   Docker host on each cloud for `cloud-docker` ([`cloud_docker_modules`]), and on a Proxmox
 //!   server for `docker-vm` ([`docker_vm_module`], its run manifest [`docker_vm_manifest`]).
 //!
-//! Every VM target sets its machines up through one core (cloud-init, `remote-exec` over SSH,
-//! WinRM, cloudbase-init, the Ansible controller), so a step of the plan is written once for
-//! all of them. The crate sits above `isoloom-render` and below `isoloom-targets`, and depends
+//! Every VM target sets its machines up through one core (a cloud machine's own user data,
+//! cloud-init, `remote-exec` over SSH, WinRM, cloudbase-init, the Ansible controller), so a step
+//! of the plan is written once for all of them. The crate sits above `isoloom-render` and below `isoloom-targets`, and depends
 //! on no other backend.
 //!
 //! ```

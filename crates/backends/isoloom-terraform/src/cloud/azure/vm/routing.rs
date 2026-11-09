@@ -5,8 +5,9 @@
 //! network sends every other network through its own gateway, so traffic crosses the gateway
 //! both ways.
 //!
-//! The machines keep their own public addresses (Terraform sets them up over SSH there), so a
-//! routed network still goes out to the internet directly rather than through its gateway.
+//! The machines keep their own public addresses (the runner reaches them there over SSH, Terraform
+//! a Windows one over WinRM), so a routed network still goes out to the internet directly rather
+//! than through its gateway.
 
 use crate::hcl_builder::{Module, reference, string};
 use isoloom_plan::Environment;
