@@ -96,6 +96,26 @@ fn validate_json_reports_v1_and_the_isoloom_version_for_a_valid_spec() -> Outcom
     Ok(())
 }
 
+/// A daemon installed with no `service` step for it is a warning: shown, in the JSON too, and
+/// the spec still valid (exit 0).
+#[test]
+fn validate_shows_the_warnings_and_passes() -> Outcome {
+    let dir = project(
+        "warned-spec",
+        "version: 1\nname: warned\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ packages: [nginx] }] }\n",
+    )?;
+    let (run, v) = validate_json(&dir, &dir)?;
+    assert_eq!((run.code, &v["ok"]), (Some(0), &serde_json::json!(true)), "{v}");
+    let warnings = v["warnings"].as_array().ok_or("no warnings")?;
+    assert_eq!(warnings.len(), 1, "{v}");
+    assert_eq!(warnings[0]["path"], "machines.web.app.steps[0]", "{v}");
+    let text = isoloom(&dir, &[&"validate", &dir, &"--skip-files"])?;
+    assert_eq!(text.code, Some(0), "{text:?}");
+    assert!(text.stdout.contains("! warning: machines.web.app.steps[0]"), "{}", text.stdout);
+    assert!(text.stdout.trim_end().ends_with("✓ warned is valid"), "{}", text.stdout);
+    Ok(())
+}
+
 #[test]
 fn validate_json_reports_legacy_for_a_spec_with_a_removed_key() -> Outcome {
     let dir = project(

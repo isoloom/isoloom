@@ -1,4 +1,5 @@
-//! `isoloom validate`: the spec's mistakes, and the paths it mentions that don't exist.
+//! `isoloom validate`: the spec's mistakes, the paths it mentions that don't exist, and what it
+//! says that is likely not what its author means (warnings, which never fail it).
 
 use std::path::PathBuf;
 
@@ -17,20 +18,21 @@ pub(crate) struct Args {
     json: bool,
 }
 
-/// Lists the spec's problems: its answer is the verdict, so a spec with problems is a no, not
-/// an error.
+/// Lists the spec's problems, then its warnings: its answer is the verdict (the problems'), so a
+/// spec with problems is a no, not an error, and one with warnings only is a yes.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     // A folder with no spec is an error: there is nothing to give a verdict on.
     isoloom_spec::find(&a.dir)?;
     let file = spec::file_name(&a.dir);
     let profile = profile.load(&a.dir)?;
-    let (name, problems) = match isoloom_spec::load_profiled(&a.dir, profile.as_ref(), &[]) {
+    let (name, problems, warnings) = match isoloom_spec::load_profiled(&a.dir, profile.as_ref(), &[]) {
         Ok(spec) => {
             let name = spec.name.clone();
             let lab = isoloom_targets::Lab::new(spec);
-            (name, if a.skip_files { lab.problems() } else { lab.problems_with_files(&a.dir) })
+            let problems = if a.skip_files { lab.problems() } else { lab.problems_with_files(&a.dir) };
+            (name, problems, lab.warnings())
         }
-        Err(isoloom_spec::Error::Invalid { problems, .. }) => (String::new(), problems),
+        Err(isoloom_spec::Error::Invalid { problems, .. }) => (String::new(), problems, Vec::new()),
         Err(e) => return Err(e.into()),
     };
     if a.json {
@@ -39,13 +41,19 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
             "specFormat": spec_format(&problems),
             "isoloomVersion": env!("CARGO_PKG_VERSION"),
             "problems": problems,
+            "warnings": warnings,
         }))?;
-    } else if problems.is_empty() {
+        return Ok(Verdict::of(problems.is_empty()));
+    }
+    for p in &problems {
+        console.line(format_args!("✗ {}", p.render(&file)))?;
+    }
+    for w in &warnings {
+        console.line(format_args!("! {}", w.render(&file)))?;
+    }
+    if problems.is_empty() {
         console.line(format_args!("✓ {name} is valid"))?;
     } else {
-        for p in &problems {
-            console.line(format_args!("✗ {}", p.render(&file)))?;
-        }
         console.line(format_args!("{} problem{}", problems.len(), if problems.len() == 1 { "" } else { "s" }))?;
     }
     Ok(Verdict::of(problems.is_empty()))

@@ -12,6 +12,10 @@ stable spec format.
 
 ### Added
 
+- **`isoloom validate` shows the spec's warnings**: a daemon a recipe installs with no `service`
+  step for it, a `seal: best-effort` machine. Each reads `! warning: <field>` with its reason and
+  fix, and `--json` lists them under `warnings`; they never fail validation. They were worked out
+  (`Lab::warnings`) but shown nowhere.
 - **The run manifest says what each Vagrant VM takes only when it boots** (`machines[].native.boot_digest`):
   a digest of the VM's Vagrantfile configuration but its provisioners (synced folders and
   `host_folders`, networks, forwarded ports, size, provider settings), on `vagrant` and on
