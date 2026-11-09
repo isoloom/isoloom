@@ -30,8 +30,8 @@ machines:
       build: build/app
       steps: [{ playbook: provision/app.yml }]
 
-  # A published image on containers, a Debian VM its playbook sets up (`service: postgres@16`
-  # in Phase 4).
+  # A published image on containers, a Debian VM its playbook sets up (the catalogue's
+  # `service: postgres@16` does both).
   db:
     os: debian@12
     networks: { internal: 30 }

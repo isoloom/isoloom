@@ -1,4 +1,4 @@
-//! Isoloom's runner (design §3): the process of a container whose recipe runs services, generated
+//! Isoloom's runner: the process of a container whose recipe runs services, generated
 //! per machine in POSIX `sh` and installed as the image's entrypoint. The engine's init (Compose's
 //! `init: true`, a pod sharing its process namespace) is PID 1 and reaps what the runner leaves.
 //!

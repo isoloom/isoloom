@@ -8,8 +8,8 @@
 //! - **a new VM** carries every step, through the shell library (the PowerShell library on
 //!   Windows);
 //! - **a host that already exists** (the `external` target) runs scripts, playbooks and reboots
-//!   from the project, and every other step with the Ansible CM tool (Phase 4.5: a generated role
-//!   per machine, run over the inventory). A Windows host that already exists still waits for
+//!   from the project, and every other step with the Ansible CM tool (a generated role per
+//!   machine, run over the inventory). A Windows host that already exists still waits for
 //!   Ansible's Windows modules, so its non-script steps are refused until that leg lands.
 
 use isoloom_spec::syntax::{self, FieldPath, Problem, Step};

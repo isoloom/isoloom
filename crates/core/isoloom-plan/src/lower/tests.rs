@@ -85,7 +85,7 @@ fn each_target_gets_its_own_overrides() {
     assert!(docker.spec.machines["status"].vm.is_some() && !docker.spec.machines["status"].docker.as_ref().unwrap().lxc);
     assert_eq!(docker.refusals, []);
     // The portal's and the scanner's `copy` and `packages` steps wait for VM configuration
-    // steps (Phase 4); the status board's VM recipe is a script.
+    // steps; the status board's VM recipe is a script.
     assert!(
         proxmox
             .refusals
@@ -145,9 +145,9 @@ fn the_design_examples_validate_but_for_what_waits_on_later_phases() {
     assert_eq!(problems("legacy-intranet"), []);
     // `windows` is a group name Isoloom fills itself (the inventory's).
     assert_eq!(problems("forest-mini"), [(Code::InvalidValue, "groups.windows".to_owned())]);
-    // The catalogue's nginx and postgres entries landed in Phase 4, so the examples' services
-    // resolve now. bookshelf's message still references a published port's runtime value, which
-    // validation can't resolve (a later-phase concern, not the catalogue).
+    // The catalogue has nginx and postgres entries, so the examples' services resolve.
+    // bookshelf's message still references a published port's runtime value, which validation
+    // can't resolve (not the catalogue's concern).
     assert_eq!(problems("branch-office"), []);
     assert_eq!(problems("bookshelf"), [(Code::UnknownReference, "message".to_owned())]);
 }

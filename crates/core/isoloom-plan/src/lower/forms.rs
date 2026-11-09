@@ -91,8 +91,8 @@ fn official_image(m: &syntax::Machine) -> Result<(OsRef, &'static str), NoForm> 
     Ok((os, image))
 }
 
-/// What the container built from the machine's steps runs (the configuration model's rule,
-/// design §3): refused when a service has no foreground form, or when it has ports and nothing
+/// What the container built from the machine's steps runs (the configuration model's rule):
+/// refused when a service has no foreground form, or when it has ports and nothing
 /// serves them.
 fn process(os: OsRef, m: &syntax::Machine) -> Result<(), NoForm> {
     // A step no form of the OS carries is the VM's refusal to report; a container of a Windows

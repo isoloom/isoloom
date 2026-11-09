@@ -1,4 +1,4 @@
-//! An entry's placeholders filled in for one machine (design §1.4): `{{ version }}`, `{{ os.* }}`,
+//! An entry's placeholders filled in for one machine: `{{ version }}`, `{{ os.* }}`,
 //! `{{ vars.* }}`, `{{ with.* }}` and, in a step repeated with `for_each`, `{{ item.* }}`. The
 //! lab's own paths (`{{ machine.name }}`, `{{ machines.<m>.addresses.<n> }}`) are left as they
 //! are in a template's text, for the plan to fill in per target; anywhere else they are refused,

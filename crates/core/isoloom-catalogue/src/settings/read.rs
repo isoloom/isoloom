@@ -1,4 +1,4 @@
-//! Reading `with:` against the settings (design §4.9, step 4): an unknown key (with a
+//! Reading `with:` against the settings: an unknown key (with a
 //! did-you-mean), a wrong type, a missing required setting, a secret or an input where the
 //! setting isn't a password, and an endpoint whose machine shares no network with this one are
 //! each a problem at the key.

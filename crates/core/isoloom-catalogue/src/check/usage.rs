@@ -1,4 +1,4 @@
-//! Every setting does something, in every form (design §4.4): the recipe, the image or a port
+//! Every setting does something, in every form: the recipe, the image or a port
 //! uses it, and, when the entry has an official image (which skips `install`), something besides
 //! `install` does. A string setting that reaches a template's file keeps to a `pattern` or
 //! `values`, so nothing can be injected through it. A template's file is the entry's own; a copy

@@ -1,4 +1,4 @@
-//! A machine's catalogue service, lowered (design §4.9): the entry's forms, ports, data and
+//! A machine's catalogue service, lowered: the entry's forms, ports, data and
 //! configuration, and every problem and refusal at the field the author wrote.
 
 use isoloom_spec::model::{BaseImage, Target};

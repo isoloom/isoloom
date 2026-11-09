@@ -1,4 +1,4 @@
-//! What a container runs (design §3): one daemon as its foreground process, several under the
+//! What a container runs: one daemon as its foreground process, several under the
 //! engine's init and Isoloom's runner, the machine's own command, or nothing (idle). The one rule
 //! for a container built from steps: a daemon runs only where a `service` step or `command` says
 //! so, and a container that would answer nothing on its ports is refused, as is a daemon with no

@@ -6,7 +6,7 @@
 //!
 //! - [`recipe`]: a machine's steps resolved for its family ([`Family`]), or the steps the family
 //!   can't carry at all ([`Unportable`]: a repository on Windows, a Windows file's ACL).
-//! - [`ContainerProcess`]: what its container runs (design §3), or why it can't ([`NoProcess`]).
+//! - [`ContainerProcess`]: what its container runs, or why it can't ([`NoProcess`]).
 //! - [`DaemonTable`]: the daemons' units and foreground forms; [`unstarted`]: the daemons a
 //!   recipe installs and no step starts.
 //! - [`fill`]: a template's placeholders filled in for one machine on one target.

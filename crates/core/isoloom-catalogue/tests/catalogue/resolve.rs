@@ -1,4 +1,4 @@
-//! A machine's service resolved (design §4.9): the release its version picks, the OS checked,
+//! A machine's service resolved: the release its version picks, the OS checked,
 //! `when:` and `for_each:` applied, placeholders and pins filled in, the official image only on
 //! its own OS.
 

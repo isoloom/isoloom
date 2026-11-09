@@ -1,4 +1,4 @@
-//! The Dockerfile Isoloom generates from a container's recipe (design §2.2–§2.3): `FROM` its
+//! The Dockerfile Isoloom generates from a container's recipe: `FROM` its
 //! OS's official image (pinned by digest), the project folder (`/opt/isoloom`, the same path a
 //! VM has) as its working folder, then each step in order. Scripts and copies are the
 //! Dockerfile's own `COPY` and `RUN`, a template a `COPY` of the file Isoloom filled in, and every

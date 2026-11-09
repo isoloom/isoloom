@@ -9,7 +9,7 @@
 //! running real cloud-init (`cargo xtask conformance --renderer cloud-init`): cloud-init writes
 //! and runs the script, then the shell library applied on top changes nothing.
 //!
-//! **Why the whole script, not cloud-init's own modules** (design decision 5): cloud-init's
+//! **Why the whole script, not cloud-init's own modules**: cloud-init's
 //! `packages:`, `users:` and the rest run in cloud-init's fixed module order, not the recipe's,
 //! and before `runcmd` (so before the routes, project, files, secrets and waits the set-up runs
 //! there). A recipe step reordered that way would change what the next step sees, and a native

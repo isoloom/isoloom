@@ -859,7 +859,7 @@
           "description": "Who runs the `start` steps: the image's own entrypoint (`image`, the default), or\nIsoloom's runner before it (`run`)."
         }
       },
-      "description": "How the settings reach the official image (design §4.5): its own entrypoint reads variables\nand files, or Isoloom's runner runs the recipe's `start` steps first."
+      "description": "How the settings reach the official image: its own entrypoint reads variables\nand files, or Isoloom's runner runs the recipe's `start` steps first."
     },
     "ImageStart": {
       "oneOf": [

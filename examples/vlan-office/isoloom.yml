@@ -19,7 +19,8 @@ reach:
   - { from: office.vlan10, to: servers, ports: [80] }
 
 machines:
-  # A published image on containers, a Debian VM its step sets up (`service: nginx` in Phase 4).
+  # A published image on containers, a Debian VM its step sets up (the catalogue's
+  # `service: nginx` does both).
   intranet:
     os: debian@12
     networks: { servers: 10 }

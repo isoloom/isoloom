@@ -1,4 +1,4 @@
-//! An entry's recipe resolved for one machine (design §4.9, step 5): `when:` and `for_each:`
+//! An entry's recipe resolved for one machine: `when:` and `for_each:`
 //! applied, placeholders filled in, `lock.yml`'s pins written in (a repository key's SHA-256, a
 //! vendor package's exact version), and each template's file rendered; then each step is parsed
 //! into the spec's [`Step`], so what comes out holds only valid values.

@@ -1,4 +1,4 @@
-//! An entry's parity contract, `catalogue/<entry>/contract.yml`, written by hand (design §4.6):
+//! An entry's parity contract, `catalogue/<entry>/contract.yml`, written by hand:
 //! the cases a conformance lab is built for, the checks both forms must pass, and the facts
 //! whose output must be equal in both. `cargo xtask catalogue check` runs it.
 

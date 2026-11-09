@@ -1,6 +1,6 @@
 //! An entry's definition, `catalogue/<entry>/entry.yml`, written by hand: what the service is,
 //! its releases, its official images, the settings of `with:`, its ports, data, health and
-//! daemons, how settings reach the official image, and its recipe (design §4.2). Data, not code:
+//! daemons, how settings reach the official image, and its recipe. Data, not code:
 //! a new entry needs no Rust. Its JSON Schema (`catalogue/entry.schema.json`) comes from these
 //! types.
 
@@ -129,7 +129,7 @@ impl TryFrom<EntryPortInput> for EntryPort {
     }
 }
 
-/// How the settings reach the official image (design §4.5): its own entrypoint reads variables
+/// How the settings reach the official image: its own entrypoint reads variables
 /// and files, or Isoloom's runner runs the recipe's `start` steps first.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

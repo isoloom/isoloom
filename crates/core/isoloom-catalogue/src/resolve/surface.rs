@@ -1,4 +1,4 @@
-//! What a resolved entry gives its machine besides the recipe (design §4.9, steps 6 and 7): the
+//! What a resolved entry gives its machine besides the recipe: the
 //! official image pinned by digest, the ports by number, and the passwords' value files, with a
 //! `start` step that hands each to its setting's owner.
 

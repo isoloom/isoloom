@@ -1,4 +1,4 @@
-//! An entry's releases (design §4.3): each a version, its upstream channel, where the VM form
+//! An entry's releases: each a version, its upstream channel, where the VM form
 //! installs it from, the OSes it runs on, and the variables its recipe reads.
 
 use indexmap::IndexMap;

@@ -1,4 +1,4 @@
-//! A machine's `with:` read against its entry's settings (design §4.4): every value typed, the
+//! A machine's `with:` read against its entry's settings: every value typed, the
 //! defaults filled in, and every problem placed at its key with its fix. What a value becomes in
 //! the recipe's texts is its placeholder's text ([`SettingValue::text`]); a password reaches the
 //! machine as a value file, by its path only ([`SettingValue::path`]).

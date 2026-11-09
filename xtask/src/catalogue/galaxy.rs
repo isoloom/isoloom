@@ -1,4 +1,4 @@
-//! Pinning the official Galaxy collections the Ansible renderer may name (design §4.7): each
+//! Pinning the official Galaxy collections the Ansible renderer may name: each
 //! one's version, its archive's address and SHA-256, from Galaxy's API.
 
 use serde_json::Value;

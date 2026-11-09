@@ -70,10 +70,10 @@ pub const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0
 /// adds Docker's own repository with the signing key pinned by SHA-256 ([`DOCKER_APT_KEY_SHA256`],
 /// no `curl | sh`), then installs the engine at [`DOCKER_VERSION`] (the exact package resolved from
 /// the repository, so its epoch and build suffix are the repo's) and the Compose plugin at
-/// [`COMPOSE_VERSION`]. The RPM family (Rocky, AlmaLinux, CentOS, Fedora) still uses Docker's own
-/// install script, pinned to [`DOCKER_VERSION`]. TODO(4.7): inline the dnf/RPM path too, its key
-/// pinned by SHA-256 (`e6c650e0…`), proven on a Rocky/Fedora guest. The apt branch fails closed (a
-/// `set -e` subshell, the key verified before use). On a non-x86 host (an Apple Silicon Mac's VM,
+/// [`COMPOSE_VERSION`]. The RPM family (Rocky, AlmaLinux, CentOS, Fedora) uses Docker's own
+/// install script, pinned to [`DOCKER_VERSION`] only: its repository key isn't checked against a
+/// pinned SHA-256 as the apt branch's is. The apt branch fails closed (a `set -e` subshell, the
+/// key verified before use). On a non-x86 host (an Apple Silicon Mac's VM,
 /// an Arm cloud VM) the apt branch adds QEMU's user-mode emulation (`qemu-user-static`, registered
 /// with binfmt for every container), since a lab's images are x86 unless its spec says otherwise.
 pub const INSTALL_DOCKER: &str = r#"command -v docker >/dev/null || if command -v apt-get >/dev/null; then (

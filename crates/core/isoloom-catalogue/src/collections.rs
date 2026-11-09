@@ -1,5 +1,5 @@
 //! The official Galaxy collections the Ansible renderer may name, pinned:
-//! `catalogue/collections.yml` (design §4.7). They are GPL-3.0, so they are referenced, never
+//! `catalogue/collections.yml`. They are GPL-3.0, so they are referenced, never
 //! embedded: the generated project's requirements name each with its version, its
 //! archive's SHA-256 and download address, checked on the controller before `ansible-galaxy`
 //! installs it. Only Ansible's own

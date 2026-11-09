@@ -1,4 +1,4 @@
-//! `cargo xtask catalogue refresh [<entry>…] [--check] [--update] [--propose]` (design §4.8):
+//! `cargo xtask catalogue refresh [<entry>…] [--check] [--update] [--propose]`:
 //! the only code that fetches anything for the catalogue. For each entry it pins every
 //! repository key (its GPG fingerprint checked, its file's SHA-256 recorded), every official
 //! image (its tag's multi-platform digest, platforms, entrypoint and command) and each vendor

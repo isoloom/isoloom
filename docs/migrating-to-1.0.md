@@ -162,12 +162,12 @@ unknown field.
 
 ## 6. Removed commands and crates
 
-The runtime left Isoloom; the Isothrum runner runs what Isoloom generates.
+The runtime left Isoloom; a runner runs what Isoloom generates.
 
 - Removed CLI verbs: `run`, `test`, `down`, `status`, `connect`, `exec`, `capture`,
   `reset`, `provision`, plus the registry and run-time secret delivery. Generate the
-  files with `isoloom generate` and run them with the Isothrum runner (or the native
-  tools directly).
+  files with `isoloom generate` and run them with a runner (or the native tools
+  directly).
 - Removed crate: `isoloom-coverage`. Use `isoloom matrix` (the generated capability
   matrix) and `isoloom verify` (conformance against official validators) instead.
 - Renamed crate: `isoloom-external` → `isoloom-ansible`.
@@ -176,32 +176,10 @@ The CLI commands in 1.0 are `validate`, `generate`, `check`, `targets`, `resourc
 `defaults`, `graph`, `report`, `message`, `inspect`, `profiles`, `schema`, `import`,
 `docs` and `matrix`.
 
-## 7. The Isothrum runner API
+## 7. Engine-compatibility gating
 
-If you embed the Isothrum runner, the CTF/courses word "lab" was dropped for a
-domain-neutral vocabulary:
-
-| 0.x | 1.0 |
-|---|---|
-| `Lab<'r>` (from `Runner::open`) | `Running<'r>` |
-| `status::Run` (the up/resume result) | `Started` |
-| `LabView` (the hook view) | `RunView` |
-| compiler `LabFile` | `ProjectFile` |
-| CLI `LabArgs` | `TargetArgs` |
-| `LabArgs.lab` (its path field) | `TargetArgs.path` |
-| the `lab` module | `run` |
-
-The public types are now `Runner` (`open` returns `Running<'r>`), `Running<'r>`,
-`Started` and `RunView<'a>`. See the Isothrum CHANGELOG for details. The CLI operations
-(`up`, `park`, `resume`, `status`, `check`, `provision`, `down`, `reap`) are unchanged in
-shape.
-
-## 8. Engine-compatibility gating (the launcher)
-
-The Cyber CTF launcher only runs labs whose spec format and engine versions match what it
-bundles. `isoloom validate --json` reports a lab's `specFormat` and the `isoloomVersion`
-it validated against; the publish path stores those alongside the lab, and the launcher
-returns only labs whose format is the 1.0 form and whose minimum engine versions are at or
-below the launcher's bundled Isoloom and Isothrum. A 0.x-format lab, or one validated
-against a newer engine than the launcher bundles, is hidden until it is re-validated and
-re-synced. An un-synced lab defaults to legacy and stays hidden until re-synced.
+`isoloom validate --json` reports a lab's `specFormat` and the `isoloomVersion` it validated
+against. An app that bundles Isoloom and a runner can store those with each lab and offer only
+the labs whose format is the 1.0 form and whose engine version is at or below the one it
+bundles: a 0.x-format lab, or one validated against a newer engine, is then re-validated before
+it runs.

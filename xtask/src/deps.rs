@@ -1,4 +1,4 @@
-//! The one-way dependency rule of the engineering standard (PLAN 3b), checked on what
+//! The one-way dependency rule of the engineering standard, checked on what
 //! `cargo metadata` says: spec → plan → render → backends → targets → cli. A crate depends only
 //! on crates below it, so no backend depends on another backend, the tools (import) depend on
 //! the core alone, the manifest crate depends on no other crate of the workspace (it is the

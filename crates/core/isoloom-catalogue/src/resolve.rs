@@ -1,4 +1,4 @@
-//! A machine's catalogue service resolved (design §4.9, steps 1 to 5): the entry it names, the
+//! A machine's catalogue service resolved: the entry it names, the
 //! release its version picks, the OS checked against it, `with:` typed against the settings,
 //! and the recipe resolved, with the official image when the OS has one. Lowering builds both
 //! forms from what comes out ([`Resolved`]); every problem is a spec [`Problem`] at the field

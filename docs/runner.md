@@ -5,8 +5,8 @@ manifest** (`.isoloom/<target>/run.json`): a versioned, self-contained descripti
 the environment up, check it and tear it down. Isoloom runs nothing itself. The run manifest is
 the contract between Isoloom and a runner.
 
-The [Isothrum runner](https://github.com/Isothrum/isothrum) executes it. You can also run each
-tool's files by hand (`docker compose up`, `kubectl apply -k`, `vagrant up`, `terraform apply`,
+A runner executes it: any program that reads the manifest and follows this contract. You can
+also run each tool's files by hand (`docker compose up`, `kubectl apply -k`, `vagrant up`, `terraform apply`,
 `ansible-playbook`); the manifest exists so a runner doesn't have to know each tool's commands.
 
 ## What the manifest holds
@@ -28,22 +28,23 @@ and `isoloom-manifest` holds the types and the fixtures both repositories test a
 
 ## The lifecycle
 
-The Isothrum runner drives one lifecycle over the manifest:
+The manifest's `lifecycle` holds each operation as ordered steps; a runner runs an operation's
+steps in order, each under its own policy (time limit, retries, whether a failure fails the
+operation):
 
-| Command | Does |
+| Operation | What a runner does |
 |---|---|
-| `up` | Bring the environment up, following the manifest; fails before creating anything if a required tool is missing or too old |
-| `check` | Run the checks from inside the environment |
-| `status` | Report each machine's state |
-| `park` | Stop the environment, keeping its state — `--mode shutdown` (default) or `pause` |
-| `resume` | Bring a parked environment back |
-| `provision` | Re-run a machine's set-up (VM targets) |
-| `down` | Tear it down and remove its state |
-| `events` | Stream the run's events |
+| `up` | Checks the manifest's `tools` first (it fails before creating anything when one is missing or too old), runs `lifecycle.up`, delivers the secrets and inputs, waits for the readiness criteria, then runs `lifecycle.seal` when there is one |
+| `check` | Runs the manifest's `checks` (below) and reports each check |
+| `status` | Runs `lifecycle.status`, a read-only probe, and reads each machine's state from it |
+| `park` | Runs `lifecycle.park.shutdown` (machines powered off) or `lifecycle.park.pause` (frozen, memory kept), whichever the target has and the runner chooses; the run's state is kept |
+| `resume` | Runs `lifecycle.resume`: the parked machines come back as they were, no container re-created and no VM set up again, so no input is needed again |
+| `provision` | Runs `lifecycle.provision.all`, or `lifecycle.provision.machine` with `${machine}` bound to one machine: the set-up again on running VMs |
+| `down` | Runs `lifecycle.down`, which removes everything the run created |
 
-The runner keeps each run's record, lock, event log and pinned host ports under its own home
-(`~/.isothrum` for the CLI), never in the lab folder. A secret or input value reaches only the
-steps its delivery names, and every sensitive value is masked (`***`) in events, logs and errors.
+A runner keeps each run's state (its record, the values it set, the host ports it pinned) outside
+the lab folder. A secret or input value reaches only the steps its delivery names, and a runner
+never writes a sensitive value to a log or an error.
 
 ### What a VM takes only when it boots
 
@@ -99,15 +100,9 @@ operation replays it, so a later apply can't silently undo it.
 
 ## Running it
 
-```sh
-isoloom generate            # writes .isoloom/<target>/{files…, run.json}
-isothrum up                 # reads .isoloom/<target>/run.json (or pass --target)
-isothrum check
-isothrum down
-```
-
-The runner's own commands, options, event stream (version 0) and error codes are documented in
-the [Isothrum repository](https://github.com/Isothrum/isothrum).
+`isoloom generate` writes `.isoloom/<target>/{files…, run.json}`; a runner then reads the
+`run.json` of the target it runs. Its own commands, options and messages are its own, documented
+with it.
 
 ## See also
 

@@ -56,7 +56,7 @@ recorded real runs, never written by hand, and the [matrix](matrix.md) shows eac
 evidence.
 
 - **Tier 1** — proven by a full real run (up, checks, down) from every host OS the target exists
-  on. These are the launcher's targets, the ones 1.0 commits to.
+  on. These are the targets 1.0 commits to.
 - **Tier 2** — generated and validated: every generated file passes its format's official
   validator (`cargo xtask verify`), but a full real run from every host isn't yet recorded.
 - **Tier 3** — experimental.
@@ -70,7 +70,7 @@ still pending.
   runner); `vagrant/libvirt` is Tier 1 on Linux; `vagrant/virtualbox` and `docker-vm/virtualbox`
   have real macOS runs; `vagrant/hyperv` has a partial Windows run.
 - **Server** (`proxmox`, `vagrant/vmware_esxi`, the `esxi` Terraform target) is proven against
-  real lab servers from macOS, through the runner and the launcher. Tier 1 for server mode still
+  real lab servers from macOS, through the runner. Tier 1 for server mode still
   needs runs from Linux and Windows hosts, so these remain Tier 2 for now.
 - **Cloud** (`cloud-vm`, `cloud-docker`, `cloud-services`) ships **generated and validated**: the
   modules are proven by `terraform validate` and by `terraform test` with mocked providers

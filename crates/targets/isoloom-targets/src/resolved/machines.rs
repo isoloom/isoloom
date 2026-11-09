@@ -58,7 +58,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Map<String, V
     out
 }
 
-/// Each service machine's catalogue services (design §4.9, step 8): the entry, the release its
+/// Each service machine's catalogue services: the entry, the release its
 /// version picked, where it comes from, and the official image a container runs where its OS
 /// has one (else the container is built from the OS's image).
 pub(super) fn add_services(machines: &mut Map<String, Value>, lab: &isoloom_plan::Lab) {

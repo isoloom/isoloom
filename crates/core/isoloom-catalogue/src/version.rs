@@ -1,4 +1,4 @@
-//! Release versions and how a machine's `service: <entry>@<version>` picks one (design §4.3): a
+//! Release versions and how a machine's `service: <entry>@<version>` picks one: a
 //! version names the release it equals, else the newest release it is a prefix of, on dot
 //! boundaries (`postgres@16` is the newest 16.x, never 160); no version means the entry's
 //! default. The release picked is recorded in `resolved.json`, so it moves only with an Isoloom

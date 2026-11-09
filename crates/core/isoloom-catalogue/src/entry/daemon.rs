@@ -1,4 +1,4 @@
-//! The daemons an entry runs (design §3.4): for each, its unit and package per family, its
+//! The daemons an entry runs: for each, its unit and package per family, its
 //! foreground form for containers, its user and its log files. The catalogue's daemon table is
 //! every entry's daemons plus `catalogue/daemons.yml`, for the daemons no entry owns.
 

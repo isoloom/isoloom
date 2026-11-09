@@ -1,5 +1,5 @@
-//! `cargo xtask fuzz-combos`: combination fuzzing of the spec pipeline (the Phase 6 "10k random
-//! specs" item). A seeded generator ([`generator`]) builds many thousands of random but valid
+//! `cargo xtask fuzz-combos`: combination fuzzing of the spec pipeline (10k random
+//! specs by default). A seeded generator ([`generator`]) builds many thousands of random but valid
 //! specs in the new syntax, and for each the harness runs the full `generate_all` across every
 //! target, asserting the [`invariants`]: no panic (no `unwrap`/`expect` fires), generation is
 //! deterministic (render-twice is byte-identical), every refusal carries a reason, and no secret
@@ -20,7 +20,7 @@ use std::process::ExitCode;
 
 use crate::Res;
 
-/// How many random specs the big run checks by default: the Phase 6 "10k random specs".
+/// How many random specs the big run checks by default.
 const DEEP: u64 = 10_000;
 
 /// How many the fast test (the normal gate) checks: enough to exercise the generator's variety,

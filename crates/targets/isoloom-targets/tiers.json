@@ -19,19 +19,19 @@
           "host": "mac",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "hello-stack, segmented and invoice-portal-api: up, checks, park, resume and down, through the launcher and the Isothrum runner (Docker Desktop 29.8.1)"
+          "note": "hello-stack, segmented and an API lab not in this repository: up, checks, park, resume and down, through the runner (Docker Desktop 29.8.1)"
         },
         {
           "host": "jarvis",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the Isothrum runner (Debian 13, Docker 29.9.0, Compose 5.6.0). Flag proof: each file holds the input with its owner and mode (0:0 0400 by default, 999:1000 0440 as asked), after up and after resume; the flag is in no env, container config, generated file or run state"
+          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the runner (Debian 13, Docker 29.9.0, Compose 5.6.0). Flag proof: each file holds the input with its owner and mode (0:0 0400 by default, 999:1000 0440 as asked), after up and after resume; the flag is in no env, container config, generated file or run state"
         },
         {
           "host": "karen",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the Isothrum runner over SSH (Windows 11, Docker Desktop 29.8.2 on WSL 2, Compose 5.6.0; the session's Docker CLI without Docker Desktop's credential helper, which fails without a logon session). Flag proof: as on jarvis, after up and after resume"
+          "note": "hello-stack (12/12 checks), segmented (8/8) and a flag lab (hello-stack with an input delivered as files, 14/14): up, checks, park, resume on the same host port, checks and down with no container, network or volume left, through the runner over SSH (Windows 11, Docker Desktop 29.8.2 on WSL 2, Compose 5.6.0; the session's Docker CLI without Docker Desktop's credential helper, which fails without a logon session). Flag proof: as on jarvis, after up and after resume"
         }
       ]
     },
@@ -58,7 +58,7 @@
           "host": "mac",
           "date": "2026-10-16",
           "result": "pass",
-          "note": "hello-stack up, 12 checks, down through the Isothrum runner on VirtualBox 7.2 (bento/debian-12, Docker inside); no VM or container left behind"
+          "note": "hello-stack up, 12 checks, down through the runner on VirtualBox 7.2 (bento/debian-12, Docker inside); no VM or container left behind"
         }
       ]
     },
@@ -138,7 +138,7 @@
           "host": "mac",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "solo-web through the Isothrum runner: up (Docker in the VM over SSH, Compose), web check, down, reap; zero AWS leftovers"
+          "note": "solo-web through the runner: up (Docker in the VM over SSH, Compose), web check, down, reap; zero AWS leftovers"
         }
       ]
     },
@@ -230,19 +230,19 @@
           "host": "mac",
           "date": "2026-10-15",
           "result": "pass",
-          "note": "the full cycle through the launcher's runner path (real_vm_labs), VirtualBox 7.2.20"
+          "note": "the full cycle through an app's runner path, VirtualBox 7.2.20"
         },
         {
           "host": "mac",
           "date": "2026-10-16",
           "result": "pass",
-          "note": "configured-app (Phase 4.2's configuration renderers): every step kind through the shell library on Debian 12 and Ubuntu 24.04 (nginx from packages with a template, a user and group, files, a guarded command, the firewall, two services Isoloom defines as systemd units): up, 5/5 checks, a second and third provision changing nothing, down, through the Isothrum runner (VirtualBox 7.2)"
+          "note": "configured-app (the configuration renderers): every step kind through the shell library on Debian 12 and Ubuntu 24.04 (nginx from packages with a template, a user and group, files, a guarded command, the firewall, two services Isoloom defines as systemd units): up, 5/5 checks, a second and third provision changing nothing, down, through the runner (VirtualBox 7.2)"
         },
         {
           "host": "mac",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "bridged LAN VM on 10.0.0.101+ (public_network) through the launcher's runner path (real_vm_labs): web boots a fixed 10.0.0.101 on en0, reachable from the host (ping + curl the page), full cycle up/checks/pause+resume/shutdown+resume/provision/down, no VM left; VirtualBox 7.2.20, bento/debian-12"
+          "note": "bridged LAN VM on 10.0.0.101+ (public_network) through an app's runner path: web boots a fixed 10.0.0.101 on en0, reachable from the host (ping + curl the page), full cycle up/checks/pause+resume/shutdown+resume/provision/down, no VM left; VirtualBox 7.2.20, bento/debian-12"
         }
       ]
     },
@@ -279,13 +279,13 @@
           "host": "karen",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up (Hyper-V relay 127.0.0.1:8080->guest:80), http 200, checks pass, pause+resume, shutdown+resume, provision, down; Get-VM clean, no VM left. Elevated-Vagrant path OK via the already-elevated branch (UAC off, so no prompt raised). Vagrant 2.4.9, solo-web, Windows 11"
+          "note": "full cycle through an app's VM runner path (the runner 0.11.1) on published 0.11.1: up (Hyper-V relay 127.0.0.1:8080->guest:80), http 200, checks pass, pause+resume, shutdown+resume, provision, down; Get-VM clean, no VM left. Elevated-Vagrant path OK via the already-elevated branch (UAC off, so no prompt raised). Vagrant 2.4.9, solo-web, Windows 11"
         },
         {
           "host": "karen",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "runner-only launcher 00425c6 re-validation: full cycle via launch::start_vm_run -> Isothrum runner (up/check/pause+resume/shutdown+resume/provision/down), Hyper-V relay 127.0.0.1:8080->guest:80, http 200, Get-VM clean, no VM left (already-elevated branch, UAC off). Vagrant 2.4.9, solo-web, Windows 11. Built with dev-link isothrum 34244d6."
+          "note": "re-validation through an app's runner-only path: full cycle via the runner (up/check/pause+resume/shutdown+resume/provision/down), Hyper-V relay 127.0.0.1:8080->guest:80, http 200, Get-VM clean, no VM left (already-elevated branch, UAC off). Vagrant 2.4.9, solo-web, Windows 11. Built with dev-link isothrum 34244d6."
         }
       ]
     },
@@ -314,13 +314,13 @@
           "host": "friday",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "full cycle through the v1 launcher VM runner path (launch::start_vm_run -> Isothrum runner 0.11.1) on published 0.11.1: up, http 200, checks pass, pause+resume, shutdown+resume, provision, down; virsh clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13"
+          "note": "full cycle through an app's VM runner path (the runner 0.11.1) on published 0.11.1: up, http 200, checks pass, pause+resume, shutdown+resume, provision, down; virsh clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13"
         },
         {
           "host": "friday",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "runner-only launcher 00425c6 re-validation: full cycle via launch::start_vm_run -> Isothrum runner (up/check/pause+resume/shutdown+resume/provision/down), http 200, virsh + vagrant global-status clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13. Built with dev-link isothrum 34244d6."
+          "note": "re-validation through an app's runner-only path: full cycle via the runner (up/check/pause+resume/shutdown+resume/provision/down), http 200, virsh + vagrant global-status clean, no VM left. Vagrant 2.4.9 + vagrant-libvirt 0.12.2, solo-web, Debian 13. Built with dev-link isothrum 34244d6."
         }
       ]
     },
@@ -355,21 +355,21 @@
           "date": "2026-10-15",
           "result": "pass",
           "server": "esxi-lab",
-          "note": "ESXi 8.0U3e with promiscuous mode on: nested DHCP and the launcher's Vagrant self-test"
+          "note": "ESXi 8.0U3e with promiscuous mode on: nested DHCP and an app's Vagrant self-test"
         },
         {
           "host": "mac",
           "date": "2026-10-15",
           "result": "pass",
           "server": "esxi-lab",
-          "note": "up, status, checks, park, resume and down through the Isothrum runner"
+          "note": "up, status, checks, park, resume and down through the runner"
         },
         {
           "host": "mac",
           "date": "2026-10-16",
           "result": "pass",
           "server": "esxi-lab",
-          "note": "up, status, checks, provisioning and down through the launcher (the Isothrum runner)"
+          "note": "up, status, checks, provisioning and down through the runner"
         }
       ]
     },
@@ -394,7 +394,7 @@
           "date": "2026-10-15",
           "result": "pass",
           "server": "pve-lab",
-          "note": "up, status, checks and down through the Isothrum runner and the launcher"
+          "note": "up, status, checks and down through the runner"
         },
         {
           "host": "mac",
@@ -415,7 +415,7 @@
           "date": "2026-10-17",
           "result": "pass",
           "server": "pve-lab",
-          "note": "runner-only launcher 00425c6 re-validation: up/status/check/down full cycle via Isothrum runner; web+isoloom-router on vmbr1/SDN, http 200, check ok, Terraform destroyed 13 resources, node clean. Built with dev-link isothrum 34244d6 (published 0.11.1 lacks the API)."
+          "note": "re-validation through an app's runner-only path: up/status/check/down full cycle via the runner; web+isoloom-router on vmbr1/SDN, http 200, check ok, Terraform destroyed 13 resources, node clean. Built with dev-link isothrum 34244d6 (published 0.11.1 lacks the API)."
         }
       ]
     },
@@ -440,7 +440,7 @@
           "date": "2026-10-17",
           "result": "partial",
           "server": "esxi-lab",
-          "note": "static only 2026-10-17: generated hosts self-name+aliases, set-up progress ready-file and router sealed.nft all correct; NO live cycle - josenk/esxi provider is password-only but esxi-lab sshd is key-only (PasswordAuthentication no), and the esxi target emits no runner/launcher run.json; live seal reload owed"
+          "note": "static only 2026-10-17: generated hosts self-name+aliases, set-up progress ready-file and router sealed.nft all correct; NO live cycle - josenk/esxi provider is password-only but esxi-lab sshd is key-only (PasswordAuthentication no), and the esxi target emits no run.json; live seal reload owed"
         }
       ]
     },
@@ -457,7 +457,7 @@
           "host": "mac",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "solo-web and segmented through the Isothrum runner: up, seal, checks (segmented: no-internet-from-cache plus reachability), down, reap; zero AWS leftovers"
+          "note": "solo-web and segmented through the runner: up, seal, checks (segmented: no-internet-from-cache plus reachability), down, reap; zero AWS leftovers"
         }
       ]
     },
@@ -533,7 +533,7 @@
           "host": "mac",
           "date": "2026-10-17",
           "result": "pass",
-          "note": "cloud-bucket (S3 site) through the Isothrum CLI: up, the site answers 200 'hello from isoloom', down; no bucket left"
+          "note": "cloud-bucket (S3 site) through the runner: up, the site answers 200 'hello from isoloom', down; no bucket left"
         }
       ]
     },

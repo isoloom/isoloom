@@ -1,4 +1,4 @@
-//! A machine's catalogue service in lowering (design §4.9, steps 6 to 8): each service machine
+//! A machine's catalogue service in lowering: each service machine
 //! resolved once through the catalogue, then lowered as the machine its entry makes of it. The
 //! entry gives its ports (the author's `publish` kept), its health unless the author gives one,
 //! its data as the machine's volumes, and its passwords as value files; the same path or name

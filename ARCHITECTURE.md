@@ -23,7 +23,7 @@ Supporting the backbone:
   YAML, shell, PowerShell, Dockerfile), plus the configuration renderers and the shared container
   pieces.
 - **`isoloom-manifest`** — the run manifest types, its generated JSON schema and the fixtures both
-  Isoloom and Isothrum test against.
+  Isoloom and a runner test against.
 - **`isoloom-import`** — the reverse direction: a spec drafted from Compose, Vagrant or Terraform
   files.
 - **`isoloom-targets`** — every backend behind one call, the composite targets, refusals, the
@@ -67,11 +67,11 @@ container image). Each target sits in a [tier](docs/matrix.md) worked out from r
 never written by hand. The capability matrix (`isoloom matrix`) is generated from the generators
 themselves, so it can never claim more than they do.
 
-## The three products
+## Converting, not running
 
-Isoloom is one of three products that ship 1.0 together: Isoloom converts, the **Isothrum runner**
-executes the run manifest, and the **Cyber CTF launcher** is the UI. The run manifest is the
-contract between them. See the [run manifest guide](docs/runner.md).
+Isoloom converts; it runs nothing. A runner executes the run manifest, and an app may embed a
+runner behind its own interface. The run manifest is the contract between Isoloom and any runner.
+See the [run manifest guide](docs/runner.md).
 
 ## Decisions
 

@@ -1,4 +1,4 @@
-//! The hot paths of `isoloom generate` (PLAN 3d), on representative examples: parsing the spec,
+//! The hot paths of `isoloom generate`, on representative examples: parsing the spec,
 //! lowering it into the plan of every target it is generated for, and rendering those plans into
 //! files; and generating every example on every target, the generation-time budget's measure.
 //! `cargo xtask bench` runs them, compares each one's median with the stored baseline

@@ -1,4 +1,4 @@
-//! `cargo xtask mutants [CRATE...]`: mutation testing (cargo-mutants, PLAN 3d) on the core crates
+//! `cargo xtask mutants [CRATE...]`: mutation testing (cargo-mutants) on the core crates
 //! (by default isoloom-spec, isoloom-catalogue, isoloom-plan, isoloom-render and
 //! isoloom-manifest). Each mutant is a
 //! small change to the code (an operator swapped, a condition negated, a function returning a

@@ -1,5 +1,5 @@
 //! An entry's pins, `catalogue/<entry>/lock.yml`, written only by `cargo xtask catalogue
-//! refresh` (design §4.8): each repository key's SHA-256 (a GPG key's fingerprint checked first),
+//! refresh`: each repository key's SHA-256 (a GPG key's fingerprint checked first),
 //! and per release each official image's multi-platform digest, its platforms, its own
 //! entrypoint and command, and each OS's exact package versions. People review intent in
 //! `entry.yml`; a tool owns the pins (so `lock.yml` has no schema for editors).

@@ -13,7 +13,8 @@ reach:
   - { from: front, to: back, ports: [80] }
 
 machines:
-  # A published image on containers, a Debian VM its step sets up (`service: nginx` in Phase 4).
+  # A published image on containers, a Debian VM its step sets up (the catalogue's
+  # `service: nginx` does both).
   web:
     os: debian@12
     networks: { back: 10 }

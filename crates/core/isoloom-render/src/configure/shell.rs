@@ -1,4 +1,4 @@
-//! The shell rendering of a recipe (design §2.1–§2.2): the POSIX library (`configure.sh`, one
+//! The shell rendering of a recipe: the POSIX library (`configure.sh`, one
 //! function per step kind, for apt, dnf and apk, systemd and OpenRC), and one library call per
 //! step. A Linux VM's set-up runs the calls after the library; a generated Dockerfile `RUN`s each
 //! call after sourcing it; cloud-init carries the VM's script. Every argument is quoted.

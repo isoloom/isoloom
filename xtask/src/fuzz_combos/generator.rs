@@ -7,7 +7,7 @@
 //! a per-spec counter so none collide. The harness asserts the spec is valid, so a spec that
 //! isn't is a generator bug the fast test catches.
 //!
-//! It varies what Phase 6 asks it to: the machines, their OS, the `app` form (an image, a build,
+//! It varies the machines, their OS, the `app` form (an image, a build,
 //! the configuration model, or a plain OS), the ports map, files reading inputs and secrets,
 //! per-target overrides, the networks and the `setup` scripts. A `user` step carries a recognis-
 //! able sentinel password ([`SENTINEL_PREFIX`]), which is hashed before it reaches any file: the

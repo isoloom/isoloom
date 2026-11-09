@@ -1,4 +1,4 @@
-//! The PowerShell rendering of a Windows recipe (design §2.1–§2.2): the library
+//! The PowerShell rendering of a Windows recipe: the library
 //! (`configure.ps1`, one function per step kind) and one call per step. A Windows VM's set-up
 //! runs the calls after the library. Every argument is a single-quoted literal.
 

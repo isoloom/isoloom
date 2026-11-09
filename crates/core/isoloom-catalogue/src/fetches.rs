@@ -1,4 +1,4 @@
-//! What `cargo xtask catalogue refresh` fetches to pin an entry (design §4.8), worked out from
+//! What `cargo xtask catalogue refresh` fetches to pin an entry, worked out from
 //! the definition alone, since the lock is what it writes: for one release on one OS, the
 //! official image's tag, each repository the recipe adds with its key, and each package the
 //! recipe pins to the release. A step any setting may enable counts: `when:`'s `set` and `unset`

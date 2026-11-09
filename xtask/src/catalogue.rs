@@ -1,4 +1,4 @@
-//! `cargo xtask catalogue`: the catalogue's tools (design §4.6 and §4.8).
+//! `cargo xtask catalogue`: the catalogue's tools.
 //!
 //! - `refresh`: pins what the entries fetch into their `lock.yml` (and the Galaxy collections
 //!   into `collections.yml`), the only code that reaches the network for the catalogue;
