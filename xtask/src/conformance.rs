@@ -25,7 +25,7 @@
 //! Containers run with `docker run --cpus` (`ISOLOOM_VERIFY_CPUS`, default 4), builds with
 //! `docker build --resource cpu-quota`. The project and the scripts go in with `docker cp`, so
 //! no host path is mounted and it runs the same on macOS, Linux and Windows. It needs the network
-//! (packages, nginx.org's repositories), so it is a deep gate, run before a release. Logs go to
+//! (packages, nginx.org's repositories), so it is a long check, run before a release. Logs go to
 //! `target/conformance/<family>-<renderer>.log`. Exit status: 0 when every kind holds, 1 when one
 //! doesn't, 2 when the harness itself failed.
 

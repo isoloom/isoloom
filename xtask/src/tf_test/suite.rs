@@ -32,7 +32,7 @@ pub(crate) const DIR: &str = "tests/terraform";
 /// The folder of shared mocks, under [`DIR`].
 pub(crate) const MOCKS: &str = "mocks";
 
-/// The examples of the fast subset (`--fast`, for the everyday gate): one rich example,
+/// The examples of the fast subset (`--fast`, for the quick check run on every change): one rich example,
 /// on every target the suites cover.
 const FAST: [&str; 1] = ["segmented"];
 
