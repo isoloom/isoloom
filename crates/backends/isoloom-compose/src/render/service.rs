@@ -198,7 +198,7 @@ fn environment(env: &Environment, plan: &isoloom_plan::MachinePlan) -> Option<In
 }
 
 /// A network appliance's files, start and interfaces in the order it expects (nothing for a
-/// machine that isn't one).
+/// machine that isn't one); its mounts and environment add to the spec's own.
 fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut Vec<GeneratedFile>) {
     let Some((d, kind)) = m.spec.docker.as_ref().and_then(|d| Some((d, d.appliance?))) else {
         return;
@@ -206,7 +206,6 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
     let spec = env.spec();
     let name = m.name;
     let w = appliances::wiring(spec, name, m.spec, kind, |n, o| isoloom_plan::addressing::address(spec, n, o));
-    svc.volumes.clear();
     for f in w.files {
         files.push(GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/appliances/{name}/{}", f.name),
@@ -234,7 +233,7 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
     }
     // `$$`: the script's own variables, not Compose's interpolation.
     svc.entrypoint = w.entrypoint.iter().map(|e| literal(e)).collect();
-    svc.environment = Some(w.environment.into_iter().collect());
+    svc.environment.get_or_insert_default().extend(w.environment);
     if w.privileged {
         svc.privileged = true;
     } else {
@@ -382,6 +381,22 @@ mod tests {
         );
         let dockerfile = "FROM ubuntu:24.04 AS base\nRUN true\nFROM ubuntu:24.04\n";
         assert_eq!(pull_from(&env, dockerfile), dockerfile);
+    }
+
+    #[test]
+    fn an_appliance_keeps_the_specs_mounts_and_environment_beside_its_own() {
+        let env = crate::testing::environment(
+            "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 } }\nvolumes: { data: {} }\nmachines:\n  r:\n    networks: { a: 1 }\n    volumes: { data: /data }\n    host_folders: [{ from: shared, path: /shared }]\n    environment: { SITE: lab }\n    app: { image: iol, appliance: cisco-iol }\n",
+        );
+        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        let r = &file.services["r"];
+        let mounts = serde_yaml_ng::to_string(&r.volumes).unwrap();
+        for wanted in ["data:/data", "target: /shared", "./appliances/r/"] {
+            assert!(mounts.contains(wanted), "{wanted}: {mounts}");
+        }
+        let environment = r.environment.as_ref().unwrap();
+        assert_eq!(environment.get("SITE").map(String::as_str), Some("lab"), "{environment:?}");
+        assert_eq!(environment.get("IOL_PID").map(String::as_str), Some("1"), "{environment:?}");
     }
 
     #[test]

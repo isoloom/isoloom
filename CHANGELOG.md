@@ -307,6 +307,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A network appliance keeps the spec's `volumes`, `host_folders` and `environment`** on the
+  Docker targets: its own mounts and variables (configuration files, `IOL_PID`) replaced them,
+  silently. They are added to the spec's now.
 - **A Proxmox router waits for its uplink address, as its check says.** The provider's wait for an
   address ended at the first IPv4 address the guest agent reported, whichever card had it: the
   router's environment addresses, set statically, came first, so on an uplink whose DHCP was slow
