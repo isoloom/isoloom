@@ -266,8 +266,8 @@ pub struct Machine {
     /// Infra that stays on once the lab is built (a controller with `keep_running`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub keep_running: bool,
-    /// Brought up on demand, never by the initial `up`: the learner's access machine (their
-    /// attacker box), which the runner hot-adds onto a chosen lab network when the learner asks.
+    /// Brought up on demand, never by the initial `up`: the access machine, which the runner
+    /// hot-adds onto a chosen lab network when asked.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub on_demand: bool,
     /// Its name where the target creates it.

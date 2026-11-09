@@ -131,7 +131,8 @@ pub(crate) struct MachineInput {
     /// first is its primary address). Every machine has one, but a LAN's `switch`.
     #[serde(default)]
     networks: IndexMap<String, Octets>,
-    /// More DNS names it answers to besides its own (`api.example.com`), on every network.
+    /// More DNS names it answers to besides its own (`api.example.com`), on every network. Names
+    /// starting with `isoloom-` are Isoloom's own and refused.
     #[serde(default)]
     aliases: Vec<String>,
     /// How many of this machine (2 to 99): clones `<name>-01`, `<name>-02`, ..., each one address

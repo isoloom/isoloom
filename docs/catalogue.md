@@ -5,9 +5,8 @@ packaged **catalogue entry** with `service:`. Isoloom resolves it to a recipe th
 forms — an official image (or a build from the OS base image) on container targets, and a fresh
 VM set up by the same recipe on VM targets — and keeps the two in parity by construction.
 
-> At 0.11.0 the catalogue ships one entry, **`nginx`**. More entries (apache, php-fpm,
-> mysql/mariadb, postgres, mongodb, redis/valkey, dvwa, juice-shop and others) are planned for
-> 1.x. A `service:` naming an entry the catalogue doesn't have is refused with `unknown-reference`
+> The catalogue ships **`apache`**, **`dvwa`**, **`juice-shop`**, **`mariadb`**, **`mongodb`**,
+> **`mysql`**, **`nginx`**, **`openssh`**, **`php-fpm`** and **`postgres`**. A `service:` naming an entry the catalogue doesn't have is refused with `unknown-reference`
 > at `machines.<m>.service`.
 
 ## Using a service

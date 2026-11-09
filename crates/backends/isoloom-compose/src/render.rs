@@ -71,9 +71,9 @@ pub(crate) fn compose_file(target: Target, env: &Environment) -> Result<Rendered
     for m in Machine::containers(env) {
         service::machine(env, m, &ts, &mut out);
     }
-    // The access box (the learner's attacker box) renders as an on-demand service even when it is
+    // The access machine renders as an on-demand service even when it is
     // `Supplied` (no `docker:`/`vm:` form of its own): the runner hot-adds it. Container-shape
-    // access boxes are already covered by `containers()` above.
+    // access machines are already covered by `containers()` above.
     for m in Machine::supplied_access(env) {
         service::machine(env, m, &ts, &mut out);
     }

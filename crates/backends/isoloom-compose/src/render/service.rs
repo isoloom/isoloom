@@ -83,10 +83,9 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         svc.init = true;
         svc.entrypoint = vec!["sleep".into(), "infinity".into()];
     }
-    // The learner's access machine (their attacker box): brought up on demand, never by the
-    // initial `up`. It sits in the `access` Compose profile (so `up` skips it) and runs a
-    // parameterizable image the runner can override when it hot-adds the box; it stays up idle
-    // for the learner to work from.
+    // The access machine: brought up on demand, never by the initial `up`. It sits in the
+    // `access` Compose profile (so `up` skips it) and runs a parameterizable image the runner can
+    // override when it hot-adds it; it stays up idle for the user to work from.
     if spec.access {
         access_box(plan, &mut svc);
     }
@@ -124,10 +123,10 @@ fn dns(spec: &model::Machine, svc: &mut Service) {
     }
 }
 
-/// The learner's access machine (their attacker box): brought up on demand, never by the initial
-/// `up`. It sits in the `access` Compose profile (so `up` skips it) and stays up idle for the
-/// learner to work from. A lab that authors its own attacker image (a `build`) keeps it; otherwise
-/// the box runs a stock image the runner can override with the one the learner picks.
+/// The access machine: brought up on demand, never by the initial `up`. It sits in the `access`
+/// Compose profile (so `up` skips it) and stays up idle for the user to work from. A lab that
+/// builds its own image for it (a `build`) keeps it; otherwise it runs a stock image the runner
+/// can override with one it is given.
 fn access_box(plan: &isoloom_plan::MachinePlan, svc: &mut Service) {
     svc.profiles = vec![manifest::access::PROFILE.to_owned()];
     svc.init = true;

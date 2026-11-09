@@ -22,7 +22,7 @@ struct Known {
 
 const EVERY_HOST: &[HostOs] = &[HostOs::Linux, HostOs::Macos, HostOs::Windows];
 
-/// Every provider the Vagrantfile has a block for, in the order the launcher offers them.
+/// Every provider the Vagrantfile has a block for, in the order a runner offers them.
 const PROVIDERS: [Known; 8] = [
     Known {
         id: Provider::Virtualbox,

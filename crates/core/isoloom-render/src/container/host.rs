@@ -10,15 +10,15 @@ pub struct HostSize {
     pub cpus: u32,
     /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself.
     pub memory_mb: u32,
-    /// Disk in GB: 5 per container unless it says, at least [`HostSize::MIN_DISK_GB`] (the
-    /// learner's attack box runs on this host too).
+    /// Disk in GB: 5 per container unless it says, at least [`HostSize::MIN_DISK_GB`] (an
+    /// on-demand access machine runs on this host too).
     pub disk_gb: u32,
 }
 
 impl HostSize {
-    /// The smallest disk of a containers' host: the learner's attack box is added to it while the
-    /// lab runs, and an attack image like Kali's with its tools unpacks to about 12 GB, on top of
-    /// the system, Docker and the lab's own images. 20 GB filled up.
+    /// The smallest disk of a containers' host: room for the system, Docker and the lab's own
+    /// images, and for a large image started on it while the lab runs (an on-demand access
+    /// machine's: a full desktop or tools image unpacks to about 12 GB). 20 GB filled up.
     pub const MIN_DISK_GB: u32 = 40;
 
     /// The host's size for the environment's containers.

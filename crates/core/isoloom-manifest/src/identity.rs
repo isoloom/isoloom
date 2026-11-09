@@ -143,8 +143,7 @@ pub struct Tool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ComposeIdentity {
-    /// The project name: `${run.name}`, which the embedder may set (the launcher's
-    /// `cyberctf-<lab id>`).
+    /// The project name: `${run.name}`, which the program running it may set (`<app>-<lab id>`).
     pub project: Template,
     /// The Compose files, in order.
     pub files: NonEmpty<PathTemplate>,

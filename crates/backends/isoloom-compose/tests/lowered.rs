@@ -87,13 +87,13 @@ fn a_flag_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
 }
 
 /// A machine that publishes an image it also builds (the Compose build+image combo) makes the run
-/// pull the published image first; `up` then drops `--build`, so a student runs the published
+/// pull the published image first; `up` then drops `--build`, so a user runs the published
 /// image and only an image that could not be pulled is built. A lab that only builds locally keeps
 /// `--build` and gains no pull step, so an author's edits always rebuild.
 #[test]
 fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() -> Outcome {
     let combo = up_lifecycle_text(&plan_of(
-        "version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/cyberctf/lab-web:1\n      build: { context: web }\n",
+        "version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/example/lab-web:1\n      build: { context: web }\n",
     )?)?;
     assert!(combo.contains("--ignore-pull-failures"), "a published build pulls first: {combo}");
     assert!(!combo.contains("--build"), "a published build must not force a local build: {combo}");
@@ -113,7 +113,7 @@ fn portable_steps_build_from_the_os_image() -> Outcome {
     let c = file(&files, ".isoloom/docker/compose.yml")?;
     assert!(c.contains("context: ../..\n      dockerfile: .isoloom/docker/build/portal/Dockerfile"), "{c}");
     // The clerk is the access box: its OS image is the parameterized default (the runner
-    // overrides it to the box the learner picks), and it sits in the `access` profile so the
+    // overrides it with one it is given), and it sits in the `access` profile so the
     // initial `up` skips it, brought up on demand.
     assert!(c.contains("image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:"), "{c}");
     assert!(c.contains("profiles:\n    - access"), "{c}");

@@ -75,7 +75,7 @@ machines:
     command: [app.exe]
 ";
 
-/// A CTF lab as the Cyber CTF launcher feeds it: one input per objective (`CTF_FLAG_<KEY>`), each
+/// A CTF lab as a runner feeds it: one input per objective (`CTF_FLAG_<KEY>`), each
 /// a file, on containers and on a VM.
 const FLAGS: &str = "
 version: 1
@@ -233,7 +233,7 @@ fn every_flag_is_an_optional_sensitive_slot_and_a_file_never_an_environment_valu
                 .iter()
                 .find(|s| s["name"] == flag)
                 .ok_or_else(|| format!("{} has no slot {flag}", path.display()))?;
-            // The launcher gives a flag only when the backend issues it: without one, the slot
+            // A runner gives a flag only when the backend issues it: without one, the slot
             // is empty (the lab's development value), never refused, never shown.
             assert_eq!(
                 (&slot["kind"], &slot["required"], &slot["sensitive"], &slot["default"]),

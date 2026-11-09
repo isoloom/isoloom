@@ -108,7 +108,7 @@ fn own_variables() -> Vec<Variable> {
 }
 
 /// The node the VMs go on: no default, since a server's first node can be named anything (the
-/// launcher finds it when the server is added); an empty name is refused before anything is made.
+/// runner's user finds it when the server is added); an empty name is refused before anything is made.
 pub(super) fn node() -> Variable {
     Variable::new("node", "string")
         .describe("The Proxmox node the VMs go on (`pvesh get /nodes` lists them)")

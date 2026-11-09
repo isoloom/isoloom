@@ -322,7 +322,7 @@ Keep its data when the environment is torn down: `isothrum down` leaves it, and 
 
 ### `machines`
 
-The environment's machines, by name, started in the order written (after their `depends_on`).
+The environment's machines, by name, started in the order written (after their `depends_on`). Names starting with `isoloom-` are Isoloom's own (its controller, the check stand-in, the check runners) and refused.
 
 - **Type:** map of name to mapping
 - **Limits:** names match `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`
@@ -817,7 +817,7 @@ Network name → the last octet of the machine's address on it, or a list of the
 
 ### `machines.*.aliases`
 
-More DNS names it answers to besides its own (`api.example.com`), on every network.
+More DNS names it answers to besides its own (`api.example.com`), on every network. Names starting with `isoloom-` are Isoloom's own and refused.
 
 - **Type:** list of strings
 

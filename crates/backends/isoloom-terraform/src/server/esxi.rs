@@ -67,7 +67,7 @@ const LIMITS: Limits = Limits {
 ///
 /// The `josenk/esxi` provider deploys an OVA from `ovf_source` with no checksum slot, so the
 /// pin here is the dated URL; the OVAs' published SHA-256 sums (resolved 2026-10-17) are
-/// recorded for a future verify step or a refresh tool, and the launcher's own ESXi path
+/// recorded for a future verify step or a refresh tool, and the other ESXi path
 /// (`vagrant/vmware_esxi`) pins its boxes through Vagrant instead:
 ///   focal  (20.04): 1d4521b2df38914965064537e31f7fbb1c3fabeaca789e3350b79a0b1a0838fc
 ///   jammy  (22.04): ea42c32ec5e7ca343f0a5da30f242364adc75f564cbc8b9e61ab3e9c68337df7

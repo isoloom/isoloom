@@ -73,7 +73,7 @@ fn a_destroy_applies_the_sdn_deletions_once_the_zone_is_gone() -> Outcome {
 #[test]
 fn the_node_has_no_default_name() -> Outcome {
     // Regression: `node` defaulted to `pve`, while a server's first node can be named anything
-    // (the launcher's connection test passed on `pve-lab`, then the launch failed).
+    // (a connection test passed on `pve-lab`, then the launch failed).
     let tf = proxmox("hello-stack")?;
     let node = block(&tf, "variable \"node\"");
     assert!(!node.contains("default"), "{node}");

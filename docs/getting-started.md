@@ -12,7 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/inst
 
 The installer puts the `isoloom` binary on your `PATH`. Release binaries for macOS, Linux and
 Windows are also on the [releases page](https://github.com/isoloom/isoloom/releases). The current
-release is 0.11.0, the release candidate for 1.0.0.
+release is 1.0.9.
 
 Check it works:
 

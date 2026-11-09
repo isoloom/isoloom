@@ -51,7 +51,7 @@ pub struct ApplianceRecipe {
 #[serde(deny_unknown_fields)]
 pub struct Build {
     /// The published image name/tag this build produces, when `app.image` is given beside
-    /// `build` (`ghcr.io/cyberctf/ad-kerberoasting:1`): development builds and tags it, production
+    /// `build` (`ghcr.io/example/web:1`): development builds and tags it, production
     /// pulls it. `None` for a build with no published name (tagged locally). Set from `app.image`,
     /// never read from inside `build:`.
     #[serde(skip)]

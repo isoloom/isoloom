@@ -37,8 +37,8 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
-    // The learner's access machine (their attacker box) is defined but not started by `vagrant
-    // up`: the runner hot-adds it, overriding its box with the one the learner picked.
+    // The access machine is defined but not started by `vagrant up`: the runner hot-adds it,
+    // overriding its box with one it is given.
     let access = env.spec().machines.get(name).is_some_and(|m| m.access);
     define(r, name, access, |r| {
         boxed(r, &image, mp.arch, access);
@@ -82,7 +82,7 @@ pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnc
 }
 
 /// The box and its version and architecture. The access box reads its box from the runner's
-/// `ISOLOOM_ACCESS_BOX` (its resolved box the fallback), so the learner can pick one.
+/// `ISOLOOM_ACCESS_BOX` (its resolved box the fallback), so the runner can give another.
 fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, access: bool) {
     if access {
         r.assign("m.vm.box", Value::raw(format!("ENV.fetch({:?}, {:?})", manifest::access::BOX_ENV, image.name)));

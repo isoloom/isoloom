@@ -1,4 +1,4 @@
-//! The spec's `inputs`: values the launcher, CI or the command line provides at each start.
+//! The spec's `inputs`: values the runner, CI or the command line provides at each start.
 //! `inputs: [FLAG]` is short for `inputs: { FLAG: {} }`. An input is sensitive unless it says
 //! otherwise, and a sensitive one can only reach a machine as a file (or a catalogue setting).
 

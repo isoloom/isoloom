@@ -64,7 +64,7 @@ fn runner(env: &Environment, pos: &Position, scripts: bool, services: &mut Index
     if scripts {
         c.volumes.push(format!("{ROOT}:/isoloom/project:ro").into());
     }
-    // The access box (the learner's attacker machine) sits in the `access` profile, which the check
+    // The access machine sits in the `access` profile, which the check
     // profile doesn't bring up; a check runner must not depend_on it, or Compose rejects the project
     // ("depends on undefined service") when it runs the checks without `access`.
     for m in Machine::all(env).filter(|m| m.spec.docker.is_some() && !m.spec.access) {

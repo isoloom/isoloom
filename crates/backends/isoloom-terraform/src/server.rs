@@ -1,4 +1,4 @@
-//! The targets on a server of your own (the launcher's server mode): a Proxmox server
+//! The targets on a server of your own (a runner's server mode): a Proxmox server
 //! ([`proxmox`]) and a standalone ESXi host ([`esxi`]). Both put the environment behind a router
 //! VM of their own ([`router`]), boot a machine's disk through the hypervisor's firmware
 //! ([`boot`]), and name what they create after the environment's `slot` on the server

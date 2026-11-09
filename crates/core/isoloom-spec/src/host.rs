@@ -1,5 +1,5 @@
 //! The host a command runs on, as Isoloom reads it: its environment variables, passed in by the
-//! program that runs (the command line, the launcher), never read from the process here, so
+//! program that runs (the command line, a desktop app), never read from the process here, so
 //! every function of the crate stays a function of its inputs.
 
 use std::ffi::{OsStr, OsString};

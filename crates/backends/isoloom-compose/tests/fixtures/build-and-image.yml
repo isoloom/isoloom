@@ -8,5 +8,5 @@ machines:
     networks: { lan: 10 }
     ports: { site: 8000 }
     app:
-      image: ghcr.io/cyberctf/ad-kerberoasting:1
+      image: ghcr.io/example/web:1
       build: build/web

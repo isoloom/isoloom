@@ -21,7 +21,7 @@ pub enum Image {
         /// Whether `reference` is a published image, pullable from a registry (`app.image` was
         /// given: an image-only machine, or the build+image combo), rather than a tag the project
         /// only builds locally. When it is, a run pulls it before falling back to the build, so a
-        /// student uses the published image instead of building it.
+        /// user runs the published image instead of building it.
         published: bool,
     },
     /// A VM's operating system.

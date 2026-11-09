@@ -632,7 +632,7 @@
       "properties": {
         "project": {
           "$ref": "#/$defs/Template",
-          "description": "The project name: `${run.name}`, which the embedder may set (the launcher's `cyberctf-<lab id>`)."
+          "description": "The project name: `${run.name}`, which the program running it may set (`<app>-<lab id>`)."
         },
         "files": {
           "type": "array",
@@ -1356,7 +1356,7 @@
         },
         "on_demand": {
           "type": "boolean",
-          "description": "Brought up on demand, never by the initial `up`: the learner's access machine (their attacker box), which the runner hot-adds onto a chosen lab network when the learner asks."
+          "description": "Brought up on demand, never by the initial `up`: the access machine, which the runner hot-adds onto a chosen lab network when asked."
         },
         "native": {
           "anyOf": [

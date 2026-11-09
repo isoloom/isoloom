@@ -31,7 +31,7 @@ use isoloom_spec::model::Target;
 use crate::Error;
 
 /// The Terraform image macOS runs the module from, pinned by the digest of its multi-arch index
-/// (the launcher's, proven on a Proxmox server).
+/// (proven on a Proxmox server).
 const TERRAFORM_IMAGE: &str = "hashicorp/terraform:1.9.8@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd";
 
 /// The oldest Terraform the module takes (its `required_version`).

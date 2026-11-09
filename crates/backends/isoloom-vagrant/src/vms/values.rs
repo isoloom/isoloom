@@ -205,7 +205,7 @@ machines:
 
     #[test]
     fn a_reprovision_given_no_value_keeps_the_value_kept() {
-        // The launcher re-provisions a VM lab without its launch values (it keeps none).
+        // A runner re-provisions a VM lab without its launch values (it keeps none).
         let script = isoloom_render::secrets::from_environment(&[("input-flag".into(), "V".into())], &[]);
         let dir = std::env::temp_dir().join(format!("isoloom-values-keep-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("a temporary folder");

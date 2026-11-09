@@ -5,7 +5,7 @@
 //! The credentials reach Terraform's own steps only, as the provider's environment: never a
 //! command line, never a file, never the SSH sessions to the machines. Each slot also names the
 //! runner's environment as its source, so a command line run with the cloud's variables
-//! exported just works; an embedder (the launcher) gives them from the cloud CLI's profile
+//! exported just works; a program embedding the runner gives them from the cloud CLI's profile
 //! instead (`Lab::with_connection`). The profile, region and account are params, so the runner
 //! records them at `up` and a `down` replays them (risk R2): the runner gives Terraform no
 //! ambient cloud variable of its own.

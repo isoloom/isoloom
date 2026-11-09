@@ -16,7 +16,7 @@ services:
       labels:
         isoloom.managed: 'true'
         isoloom.environment: build-and-image
-    image: ghcr.io/cyberctf/ad-kerberoasting:1
+    image: ghcr.io/example/web:1
     platform: linux/amd64
     hostname: web
     networks:

@@ -76,8 +76,7 @@ curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/inst
 ```
 
 Release binaries for macOS, Linux and Windows are on the
-[releases page](https://github.com/isoloom/isoloom/releases). The current release is **0.11.0**,
-the release candidate for 1.0.0.
+[releases page](https://github.com/isoloom/isoloom/releases). The current release is **1.0.9**.
 
 ## Targets
 
@@ -99,8 +98,8 @@ the release candidate for 1.0.0.
 
 Targets are derived from the spec: a Windows machine has no container form, so that environment
 never gets a broken Compose file. `targets:` can only narrow the list. Each target's tier and the
-evidence behind it are in the [target matrix](docs/matrix.md); the launcher's targets (local,
-server and cloud) are Tier 1 for 1.0, the rest Tier 2 (generated and validated).
+evidence behind it are in the [target matrix](docs/matrix.md); the local, server and cloud
+targets are Tier 1 for 1.0, the rest Tier 2 (generated and validated).
 
 ## Running what Isoloom generates
 
@@ -125,8 +124,8 @@ The crates are published on [crates.io](https://crates.io/crates/isoloom) under 
 one workspace version. Depend on the ones you use:
 
 ```toml
-isoloom-spec = "0.11.0"
-isoloom-targets = "0.11.0"
+isoloom-spec = "1"
+isoloom-targets = "1"
 ```
 
 | Crate | Holds |

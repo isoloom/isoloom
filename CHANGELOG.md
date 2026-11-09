@@ -10,6 +10,38 @@ stable spec format.
 
 ## [Unreleased]
 
+### Added
+
+- **Kali on AWS `cloud-vm`.** `os: kali` boots Kali's own image from the AWS Marketplace, pinned
+  to its product (the name alone could match a look-alike), logging in as `kali`, like any other
+  OS of AWS's image table. An account may have to accept the image's terms on the Marketplace once.
+- **Each `cloud-vm` machine has its `ssh_user_<machine>` output.** The runner signs in to a
+  machine as `ssh_user_<machine>` (then `ssh_user`, then root); the modules only gave an
+  `ssh_users` map, so on AWS a secret's delivery signed in as root and was refused.
+
+### Changed
+
+- **Machine names and aliases starting with `isoloom-` are refused.** They are Isoloom's own (its
+  controller, the check stand-in, the check runners): a machine named `isoloom-access` collided
+  with the stand-in, and `isoloom-web` shared `web`'s check step. `docs/spec.md` says so.
+- **Compose's start removes the services the lab no longer has** (`up --remove-orphans`), on this
+  computer and in a VM: a machine taken out of a lab, then the run brought up to date, goes.
+  Services behind a profile that isn't started are still the file's, so they stay.
+- **An AWS machine sets itself up once, from its first boot's user data.** Its instance ignores
+  later changes to its user data (`lifecycle { ignore_changes }`): a later apply without the
+  launch's values, which a run never keeps, no longer stops and restarts it to change them.
+- **A `cloud-vm` Linux machine is named after itself**, as on every other target, not after its
+  address or its image (Kali's names itself `kali`); kept through a reboot.
+- **A refusal for an OS AWS has no image of lists the ones it has from its image table**, Kali
+  among them (it was left out); every cloud's list is built from its own table, so it can't drift
+  (`Windows Server 2016/2019/2022/2025`).
+- **A containers' host VM has at least 40 GB of disk** (`HostSize::MIN_DISK_GB`) on every cloud
+  and on QEMU: room for a large image started on it while the lab runs (a full tools image
+  unpacks to about 12 GB) beside the lab's own. GCP had 30 GB fixed, Azure the image's default,
+  and docker-vm on QEMU its own 40 GB whatever the containers needed; the size follows the
+  containers beyond that, from the spec's defaults.
+- The run manifests' and the spec's docs no longer name a particular program running them.
+
 ### Fixed
 
 - **A lab's own access machine can start after its checks ran.** The checks that run from the
@@ -17,19 +49,31 @@ stable spec format.
   which nothing took down: once checked, the lab's access machine couldn't come up (Docker:
   "Address already in use"). Every container target's run manifest now takes the stand-ins down
   in `checks.teardown` (`stand-ins-down`), after the checks whatever happened: the docker target,
-  and Compose in a VM (docker-vm, Proxmox, cloud-docker). `GuestCompose::empty` builds an empty
-  guest for tests.
+  and Compose in a VM (docker-vm on Vagrant and on Proxmox, cloud-docker). Taking them down is a
+  clean-up: its failure is logged and fails no check (`failure: tolerate`). The docker-vm
+  Vagrantfile's `checks` provisioner takes them down after its runners too.
+- **An AWS machine that asks for a TPM plans again.** Its instance had two `lifecycle` blocks (the
+  NitroTPM precondition and the set-up once), which Terraform refuses ("Duplicate lifecycle
+  block"); they are one block now.
+- **The cloud-docker run manifest lists the lab's networks**, by their Compose names in the VM, as
+  docker-vm's does: it listed none, so a runner reported none.
+- **The access machine keeps its role on the Terraform targets** (`access` in the run manifest,
+  not `target`), and **an AWS machine's root disk is at least its image's** (Kali's snapshot is
+  25 GB; AWS refuses a smaller root volume), or the spec's when it asks for more.
 
 ### Removed
 
 - **The Vagrantfile's hook for the runner's ad-hoc VM.** A Vagrantfile no longer carries
   `IsoloomAdHoc` (its `ADHOC_*` constants and the loader of `<VAGRANT_DOTFILE_PATH>/adhoc/*.rb`),
   and on QEMU a network's hub no longer keeps a spare port for that VM (`isoloom-access` is gone
-  from `QEMU_HUBS`). The runner no longer stands up an attack VM of its own on a lab that declares
-  no `access: true` machine: a lab's own access machine is unchanged, and a launcher adds its attack
-  box as an ordinary lab machine. `isoloom_manifest::access::DEFAULT_BOX` and `DEFAULT_ARM64_BOX`,
-  which only that VM used, are removed too. The unreleased `hostname:` and `image:` of
-  `IsoloomAdHoc.define` go with it.
+  from `QEMU_HUBS`). The runner no longer stands up a VM of its own on a lab that declares no
+  `access: true` machine: a lab's own access machine is unchanged, and a program that wants
+  another machine adds it to the spec as an ordinary lab machine.
+  `isoloom_manifest::access::DEFAULT_BOX` and `DEFAULT_ARM64_BOX`, which only that VM used, are
+  removed too. The unreleased `hostname:` and `image:` of `IsoloomAdHoc.define` go with it.
+- **`Spec::with_cloud_outputs`, `Spec::cloud_message` and `Copy::is_folder`**, which nothing in
+  Isoloom called but their own tests, and the public `secrets::windows::command_line` (now
+  test-only). `GuestCompose::empty` is hidden from the docs.
 
 ## [1.0.9] — 2026-11-08
 

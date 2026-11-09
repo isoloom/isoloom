@@ -94,7 +94,7 @@ pub struct TierEntry {
     pub target: Target,
     /// Its provider or cloud (`libvirt`, `aws`), for a target that has them.
     pub variant: Option<&'static str>,
-    /// The tier 1.0 aims for: 1 for the launcher's targets.
+    /// The tier 1.0 aims for: 1 for the local, server and cloud targets.
     pub goal: Tier,
     /// The host operating systems it exists on.
     pub exists_on: BTreeSet<HostOs>,
@@ -256,7 +256,7 @@ pub fn of(entries: &[TierEntry], target: Target) -> Vec<&TierEntry> {
 }
 
 /// The Vagrant providers the Vagrantfile has a block for, as `vagrant up --provider` names them,
-/// in the order the launcher offers them.
+/// in the order a runner offers them.
 pub(crate) const VAGRANT_PROVIDERS: [&str; 8] = ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "utm", "vmware_esxi"];
 
 /// Where `docker-vm`'s VM runs: the Vagrant providers its Vagrantfile has a block for (no
