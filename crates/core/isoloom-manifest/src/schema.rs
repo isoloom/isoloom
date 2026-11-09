@@ -62,6 +62,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_schema_names_its_published_file_its_version_and_the_policy() {
+        let s = schema();
+        assert_eq!(s["$id"], SCHEMA_URL);
+        assert!(SCHEMA_URL.ends_with("/main/schemas/run-manifest-v1.schema.json"), "{SCHEMA_URL}");
+        let description = s["description"].as_str().unwrap_or_default();
+        assert!(
+            description.contains("(`manifest_version`)") && description.ends_with(COMPATIBILITY),
+            "{description}"
+        );
+        assert_eq!(s.pointer("/$defs/ManifestVersion/const"), Some(&json!(1)));
+    }
+
+    #[test]
     fn a_description_reads_as_one_line_per_paragraph_and_nothing_else_changes() {
         let mut v = json!({ "description": "one\ntwo\n\nthree", "pattern": "a\nb", "items": [{ "description": "x\ny" }] });
         unwrap_descriptions(&mut v);
