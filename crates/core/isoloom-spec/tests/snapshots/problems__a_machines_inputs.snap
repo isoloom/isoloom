@@ -1,6 +1,6 @@
 ---
 source: crates/core/isoloom-spec/tests/problems.rs
-expression: "rendered(&spec(\"inputs: [CTF_FLAG_MAIN]\\nmachines:\\n  web:\\n    os: debian@12\\n    networks: { lab: 10 }\\n    inputs: [CTF_FLAG_MAIN]\\n\"))"
+expression: "rendered(&spec(\"inputs: [DEMO_SECRET]\\nmachines:\\n  web:\\n    os: debian@12\\n    networks: { lab: 10 }\\n    inputs: [DEMO_SECRET]\\n\"))"
 ---
 error[removed-field] machines.web.inputs  (isoloom.yml:10:5)
   an input reaches a machine as a file or an environment value

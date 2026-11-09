@@ -52,7 +52,7 @@ fn file<'a>(files: &'a [GeneratedFile], path: &str) -> Outcome<&'a str> {
 }
 
 #[test]
-fn a_flag_is_a_secret_file_read_from_its_input_never_the_environment() -> Outcome {
+fn an_input_file_is_a_secret_read_from_its_input_never_the_environment() -> Outcome {
     let files = render("help-desk")?;
     let c = file(&files, ".isoloom/docker/compose.yml")?;
     assert!(c.contains("secrets:\n  input-demo-secret:\n    environment: DEMO_SECRET\n"), "{c}");
@@ -68,7 +68,7 @@ fn a_flag_is_a_secret_file_read_from_its_input_never_the_environment() -> Outcom
 /// Compose writes the file again from the variable each time it starts the container, and won't
 /// start it without the variable: the value goes to `start` (resume) as well as `up`.
 #[test]
-fn a_flag_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
+fn an_input_file_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
     let backend = isoloom_compose::ComposeBackend(Target::Docker);
     let manifest = isoloom_render::backend::Backend::run_manifest(&backend, &plan("help-desk")?)?.ok_or("no run manifest")?;
     let slot = manifest

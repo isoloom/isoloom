@@ -10,7 +10,7 @@ use isoloom_targets::{GeneratedFile, generate, refusal};
 use crate::testing::{Outcome, file, lab};
 
 /// A web container with a secret file and a published port, and a set-up job nothing waits for.
-const FLAGGED: &str = "
+const WITH_SECRET: &str = "
 version: 1
 name: flagged
 inputs: [DEMO_SECRET]
@@ -27,7 +27,7 @@ checks:
 ";
 
 fn manifests() -> Outcome<(Vec<GeneratedFile>, Manifest, Manifest)> {
-    let files = generate(&lab(FLAGGED)?, Target::DockerVm)?;
+    let files = generate(&lab(WITH_SECRET)?, Target::DockerVm)?;
     let local = isoloom_manifest::parse(file(&files, ".isoloom/docker-vm/run.json")?)?;
     let server = isoloom_manifest::parse(file(&files, ".isoloom/docker-vm/proxmox/run.json")?)?;
     Ok((files, local, server))

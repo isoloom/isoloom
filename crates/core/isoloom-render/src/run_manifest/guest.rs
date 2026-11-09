@@ -488,12 +488,12 @@ mod tests {
     #[test]
     fn accept_env_is_none_without_forwarded_vars_and_lists_them_otherwise() {
         assert_eq!(guest(Vec::new()).accept_env_command().unwrap(), None);
-        let cmd = guest(vec![slot("TOKEN", "CTF_LAUNCH_TOKEN"), slot("DEMO_SECRET", "DEMO_SECRET")])
+        let cmd = guest(vec![slot("TOKEN", "LAUNCH_TOKEN"), slot("DEMO_SECRET", "DEMO_SECRET")])
             .accept_env_command()
             .unwrap()
             .expect("a command when a value is forwarded");
         let line = cmd.command.to_string();
-        assert!(line.contains("AcceptEnv CTF_LAUNCH_TOKEN DEMO_SECRET"), "{line}");
+        assert!(line.contains("AcceptEnv DEMO_SECRET LAUNCH_TOKEN"), "{line}");
         assert!(line.contains("/etc/ssh/sshd_config.d/isoloom-env.conf"), "{line}");
         // The drop-in directory is created first: a bare Terraform-made VM may lack it, and `tee`
         // cannot create it, so without this the forwarded launch values would arrive unset.

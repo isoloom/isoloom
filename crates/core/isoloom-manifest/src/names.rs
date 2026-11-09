@@ -328,7 +328,7 @@ mod tests {
         assert!(Name::parse("-web").is_err());
         assert!(EnvName::parse("DEMO_SECRET").is_ok());
         assert!(EnvName::parse("demo_secret").is_ok());
-        assert!(EnvName::parse("1FLAG").is_err());
+        assert!(EnvName::parse("1TOKEN").is_err());
         assert!(Identifier::parse("db-password").is_ok());
         assert!(StepId::parse("job-isoloom-init-web-1").is_ok());
         assert!(StepId::parse("Up").is_err());

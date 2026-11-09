@@ -137,7 +137,7 @@ machines:
     #[test]
     fn a_target_running_vms_and_containers_is_asked_about_the_first_of_each() {
         let lab = testing::lab(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: [10, 11] }, ports: { web: 80 }, app: { steps: [{ run: w.sh }] } }\n  decoy: { os: debian@12, networks: { lan: [40, 41] }, app: { steps: [{ run: d.sh }] } }\n  more: { os: debian@12, networks: { lan: [50, 51] }, app: { steps: [{ run: m.sh }] } }\n",
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: [10, 11] }, ports: { web: 80 }, app: { steps: [{ run: w.sh }] } }\n  block: { os: debian@12, networks: { lan: [40, 41] }, app: { steps: [{ run: d.sh }] } }\n  more: { os: debian@12, networks: { lan: [50, 51] }, app: { steps: [{ run: m.sh }] } }\n",
         );
         let asked: Vec<(String, MachineShape)> = testing::planned(&lab, Target::Hybrid)
             .requirements
@@ -147,6 +147,6 @@ machines:
                 _ => None,
             })
             .collect();
-        assert_eq!(asked, [("web".to_owned(), MachineShape::Vm), ("decoy".to_owned(), MachineShape::Container)]);
+        assert_eq!(asked, [("web".to_owned(), MachineShape::Vm), ("block".to_owned(), MachineShape::Container)]);
     }
 }

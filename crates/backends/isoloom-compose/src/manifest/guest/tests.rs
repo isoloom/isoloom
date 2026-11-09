@@ -6,7 +6,7 @@ use crate::testing::environment;
 
 /// A web machine with a secret file, a published port and a set-up script nothing waits for, and a
 /// cache.
-const FLAGGED: &str = "version: 1
+const WITH_SECRET: &str = "version: 1
 name: shop
 inputs: { DEMO_SECRET: { description: the secret } }
 networks: { app: { cidr: 10.60.0.0/24, internet: false } }
@@ -35,7 +35,7 @@ fn guest_of(yaml: &str) -> GuestCompose {
 
 #[test]
 fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
-    let g = guest_of(FLAGGED);
+    let g = guest_of(WITH_SECRET);
     let start = g.start[0].command.to_string();
     assert!(start.starts_with("cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600"), "{start}");
     assert_eq!(g.start[0].id.as_str(), "start");
@@ -76,8 +76,8 @@ fn a_published_build_pulls_first_in_the_vm_as_on_the_host_its_failure_tolerated(
 }
 
 #[test]
-fn the_flag_reaches_only_the_start_steps_and_is_forwarded_into_the_vm() {
-    let g = guest_of(FLAGGED);
+fn the_secret_reaches_only_the_start_steps_and_is_forwarded_into_the_vm() {
+    let g = guest_of(WITH_SECRET);
     let secret = g.slots.iter().find(|s| s.name.as_str() == "DEMO_SECRET").unwrap();
     assert_eq!(secret.kind, SlotKind::Input);
     let Some(Delivery::Env {
@@ -95,7 +95,7 @@ fn the_flag_reaches_only_the_start_steps_and_is_forwarded_into_the_vm() {
 
 #[test]
 fn every_published_port_is_fixed_and_its_address_left_to_the_vm() {
-    let g = guest_of(FLAGGED);
+    let g = guest_of(WITH_SECRET);
     let web = g.machines.iter().find(|m| m.name.as_str() == "web").unwrap();
     let publish = web.ports[0].publish.as_ref().unwrap();
     assert_eq!((publish.mode, publish.address.as_ref()), (PublishMode::Fixed, None));
@@ -118,7 +118,7 @@ fn every_published_port_is_fixed_and_its_address_left_to_the_vm() {
 
 #[test]
 fn the_runners_pass_the_derived_switch_and_pipe_exec_checks_from_the_copy() {
-    let g = guest_of(FLAGGED);
+    let g = guest_of(WITH_SECRET);
     let ids: Vec<&str> = g.runners.iter().map(|r| r.command.id.as_str()).collect();
     assert!(ids.contains(&"check-cache") && ids.contains(&"check-exec-cache"), "{ids:?}");
     let exec = g.runners.iter().find(|r| r.command.id.as_str() == "check-exec-cache").unwrap();

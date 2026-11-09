@@ -16,7 +16,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 ### Highlights
 
 - **Breaking:** the run manifest is `manifest_version: 1`, frozen with a compatibility policy;
-  a runner built for 1.x's version 0 refuses it (Isothrum 2.0 reads it).
+  a runner built for 1.x's version 0 refuses it.
 - **Breaking:** the `dvwa` and `juice-shop` catalogue entries are removed, and machine names
   starting with `isoloom-` are refused.
 - **Breaking:** Kubernetes publishes a port as a ClusterIP Service by default, with a restricted
@@ -181,7 +181,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   for the spec model ([policies](docs/reference/policies.md#what-is-stable)).
 - **Step timeouts count time without progress**: the manifest's `timeout_s` and
   `provider_timeout_s` say so (a step stops after that long without new output, or at six
-  hours, or the limit when longer), as Isothrum runs them.
+  hours, or the limit when longer), which a runner follows.
 - **Helper images pinned by digest**: `curlimages/curl:8.22.0`, `busybox:1.37.0-musl`, and
   `alpine:3.24` in place of the unsupported 3.20.
 - The ESXi module's header takes the password from `TF_VAR_esxi_password`, never a command line.

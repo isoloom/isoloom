@@ -1,6 +1,6 @@
 ---
 source: crates/core/isoloom-spec/tests/problems.rs
-expression: "rendered(&spec(\"machines:\\n  web:\\n    networks: { lab: 10 }\\n    docker: { build: build/web, init: [ctf/flag.sh] }\\n\"))"
+expression: "rendered(&spec(\"machines:\\n  web:\\n    networks: { lab: 10 }\\n    docker: { build: build/web, init: [data/secret.sh] }\\n\"))"
 ---
 error[removed-field] machines.web.docker  (isoloom.yml:8:5)
   a machine says what it runs, never how a platform runs it, so `docker:` is gone

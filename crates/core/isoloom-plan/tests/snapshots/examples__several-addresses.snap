@@ -1,6 +1,5 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 62
 expression: example(&name).unwrap().spec()
 ---
 version: 1
@@ -44,7 +43,7 @@ machines:
       provision:
         - provision/web.sh
       image: ~
-  decoy:
+  block:
     networks:
       office: 40
     more_addresses:
@@ -86,7 +85,7 @@ machines:
     vm:
       os: debian-12
       provision:
-        - provision/decoy.sh
+        - provision/block.sh
       image: ~
   client:
     networks:
@@ -134,7 +133,7 @@ checks:
     script: ~
     expect: web
     wait: ~
-  - name: the decoy answers on its /28
+  - name: the block host answers on its /28
     from: client
     http: ~
     tcp: ~
