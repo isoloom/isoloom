@@ -8,8 +8,9 @@ use serde::{Deserialize, Serialize};
 use super::Resources;
 
 /// How a container produces a machine: an image, or one built from the project.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct DockerImpl {
     /// A published image. With `build`, the name that build is tagged with (built in
     /// development, pulled in production); on its own, the image to pull.
@@ -124,6 +125,7 @@ pub enum Appliance {
 /// How a VM produces a machine: its OS, and the steps that set it up.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct VmImpl {
     /// The OS, as `<family>@<version>` (`debian@12`) or a family alone for its pinned default;
     /// each target maps it to an image. Once parsed, it holds the image table's name for the OS
@@ -155,6 +157,21 @@ pub struct VmImpl {
     #[serde(skip)]
     #[schemars(skip)]
     pub setup: Vec<String>,
+}
+
+impl VmImpl {
+    /// A VM of `os` (its image-table name, `debian-12`) with nothing else set.
+    #[must_use]
+    pub fn new(os: impl Into<String>) -> VmImpl {
+        VmImpl {
+            os: os.into(),
+            provision: Vec::new(),
+            image: None,
+            tpm: None,
+            boot: None,
+            setup: Vec::new(),
+        }
+    }
 }
 
 /// The `vm.provision` step that restarts a Linux machine; the steps after it run once the
@@ -203,6 +220,7 @@ pub struct Dns {
 /// A machine's own image, per target, instead of the built-in one for its OS.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct VmImage {
     /// A Vagrant box name (e.g. `StefanScherer/windows_2019`).
     #[serde(default)]

@@ -57,6 +57,7 @@ use serde::{Deserialize, Serialize};
 /// An environment spec. Field order in the file is kept (machines start in the order written).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Spec {
     /// The version of the `isoloom.yml` format the file is written in: `1`, the only one so far.
     pub version: u32,
@@ -151,6 +152,38 @@ pub struct Spec {
     #[serde(skip)]
     #[schemars(skip)]
     pub clones: IndexMap<String, Vec<String>>,
+}
+
+impl Spec {
+    /// An empty spec of format version 1 named `name`: what a program building one starts from
+    /// (the struct grows with the format, so it isn't built field by field outside this crate).
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Spec {
+        Spec {
+            version: 1,
+            name: name.into(),
+            networks: IndexMap::new(),
+            reach: Vec::new(),
+            dns: None,
+            inputs: Vec::new(),
+            plain_inputs: Vec::new(),
+            secrets: IndexMap::new(),
+            machines: IndexMap::new(),
+            cloud: None,
+            volumes: IndexMap::new(),
+            constraints: None,
+            common: None,
+            groups: IndexMap::new(),
+            provision: Vec::new(),
+            controller: None,
+            checks: Vec::new(),
+            targets: None,
+            message: None,
+            tags: IndexMap::new(),
+            tools: IndexMap::new(),
+            clones: IndexMap::new(),
+        }
+    }
 }
 
 impl Spec {

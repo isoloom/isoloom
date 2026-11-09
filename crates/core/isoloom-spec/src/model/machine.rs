@@ -71,6 +71,7 @@ impl Seal {
     clippy::struct_excessive_bools,
     reason = "the lowered form keeps one independent switch per field the backends read (spec.md §7.1); it shrinks as they read the plan instead"
 )]
+#[non_exhaustive]
 pub struct Machine {
     /// Network name -> last octet of the machine's address on it. Every machine has one, but a
     /// LAN's `switch`, whose ports the LAN gives it. A list (`lan: [10, 11, 12]`) gives the

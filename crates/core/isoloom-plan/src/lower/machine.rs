@@ -45,45 +45,43 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     let docker = docker(l, name, m, service);
     let official = docker.as_ref().and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry);
     let (networks, more_addresses) = addresses(&m.networks);
-    let mut out = model::Machine {
-        networks,
-        more_addresses,
-        count: None,
-        aliases: m.aliases.clone(),
-        os: m.os.map(|o| o.to_string()),
-        arch: m.hardware.arch,
-        rate_limit: m.rate_limit.clone(),
-        privileged: m.privileged,
-        seal: m.seal,
-        nested_virtualization: m.hardware.nested_virtualization,
-        gpus: m.hardware.gpus.clone(),
-        devices: m.hardware.devices.clone(),
-        read_only: m.read_only,
-        tmpfs: m.tmpfs.clone(),
-        shm_size: m.shm_size.clone(),
-        dns: m.dns.clone(),
-        environment: environment(m, image_environment(l, official, service)),
-        sysctls: m.sysctls.clone(),
-        ulimits: m.ulimits.clone(),
-        ports,
-        inputs: environment_inputs(m),
-        secrets,
-        resources: m.resources,
-        command: m.command.as_ref().map(|c| c.run.clone()),
-        working_dir: m.command.as_ref().and_then(|c| c.cwd.clone()),
-        healthcheck: healthcheck.flatten(),
-        depends_on: m.depends_on.clone(),
-        volumes: m.volumes.clone(),
-        files,
-        disks: m.disks.clone(),
-        host_folders: m.host_folders.clone(),
-        access: m.access,
-        vm: vm(l.source, name, m, service),
-        docker,
-        external: overrides::external(l.source, name),
-        supplied: false,
-        configuration: configuration(l, m, service, official),
-    };
+    // Every field the spec's machine gives; the others (`count`, `supplied`) keep their default.
+    let mut out = model::Machine::default();
+    out.networks = networks;
+    out.more_addresses = more_addresses;
+    out.aliases.clone_from(&m.aliases);
+    out.os = m.os.map(|o| o.to_string());
+    out.arch = m.hardware.arch;
+    out.rate_limit.clone_from(&m.rate_limit);
+    out.privileged = m.privileged;
+    out.seal = m.seal;
+    out.nested_virtualization = m.hardware.nested_virtualization;
+    out.gpus.clone_from(&m.hardware.gpus);
+    out.devices.clone_from(&m.hardware.devices);
+    out.read_only = m.read_only;
+    out.tmpfs.clone_from(&m.tmpfs);
+    out.shm_size.clone_from(&m.shm_size);
+    out.dns.clone_from(&m.dns);
+    out.environment = environment(m, image_environment(l, official, service));
+    out.sysctls.clone_from(&m.sysctls);
+    out.ulimits.clone_from(&m.ulimits);
+    out.ports = ports;
+    out.inputs = environment_inputs(m);
+    out.secrets = secrets;
+    out.resources = m.resources;
+    out.command = m.command.as_ref().map(|c| c.run.clone());
+    out.working_dir = m.command.as_ref().and_then(|c| c.cwd.clone());
+    out.healthcheck = healthcheck.flatten();
+    out.depends_on.clone_from(&m.depends_on);
+    out.volumes.clone_from(&m.volumes);
+    out.files = files;
+    out.disks.clone_from(&m.disks);
+    out.host_folders.clone_from(&m.host_folders);
+    out.access = m.access;
+    out.vm = vm(l.source, name, m, service);
+    out.docker = docker;
+    out.external = overrides::external(l.source, name);
+    out.configuration = configuration(l, m, service, official);
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
         out.vm = None;
@@ -303,20 +301,10 @@ fn value_file(secret: &str, f: &syntax::File, windows: bool) -> MachineSecret {
 fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_>) -> Option<DockerImpl> {
     let (source, scope) = (l.source, l.scope);
     let idle = m.command.is_none();
-    let mut d = DockerImpl {
-        image: None,
-        build: None,
-        dockerfile: None,
-        target: None,
-        args: IndexMap::new(),
-        init: m.setup.clone(),
-        idle: false,
-        appliance: None,
-        config: None,
-        firmware: None,
-        lxc: overrides::lxc(source, name, scope),
-        generated: None,
-    };
+    // What the forms below don't set keeps its default (no image, no build, not idle).
+    let mut d = DockerImpl::default();
+    d.init.clone_from(&m.setup);
+    d.lxc = overrides::lxc(source, name, scope);
     // No container form: the target refuses the machine there (`refusals`), or the lab lowers
     // it with the forms it has.
     match forms::container(m, service).ok()? {
@@ -386,18 +374,17 @@ fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'
                 .collect()
         })
         .unwrap_or_default();
-    Some(VmImpl {
-        os: os.name().to_owned(),
-        provision,
-        image: overrides::vm_image(source, name),
-        tpm: match m.hardware.tpm {
-            Tpm::Auto => None,
-            Tpm::Required => Some(true),
-            Tpm::None => Some(false),
-        },
-        boot: m.hardware.boot.clone(),
-        setup: m.setup.clone(),
-    })
+    let mut vm = VmImpl::new(os.name());
+    vm.provision = provision;
+    vm.image = overrides::vm_image(source, name);
+    vm.tpm = match m.hardware.tpm {
+        Tpm::Auto => None,
+        Tpm::Required => Some(true),
+        Tpm::None => Some(false),
+    };
+    vm.boot.clone_from(&m.hardware.boot);
+    vm.setup.clone_from(&m.setup);
+    Some(vm)
 }
 
 /// DNS servers named by machine, replaced by that machine's address on a network both share

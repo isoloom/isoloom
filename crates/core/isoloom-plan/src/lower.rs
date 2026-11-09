@@ -89,30 +89,26 @@ pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowe
         problems.extend(lowered.problems);
         machines.insert(name.clone(), lowered.machine);
     }
-    let mut spec = model::Spec {
-        version: 1,
-        name: source.name.clone(),
-        networks: overrides::networks(source, scope),
-        reach: source.reach.clone(),
-        dns: source.dns.clone(),
-        inputs: source.inputs.0.keys().map(ToString::to_string).collect(),
-        plain_inputs: source.inputs.0.iter().filter(|(_, i)| !i.sensitive).map(|(name, _)| name.to_string()).collect(),
-        secrets,
-        machines,
-        cloud: source.cloud.clone(),
-        volumes: overrides::volumes(source, scope),
-        constraints: source.constraints.clone(),
-        common: None,
-        groups: groups(source),
-        provision: source.provision.clone(),
-        controller: controller(source),
-        checks: source.checks.clone(),
-        targets: source.targets.clone(),
-        message: source.message.clone(),
-        tags: source.tags.clone(),
-        tools: source.tools.clone(),
-        clones: source.clones.clone(),
-    };
+    let mut spec = model::Spec::new(source.name.clone());
+    spec.networks = overrides::networks(source, scope);
+    spec.reach.clone_from(&source.reach);
+    spec.dns.clone_from(&source.dns);
+    spec.inputs = source.inputs.0.keys().map(ToString::to_string).collect();
+    spec.plain_inputs = source.inputs.0.iter().filter(|(_, i)| !i.sensitive).map(|(name, _)| name.to_string()).collect();
+    spec.secrets = secrets;
+    spec.machines = machines;
+    spec.cloud.clone_from(&source.cloud);
+    spec.volumes = overrides::volumes(source, scope);
+    spec.constraints.clone_from(&source.constraints);
+    spec.groups = groups(source);
+    spec.provision.clone_from(&source.provision);
+    spec.controller = controller(source);
+    spec.checks.clone_from(&source.checks);
+    spec.targets.clone_from(&source.targets);
+    spec.message.clone_from(&source.message);
+    spec.tags.clone_from(&source.tags);
+    spec.tools.clone_from(&source.tools);
+    spec.clones.clone_from(&source.clones);
     machine::resolve_dns(&mut spec, scope);
     let refusals = scope.target().map(|t| refusals::of(source, &services, t)).unwrap_or_default();
     trail.inputs(source);
@@ -159,10 +155,11 @@ fn groups(source: &syntax::Spec) -> IndexMap<String, Group> {
 /// The controller, with its Vagrant box from `overrides.vagrant.controller`.
 fn controller(source: &syntax::Spec) -> Option<Controller> {
     let vagrant = source.overrides.vagrant.as_ref().and_then(|v| v.controller.as_ref());
-    let image = vagrant.filter(|b| b.box_name.is_some() || b.box_version.is_some()).map(|b| VmImage {
-        vagrant: b.box_name.clone(),
-        vagrant_version: b.box_version.clone(),
-        ..VmImage::default()
+    let image = vagrant.filter(|b| b.box_name.is_some() || b.box_version.is_some()).map(|b| {
+        let mut image = VmImage::default();
+        image.vagrant.clone_from(&b.box_name);
+        image.vagrant_version.clone_from(&b.box_version);
+        image
     });
     match (&source.controller, image) {
         (None, None) => None,

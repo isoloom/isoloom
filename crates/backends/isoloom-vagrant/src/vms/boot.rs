@@ -140,12 +140,10 @@ mod tests {
     #[test]
     fn a_box_file_in_the_project_is_found_from_the_vagrantfile() {
         let mut r = Ruby::new();
-        let image = VmImage {
-            vagrant: Some("my/box".into()),
-            box_url: Some("boxes/my.box".into()),
-            box_server_url: Some("https://boxes.example".into()),
-            ..VmImage::default()
-        };
+        let mut image = VmImage::default();
+        image.vagrant = Some("my/box".into());
+        image.box_url = Some("boxes/my.box".into());
+        image.box_server_url = Some("https://boxes.example".into());
         source(&mut r, Some(&image));
         let text = r.finish();
         assert!(text.contains("m.vm.box_url = File.join(ROOT, \"boxes/my.box\")"), "{text}");

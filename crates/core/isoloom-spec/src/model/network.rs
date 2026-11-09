@@ -11,6 +11,7 @@ pub use super::bridged::Bridged;
 /// A network: an address block, whether it reaches the internet, and what routes it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Network {
     /// The network's private IPv4 block (inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16),
     /// a /24 to a /29, e.g. `10.20.0.0/24`. A LAN split into `vlans` may be larger, from /8.
