@@ -117,7 +117,7 @@ pub(crate) fn valid(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &
 /// The resolved snapshot of a project (as an instance when asked), once it is valid.
 pub(crate) fn snapshot(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Result<serde_json::Value> {
     let lab = valid(profile, dir, instance, sets)?;
-    Ok(isoloom_targets::resolved::resolve_with(&lab, instance))
+    Ok(isoloom_targets::resolved::resolve_with(&lab, instance)?)
 }
 
 #[cfg(test)]

@@ -14,11 +14,12 @@ use crate::{Error, Result};
 ///
 /// # Errors
 ///
-/// [`Error::Placeholder`] for a placeholder that points at nothing in the snapshot, and
-/// [`Error::Unclosed`] for a `{{` without its `}}`.
+/// [`Error::Instance`] when the lab can't be made that instance, [`Error::Placeholder`] for a
+/// placeholder that points at nothing in the snapshot, and [`Error::Unclosed`] for a `{{` without
+/// its `}}`.
 pub fn render_message(lab: &Lab, instance: Option<u8>) -> Result<Option<String>> {
     let Some(m) = &lab.source().message else { return Ok(None) };
-    fill(m, &resolve_with(lab, instance)).map(Some)
+    fill(m, &resolve_with(lab, instance)?).map(Some)
 }
 
 /// The message as it reads where the environment runs on `target`: on the targets that run
@@ -29,63 +30,8 @@ pub fn render_message(lab: &Lab, instance: Option<u8>) -> Result<Option<String>>
 ///
 /// As [`render_message`].
 pub fn render_message_on(lab: &Lab, instance: Option<u8>, target: Target) -> Result<Option<String>> {
-    render_message_at(lab, instance, target, &[])
-}
-
-/// A machine's port and the host port a runner published it on: local Docker publishes on free
-/// ports unless `ISOLOOM_PUBLISH_FIXED` is set, so the message must say where it answers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct HostPort {
-    /// The machine.
-    pub machine: String,
-    /// The port's name (`site`).
-    pub port: String,
-    /// The host port it got.
-    pub host: u16,
-}
-
-/// [`render_message_on`] with the host ports the environment really got, so
-/// `{{ machines.web.ports.site.published }}` says where it answers (see `with_published`).
-///
-/// # Errors
-///
-/// As [`render_message`].
-pub fn render_message_at(lab: &Lab, instance: Option<u8>, target: Target, published: &[HostPort]) -> Result<Option<String>> {
     let Some(m) = &lab.source().message else { return Ok(None) };
-    fill(m, &with_published(on_target(resolve_with(lab, instance), target), published)).map(Some)
-}
-
-/// The snapshot with the host ports the environment really got: each port's `published` and
-/// `url`, and the `published` list's `host_port`.
-#[must_use]
-pub(crate) fn with_published(mut snapshot: Value, published: &[HostPort]) -> Value {
-    for HostPort { machine, port, host } in published {
-        let entry = snapshot
-            .pointer_mut(&format!("/machines/{machine}/ports/{port}"))
-            .and_then(Value::as_object_mut);
-        if let Some(p) = entry {
-            p.insert("published".into(), (*host).into());
-            if let Some(url) = p.get("url").and_then(Value::as_str).map(|u| with_port(u, *host)) {
-                p.insert("url".into(), url.into());
-            }
-        }
-        let listed = snapshot.get_mut("published").and_then(Value::as_array_mut);
-        for p in listed.into_iter().flatten().filter_map(Value::as_object_mut) {
-            let named = |key: &str, want: &str| p.get(key).and_then(Value::as_str) == Some(want);
-            if named("machine", machine) && named("name", port) {
-                p.insert("host_port".into(), (*host).into());
-            }
-        }
-    }
-    snapshot
-}
-
-/// URL `url` (`http://127.0.0.1:8080/`) on host port `host` instead.
-fn with_port(url: &str, host: u16) -> String {
-    match url.rsplit_once(':') {
-        Some((head, _)) => format!("{head}:{host}/"),
-        None => url.to_owned(),
-    }
+    fill(m, &on_target(resolve_with(lab, instance)?, target)).map(Some)
 }
 
 /// The snapshot as seen on `target`: on the Compose targets (Docker, a hosting service, Docker
@@ -171,7 +117,7 @@ pub fn fill(text: &str, snapshot: &Value) -> Result<String> {
 /// snapshot's message is null then too).
 pub(crate) fn manifest_message(lab: &Lab, instance: Option<u8>, target: Target) -> Option<Template> {
     let text = lab.source().message.as_ref()?;
-    let snapshot = on_target(resolve_with(lab, instance), target);
+    let snapshot = on_target(resolve_with(lab, instance).ok()?, target);
     let mut parts = Vec::new();
     for piece in pieces(text).ok()? {
         match piece {
@@ -239,8 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn a_published_port_moves_its_url_to_the_host_port_it_got() {
-        assert_eq!(with_port("http://127.0.0.1:8080/", 32772), "http://127.0.0.1:32772/");
+    fn a_path_reads_through_lists_by_index() {
         assert_eq!(lookup(&json!({ "a": [{ "b": 1 }] }), "a.0.b"), Some(&json!(1)));
     }
 

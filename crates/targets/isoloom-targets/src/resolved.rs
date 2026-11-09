@@ -19,8 +19,10 @@ use isoloom_render::GeneratedFile;
 use isoloom_spec::model::{Spec, Target};
 use serde_json::{Map, Value, json};
 
+use crate::{Error, Result};
+
 pub(crate) use message::manifest_message;
-pub use message::{HostPort, fill, lookup, render_message, render_message_at, render_message_on};
+pub use message::{fill, lookup, render_message, render_message_on};
 
 /// The format of the snapshot; bumped when a field changes meaning or goes away (3: a machine's
 /// `ports` keyed by name, each with its `protocol`, `published` and `url`).
@@ -31,15 +33,20 @@ pub const PATH: &str = ".isoloom/resolved.json";
 
 /// The snapshot as a generated file.
 pub(crate) fn file(lab: &Lab) -> GeneratedFile {
-    file_with(lab, None)
+    snapshot_file(&resolve(lab))
 }
 
-/// The snapshot of instance `instance` of the lab.
-pub(crate) fn file_with(lab: &Lab, instance: Option<u8>) -> GeneratedFile {
+/// The snapshot of instance `n` of the lab.
+pub(crate) fn file_with(lab: &Lab, n: u8) -> Result<GeneratedFile> {
+    resolve_with(lab, Some(n)).map(|s| snapshot_file(&s))
+}
+
+/// `snapshot` as the file it is written to.
+fn snapshot_file(snapshot: &Value) -> GeneratedFile {
     // `{:#}` is serde_json's pretty printer (two-space indent), and a `Value` always prints.
     GeneratedFile {
         path: PATH.to_owned(),
-        contents: format!("{:#}\n", resolve_with(lab, instance)),
+        contents: format!("{snapshot:#}\n"),
     }
 }
 
@@ -52,23 +59,22 @@ pub(crate) fn entries<'a>(snapshot: &'a Value, key: &str) -> impl Iterator<Item 
 /// The snapshot as JSON (checked labs only).
 #[must_use]
 pub fn resolve(lab: &Lab) -> Value {
-    resolve_with(lab, None)
+    snapshot(lab, &lab.spec(), None)
 }
 
-/// The lab as the snapshot reads it: every form, no target's own facts, as instance `instance`
-/// when one is asked (as written when it can't be made: generating it says why).
-fn lab_spec(lab: &Lab, instance: Option<u8>) -> Spec {
-    let spec = lab.spec();
-    match instance {
-        Some(n) => isoloom_spec::instance::apply(&spec, n).unwrap_or(spec),
-        None => spec,
-    }
+/// The snapshot of an instance (`None`: the lab as written): every form, no target's own facts.
+///
+/// # Errors
+///
+/// [`Error::Instance`] when the lab can't be made instance `instance`.
+pub fn resolve_with(lab: &Lab, instance: Option<u8>) -> Result<Value> {
+    let Some(n) = instance else { return Ok(resolve(lab)) };
+    let spec = isoloom_spec::instance::apply(&lab.spec(), n).map_err(|source| Error::Instance { number: n, source })?;
+    Ok(snapshot(lab, &spec, Some(n)))
 }
 
-/// The snapshot of an instance (`None`: the lab as written).
-#[must_use]
-pub fn resolve_with(lab: &Lab, instance: Option<u8>) -> Value {
-    let spec = &lab_spec(lab, instance);
+/// The snapshot of `spec`, the lab as instance `instance` (or as written).
+fn snapshot(lab: &Lab, spec: &Spec, instance: Option<u8>) -> Value {
     let docker = isoloom_plan::environment::lay_out(spec, Target::Docker);
     let routed = isoloom_render::router::needed(spec);
     let mut out = Map::new();

@@ -2,7 +2,7 @@
 
 use isoloom_spec::parse;
 use isoloom_targets::Lab;
-use isoloom_targets::resolved::{HostPort, fill, render_message, resolve};
+use isoloom_targets::resolved::{fill, render_message, resolve};
 
 use crate::testing::{Outcome, example};
 
@@ -48,24 +48,4 @@ fn a_placeholder_pointing_at_nothing_is_an_error_and_syntax_is_validated() {
     let problems: Vec<String> = bad.problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
     assert_eq!(problems.len(), 3, "{problems:?}");
     assert!(problems.iter().all(|p| p.starts_with("message:")), "{problems:?}");
-}
-
-#[test]
-fn the_message_says_the_host_port_the_environment_really_got() -> Outcome {
-    use isoloom_spec::Target;
-    use isoloom_targets::resolved::render_message_at;
-    let m = render_message_at(
-        &hello_stack()?,
-        None,
-        Target::Docker,
-        &[HostPort {
-            machine: "web".into(),
-            port: "web".into(),
-            host: 32772,
-        }],
-    )
-    .unwrap()
-    .unwrap();
-    assert!(m.contains("http://127.0.0.1:32772/"), "{m}");
-    Ok(())
 }

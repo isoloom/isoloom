@@ -75,3 +75,15 @@ fn vagrant_instances_differ_by_name_only() -> Outcome {
     assert!(vf.contains("rel.start_with?(\".isoloom\")"));
     Ok(())
 }
+
+#[test]
+fn the_snapshot_of_an_instance_that_cant_be_made_is_an_error_not_the_lab_as_written() -> Outcome {
+    use isoloom_targets::resolved::resolve_with;
+    let lab = example("hello-stack")?;
+    assert_eq!(resolve_with(&lab, Some(2))?["instance"], 2);
+    // Instance 100 doesn't exist: the snapshot isn't the lab as written saying "instance": 100.
+    let refused = resolve_with(&lab, Some(100)).unwrap_err().to_string();
+    assert!(refused.starts_with("instance 100:"), "{refused}");
+    assert_eq!(resolve_with(&lab, None)?["instance"], serde_json::Value::Null);
+    Ok(())
+}

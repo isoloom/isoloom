@@ -14,6 +14,15 @@ pub enum Error {
     /// backend failed.
     #[error(transparent)]
     Generate(#[from] GenerateError),
+    /// The lab can't be made the instance asked for (`isoloom_spec::instance::apply`).
+    #[error("instance {number}: {source}")]
+    Instance {
+        /// The instance number asked for.
+        number: u8,
+        /// Why it can't be made.
+        #[source]
+        source: isoloom_spec::Error,
+    },
     /// A `{{ path }}` of the message points at nothing in the resolved snapshot.
     #[error("message: `{{{{ {path} }}}}` points at nothing in the snapshot (see `isoloom inspect`){hint}")]
     Placeholder {

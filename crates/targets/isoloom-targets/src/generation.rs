@@ -37,7 +37,7 @@ fn with_snapshot(lab: &Lab, target: Target) -> std::result::Result<Vec<Generated
 /// As [`generate`], and [`Error::Generate`] when the instance can't be made.
 pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<GeneratedFile>> {
     let mut files = target_files(lab, target, Some(n))?;
-    files.push(resolved::file_with(lab, Some(n)));
+    files.push(resolved::file_with(lab, n)?);
     Ok(files
         .into_iter()
         .map(|f| {
