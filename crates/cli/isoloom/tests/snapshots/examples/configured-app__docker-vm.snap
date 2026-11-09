@@ -22,6 +22,25 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker-vm/proxmox/run.json
 ✓ .isoloom/resolved.json
 
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/configure/api/run
+.isoloom/configure/lib/configure.sh
+.isoloom/configure/web/rendered/conf/site.conf
+.isoloom/configure/web/run
+.isoloom/docker-vm/Vagrantfile
+.isoloom/docker-vm/proxmox/main.tf
+.isoloom/docker-vm/proxmox/run.json
+.isoloom/docker-vm/proxmox/setup.sh
+.isoloom/docker-vm/run.json
+.isoloom/docker/build/api/Dockerfile
+.isoloom/docker/build/web/Dockerfile
+.isoloom/docker/checks/api.sh
+.isoloom/docker/checks/networks.sh
+.isoloom/docker/checks/web.sh
+.isoloom/docker/compose.yml
+.isoloom/resolved.json
+
 ## .isoloom/configure/api/run: identical in the `docker` snapshot
 
 ## .isoloom/configure/lib/configure.sh: identical in the `docker` snapshot

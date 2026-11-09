@@ -13,6 +13,16 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/vagrant/run.json
 ✓ .isoloom/resolved.json
 
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/configure/lib/configure.sh
+.isoloom/resolved.json
+.isoloom/vagrant/Vagrantfile
+.isoloom/vagrant/checks/api.sh
+.isoloom/vagrant/checks/controller.sh
+.isoloom/vagrant/checks/web.sh
+.isoloom/vagrant/run.json
+
 ## .isoloom/configure/lib/configure.sh: identical in the `docker` snapshot
 
 ## .isoloom/resolved.json: identical in the `docker` snapshot

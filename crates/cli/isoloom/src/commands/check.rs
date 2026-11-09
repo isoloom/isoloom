@@ -23,7 +23,8 @@ pub(crate) struct Args {
 }
 
 /// Generates the targets `generate` would (every one, or the one asked for or pinned by the
-/// profile) in memory and compares each file with the one on disk. A target left out because it
+/// profile) in memory and compares each file with the one on disk; a file `generate` wrote
+/// there before and would now remove (`generated::stale`) is out of date too. A target left out because it
 /// refuses the lab has no files to compare, unless it is the one asked for: then there is nothing
 /// to vouch for. One left out for any other reason (its backend failed) is an error, since its
 /// committed files can't be vouched for.
@@ -56,6 +57,10 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
                 stale += 1;
             }
         }
+    }
+    for p in generated::stale(&a.project.dir, &files, &generated::scope(target.as_deref()))? {
+        console.line(format_args!("✗ {p} is no longer generated"))?;
+        stale += 1;
     }
     if stale > 0 {
         console.line("run `isoloom generate` and commit the result")?;

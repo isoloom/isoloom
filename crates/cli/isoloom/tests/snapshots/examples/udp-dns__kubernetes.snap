@@ -24,6 +24,27 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/resolved.json
 ✓ .isoloom/kubernetes/chart/files/project/checks/resolve.sh
 
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/docker/build/client/Dockerfile
+.isoloom/kubernetes/chart/Chart.yaml
+.isoloom/kubernetes/chart/files/checks/client.sh
+.isoloom/kubernetes/chart/files/checks/dns.sh
+.isoloom/kubernetes/chart/files/project/checks/resolve.sh
+.isoloom/kubernetes/chart/templates/NOTES.txt
+.isoloom/kubernetes/chart/templates/environment.yaml
+.isoloom/kubernetes/chart/templates/scripts.yaml
+.isoloom/kubernetes/chart/templates/tests/checks.yaml
+.isoloom/kubernetes/chart/values.schema.json
+.isoloom/kubernetes/chart/values.yaml
+.isoloom/kubernetes/checks/client.sh
+.isoloom/kubernetes/checks/dns.sh
+.isoloom/kubernetes/checks/job.yaml
+.isoloom/kubernetes/checks/kustomization.yaml
+.isoloom/kubernetes/environment.yaml
+.isoloom/kubernetes/kustomization.yaml
+.isoloom/resolved.json
+
 ## .isoloom/docker/build/client/Dockerfile: identical in the `docker` snapshot
 
 ## .isoloom/kubernetes/chart/Chart.yaml

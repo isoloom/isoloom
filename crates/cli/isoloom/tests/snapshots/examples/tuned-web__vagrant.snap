@@ -10,6 +10,13 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/vagrant/run.json
 ✓ .isoloom/resolved.json
 
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/resolved.json
+.isoloom/vagrant/Vagrantfile
+.isoloom/vagrant/checks/web.sh
+.isoloom/vagrant/run.json
+
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",

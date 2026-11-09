@@ -15,6 +15,18 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
 
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/docker/appliances/sw1/NETMAP
+.isoloom/docker/appliances/sw1/base.txt
+.isoloom/docker/appliances/sw1/iouyap.ini
+.isoloom/docker/checks/files.sh
+.isoloom/docker/checks/guest.sh
+.isoloom/docker/checks/staff.sh
+.isoloom/docker/compose.yml
+.isoloom/docker/run.json
+.isoloom/resolved.json
+
 ## .isoloom/docker/appliances/sw1/NETMAP
 1:0/0 513:0/0
 1:0/1 513:0/1

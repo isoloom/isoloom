@@ -1,5 +1,5 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
 ✓ hosted
@@ -13,6 +13,17 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/appliances/sw1/NETMAP
 ✓ .isoloom/docker/appliances/sw1/iouyap.ini
 ✓ .isoloom/resolved.json
+
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/docker/appliances/sw1/NETMAP
+.isoloom/docker/appliances/sw1/base.txt
+.isoloom/docker/appliances/sw1/iouyap.ini
+.isoloom/docker/checks/files.sh
+.isoloom/docker/checks/guest.sh
+.isoloom/docker/checks/staff.sh
+.isoloom/docker/compose.yml
+.isoloom/resolved.json
 
 ## .isoloom/docker/appliances/sw1/NETMAP: identical in the `docker` snapshot
 

@@ -311,3 +311,82 @@ fn a_users_default_region_reaches_the_module_and_the_run_manifest() -> Outcome {
     assert_eq!(checked.code, Some(0), "{checked:?}");
     Ok(())
 }
+
+/// A Linux web VM; `os` for its OS.
+fn one_vm(os: &str) -> String {
+    format!(
+        "version: 1\nname: p\nnetworks:\n  lan: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    os: {os}\n    networks: {{ lan: 10 }}\n    app: {{ steps: [{{ run: p.sh }}] }}\n"
+    )
+}
+
+#[test]
+fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
+    let home = scratch("stale-home")?;
+    let dir = project("stale", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    let first = isoloom(&home, &[&"generate", &dir])?;
+    assert_eq!(first.code, Some(0), "{first:?}");
+    let out = dir.join(".isoloom");
+    for written in [
+        "docker/compose.yml",
+        "kubernetes/environment.yaml",
+        "cloud-vm/gcp/main.tf",
+        "docker-vm/Vagrantfile",
+    ] {
+        assert!(out.join(written).is_file(), "{written}");
+    }
+    // What a runner and its tools leave beside the generated files is theirs.
+    std::fs::write(out.join("cloud-vm/gcp/.terraform.lock.hcl"), "lock\n")?;
+    std::fs::create_dir_all(out.join("docker-vm/.vagrant/machines"))?;
+    std::fs::write(out.join("docker-vm/.vagrant/machines/id"), "x\n")?;
+    // The machine becomes Windows: no container form, no Windows on Google Cloud.
+    std::fs::write(dir.join("isoloom.yml"), one_vm("windows-server@2022").replace("p.sh", "p.ps1"))?;
+    std::fs::write(dir.join("p.ps1"), "$true\n")?;
+    let checked = isoloom(&home, &[&"check", &dir])?;
+    assert_eq!(checked.code, Some(1), "{checked:?}");
+    assert!(
+        checked.stdout.contains("✗ .isoloom/docker/compose.yml is no longer generated"),
+        "{}",
+        checked.stdout
+    );
+    let o = isoloom(&home, &[&"generate", &dir])?;
+    assert_eq!(o.code, Some(0), "{o:?}");
+    assert!(
+        o.stdout.contains("− .isoloom/kubernetes/environment.yaml (no longer generated)"),
+        "{}",
+        o.stdout
+    );
+    for gone in [
+        "docker",
+        "kubernetes",
+        "cloud-docker",
+        "cloud-vm/digitalocean",
+        "cloud-vm/linode",
+        "cloud-vm/oci",
+    ] {
+        assert!(!out.join(gone).exists(), "{gone} is left");
+    }
+    assert!(!out.join("cloud-vm/gcp/main.tf").exists() && !out.join("cloud-vm/gcp/run.json").exists());
+    assert!(out.join("cloud-vm/gcp/.terraform.lock.hcl").is_file(), "a tool's file is kept");
+    assert!(out.join("docker-vm/.vagrant/machines/id").is_file() && !out.join("docker-vm/Vagrantfile").exists());
+    assert!(out.join("vagrant/Vagrantfile").is_file() && out.join("cloud-vm/aws/main.tf").is_file());
+    let clean = isoloom(&home, &[&"check", &dir])?;
+    assert_eq!(clean.code, Some(0), "{clean:?}");
+    Ok(())
+}
+
+#[test]
+fn generating_one_target_leaves_the_others_files_alone() -> Outcome {
+    let home = scratch("stale-one-home")?;
+    let dir = project("stale-one", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir])?.code, Some(0));
+    std::fs::write(dir.join("isoloom.yml"), one_vm("windows-server@2022").replace("p.sh", "p.ps1"))?;
+    std::fs::write(dir.join("p.ps1"), "$true\n")?;
+    let o = isoloom(&home, &[&"generate", &dir, &"--target", &"cloud-vm"])?;
+    assert_eq!(o.code, Some(0), "{o:?}");
+    let out = dir.join(".isoloom");
+    assert!(!out.join("cloud-vm/gcp").exists(), "the target's own stale files go");
+    assert!(out.join("docker/compose.yml").is_file(), "another target's stay until it is generated");
+    Ok(())
+}

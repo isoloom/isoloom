@@ -10,6 +10,13 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/configure/lib/configure.ps1
 ✓ .isoloom/resolved.json
 
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/configure/lib/configure.ps1
+.isoloom/esxi/checks/networks.sh
+.isoloom/esxi/main.tf
+.isoloom/resolved.json
+
 ## .isoloom/configure/lib/configure.ps1: identical in the `vagrant` snapshot
 
 ## .isoloom/esxi/checks/networks.sh

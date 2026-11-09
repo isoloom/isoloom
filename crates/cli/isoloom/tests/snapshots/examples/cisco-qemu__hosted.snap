@@ -1,5 +1,5 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
 ✓ hosted
@@ -10,6 +10,14 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/appliances/vios/base.cfg
 ✓ .isoloom/docker/appliances/csr/base.cfg
 ✓ .isoloom/resolved.json
+
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/docker/appliances/csr/base.cfg
+.isoloom/docker/appliances/vios/base.cfg
+.isoloom/docker/checks/host-a.sh
+.isoloom/docker/compose.yml
+.isoloom/resolved.json
 
 ## .isoloom/docker/appliances/csr/base.cfg: identical in the `docker` snapshot
 

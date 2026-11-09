@@ -1,5 +1,5 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
 ✓ hosted
@@ -8,6 +8,12 @@ source: crates/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/compose.yml
 ✓ .isoloom/docker/checks/bench.sh
 ✓ .isoloom/resolved.json
+
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/docker/checks/bench.sh
+.isoloom/docker/compose.yml
+.isoloom/resolved.json
 
 ## .isoloom/docker/checks/bench.sh: identical in the `docker` snapshot
 

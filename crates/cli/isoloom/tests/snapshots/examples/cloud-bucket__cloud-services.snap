@@ -9,6 +9,12 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/cloud-services/run.json
 ✓ .isoloom/resolved.json
 
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/cloud-services/run.json
+.isoloom/cloud-services/terraform.tfvars.json
+.isoloom/resolved.json
+
 ## .isoloom/cloud-services/run.json
 {
   "$schema": "https://www.isoloom.com/schema/run-manifest/v0.json",

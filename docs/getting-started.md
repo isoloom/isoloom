@@ -74,7 +74,10 @@ isoloom generate --target docker # or just one
 Each target's files are written under `.isoloom/<target>/`, ready to run by hand, commit, or hand
 to the runner. `isoloom targets` lists the targets this spec can be generated for, why the others
 can't, and the [tier](targets.md) of each. `isoloom check` fails in CI when the files under
-`.isoloom/` drift from the spec.
+`.isoloom/` drift from the spec. `isoloom generate` lists what it wrote in `.isoloom/.generated`
+and removes a file of that list it no longer writes (a target the spec no longer allows, a
+machine renamed), which `isoloom check` reports; anything else there (what a runner or its tools
+write) is left alone.
 
 ## Run it
 

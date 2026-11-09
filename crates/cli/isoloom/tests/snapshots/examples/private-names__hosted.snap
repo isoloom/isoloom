@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 219
 ---
 # isoloom targets
 ✓ hosted
@@ -12,6 +11,15 @@ assertion_line: 219
 ✓ .isoloom/docker/checks/client.sh
 ✓ .isoloom/docker/build/client/Dockerfile
 ✓ .isoloom/resolved.json
+
+## .isoloom/.generated
+# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/docker/build/client/Dockerfile
+.isoloom/docker/checks/client.sh
+.isoloom/docker/checks/exec-web.sh
+.isoloom/docker/checks/web.sh
+.isoloom/docker/compose.yml
+.isoloom/resolved.json
 
 ## .isoloom/docker/build/client/Dockerfile: identical in the `docker` snapshot
 
