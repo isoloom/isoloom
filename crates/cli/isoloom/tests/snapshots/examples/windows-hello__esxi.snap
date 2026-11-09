@@ -180,7 +180,7 @@ variable "images" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "Installed for the user `isoloom` on every VM"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 variable "ssh_private_key_file" {

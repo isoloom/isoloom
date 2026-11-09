@@ -80,6 +80,11 @@ stable spec format.
   and docker-vm on QEMU its own 40 GB whatever the containers needed; the size follows the
   containers beyond that, from the spec's defaults.
 - The run manifests' and the spec's docs no longer name a particular program running them.
+- **Every Terraform module describes `ssh_public_key` the same way** ("The SSH public key the
+  machines let in: whoever holds its private key signs in, as the runner (run.json) does to
+  deliver the project and run the checks"), from one definition: the Proxmox and ESXi modules
+  each had their own ("Installed for the user `isoloom`..."). It stays required on the clouds and
+  ESXi and empty by default on Proxmox.
 
 ### Fixed
 

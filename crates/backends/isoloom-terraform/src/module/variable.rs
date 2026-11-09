@@ -1,6 +1,7 @@
 //! A module's `variable` blocks, built up.
 
 use isoloom_render::hcl_builder::{Block, Expression, boolean, reference, string};
+use isoloom_render::run_manifest::RUNNER;
 
 /// A `variable` block, built up.
 #[derive(Debug, Clone)]
@@ -124,6 +125,18 @@ impl Variable {
         }
         b.build()
     }
+}
+
+/// `ssh_public_key`, with the one description every module gives it. Required as built: a
+/// cloud's machines are reachable only with a key (its key pair or instance metadata takes one),
+/// and ESXi's Terraform signs in with its private key (`ssh_private_key_file`) to set the
+/// machines up. A Proxmox module defaults it to empty instead: its machines are set up from
+/// cloud-init snippets, nobody needs to sign in for them to be made, and an empty key installs
+/// none.
+pub(crate) fn ssh_public_key() -> Variable {
+    Variable::new("ssh_public_key", "string").describe(&format!(
+        "The SSH public key the machines let in: whoever holds its private key signs in, as {RUNNER} does to deliver the project and run the checks"
+    ))
 }
 
 #[cfg(test)]

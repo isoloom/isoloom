@@ -10,7 +10,7 @@ use isoloom_render::hcl_builder::{
 use super::pinned;
 use crate::machine::{controller, vms};
 use crate::module::providers;
-use crate::module::variable::Variable;
+use crate::module::variable::{self, Variable};
 use crate::module::{ident, resource};
 use crate::server::{self, PinnedImage, credentials, slotted, user};
 
@@ -102,7 +102,7 @@ fn own_variables() -> Vec<Variable> {
         Variable::new("slot", "number")
             .default(number(1))
             .describe("1 to 99, unique per environment on this server (SDN ids are short)"),
-        s("ssh_public_key").default(string("")).describe("Installed for the user `isoloom` on every VM"),
+        variable::ssh_public_key().default(string("")),
     ]);
     v
 }

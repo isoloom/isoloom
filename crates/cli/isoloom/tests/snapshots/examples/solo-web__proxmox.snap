@@ -199,7 +199,7 @@ variable "slot" {
 variable "ssh_public_key" {
   type        = string
   default     = ""
-  description = "Installed for the user `isoloom` on every VM"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 provider "proxmox" {

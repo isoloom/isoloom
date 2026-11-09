@@ -8,7 +8,7 @@ use isoloom_render::hcl_builder::{BinaryOperator, Block, Module, Template, binar
 use super::{SERVICE_OS, default_image};
 use crate::machine::{vms, windows};
 use crate::module::providers;
-use crate::module::variable::Variable;
+use crate::module::variable::{self, Variable};
 use crate::server::{self, credentials, user};
 
 /// The highest slot: it is the fourth byte of the VMs' MACs, which VMware keeps under 0x40 for
@@ -51,7 +51,7 @@ fn variables(env: &Environment) -> Vec<Block> {
             .block(),
         slot(),
         images(env),
-        s("ssh_public_key").describe("Installed for the user `isoloom` on every VM").block(),
+        variable::ssh_public_key().block(),
         s("ssh_private_key_file")
             .describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router")
             .block(),

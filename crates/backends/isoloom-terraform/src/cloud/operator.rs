@@ -3,10 +3,9 @@
 //! module is started (through the runner, which sets most of them).
 
 use isoloom_render::hcl_builder::string;
-use isoloom_render::run_manifest::RUNNER;
 
 use crate::module::Usage;
-use crate::module::variable::Variable;
+use crate::module::variable::{self, Variable};
 
 /// Who may reach the machines, as a module's usage tells the operator to give it.
 pub(crate) const ALLOWED: &str = "-var allowed_cidr=<your IP>/32 ";
@@ -23,9 +22,7 @@ pub(crate) fn usage(folder: &str) -> Usage<'_> {
 pub(crate) fn host_reaching() -> Vec<Variable> {
     vec![
         Variable::new("allowed_cidr", "string").describe("Who may reach the machines (SSH and the published ports), e.g. your IP/32"),
-        Variable::new("ssh_public_key", "string").describe(&format!(
-            "The key the machines let in: the one {RUNNER} signs in with (it delivers the project and runs the checks over SSH)"
-        )),
+        variable::ssh_public_key(),
         expires_at(),
     ]
 }

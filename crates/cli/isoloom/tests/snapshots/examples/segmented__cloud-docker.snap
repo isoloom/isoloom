@@ -64,7 +64,7 @@ variable "allowed_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The key the machines let in: the one the runner (run.json) signs in with (it delivers the project and runs the checks over SSH)"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 variable "expires_at" {
@@ -1013,7 +1013,7 @@ variable "allowed_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The key the machines let in: the one the runner (run.json) signs in with (it delivers the project and runs the checks over SSH)"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 variable "expires_at" {
@@ -1957,7 +1957,7 @@ variable "allowed_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The key the machines let in: the one the runner (run.json) signs in with (it delivers the project and runs the checks over SSH)"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 variable "expires_at" {
@@ -2806,7 +2806,7 @@ variable "allowed_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The key the machines let in: the one the runner (run.json) signs in with (it delivers the project and runs the checks over SSH)"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 variable "expires_at" {
@@ -3725,7 +3725,7 @@ variable "allowed_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The key the machines let in: the one the runner (run.json) signs in with (it delivers the project and runs the checks over SSH)"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 variable "expires_at" {
@@ -4546,7 +4546,7 @@ variable "allowed_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The key the machines let in: the one the runner (run.json) signs in with (it delivers the project and runs the checks over SSH)"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
 }
 
 variable "expires_at" {

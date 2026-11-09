@@ -21,7 +21,7 @@ use super::machine::snippet;
 use crate::Result;
 use crate::machine::cloud_init::{self, CloudConfig};
 use crate::module::providers::{self, terraform};
-use crate::module::variable::Variable;
+use crate::module::variable::{self, Variable};
 use crate::module::{self, ProjectCopy, Usage, output, resource};
 use crate::server::{slotted, user};
 
@@ -97,7 +97,7 @@ pub(super) fn variables() -> Vec<Variable> {
         Variable::new("slot", "number")
             .default(number(1))
             .describe("1 to 99, unique per environment on this server"),
-        s("ssh_public_key").default(string("")).describe("Installed for the user `isoloom`"),
+        variable::ssh_public_key().default(string("")),
     ]);
     v
 }
