@@ -71,5 +71,5 @@ pub use fetches::{Fetches, KeyCheck, RepositoryFetch};
 pub use lock::{Digest, Lock, LockedImage, LockedKey, LockedRelease};
 pub use names::{CaseName, DataName, EntryName, Kind, Name, SettingName, VarName};
 pub use resolve::{OfficialImage, Resolved, ResolvedPort, ValueFile};
-pub use settings::{Endpoint, NotText, Password, SettingValue, Settings, value_file};
+pub use settings::{Endpoint, NotText, Password, SettingValue, Settings};
 pub use version::{Version, pick};

@@ -166,12 +166,6 @@ impl Problem {
     pub fn line(&self) -> String {
         format!("{}: {}", self.path, self.reason)
     }
-
-    /// The top-level section the problem is in: `machines` for `machines.web.app`.
-    #[must_use]
-    pub fn section(&self) -> &str {
-        self.path.as_str().split(['.', '[']).next().unwrap_or_default()
-    }
 }
 
 impl fmt::Display for Problem {
@@ -251,7 +245,6 @@ mod tests {
         let json = serde_json::to_value(&p).unwrap();
         assert_eq!(json["code"], "removed-field");
         assert_eq!((json["line"].as_u64(), json["column"].as_u64()), (Some(12), Some(5)));
-        assert_eq!(p.section(), "machines");
     }
 
     #[test]

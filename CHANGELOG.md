@@ -139,7 +139,7 @@ stable spec format.
   MTU discovery from the containers (every other cloud lets everything out).
 - **One rule for what several crates wrote each their own way** (library): a check runner's name
   (`isoloom_render::container::check_runner`, `CHECK_RUNNER_PREFIX`), Isoloom's folder on a Linux
-  VM (`isoloom_render::steps::STATE_DIR`, `MAKE_STATE_DIR`) and on a Windows one
+  VM (`isoloom_render::steps::MAKE_STATE_DIR`) and on a Windows one
   (`isoloom_spec::windows::ISOLOOM_DIR`, `READY_FILE`), the containers' VM in a run manifest
   (`run_manifest::guest::GuestCompose::docker_host`, `docker_host_outputs`), Proxmox's server
   variables, and a name's DNS-label rule (`isoloom_spec::validate::dns_label`, which the catalogue
@@ -250,6 +250,17 @@ stable spec format.
   resolved::with_published}`; `Row::used_by` is the matrix tests' only. The cloud user-data caps
   (`isoloom_render::configure::cloud_init::{Limit, TooBig}`) moved into `isoloom-terraform`,
   crate-internal.
+- **Library items nothing outside their crate used** (Isothrum and the launcher included):
+  `Placeholder::root`, `isoloom_spec::syntax::reboots`, `Problem::section` (both the syntax's and
+  validation's) are gone; `Lab::lowered`, the runner's side of secret delivery
+  (`isoloom_render::secrets::receive`, `secrets::windows::{receive, powershell_args, input}`) and
+  the matrix's `Authored` and `Matrix::cell` are test-only; `isoloom_targets::decision`, the
+  matrix's `columns`, `rows`, `Row` and `Cell`, `isoloom_render::configure::supervisor`,
+  `isoloom_plan::ansible`, `PortKind::tls`, `isoloom_render::secrets::KEPT_DIR` (and Windows'),
+  the configure libraries' `LIBRARY`, `LIBRARY_PATH` and `library_file`, and
+  `hcl_builder::Template::is_text` are crate-internal; `isoloom_spec::derive`,
+  `isoloom_spec::model::after_drive`, `isoloom_catalogue::value_file` and
+  `isoloom_plan::configure::codename` leave their re-exports.
 
 ## [1.0.9] — 2026-11-08
 

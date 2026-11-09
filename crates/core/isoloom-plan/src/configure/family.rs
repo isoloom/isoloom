@@ -2,4 +2,5 @@
 //! names units and packages per family); the configuration model resolves a recipe for the family
 //! of its machine's OS.
 
-pub use isoloom_catalogue::{Family, codename};
+pub use isoloom_catalogue::Family;
+pub(crate) use isoloom_catalogue::codename;

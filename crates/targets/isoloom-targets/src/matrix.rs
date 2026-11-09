@@ -3,7 +3,7 @@
 //!
 //! Nothing in it is written by hand. Each row is a change to a small lab that uses one field (its
 //! value, or fields together): `probes.yml`, and one row per OS of the spec's own table. Each
-//! column ([`Column`]) decides on the changed lab exactly as it decides on any spec ([`decide`]):
+//! column (`Column`) decides on the changed lab exactly as it decides on any spec (`decide`):
 //! lowering, the backend's declared capabilities, its own limits, a Vagrant provider's, a
 //! cloud's. A cell is generated, refused with the step that refused it and why, or not
 //! applicable. Tests hold every feature of the plan to a row, and every example's refusals to
@@ -32,17 +32,16 @@ use probe::{Probe, Probes, Uses, merge, with_hosts};
 #[non_exhaustive]
 pub struct Matrix {
     /// The columns, in the order targets are listed.
-    pub columns: Vec<Column>,
+    pub(crate) columns: Vec<Column>,
     /// Every tier entry (a target, or one of its providers or clouds).
     pub tiers: Vec<TierEntry>,
     /// The rows.
-    pub rows: Vec<Row>,
+    pub(crate) rows: Vec<Row>,
 }
 
 /// A row: a spec field (or a value of it), and what each column decides.
 #[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct Row {
+pub(crate) struct Row {
     /// The field, `*` for any name and `[]` for any item (`machines.*.hardware.tpm`).
     pub field: String,
     /// The value the row is about, when it is one value of the field (`required`).
@@ -58,7 +57,7 @@ pub struct Row {
 
 /// What a column decides about a lab using a row's field.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Cell {
+pub(crate) enum Cell {
     /// It generates the lab.
     Supported,
     /// It refuses it: the step, and why.
@@ -69,13 +68,14 @@ pub enum Cell {
 }
 
 /// A spec as its author wrote it, read as YAML: what `Row::used_by` looks into.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq)]
-pub struct Authored(Value);
+pub(crate) struct Authored(Value);
 
+#[cfg(test)]
 impl Authored {
     /// The spec written as `yaml`, when it is YAML.
-    #[must_use]
-    pub fn parse(yaml: &str) -> Option<Authored> {
+    pub(crate) fn parse(yaml: &str) -> Option<Authored> {
         serde_yaml_ng::from_str(yaml).ok().map(Authored)
     }
 }
@@ -83,7 +83,7 @@ impl Authored {
 impl Row {
     /// The row's name: its field, then `= <value>` when it is about one value.
     #[must_use]
-    pub fn name(&self) -> String {
+    pub(crate) fn name(&self) -> String {
         match &self.value {
             Some(v) => format!("{} = {v}", self.field),
             None => self.field.clone(),
@@ -192,8 +192,8 @@ fn cell(p: &Probe, labs: &Labs, column: &Column) -> Cell {
 
 impl Matrix {
     /// The cell of `row` in `column`.
-    #[must_use]
-    pub fn cell<'a>(&self, row: &'a Row, column: &Column) -> Option<&'a Cell> {
+    #[cfg(test)]
+    pub(crate) fn cell<'a>(&self, row: &'a Row, column: &Column) -> Option<&'a Cell> {
         self.columns.iter().position(|c| c == column).and_then(|i| row.cells.get(i))
     }
 

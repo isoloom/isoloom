@@ -22,7 +22,7 @@ mod template;
 mod unstarted;
 
 pub use daemons::{Daemon, DaemonEntry, DaemonTable, FamilyDaemon, LogLink, Stream};
-pub use family::{Family, codename};
+pub use family::Family;
 pub use process::{ContainerProcess, NoProcess};
 pub use recipe::{Recipe, Unportable, recipe};
 pub use resources::{

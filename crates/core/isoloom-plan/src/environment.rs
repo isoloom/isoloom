@@ -69,7 +69,7 @@ pub struct Environment {
     pub requirements: Vec<Requirement>,
     /// The image references to pull, through the registry mirrors.
     pub images: Images,
-    /// The Ansible inventory groups and their members (see [`ansible::groups`]).
+    /// The Ansible inventory groups and their members (see `ansible::groups`).
     pub inventory_groups: IndexMap<String, Vec<String>>,
     /// The private DNS zone, when `dns.private` is on: its domain and records.
     pub private_dns: Option<crate::private_dns::PrivateDns>,

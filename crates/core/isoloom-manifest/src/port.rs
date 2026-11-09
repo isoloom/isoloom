@@ -73,7 +73,7 @@ impl PortKind {
 
     /// It speaks TLS: `https` and `tls`.
     #[must_use]
-    pub const fn tls(self) -> bool {
+    pub(crate) const fn tls(self) -> bool {
         matches!(self, PortKind::Https | PortKind::Tls)
     }
 }

@@ -1,4 +1,4 @@
-//! Secrets on a Windows VM, in PowerShell. Delivery keeps each value under [`KEPT_DIR`], a
+//! Secrets on a Windows VM, in PowerShell. Delivery keeps each value under `KEPT_DIR`, a
 //! folder only SYSTEM and Administrators can open, and leaves the mark [`DELIVERED`] the set-up
 //! waits for; each file is then written at its path with the same two readers and nobody else.
 //!
@@ -13,12 +13,13 @@
 
 use isoloom_plan::SecretFile;
 use isoloom_spec::model::is_drive_path;
+#[cfg(test)]
 use isoloom_spec::shell::base64;
 
 use crate::powershell;
 
 /// Where a Windows machine keeps the secrets delivered to it.
-pub const KEPT_DIR: &str = "C:\\ProgramData\\isoloom\\secrets";
+pub(crate) const KEPT_DIR: &str = "C:\\ProgramData\\isoloom\\secrets";
 /// The mark delivery leaves once every secret is kept.
 pub const DELIVERED: &str = "C:\\ProgramData\\isoloom\\secrets\\.delivered";
 /// The script putting the files in place, run by the startup task and before the process.
@@ -29,7 +30,8 @@ const PLACE_TASK: &str = "isoloom-apply-secrets";
 /// What the runner starts on the machine (as `powershell -EncodedCommand`): it reads the
 /// first line of its standard input, the receiving script in base64, and runs it. The script
 /// reads the values from the lines that follow.
-pub(crate) const BOOTSTRAP: &str = "$s = [Console]::In.ReadLine(); Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($s)))";
+#[cfg(test)]
+const BOOTSTRAP: &str = "$s = [Console]::In.ReadLine(); Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($s)))";
 
 /// Limits a file or folder to SYSTEM (S-1-5-18) and Administrators (S-1-5-32-544), nothing
 /// inherited: a new access list replaces whatever the path had.
@@ -51,9 +53,11 @@ pub fn path(p: &str) -> String {
 
 /// The receiving script. After the line that holds it, its standard input holds one line per
 /// secret of `names`, in that order, each value in base64; it keeps each one, marks the
-/// delivery, then puts `files` in place (so a run again refreshes them).
-#[must_use]
-pub fn receive(names: &[String], files: &[SecretFile]) -> String {
+/// delivery, then puts `files` in place (so a run again refreshes them). The runner's side of
+/// delivery, like [`BOOTSTRAP`], [`powershell_args`] and [`input`]: the runner writes them itself,
+/// they are kept here to test the step against.
+#[cfg(test)]
+fn receive(names: &[String], files: &[SecretFile]) -> String {
     let list = names.iter().map(|n| powershell::quote(n)).collect::<Vec<_>>().join(", ");
     format!(
         "$ErrorActionPreference = 'Stop'\n{PROTECT}\n$k = {k}\nNew-Item -ItemType Directory -Force $k | Out-Null\nProtect-IsoloomPath $k\n\
@@ -154,8 +158,8 @@ pub(crate) fn place_first() -> String {
 
 /// The arguments of `powershell.exe` running `BOOTSTRAP`, encoded (UTF-16LE in base64) so
 /// that no remote shell (cmd, PowerShell) reads anything into it.
-#[must_use]
-pub fn powershell_args() -> Vec<String> {
+#[cfg(test)]
+fn powershell_args() -> Vec<String> {
     let bytes: Vec<u8> = BOOTSTRAP.encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut args: Vec<String> = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand"]
         .map(String::from)
@@ -173,8 +177,8 @@ fn command_line() -> String {
 
 /// What the deliverer writes on the connection's standard input: the receiving script in
 /// base64 on the first line, then `values` (one base64 line per secret, in `names`' order).
-#[must_use]
-pub fn input(names: &[String], files: &[SecretFile], values: &[u8]) -> Vec<u8> {
+#[cfg(test)]
+fn input(names: &[String], files: &[SecretFile], values: &[u8]) -> Vec<u8> {
     let mut out = base64(receive(names, files).as_bytes()).into_bytes();
     out.push(b'\n');
     out.extend_from_slice(values);

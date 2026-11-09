@@ -90,7 +90,7 @@ impl Template {
 
     /// Whether it is plain text (no interpolation).
     #[must_use]
-    pub fn is_text(&self) -> bool {
+    pub(crate) fn is_text(&self) -> bool {
         self.parts.iter().all(|p| matches!(p, Part::Text(_)))
     }
 

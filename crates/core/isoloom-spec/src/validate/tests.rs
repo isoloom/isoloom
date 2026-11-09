@@ -1,16 +1,9 @@
-use super::{Problem, starts_after, validate};
+use super::{starts_after, validate};
 use crate::syntax::Code;
 use crate::testing::{lab, problems};
 
 fn spec(yaml: &str) -> crate::model::Spec {
     crate::testing::model(yaml).unwrap()
-}
-
-#[test]
-fn a_problem_knows_its_section() {
-    assert_eq!(Problem::new(Code::InvalidValue, "machines.web.depends_on[0]", "x").section(), "machines");
-    assert_eq!(Problem::new(Code::InvalidValue, "checks[2].http", "x").section(), "checks");
-    assert_eq!(Problem::new(Code::InvalidValue, "name", "x").section(), "name");
 }
 
 #[test]

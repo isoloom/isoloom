@@ -22,8 +22,8 @@ mod wait;
 /// Where the project is unpacked on a VM.
 pub const PROJECT_DIR: &str = "/opt/isoloom";
 /// Isoloom's own folder on a Linux VM: its marks, and what it keeps between boots.
-pub const STATE_DIR: &str = "/var/lib/isoloom";
-/// Makes [`STATE_DIR`]: the command before a mark is written there.
+pub(crate) const STATE_DIR: &str = "/var/lib/isoloom";
+/// Makes `STATE_DIR`: the command before a mark is written there.
 pub const MAKE_STATE_DIR: &str = "mkdir -p /var/lib/isoloom";
 /// The project's archive, uploaded before the steps run.
 pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";

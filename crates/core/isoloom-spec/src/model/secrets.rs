@@ -118,7 +118,7 @@ pub fn is_drive_path(p: &str) -> bool {
 /// The path after its drive (`\app\db` of `C:\app\db`), when `p` is an absolute Windows path
 /// on a drive.
 #[must_use]
-pub fn after_drive(p: &str) -> Option<&str> {
+pub(crate) fn after_drive(p: &str) -> Option<&str> {
     let rest = p.strip_prefix(|c: char| c.is_ascii_alphabetic())?.strip_prefix(':')?;
     (rest.len() > 1 && rest.starts_with(['\\', '/'])).then_some(rest)
 }

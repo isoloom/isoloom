@@ -18,7 +18,7 @@ use crate::tiers::VAGRANT_PROVIDERS;
 /// A target, or one of its Vagrant providers or clouds where each decides on its own: a column
 /// of the capability matrix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Column {
+pub(crate) struct Column {
     /// The target.
     pub target: Target,
     /// The Vagrant provider (`libvirt`) or the cloud (`aws`), for `vagrant` and `cloud-vm`.
@@ -28,7 +28,7 @@ pub struct Column {
 impl Column {
     /// Its name: the target's id, then `/` and the provider or cloud (`vagrant/libvirt`).
     #[must_use]
-    pub fn id(&self) -> String {
+    pub(crate) fn id(&self) -> String {
         crate::tiers::name(self.target, self.variant)
     }
 }
@@ -36,7 +36,7 @@ impl Column {
 /// Every column, in the order targets are listed: `vagrant` once per provider, `cloud-vm` once
 /// per cloud, every other target once.
 #[must_use]
-pub fn columns() -> Vec<Column> {
+pub(crate) fn columns() -> Vec<Column> {
     let of = |target, variant| Column { target, variant };
     Target::ALL
         .into_iter()
@@ -51,7 +51,7 @@ pub fn columns() -> Vec<Column> {
 /// The step that refuses a lab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum Code {
+pub(crate) enum Code {
     /// The spec isn't valid, or not once lowered for the target.
     Invalid,
     /// Lowering: a machine has no form the target runs, or a step the target doesn't run yet,
@@ -71,7 +71,7 @@ impl Code {
     /// The code as the matrix writes it: `invalid`, `lowering`, `capability`, `target`,
     /// `provider` or `cloud`.
     #[must_use]
-    pub fn id(self) -> &'static str {
+    pub(crate) fn id(self) -> &'static str {
         match self {
             Code::Invalid => "invalid",
             Code::Lowering => "lowering",
@@ -84,7 +84,7 @@ impl Code {
 
     /// The capability lacking, for [`Code::Capability`].
     #[must_use]
-    pub fn feature(self) -> Option<Feature> {
+    pub(crate) fn feature(self) -> Option<Feature> {
         match self {
             Code::Capability(f) => Some(f),
             _ => None,
@@ -96,7 +96,7 @@ impl Code {
 /// generator gives it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct Refused {
+pub(crate) struct Refused {
     /// The step that refuses.
     pub code: Code,
     /// The field, as written in the spec (`machines.web.app.image`), when the step names one.
@@ -107,7 +107,7 @@ pub struct Refused {
 
 /// What a column decides about a lab.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Decision {
+pub(crate) enum Decision {
     /// It generates the lab.
     Generated,
     /// It refuses it.
@@ -131,7 +131,7 @@ fn refused(code: Code, field: Option<String>, reason: impl Into<String>) -> Deci
 /// capabilities and its own limits (a cloud's, for a `cloud-vm` column), then the Vagrant
 /// provider's.
 #[must_use]
-pub fn decide(lab: &Lab, column: &Column) -> Decision {
+pub(crate) fn decide(lab: &Lab, column: &Column) -> Decision {
     let target = column.target;
     if let Some(p) = lab.problems().into_iter().next() {
         return refused(Code::Invalid, Some(p.path.to_string()), p.reason);

@@ -174,7 +174,7 @@ impl SettingValue {
 /// Where the value file of password setting `setting` goes on `family` (`field`, `index`: a
 /// list item's field, the item from 1).
 #[must_use]
-pub fn value_file(family: Family, setting: &SettingName, item: Option<(usize, &SettingName)>) -> String {
+pub(crate) fn value_file(family: Family, setting: &SettingName, item: Option<(usize, &SettingName)>) -> String {
     let (root, sep) = if family == Family::Windows {
         (format!("{}\\with", isoloom_spec::windows::ISOLOOM_DIR), "\\")
     } else {

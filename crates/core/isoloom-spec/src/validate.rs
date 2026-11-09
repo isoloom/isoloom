@@ -74,13 +74,6 @@ impl Problem {
             message: message.into(),
         }
     }
-
-    /// The top-level section of the spec the problem is in: `machines` for
-    /// `machines.web.depends_on[0]`, `checks` for `checks[2].http`.
-    #[must_use]
-    pub fn section(&self) -> &str {
-        self.at.split(['.', '[']).next().unwrap_or_default()
-    }
 }
 
 impl std::fmt::Display for Problem {

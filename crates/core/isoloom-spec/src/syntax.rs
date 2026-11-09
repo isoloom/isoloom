@@ -29,7 +29,7 @@ mod warning;
 pub use app::{App, ApplianceRecipe, Build, Recipe};
 pub use check::{Unresolved, check, placeholder_problems};
 pub use files::{File, FileSource, Mode};
-pub use forms::{Form, NoForm, container as container_form, reboots, vm as vm_form};
+pub use forms::{Form, NoForm, container as container_form, vm as vm_form};
 pub use hardware::{Hardware, Tpm};
 pub use inputs::{Input, Inputs};
 pub use machine::{Kind, Machine, Octets, Services};

@@ -12,7 +12,7 @@ use isoloom_spec::model::Spec;
 /// Members are machine names in the order first given; which of them a target can reach is
 /// the renderer's filter.
 #[must_use]
-pub fn groups(spec: &Spec) -> IndexMap<String, Vec<String>> {
+pub(crate) fn groups(spec: &Spec) -> IndexMap<String, Vec<String>> {
     let mut out: IndexMap<String, Vec<String>> = IndexMap::new();
     let declared = spec.provision.iter().flat_map(|s| s.groups.iter().map(|(g, m)| (g.clone(), m.clone())));
     let resolved = spec.groups.keys().map(|g| (g.clone(), groups::members(spec, g)));
@@ -30,7 +30,7 @@ pub fn groups(spec: &Spec) -> IndexMap<String, Vec<String>> {
 /// The variables of `machine` from every `provision[].host_vars`, in step order (a later step
 /// overrides an earlier one's value and keeps its place).
 #[must_use]
-pub fn host_vars(spec: &Spec, machine: &str) -> IndexMap<String, serde_json::Value> {
+pub(crate) fn host_vars(spec: &Spec, machine: &str) -> IndexMap<String, serde_json::Value> {
     spec.provision
         .iter()
         .filter_map(|s| s.host_vars.get(machine))

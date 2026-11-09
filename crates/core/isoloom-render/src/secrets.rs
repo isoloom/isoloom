@@ -1,6 +1,6 @@
 //! Secrets on a VM and on a Docker host. The generated set-up never holds a value: it waits
 //! for the runner to deliver them over the machine's own connection (SSH), then puts each
-//! file in place. Delivery writes a root-only copy of each value under [`KEPT_DIR`] (it outlives
+//! file in place. Delivery writes a root-only copy of each value under `KEPT_DIR` (it outlives
 //! a reboot, which empties `/run/secrets`) and the mark [`DELIVERED`] the set-up waits for.
 //!
 //! The order is the plan's `Secrets` step: after the machine's files, before what may read a
@@ -19,7 +19,7 @@ use crate::run_manifest::RUNNER;
 pub mod windows;
 
 /// Where a machine keeps the secrets delivered to it: root-only, on disk.
-pub const KEPT_DIR: &str = "/var/lib/isoloom/secrets";
+pub(crate) const KEPT_DIR: &str = "/var/lib/isoloom/secrets";
 /// The mark delivery leaves once every secret is kept.
 pub const DELIVERED: &str = "/var/lib/isoloom/secrets/.delivered";
 /// Where a Terraform set-up that waits for its secrets says how to reach its machine, under
@@ -35,9 +35,10 @@ pub(crate) const PLACE_SERVICE: &str = "apply-secrets";
 /// The script the runner runs as root on the machine. Its standard input holds one line per
 /// secret of `names`, in that order, each value in base64 (so any text fits on one line); the
 /// script keeps each one, marks the delivery, then puts `files` in place (so a run again
-/// refreshes them). Nothing of a value reaches its command line or its output.
-#[must_use]
-pub fn receive(names: &[String], files: &[SecretFile]) -> String {
+/// refreshes them). Nothing of a value reaches its command line or its output. The runner's side
+/// of delivery, which the runner writes itself: kept here to test the step against.
+#[cfg(test)]
+fn receive(names: &[String], files: &[SecretFile]) -> String {
     let kept: String = names
         .iter()
         .map(|name| {

@@ -14,17 +14,17 @@ use crate::steps::PROJECT_DIR;
 use crate::{GeneratedFile, header};
 
 /// The library, as Isoloom ships it.
-pub const LIBRARY: &str = include_str!("shell/configure.sh");
+pub(crate) const LIBRARY: &str = include_str!("shell/configure.sh");
 
 /// Where the library is generated, from the project folder.
-pub const LIBRARY_PATH: &str = ".isoloom/configure/lib/configure.sh";
+pub(crate) const LIBRARY_PATH: &str = ".isoloom/configure/lib/configure.sh";
 
 /// The file the restart rule reads on a VM: something changed during this apply.
 const CHANGED: &str = "/run/isoloom/configure.changed";
 
 /// The library as a generated file, at [`LIBRARY_PATH`].
 #[must_use]
-pub fn library_file() -> GeneratedFile {
+pub(crate) fn library_file() -> GeneratedFile {
     GeneratedFile {
         path: LIBRARY_PATH.to_owned(),
         contents: format!("{}{LIBRARY}", header("#")),

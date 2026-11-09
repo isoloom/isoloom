@@ -3,7 +3,7 @@
 //! VM has) as its working folder, then each step in order. Scripts and copies are the
 //! Dockerfile's own `COPY` and `RUN`, a template a `COPY` of the file Isoloom filled in, and every
 //! other step one `RUN` of the shell library's call. A service doesn't run at build: Isoloom's
-//! supervisor ([`super::supervisor`]) is the image's entrypoint, and starts it. The project folder is the
+//! supervisor (`super::supervisor`) is the image's entrypoint, and starts it. The project folder is the
 //! build context.
 
 use isoloom_plan::configure::{ContainerProcess, Resource, RunPlan, TemplatePlan};

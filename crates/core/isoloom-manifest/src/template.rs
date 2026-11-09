@@ -120,20 +120,6 @@ impl Placeholder {
             _ => Err(unknown()),
         }
     }
-
-    /// The root, as validation names it (`run`, `params`, `machine`).
-    #[must_use]
-    pub fn root(&self) -> &'static str {
-        match self {
-            Placeholder::Run(_) => "run",
-            Placeholder::Param(_) => "params",
-            Placeholder::Output(_) => "outputs",
-            Placeholder::Published { .. } => "published",
-            Placeholder::Host(_) => "host",
-            Placeholder::Machine => "machine",
-            Placeholder::Value => "value",
-        }
-    }
 }
 
 /// `<machine>.<port>`, after `published.`: a port's name has no dot.
@@ -363,17 +349,17 @@ mod tests {
     }
 
     #[test]
-    fn a_placeholder_is_written_from_its_root() {
-        for (text, root) in [
-            ("${run.known_hosts}", "run"),
-            ("${params.REGION}", "params"),
-            ("${outputs.web_site}", "outputs"),
-            ("${published.web.site}", "published"),
-            ("${host.web}", "host"),
-            ("${machine}", "machine"),
-            ("${value}", "value"),
+    fn each_placeholder_root_reads_back_as_written() {
+        for text in [
+            "${run.known_hosts}",
+            "${params.REGION}",
+            "${outputs.web_site}",
+            "${published.web.site}",
+            "${host.web}",
+            "${machine}",
+            "${value}",
         ] {
-            assert_eq!(round_trip(text).placeholders().next().map(Placeholder::root), Some(root), "{text}");
+            assert_eq!(round_trip(text).placeholders().count(), 1, "{text}");
         }
         assert_eq!(RunVar::SshKey.key(), "ssh_key");
     }

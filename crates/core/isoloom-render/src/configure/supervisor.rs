@@ -21,13 +21,13 @@ use crate::{GeneratedFile, header};
 
 /// Where machine `machine`'s supervisor is generated, from the project folder.
 #[must_use]
-pub fn path(machine: &str) -> String {
+pub(crate) fn path(machine: &str) -> String {
     format!("{DIR}/{machine}/run")
 }
 
 /// Machine `c`'s supervisor as a generated file, when its container runs `process` through it.
 #[must_use]
-pub fn file(c: &Configured<'_>, process: &ContainerProcess) -> Option<GeneratedFile> {
+pub(crate) fn file(c: &Configured<'_>, process: &ContainerProcess) -> Option<GeneratedFile> {
     Some(GeneratedFile {
         path: path(c.machine()),
         contents: script(c, process)?,
@@ -96,7 +96,7 @@ isoloom_watch() {
 
 /// Machine `c`'s supervisor, when its container runs `process` through it (one daemon, or several).
 #[must_use]
-pub fn script(c: &Configured<'_>, process: &ContainerProcess) -> Option<String> {
+pub(crate) fn script(c: &Configured<'_>, process: &ContainerProcess) -> Option<String> {
     let (daemons, command) = match process {
         ContainerProcess::One(d) => (std::slice::from_ref(d), false),
         ContainerProcess::Supervised { daemons, command } => (daemons.as_slice(), command.is_some()),

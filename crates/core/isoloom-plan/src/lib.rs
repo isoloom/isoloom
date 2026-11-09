@@ -32,7 +32,7 @@
 //! ```
 
 pub mod addressing;
-pub mod ansible;
+pub(crate) mod ansible;
 pub mod boot;
 pub mod checks;
 pub mod configure;

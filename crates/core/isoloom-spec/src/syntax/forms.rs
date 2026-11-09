@@ -7,7 +7,6 @@
 use super::app::Recipe;
 use super::machine::{Kind, Machine};
 use super::problem::{Code, FieldPath, Problem};
-use super::step::Step;
 
 /// How a machine is produced in one form.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,12 +152,6 @@ pub fn vm(m: &Machine) -> Result<Form<'_>, NoForm> {
     }
 }
 
-/// Whether one of the machine's steps restarts it (its inputs must outlive the boot).
-#[must_use]
-pub fn reboots(m: &Machine) -> bool {
-    m.app().is_some_and(|a| a.steps.contains(&Step::Reboot))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,12 +179,6 @@ mod tests {
     }
 
     #[test]
-    fn only_a_reboot_step_reboots() {
-        assert!(!reboots(&machine("{ os: debian@12, app: { steps: [{ run: a.sh }] } }")));
-        assert!(!reboots(&machine("{ os: debian@12 }")));
-    }
-
-    #[test]
     fn a_refusal_is_placed_at_its_field() {
         let built = machine("{ app: { build: build/web } }");
         let refusal = vm(&built).unwrap_err().refusal("web");
@@ -212,7 +199,6 @@ mod tests {
         let rebooting = machine("{ os: debian@12, app: { steps: [{ run: a.sh }, reboot] } }");
         assert_eq!(container(&rebooting).unwrap_err().path("web").as_str(), "machines.web.app.steps[1]");
         assert_eq!(vm(&rebooting), Ok(Form::Steps));
-        assert!(reboots(&rebooting));
         let both = machine("{ os: debian@12, app: { image: redis:7, steps: [reboot] } }");
         assert!(matches!(container(&both), Ok(Form::Recipe(_))) && vm(&both).is_ok());
     }

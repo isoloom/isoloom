@@ -8,7 +8,7 @@
 //!   (gzip then base64) and run from `runcmd`, for the targets that hand a VM its user data.
 //! - [`powershell`]: the PowerShell library and a recipe's calls, for a Windows VM's set-up.
 //! - [`dockerfile`]: the image a container builds from its recipe, its process Isoloom's
-//!   [`supervisor`] when it runs services.
+//!   `supervisor` when it runs services.
 //! - [`files`]: the files they add to a target's: the Dockerfiles, the libraries, the supervisors and
 //!   the templates filled in for a container's build.
 //!
@@ -25,7 +25,7 @@ pub mod dockerfile;
 mod password;
 pub mod powershell;
 pub mod shell;
-pub mod supervisor;
+pub(crate) mod supervisor;
 mod units;
 
 pub use units::{linux_unit, systemd_word};

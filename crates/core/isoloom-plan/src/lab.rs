@@ -127,9 +127,9 @@ impl Lab {
         self.catalogue
     }
 
-    /// The spec lowered for `scope`, the image table applied.
-    #[must_use]
-    pub fn lowered(&self, scope: Scope) -> Lowered {
+    /// The spec lowered for `scope`, the image table applied (what the lowering's tests read).
+    #[cfg(test)]
+    pub(crate) fn lowered(&self, scope: Scope) -> Lowered {
         let mut l = self.raw(scope).into_owned();
         l.spec = self.finish(&l.spec);
         l

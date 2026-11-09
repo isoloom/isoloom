@@ -12,17 +12,17 @@ use crate::steps::WINDOWS_PROJECT_DIR;
 use crate::{GeneratedFile, header};
 
 /// The library, as Isoloom ships it.
-pub const LIBRARY: &str = include_str!("powershell/configure.ps1");
+pub(crate) const LIBRARY: &str = include_str!("powershell/configure.ps1");
 
 /// Where the library is generated, from the project folder.
-pub const LIBRARY_PATH: &str = ".isoloom/configure/lib/configure.ps1";
+pub(crate) const LIBRARY_PATH: &str = ".isoloom/configure/lib/configure.ps1";
 
 /// The file the restart rule reads on a Windows VM.
 const CHANGED: &str = "C:\\Windows\\Temp\\isoloom-configure.changed";
 
 /// The library as a generated file, at [`LIBRARY_PATH`].
 #[must_use]
-pub fn library_file() -> GeneratedFile {
+pub(crate) fn library_file() -> GeneratedFile {
     GeneratedFile {
         path: LIBRARY_PATH.to_owned(),
         contents: format!("{}{LIBRARY}", header("#")),
