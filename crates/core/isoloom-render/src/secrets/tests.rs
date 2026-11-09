@@ -5,7 +5,7 @@ use crate::testing;
 use isoloom_plan::SecretFile;
 use isoloom_spec::model::Target;
 
-/// Two secrets and an input's file: `web` (a container) gets `db-password` and the flag, `vm`
+/// Two secrets and an input's file: `web` (a container) gets `db-password` and the input, `vm`
 /// (a Windows VM) gets `api-key`.
 const LAB: &str = r"
 version: 1
