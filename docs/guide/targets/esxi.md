@@ -39,8 +39,9 @@ simplest that works.
 ```sh
 isoloom generate --target esxi
 terraform -chdir=.isoloom/esxi init
+export TF_VAR_esxi_password="$ESXI_PASSWORD"   # never on the command line
 terraform -chdir=.isoloom/esxi apply \
-  -var esxi_hostname=esxi.example.internal -var esxi_password="$ESXI_PASSWORD" \
+  -var esxi_hostname=esxi.example.internal \
   -var-file="$PWD/images.tfvars" \
   -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)" -var ssh_private_key_file=~/.ssh/id_ed25519
 ```

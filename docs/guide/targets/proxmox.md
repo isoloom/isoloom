@@ -46,9 +46,10 @@ The SSH user must be able to write to the snippets datastore's folder on the nod
 
 ### TLS
 
-`proxmox_insecure` defaults to `true`: the module accepts the server's self-signed certificate,
-as most Proxmox servers present one. With a certificate your machines trust (from your corporate
-CA, or ACME), set `proxmox_insecure=false`. See
+`proxmox_insecure` defaults to `false`: the module verifies the Proxmox API's certificate. A
+server that presents its own self-signed certificate, as a fresh Proxmox install does, needs
+`proxmox_insecure=true`, or better, a certificate your machines trust (from your corporate CA, or
+ACME). See
 [security considerations](../../explanation/security.md#proxmox-tls).
 
 ## Generate and run

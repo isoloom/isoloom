@@ -4,7 +4,7 @@ Everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability 
 
 ## Gates
 
-Every change passes these, locally and in CI. `cargo xtask check-all` runs them all.
+Every change passes these, locally and in CI. CI runs every one of them on each pull request.
 
 ```sh
 cargo fmt --all --check
@@ -14,7 +14,7 @@ cargo xtask test                               # the tests under cargo-nextest, 
 cargo deny check                               # advisories, licenses, bans, sources
 RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps
 cargo machete                                  # no unused dependencies
-typos                                          # spelling; legitimate words go in _typos.toml
+typos                                          # spelling; legitimate words go in .typos.toml
 lychee --offline README.md CHANGELOG.md ARCHITECTURE.md '.github/*.md' 'docs/**/*.md'   # links
 
 # The generated docs must stay current (their stale-file tests enforce this):
@@ -24,7 +24,7 @@ git diff --exit-code docs
 ```
 
 Clippy runs with `-D warnings`, as CI does: any lint that warns fails it. A lint silenced where
-the fix reads worse is an `#[expect(lint, reason = "…")]`, and `quality-baseline.json` counts
+the fix reads worse is an `#[expect(lint, reason = "…")]`, and `xtask/baselines/quality-baseline.json` counts
 those per crate (`exception/expect`) with the ratchet's other counts: `cargo xtask quality` fails
 if any count goes up. Drive counts down, never up.
 

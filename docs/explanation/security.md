@@ -78,9 +78,9 @@ the runs past it. A module applied by hand has no expiry unless you set `expires
 
 ## Proxmox TLS
 
-The Proxmox module's `proxmox_insecure` defaults to `true`, which accepts the server's
-self-signed certificate. It relaxes verification of the Proxmox API endpoint only. With a
-certificate your machines trust, set `proxmox_insecure=false`. Use an API token with a role
+The Proxmox module's `proxmox_insecure` defaults to `false`: the API's certificate is verified.
+Setting it to `true` accepts a self-signed certificate, and relaxes verification of the Proxmox
+API endpoint only; prefer giving the server a certificate your machines trust. Use an API token with a role
 limited to what the module creates ([Proxmox](../guide/targets/proxmox.md#credentials)).
 
 ## WinRM
