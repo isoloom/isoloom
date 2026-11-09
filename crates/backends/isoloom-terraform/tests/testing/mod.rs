@@ -65,6 +65,13 @@ pub fn proxmox(yaml: &str) -> Outcome<String> {
     Ok(file(&ProxmoxBackend.render(&plan(yaml, Target::Proxmox)?)?, "proxmox/main.tf")?.to_owned())
 }
 
+/// The body of `resource` (its header line) in `tf`, up to the next resource; empty when there is
+/// none.
+#[must_use]
+pub fn resource_body<'a>(tf: &'a str, resource: &str) -> &'a str {
+    tf.split(resource).nth(1).and_then(|rest| rest.split("\nresource ").next()).unwrap_or_default()
+}
+
 /// Why `backend` refuses `yaml` (a spec, valid or not), if it does.
 ///
 /// # Errors

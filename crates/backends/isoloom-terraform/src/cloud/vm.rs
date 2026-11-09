@@ -34,7 +34,7 @@ pub(crate) mod windows;
 
 use std::net::Ipv4Addr;
 
-use crate::hcl_builder::Module;
+use crate::hcl_builder::{Expression, Module};
 use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
 use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
@@ -128,6 +128,25 @@ impl Machines {
         if controller::needed(env) {
             (self.controller)(env, m)?;
         }
+        Ok(())
+    }
+
+    /// The credentials, the machines ([`Machines::write`]), then the outputs of a cloud whose
+    /// resources are named after the machines (`outputs::write_named`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Machines::write`].
+    pub(crate) fn write_with_outputs(
+        &self,
+        env: &Environment,
+        user: fn(&str) -> &'static str,
+        public_ip: fn(&str) -> Expression,
+        m: &mut Module,
+    ) -> Result<()> {
+        crate::machine::credentials(env, m);
+        self.write(env, m)?;
+        outputs::write_named(env, user, public_ip, m);
         Ok(())
     }
 }

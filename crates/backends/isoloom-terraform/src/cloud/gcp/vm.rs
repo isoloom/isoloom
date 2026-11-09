@@ -31,15 +31,10 @@ use isoloom_spec::validate::Cidr;
 use super::{own_project, public_ip};
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{Images, Kept, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes, fit};
-use crate::cloud::vm::{
-    self, Driver, gateways,
-    gpus::GpuSizes,
-    outputs::{self, Reach},
-    own_image,
-};
+use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image};
 use crate::limits::Limits;
 use crate::machine::controller;
-use crate::module::{ident, providers};
+use crate::module::providers;
 
 /// What Google Cloud takes.
 const RULES: Rules = Rules {
@@ -214,13 +209,5 @@ fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated_with(env, &|e, n, _| relocate(e, n));
     network::blocks(env, m);
     private_dns::write(env, own_project(), m);
-    crate::machine::credentials(env, m);
-    MACHINES.write(env, m)?;
-    let reach = Reach {
-        public_ip: &|n| public_ip(&ident(n)),
-        user: super::BASE.user,
-        controller: Some(public_ip("isoloom_controller")),
-    };
-    outputs::write(env, &reach, m);
-    Ok(())
+    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, m)
 }

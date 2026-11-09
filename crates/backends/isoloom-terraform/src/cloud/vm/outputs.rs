@@ -39,6 +39,17 @@ pub(crate) fn write_as(env: &Environment, user: fn(&str) -> &'static str, public
     write(env, &reach, m);
 }
 
+/// The outputs of a cloud whose machines' resources are named after them (`ident`), the
+/// controller's `isoloom_controller`: `public_ip` of a resource name, the cloud's SSH `user`.
+pub(crate) fn write_named(env: &Environment, user: fn(&str) -> &'static str, public_ip: fn(&str) -> Expression, m: &mut Module) {
+    let reach = Reach {
+        public_ip: &|n| public_ip(&crate::module::ident(n)),
+        user,
+        controller: Some(public_ip("isoloom_controller")),
+    };
+    write(env, &reach, m);
+}
+
 /// The outputs every cloud module gives: `machines`, each machine's `address_<m>` and
 /// `ssh_user_<m>` (what the run manifest reads), `ssh_users` (for an operator reading
 /// `terraform output`), `ip`, `ready_file`, `checks` and `published`.

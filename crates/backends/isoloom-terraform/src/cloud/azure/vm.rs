@@ -29,15 +29,10 @@ use isoloom_plan::{Environment, MachinePlan};
 
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
-use crate::cloud::vm::{
-    self, Driver, gateways,
-    gpus::GpuSizes,
-    outputs::{self, Reach},
-    own_image, windows,
-};
+use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image, windows};
 use crate::limits::Limits;
 use crate::machine::controller;
-use crate::module::{ident, providers};
+use crate::module::providers;
 
 /// Azure creates the administrator with the VM: a name it never reserves, on every machine.
 pub(super) use crate::machine::USER;
@@ -199,15 +194,7 @@ fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     network::blocks(env, m);
     routing::blocks(env, m);
     private_dns::write(env, m);
-    crate::machine::credentials(env, m);
-    MACHINES.write(env, m)?;
-    let reach = Reach {
-        public_ip: &|n| public_ip(&ident(n)),
-        user: super::BASE.user,
-        controller: Some(public_ip("isoloom_controller")),
-    };
-    outputs::write(env, &reach, m);
-    Ok(())
+    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, m)
 }
 
 /// The address Terraform reaches a machine at (`id`: its resource name).
