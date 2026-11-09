@@ -4,9 +4,9 @@
 //! reached through it from outside ([`outputs`]): each published service at its uplink address,
 //! each machine over SSH by it. Each platform makes the VM itself.
 
+use crate::hcl_builder::{Block, Expression, Module, Template, object, reference, string};
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, object, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;

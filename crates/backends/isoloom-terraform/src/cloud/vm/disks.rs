@@ -6,8 +6,8 @@
 //! carries the environment's tags (labels on Google Cloud), as its instance does, for a reaper to
 //! find.
 
+use crate::hcl_builder::{Block, Expression, boolean, call, list, number, reference, string};
 use isoloom_plan::{DataDisk, Environment};
-use isoloom_render::hcl_builder::{Block, Expression, boolean, call, list, number, reference, string};
 
 use super::rules::Volumes;
 use crate::cloud::Cloud;

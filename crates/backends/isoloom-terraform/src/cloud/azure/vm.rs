@@ -24,8 +24,8 @@ mod routing;
 
 pub(super) use machines::{os_disk, source_image};
 
+use crate::hcl_builder::{Expression, Module, reference};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Expression, Module, reference};
 
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};

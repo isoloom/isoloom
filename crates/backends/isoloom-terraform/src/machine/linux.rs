@@ -7,8 +7,8 @@
 //!   runner delivers, then runs the same steps itself (`super::user_data`), a `reboot`
 //!   step ending a part.
 
+use crate::hcl_builder::{Expression, Template, reference};
 use isoloom_plan::{Environment, MachinePlan, MachineShape, Step};
-use isoloom_render::hcl_builder::{Expression, Template, reference};
 use isoloom_render::steps;
 
 use super::provisioner::{Connection, Provisioner, Upload};

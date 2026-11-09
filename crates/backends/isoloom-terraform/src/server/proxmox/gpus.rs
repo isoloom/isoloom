@@ -3,8 +3,8 @@
 //! mapping's name (which an API token may use). The VM is a q35 machine, so the GPU is a PCIe
 //! device. Proxmox can't pick GPUs by count: the spec names them (`gpus.ids`).
 
+use crate::hcl_builder::{Block, boolean, string};
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_render::hcl_builder::{Block, boolean, string};
 use isoloom_spec::model::{GpuCount, Gpus};
 
 /// Why Proxmox can't pass a machine's GPUs through, if it can't.
@@ -82,7 +82,7 @@ mod tests {
         for id in ["gpu0", "01:00.10", "1:00.0", "0000:01:00:00"] {
             assert!(!pci_address(id), "{id}");
         }
-        let mut m = isoloom_render::hcl_builder::Module::new("");
+        let mut m = crate::hcl_builder::Module::new("");
         m.blocks(hostpci(Some(&gpus(json!({ "ids": ["0000:01:00.0", "rtx"] })))));
         let text = m.render().unwrap();
         assert!(

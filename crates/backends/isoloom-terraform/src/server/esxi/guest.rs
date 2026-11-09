@@ -5,7 +5,7 @@
 //! service on Windows: the metadata holds the VM's name and its network configuration (each
 //! interface found by its MAC), the user data its set-up.
 
-use isoloom_render::hcl_builder::{Block, Expression, boolean, call, entry, list, number, object, reference, string};
+use crate::hcl_builder::{Block, Expression, boolean, call, entry, list, number, object, reference, string};
 
 use crate::module::resource;
 use crate::server::slotted;

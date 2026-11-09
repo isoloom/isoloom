@@ -2,7 +2,7 @@
 //! files to upload, then commands in one or more `remote-exec` provisioners, the machine
 //! restarting between two of them.
 
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Template, boolean, call, list, reference, string};
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Template, boolean, call, list, reference, string};
 use isoloom_render::secrets::REACH_DIR;
 
 /// How Terraform reaches the machine.

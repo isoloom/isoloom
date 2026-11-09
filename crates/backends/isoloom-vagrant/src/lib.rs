@@ -43,7 +43,7 @@ mod error;
 mod host_folders;
 pub mod hybrid;
 mod manifest;
-mod ruby;
+pub mod ruby;
 #[cfg(test)]
 mod testing;
 mod vagrantfile;

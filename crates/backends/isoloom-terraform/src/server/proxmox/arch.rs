@@ -4,8 +4,8 @@
 //! `proxmox_username` and `proxmox_password`, not a token), and boots it through the server's
 //! aarch64 UEFI firmware (the `pve-edk2-firmware-aarch64` package).
 
+use crate::hcl_builder::{Block, BlockBuilder, number, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, number, reference, string};
 use isoloom_spec::model::Arch;
 
 use crate::machine::vms;

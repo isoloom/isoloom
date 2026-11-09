@@ -3,8 +3,8 @@
 //! data, the hosts file, Ansible, then a wait for each machine's own set-up (its ready file over
 //! SSH, a Windows machine's marker over WinRM) before the playbooks run.
 
+use crate::hcl_builder::{Expression, Template, call, reference};
 use isoloom_plan::{Environment, MachinePlan, Step};
-use isoloom_render::hcl_builder::{Expression, Template, call, reference};
 use isoloom_render::steps;
 
 use crate::machine::user_data::{SetUp, Tracked, expiry_shutdown, project_wait};

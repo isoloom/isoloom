@@ -13,8 +13,8 @@
 //!   address in that one. The peerings exchange these routes, so a network the gateway isn't on
 //!   reaches it through a peer the gateway is on.
 
+use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
 
 use super::mtu;
 use crate::cloud::instance::name_with;

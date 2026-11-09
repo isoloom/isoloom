@@ -2,8 +2,8 @@
 //! for its variables) and its boot order. Proxmox boots the VM's disk through its own firmware:
 //! a kernel, a firmware file or a network boot of the machine's own are refused, with why.
 
+use crate::hcl_builder::{Block, BlockBuilder, boolean, list, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, boolean, list, reference, string};
 use isoloom_spec::model::{Boot, BootDevice, Firmware};
 
 use crate::machine::vms;

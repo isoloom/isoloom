@@ -5,9 +5,10 @@
 //!
 //! - **The port:** [`backend`] (the [`Backend`](backend::Backend) trait a target's renderer
 //!   implements) and its [`Error`].
-//! - **The builders**, one per language a target writes: [`hcl_builder`] (Terraform), [`ruby`]
-//!   (a Vagrantfile's literals), [`powershell`] (a Windows machine's) and [`inventory`]
-//!   (Ansible's); shell is `isoloom_spec::shell`, below every crate.
+//! - **The builders** more than one backend writes with: [`powershell`] (a Windows machine's
+//!   literals) and [`inventory`] (Ansible's); shell is `isoloom_spec::shell`, below every crate.
+//!   A builder only one backend uses is that backend's own (HCL in `isoloom-terraform`, Ruby in
+//!   `isoloom-vagrant`).
 //! - **The configuration renderers** ([`configure`]): a machine's recipe as the shell and
 //!   PowerShell libraries' calls, the Dockerfile its container builds from, and Isoloom's supervisor,
 //!   the process of a container that runs services.
@@ -45,13 +46,11 @@ pub mod constraints;
 pub mod container;
 pub mod controller;
 mod error;
-pub mod hcl_builder;
 pub mod inventory;
 mod network;
 mod output;
 pub mod powershell;
 pub mod project;
-pub mod ruby;
 pub mod run_manifest;
 pub mod secrets;
 pub mod stable_hash;

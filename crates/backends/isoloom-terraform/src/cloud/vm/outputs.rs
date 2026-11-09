@@ -1,9 +1,9 @@
 //! The outputs every cloud module gives: every machine's public address and SSH user, where to
 //! stand, the ready marker, the checks, the published services.
 
+use crate::hcl_builder::{Expression, Module, Template, null, object, string};
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Expression, Module, Template, null, object, string};
 use isoloom_render::run_manifest::RUNNER;
 use isoloom_spec::model::Target;
 
@@ -120,7 +120,7 @@ fn runner(env: &Environment, reach: &Reach, p: &Position) -> Option<Runner> {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_render::hcl_builder::Module;
+    use crate::hcl_builder::Module;
     use isoloom_spec::model::Target;
 
     use crate::cloud::{aws, azure, digitalocean, gcp, linode, oci};

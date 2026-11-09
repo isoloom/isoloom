@@ -13,9 +13,9 @@
 
 use std::borrow::Cow;
 
+use crate::hcl_builder::{Block, Expression, Module, Template, boolean, list, object, reference, string};
 use isoloom_plan::lifecycle::{SharedRole, Step};
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, boolean, list, object, reference, string};
 use isoloom_spec::model::{MAX_VIRTIOFS, Virtiofs};
 
 use crate::machine::cloud_init::file;

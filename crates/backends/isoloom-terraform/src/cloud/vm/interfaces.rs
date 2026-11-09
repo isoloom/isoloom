@@ -3,9 +3,9 @@
 
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::{Expression, Template};
 use indexmap::IndexMap;
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Expression, Template};
 use isoloom_spec::validate::Cidr;
 
 /// The commands bringing up the interfaces after the first (found by MAC, `mac(network)` the

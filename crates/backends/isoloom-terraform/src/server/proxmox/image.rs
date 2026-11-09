@@ -2,8 +2,8 @@
 //! machine, or the id of a Linux template VM on the node, cloned with its disk grown. A Windows
 //! machine boots its OS's template (`windows`), so its own image is refused.
 
+use crate::hcl_builder::{Block, Expression, Module, boolean};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Expression, Module, boolean};
 
 use super::machine::Boot;
 use crate::machine::vms;

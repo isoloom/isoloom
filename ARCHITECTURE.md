@@ -19,11 +19,12 @@ Supporting the backbone:
 
 - **`isoloom-catalogue`** — packaged services (entries, release matching, typed `with:` settings,
   parity contracts), resolved during lowering.
-- **`isoloom-render`** — the `Backend` trait and the builders every backend shares (HCL, YAML,
-  shell, PowerShell, Dockerfile, and Ruby's string quoting; the Vagrantfile's Ruby builder is
-  `isoloom-vagrant`'s), plus the configuration renderers and the shared container pieces.
-- **`isoloom-manifest`** — the run manifest types, its generated JSON schema and the fixtures both
-  Isoloom and a runner test against.
+- **`isoloom-render`** — the `Backend` trait and the builders more than one backend uses
+  (PowerShell, Dockerfile, the Ansible inventory), plus the configuration renderers and the shared
+  container pieces. A builder only one backend uses is that backend's: the HCL builder is
+  `isoloom-terraform`'s, the Ruby one (string quoting included) `isoloom-vagrant`'s.
+- **`isoloom-manifest`** — the run manifest types, its generated JSON schema and the fixtures
+  runners can test against.
 - **`isoloom-import`** — the reverse direction: a spec drafted from Compose, Vagrant or Terraform
   files.
 - **`isoloom-targets`** — every backend behind one call, the composite targets, refusals, the

@@ -2,9 +2,9 @@
 //! Windows machine's cloudbase-init script, and its VM; and the pieces the router and the
 //! controller are made of too.
 
+use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
 use isoloom_plan::checks::{Position, Probe, by_position};
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
 use isoloom_render::router;
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::{DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};

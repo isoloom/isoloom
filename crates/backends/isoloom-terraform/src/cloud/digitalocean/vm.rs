@@ -4,8 +4,8 @@
 //! lab's fixed inter-machine addressing wouldn't hold: the module takes only single-network,
 //! single-Linux-VM labs and refuses the rest.
 
+use crate::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_spec::DEFAULT_MEMORY_MB;
 
 use super::{Way, rule, ssh_key, vpc};

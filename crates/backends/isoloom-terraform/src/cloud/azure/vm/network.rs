@@ -3,8 +3,8 @@
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, number, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, list, number, reference, string};
 
 use crate::cloud::instance::name_with;
 use crate::module::{ident, resource};

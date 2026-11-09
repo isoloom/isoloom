@@ -34,6 +34,7 @@ mod checks;
 mod cloud;
 mod docker_host;
 mod error;
+pub mod hcl_builder;
 mod limits;
 mod machine;
 mod module;

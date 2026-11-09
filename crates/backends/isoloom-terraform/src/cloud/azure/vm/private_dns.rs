@@ -4,9 +4,9 @@
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, list, number, reference, string};
 use isoloom_plan::Environment;
 use isoloom_plan::private_dns::{PrivateDns, Record};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list, number, reference, string};
 
 use crate::cloud::vm::private_dns::{TTL, address, records};
 use crate::module::{ident, resource};

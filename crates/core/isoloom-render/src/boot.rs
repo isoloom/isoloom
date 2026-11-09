@@ -50,33 +50,17 @@ pub fn at_boot(name: &str, what: &str, script: &str, trigger: Trigger, after: &[
     })
 }
 
-/// How a [`service`] runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Kind {
-    /// Runs to its end, now and at every boot; a failure fails the step that installs it
-    /// (a machine's `before` scripts).
-    Once,
-    /// Keeps running, restarted when it fails (a machine's own command).
-    Daemon,
-}
-
 /// `script` saved as `/etc/isoloom/<name>.sh` and run as the systemd service `isoloom-<name>`,
-/// started now and at every boot after (and requiring) `after`'s: [`at_boot`]'s script and
-/// unit, for a step whose failure matters (`Kind::Once`) or a process that keeps running
-/// (`Kind::Daemon`).
+/// a process that keeps running (restarted when it fails), started now and at every boot after
+/// (and requiring) `after`'s: [`at_boot`]'s script and unit, for a machine's own command.
 ///
-/// Without systemd (OpenRC: Alpine), it runs from `/etc/local.d` at boot (in the background
-/// for a daemon, its output in `/var/log/isoloom-<name>.log`), and now.
+/// Without systemd (OpenRC: Alpine), it runs from `/etc/local.d` at boot, in the background, its
+/// output in `/var/log/isoloom-<name>.log`, and now.
 #[must_use]
-pub fn service(name: &str, what: &str, script: &str, kind: Kind, after: &[&str]) -> String {
+pub(crate) fn service(name: &str, what: &str, script: &str, after: &[&str]) -> String {
     let path = format!("/etc/isoloom/{name}.sh");
-    let (service, now) = match kind {
-        Kind::Once => (format!("Type=oneshot\nRemainAfterExit=yes\nExecStart={path}"), path.clone()),
-        Kind::Daemon => (
-            format!("Type=simple\nExecStart={path}\nRestart=on-failure\nRestartSec=2"),
-            format!("nohup {path} >/var/log/isoloom-{name}.log 2>&1 &"),
-        ),
-    };
+    let service = format!("Type=simple\nExecStart={path}\nRestart=on-failure\nRestartSec=2");
+    let now = format!("nohup {path} >/var/log/isoloom-{name}.log 2>&1 &");
     let start = format!("/etc/local.d/isoloom-{name}.start");
     install(&Unit {
         name,
@@ -145,11 +129,11 @@ fn install(u: &Unit) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Kind, Trigger, at_boot, service};
+    use super::{Trigger, at_boot, service};
 
     #[test]
-    fn a_daemon_restarts_and_a_step_fails_its_setup() {
-        let sh = service("command", "The machine's command", "exec app\n", Kind::Daemon, &["before"]);
+    fn a_daemon_restarts_and_requires_what_it_runs_after() {
+        let sh = service("command", "The machine's command", "exec app\n", &["before"]);
         assert!(
             sh.contains("cat > /etc/isoloom/command.sh <<'COMMAND'\n#!/bin/sh\n# The machine's command\nexec app\nCOMMAND\n"),
             "{sh}"
@@ -160,9 +144,6 @@ mod tests {
             "{sh}"
         );
         assert!(sh.contains("nohup /etc/isoloom/command.sh >/var/log/isoloom-command.log 2>&1 &"), "{sh}");
-        let once = service("before", "Before", "sh x.sh\n", Kind::Once, &[]);
-        assert!(once.contains("Type=oneshot\nRemainAfterExit=yes\nExecStart=/etc/isoloom/before.sh\n"), "{once}");
-        assert!(!once.contains("ExecStart=-") && !once.contains("Requires="), "a failure is reported: {once}");
     }
 
     #[test]

@@ -7,8 +7,8 @@
 //! The rules take effect where the datacenter's firewall is on (Datacenter, Firewall, Options):
 //! Isoloom doesn't turn it on, as that changes the server's own rules.
 
+use crate::hcl_builder::{Block, Expression, Module, Template, boolean, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, boolean, reference, string};
 use isoloom_render::router;
 
 use crate::module::ident;

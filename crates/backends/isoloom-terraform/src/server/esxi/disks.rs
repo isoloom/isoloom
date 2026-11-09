@@ -3,8 +3,8 @@
 //! machine's `Disks` step finds each one by its size, then formats and mounts it (see
 //! `isoloom_render::disks`): the module only makes and attaches them.
 
+use crate::hcl_builder::{Expression, Module, number, reference, string};
 use isoloom_plan::{DataDisk, Environment};
-use isoloom_render::hcl_builder::{Expression, Module, number, reference, string};
 
 use super::guest::MAX_DISKS;
 use crate::machine::vms;

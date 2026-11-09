@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-render"
-description = "What every Isoloom backend renders with: the backend port, the builders (HCL, Ruby, PowerShell, Dockerfile, the Ansible inventory), a VM's set-up steps, the network pieces and the containers' shared parts."
+description = "What every Isoloom backend renders with: the backend port, the shared builders (PowerShell, Dockerfile, the Ansible inventory), a VM's set-up steps, the network pieces and the containers' shared parts."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -19,7 +19,6 @@ isoloom-plan.workspace = true
 isoloom-manifest.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
-hcl.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 # The cloud-init carrier compresses a recipe's script for `write_files` (`encoding: gz+b64`).

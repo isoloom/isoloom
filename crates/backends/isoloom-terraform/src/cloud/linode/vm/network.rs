@@ -5,8 +5,8 @@
 //! dropped. Out: the `reach` rules out of its network, then nothing to the environment's other
 //! networks; the rest (its own network, the internet) is accepted. Replies come back either way.
 
+use crate::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
 use isoloom_spec::validate::Cidr;
 
 use crate::cloud::instance::name_with;

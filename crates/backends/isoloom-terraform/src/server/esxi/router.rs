@@ -3,8 +3,8 @@
 //! internet (the same ruleset). VMware Tools reports its uplink address: the published ports
 //! are reached there, and Terraform reaches the machines through it.
 
+use crate::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, list, not, reference, string};
 use isoloom_plan::{Environment, ipv6};
-use isoloom_render::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, list, not, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::{Cidr, IPV6_PREFIX};

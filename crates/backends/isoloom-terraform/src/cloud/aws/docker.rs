@@ -2,9 +2,9 @@
 //! of the Docker host's OS from AWS's image table (it terminates on shutdown, so its expiry ends
 //! it), every resource tagged as on `cloud-vm` (the shared provider).
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, call, list, object, reference, string};
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, call, list, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{ec2_instance, egress, first_zone, ingress, instance_type, key_pair, root_disk, route_out, vm, zones};

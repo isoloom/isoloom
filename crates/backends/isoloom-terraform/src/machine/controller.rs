@@ -5,10 +5,10 @@
 
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::{Expression, Module, Template, call, reference, string};
 use indexmap::IndexMap;
 use isoloom_plan::addressing::{address, names_of};
 use isoloom_plan::{Controller, Environment, Step};
-use isoloom_render::hcl_builder::{Expression, Module, Template, call, reference, string};
 use isoloom_render::inventory::{self, Access, WinrmAuth};
 use isoloom_render::{controller, steps};
 use isoloom_spec::validate::Cidr;

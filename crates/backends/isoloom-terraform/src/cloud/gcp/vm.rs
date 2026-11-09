@@ -23,8 +23,8 @@ mod private_dns;
 
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::Module;
 use isoloom_plan::{Environment, NetworkPlan};
-use isoloom_render::hcl_builder::Module;
 use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 

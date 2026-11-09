@@ -1,8 +1,8 @@
 //! Linode's `cloud-docker` module: an instance of the Docker host's OS with the operator's key,
 //! behind a firewall.
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{Action, Way, rule, vm};

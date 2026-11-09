@@ -8,8 +8,8 @@
 
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::{BlockBuilder, boolean, list, string};
 use isoloom_plan::MachinePlan;
-use isoloom_render::hcl_builder::{BlockBuilder, boolean, list, string};
 
 /// The further addresses of a machine on one network: those AWS takes one by one, and the /28
 /// prefixes it takes whole.

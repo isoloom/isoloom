@@ -6,8 +6,8 @@
 
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::{Block, Expression, Module, attr, index, list, reference, string};
 use isoloom_plan::MachinePlan;
-use isoloom_render::hcl_builder::{Block, Expression, Module, attr, index, list, reference, string};
 
 use crate::cloud::instance::name_with;
 use crate::module::ident;

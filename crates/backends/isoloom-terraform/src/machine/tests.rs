@@ -1,8 +1,8 @@
 //! The VM core on small plans: the transports split the steps at a reboot, the hooks land where
 //! they say.
 
+use crate::hcl_builder::{Expression, Module, Template, reference, string};
 use isoloom_plan::{Environment, Step};
-use isoloom_render::hcl_builder::{Expression, Module, Template, reference, string};
 use isoloom_spec::model::Target;
 
 use super::Remote;

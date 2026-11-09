@@ -6,9 +6,10 @@
 //! parser.
 
 use hcl::Expression;
-use isoloom_render::hcl_builder::{Block, Module, Template, list, object, reference, string};
-use isoloom_render::{powershell, ruby};
+use isoloom_render::powershell;
 use isoloom_spec::shell::quote;
+use isoloom_terraform::hcl_builder::{Block, Module, Template, list, object, reference, string};
+use isoloom_vagrant::ruby;
 use proptest::prelude::*;
 
 #[path = "quoting/literals.rs"]

@@ -6,9 +6,9 @@
 //! reaches it the way it reaches a cloud's Windows machines, and the controller waits for its
 //! ready marker over WinRM before running the playbooks (`controller::windows_waits`).
 
+use crate::hcl_builder::{Expression, Template, call, for_list, reference, string};
 use isoloom_plan::lifecycle::has_extension;
 use isoloom_plan::{Environment, MachinePlan, Step};
-use isoloom_render::hcl_builder::{Expression, Template, call, for_list, reference, string};
 use isoloom_render::steps;
 
 use super::{vms, windows};

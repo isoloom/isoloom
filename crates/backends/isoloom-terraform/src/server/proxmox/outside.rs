@@ -3,8 +3,8 @@
 //! named, tagged with the VLAN when one is given). Isoloom makes no VNet for them, and the
 //! router and the controller aren't on them.
 
+use crate::hcl_builder::{Block, number, reference, string};
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
-use isoloom_render::hcl_builder::{Block, number, reference, string};
 use isoloom_spec::validate::Cidr;
 
 use super::machine::ip_config;
@@ -50,7 +50,7 @@ mod tests {
             Target::Proxmox,
         );
         let mp = &env.machines["a"];
-        let mut body = isoloom_render::hcl_builder::Module::new("");
+        let mut body = crate::hcl_builder::Module::new("");
         for (device, ip) in interfaces(&env, mp) {
             body.block(device);
             body.block(ip);

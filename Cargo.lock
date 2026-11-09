@@ -724,7 +724,6 @@ name = "isoloom-render"
 version = "1.0.9"
 dependencies = [
  "flate2",
- "hcl-rs",
  "indexmap",
  "insta",
  "isoloom-manifest",
@@ -759,6 +758,7 @@ name = "isoloom-targets"
 version = "1.0.9"
 dependencies = [
  "criterion",
+ "hcl-rs",
  "insta",
  "isoloom-ansible",
  "isoloom-compose",
@@ -781,6 +781,7 @@ dependencies = [
 name = "isoloom-terraform"
 version = "1.0.9"
 dependencies = [
+ "hcl-rs",
  "indexmap",
  "insta",
  "isoloom-manifest",

@@ -1,8 +1,8 @@
 //! A machine's published ports, on its own primary VNIC only: a network security group of its
 //! own, one rule per port, so a port opens on the machine that publishes it and no other.
 
+use crate::hcl_builder::{Block, Expression, Module, number, reference, string};
 use isoloom_plan::MachinePlan;
-use isoloom_render::hcl_builder::{Block, Expression, Module, number, reference, string};
 
 use crate::cloud::instance::name_with;
 use crate::cloud::oci::owned;

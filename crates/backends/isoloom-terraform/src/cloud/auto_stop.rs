@@ -5,7 +5,7 @@
 //! same: `crate::machine::user_data::expiry_only`). The Docker host on a Proxmox server keeps
 //! its `auto_stop_minutes`.
 
-use isoloom_render::hcl_builder::{BinaryOperator, Expression, Template, binary, conditional, reference, string};
+use crate::hcl_builder::{BinaryOperator, Expression, Template, binary, conditional, reference, string};
 
 /// `var.expires_at != "" ? <yes> : <no>`: whether the run has an end.
 pub(crate) fn if_expires(yes: Expression, no: Expression) -> Expression {

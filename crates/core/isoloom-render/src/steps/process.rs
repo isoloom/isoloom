@@ -8,7 +8,7 @@ use isoloom_spec::model::CommandLine;
 use isoloom_spec::shell::quote;
 
 use super::{MAKE_STATE_DIR, PROJECT_DIR, WINDOWS_PROJECT_DIR, inputs_file};
-use crate::boot::{self, Kind};
+use crate::boot;
 use crate::powershell;
 use crate::secrets;
 
@@ -44,7 +44,7 @@ pub(super) fn command(env: &Environment, machine: &str) -> Option<String> {
     let mp = env.machines.get(machine)?;
     let line = mp.process.command.as_ref()?.argv().iter().map(|a| quote(a)).collect::<Vec<_>>().join(" ");
     let script = format!("{}exec {line}\n", prelude(env, machine, mp));
-    Some(boot::service("command", "The machine's own command", &script, Kind::Daemon, &secrets_first(mp)))
+    Some(boot::service("command", "The machine's own command", &script, &secrets_first(mp)))
 }
 
 /// Marks a machine's `setup` scripts as run: they run once, not at every provisioning.

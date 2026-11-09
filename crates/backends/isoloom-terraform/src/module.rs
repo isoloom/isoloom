@@ -9,7 +9,7 @@ pub(crate) mod providers;
 mod usage;
 pub(crate) mod variable;
 
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, number};
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, number};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, project};
 use isoloom_spec::model::Target;
 
@@ -102,7 +102,7 @@ mod tests {
         assert!(archived.contents.contains("local_file\" \"isoloom_project\""), "{}", archived.contents);
         assert!(!archived.contents.contains("project_paths"), "{}", archived.contents);
         let mut reading = start(&usage);
-        reading.block(output("files", isoloom_render::hcl_builder::reference("local.project_paths")));
+        reading.block(output("files", crate::hcl_builder::reference("local.project_paths")));
         let written = file(Target::Proxmox, "t", reading, ProjectCopy::Files).unwrap();
         assert!(written.contents.contains("  project_paths = [for f"), "{}", written.contents);
         assert!(

@@ -2,7 +2,7 @@
 //! `terraform` block requiring them. `~> X.Y.Z` takes that version's patch releases only, so a
 //! module never runs on a provider whose schema it wasn't written against.
 
-use isoloom_render::hcl_builder::{Block, object, string};
+use crate::hcl_builder::{Block, object, string};
 
 /// A provider a module requires.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

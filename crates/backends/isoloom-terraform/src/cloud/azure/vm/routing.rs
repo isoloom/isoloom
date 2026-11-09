@@ -8,8 +8,8 @@
 //! The machines keep their own public addresses (Terraform sets them up over SSH there), so a
 //! routed network still goes out to the internet directly rather than through its gateway.
 
+use crate::hcl_builder::{Module, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Module, reference, string};
 
 use super::network::placed;
 use crate::cloud::instance::name_with;

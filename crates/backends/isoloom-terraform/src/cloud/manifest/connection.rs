@@ -254,12 +254,12 @@ mod tests {
     #[test]
     fn the_runner_sets_the_key_the_expiry_and_the_seal_and_the_account_is_required() {
         let vars = [
-            Variable::new("region", "string").default(isoloom_render::hcl_builder::string("x")),
-            Variable::new("subscription_id", "string").default(isoloom_render::hcl_builder::null()),
+            Variable::new("region", "string").default(crate::hcl_builder::string("x")),
+            Variable::new("subscription_id", "string").default(crate::hcl_builder::null()),
             Variable::new("allowed_cidr", "string"),
             Variable::new("ssh_public_key", "string"),
-            Variable::new("expires_at", "string").default(isoloom_render::hcl_builder::string("")),
-            Variable::new(SEALED, "bool").default(isoloom_render::hcl_builder::boolean(false)),
+            Variable::new("expires_at", "string").default(crate::hcl_builder::string("")),
+            Variable::new(SEALED, "bool").default(crate::hcl_builder::boolean(false)),
         ];
         let p = params(&vars, Cloud::Azure).unwrap();
         let named = |n: &str| p.iter().find(|x| x.name.as_str() == n);

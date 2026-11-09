@@ -19,7 +19,7 @@ use isoloom_render::boot::{self, Trigger};
 use isoloom_render::configure::cloud_init::gzip;
 
 use crate::cloud::user_data_limit::Limit;
-use isoloom_render::hcl_builder::{Expression, Piece, Template, reference};
+use crate::hcl_builder::{Expression, Piece, Template, reference};
 use isoloom_render::run_manifest::RUNNER;
 use isoloom_render::steps::wait_for_mark;
 use isoloom_spec::model::Target;

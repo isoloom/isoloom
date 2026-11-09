@@ -5,8 +5,8 @@
 pub(crate) mod docker;
 pub(crate) mod vm;
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, index, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, index, reference, string};
 
 use super::Base;
 use crate::cloud::instance;

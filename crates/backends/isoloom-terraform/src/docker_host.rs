@@ -4,8 +4,8 @@
 //! host sets itself up from its user data (`crate::cloud::docker::setup`), and the Proxmox one
 //! through the docker-vm run manifest.
 
+use crate::hcl_builder::{Expression, list, string};
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_render::hcl_builder::{Expression, list, string};
 use isoloom_spec::model::Protocol;
 
 /// The ports the containers publish over `protocol`, sorted, each once.

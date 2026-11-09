@@ -1,5 +1,5 @@
 //! The one Ruby builder every Vagrantfile is written with: code is assembled from typed pieces,
-//! every string goes through [`ruby::quote`] (so no value can end a literal or interpolate), and the
+//! every string goes through [`quote`] (so no value can end a literal or interpolate), and the
 //! indentation follows the block nesting instead of being spelled out in format strings.
 //!
 //! - [`Value`]: one Ruby expression. [`Value::str`] quotes text, [`Value::raw`] takes code
@@ -23,16 +23,27 @@
 
 use std::fmt;
 
-use isoloom_render::ruby;
+/// A Ruby double-quoted string literal reading as `s`: backslashes and quotes escaped, and every
+/// `#` that could start an interpolation (`#{...}`, `#$global`, `#@ivar`) made literal.
+#[must_use]
+pub fn quote(s: &str) -> String {
+    let escaped = s
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace("#{", "\\#{")
+        .replace("#$", "\\#$")
+        .replace("#@", "\\#@");
+    format!("\"{escaped}\"")
+}
 
 /// One Ruby expression, already written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Value(String);
 
 impl Value {
-    /// A string literal holding `text`, quoted by [`ruby::quote`].
+    /// A string literal holding `text`, quoted by [`quote`].
     pub(crate) fn str(text: &str) -> Value {
-        Value(ruby::quote(text))
+        Value(quote(text))
     }
 
     /// Ruby code as written: an expression Isoloom composes itself, never user text.
@@ -468,7 +479,13 @@ fn closing_tag(tag: &str, script: &str) -> String {
 mod tests {
     use proptest::prelude::*;
 
-    use super::{Call, Provision, Ruby, Value, closing_tag};
+    use super::{Call, Provision, Ruby, Value, closing_tag, quote};
+
+    #[test]
+    fn quotes_backslashes_and_interpolations_are_escaped() {
+        assert_eq!(quote(r#"a"b\c"#), r#""a\"b\\c""#);
+        assert_eq!(quote("#{x} #$y #@z # {"), r#""\#{x} \#$y \#@z # {""#);
+    }
 
     #[test]
     fn a_vagrantfile_is_written_from_typed_pieces() {

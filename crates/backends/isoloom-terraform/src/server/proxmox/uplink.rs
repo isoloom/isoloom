@@ -6,7 +6,7 @@
 //! index with no reason. The address is read with `try`, so a destroy after such a failure still
 //! runs.
 
-use isoloom_render::hcl_builder::{BinaryOperator, Block, Expression, Template, binary, boolean, call, for_list, index, list, not, number, reference, string};
+use crate::hcl_builder::{BinaryOperator, Block, Expression, Template, binary, boolean, call, for_list, index, list, not, number, reference, string};
 
 /// How long the provider waits for the agent's address: the slowest boot measured, and margin.
 const AGENT_WAIT: &str = "8m";

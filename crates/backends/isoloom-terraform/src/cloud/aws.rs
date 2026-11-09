@@ -5,7 +5,7 @@
 pub(crate) mod docker;
 pub(crate) mod vm;
 
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, boolean, index, list, number, reference, string};
+use crate::hcl_builder::{Block, BlockBuilder, Expression, boolean, index, list, number, reference, string};
 
 use super::{Base, instance, operator};
 use crate::module::variable::Variable;

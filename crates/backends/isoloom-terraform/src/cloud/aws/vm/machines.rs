@@ -2,10 +2,8 @@
 //! own user data through the VM core; the Windows machines' and the controller's.
 
 use crate::cloud::user_data_limit::Limit;
+use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string,
-};
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 

@@ -6,8 +6,8 @@
 //!   it from the instance's metadata service (`super::metadata`) and puts it on the interface
 //!   holding the machine's IPv4 address there, at every boot.
 
+use crate::hcl_builder::{Block, BlockBuilder, Template, boolean, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Template, boolean, string};
 use isoloom_spec::model::Ipv6Addresses;
 use isoloom_spec::validate::IPV6_PREFIX;
 

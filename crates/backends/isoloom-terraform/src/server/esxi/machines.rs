@@ -3,8 +3,8 @@
 //! transports (its steps from the plan), a Windows one by cloudbase-init at its first boot; the
 //! controller runs the playbooks once every machine is set up.
 
+use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Expression, Module, reference, string};
 use isoloom_render::inventory::Access;
 use isoloom_render::router;
 use isoloom_spec::validate::Cidr;

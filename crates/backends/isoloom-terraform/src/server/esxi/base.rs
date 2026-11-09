@@ -2,8 +2,8 @@
 //! connection to the host, the locals every VM shares, the generated credentials, and the
 //! networks (`networks`, `outside`).
 
+use crate::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, for_list, list, number, object, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, for_list, list, number, object, reference, string};
 
 use super::{SERVICE_OS, default_image};
 use crate::machine::credentials;

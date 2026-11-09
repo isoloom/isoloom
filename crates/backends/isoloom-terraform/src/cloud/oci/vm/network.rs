@@ -17,8 +17,8 @@
 //!   prefixes itself; no IPv6 route leaves it, since Oracle Cloud routes no private prefix to
 //!   the internet (machines go out over IPv4).
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, index, list, number, reference, string};
 use isoloom_plan::{Environment, NetworkPlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, index, list, number, reference, string};
 
 use crate::cloud::instance::name_with;
 use crate::cloud::oci::{owned, route_out};

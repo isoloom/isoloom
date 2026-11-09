@@ -3,7 +3,7 @@
 //! early, or something in it would expand). The quoting properties (`tests/quoting.rs`) and the fuzz
 //! target (`fuzz/fuzz_targets/quoting.rs`) both check that every literal reads back as its text.
 
-use isoloom_render::hcl_builder::{Block, Module, string};
+use isoloom_terraform::hcl_builder::{Block, Module, string};
 
 /// The literal the HCL builder writes for a string value (`v = <literal>` in a block); `None`
 /// when the module can't be written.

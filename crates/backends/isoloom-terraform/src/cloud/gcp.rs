@@ -5,10 +5,8 @@
 pub(crate) mod docker;
 pub(crate) mod vm;
 
+use crate::hcl_builder::{BinaryOperator, Block, Expression, Module, Template, attr, binary, boolean, conditional, index, null, number, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, Expression, Module, Template, attr, binary, boolean, conditional, index, null, number, reference, string,
-};
 
 use super::Base;
 use crate::module::variable::Variable;

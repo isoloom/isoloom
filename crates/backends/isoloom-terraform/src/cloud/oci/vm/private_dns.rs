@@ -1,8 +1,8 @@
 //! The private DNS zone on Oracle Cloud: a private view holding the zone and its records,
 //! attached to the VCN's own resolver.
 
+use crate::hcl_builder::{Block, Module, number, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Module, number, reference, string};
 
 use crate::cloud::oci::owned;
 use crate::cloud::vm::private_dns::{TTL, records};

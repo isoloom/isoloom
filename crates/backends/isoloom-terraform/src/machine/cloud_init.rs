@@ -6,11 +6,11 @@
 //! cloud-init's own: each found by its serial (the disk's name, as the target attaches it),
 //! partitioned, formatted with its name as the label and mounted from `/etc/fstab`.
 
+use crate::hcl_builder::{Expression, boolean, call, list, object, string};
 use isoloom_plan::configure::Resource;
 use isoloom_plan::{DataDisk, Environment, MachinePlan, Step};
 use isoloom_render::configure::Configured;
 use isoloom_render::configure::cloud_init as cloud_init_carrier;
-use isoloom_render::hcl_builder::{Expression, boolean, call, list, object, string};
 use isoloom_render::steps::{self, READY_FILE};
 
 use isoloom_spec::shell::quote;

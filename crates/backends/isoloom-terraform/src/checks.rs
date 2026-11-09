@@ -2,10 +2,10 @@
 //! addresses as the machines have them), and the `checks` output saying which machine runs each
 //! (Proxmox, ESXi, `cloud-vm`).
 
+use crate::hcl_builder::{Block, Expression, list, object, string};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position};
 use isoloom_render::checks::{address_of, script_command};
-use isoloom_render::hcl_builder::{Block, Expression, list, object, string};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 
 use crate::module::output;

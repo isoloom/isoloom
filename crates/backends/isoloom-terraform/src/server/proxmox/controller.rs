@@ -3,8 +3,8 @@
 //! Its cloud-init carries the project, its key and the inventory; it then waits for each
 //! machine's ready marker (over SSH, over WinRM on Windows) and runs the playbooks.
 
+use crate::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
-use isoloom_render::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_render::steps;
 use isoloom_spec::validate::Cidr;
 

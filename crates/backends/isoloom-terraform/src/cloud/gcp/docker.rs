@@ -1,9 +1,9 @@
 //! Google Cloud's `cloud-docker` module: a project of its own unless one is given, a network
 //! and subnet, a firewall, and an instance of the Docker host's OS.
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{public_ip, vm};

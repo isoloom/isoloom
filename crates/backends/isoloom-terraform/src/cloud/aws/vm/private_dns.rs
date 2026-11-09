@@ -2,8 +2,8 @@
 //! A records. The VPC resolves through Route 53 (`enable_dns_support`, `enable_dns_hostnames`:
 //! see `network`).
 
+use crate::hcl_builder::{Block, Module, number, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Module, number, reference, string};
 
 use crate::cloud::vm::private_dns::{TTL, address, records};
 use crate::module::resource;

@@ -2,9 +2,9 @@
 //! security list, a subnet, and an instance of the Docker host's OS from Oracle Cloud's image
 //! table: Ubuntu (Oracle Cloud has no Debian image of its own).
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{SHAPE, availability_domain, availability_domains, owned, route_out, ubuntu_images, vm};

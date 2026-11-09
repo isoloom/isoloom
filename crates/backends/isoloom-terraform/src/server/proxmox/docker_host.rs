@@ -9,9 +9,9 @@
 
 pub use super::manifest::docker_vm::docker_vm as manifest;
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, boolean, list, number, reference, string};
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, boolean, list, number, reference, string};
 use isoloom_render::run_manifest::guest::{self, GuestCompose};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::Target;
@@ -154,8 +154,8 @@ fn vm(env: &Environment) -> Block {
 
 #[cfg(test)]
 mod tests {
+    use crate::hcl_builder::Module;
     use isoloom_render::container::HostSize;
-    use isoloom_render::hcl_builder::Module;
     use isoloom_spec::model::Target;
 
     /// The VM's disk is the containers' host's (`HostSize`): at least its floor, more when the

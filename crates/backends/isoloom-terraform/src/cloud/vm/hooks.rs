@@ -2,9 +2,9 @@
 //! before the machine closes itself off, and the steps the cloud's network does itself left out;
 //! and the machine's user data, the set-up it runs itself (`crate::machine::user_data`).
 
+use crate::hcl_builder::{Expression, Template};
 use isoloom_plan::{Environment, MachinePlan, Step};
 use isoloom_render::boot::{self, Trigger};
-use isoloom_render::hcl_builder::{Expression, Template};
 use isoloom_render::steps;
 use isoloom_spec::shell::quote;
 
@@ -82,7 +82,7 @@ const PUBLISH_NFT: &str = "/etc/isoloom-publish.nft";
 mod tests {
     use isoloom_spec::model::Target;
 
-    use isoloom_render::hcl_builder::Piece;
+    use crate::hcl_builder::Piece;
 
     use super::redirects;
     use crate::testing::environment;

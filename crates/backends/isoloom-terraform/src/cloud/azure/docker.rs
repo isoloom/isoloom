@@ -2,9 +2,9 @@
 //! static public address, a security group, and a VM of the Docker host's OS, every resource
 //! tagged.
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, number, reference, string};
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, number, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::vm::{self, USER};

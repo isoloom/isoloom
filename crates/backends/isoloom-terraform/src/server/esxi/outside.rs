@@ -5,8 +5,8 @@
 //! vSwitch); tagged with the VLAN when one is given. The router and the controller aren't on
 //! them, as on Proxmox.
 
+use crate::hcl_builder::{Block, Expression, Module, number, reference, string};
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
-use isoloom_render::hcl_builder::{Block, Expression, Module, number, reference, string};
 use isoloom_spec::validate::Cidr;
 
 use super::guest::Nic;

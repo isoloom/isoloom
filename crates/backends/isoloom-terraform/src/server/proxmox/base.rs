@@ -2,10 +2,10 @@
 //! connection, the locals every VM shares, the pool, the networks (an SDN zone, a VNet each),
 //! the generated credentials and the cloud images.
 
-use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{
+use crate::hcl_builder::{
     BinaryOperator, Block, Expression, Module, Template, binary, boolean, call, conditional, for_list, list, null, number, object, reference, string,
 };
+use isoloom_plan::Environment;
 
 use super::pinned;
 use crate::machine::credentials;

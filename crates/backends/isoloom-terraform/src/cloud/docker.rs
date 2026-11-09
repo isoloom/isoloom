@@ -19,10 +19,10 @@
 
 pub(crate) mod manifest;
 
+use crate::hcl_builder::{Expression, Module, string};
 use isoloom_plan::Environment;
 use isoloom_render::backend::{Files, Placed};
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Expression, Module, string};
 use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::Target;

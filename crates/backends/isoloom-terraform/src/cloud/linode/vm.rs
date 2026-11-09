@@ -9,8 +9,8 @@ mod network;
 
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::{Block, Expression, Module, Template, boolean, call, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, boolean, call, list, reference, string};
 use isoloom_spec::DEFAULT_MEMORY_MB;
 
 use crate::cloud::Cloud;

@@ -1,6 +1,6 @@
 //! A module's `variable` blocks, built up.
 
-use isoloom_render::hcl_builder::{Block, Expression, boolean, reference, string};
+use crate::hcl_builder::{Block, Expression, boolean, reference, string};
 use isoloom_render::run_manifest::RUNNER;
 
 /// A `variable` block, built up.
@@ -147,7 +147,7 @@ pub(crate) fn ssh_public_key(runner: bool) -> Variable {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_render::hcl_builder::Module;
+    use crate::hcl_builder::Module;
 
     use super::*;
 

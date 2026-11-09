@@ -2,8 +2,8 @@
 //! managed zone visible from every network's VPC network, and its A records (names end with a
 //! dot).
 
+use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
 
 use crate::cloud::instance::name_with;
 use crate::cloud::vm::private_dns::{TTL, address, records};

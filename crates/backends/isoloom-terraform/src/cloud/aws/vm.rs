@@ -23,8 +23,8 @@ mod outputs;
 mod private_dns;
 mod routing;
 
+use crate::hcl_builder::{Block, BlockBuilder, Module, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, string};
 use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 

@@ -6,8 +6,8 @@
 use std::borrow::Cow;
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::Template;
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan, Step};
-use isoloom_render::hcl_builder::Template;
 use isoloom_spec::validate::Cidr;
 
 /// The networks a machine routes, each with that machine, in spec order.

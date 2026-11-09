@@ -34,11 +34,11 @@ pub(crate) mod windows;
 
 use std::net::Ipv4Addr;
 
+use crate::hcl_builder::Module;
 use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
 use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{Backend, Files, Placed};
-use isoloom_render::hcl_builder::Module;
 use isoloom_spec::model::Target;
 
 use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};

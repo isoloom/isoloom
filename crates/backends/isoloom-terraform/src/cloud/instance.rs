@@ -2,10 +2,8 @@
 //! instances of one spec never collide), its project root, the tags or labels every resource
 //! carries (what a reaper reads), and the `lifecycle` of a VM set up once from its user data.
 
+use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Template, binary, call, conditional, list, number, object, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Template, binary, call, conditional, list, number, object, reference, string,
-};
 
 /// The labels on every resource: the environment, who manages it, its instance and its expiry
 /// (what a reaper reads).

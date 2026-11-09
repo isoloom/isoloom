@@ -21,8 +21,8 @@ pub(crate) mod vm;
 
 use std::fmt;
 
+use crate::hcl_builder::{Expression, Module};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Expression, Module};
 
 use crate::module::variable::Variable;
 use crate::module::{ProjectCopy, Usage};

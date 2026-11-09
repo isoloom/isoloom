@@ -4,8 +4,8 @@
 //! (`crate::cloud::<cloud>::vm::private_dns`). DigitalOcean and Linode have no private DNS: their
 //! VMs' hosts files carry the names, as on every VM target.
 
+use crate::hcl_builder::{Expression, list, string};
 use isoloom_plan::private_dns::{PrivateDns, Record};
-use isoloom_render::hcl_builder::{Expression, list, string};
 
 use crate::module::ident;
 

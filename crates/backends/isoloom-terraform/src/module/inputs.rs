@@ -1,8 +1,8 @@
 //! The spec's launch-time inputs (`inputs:`): the `inputs` variable a module takes them in, and
 //! the inputs file a machine reads them from.
 
+use crate::hcl_builder::{Block, Expression, Template, call, list, object, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, Expression, Template, call, list, object, reference, string};
 use isoloom_render::steps;
 
 use super::variable::Variable;

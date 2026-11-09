@@ -41,10 +41,10 @@ mod uplink;
 mod virtiofs;
 mod windows;
 
+use crate::hcl_builder::Module;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
-use isoloom_render::hcl_builder::Module;
 use isoloom_spec::model::Target;
 
 use super::{Parts, PinnedImage};

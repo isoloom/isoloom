@@ -14,8 +14,8 @@
 //! a sealed machine can still resolve names, a channel out the seal leaves open there. On
 //! DigitalOcean and Linode the resolvers are public addresses, which the seal closes.
 
+use crate::hcl_builder::{Expression, conditional, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Expression, conditional, list, reference, string};
 
 use crate::machine::vms;
 use crate::module::variable::Variable;
@@ -44,7 +44,7 @@ pub(crate) fn any(env: &Environment) -> bool {
 pub(crate) fn variable(env: &Environment) -> Option<Variable> {
     any(env).then(|| {
         Variable::new(SEALED, "bool")
-            .default(isoloom_render::hcl_builder::boolean(false))
+            .default(crate::hcl_builder::boolean(false))
             .describe("Close the internet to the machines of every `internet: false` network, at the network: the runner sets it once the machines are set up")
     })
 }

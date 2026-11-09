@@ -2,7 +2,7 @@
 //! the machines, the runner's SSH key, the expiry and the launch-time inputs. How a module is
 //! started is its cloud's (`Base::usage`).
 
-use isoloom_render::hcl_builder::{Block, Module, string};
+use crate::hcl_builder::{Block, Module, string};
 
 use crate::module::Usage;
 use crate::module::variable::{self, Variable};

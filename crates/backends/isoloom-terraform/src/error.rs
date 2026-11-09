@@ -1,8 +1,8 @@
 //! Why a target's Terraform isn't rendered: the target refuses the environment, or a module
 //! can't be written. A backend reports either as the rendering layer's [`RenderError`].
 
+use crate::hcl_builder;
 use isoloom_render::Error as RenderError;
-use isoloom_render::hcl_builder;
 use isoloom_spec::model::Target;
 
 /// Why a target's Terraform isn't rendered.

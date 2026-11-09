@@ -30,8 +30,8 @@ pub(crate) mod windows;
 #[cfg(test)]
 mod tests;
 
+use crate::hcl_builder::Expression;
 use isoloom_plan::{Environment, Feature, MachinePlan, MachineShape, Step};
-use isoloom_render::hcl_builder::Expression;
 use isoloom_render::steps;
 use isoloom_spec::shell::quote;
 
@@ -142,7 +142,7 @@ impl Shell {
 
 /// The credentials a module generates, on a server or a cloud: the controller's key, then the
 /// Windows machines' password.
-pub(crate) fn credentials(env: &Environment, m: &mut isoloom_render::hcl_builder::Module) {
+pub(crate) fn credentials(env: &Environment, m: &mut crate::hcl_builder::Module) {
     controller::write_key(env, m);
     windows::write_password(env, m);
 }

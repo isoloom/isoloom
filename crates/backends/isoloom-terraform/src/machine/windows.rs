@@ -3,8 +3,8 @@
 //! ports. The target's image must start WinRM over HTTP for `isoloom` with the generated
 //! password ([`write_password`]; see each target's user data).
 
+use crate::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
-use isoloom_render::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_render::steps;
 use isoloom_spec::model::Port;
 

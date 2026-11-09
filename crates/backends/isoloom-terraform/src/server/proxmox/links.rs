@@ -5,8 +5,8 @@
 //! A machine on several VLANs of one LAN gets an access device per VLAN, each tagged: the
 //! addresses and the routing are the same as over a trunk, and the guest needs no VLAN set-up.
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, number, reference};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, number, reference};
 
 use crate::module::ident;
 

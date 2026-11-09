@@ -1,7 +1,7 @@
 //! The VPC, its subnets, and each machine's security group.
 
+use crate::hcl_builder::{Block, BlockBuilder, Module, boolean, list, object, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, boolean, list, object, reference, string};
 
 use super::routing;
 use crate::cloud::aws::{egress, egress_to, first_zone, ingress, key_pair, route_out, sealed_route_out};

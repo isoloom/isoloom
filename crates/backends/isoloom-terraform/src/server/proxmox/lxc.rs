@@ -10,9 +10,9 @@
 
 use std::borrow::Cow;
 
+use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, object, reference, string};
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_render::hcl_builder::{Block, Expression, Module, boolean, list, number, object, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::{Arch, Machine};
 use isoloom_spec::validate::Cidr;

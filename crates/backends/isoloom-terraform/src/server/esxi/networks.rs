@@ -1,8 +1,8 @@
 //! The environment's networks on the host: a vSwitch of its own per network, with no uplink, and
 //! a port group on it passing the machines' VLAN tags.
 
+use crate::hcl_builder::{Module, number, reference};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Module, number, reference};
 
 use crate::module::{ident, resource};
 use crate::server::slotted;

@@ -2,9 +2,9 @@
 //! on every network at its router address (matched by MAC). The guest agent reports its uplink
 //! address, which the outputs give.
 
+use crate::hcl_builder::{Block, Expression, Module, Template, call, list, number, reference, string};
 use isoloom_plan::Environment;
 use isoloom_plan::ipv6;
-use isoloom_render::hcl_builder::{Block, Expression, Module, Template, call, list, number, reference, string};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::{Cidr, IPV6_PREFIX};

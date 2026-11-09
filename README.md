@@ -133,11 +133,11 @@ isoloom-targets = "1"
 | `isoloom-manifest` | The run manifest: its types, generated JSON schema and fixtures |
 | `isoloom-catalogue` | The service catalogue: entries, release matching, typed `with:` settings and parity contracts |
 | `isoloom-plan` | Lowering the spec into the target-neutral plan, the checks and refusals |
-| `isoloom-render` | The `Backend` trait, the builders (HCL, Ruby, YAML, shell, PowerShell, Dockerfile) and the shared container pieces |
+| `isoloom-render` | The `Backend` trait, the builders more than one backend uses (PowerShell, Dockerfile, the Ansible inventory) and the shared container pieces |
 | `isoloom-compose` | The Compose backend: `docker`, `hosted` |
 | `isoloom-kubernetes` | The Kubernetes backend: manifests, Kustomize, the Helm chart |
-| `isoloom-vagrant` | The Vagrant backend: `vagrant` and its providers |
-| `isoloom-terraform` | The Terraform backends: `proxmox`, `esxi`, `cloud-vm`, `cloud-docker`, `cloud-services` |
+| `isoloom-vagrant` | The Vagrant backend: `vagrant` and its providers, with its Ruby builder |
+| `isoloom-terraform` | The Terraform backends: `proxmox`, `esxi`, `cloud-vm`, `cloud-docker`, `cloud-services`, with their HCL builder |
 | `isoloom-ansible` | The Ansible backend, which renders the `external` target |
 | `isoloom-targets` | Every backend behind one call, the composite targets, refusals, the resolved snapshot, the matrix and tiers |
 | `isoloom-import` | Drafting a spec from Compose, Vagrant and Terraform files |

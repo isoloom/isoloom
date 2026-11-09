@@ -1,8 +1,8 @@
 //! DigitalOcean's `cloud-docker` module: a VPC, the operator's key, a droplet of the Docker
 //! host's OS, and a firewall.
 
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, list, reference, string};
 use isoloom_plan::Environment;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list, reference, string};
 use isoloom_spec::model::Protocol;
 
 use super::{Way, rule, ssh_key, vm, vpc};
