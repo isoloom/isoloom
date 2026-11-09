@@ -3,7 +3,7 @@
 //!
 //! The module is the project's own and stays untouched: Isoloom writes, under
 //! `.isoloom/cloud-services/`, its fixed variables (`terraform.tfvars.json`) and the run manifest
-//! the Isothrum runner executes ([`manifest`]): the module copied into the run's own folder,
+//! the runner executes ([`manifest`]): the module copied into the run's own folder,
 //! applied there with the state and the plugins kept with the run, never in the project. The
 //! cloud's credentials come from the environment, as Terraform expects.
 

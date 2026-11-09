@@ -45,7 +45,7 @@ fn instance_files_live_next_to_the_committed_ones() -> Outcome {
         compose.contents
     );
     // Paths inside the files follow the folder.
-    assert!(compose.contents.contains("isothrum check ."));
+    assert!(compose.contents.contains("# Checks: the runner (run.json), or by hand"));
     assert!(
         files.iter().all(|f| f.path.starts_with(".isoloom-3/")),
         "{:?}",

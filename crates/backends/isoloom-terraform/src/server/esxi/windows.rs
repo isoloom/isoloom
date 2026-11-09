@@ -4,7 +4,7 @@
 //! one PowerShell script cloudbase-init runs at the first boot (the `isoloom` administrator,
 //! its name, the project, its services' openings, its steps, and last WinRM over HTTP), from
 //! the user data in `guestinfo`. Terraform's WinRM can't go through the router, so the
-//! controller waits for its ready marker over WinRM before the playbooks, and `isoloom run`
+//! controller waits for its ready marker over WinRM before the playbooks, and the runner
 //! delivers its secrets through an SSH tunnel by the router, as on Proxmox.
 
 use isoloom_plan::Environment;

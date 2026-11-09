@@ -51,7 +51,7 @@ run "the_bucket_serves_its_page_publicly_and_goes_with_the_environment" {
 
   assert {
     condition     = aws_s3_bucket.site.bucket == "isoloom-cloud-bucket-0a1b2c3d" && aws_s3_bucket.site.force_destroy == true
-    error_message = "the bucket must be the environment's, and emptied on destroy so `isothrum down .` ends it"
+    error_message = "the bucket must be the environment's, and emptied on destroy so a runner's down ends it"
   }
   assert {
     condition     = aws_s3_bucket_public_access_block.site.block_public_policy == false && aws_s3_bucket_public_access_block.site.restrict_public_buckets == false

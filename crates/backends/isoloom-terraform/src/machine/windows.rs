@@ -104,7 +104,7 @@ pub(crate) fn blocks(w: Machine) -> Vec<Block> {
         uploads,
         parts: vec![commands],
         depends_on,
-        // `isoloom run` delivers its secrets over WinRM while the set-up waits for them.
+        // The runner delivers its secrets over WinRM while the set-up waits for them.
         announce: (!plan.secrets.is_empty()).then(|| name.to_owned()),
     };
     out.push(setup.block());

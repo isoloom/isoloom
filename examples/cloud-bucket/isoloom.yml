@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # Cloud services instead of machines: a Terraform module (terraform/) applied into the user's
-# own AWS account, here a public S3 website. `isothrum up .` creates it,
-# `isothrum check .` checks it from here, `isothrum down .` ends it.
+# own AWS account, here a public S3 website. A runner's up creates it, its check checks it from
+# here, its down ends it.
 version: 1
 name: cloud-bucket
 

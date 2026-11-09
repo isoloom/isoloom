@@ -2,7 +2,7 @@
 #
 # What openssh does the same as a container and as a VM. `cargo xtask catalogue check openssh`
 # builds one small lab per case (`web`, the case's helpers and an access machine `probe`) and runs
-# it on `docker` and on `vagrant` through the Isothrum CLI. The busybox probe has no SSH client,
+# it on `docker` and on `vagrant` through a runner. The busybox probe has no SSH client,
 # so a login is not exercised here; the account and password auth are delivered, and sshd's
 # config is proven valid.
 cases:

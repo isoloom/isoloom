@@ -114,7 +114,7 @@ pub(crate) fn module(cloud: Cloud, env: &Environment) -> Result<GeneratedFile> {
 }
 
 /// The host's set-up script `.isoloom/cloud-docker/<cloud>/setup.sh` (the same on every cloud):
-/// the Isothrum runner pipes it into `sudo sh -s` to install Docker in the VM.
+/// the runner pipes it into `sudo sh -s` to install Docker in the VM.
 fn setup_files(env: &Environment) -> Vec<GeneratedFile> {
     Cloud::ALL
         .iter()

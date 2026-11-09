@@ -23,7 +23,7 @@
 //! - The host, its datastore, the uplink port group and a `slot` (unique per environment on
 //!   the host: it names the vSwitches and the VMs, and makes the MACs) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`): the `machines`
-//!   output gives their addresses, and `isothrum check` pipes the check runners in
+//!   output gives their addresses, and the runner pipes the check runners in
 //!   `.isoloom/esxi/checks/<position>.sh` to them.
 
 mod base;

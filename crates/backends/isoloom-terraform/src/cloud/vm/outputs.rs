@@ -4,6 +4,7 @@
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Expression, Module, Template, null, object, string};
+use isoloom_render::run_manifest::RUNNER;
 use isoloom_spec::model::Target;
 
 use crate::checks::{Invocation, Runner, output_block};
@@ -50,7 +51,7 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
     m.block(output("ready_file", string(crate::machine::cloud_init::READY_FILE)));
     if let Some(checks) = output_block(env, Target::CloudVm.id(), Invocation::Command, &|p| runner(env, reach, p)) {
         m.commented(
-            "The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or `isothrum check .`.",
+            &format!("The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or {RUNNER}."),
             checks,
         );
     }

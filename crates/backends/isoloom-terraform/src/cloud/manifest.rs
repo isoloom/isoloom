@@ -1,5 +1,5 @@
 //! What every cloud target's run manifest shares (`.isoloom/<target>/<cloud>/run.json`): the
-//! Isothrum runner executes it, Terraform keeping only the infrastructure.
+//! runner executes it, Terraform keeping only the infrastructure.
 //!
 //! - **Terraform** makes the machines (`init`, `apply`; `destroy`), its state kept by the runner
 //!   (`identity.terraform.state: runner`), the provider's credentials given as connection slots

@@ -1,9 +1,10 @@
 //! Secrets as Compose writes them: each declared once at the top, read from a variable of
-//! Compose's own environment (`ISOLOOM_SECRET_<NAME>`, set by `isoloom run` from the secret's
+//! Compose's own environment (`ISOLOOM_SECRET_<NAME>`, set by the runner from the secret's
 //! store), and mounted as a file in the containers that get it. The file never holds a value.
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
+use isoloom_render::run_manifest::RUNNER;
 
 use crate::file::{ComposeFile, Secret, ServiceSecret};
 
@@ -50,9 +51,6 @@ pub(super) fn usage(file: &ComposeFile) -> String {
             vars.join(", ")
         )
     } else {
-        format!(
-            "# Secrets: `isothrum up .` reads them from their stores; by hand, set {} for `up`.\n",
-            vars.join(", ")
-        )
+        format!("# Secrets: {RUNNER} reads them from their stores; by hand, set {} for `up`.\n", vars.join(", "))
     }
 }

@@ -1,5 +1,5 @@
 //! The controller: the VM that runs the environment's playbooks (`provision:`) on every target
-//! that runs playbooks (Vagrant, Proxmox, the clouds, `isoloom provision`), with one script, so
+//! that runs playbooks (Vagrant, Proxmox, the clouds, the runner's `provision`), with one script, so
 //! they all retry the same way.
 //!
 //! After a failed run, when no task failed on its own, the hosts that failed only because of the
@@ -27,9 +27,9 @@ const RETRY_DIR: &str = "/tmp/isoloom-retry";
 
 /// The controller's script running the environment's playbooks, in order, with the inventory
 /// at `/etc/isoloom/inventory.ini` plus each step's own inventories, as it runs when the
-/// environment comes up; `isoloom provision` runs it again on a running environment.
+/// environment comes up; the runner's `provision` runs it again on a running environment.
 ///
-/// `limit`: only these machines (`isoloom provision web`); every machine when empty.
+/// `limit`: only these machines (the runner's `provision` of `web`); every machine when empty.
 #[must_use]
 pub fn provision_script(spec: &Spec, limit: &[String]) -> String {
     let limit = if limit.is_empty() {

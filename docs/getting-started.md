@@ -80,18 +80,13 @@ can't, and the [tier](targets.md) of each. `isoloom check` fails in CI when the 
 
 Isoloom runs nothing itself. To bring the environment up, either run each tool's files directly
 (for the `docker` target, `docker compose -f .isoloom/docker/compose.yaml up`), or hand the run
-manifest to the [Isothrum runner](runner.md):
-
-```sh
-isothrum up      # bring it up, following .isoloom/<target>/run.json
-isothrum check   # run the checks
-isothrum down    # tear it down
-```
+manifest (`.isoloom/<target>/run.json`) to a [runner](runner.md), which brings the environment
+up, runs the checks and tears it down.
 
 ## Next steps
 
 - [Spec reference](spec.md) — every field, generated from the schema.
 - [Targets and tiers](targets.md) — what each target does, and how far each is proven.
 - [Catalogue services](catalogue.md) — use a packaged service with `service:`, or write an entry.
-- [The runner](runner.md) — the lifecycle Isothrum drives over a run manifest.
+- [The runner](runner.md) — the lifecycle a runner drives over a run manifest.
 - [Architecture](../ARCHITECTURE.md) — how the pipeline and the crates fit together.

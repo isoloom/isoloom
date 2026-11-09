@@ -1,7 +1,7 @@
 //! A Linux machine that sets itself up from its user data, on a cloud. Terraform makes the VM and
 //! nothing else: no SSH from Terraform, no file it uploads. The user data writes the set-up
 //! script and a systemd unit running it at boot, then starts the unit; the set-up waits for the
-//! project, which the Isothrum runner delivers over SSH once the apply is done (an `ssh.run` step
+//! project, which the runner delivers over SSH once the apply is done (an `ssh.run` step
 //! of the run manifest, piping the project's archive into `tar`), then runs the machine's steps.
 //!
 //! The set-up says how far it got in the ready file, in the `isoloom-ready/1` grammar the runner
@@ -15,6 +15,7 @@
 
 use isoloom_render::configure::cloud_init::{Limit, gzip};
 use isoloom_render::hcl_builder::{Expression, Piece, Template, reference};
+use isoloom_render::run_manifest::RUNNER;
 use isoloom_spec::model::Target;
 use isoloom_spec::shell::quote;
 
@@ -92,7 +93,8 @@ pub(crate) fn project_wait() -> Tracked {
     Tracked::new(
         "waiting for the project (the runner delivers it over SSH)",
         format!(
-            "i=0; until [ -f {DELIVERED} ]; do i=$((i+5)); if [ $i -gt {DELIVERY_WAIT_S} ]; then echo 'the project never came: start the lab through the Isothrum runner (run.json), which delivers it over SSH' >&2; exit 1; fi; sleep 5; done"
+            "i=0; until [ -f {DELIVERED} ]; do i=$((i+5)); if [ $i -gt {DELIVERY_WAIT_S} ]; then echo {} >&2; exit 1; fi; sleep 5; done",
+            quote(&format!("the project never came: start the lab through {RUNNER}, which delivers it over SSH"))
         ),
     )
 }
@@ -157,7 +159,7 @@ fn unit() -> String {
 #[must_use]
 pub(crate) fn script(s: &SetUp) -> Template {
     let mut t = Template::text(format!(
-        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The Isothrum runner delivers the project over SSH.\nmkdir -p {DIR}\ncat > {DIR}/setup.sh.new <<'ISOLOOM_SETUP'\n"
+        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The project comes over SSH from {RUNNER}.\nmkdir -p {DIR}\ncat > {DIR}/setup.sh.new <<'ISOLOOM_SETUP'\n"
     ));
     t.append(body(s));
     t.push_text(format!(

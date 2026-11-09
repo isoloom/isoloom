@@ -73,7 +73,7 @@ pub(crate) fn chosen_ports(r: &mut Ruby) {
 }
 
 /// A port forwarded from the host's loopback: `guest` in the VM to `host` on this machine. UDP
-/// says so (vagrant-libvirt skips those, with a warning; `isoloom run` repeats it).
+/// says so (vagrant-libvirt skips those, with a warning; the runner repeats it).
 pub(crate) fn forwarded_port(var: &str, guest: u16, host: u16, protocol: Protocol) -> Call {
     forwarded_port_with(var, guest, host, protocol)
 }

@@ -19,6 +19,10 @@ use isoloom_plan::checks::{Probe, Resolved};
 use isoloom_plan::{Environment, MachinePlan, PublishedPort};
 use isoloom_spec::model;
 
+/// What generated files and messages call the program that executes a run manifest: no
+/// particular one, the contract it follows. The one phrase every target says it with.
+pub const RUNNER: &str = "the runner (run.json)";
+
 /// What a check runner's step may add to its checks' waits: the probes' own time (curl and nc
 /// cap a probe at 5 to 10 s) per check, and the runner's start.
 const PER_CHECK_S: u32 = 15;

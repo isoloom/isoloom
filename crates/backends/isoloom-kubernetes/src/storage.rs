@@ -8,7 +8,7 @@ use isoloom_plan::{DataDisk, Lifetime, Volume as PlanVolume};
 use crate::machine::Machine;
 use crate::objects::{ClaimResources, ClaimSpec, EmptyDir, Labels, Manifest, Volume, VolumeDevice, VolumeMount, VolumeSource};
 
-/// The label of the objects `isoloom down` keeps (`down --volumes` removes them too): the claims
+/// The label of the objects the runner's `down` keeps (`down --volumes` removes them too): the claims
 /// of persistent volumes, and the namespace holding them.
 pub(crate) const PERSISTENT_LABEL: &str = "isoloom.persistent";
 

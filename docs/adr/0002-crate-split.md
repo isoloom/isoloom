@@ -22,7 +22,7 @@ cli/       isoloom
 
 The order is spec → plan → render → backends → targets → cli. No backend depends on another
 backend; the targets made of two backends (`cloud-docker`, `docker-vm`, `hybrid`) are composed in
-`isoloom-targets`. The runtime crate was removed (running is the Isothrum runner's job), and
+`isoloom-targets`. The runtime crate was removed (running is a runner's job), and
 `isoloom-external` became `isoloom-ansible` (the backend that renders the `external` target).
 
 ## Consequences

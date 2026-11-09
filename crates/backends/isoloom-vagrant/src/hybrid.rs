@@ -41,7 +41,7 @@ pub fn capabilities() -> Capabilities {
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Tpm,
-        // Delivered by `isoloom run` over the machine's SSH, owners included.
+        // Delivered by the runner over the machine's SSH, owners included.
         Feature::Secrets,
         Feature::SecretOwners,
         // Read into Compose's environment by the containers' host before `up`.

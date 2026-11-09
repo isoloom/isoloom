@@ -1,5 +1,5 @@
 #!/bin/sh
-# nginx on a machine that already exists, run over SSH by `isothrum up .`.
+# nginx on a machine that already exists, run over SSH by the runner (up).
 set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq

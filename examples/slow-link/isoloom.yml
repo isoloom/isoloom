@@ -31,7 +31,7 @@ machines:
     networks: { branch: 10 }
 
 tools:
-  shell: {}                 # a toolbox on both networks to watch the link from (isoloom connect shell)
+  shell: {}                 # a toolbox on both networks to watch the link from (a session on `shell`)
 
 checks:
   - name: the far site answers, slowly

@@ -56,7 +56,7 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::BridgedNetworks,
         // Given on VirtualBox, libvirt and Hyper-V; `provider_refusal` refuses the others.
         Feature::Tpm,
-        // Delivered by `isoloom run` over the machine's SSH, owners included.
+        // Delivered by the runner over the machine's SSH, owners included.
         Feature::Secrets,
         Feature::SecretOwners,
         Feature::MachineProcess,

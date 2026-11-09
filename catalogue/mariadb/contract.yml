@@ -2,7 +2,7 @@
 #
 # What mariadb does, proven on the container form (the official image). `cargo xtask catalogue
 # check mariadb` builds a small lab (`web`, an access machine `probe`) and runs it on `docker`
-# through the Isothrum CLI. The exec probes run as root in the container, which the image's
+# through a runner. The exec probes run as root in the container, which the image's
 # unix-socket plugin authenticates.
 cases:
   default:

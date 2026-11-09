@@ -1,4 +1,4 @@
-//! The `docker` target's run manifest (`.isoloom/docker/run.json`): what the Isothrum runner
+//! The `docker` target's run manifest (`.isoloom/docker/run.json`): what the runner
 //! executes. It is built from the plan and the typed Compose file this backend renders, never
 //! re-parsed from the file's text, by pure functions. Every command is Docker Compose's under
 //! the project `${run.name}`, with the Compose file and the runner's pinned-ports file; the

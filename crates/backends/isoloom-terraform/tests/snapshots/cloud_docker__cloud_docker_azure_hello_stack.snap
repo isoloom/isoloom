@@ -8,8 +8,8 @@ expression: "cloud(\"azure\")?"
 # Start:  terraform -chdir=.isoloom/cloud-docker/azure init && terraform -chdir=.isoloom/cloud-docker/azure apply \
 #           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/azure destroy (same variables)
-# Then:   the machines wait for the project: run the lab through the Isothrum runner (run.json
-#         beside this file), which delivers the project over SSH, waits for each set-up and runs the checks.
+# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+#         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
   required_version = ">= 1.6"
@@ -42,7 +42,7 @@ variable "allowed_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The key the machines let in: the Isothrum runner's (it delivers the project and runs the checks over SSH)"
+  description = "The key the machines let in: the one the runner (run.json) signs in with (it delivers the project and runs the checks over SSH)"
 }
 
 variable "expires_at" {

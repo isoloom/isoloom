@@ -8,7 +8,7 @@
 //!   there ([`isoloom_render::inventory`] with [`Access::external`]).
 //! - `checks/<machine>.sh`: the check runner of each machine that has an address (declared and
 //!   derived probes; scripts need the project on the machine and are left out, with a note).
-//! - `machines.json`: name to address, user, port and key, for `isoloom run/test/connect/exec`.
+//! - `machines.json`: name to address, user, port and key, for the runner (its up, check and a session on a host).
 //!
 //! Networks and `reach` are expected behaviour there (Isoloom adds no router), which the derived
 //! checks verify.

@@ -2,7 +2,7 @@
 #
 # What php-fpm does the same as a container and as a VM. `cargo xtask catalogue check php-fpm`
 # builds one small lab per case: this machine (`web`), the case's helper machines, and an access
-# machine (`probe`) running the checks, on `docker` and on `vagrant` through the Isothrum CLI. A
+# machine (`probe`) running the checks, on `docker` and on `vagrant` through a runner. A
 # case passes when every check passes in both forms and every fact reads the same in both.
 cases:
   default: {}

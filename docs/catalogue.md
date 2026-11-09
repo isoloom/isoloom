@@ -107,7 +107,7 @@ cargo xtask catalogue check <entry> [--release V] [--os OS] [--form container|vm
 ```
 
 `catalogue check` runs the entry's parity contract for real: each case becomes a lab, generated
-for `docker` and for `vagrant`, run through the Isothrum CLI (`up`, `check`, `down`), and a case
+for `docker` and for `vagrant`, run through a runner (up, check, down), and a case
 passes only when every check passes in both forms and every contract fact reads the same in both.
 
 ## See also

@@ -4,7 +4,7 @@
 //!   inputs file uploaded, then the steps. A `reboot` step ends a provisioner; Terraform restarts
 //!   the machine and the next one checks that it did before going on (ESXi).
 //! - **From its own user data** ([`set_up`], the clouds): the machine waits for the project the
-//!   Isothrum runner delivers, then runs the same steps itself (`super::user_data`), a `reboot`
+//!   runner delivers, then runs the same steps itself (`super::user_data`), a `reboot`
 //!   step ending a part.
 
 use isoloom_plan::{Environment, MachinePlan, MachineShape, Step};

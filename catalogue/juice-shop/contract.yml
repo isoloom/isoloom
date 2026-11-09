@@ -2,7 +2,7 @@
 #
 # What juice-shop does, proven on the container form (it has no VM form). `cargo xtask catalogue
 # check juice-shop` builds a small lab (`web`, an access machine `probe`) and runs it on `docker`
-# through the Isothrum CLI.
+# through a runner.
 cases:
   default: {}
 

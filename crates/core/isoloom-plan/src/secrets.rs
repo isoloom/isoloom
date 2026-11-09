@@ -1,5 +1,5 @@
 //! A machine's secrets as files: which secret, at what path, owned by whom, with what mode.
-//! The plan never holds a value: `isoloom run` reads each from its store and hands it to the
+//! The plan never holds a value: the runner reads each from its store and hands it to the
 //! target's own mechanism (Compose secrets, a Kubernetes Secret).
 
 use std::fmt;
@@ -71,7 +71,7 @@ impl SecretFile {
 pub(crate) fn no_delivery(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` gets `secrets`, and this target has no machine `isoloom run` can hand them to"
+        "machine `{machine}` gets `secrets`, and this target has no machine the runner can hand them to"
     )
 }
 

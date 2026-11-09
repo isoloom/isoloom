@@ -13,7 +13,7 @@
 //! network namespace, a provisioner on a VM, a Job with a machine's labels) and how a symbolic
 //! host is written (an address, or a name on Kubernetes). The runners print one line per
 //! check, `isoloom-check: PASS <name>` or `isoloom-check: FAIL <name>: <why>`, which
-//! `isoloom test` reads back.
+//! the runner's `check` reads back.
 
 pub use isoloom_spec::probe::{Host, Url, can_run_checks};
 

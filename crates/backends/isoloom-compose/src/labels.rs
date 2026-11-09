@@ -11,7 +11,7 @@ use crate::file::ComposeFile;
 pub const MANAGED_LABEL: &str = "isoloom.managed";
 /// The environment a Docker resource belongs to.
 pub const ENVIRONMENT_LABEL: &str = "isoloom.environment";
-/// On a volume `isoloom down` keeps (`down --volumes` removes it too).
+/// On a volume the runner's `down` keeps (`down --volumes` removes it too).
 pub(crate) const PERSISTENT_LABEL: &str = "isoloom.persistent";
 
 /// Labels everything the environment creates (containers, built images, networks, volumes) as

@@ -243,7 +243,7 @@ fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
         step_provisioners(r, env, CONTROLLER, &Step::Egress, Os::Linux);
     }
     // Done: it halts (its disk kept) unless the spec keeps it running. Detached, so that the
-    // provisioner returns before the VM goes; `isoloom test` boots it again for the checks.
+    // provisioner returns before the VM goes; the runner's `check` boots it again for the checks.
     if !spec.controller.as_ref().is_some_and(|c| c.keep_running) {
         shell(r, "halt", "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &");
     }

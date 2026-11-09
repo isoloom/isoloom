@@ -65,7 +65,7 @@ pub(super) fn inside(machine: &str) -> String {
     format!("inside {machine}")
 }
 
-/// Every position's checks, in the order `isoloom test` runs them.
+/// Every position's checks, in the order the runner's `check` runs them.
 pub(super) fn planned(env: &Environment) -> Vec<Planned<'_>> {
     let spec = env.spec();
     let default = checks::default_position(spec);
@@ -87,7 +87,7 @@ pub(super) fn planned(env: &Environment) -> Vec<Planned<'_>> {
         .collect()
 }
 
-/// Every position's runners, in the order `isoloom test` runs them.
+/// Every position's runners, in the order the runner's `check` runs them.
 pub(super) fn runners(env: &Environment) -> Result<Runners> {
     let mut out = Runners {
         runners: Vec::new(),

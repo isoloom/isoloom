@@ -33,7 +33,7 @@ pub trait Backend: Sync {
         refusal(&env.requirements, &self.capabilities()).map(|r| r.to_string())
     }
 
-    /// The run manifest the Isothrum runner executes (`.isoloom/<target>/run.json`), for a target
+    /// The run manifest the runner executes (`.isoloom/<target>/run.json`), for a target
     /// that has one; its `environment.message` is left to the caller, who fills it from the resolved
     /// snapshot. `None` for the targets that have none yet.
     ///

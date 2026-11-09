@@ -1,6 +1,6 @@
 [package]
 name = "xtask-quality"
-description = "The shared `cargo xtask quality` ratchet: per-crate counts of clean-code rules against a baseline, used by Isoloom and Isothrum."
+description = "The shared `cargo xtask quality` ratchet: per-crate counts of clean-code rules against a baseline, used by Isoloom and the repositories that build on it."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

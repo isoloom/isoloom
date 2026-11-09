@@ -1,8 +1,9 @@
 //! What the operator gives every cloud module, after the cloud's own variables: who may reach
 //! the machines, the runner's SSH key, the expiry and the launch-time inputs; and how a cloud
-//! module is started (through the Isothrum runner, which sets most of them).
+//! module is started (through the runner, which sets most of them).
 
 use isoloom_render::hcl_builder::string;
+use isoloom_render::run_manifest::RUNNER;
 
 use crate::module::Usage;
 use crate::module::variable::Variable;
@@ -11,7 +12,7 @@ use crate::module::variable::Variable;
 pub(crate) const ALLOWED: &str = "-var allowed_cidr=<your IP>/32 ";
 
 /// What a cloud module's first lines say: `apply` takes who may reach the machines and the key
-/// they let in; then the machines wait for the project, which the Isothrum runner delivers.
+/// they let in; then the machines wait for the project, which the runner delivers.
 pub(crate) fn usage(folder: &str) -> Usage<'_> {
     Usage::with_runner_key(folder, ALLOWED)
 }
@@ -22,8 +23,9 @@ pub(crate) fn usage(folder: &str) -> Usage<'_> {
 pub(crate) fn host_reaching() -> Vec<Variable> {
     vec![
         Variable::new("allowed_cidr", "string").describe("Who may reach the machines (SSH and the published ports), e.g. your IP/32"),
-        Variable::new("ssh_public_key", "string")
-            .describe("The key the machines let in: the Isothrum runner's (it delivers the project and runs the checks over SSH)"),
+        Variable::new("ssh_public_key", "string").describe(&format!(
+            "The key the machines let in: the one {RUNNER} signs in with (it delivers the project and runs the checks over SSH)"
+        )),
         expires_at(),
     ]
 }

@@ -53,7 +53,7 @@ fn capabilities() -> Capabilities {
         // The hosts are already on their networks, outside ones included.
         Feature::ExternalNetworks,
         Feature::BridgedNetworks,
-        // Delivered by `isoloom run` over the host's SSH, owners included.
+        // Delivered by the runner over the host's SSH, owners included.
         Feature::Secrets,
         Feature::SecretOwners,
     ])

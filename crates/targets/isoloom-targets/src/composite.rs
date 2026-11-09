@@ -45,7 +45,7 @@ impl Backend for CloudDockerBackend {
     }
 
     /// Compose's but existing networks: the VM runs the Compose file, so it can render what
-    /// Compose can, with the secrets `isoloom run` delivers to the VM; the Docker host is a
+    /// Compose can, with the secrets the runner delivers to the VM; the Docker host is a
     /// fresh VM with no existing network to join.
     fn capabilities(&self) -> Capabilities {
         isoloom_compose::capabilities_on_a_vm()

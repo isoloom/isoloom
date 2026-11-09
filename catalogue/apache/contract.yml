@@ -2,7 +2,7 @@
 #
 # What apache does the same as a container and as a VM. `cargo xtask catalogue check apache`
 # builds one small lab per case (`web`, the case's helpers and an access machine `probe`) and runs
-# it on `docker` and on `vagrant` through the Isothrum CLI. A case passes when every check passes
+# it on `docker` and on `vagrant` through a runner. A case passes when every check passes
 # in both forms and every fact reads the same in both.
 cases:
   default: {}

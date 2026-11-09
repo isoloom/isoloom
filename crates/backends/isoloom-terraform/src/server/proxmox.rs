@@ -20,7 +20,7 @@
 //!   server: SDN ids are short) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`, the `isoloom` user
 //!   with `ssh_public_key`): the `machines` output gives their addresses, and the check runners
-//!   in `.isoloom/proxmox/checks/<position>.sh` are piped to them by `isothrum check`
+//!   in `.isoloom/proxmox/checks/<position>.sh` are piped to them by the runner
 //!   (the `checks` output says which runs where).
 
 mod arch;

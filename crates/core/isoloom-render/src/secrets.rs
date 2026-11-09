@@ -1,6 +1,5 @@
 //! Secrets on a VM and on a Docker host. The generated set-up never holds a value: it waits
-//! for the runner (Isothrum's `isothrum up`) to deliver them over the machine's own connection
-//! (SSH), then puts each
+//! for the runner to deliver them over the machine's own connection (SSH), then puts each
 //! file in place. Delivery writes a root-only copy of each value under [`KEPT_DIR`] (it outlives
 //! a reboot, which empties `/run/secrets`) and the mark [`DELIVERED`] the set-up waits for.
 //!
@@ -15,6 +14,7 @@ use isoloom_spec::model::{SecretSource, Spec, secret_variable};
 use isoloom_spec::shell::quote;
 
 use crate::boot;
+use crate::run_manifest::RUNNER;
 
 pub mod windows;
 
@@ -88,8 +88,8 @@ pub fn wait(who: &str) -> String {
 /// target's own tool, Terraform, can't), and what to do.
 fn messages(who: &str) -> (String, String) {
     (
-        format!("{who}: waiting for its secrets, which the runner (isothrum up) delivers"),
-        format!("{who}: its secrets never came; start the environment with the runner (isothrum up), which reads them from their stores and delivers them"),
+        format!("{who}: waiting for its secrets, which {RUNNER} delivers"),
+        format!("{who}: its secrets never came; start the environment with {RUNNER}, which reads them from their stores and delivers them"),
     )
 }
 

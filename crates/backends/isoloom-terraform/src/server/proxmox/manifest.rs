@@ -1,4 +1,4 @@
-//! The `proxmox` target's run manifest (`.isoloom/proxmox/run.json`): what the Isothrum runner
+//! The `proxmox` target's run manifest (`.isoloom/proxmox/run.json`): what the runner
 //! executes, built from the plan by pure functions.
 //!
 //! - **Terraform keeps only the infrastructure.** The module is applied in place, its state kept by

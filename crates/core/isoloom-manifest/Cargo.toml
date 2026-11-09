@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-manifest"
-description = "The run manifest, version 0: the types Isoloom writes next to a target's files and the Isothrum runner reads, their JSON Schema and the shared fixtures."
+description = "The run manifest, version 0: the types Isoloom writes next to a target's files and a runner reads, their JSON Schema and the shared fixtures."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -46,7 +46,7 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
     assert!(tests.contains("name: isoloom-check\n") && tests.contains("restartPolicy: Never"));
     assert!(tests.contains("networks.sh: '{{ .Files.Get \"files/checks/networks.sh\" | b64enc }}'"));
     assert_eq!(file(&files, "chart/files/checks/web.sh")?, file(&files, "kubernetes/checks/web.sh")?);
-    assert!(!tests.contains("exec-cache"), "exec checks stay with isoloom test");
+    assert!(!tests.contains("exec-cache"), "exec checks stay with the runner");
 
     let scripts = file(&files, "chart/templates/scripts.yaml")?;
     assert!(scripts.contains("build__cache__seed.sh: '{{ required"), "{scripts}");

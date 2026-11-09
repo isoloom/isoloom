@@ -1,4 +1,4 @@
-//! The `vagrant` target's run manifest (`.isoloom/vagrant/run.json`): what the Isothrum runner
+//! The `vagrant` target's run manifest (`.isoloom/vagrant/run.json`): what the runner
 //! executes. It is built from the plan and the Vagrantfile's shape ([`Shape`]), never re-read
 //! from the file's text, by pure functions. One manifest serves every provider: the runner picks
 //! `${run.provider}` among `identity.vagrant.providers`, and steps, params and slots that only

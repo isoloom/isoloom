@@ -37,7 +37,7 @@ impl Backend for KubernetesBackend {
 
 /// What Kubernetes can render: a machine's own process, IPv6 networks of every kind (the
 /// cluster picks pod addresses, so a network's IPv6 side sets the Services' IP families),
-/// secrets (a Secret `isoloom run` creates; one with an owner copied into place by an init
+/// secrets (a Secret the runner creates; one with an owner copied into place by an init
 /// container) and a project file with its own owner and mode (copied into place by an init
 /// container). No controller (no `provision:`, no Ansible checks), `exec` checks run inside a
 /// container, no network appliances, Service names have no dots, no gateway machine routes a

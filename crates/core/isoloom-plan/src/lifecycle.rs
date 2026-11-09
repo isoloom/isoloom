@@ -86,7 +86,7 @@ pub enum Step {
         /// Kept on disk (a reboot comes and `/tmp` is emptied at boot).
         persist: bool,
     },
-    /// Waits for `isoloom run` to deliver its secrets, then puts each file in place, now and at
+    /// Waits for the runner to deliver its secrets, then puts each file in place, now and at
     /// every boot (see [`crate::SecretFile`]). Before anything that may read one: the
     /// app's steps, its command and its `setup` scripts.
     Secrets,

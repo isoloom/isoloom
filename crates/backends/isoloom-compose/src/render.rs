@@ -22,6 +22,8 @@ use isoloom_spec::validate::Cidr;
 
 use crate::error::{Error, Result};
 use crate::file::{Attachment, ComposeFile, NetworkMode, Restart, Service, Volume};
+use isoloom_render::run_manifest::RUNNER;
+
 use crate::images::TOOLBOX_IMAGE;
 use crate::layout::DIR;
 use crate::machine::Machine;
@@ -29,7 +31,11 @@ use crate::names::{probe_service, tool_service};
 use crate::{check_runners, ipv6, labels, networks, outside, router, storage};
 
 /// How to start, check and stop the file by hand, at its top.
-const USAGE: &str = "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: isothrum check . (or: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check, and isoloom-check-<machine>)\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n";
+fn usage() -> String {
+    format!(
+        "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: {RUNNER}, or by hand: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check, and isoloom-check-<machine>\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n"
+    )
+}
 
 /// The Compose file of `env` and the files it mounts (check runners, appliance configurations),
 /// refused as `target` when `env` needs what Compose can't do.
@@ -43,7 +49,14 @@ pub fn render(target: Target, env: &Environment) -> Result<Files> {
     let yaml = to_yaml(target, &file)?;
     let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
-        contents: format!("{}{USAGE}{}{}{}\n{yaml}", header("#"), secrets::usage(&file), configs::usage(env), Moved(env)),
+        contents: format!(
+            "{}{}{}{}{}\n{yaml}",
+            header("#"),
+            usage(),
+            secrets::usage(&file),
+            configs::usage(env),
+            Moved(env)
+        ),
     }];
     files.extend(mounted);
     Ok(files)

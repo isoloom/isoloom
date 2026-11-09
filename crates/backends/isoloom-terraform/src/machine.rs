@@ -44,7 +44,7 @@ use isoloom_spec::shell::quote;
 ///   further addresses (on the interface of its primary address), IPv6, link impairment (`tc`)
 ///   and the networks a machine routes (`gateway:`, refused by a target's limits where its
 ///   network can't).
-/// - Secrets, owners included, delivered by `isoloom run` over the machine's own connection (SSH,
+/// - Secrets, owners included, delivered by the runner over the machine's own connection (SSH,
 ///   or WinRM on Windows).
 /// - The private zone's names: the platform's DNS where it has one, else each VM's hosts file
 ///   under the zone's domain, its search domain.

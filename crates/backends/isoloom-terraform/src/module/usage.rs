@@ -1,6 +1,7 @@
 //! A module's first lines: the generated-file header, then how to start and stop it.
 
 use isoloom_render::header;
+use isoloom_render::run_manifest::RUNNER;
 
 /// The operator's SSH key, which the modules that set machines up over SSH take.
 const SSH_KEY: &str = "-var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519";
@@ -9,7 +10,11 @@ const SSH_KEY: &str = "-var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var
 const PUBLIC_KEY: &str = "-var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\"";
 
 /// What follows a module whose machines wait for the project.
-const THEN_RUNNER: &str = "# Then:   the machines wait for the project: run the lab through the Isothrum runner (run.json\n#         beside this file), which delivers the project over SSH, waits for each set-up and runs the checks.\n";
+fn then_runner() -> String {
+    format!(
+        "# Then:   the machines wait for the project: run the lab through {RUNNER} beside this file,\n#         which delivers the project over SSH, waits for each set-up and runs the checks.\n"
+    )
+}
 
 /// How to start and stop a module, as its first comment lines say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,7 +29,7 @@ pub(crate) struct Usage<'a> {
     pub key: Option<&'a str>,
     /// A whole line after the stop, or nothing.
     pub after: &'a str,
-    /// The machines set themselves up from their user data, the Isothrum runner delivering the
+    /// The machines set themselves up from their user data, the runner delivering the
     /// project: only the public key, and a line saying so.
     pub runner: bool,
 }
@@ -55,7 +60,7 @@ impl<'a> Usage<'a> {
         let chdir = format!("terraform -chdir=.isoloom/{}", self.folder);
         let ssh = if self.runner { PUBLIC_KEY } else { SSH_KEY };
         let key = self.key.map(|settings| format!(" \\\n#           {settings}{ssh}")).unwrap_or_default();
-        let then = if self.runner { THEN_RUNNER } else { "" };
+        let then = if self.runner { then_runner() } else { String::new() };
         format!(
             "{}{}# Start:  {chdir} init && {chdir} apply{}{key}\n# Stop:   {chdir} destroy (same variables)\n{}{then}",
             header("#"),

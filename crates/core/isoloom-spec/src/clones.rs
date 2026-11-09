@@ -11,8 +11,7 @@
 //!
 //! The clones are ordinary machines named `<name>-01`, `<name>-02`, ..., each one address
 //! further along on every network. Where the spec names the base machine, it means every
-//! clone: `depends_on`, a check's `from`, a group's members, provisioning groups, and
-//! `isoloom exec`. Expansion happens on the YAML before the spec is parsed (before `common:`
+//! clone: `depends_on`, a check's `from`, a group's members and provisioning groups. Expansion happens on the YAML before the spec is parsed (before `common:`
 //! and `groups:` fold in), so every reader sees finished machines.
 
 use indexmap::IndexMap;

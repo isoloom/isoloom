@@ -179,7 +179,7 @@ pub struct Machine {
     pub inputs: Vec<String>,
     /// The secrets this machine gets, as files (never environment variables): a name from the
     /// top-level `secrets` (`/run/secrets/<name>`), or `{ source, target, uid, gid, mode }`.
-    /// Delivered by `isoloom run` when the machine starts.
+    /// Delivered by the runner when the machine starts.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub secrets: Vec<MachineSecret>,
     /// CPUs, memory and disk for the machine (a VM's size, a container's limits). Default: 1

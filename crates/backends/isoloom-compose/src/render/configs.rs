@@ -10,6 +10,7 @@
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::container::{copied_from_project, project_variables, variable};
+use isoloom_render::run_manifest::RUNNER;
 
 use crate::file::{Config, ConfigMount};
 use crate::interpolation::literal;
@@ -30,7 +31,7 @@ pub(super) fn usage(env: &Environment) -> String {
     }
     let each: Vec<String> = vars.iter().map(|(var, path)| format!("{var} to {path}'s contents")).collect();
     format!(
-        "# Project files with an owner or a mode: `isothrum up .` reads them into Compose's environment; by hand, set {} for `up`.\n",
+        "# Project files with an owner or a mode: {RUNNER} reads them into Compose's environment; by hand, set {} for `up`.\n",
         each.join(", ")
     )
 }

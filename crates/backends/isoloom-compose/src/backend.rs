@@ -93,7 +93,7 @@ pub(crate) fn capabilities(target: Target) -> Capabilities {
 /// existing networks, which a fresh Docker host VM has none of, and the host's GPUs and
 /// devices, which a VM Isoloom creates doesn't have, and volumes kept past `down` or existing
 /// already (the storage goes with the VM). Secrets reach the VM over its own
-/// connection (`isoloom run`), and Compose takes them from there.
+/// connection (the runner), and Compose takes them from there.
 #[must_use]
 pub fn capabilities_on_a_vm() -> Capabilities {
     Capabilities::of([

@@ -11,7 +11,7 @@ variable "region" {
   default = "us-east-1"
 }
 
-# Set by Isoloom for each deployment, so `isothrum down .` can list what is left with its tag.
+# Set by Isoloom for each deployment, so a runner's down can list what is left with its tag.
 variable "isoloom_instance" {
   type    = string
   default = ""

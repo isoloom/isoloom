@@ -58,7 +58,7 @@ pub struct Spec {
     /// The version of the `isoloom.yml` format the file is written in: `1`, the only one so far.
     pub version: u32,
     /// The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs,
-    /// networks and cloud resources, and the environment in `isoloom status`.
+    /// networks and cloud resources, and the environment in the run manifest.
     pub name: String,
     /// The environment's networks, by name: each an address block the machines on it share.
     #[serde(default)]
@@ -71,7 +71,7 @@ pub struct Spec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dns: Option<EnvironmentDns>,
     /// Names of the values a runner provides at launch (a token, a licence key): from the
-    /// environment of `isoloom run`, or a profile's `inputs`. A machine receives the ones its own
+    /// runner's environment, or a profile's `inputs`. A machine receives the ones its own
     /// `inputs` lists. Never baked into images.
     #[serde(default)]
     pub inputs: Vec<String>,
@@ -80,7 +80,7 @@ pub struct Spec {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[schemars(skip)]
     pub plain_inputs: Vec<String>,
-    /// Secrets, by kebab-case name: where `isoloom run` reads each value on the runner (`env`,
+    /// Secrets, by kebab-case name: where the runner reads each value on its host (`env`,
     /// `file`, `vault`, `sops`). A machine lists the ones it gets in its own `secrets`, as
     /// files. Values never reach a generated file, the resolved snapshot or a log.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
@@ -95,7 +95,7 @@ pub struct Spec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<CloudServices>,
     /// Volumes shared between machines: a machine volume with one of these names is this
-    /// volume, wherever it mounts it. One declared here can also outlive `isoloom down`
+    /// volume, wherever it mounts it. One declared here can also outlive the runner's `down`
     /// (`persistent: true`) or be one that exists already (`external: <name>`).
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub volumes: IndexMap<String, SharedVolume>,
@@ -108,8 +108,7 @@ pub struct Spec {
     #[serde(default)]
     pub common: Option<Shared>,
     /// Named sets of machines sharing fields (over `common:`, under the machine's own; the most
-    /// specific group wins). They also become Ansible inventory groups, and `isoloom exec`
-    /// targets.
+    /// specific group wins). They also become Ansible inventory groups.
     #[serde(default)]
     pub groups: IndexMap<String, Group>,
     /// Provisioning across machines, once every machine is up: Ansible playbooks run from a
@@ -128,7 +127,7 @@ pub struct Spec {
     /// Narrows the targets derived from the implementations (e.g. not tested on Proxmox yet).
     #[serde(default)]
     pub targets: Option<Vec<Target>>,
-    /// Shown once the environment is up (`isoloom run`, `isoloom message`): how to start, in
+    /// Shown once the environment is up (the runner, `isoloom message`): how to start, in
     /// Markdown. `{{ machines.web.addresses.front }}`-style placeholders take any value of the
     /// resolved snapshot (`isoloom inspect` shows the paths).
     #[serde(default, skip_serializing_if = "Option::is_none")]

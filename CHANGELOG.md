@@ -64,6 +64,10 @@ stable spec format.
   `expires_at` no longer stops and starts the AWS host or replaces the Azure, DigitalOcean, Linode
   or Oracle Cloud one. GCP's startup script is a `metadata` entry, which the provider updates in
   place, and the next boot schedules the new expiry.
+- **Generated files and messages name no particular runner.** Usage comments, the check
+  runners' headers, a set-up's waits for its secrets and its project, and the `ssh_public_key`
+  variable's description say "the runner (run.json)"; a refusal no longer names the removed
+  `isoloom run`.
 - **A `cloud-vm` Linux machine is named after itself**, as on every other target, not after its
   address or its image (Kali's names itself `kali`); kept through a reboot.
 - **A refusal for an OS AWS has no image of lists the ones it has from its image table**, Kali

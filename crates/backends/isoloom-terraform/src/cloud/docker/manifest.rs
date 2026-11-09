@@ -1,5 +1,5 @@
 //! The `cloud-docker` run manifest (`.isoloom/cloud-docker/<cloud>/run.json`): Terraform makes
-//! one VM, and the Isothrum runner runs the environment's containers inside it, as `docker-vm`
+//! one VM, and the runner runs the environment's containers inside it, as `docker-vm`
 //! does on a server. The containers and the commands that start, check and read them are the
 //! shared Compose-in-a-VM pieces (`isoloom_render::run_manifest::guest`); this module adds the
 //! Terraform lifecycle, the cloud's credentials and the VM.

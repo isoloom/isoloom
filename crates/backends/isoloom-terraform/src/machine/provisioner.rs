@@ -70,7 +70,7 @@ pub(crate) struct Provisioner {
     pub(crate) parts: Vec<Vec<Expression>>,
     /// The resources it waits for.
     pub(crate) depends_on: Vec<Expression>,
-    /// The name it tells `isoloom run` how to reach the machine under, before anything else
+    /// The name it tells the runner how to reach the machine under, before anything else
     /// (`isoloom_render::secrets::REACH_DIR`): a machine whose set-up waits for its secrets.
     pub(crate) announce: Option<String>,
 }
@@ -114,7 +114,7 @@ impl Provisioner {
 /// A `local-exec` writing `<user>@<address>` to `<module>/.isoloom-reach/<name>`, followed on
 /// Windows by how WinRM authenticates (`winrm`, or `winrm-ntlm`), or by `via <user>@<address>`
 /// through a jump host: an address, never a secret (the password stays in Terraform's state,
-/// where `isoloom run` reads it).
+/// where the runner reads it).
 fn announce(name: &str, c: &Connection) -> Block {
     let (host, user, suffix) = match c {
         Connection::Ssh { host, user } | Connection::SshVia { host, user, .. } => (host.clone(), user.as_str(), ""),

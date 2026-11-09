@@ -1,5 +1,5 @@
-//! `machines.json`: each existing host's SSH endpoint, for `isoloom run`, `test`, `connect` and
-//! `exec`.
+//! `machines.json`: each existing host's SSH endpoint, for the runner (its up, check and a
+//! session on a host).
 
 use isoloom_plan::Environment;
 use serde_json::{Map, Value, json};

@@ -2,7 +2,7 @@
 #
 # What mongodb does, proven on the container form (the official image). `cargo xtask catalogue
 # check mongodb` builds a small lab (`web`, an access machine `probe`) and runs it on `docker`
-# through the Isothrum CLI.
+# through a runner.
 cases:
   default: {}
 

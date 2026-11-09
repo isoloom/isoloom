@@ -11,7 +11,7 @@
 //! - Published ports: the VM forwards them from the host's loopback.
 //! - The containers' host folders: each shared into the VM by its provider's own shared folder,
 //!   under `/mnt/isoloom`, where the commands run there tell Compose to bind it from.
-//! - The run manifest (`docker-vm/run.json`, [`manifest`]): the Isothrum runner brings the VM up
+//! - The run manifest (`docker-vm/run.json`, [`manifest`]): the runner brings the VM up
 //!   with every provisioner but the lab's start (`prepares`), then runs the same commands
 //!   through `vagrant ssh`, the values given at launch forwarded into the VM (SSH's `SendEnv`,
 //!   accepted by the VM's `sshd`), never written in it.

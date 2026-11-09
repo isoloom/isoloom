@@ -96,7 +96,7 @@ pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Positi
 
 /// A position's checks, on demand. The Vagrantfile is read on every `vagrant` command, so the
 /// project's check scripts are read then and written over the VM's copy first: an edited
-/// script runs at the next `isoloom test`, not the copy made when the VM was provisioned. Then
+/// script runs at the runner's next `check`, not the copy made when the VM was provisioned. Then
 /// the runner itself.
 pub(crate) fn provisioner(r: &mut Ruby, file: &str, group: &[&Resolved]) {
     let runner = format!("checks/{file}.sh");
