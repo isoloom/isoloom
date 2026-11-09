@@ -52,8 +52,7 @@ const RULES: Rules = Rules {
     kept: None,
     images: Images {
         label: "Linode",
-        has: |os| image(os).is_some(),
-        list: || IMAGES.listed(),
+        table: &IMAGES,
         own: own_image::linode,
     },
 };

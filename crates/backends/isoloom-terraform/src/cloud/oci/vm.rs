@@ -31,7 +31,7 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 use super::{SHAPE, availability_domain, availability_domains, owned, provider, ubuntu_images};
 use crate::cloud::Cloud;
 use crate::cloud::instance::name_with;
-use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
+use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::vms;
@@ -68,8 +68,7 @@ const RULES: Rules = Rules {
     kept: None,
     images: Images {
         label: "Oracle Cloud",
-        has: |os| matches!(os, "debian-12" | "debian-13" | "ubuntu-22.04" | "ubuntu-24.04"),
-        list: || "Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04".to_owned(),
+        table: &IMAGES,
         own: own_image::oci,
     },
 };
@@ -83,13 +82,45 @@ fn refusal(env: &Environment) -> Option<String> {
     RULES.linux_refusal(env).or_else(|| network::refusal(env)).or_else(|| ipv6::refusal(env))
 }
 
-/// The Ubuntu version an OS runs on: Oracle Cloud has no Debian image, so Debian labs fall back
+/// The Ubuntu version each OS runs on: Oracle Cloud has no Debian image, so Debian labs fall back
 /// to the newest Ubuntu LTS, as cloud-docker does.
-fn ubuntu(os: &str) -> &'static str {
-    match os {
-        "ubuntu-22.04" => "22.04",
-        _ => "24.04",
+const IMAGES: UbuntuImages = UbuntuImages(OsImages(&[
+    ("ubuntu-22.04", "22.04"),
+    ("ubuntu-24.04", NEWEST_UBUNTU),
+    ("debian-12", NEWEST_UBUNTU),
+    ("debian-13", NEWEST_UBUNTU),
+]));
+
+/// The newest Ubuntu LTS, which an OS with no image of its own runs on.
+const NEWEST_UBUNTU: &str = "24.04";
+
+/// Oracle Cloud's images: Canonical's Ubuntu, by the version each OS runs on.
+#[derive(Debug)]
+struct UbuntuImages(OsImages<&'static str>);
+
+impl ImageTable for UbuntuImages {
+    fn oses(&self) -> Vec<&'static str> {
+        self.0.oses()
     }
+
+    /// Ubuntu's own versions, then the OSes that run on one (`Debian 12/13 on Ubuntu 24.04`).
+    fn listed(&self) -> String {
+        let own = |os: &str, v: &str| os.strip_prefix("ubuntu-") == Some(v);
+        let mut parts = vec![listed(self.0.0.iter().filter(|(os, v)| own(os, v)).map(|(os, _)| *os))];
+        let mut versions: Vec<&str> = self.0.0.iter().filter(|(os, v)| !own(os, v)).map(|(_, v)| *v).collect();
+        versions.dedup();
+        for v in versions {
+            let on = self.0.0.iter().filter(|(os, u)| *u == v && !own(os, u)).map(|(os, _)| *os);
+            parts.push(format!("{} on Ubuntu {v}", listed(on)));
+        }
+        parts.join(", ")
+    }
+}
+
+/// The Ubuntu version an OS runs on (the newest LTS for one Oracle Cloud has no image for, which
+/// the refusal already turned away).
+fn ubuntu(os: &str) -> &'static str {
+    IMAGES.0.of(os).unwrap_or(NEWEST_UBUNTU)
 }
 
 /// The `oci_core_images` data source of an Ubuntu version.

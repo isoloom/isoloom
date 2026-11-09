@@ -86,10 +86,8 @@ pub(crate) const FIRST_THREE: Kept = Kept {
 pub(crate) struct Images {
     /// The cloud, as the refusal names it (`GCP`).
     pub(crate) label: &'static str,
-    /// Whether it has an image for an OS.
-    pub(crate) has: fn(&str) -> bool,
-    /// The OSes it has images for, as the refusal lists them (see [`listed`]).
-    pub(crate) list: fn() -> String,
+    /// Its image table: the OSes it has an image for, which the refusal lists.
+    pub(crate) table: &'static dyn ImageTable,
     /// The field of `vm.image` naming a machine's own image there, which stands in for its OS's.
     pub(crate) own: own_image::Field,
 }
@@ -97,11 +95,24 @@ pub(crate) struct Images {
 impl Images {
     /// Why machine `name` has no image here: none for its OS, and none of its own.
     pub(crate) fn missing(&self, name: &str, os: &str, own: Option<&str>) -> Option<String> {
-        (!(self.has)(os) && own.is_none()).then(|| format!("machine `{name}`: no {} image for `{os}` yet ({})", self.label, (self.list)()))
+        (!self.table.oses().contains(&os) && own.is_none())
+            .then(|| format!("machine `{name}`: no {} image for `{os}` yet ({})", self.label, self.table.listed()))
+    }
+}
+
+/// A cloud's image table, as a refusal reads it.
+pub(crate) trait ImageTable: std::fmt::Debug + Sync {
+    /// The OSes it has an image for (their plan names, `debian-12`), in its order.
+    fn oses(&self) -> Vec<&'static str>;
+
+    /// The OSes, as a refusal lists them ([`listed`]).
+    fn listed(&self) -> String {
+        listed(self.oses())
     }
 }
 
 /// The images a cloud has, by the OS each is for (its plan name, `debian-12`).
+#[derive(Debug)]
 pub(crate) struct OsImages<T: 'static>(pub(crate) &'static [(&'static str, T)]);
 
 impl<T: Copy> OsImages<T> {
@@ -109,10 +120,11 @@ impl<T: Copy> OsImages<T> {
     pub(crate) fn of(&self, os: &str) -> Option<T> {
         self.0.iter().find(|(o, _)| *o == os).map(|(_, i)| *i)
     }
+}
 
-    /// The OSes, as a refusal lists them ([`listed`]).
-    pub(crate) fn listed(&self) -> String {
-        listed(self.0.iter().map(|(os, _)| *os))
+impl<T: std::fmt::Debug + Sync> ImageTable for OsImages<T> {
+    fn oses(&self) -> Vec<&'static str> {
+        self.0.iter().map(|(os, _)| *os).collect()
     }
 }
 

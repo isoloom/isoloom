@@ -75,8 +75,7 @@ const RULES: Rules = Rules {
     }),
     images: Images {
         label: "GCP",
-        has: |os| image(os).is_some(),
-        list: || IMAGES.listed(),
+        table: &IMAGES,
         own: own_image::gcp,
     },
 };

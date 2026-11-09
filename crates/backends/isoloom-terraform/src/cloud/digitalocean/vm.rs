@@ -43,8 +43,7 @@ const RULES: Rules = Rules {
     kept: None,
     images: Images {
         label: "DigitalOcean",
-        has: |os| image(os).is_some(),
-        list: || IMAGES.listed(),
+        table: &IMAGES,
         own: own_image::digitalocean,
     },
 };

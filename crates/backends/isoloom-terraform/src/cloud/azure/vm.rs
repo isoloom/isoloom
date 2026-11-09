@@ -70,8 +70,7 @@ const RULES: Rules = Rules {
     kept: Some(FIRST_THREE),
     images: Images {
         label: "Azure",
-        has: |os| image(os).is_some(),
-        list: || IMAGES.listed(),
+        table: &IMAGES,
         own: own_image::azure,
     },
 };

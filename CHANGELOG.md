@@ -47,8 +47,9 @@ stable spec format.
 - **A `cloud-vm` Linux machine is named after itself**, as on every other target, not after its
   address or its image (Kali's names itself `kali`); kept through a reboot.
 - **A refusal for an OS AWS has no image of lists the ones it has from its image table**, Kali
-  among them (it was left out); every cloud's list is built from its own table, so it can't drift
-  (`Windows Server 2016/2019/2022/2025`).
+  among them (it was left out); every cloud's list, and whether it has an image at all, is read
+  from its own image table, so they can't drift (`Windows Server 2016/2019/2022/2025`; Oracle
+  Cloud's `Debian 12/13 on Ubuntu 24.04` from the Ubuntu each OS runs on there).
 - **A containers' host VM has at least 40 GB of disk** (`HostSize::MIN_DISK_GB`) on every cloud
   and on QEMU: room for a large image started on it while the lab runs (a full tools image
   unpacks to about 12 GB) beside the lab's own. GCP had 30 GB fixed, Azure the image's default,

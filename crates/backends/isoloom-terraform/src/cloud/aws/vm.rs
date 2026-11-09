@@ -29,7 +29,7 @@ use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 
 use super::{ami, ami_filter, instance_type, provider, region, zones};
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes, listed};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::cloud::{Cloud, instance, operator};
 use crate::limits::Limits;
@@ -70,8 +70,7 @@ const RULES: Rules = Rules {
     kept: Some(FIRST_THREE),
     images: Images {
         label: "AWS",
-        has: |os| image(os).is_some(),
-        list: || listed(IMAGES.iter().map(|i| i.os)),
+        table: &IMAGES,
         own: own_image::aws,
     },
 };
@@ -108,9 +107,8 @@ fn nesting(b: BlockBuilder, mp: &MachinePlan) -> BlockBuilder {
 }
 
 /// An OS's image on AWS: how its AMI is looked up, and what it needs.
+#[derive(Debug, Clone, Copy)]
 struct Image {
-    /// The OS, as the plan names it (`debian-12`).
-    os: &'static str,
     /// The AMI's owner (an account, or `aws-marketplace`).
     owner: &'static str,
     /// The AMI's name filter (the latest match is taken).
@@ -127,9 +125,8 @@ struct Image {
 
 impl Image {
     /// An image looked up by owner and name only, with no disk of its own.
-    const fn new(os: &'static str, owner: &'static str, filter: &'static str, user: &'static str) -> Image {
+    const fn new(owner: &'static str, filter: &'static str, user: &'static str) -> Image {
         Image {
-            os,
             owner,
             filter,
             user,
@@ -140,38 +137,49 @@ impl Image {
 }
 
 /// The OSes AWS has images for.
-const IMAGES: &[Image] = &[
-    Image::new("debian-12", "136693071363", "debian-12-amd64-*", "admin"),
-    Image::new("debian-13", "136693071363", "debian-13-amd64-*", "admin"),
-    Image::new(
+const IMAGES: OsImages<Image> = OsImages(&[
+    ("debian-12", Image::new("136693071363", "debian-12-amd64-*", "admin")),
+    ("debian-13", Image::new("136693071363", "debian-13-amd64-*", "admin")),
+    (
         "ubuntu-22.04",
-        "099720109477",
-        "ubuntu/images/hvm-ssd*/ubuntu-jammy-22.04-amd64-server-*",
-        "ubuntu",
+        Image::new("099720109477", "ubuntu/images/hvm-ssd*/ubuntu-jammy-22.04-amd64-server-*", "ubuntu"),
     ),
-    Image::new(
+    (
         "ubuntu-24.04",
-        "099720109477",
-        "ubuntu/images/hvm-ssd*/ubuntu-noble-24.04-amd64-server-*",
-        "ubuntu",
+        Image::new("099720109477", "ubuntu/images/hvm-ssd*/ubuntu-noble-24.04-amd64-server-*", "ubuntu"),
     ),
     // Amazon's Windows Server images (license included, billed per hour).
-    Image::new("windows-server-2016", "801119661308", "Windows_Server-2016-English-Full-Base-*", "isoloom"),
-    Image::new("windows-server-2019", "801119661308", "Windows_Server-2019-English-Full-Base-*", "isoloom"),
-    Image::new("windows-server-2022", "801119661308", "Windows_Server-2022-English-Full-Base-*", "isoloom"),
-    Image::new("windows-server-2025", "801119661308", "Windows_Server-2025-English-Full-Base-*", "isoloom"),
+    (
+        "windows-server-2016",
+        Image::new("801119661308", "Windows_Server-2016-English-Full-Base-*", "isoloom"),
+    ),
+    (
+        "windows-server-2019",
+        Image::new("801119661308", "Windows_Server-2019-English-Full-Base-*", "isoloom"),
+    ),
+    (
+        "windows-server-2022",
+        Image::new("801119661308", "Windows_Server-2022-English-Full-Base-*", "isoloom"),
+    ),
+    (
+        "windows-server-2025",
+        Image::new("801119661308", "Windows_Server-2025-English-Full-Base-*", "isoloom"),
+    ),
     // Kali's own image, on the AWS Marketplace (free; an account may have to accept its terms
     // there once), pinned to its product; its snapshot is 25 GB.
-    Image {
-        product_code: Some("7lgvy7mt78lgoi4lant0znp5h"),
-        min_disk_gb: Some(25),
-        ..Image::new("kali", "aws-marketplace", "debian-kali-last-snapshot-amd64-*", "kali")
-    },
-];
+    (
+        "kali",
+        Image {
+            product_code: Some("7lgvy7mt78lgoi4lant0znp5h"),
+            min_disk_gb: Some(25),
+            ..Image::new("aws-marketplace", "debian-kali-last-snapshot-amd64-*", "kali")
+        },
+    ),
+]);
 
 /// An OS's image, when AWS has one.
-fn image(os: &str) -> Option<&'static Image> {
-    IMAGES.iter().find(|i| i.os == os)
+fn image(os: &str) -> Option<Image> {
+    IMAGES.of(os)
 }
 
 /// The smallest root disk an OS's image takes, in GB (0 when the default is enough).
@@ -262,9 +270,9 @@ fn amis(env: &Environment) -> Vec<Block> {
     oses.sort_unstable();
     oses.dedup();
     oses.into_iter()
-        .filter_map(image)
-        .map(|i| {
-            let lookup = ami(&ident(i.os), i.owner, i.filter).add_block(ami_filter("architecture", "x86_64"));
+        .filter_map(|os| Some((os, image(os)?)))
+        .map(|(os, i)| {
+            let lookup = ami(&ident(os), i.owner, i.filter).add_block(ami_filter("architecture", "x86_64"));
             match i.product_code {
                 Some(code) => lookup.add_block(ami_filter("product-code", code)).build(),
                 None => lookup.build(),
