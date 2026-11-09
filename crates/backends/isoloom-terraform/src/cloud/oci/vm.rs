@@ -58,6 +58,8 @@ const RULES: Rules = Rules {
     },
     // The AMD shape exposes its virtualization instructions when asked (`platform_config`).
     nests: true,
+    largest: None,
+    largest_nesting: None,
     mtu: Mtu::Fixed,
     // A VNIC on an `auto` network takes the address Oracle Cloud picks (`ipv6`).
     picks_ipv6: true,

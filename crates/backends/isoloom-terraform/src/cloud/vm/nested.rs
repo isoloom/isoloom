@@ -30,12 +30,10 @@ pub(crate) fn refusal(env: &Environment, cloud: Cloud, supported: bool) -> Optio
 }
 
 /// The size for a machine that nests, by its memory: the smallest of `sizes` (memory in MB,
-/// size) with as much, else the largest. `None` when it doesn't nest.
+/// size) with as much ([`super::rules::fit`]; more than the largest is refused). `None` when it
+/// doesn't nest.
 pub(crate) fn size(mp: &MachinePlan, memory_mb: u32, sizes: &[(u32, &'static str)]) -> Option<&'static str> {
-    if !wanted(mp) {
-        return None;
-    }
-    sizes.iter().find(|(mb, _)| *mb >= memory_mb).or(sizes.last()).map(|(_, s)| *s)
+    wanted(mp).then(|| super::rules::fit(sizes, memory_mb))
 }
 
 #[cfg(test)]

@@ -28,7 +28,7 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Expression, Module, reference};
 
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{
     self, Driver, gateways,
     gpus::GpuSizes,
@@ -60,6 +60,11 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: false,
+    largest: Some({
+        let [.., (size, memory_mb, _)] = SIZES;
+        Largest { memory_mb, size }
+    }),
+    largest_nesting: None,
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 1, most: 2 },
@@ -137,7 +142,8 @@ const SIZES: [(&str, u32, usize); 8] = [
 /// The network interfaces an Azure VM of [`SIZES`] takes at most.
 const MOST_INTERFACES: usize = 8;
 
-/// The cheapest size with `memory_mb` and `interfaces`; the largest when none has enough.
+/// The cheapest size with `memory_mb` and `interfaces`; the largest when none has enough (more
+/// memory than it has is refused: `Rules::memory`; more interfaces: [`interfaces`]).
 fn size(memory_mb: u32, interfaces: usize) -> &'static str {
     let [.., largest] = SIZES;
     SIZES

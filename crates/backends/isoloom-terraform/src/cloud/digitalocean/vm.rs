@@ -11,7 +11,7 @@ use isoloom_spec::DEFAULT_MEMORY_MB;
 use super::{Way, rule, ssh_key, vpc};
 use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with, tag_list};
-use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes};
+use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, fit};
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
 use crate::limits::Limits;
 use crate::machine::vms;
@@ -35,6 +35,8 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: false,
+    largest: Some(Largest::of(SIZES)),
+    largest_nesting: None,
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 1, most: 7 },
@@ -81,14 +83,12 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
     IMAGES.of(os)
 }
 
+/// The droplet sizes, by their memory in MB.
+const SIZES: &[(u32, &str)] = &[(1024, "s-1vcpu-1gb"), (2048, "s-2vcpu-2gb"), (4096, "s-2vcpu-4gb"), (8192, "s-4vcpu-8gb")];
+
 /// The droplet size for a machine's memory.
 fn size(memory_mb: u32) -> &'static str {
-    match memory_mb {
-        0..=1024 => "s-1vcpu-1gb",
-        1025..=2048 => "s-2vcpu-2gb",
-        2049..=4096 => "s-2vcpu-4gb",
-        _ => "s-4vcpu-8gb",
-    }
+    fit(SIZES, memory_mb)
 }
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.

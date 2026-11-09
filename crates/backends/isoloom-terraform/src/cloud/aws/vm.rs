@@ -28,9 +28,9 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, string};
 use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 
-use super::{ami, ami_filter, instance_type, zones};
+use super::{INSTANCE_TYPES, ami, ami_filter, instance_type, zones};
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::limits::Limits;
 use crate::machine::{controller, vms};
@@ -56,6 +56,8 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: true,
+    largest: Some(Largest::of(INSTANCE_TYPES)),
+    largest_nesting: Some(Largest::of(NESTING)),
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes {
@@ -204,6 +206,7 @@ fn refusal(env: &Environment) -> Option<String> {
         .or_else(|| machines_refusal(env))
         .or_else(|| RULES.gpus(env))
         .or_else(|| RULES.nesting(env))
+        .or_else(|| RULES.memory(env))
         .or_else(|| RULES.volumes(env))
 }
 

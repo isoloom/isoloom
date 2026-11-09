@@ -1,10 +1,11 @@
 //! What a cloud takes, declared once and read by its refusal ([`Rules`]): the networks it
-//! models, the features it lacks, its GPU types, whether its VMs nest, its networks' MTU,
-//! whether it picks IPv6 addresses itself, its volumes, its TPM and its images.
+//! models, the features it lacks, its GPU types, whether its VMs nest, its largest sizes, its
+//! networks' MTU, whether it picks IPv6 addresses itself, its volumes, its TPM and its images.
 
 use std::ops::RangeInclusive;
 
 use isoloom_plan::Environment;
+use isoloom_spec::DEFAULT_MEMORY_MB;
 use isoloom_spec::model::{Ipv6Addresses, Machine};
 use isoloom_spec::validate::Cidr;
 use isoloom_spec::windows::Tpm;
@@ -54,6 +55,31 @@ pub(crate) struct Volumes {
     pub(crate) smallest_gb: u32,
     /// The most a VM takes.
     pub(crate) most: usize,
+}
+
+/// A cloud's largest size for a machine: the most memory its size table gives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Largest {
+    /// Its memory, in MB.
+    pub(crate) memory_mb: u32,
+    /// The size.
+    pub(crate) size: &'static str,
+}
+
+impl Largest {
+    /// The last of `table` (memory in MB, size; smallest first; none when it is empty).
+    pub(crate) const fn of(table: &[(u32, &'static str)]) -> Largest {
+        match table {
+            [.., (memory_mb, size)] => Largest { memory_mb: *memory_mb, size },
+            [] => Largest { memory_mb: 0, size: "" },
+        }
+    }
+}
+
+/// The smallest of `table` (memory in MB, size; smallest first) with `memory_mb` or more; the
+/// largest when none has as much, which the cloud's refusal ([`Rules::memory`]) rules out.
+pub(crate) fn fit(table: &[(u32, &'static str)], memory_mb: u32) -> &'static str {
+    table.iter().find(|(mb, _)| *mb >= memory_mb).or(table.last()).map_or("", |(_, s)| *s)
 }
 
 /// The smallest subnets a cloud makes.
@@ -176,6 +202,11 @@ pub(crate) struct Rules {
     pub(crate) gpus: GpuSizes,
     /// Whether its VMs can run VMs of their own (`nested_virtualization`).
     pub(crate) nests: bool,
+    /// Its largest size for a machine by its memory (`None`: its shapes are sized to the
+    /// machine, Oracle Cloud's flexible ones).
+    pub(crate) largest: Option<Largest>,
+    /// The same for a machine that nests.
+    pub(crate) largest_nesting: Option<Largest>,
     /// Its networks' MTU.
     pub(crate) mtu: Mtu,
     /// Whether it picks a machine's IPv6 address itself (`ipv6.addresses: auto`), or gives each
@@ -196,12 +227,14 @@ pub(crate) struct Rules {
 
 impl Rules {
     /// The first feature the environment asks for and the cloud can't give, in this order: its
-    /// limits, GPUs, nesting, a network's MTU, IPv6 addresses it doesn't pick, data disks.
+    /// limits, GPUs, nesting, memory, a network's MTU, IPv6 addresses it doesn't pick, data
+    /// disks.
     pub(crate) fn features(&self, env: &Environment) -> Option<String> {
         self.limits
             .refusal(env)
             .or_else(|| self.gpus(env))
             .or_else(|| self.nesting(env))
+            .or_else(|| self.memory(env))
             .or_else(|| self.mtu(env))
             .or_else(|| self.ipv6_addresses(env))
             .or_else(|| self.volumes(env))
@@ -236,6 +269,27 @@ impl Rules {
     /// Why the cloud can't run the machines' VMs inside them, if it can't.
     pub(crate) fn nesting(&self, env: &Environment) -> Option<String> {
         nested::refusal(env, self.cloud, self.nests)
+    }
+
+    /// Why a machine can't have its memory here, if one can't: more than the cloud's largest
+    /// size gives (a GPU type's memory is its own).
+    pub(crate) fn memory(&self, env: &Environment) -> Option<String> {
+        vms(env).find_map(|(name, mp)| {
+            if self.gpus.of(mp).is_some() {
+                return None;
+            }
+            let largest = if nested::wanted(mp) { self.largest_nesting } else { self.largest }?;
+            let memory = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
+            (memory > largest.memory_mb).then(|| {
+                format!(
+                    "machine `{name}` asks for {} of memory: the largest {} size here, `{}`, has {}",
+                    mb(memory),
+                    self.cloud,
+                    largest.size,
+                    mb(largest.memory_mb)
+                )
+            })
+        })
     }
 
     /// Why a network's MTU can't be its own here, if one can't.
@@ -314,6 +368,15 @@ impl Rules {
                 .map(|(name, _)| format!("machine `{name}` is on several networks: a {cloud} instance has one VPC interface")),
             _ => None,
         }
+    }
+}
+
+/// An amount of memory as a refusal says it: whole GB when it is, else MB.
+fn mb(memory_mb: u32) -> String {
+    if memory_mb.is_multiple_of(1024) {
+        format!("{} GB", memory_mb / 1024)
+    } else {
+        format!("{memory_mb} MB")
     }
 }
 

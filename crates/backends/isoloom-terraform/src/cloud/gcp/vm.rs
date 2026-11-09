@@ -30,7 +30,7 @@ use isoloom_spec::validate::Cidr;
 
 use super::{own_project, public_ip};
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{Images, Kept, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{Images, Kept, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes, fit};
 use crate::cloud::vm::{
     self, Driver, gateways,
     gpus::GpuSizes,
@@ -61,6 +61,8 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: true,
+    largest: Some(Largest::of(MACHINE_TYPES)),
+    largest_nesting: Some(Largest::of(NESTING)),
     mtu: Mtu::Between { low: 1300, high: 8896 },
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 10, most: 15 },
@@ -111,13 +113,11 @@ pub(super) fn user(os: &str) -> &'static str {
 
 /// The machine type for a memory size: E2 shared-core up to 4 GB, then standard.
 fn machine_type(memory_mb: u32) -> &'static str {
-    match memory_mb {
-        0..=1024 => "e2-small",
-        1025..=2048 => "e2-medium",
-        2049..=8192 => "e2-standard-2",
-        _ => "e2-standard-4",
-    }
+    fit(MACHINE_TYPES, memory_mb)
 }
+
+/// The machine types, by the memory in MB they are picked for.
+const MACHINE_TYPES: &[(u32, &str)] = &[(1024, "e2-small"), (2048, "e2-medium"), (8192, "e2-standard-2"), (16384, "e2-standard-4")];
 
 /// Why Google Cloud can't run this environment, if it can't: its features, its address rules,
 /// then single-interface Linux machines with images, and the controller on one network.

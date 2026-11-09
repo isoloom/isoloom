@@ -15,7 +15,7 @@ use isoloom_spec::DEFAULT_MEMORY_MB;
 
 use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
-use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes};
+use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, fit};
 use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
 use crate::limits::Limits;
 use crate::module::{self, ident, providers, resource};
@@ -43,6 +43,8 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: false,
+    largest: Some(Largest::of(PLANS)),
+    largest_nesting: None,
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 10, most: 6 },
@@ -82,14 +84,17 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
 
 /// The Linode plan for a machine's memory.
 fn plan(memory_mb: u32) -> &'static str {
-    match memory_mb {
-        0..=1024 => "g6-nanode-1",
-        1025..=2048 => "g6-standard-1",
-        2049..=4096 => "g6-standard-2",
-        4097..=8192 => "g6-standard-4",
-        _ => "g6-standard-6",
-    }
+    fit(PLANS, memory_mb)
 }
+
+/// The plans, by their memory in MB.
+const PLANS: &[(u32, &str)] = &[
+    (1024, "g6-nanode-1"),
+    (2048, "g6-standard-1"),
+    (4096, "g6-standard-2"),
+    (8192, "g6-standard-4"),
+    (16384, "g6-standard-6"),
+];
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
 pub(crate) const DRIVER: Driver = Driver {

@@ -141,14 +141,17 @@ pub(crate) fn sealed_route_out() -> Block {
         .build()
 }
 
-/// The instance type for an amount of memory: Free Tier eligible up to 8 GB (accounts on the
-/// AWS Free plan can't launch other types), then general purpose.
+/// The instance types by their memory in MB: Free Tier eligible up to 8 GB (accounts on the AWS
+/// Free plan can't launch other types), then general purpose.
+pub(crate) const INSTANCE_TYPES: &[(u32, &str)] = &[
+    (1024, "t3.micro"),
+    (2048, "t3.small"),
+    (4096, "c7i-flex.large"),
+    (8192, "m7i-flex.large"),
+    (16384, "m7i-flex.xlarge"),
+];
+
+/// The instance type for an amount of memory ([`INSTANCE_TYPES`]).
 pub(crate) fn instance_type(memory_mb: u32) -> &'static str {
-    match memory_mb {
-        0..=1024 => "t3.micro",
-        1025..=2048 => "t3.small",
-        2049..=4096 => "c7i-flex.large",
-        4097..=8192 => "m7i-flex.large",
-        _ => "m7i-flex.xlarge",
-    }
+    crate::cloud::vm::rules::fit(INSTANCE_TYPES, memory_mb)
 }
