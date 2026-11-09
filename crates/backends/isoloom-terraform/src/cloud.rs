@@ -16,6 +16,7 @@ pub(crate) mod manifest;
 pub(crate) mod oci;
 pub(crate) mod operator;
 pub(crate) mod services;
+pub(crate) mod user_data_limit;
 pub(crate) mod vm;
 
 use std::fmt;

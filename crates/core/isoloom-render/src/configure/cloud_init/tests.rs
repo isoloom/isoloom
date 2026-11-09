@@ -54,18 +54,3 @@ fn gzip_is_deterministic_and_is_standard_base64() {
     );
     assert_eq!(once.len() % 4, 0, "{once}");
 }
-
-#[test]
-fn a_limit_refuses_a_document_over_its_cap_naming_the_overflow() {
-    let small = "x".repeat(100);
-    assert_eq!(Limit::Aws.fits(small.as_bytes()), Ok(()));
-    let big = "x".repeat(Limit::Aws.bytes() + 50);
-    let err = Limit::Aws.fits(big.as_bytes()).unwrap_err();
-    assert_eq!(err.provider, "AWS");
-    assert_eq!(err.cap, 16 * 1024);
-    assert_eq!(err.size, 16 * 1024 + 50);
-    assert!(err.to_string().contains("16434 bytes as AWS counts it, over its 16384-byte limit"), "{err}");
-    assert_eq!(Limit::Aws.fits(&gzip(&big)), Ok(()), "gzip shrinks what AWS counts");
-    assert_eq!((Limit::Azure.bytes(), Limit::Gcp.bytes()), (65_535, 256 * 1024));
-    assert_eq!((Limit::Azure.provider(), Limit::Gcp.provider()), ("Azure", "Google Cloud"));
-}

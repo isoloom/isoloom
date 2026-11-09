@@ -9,7 +9,7 @@ use isoloom_spec::model::Protocol;
 
 use super::{SHAPE, availability_domain, availability_domains, owned, provider, route_out, ubuntu_images};
 use crate::cloud::docker::Driver;
-use crate::cloud::vm::hooks;
+use crate::cloud::instance;
 use crate::docker_host::published;
 use crate::module::providers;
 use crate::module::variable::Variable;
@@ -106,7 +106,7 @@ fn network(env: &Environment) -> Vec<Block> {
 }
 
 /// The instance: Ubuntu on the flexible shape, sized for the containers, its expiry in its user
-/// data, run once ([`hooks::set_up_once`]).
+/// data, run once ([`instance::set_up_once`]).
 fn vm(env: &Environment, user_data: Expression) -> Block {
     let (ocpus, memory) = HostSize::of(env).pick([(1, 4), (2, 8), (4, 16)]);
     resource("oci_core_instance")
@@ -138,6 +138,6 @@ fn vm(env: &Environment, user_data: Expression) -> Block {
                 ("user_data", call("base64encode", [user_data])),
             ]),
         ))
-        .add_block(hooks::set_up_once(entry(reference("metadata"), "user_data")).build())
+        .add_block(instance::set_up_once(entry(reference("metadata"), "user_data")).build())
         .build()
 }

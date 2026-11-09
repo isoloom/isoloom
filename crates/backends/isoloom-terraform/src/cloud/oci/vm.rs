@@ -30,7 +30,7 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::{SHAPE, availability_domain, availability_domains, owned, provider, ubuntu_images};
 use crate::cloud::Cloud;
-use crate::cloud::instance::name_with;
+use crate::cloud::instance::{self, name_with};
 use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
@@ -255,7 +255,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
         .add_block(vnic)
         .add_blocks(disks::oci(name, &mp.disks))
         .add_attribute(("metadata", metadata))
-        .add_block(hooks::set_up_once(entry(reference("metadata"), "user_data")).build())
+        .add_block(instance::set_up_once(entry(reference("metadata"), "user_data")).build())
         .build()
 }
 

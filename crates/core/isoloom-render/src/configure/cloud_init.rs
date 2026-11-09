@@ -17,9 +17,9 @@
 //! a service would not restart when the shell renderer would restart it. The library keeps one
 //! implementation, guarded and ordered, that every carrier runs the same way.
 //!
-//! **Size.** A cloud that caps user data ([`Limit`]) measures the whole document, as it receives
-//! it; gzip keeps a recipe's script small. The `cloud-vm` modules refuse a machine whose user data
-//! is still over its cloud's cap ([`Limit::fits`]), naming the machine.
+//! **Size.** A cloud that caps user data measures the whole document, as it receives it; gzip
+//! keeps a recipe's script small. The `cloud-vm` modules (`isoloom-terraform`, which knows each
+//! cloud's cap) refuse a machine whose user data is still over its cloud's, naming the machine.
 
 use std::io::Write as _;
 
@@ -88,79 +88,6 @@ pub fn gzip(script: &str) -> Vec<u8> {
     // Writing to and flushing an in-memory `Vec` can't fail; the empty fallback is unreachable.
     let written = gz.write_all(script.as_bytes());
     written.and(gz.finish()).unwrap_or_default()
-}
-
-/// How large a cloud lets a machine's user data be, in bytes of the document it receives once
-/// decoded from the base64 it travels in (a `docker-vm`, Proxmox or ESXi snippet has no such cap).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum Limit {
-    /// AWS: 16 KiB of user data, counted before its base64 (so, for gzipped user data, the
-    /// gzip's bytes).
-    /// <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html>
-    Aws,
-    /// Azure: 65535 bytes of custom data, once decoded from its base64.
-    /// <https://learn.microsoft.com/rest/api/compute/virtual-machines/create-or-update#osprofile>
-    Azure,
-    /// Google Cloud: 256 KiB for one metadata value (the startup script).
-    /// <https://cloud.google.com/compute/docs/metadata/setting-custom-metadata#limitations>
-    Gcp,
-}
-
-impl Limit {
-    /// The cap in bytes.
-    #[must_use]
-    pub fn bytes(self) -> usize {
-        match self {
-            Limit::Aws => 16 * 1024,
-            Limit::Azure => 65_535,
-            Limit::Gcp => 256 * 1024,
-        }
-    }
-
-    /// The provider's name, for a refusal.
-    #[must_use]
-    pub fn provider(self) -> &'static str {
-        match self {
-            Limit::Aws => "AWS",
-            Limit::Azure => "Azure",
-            Limit::Gcp => "Google Cloud",
-        }
-    }
-
-    /// `Ok` when `document` (the user data as the cloud counts it: gzipped when it is sent
-    /// gzipped, never base64) fits; otherwise [`TooBig`], which a caller turns into a refusal
-    /// naming the machine.
-    ///
-    /// # Errors
-    ///
-    /// [`TooBig`] when the document is over the cap, with its size and the cap.
-    pub fn fits(self, document: &[u8]) -> Result<(), TooBig> {
-        let size = document.len();
-        let cap = self.bytes();
-        if size <= cap {
-            Ok(())
-        } else {
-            Err(TooBig {
-                provider: self.provider(),
-                size,
-                cap,
-            })
-        }
-    }
-}
-
-/// A machine's user data doesn't fit its cloud's cap.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error("its user data is {size} bytes as {provider} counts it, over its {cap}-byte limit: fewer or smaller steps, files or recipes")]
-#[non_exhaustive]
-pub struct TooBig {
-    /// The provider whose cap it broke.
-    pub provider: &'static str,
-    /// The document's size, in bytes.
-    pub size: usize,
-    /// The cap, in bytes.
-    pub cap: usize,
 }
 
 #[cfg(test)]

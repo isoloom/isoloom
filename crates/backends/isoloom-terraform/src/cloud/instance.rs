@@ -1,6 +1,6 @@
 //! The environment's instance in a cloud: its random id and name (`local.name`, so two
-//! instances of one spec never collide), its project root, and the tags or labels every
-//! resource carries (what a reaper reads).
+//! instances of one spec never collide), its project root, the tags or labels every resource
+//! carries (what a reaper reads), and the `lifecycle` of a VM set up once from its user data.
 
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{
@@ -82,6 +82,17 @@ pub(crate) fn tag_list(env: &Environment) -> Expression {
 /// `"${local.name}<suffix>"`: a resource's name in the environment.
 pub(crate) fn name_with(suffix: &str) -> Expression {
     Template::new().with_expr(reference("local.name")).with_text(suffix).into_expression()
+}
+
+/// The `lifecycle` of a machine whose user data (`attribute`, as `ignore_changes` names it) runs
+/// once, at its first boot: its set-up, or a Docker host's expiry. A later apply with other
+/// values in it (the launch's inputs, `var.expires_at` among them, which a run never keeps) leaves
+/// the machine as it is, where the cloud would replace it (Azure's `custom_data`, GCP's
+/// `metadata_startup_script`, DigitalOcean's `user_data`, Oracle Cloud's `metadata["user_data"]`,
+/// Linode's `metadata[0].user_data`: each forces a new VM in the provider version the modules
+/// require) or stop and start it (AWS's `user_data_base64`).
+pub(crate) fn set_up_once(attribute: Expression) -> BlockBuilder {
+    Block::builder("lifecycle").add_attribute(("ignore_changes", list([attribute])))
 }
 
 #[cfg(test)]

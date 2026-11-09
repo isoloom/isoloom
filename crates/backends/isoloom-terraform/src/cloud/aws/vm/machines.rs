@@ -1,8 +1,8 @@
 //! Each machine's instance (its interfaces and Elastic IP on several networks), set up from its
 //! own user data through the VM core; the Windows machines' and the controller's.
 
+use crate::cloud::user_data_limit::Limit;
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::configure::cloud_init::Limit;
 use isoloom_render::hcl_builder::{
     BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string,
 };
@@ -14,7 +14,7 @@ use super::{addresses, image_user, machine_type, nesting};
 use crate::Result;
 use crate::cloud::auto_stop;
 use crate::cloud::aws::instance_type;
-use crate::cloud::instance::name_with;
+use crate::cloud::instance::{self, name_with};
 use crate::cloud::vm::controller_setup;
 use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image};
 use crate::machine::user_data::Capped;
@@ -85,13 +85,13 @@ fn root_disk_gb(mp: &MachinePlan) -> u32 {
 }
 
 /// The instance's one `lifecycle` block (Terraform takes no second): set up once from its user
-/// data (`attribute`, [`hooks::set_up_once`]).
+/// data (`attribute`, [`instance::set_up_once`]).
 ///
 /// A TPM on AWS is NitroTPM, which the AMI enables (`tpm_support`): with `tpm_ami`, the looked-up
 /// AMI of a machine that asks for one, the plan stops when the image has none rather than start
 /// a VM without.
 fn lifecycle(attribute: &str, tpm_ami: Option<&str>) -> Block {
-    let block = hooks::set_up_once(reference(attribute));
+    let block = instance::set_up_once(reference(attribute));
     let Some(ami) = tpm_ami else { return block.build() };
     let condition = binary(reference(&format!("data.aws_ami.{ami}.tpm_support")), BinaryOperator::Eq, string("v2.0"));
     let precondition = Block::builder("precondition")

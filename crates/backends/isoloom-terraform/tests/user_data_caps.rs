@@ -4,7 +4,6 @@
 
 pub mod testing;
 
-use isoloom_render::configure::cloud_init::Limit;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
 use testing::{Outcome, plan};
@@ -74,7 +73,7 @@ fn aws_counts_the_gzip_and_refuses_over_16_kb_naming_the_machine() -> Outcome {
     let yaml = lab(40_000);
     let why = refusal(Cloud::Aws, &yaml)?.ok_or("AWS takes it")?;
     assert!(why.starts_with("machine `web`: its user data is "), "{why}");
-    assert!(why.contains(&format!("as AWS counts it, over its {}-byte limit", Limit::Aws.bytes())), "{why}");
+    assert!(why.contains("as AWS counts it, over its 16384-byte limit"), "{why}");
     for cloud in [Cloud::Azure, Cloud::Gcp] {
         assert_eq!(refusal(cloud, &yaml)?, None, "{}", cloud.id());
     }

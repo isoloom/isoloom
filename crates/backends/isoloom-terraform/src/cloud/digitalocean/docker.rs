@@ -7,8 +7,7 @@ use isoloom_spec::model::Protocol;
 
 use super::{Way, region, rule, ssh_key, vpc};
 use crate::cloud::docker::{Driver, SizeVariable};
-use crate::cloud::instance::tag_list;
-use crate::cloud::vm::hooks;
+use crate::cloud::instance::{self, tag_list};
 use crate::docker_host::published;
 use crate::module::providers;
 
@@ -41,7 +40,7 @@ fn resource(kind: &str) -> BlockBuilder {
     crate::module::resource(kind, "env").add_attribute(("name", reference("local.name")))
 }
 
-/// Debian 12 with the runner's key, its expiry in its user data, run once ([`hooks::set_up_once`]).
+/// Debian 12 with the runner's key, its expiry in its user data, run once ([`instance::set_up_once`]).
 fn droplet(env: &Environment, user_data: Expression) -> Block {
     resource("digitalocean_droplet")
         .add_attribute(("region", reference("var.region")))
@@ -51,7 +50,7 @@ fn droplet(env: &Environment, user_data: Expression) -> Block {
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))
         .add_attribute(("user_data", user_data))
         .add_attribute(("tags", tag_list(env)))
-        .add_block(hooks::set_up_once(reference("user_data")).build())
+        .add_block(instance::set_up_once(reference("user_data")).build())
         .build()
 }
 

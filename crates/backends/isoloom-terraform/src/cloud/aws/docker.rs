@@ -8,7 +8,7 @@ use isoloom_spec::model::Protocol;
 
 use super::{ami, egress, first_zone, ingress, instance_type, key_pair, provider, region, route_out, zones};
 use crate::cloud::docker::{Driver, SizeVariable};
-use crate::cloud::vm::hooks;
+use crate::cloud::instance;
 use crate::docker_host::published;
 use crate::module::providers;
 
@@ -108,7 +108,7 @@ fn security_group(env: &Environment) -> Block {
 }
 
 /// The instance: its expiry in its user data (gzipped: AWS takes 16 KB), run once
-/// ([`hooks::set_up_once`]), terminated when it shuts down.
+/// ([`instance::set_up_once`]), terminated when it shuts down.
 fn vm(size: HostSize, user_data: Expression) -> Block {
     resource("aws_instance")
         .add_attribute(("ami", reference("data.aws_ami.debian.id")))
@@ -118,7 +118,7 @@ fn vm(size: HostSize, user_data: Expression) -> Block {
         .add_attribute(("vpc_security_group_ids", list([reference("aws_security_group.env.id")])))
         .add_attribute(("instance_initiated_shutdown_behavior", string("terminate")))
         .add_attribute(("user_data_base64", call("base64gzip", [user_data])))
-        .add_block(hooks::set_up_once(reference("user_data_base64")).build())
+        .add_block(instance::set_up_once(reference("user_data_base64")).build())
         .add_block(
             Block::builder("root_block_device")
                 .add_attribute(("volume_size", number(size.disk_gb.into())))

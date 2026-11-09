@@ -6,8 +6,7 @@ pub(crate) mod vm;
 
 use isoloom_render::hcl_builder::{Block, Expression, attr, call, index, reference, string};
 
-use crate::cloud::vm::hooks;
-
+use crate::cloud::instance;
 use crate::module::variable::Variable;
 
 /// The `region` variable: Paris by default.
@@ -23,11 +22,11 @@ pub(crate) fn metadata(user_data: Expression) -> Block {
         .build()
 }
 
-/// An instance's `lifecycle`: set up once from its user data ([`hooks::set_up_once`]), which the
+/// An instance's `lifecycle`: set up once from its user data ([`instance::set_up_once`]), which the
 /// provider would otherwise replace the instance for (`metadata.user_data` is `ForceNew` in the
 /// `linode/linode` provider the modules require).
 pub(crate) fn set_up_once() -> Block {
-    hooks::set_up_once(attr(index(reference("metadata"), 0), "user_data")).build()
+    instance::set_up_once(attr(index(reference("metadata"), 0), "user_data")).build()
 }
 
 /// Which way a firewall rule applies.

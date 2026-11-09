@@ -9,7 +9,7 @@ use isoloom_render::hcl_builder::{Block, Expression, Module, list, reference, st
 use isoloom_spec::DEFAULT_MEMORY_MB;
 
 use super::{Way, region, rule, ssh_key, vpc};
-use crate::cloud::instance::{name_with, tag_list};
+use crate::cloud::instance::{self, name_with, tag_list};
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
 use crate::cloud::{Cloud, operator};
@@ -154,7 +154,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))
         .add_attribute(("user_data", hooks::user_data(env, (name, mp), USER, Vec::new())))
         .add_attribute(("tags", tag_list(env)))
-        .add_block(hooks::set_up_once(reference("user_data")).build());
+        .add_block(instance::set_up_once(reference("user_data")).build());
     if !mp.disks.is_empty() {
         droplet = droplet.add_attribute(("volume_ids", disks::digitalocean_ids(name, &mp.disks)));
     }

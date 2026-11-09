@@ -13,7 +13,9 @@
 //! script): a set-up that ended (`ready`, or `failed: …`) doesn't run again, and the script it
 //! is reading is never rewritten in place.
 
-use isoloom_render::configure::cloud_init::{Limit, gzip};
+use isoloom_render::configure::cloud_init::gzip;
+
+use crate::cloud::user_data_limit::Limit;
 use isoloom_render::hcl_builder::{Expression, Piece, Template, reference};
 use isoloom_render::run_manifest::RUNNER;
 use isoloom_render::steps::wait_for_mark;

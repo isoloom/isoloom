@@ -3,7 +3,7 @@
 //! and the machine's user data, the set-up it runs itself (`crate::machine::user_data`).
 
 use isoloom_plan::{Environment, MachinePlan, Step};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Template, list};
+use isoloom_render::hcl_builder::{Expression, Template};
 
 use crate::Result;
 use crate::machine::linux::{self, Hooks};
@@ -37,17 +37,6 @@ pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: 
 pub(crate) fn capped_user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>, cap: Capped) -> Result<Expression> {
     let hooks = of(machine.1, at_boot);
     user_data::capped(&linux::set_up(env, machine, user, &hooks), &format!("machine `{}`", machine.0), cap)
-}
-
-/// The `lifecycle` of a machine whose user data (`attribute`, as `ignore_changes` names it) runs
-/// once, at its first boot: its set-up, or a Docker host's expiry. A later apply with other
-/// values in it (the launch's inputs, `var.expires_at` among them, which a run never keeps) leaves
-/// the machine as it is, where the cloud would replace it (Azure's `custom_data`, GCP's
-/// `metadata_startup_script`, DigitalOcean's `user_data`, Oracle Cloud's `metadata["user_data"]`,
-/// Linode's `metadata[0].user_data`: each forces a new VM in the provider version the modules
-/// require) or stop and start it (AWS's `user_data_base64`).
-pub(crate) fn set_up_once(attribute: Expression) -> BlockBuilder {
-    Block::builder("lifecycle").add_attribute(("ignore_changes", list([attribute])))
 }
 
 /// The steps a cloud's network does itself: it routes between its subnets, each VLAN its own.

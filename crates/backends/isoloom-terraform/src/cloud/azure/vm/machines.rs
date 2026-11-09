@@ -3,9 +3,9 @@
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use crate::cloud::user_data_limit::Limit;
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::configure::cloud_init::Limit;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, reference, string};
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
@@ -14,7 +14,7 @@ use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{USER, image, machine_size, public_ip as address_of, size};
 use crate::Result;
 use crate::cloud::auto_stop;
-use crate::cloud::instance::name_with;
+use crate::cloud::instance::{self, name_with};
 use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, own_image, reach};
 use crate::machine::user_data::Capped;
 use crate::machine::{Remote, controller, user_data, windows};
@@ -110,7 +110,7 @@ fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk
         )
         .add_block(os_disk(disk));
     with_image(vm, (os, own), tpm)
-        .add_block(hooks::set_up_once(reference("custom_data")).build())
+        .add_block(instance::set_up_once(reference("custom_data")).build())
         .build()
 }
 
