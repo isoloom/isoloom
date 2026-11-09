@@ -88,6 +88,10 @@ stable spec format.
 - **`Spec::with_cloud_outputs`, `Spec::cloud_message` and `Copy::is_folder`**, which nothing in
   Isoloom called but their own tests, and the public `secrets::windows::command_line` (now
   test-only). `GuestCompose::empty` is hidden from the docs.
+- **`isoloom_plan::configure::{Configure, Handoff, OutPath}` and the plan's `Error::UnknownTool`
+  and `Error::Unpaired`.** They described choosing a CM tool per target (`--configure`,
+  `overrides.<target>.configure`), which no command or spec key ever offered: each target renders
+  its machines' configuration its own way.
 
 ## [1.0.9] — 2026-11-08
 

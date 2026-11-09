@@ -10,9 +10,6 @@
 //! - [`DaemonTable`]: the daemons' units and foreground forms; [`unstarted`]: the daemons a
 //!   recipe installs and no step starts.
 //! - [`fill`]: a template's placeholders filled in for one machine on one target.
-//! - [`Configure`] and [`Handoff`]: the CM tools, each target's default, and how the infrastructure
-//!   tool
-//!   reaches the rendered configuration.
 //!
 //! All of it is pure: no I/O, no clock, no environment.
 
@@ -22,7 +19,6 @@ mod process;
 mod recipe;
 mod resources;
 mod template;
-mod tools;
 mod unstarted;
 
 pub use daemons::{Daemon, DaemonEntry, DaemonTable, FamilyDaemon, LogLink, Stream};
@@ -34,5 +30,4 @@ pub use resources::{
     TemplatePlan, UserPlan,
 };
 pub use template::{Context, fill};
-pub use tools::{Configure, Handoff, OutPath};
 pub use unstarted::{Unstarted, unstarted};
