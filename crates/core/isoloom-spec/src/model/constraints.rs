@@ -28,6 +28,22 @@ pub struct Constraints {
     /// where the place forbids the public pools.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ntp: Vec<String>,
+    /// Certificate authorities every machine trusts beside the public ones (PEM files in the
+    /// project, one certificate each): a TLS-inspecting proxy's, an internal registry's. Each
+    /// Linux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`), each
+    /// Windows VM to its root store, each image Isoloom builds at build time, and each container
+    /// has them at `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ca_certificates: Vec<String>,
+}
+
+impl Constraints {
+    /// Where a container has the `n`th of [`Constraints::ca_certificates`]: the trust store's
+    /// folder Debian, Ubuntu and Alpine read.
+    #[must_use]
+    pub fn ca_certificate_path(n: usize) -> String {
+        format!("/usr/local/share/ca-certificates/isoloom-{n}.crt")
+    }
 }
 
 /// An HTTP proxy (see [`Constraints::proxy`]).

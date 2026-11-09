@@ -82,6 +82,12 @@ pub enum Step {
     },
     /// The project copied to `/opt/isoloom`.
     Project,
+    /// The spec's certificate authorities (`constraints.ca_certificates`) added to the
+    /// machine's trust store from the unpacked project, before anything downloads with them.
+    CaCertificates {
+        /// The PEM files, from the project folder.
+        files: Vec<String>,
+    },
     /// The machine's `files`, each placed at its path with its owner and mode (a `source` read
     /// from the unpacked project).
     Files {
@@ -192,6 +198,9 @@ pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) 
         });
     }
     steps.push(Step::Project);
+    if let Some(files) = spec.constraints.as_ref().map(|c| c.ca_certificates.clone()).filter(|f| !f.is_empty()) {
+        steps.push(Step::CaCertificates { files });
+    }
     steps.push(hosts(spec, name));
     steps.push(Step::Settings);
     steps.extend(shared_volumes(spec, name, m));

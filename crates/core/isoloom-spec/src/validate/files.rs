@@ -57,6 +57,9 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
         }
     }
     machines(spec, &mut paths);
+    for (i, ca) in spec.constraints.iter().flat_map(|c| c.ca_certificates.iter()).enumerate() {
+        paths.check(format!("constraints.ca_certificates[{i}]"), ca);
+    }
     for (i, step) in spec.provision.iter().enumerate() {
         paths.check(format!("provision[{i}].ansible"), &step.ansible);
         for (j, inv) in step.inventory.iter().enumerate() {

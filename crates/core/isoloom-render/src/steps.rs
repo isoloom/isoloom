@@ -176,6 +176,9 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Project => Some(format!(
             "mkdir -p {PROJECT_DIR} && tar -xzf {PROJECT_ARCHIVE} -C {PROJECT_DIR} --strip-components=1 && rm -f {PROJECT_ARCHIVE}\n"
         )),
+        Step::CaCertificates { files } => Some(constraints::trust_linux(
+            &files.iter().map(|f| format!("{PROJECT_DIR}/{f}")).collect::<Vec<_>>(),
+        )),
         Step::Files { files } => Some(files::linux(files)),
         Step::Secrets => env.machines.get(machine).map(|mp| secrets::step(machine, &mp.secrets)),
         Step::Inputs { persist } => persist.then(|| format!("{MAKE_STATE_DIR} && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
@@ -209,6 +212,12 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Project => Some(format!(
             "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = '{WINDOWS_PROJECT_DIR}'; $strip = 1\n{}",
             powershell::UNTAR
+        )),
+        Step::CaCertificates { files } => Some(constraints::trust_windows(
+            &files
+                .iter()
+                .map(|f| format!("{WINDOWS_PROJECT_DIR}\\{}", f.replace('/', "\\")))
+                .collect::<Vec<_>>(),
         )),
         Step::Files { files } => Some(files::windows(files)),
         Step::Secrets => env.machines.get(machine).map(|mp| secrets::windows::step(machine, &mp.secrets)),

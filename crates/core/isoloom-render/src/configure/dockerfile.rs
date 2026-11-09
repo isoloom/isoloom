@@ -85,10 +85,35 @@ pub(crate) fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess)
         String::new()
     };
     format!(
-        "{}# The container form of machine `{}`: its OS's image and its steps.\nFROM {base}\n{workdir}{library}{steps}{entrypoint}",
+        "{}# The container form of machine `{}`: its OS's image and its steps.\nFROM {base}\n{}{workdir}{library}{steps}{entrypoint}",
         header("#"),
-        c.machine()
+        c.machine(),
+        trusted(c.env())
     )
+}
+
+/// Where the build puts the certificate authorities before trusting them.
+const CA_DIR: &str = "/tmp/isoloom-ca";
+
+/// The spec's certificate authorities (`constraints.ca_certificates`) trusted by the image,
+/// before any step downloads: copied from the project, added to the image's trust store, then
+/// removed. Nothing without any.
+fn trusted(env: &Environment) -> String {
+    let files: &[String] = env.spec().constraints.as_ref().map_or(&[], |c| c.ca_certificates.as_slice());
+    if files.is_empty() {
+        return String::new();
+    }
+    let copies = files
+        .iter()
+        .enumerate()
+        .map(|(n, f)| format!("COPY {f} {CA_DIR}/{n}.pem\n"))
+        .collect::<Vec<_>>()
+        .concat();
+    let inside: Vec<String> = (0..files.len()).map(|n| format!("{CA_DIR}/{n}.pem")).collect();
+    let script = format!("set -e\n{}rm -rf {CA_DIR}\n", crate::constraints::trust_linux(&inside));
+    // The exec form's JSON keeps the script's lines as they are.
+    let run = serde_json::to_string(&["sh", "-c", script.as_str()]).unwrap_or_default();
+    format!("{copies}RUN {run}\n")
 }
 
 /// The project files the recipe's `start` steps read when the supervisor runs them at each start

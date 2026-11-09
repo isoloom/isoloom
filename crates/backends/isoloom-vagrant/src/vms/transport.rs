@@ -116,6 +116,7 @@ fn label(step: &Step) -> String {
         Step::Volumes { .. } => "volumes".into(),
         Step::SharedVolume { volume, .. } => format!("volume {volume}"),
         Step::Project => "project".into(),
+        Step::CaCertificates { .. } => "certificate authorities".into(),
         Step::Files { .. } => "files".into(),
         Step::Secrets => "secrets".into(),
         Step::Inputs { .. } => "inputs".into(),

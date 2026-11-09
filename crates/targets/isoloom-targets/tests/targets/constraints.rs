@@ -197,3 +197,95 @@ constraints:
     let e = parse(&format!("{text}\nconstraints: {{ proxi: {{}} }}\n")).unwrap_err().to_string();
     assert!(e.contains("proxi"), "{e}");
 }
+
+/// segmented with the site's certificate authority, `certs/corp-ca.pem`.
+fn with_ca() -> Outcome<Lab> {
+    let text = std::fs::read_to_string(examples().join("segmented/isoloom.yml"))?;
+    valid(&format!("{text}\nconstraints:\n  ca_certificates: [certs/corp-ca.pem]\n"))
+}
+
+#[test]
+fn every_vm_trusts_the_sites_certificate_authority_once_the_project_is_in() -> Outcome {
+    let lab = with_ca()?;
+    let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
+    // cache, web and user: each spec VM, from the unpacked project, after it and before its steps.
+    assert_eq!(vf.matches("name: \"certificate authorities\"").count(), 3, "{vf}");
+    assert!(
+        vf.contains("install -m 0644 '/opt/isoloom/certs/corp-ca.pem' /usr/local/share/ca-certificates/isoloom-0.crt"),
+        "{vf}"
+    );
+    assert!(vf.contains("update-ca-certificates") && vf.contains("update-ca-trust extract"), "{vf}");
+    for block in vf.split("config.vm.define").skip(1).filter(|b| b.contains("certificate authorities")) {
+        let at = |name: &str| block.find(&format!("name: \"{name}\"")).unwrap_or(usize::MAX);
+        assert!(at("project") < at("certificate authorities"), "{block}");
+    }
+    for (target, path) in [(Target::Proxmox, "proxmox/main.tf"), (Target::CloudVm, "cloud-vm/aws/main.tf")] {
+        let tf = file(&lab, target, path)?;
+        assert!(tf.contains("/opt/isoloom/certs/corp-ca.pem"), "{target:?}: {tf}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_windows_vm_imports_the_certificate_authority_into_its_root_store() -> Outcome {
+    let text = std::fs::read_to_string(examples().join("windows-hello/isoloom.yml"))?;
+    let lab = valid(&format!("{text}\nconstraints:\n  ca_certificates: [certs/corp-ca.pem]\n"))?;
+    let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
+    assert!(
+        vf.contains("Import-Certificate -FilePath 'C:\\\\isoloom\\\\certs\\\\corp-ca.pem' -CertStoreLocation Cert:\\\\LocalMachine\\\\Root"),
+        "{vf}"
+    );
+    Ok(())
+}
+
+#[test]
+fn containers_have_the_certificate_authority_and_built_images_trust_it() -> Outcome {
+    let lab = with_ca()?;
+    let compose = file(&lab, Target::Docker, "docker/compose.yml")?;
+    assert!(compose.contains("file: ../../certs/corp-ca.pem"), "{compose}");
+    assert_eq!(
+        compose.matches("target: /usr/local/share/ca-certificates/isoloom-0.crt").count(),
+        3,
+        "{compose}"
+    );
+    let k8s = file(&lab, Target::Kubernetes, "kubernetes/environment.yaml")?;
+    assert!(k8s.contains("/usr/local/share/ca-certificates/isoloom-0.crt"), "{k8s}");
+    // An image Isoloom builds from steps trusts it at build time, before any step downloads.
+    let steps = valid(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: 10 }, app: { steps: [{ packages: [curl] }] } }\nconstraints:\n  ca_certificates: [corp.pem]\n",
+    )?;
+    let dockerfile = file(&steps, Target::Docker, "docker/build/web/Dockerfile")?;
+    let (copy, run) = (
+        dockerfile.find("COPY corp.pem /tmp/isoloom-ca/0.pem").ok_or("no COPY")?,
+        dockerfile.find("update-ca-certificates").ok_or("no RUN")?,
+    );
+    let install = dockerfile.find("curl").ok_or("no install")?;
+    assert!(
+        dockerfile.find("FROM").unwrap_or(usize::MAX) < copy && copy < run && run < install,
+        "{dockerfile}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_certificate_authority_must_be_a_file_of_the_project() -> Outcome {
+    let dir = crate::testing::examples().join("segmented");
+    let text = std::fs::read_to_string(dir.join("isoloom.yml"))?;
+    let lab = Lab::new(parse(&format!(
+        "{text}\nconstraints:\n  ca_certificates: [certs/missing.pem, /etc/ssl/ca.pem]\n"
+    ))?);
+    let found: Vec<String> = lab.problems_with_files(&dir).iter().map(|p| format!("{}: {}", p.path, p.reason)).collect();
+    assert!(
+        found
+            .iter()
+            .any(|p| p.starts_with("constraints.ca_certificates[0]") && p.contains("doesn't exist")),
+        "{found:?}"
+    );
+    assert!(
+        found
+            .iter()
+            .any(|p| p.starts_with("constraints.ca_certificates[1]") && p.contains("inside the project")),
+        "{found:?}"
+    );
+    Ok(())
+}

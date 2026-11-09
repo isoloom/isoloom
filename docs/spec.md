@@ -2124,6 +2124,12 @@ The time servers (names or addresses) the Linux VMs synchronise their clocks wit
 
 - **Type:** list of strings
 
+### `constraints.ca_certificates`
+
+Certificate authorities every machine trusts beside the public ones (PEM files in the project, one certificate each): a TLS-inspecting proxy's, an internal registry's. Each Linux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`), each Windows VM to its root store, each image Isoloom builds at build time, and each container has them at `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
+
+- **Type:** list of strings
+
 ## `cloud`
 
 ### `cloud`

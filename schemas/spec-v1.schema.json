@@ -131,7 +131,7 @@
     "version",
     "name"
   ],
-  "description": "An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec-reference",
+  "description": "An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec",
   "title": "isoloom.yml",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
@@ -3783,6 +3783,13 @@
             "type": "string"
           },
           "description": "The time servers (names or addresses) the Linux VMs synchronise their clocks with,\nwhere the place forbids the public pools."
+        },
+        "ca_certificates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Certificate authorities every machine trusts beside the public ones (PEM files in the\nproject, one certificate each): a TLS-inspecting proxy's, an internal registry's. Each\nLinux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`), each\nWindows VM to its root store, each image Isoloom builds at build time, and each container\nhas them at `/usr/local/share/ca-certificates/isoloom-<n>.crt`."
         }
       },
       "description": "What the network an environment runs in imposes, applied on every target: images pulled\nthrough the customer's registry, packages through their mirrors, outbound HTTP through their\nproxy, time from their servers."

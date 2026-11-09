@@ -190,5 +190,60 @@ fn package_proxies((http, https): (&str, &str), env: &[(String, String)]) -> Str
     )
 }
 
+/// Adds the certificate authorities at `sources` (paths on the machine) to a Linux trust store,
+/// as root: Debian's, Ubuntu's and Alpine's `update-ca-certificates`, Red Hat's
+/// `update-ca-trust`, else appended to the bundle OpenSSL reads; then a running Docker daemon
+/// restarts to pull with them. Running it again changes nothing.
+#[must_use]
+pub fn trust_linux(sources: &[String]) -> String {
+    let copies = |dir: &str, ext: &str| -> String {
+        sources
+            .iter()
+            .enumerate()
+            .map(|(n, src)| format!("install -m 0644 {} {dir}/isoloom-{n}.{ext}\n", quote(src)))
+            .collect::<Vec<_>>()
+            .concat()
+    };
+    // Without either tool, each one is appended to the bundle OpenSSL reads, once: its copy
+    // beside the bundle says it is in.
+    let appended = sources
+        .iter()
+        .enumerate()
+        .map(|(n, src)| {
+            let copy = format!("/etc/ssl/certs/isoloom-{n}.pem");
+            format!(
+                "if ! cmp -s {0} {copy}; then install -m 0644 {0} {copy} && cat {0} >> /etc/ssl/certs/ca-certificates.crt; fi\n",
+                quote(src)
+            )
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    format!(
+        "# The site's certificate authorities, trusted beside the public ones.\n\
+         if command -v update-ca-certificates >/dev/null; then\nmkdir -p /usr/local/share/ca-certificates\n{}update-ca-certificates >/dev/null\n\
+         elif command -v update-ca-trust >/dev/null; then\n{}update-ca-trust extract\n\
+         else\nmkdir -p /etc/ssl/certs\n{appended}fi\n\
+         if systemctl is-active --quiet docker 2>/dev/null; then systemctl restart docker; fi\n",
+        copies("/usr/local/share/ca-certificates", "crt"),
+        copies("/etc/pki/ca-trust/source/anchors", "pem"),
+    )
+}
+
+/// Imports the certificate authorities at `sources` (paths on the machine) into a Windows
+/// machine's trusted root store.
+#[must_use]
+pub fn trust_windows(sources: &[String]) -> String {
+    sources
+        .iter()
+        .map(|src| {
+            format!(
+                "Import-Certificate -FilePath {} -CertStoreLocation Cert:\\LocalMachine\\Root | Out-Null\n",
+                crate::powershell::quote(src)
+            )
+        })
+        .collect::<Vec<_>>()
+        .concat()
+}
+
 #[cfg(test)]
 mod tests;

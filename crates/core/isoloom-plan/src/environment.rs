@@ -504,7 +504,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         seal: m.seal,
         ports: published(m),
         volumes: storage::volumes(spec, name, m),
-        files: m.files.clone(),
+        files: files(spec, m, shape),
         disks: storage::disks(name, m),
         host_folders: m.host_folders.clone(),
         settings: Settings {
@@ -568,6 +568,22 @@ fn published(m: &Machine) -> Vec<PublishedPort> {
             })
         })
         .collect()
+}
+
+/// A machine's files: the spec's, and for a container the certificate authorities it trusts
+/// (`constraints.ca_certificates`) where its trust store reads them (a VM installs them in a
+/// set-up step instead).
+fn files(spec: &Spec, m: &Machine, shape: MachineShape) -> Vec<MachineFile> {
+    let authorities = spec.constraints.iter().flat_map(|c| c.ca_certificates.iter()).enumerate();
+    let trusted = authorities.filter(|_| shape == MachineShape::Container).map(|(n, source)| MachineFile {
+        path: Constraints::ca_certificate_path(n),
+        source: Some(source.clone()),
+        content: None,
+        uid: None,
+        gid: None,
+        mode: None,
+    });
+    m.files.iter().cloned().chain(trusted).collect()
 }
 
 #[cfg(test)]

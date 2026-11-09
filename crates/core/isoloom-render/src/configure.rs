@@ -56,6 +56,12 @@ impl<'a> Configured<'a> {
         self.machine
     }
 
+    /// The environment it is part of.
+    #[must_use]
+    pub fn env(&self) -> &'a Environment {
+        self.env
+    }
+
     /// Its recipe.
     #[must_use]
     pub fn recipe(&self) -> &'a Recipe {
