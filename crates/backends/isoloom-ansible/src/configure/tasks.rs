@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 
 use super::services;
 use super::task::Task;
+use crate::error::{Error, Result};
 
 /// A project path as the role names it on the control node, under the play's `isoloom_project`
 /// (the project folder), so `copy` and `script` find it wherever the playbook is run from.
@@ -31,13 +32,17 @@ pub(super) fn rendered(from: &str) -> String {
 /// Step `r`'s tasks, each notifying the service handlers in `notify` when it can change something;
 /// `seq` is the step's index in the recipe, so a guard's or a firewall's registered variables are
 /// unique within the role.
-#[must_use]
-pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], seq: usize) -> Vec<Value> {
+///
+/// # Errors
+///
+/// [`Error::WindowsPackages`] for a `packages` step on Windows, which the lab's lowering refuses
+/// first.
+pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], seq: usize) -> Result<Vec<Value>> {
     // Registers a task sets are prefixed with the role's name (`ansible-lint`'s `var-naming`).
     let vars = format!("isoloom_machine_{}", c.machine());
-    match r {
+    Ok(match r {
         Resource::Repository(p) => repository(p, notify),
-        Resource::Packages(ps) => packages(c.recipe().family, ps, notify, &vars, seq),
+        Resource::Packages(ps) => packages(c, ps, notify, &vars, seq)?,
         Resource::Copy(cp) => vec![copy(cp, notify)],
         Resource::Template(t) => vec![template(c, t, notify)],
         Resource::File(f) => vec![file(f, notify)],
@@ -49,8 +54,7 @@ pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], se
         Resource::Run(run) => vec![services::run(run, notify)],
         Resource::Reboot => vec![services::reboot()],
         Resource::Playbook(p) => vec![services::playbook(p, notify)],
-        _ => Vec::new(),
-    }
+    })
 }
 
 /// A mode as Ansible wants it: the octal text (`"0644"`), never a bare number.
@@ -170,7 +174,8 @@ fn key_task(url: &str, dest: &str, sha: &Value, mode: &str) -> Value {
 /// the install when every package is already installed or provided by another one (`rpm -q
 /// --whatprovides`, as the shell library does: Rocky's `curl-minimal` is its `curl`), so `dnf`
 /// never tries to swap a provider and conflict.
-fn packages(family: Family, ps: &[PinnedPackage], notify: &[String], vars: &str, seq: usize) -> Vec<Value> {
+fn packages(c: &Configured<'_>, ps: &[PinnedPackage], notify: &[String], vars: &str, seq: usize) -> Result<Vec<Value>> {
+    let family = c.recipe().family;
     let name = |p: &PinnedPackage| match (&p.version, family) {
         (Some(v), Family::RedHat) => format!("{}-{v}", p.name),
         (Some(v), _) => format!("{}={v}", p.name),
@@ -197,12 +202,16 @@ fn packages(family: Family, ps: &[PinnedPackage], notify: &[String], vars: &str,
                 .set("register", json!("isoloom_apk"))
                 .set("changed_when", json!("'Installing' in isoloom_apk.stdout or 'Upgrading' in isoloom_apk.stdout")),
         ),
-        Family::Windows => (None, task.module("ansible.windows.win_feature", json!({ "name": names, "state": "present" }))),
+        Family::Windows => {
+            return Err(Error::WindowsPackages {
+                machine: c.machine().to_owned(),
+            });
+        }
     };
-    match reg {
+    Ok(match reg {
         Some(reg) => vec![rpm_present(ps, &reg), task.notify(notify).into_value()],
         None => vec![task.notify(notify).into_value()],
-    }
+    })
 }
 
 /// The guard that registers whether every Red Hat package is already present: each one by its exact

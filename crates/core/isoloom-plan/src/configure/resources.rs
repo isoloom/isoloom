@@ -25,7 +25,6 @@ pub type CommandPlan = isoloom_spec::syntax::CommandStep;
 /// One resource of a recipe, in the order the recipe lists it: no renderer reorders, groups or
 /// parallelizes them.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum Resource {
     /// A vendor's package repository.
     Repository(RepositoryPlan),

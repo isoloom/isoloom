@@ -18,8 +18,12 @@ pub(crate) fn role_name(machine: &str) -> String {
 
 /// The files of machine `c`'s role, under `dir` (its role folder): the tasks, the handlers (when it
 /// has an enabled service) and the filled templates.
-#[must_use]
-pub fn files(c: &Configured<'_>, dir: &str) -> Vec<GeneratedFile> {
+///
+/// # Errors
+///
+/// [`crate::Error::WindowsPackages`] for a `packages` step on Windows, which the lab's lowering
+/// refuses first.
+pub fn files(c: &Configured<'_>, dir: &str) -> crate::Result<Vec<GeneratedFile>> {
     let resources: Vec<&Resource> = c.recipe().resources().collect();
     let enabled: Vec<(usize, String)> = resources
         .iter()
@@ -32,7 +36,7 @@ pub fn files(c: &Configured<'_>, dir: &str) -> Vec<GeneratedFile> {
     let mut tasks = Vec::new();
     for (i, r) in resources.iter().enumerate() {
         let notify: Vec<String> = enabled.iter().filter(|(j, _)| *j > i).map(|(_, u)| u.clone()).collect();
-        tasks.extend(step_tasks(c, r, &notify, i));
+        tasks.extend(step_tasks(c, r, &notify, i)?);
     }
     if !enabled.is_empty() {
         tasks.push(
@@ -46,7 +50,7 @@ pub fn files(c: &Configured<'_>, dir: &str) -> Vec<GeneratedFile> {
         out.push(yaml_file(&format!("{dir}/handlers/main.yml"), handlers(&enabled)));
     }
     out.extend(templates(c, dir));
-    out
+    Ok(out)
 }
 
 /// One restart handler per enabled service, by unit name (deduplicated, in first-seen order).

@@ -464,6 +464,12 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Removed
 
+- **The Ansible renderer's `ansible.windows.win_feature` task**, which no lab reached: the lab
+  refuses a `packages` step on a Windows host that already exists. The renderer writes
+  `ansible.builtin` and `ansible.posix` tasks only, as its docs say; reaching that step is an
+  error (`isoloom_ansible::Error::WindowsPackages`, and `configure::role_files` returns a
+  `Result`). `isoloom_plan::configure::Resource` is exhaustive, so a renderer handles every kind
+  of step rather than dropping a new one.
 - **The supported crates hold only the supported API.** `isoloom_spec::images::{VagrantBox,
   HyperVBox, vagrant, HYPERV_DEBIAN_12, QEMU_DEBIAN_12}`, the Vagrant boxes each OS boots, are the
   Vagrant backend's own; `isoloom_spec::windows::esxi_guest_os` is

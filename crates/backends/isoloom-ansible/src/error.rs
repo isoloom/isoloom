@@ -15,6 +15,14 @@ pub enum Error {
         /// The first requirement the target can't meet.
         refusal: Refusal,
     },
+    /// A `packages` step on a Windows host reached the renderer, which writes `ansible.builtin`
+    /// and `ansible.posix` tasks only: the lab's lowering refuses such a step first, so this is a
+    /// bug.
+    #[error("{}: machine `{machine}`: a `packages` step on Windows has no Ansible task here", Target::External.id())]
+    WindowsPackages {
+        /// The machine.
+        machine: String,
+    },
 }
 
 /// A result whose error is this crate's [`Error`].
@@ -28,6 +36,7 @@ impl From<Error> for RenderError {
                 target: Target::External,
                 refusal,
             },
+            e @ Error::WindowsPackages { .. } => RenderError::internal(Target::External, "the Ansible project can't be rendered", e),
         }
     }
 }

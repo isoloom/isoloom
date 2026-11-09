@@ -191,7 +191,7 @@ pub(super) fn ansible_files(family: Family) -> Res<Vec<GeneratedFile>> {
     let lab = lab(family)?;
     let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
     let c = Configured::of(&env, "m").ok_or_else(|| format!("{}: the machine has no recipe", family.id))?;
-    let mut files = isoloom_ansible::configure::role_files(&c, "roles/isoloom_machine_m");
+    let mut files = isoloom_ansible::configure::role_files(&c, "roles/isoloom_machine_m")?;
     if files.is_empty() {
         return Err(format!("{}: the recipe rendered no Ansible role", family.id).into());
     }

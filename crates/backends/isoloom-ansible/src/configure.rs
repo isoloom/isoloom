@@ -36,18 +36,17 @@ const PROJECT_VAR: &str = "{{ (playbook_dir + '/../..') | realpath }}";
 /// The Ansible project for `env`, its files under `base` (`.isoloom/external`): `site.yml` running
 /// each host's role, the roles themselves, and `requirements.yml` when a role names a pinned
 /// collection. A host without a recipe (a bare user machine) gets no role and no play.
-#[must_use]
-pub(crate) fn project(env: &Environment, base: &str) -> Vec<GeneratedFile> {
+pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<GeneratedFile>> {
     let configured: Vec<(String, Configured<'_>)> = hosts(env)
         .into_iter()
         .filter_map(|h| Some((h.name.to_owned(), Configured::of(env, h.name)?)))
         .collect();
     if configured.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let mut out = vec![site(base, &configured)];
     for (name, c) in &configured {
-        out.extend(role_files(c, &format!("{base}/roles/{}", role_name(name))));
+        out.extend(role_files(c, &format!("{base}/roles/{}", role_name(name)))?);
     }
     if let Some(reqs) = requirements(&configured) {
         out.push(GeneratedFile {
@@ -55,7 +54,7 @@ pub(crate) fn project(env: &Environment, base: &str) -> Vec<GeneratedFile> {
             contents: reqs,
         });
     }
-    out
+    Ok(out)
 }
 
 /// `site.yml`: one play per configured host, applying its role as `isoloom` the host over the

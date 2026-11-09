@@ -27,7 +27,7 @@ fn env(m: &str, target: Target, templates: &[(&str, &str)]) -> Environment {
 fn tasks(m: &str, target: Target, templates: &[(&str, &str)]) -> String {
     let e = env(m, target, templates);
     let c = Configured::of(&e, "m").expect("a recipe");
-    let files = role_files(&c, "roles/isoloom_machine_m");
+    let files = role_files(&c, "roles/isoloom_machine_m").expect("rendered");
     file(&files, "roles/isoloom_machine_m/tasks/main.yml")
 }
 
@@ -138,7 +138,7 @@ fn a_template_copies_the_rendered_file_not_jinja() {
         &[("conf/app.conf", "name = {{ machine.name }}\n")],
     );
     let c = Configured::of(&e, "m").unwrap();
-    let files = role_files(&c, "r");
+    let files = role_files(&c, "r").unwrap();
     assert_eq!(file(&files, "r/files/rendered/conf/app.conf"), "name = m\n");
 }
 
@@ -150,7 +150,7 @@ fn a_service_gets_a_restart_handler_notified_by_the_earlier_steps() {
         &[],
     );
     let c = Configured::of(&e, "m").unwrap();
-    let files = role_files(&c, "r");
+    let files = role_files(&c, "r").unwrap();
     let main = file(&files, "r/tasks/main.yml");
     assert!(
         main.contains("notify:\n    - \"Isoloom restart nginx\""),
@@ -168,7 +168,7 @@ fn external_project(body: &str) -> Vec<GeneratedFile> {
     let yaml = format!("version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\n{body}");
     let lab = Lab::new(isoloom_spec::parse(&yaml).expect("parses"));
     let e = Environment::build(&lab.for_target(Target::External), Target::External, None);
-    project(&e, ".isoloom/external")
+    project(&e, ".isoloom/external").expect("rendered")
 }
 
 #[test]
@@ -219,4 +219,14 @@ overrides:
         .to_string();
     assert_eq!(posix.len(), 64, "a sha256 is 64 hex chars: {posix}");
     assert!(reqs.contains(&format!("sha256: {posix}")), "requirements.yml carries the pinned sha256: {reqs}");
+}
+
+#[test]
+fn a_windows_packages_step_is_an_error_not_a_module_outside_the_builtin_ones() {
+    // The lab's lowering refuses it on a host that already exists; a recipe that reaches the
+    // renderer all the same (here, planned for another target) is a bug, said as one.
+    let e = env("os: windows-server@2022, app: { steps: [{ packages: [Web-Server] }] }", Target::Vagrant, &[]);
+    let c = Configured::of(&e, "m").unwrap();
+    let err = role_files(&c, "r").unwrap_err();
+    assert_eq!(err.to_string(), "external: machine `m`: a `packages` step on Windows has no Ansible task here");
 }
