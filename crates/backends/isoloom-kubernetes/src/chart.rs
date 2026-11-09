@@ -79,7 +79,7 @@ fn chart_file(env: &Environment) -> Result<String> {
         version: "0.1.0",
         app_version: "0.1.0",
     };
-    let usage = "# `isoloom chart --version <v>` packages it with that version.\n";
+    let usage = "# `helm package .isoloom/kubernetes/chart --version <v>` packages it with that version.\n";
     Ok(format!("{}{usage}{}", generated(), document(&chart)?))
 }
 
