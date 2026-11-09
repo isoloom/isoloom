@@ -204,7 +204,9 @@ impl<'a> Import<'a> {
         }
     }
 
-    /// A private network with a fixed address: the machine joins its block.
+    /// A private network with a fixed address: the machine joins its block (said when it isn't
+    /// the address's own: one wider than /24 or narrower than /29). An address that isn't IPv4 is
+    /// left out, and said.
     fn private_network(&mut self, at: &str, m: &mut Machine, c: &Call) {
         if text(c.opt("type")).as_deref() == Some("dhcp") || c.opt("ip").is_none() {
             self.notes.add(
@@ -214,10 +216,23 @@ impl<'a> Import<'a> {
             );
             return;
         }
-        let Some(ip) = text(c.opt("ip")).and_then(|i| i.parse::<Ipv4Addr>().ok()) else {
+        let given = text(c.opt("ip")).unwrap_or_default();
+        let Ok(ip) = given.parse::<Ipv4Addr>() else {
+            self.notes.add(
+                format!("{at}.vm.network"),
+                NoteKind::Changed,
+                format!("`{given}` isn't an IPv4 address: the machine joins no network for it; give it an IPv4 one"),
+            );
             return;
         };
-        let cidr = block(ip, text(c.opt("netmask")).as_deref());
+        let (cidr, asked) = block(ip, text(c.opt("netmask")).as_deref());
+        if let Some(len) = asked {
+            self.notes.add(
+                format!("{at}.vm.network"),
+                NoteKind::Changed,
+                format!("{ip}/{len} isn't a /24 to /29; re-addressed to {cidr}"),
+            );
+        }
         let key = cidr.to_string();
         self.nets
             .entry(key.clone())
@@ -311,18 +326,20 @@ impl<'a> Import<'a> {
 }
 
 /// The block of a private network's address: its netmask's (an address or a length), /24 when
-/// it gives none, and never wider than /24 or narrower than /29 (the spec's sizes).
-fn block(ip: Ipv4Addr, netmask: Option<&str>) -> Cidr {
-    let len = netmask
+/// it gives none, and never wider than /24 or narrower than /29 (the spec's sizes); with the
+/// length asked when it was outside those.
+fn block(ip: Ipv4Addr, netmask: Option<&str>) -> (Cidr, Option<u32>) {
+    let asked = netmask
         .and_then(|m| m.parse::<Ipv4Addr>().ok().map(|mask| u32::from(mask).count_ones()).or_else(|| m.parse().ok()))
-        .unwrap_or(24)
-        .clamp(24, 29);
+        .unwrap_or(24);
+    let clamped = asked.clamp(24, 29);
     // The clamp keeps it within 24..=29, so it fits a `u8`.
-    let len = u8::try_from(len).unwrap_or(24);
-    Cidr {
+    let len = u8::try_from(clamped).unwrap_or(24);
+    let cidr = Cidr {
         base: u32::from(ip) & (u32::MAX << (32 - u32::from(len))),
         len,
-    }
+    };
+    (cidr, (asked != clamped).then_some(asked))
 }
 
 #[cfg(test)]
@@ -332,10 +349,15 @@ mod tests {
     #[test]
     fn a_private_network_block_follows_its_netmask_within_the_spec_sizes() {
         let ip = Ipv4Addr::new(192, 168, 33, 77);
-        assert_eq!(block(ip, None).to_string(), "192.168.33.0/24");
-        assert_eq!(block(ip, Some("255.255.255.240")).to_string(), "192.168.33.64/28");
-        assert_eq!(block(ip, Some("16")).to_string(), "192.168.33.0/24");
-        assert_eq!(block(ip, Some("30")).to_string(), "192.168.33.72/29");
+        let at = |mask| {
+            let (cidr, asked) = block(ip, mask);
+            (cidr.to_string(), asked)
+        };
+        assert_eq!(at(None), ("192.168.33.0/24".to_owned(), None));
+        assert_eq!(at(Some("255.255.255.240")), ("192.168.33.64/28".to_owned(), None));
+        assert_eq!(at(Some("255.255.0.0")), ("192.168.33.0/24".to_owned(), Some(16)));
+        assert_eq!(at(Some("16")), ("192.168.33.0/24".to_owned(), Some(16)));
+        assert_eq!(at(Some("30")), ("192.168.33.72/29".to_owned(), Some(30)));
     }
 
     #[test]
@@ -345,6 +367,22 @@ mod tests {
             .parse()?;
         let d = draft(&recorded, "solo", "Vagrantfile")?;
         assert!(d.yaml.contains("  default:\n    networks: { lab: 10 }\n"), "{}", d.yaml);
+        Ok(())
+    }
+
+    /// A private network the spec can't take as given is said: an address that isn't IPv4 (left
+    /// out), and a netmask wider than /24 (narrowed to the address's /24).
+    #[test]
+    fn a_private_network_left_out_or_narrowed_is_said() -> Result<()> {
+        let recorded: Recording = r#"{"children":{"vm":{"calls":[
+            {"name":"network","args":["private_network",{"ip":"fd00::10"}]},
+            {"name":"network","args":["private_network",{"ip":"10.9.3.10","netmask":"255.255.0.0"}]}]}}}"#
+            .parse()?;
+        let d = draft(&recorded, "lab", "Vagrantfile")?;
+        let said: Vec<&str> = d.notes.iter().map(|n| n.text.as_str()).collect();
+        assert!(said.iter().any(|t| t.starts_with("`fd00::10` isn't an IPv4 address")), "{said:?}");
+        assert!(said.contains(&"10.9.3.10/16 isn't a /24 to /29; re-addressed to 10.9.3.0/24"), "{said:?}");
+        assert!(d.yaml.contains("cidr: 10.9.3.0/24"), "{}", d.yaml);
         Ok(())
     }
 

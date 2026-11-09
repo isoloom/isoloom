@@ -23,10 +23,18 @@ pub(crate) fn render(e: &CliError) -> String {
     if e.is_closed_output() {
         return String::new();
     }
+    if let CliError::Backends(each) = e {
+        return each.iter().map(|failed| one(failed, Vec::new())).collect();
+    }
     let problems: Vec<String> = match e {
         CliError::InvalidSpec { file, problems } => problems.iter().map(|p| format!("✗ {}", p.render(file))).collect(),
         _ => Vec::new(),
     };
+    one(e, problems)
+}
+
+/// One error as stderr shows it: `problems` first, then `error: ` and the error, then its causes.
+fn one(e: &dyn Error, problems: Vec<String>) -> String {
     let error = format!("error: {}", indented(&e.to_string()));
     let causes = causes(e).into_iter().map(|cause| format!("  caused by: {}", indented(&cause)));
     let lines: Vec<String> = problems.into_iter().chain(std::iter::once(error)).chain(causes).collect();

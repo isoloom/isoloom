@@ -136,6 +136,12 @@ stable spec format.
 
 ### Fixed
 
+- **`isoloom import vagrant` says what it changed in a private network**: an address that isn't
+  IPv4 was dropped silently, and a netmask wider than /24 (`255.255.0.0`) narrowed to the
+  address's /24 silently; each is a note now ("isn't a /24 to /29; re-addressed to ..."), as the
+  Compose and Terraform imports say.
+- **`isoloom generate` and `isoloom check` report every target whose backend failed**, each with
+  its cause, not only the first.
 - **A lab machine named `docker` no longer stops `docker-vm`** (and with it every `isoloom
   generate`: "`docker` appears twice"). The VM the containers run in is `isoloom-docker-host`
   everywhere, under the prefix a lab's machines can't take: `docker-vm`'s run manifests (Vagrant's

@@ -41,6 +41,10 @@ pub(crate) enum CliError {
     /// A target's files, the message or a report can't be made.
     #[error(transparent)]
     Targets(isoloom_targets::Error),
+    /// More than one target's files couldn't be made (their backends failed): each one, with
+    /// its cause.
+    #[error("{} targets' files couldn't be made", .0.len())]
+    Backends(Vec<isoloom_targets::Error>),
     /// A diagram format `isoloom graph` doesn't write.
     #[error("unknown format `{0}`; `d2` or `dot`")]
     UnknownFormat(String),

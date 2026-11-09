@@ -45,14 +45,16 @@ pub(crate) struct Listing {
     pub(crate) json: bool,
 }
 
-/// The targets `generate_all` left out, each a refusal of the lab; the first left out for any
-/// other reason (its backend failed, or it has no generator) as the error, so neither
-/// `generate` nor `check` passes over a target whose files it couldn't make.
+/// The targets `generate_all` left out, each a refusal of the lab; those left out for any other
+/// reason (a backend failed, or there is no generator) as the error, every one of them, so
+/// neither `generate` nor `check` passes over a target whose files it couldn't make.
 fn refusals(skipped: Vec<GenerateError>) -> Result<Vec<GenerateError>> {
     let (refused, failed): (Vec<_>, Vec<_>) = skipped.into_iter().partition(GenerateError::is_refusal);
-    match failed.into_iter().next() {
-        Some(e) => Err(isoloom_targets::Error::Generate(e).into()),
-        None => Ok(refused),
+    let mut failed: Vec<isoloom_targets::Error> = failed.into_iter().map(isoloom_targets::Error::Generate).collect();
+    match failed.len() {
+        0 => Ok(refused),
+        1 => Err(failed.remove(0).into()),
+        _ => Err(CliError::Backends(failed)),
     }
 }
 
@@ -122,5 +124,25 @@ mod tests {
             );
         }
         assert!(refusals(vec![GenerateError::NoGenerator(Target::Docker)]).is_err());
+    }
+
+    #[test]
+    fn every_failed_backend_is_reported() {
+        let failed = |target| GenerateError::Internal {
+            target,
+            what: "the run manifest refused a value of this backend".to_owned(),
+            source: Arc::new(std::io::Error::other("bad name")),
+        };
+        let stopped = refusals(vec![failed(Target::Vagrant), failed(Target::DockerVm)]);
+        let Err(e) = &stopped else { panic!("{stopped:?}") };
+        let rendered = crate::diagnostic::render(e);
+        for target in ["vagrant", "docker-vm"] {
+            assert!(
+                rendered.contains(&format!(
+                    "error: {target}: the run manifest refused a value of this backend\n  caused by: bad name"
+                )),
+                "{rendered}"
+            );
+        }
     }
 }
