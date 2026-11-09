@@ -55,15 +55,8 @@ pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: O
         {
             default = Some((routes.clone(), *via));
         }
-        if matches!(step, Step::Routes { .. }) && mp.is_gateway && os == Os::Linux {
-            shell(r, "forwarding", FORWARDING);
-        }
     }
 }
-
-/// A gateway forwards between its networks; its own provisioning sets the rules. (The plan has
-/// no step for it yet.)
-const FORWARDING: &str = "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom-forwarding.conf && sysctl -q -p /etc/sysctl.d/90-isoloom-forwarding.conf";
 
 /// The provisioners of one step, `machine` being a lab machine or one of Isoloom's own VMs.
 pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &Step, os: Os) {
@@ -116,6 +109,7 @@ fn label(step: &Step) -> String {
         Step::Settings => "settings".into(),
         Step::Hosts { .. } => "hosts".into(),
         Step::Routes { .. } => "routes".into(),
+        Step::Forwarding { .. } => "forwarding".into(),
         Step::Ipv6 { .. } => "ipv6".into(),
         Step::MoreAddresses { .. } => "addresses".into(),
         Step::Trunks => "trunks".into(),

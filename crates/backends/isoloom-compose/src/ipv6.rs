@@ -69,13 +69,13 @@ pub(crate) fn router_attachment(env: &Environment, net: &str, v4: Ipv4Addr) -> A
     }
 }
 
-/// The router's sysctls: IPv4 forwarding, and IPv6 forwarding when it routes IPv6.
+/// The sysctls of a container that forwards (the router, a gateway): IPv4 forwarding, and IPv6
+/// forwarding when the lab routes IPv6 (`isoloom_plan::routing::forwarding`).
 pub(crate) fn forwarding(env: &Environment) -> IndexMap<String, String> {
-    let mut out = IndexMap::from([("net.ipv4.ip_forward".to_owned(), "1".to_owned())]);
-    if !env.router6.is_empty() {
-        out.insert("net.ipv6.conf.all.forwarding".into(), "1".into());
-    }
-    out
+    isoloom_plan::routing::forwarding(!env.router6.is_empty())
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect()
 }
 
 /// The sidecar's commands for a machine's IPv6 routes (`ip -6 route replace`, idempotent).

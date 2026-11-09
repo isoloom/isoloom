@@ -6,7 +6,6 @@
 use std::borrow::Cow;
 use std::net::Ipv4Addr;
 
-use crate::hcl_builder::Template;
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan, Step};
 use isoloom_spec::validate::Cidr;
 
@@ -116,17 +115,6 @@ pub(crate) fn free_address(env: &Environment, net: &str, c: Cidr) -> Option<Ipv4
     (c.base + 2..=top).rev().map(Ipv4Addr::from).find(|a| !taken.contains(a))
 }
 
-/// A gateway forwards between its networks (its own provisioning sets the rules): forwarding
-/// on at every boot.
-pub(crate) fn at_boot(mp: &MachinePlan) -> Vec<Template> {
-    if !mp.is_gateway {
-        return Vec::new();
-    }
-    vec![Template::text(
-        "echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/90-isoloom-forwarding.conf >/dev/null && sudo sysctl -q -p /etc/sysctl.d/90-isoloom-forwarding.conf",
-    )]
-}
-
 /// The smallest block holding every network, when one of `shortest` bits or longer does: a
 /// cloud whose routes can only be more specific than its network's block puts them all in it.
 pub(crate) fn covering(env: &Environment, shortest: u8) -> Option<Cidr> {
@@ -166,7 +154,9 @@ mod tests {
         });
         assert!(hosts.unwrap().iter().any(|(a, n)| *a == Ipv4Addr::new(10, 70, 10, 254) && n[0] == "fw"));
         assert!(is_gateway_address(&e, "fw", "dmz") && !is_gateway_address(&e, "fw", "out"));
-        assert!(at_boot(&e.machines["fw"]).len() == 1 && at_boot(&e.machines["web"]).is_empty());
+        // Its forwarding is the plan's step, which the set-up renders.
+        let forwards = |m: &str| e.machines[m].lifecycle.iter().any(|s| matches!(s, Step::Forwarding { .. }));
+        assert!(forwards("fw") && !forwards("web"));
     }
 
     #[test]

@@ -14,7 +14,7 @@ use crate::cloud::auto_stop;
 use crate::cloud::aws::{ec2_instance, instance_type, root_disk};
 use crate::cloud::instance::{self, name_with};
 use crate::cloud::vm::controller_setup;
-use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image};
+use crate::cloud::vm::{disks, hooks, interfaces, own_image};
 use crate::machine::user_data::Capped;
 use crate::machine::{Remote, controller, user_data, windows};
 use crate::module::{ident, resource};
@@ -60,8 +60,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         .add_blocks(disks::aws(&mp.disks));
     // A looked-up AMI says whether it has NitroTPM; an own AMI is the author's to choose.
     let tpm_ami = (mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none()).then(|| ident(mp.os.as_deref().unwrap_or_default()));
-    let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
-    at_boot.extend(gateways::at_boot(mp));
+    let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
     let user = image_user(mp.os.as_deref().unwrap_or_default());
     let instance = nesting(instance, mp)
         .add_attribute(user_data(hooks::capped_user_data(env, (name, mp), user, at_boot, CAP)?))

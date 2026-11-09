@@ -148,6 +148,14 @@ pub fn nftables() -> String {
 /// This boot's id: it changes at each boot.
 const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
 
+/// A gateway's forwarding (`Step::Forwarding`): its kernel parameters in a sysctl file, which
+/// every boot reads, applied now.
+fn forwarding(sysctls: &[(&str, &str)]) -> String {
+    const FILE: &str = "/etc/sysctl.d/90-isoloom-forwarding.conf";
+    let lines: Vec<String> = sysctls.iter().map(|(k, v)| quote(&format!("{k}={v}"))).collect();
+    format!("printf '%s\\n' {} > {FILE} && sysctl -q -p {FILE}\n", lines.join(" "))
+}
+
 /// `step` of `machine` as a root shell script for a Linux VM; `None` when it has nothing to do
 /// there.
 #[must_use]
@@ -159,6 +167,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Settings => env.spec().machines.get(machine).and_then(settings::linux),
         Step::Hosts { entries } => network::hosts(entries),
         Step::Routes { routes, default } => network::routes(routes, *default),
+        Step::Forwarding { sysctls } => Some(forwarding(sysctls)),
         Step::Ipv6 { addresses, routes } => Some(ipv6::linux(addresses, routes)),
         Step::MoreAddresses { addresses } => Some(more_addresses::linux(addresses)),
         Step::Trunks => network::trunks(env, machine),
@@ -226,10 +235,12 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             process::windows_healthy(env, machine).unwrap_or_default(),
             isoloom_spec::windows::READY_FILE
         )),
-        // Linux's alone: the constraints, trunks and impairment are Linux tools; a Windows VM's
-        // volumes, inputs and reboots are its own scripts'.
+        // Linux's alone: the constraints, trunks, forwarding and impairment are Linux tools (a
+        // Windows gateway is refused); a Windows VM's volumes, inputs and reboots are its own
+        // scripts'.
         Step::Prelude
         | Step::Trunks
+        | Step::Forwarding { .. }
         | Step::Volumes { .. }
         | Step::SharedVolume { .. }
         | Step::Inputs { .. }

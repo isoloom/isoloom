@@ -192,7 +192,6 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
     let group = published::group(name, mp, m);
     let mut at_boot = interfaces::up_found(env, &mp.addresses, &|_, a| metadata::mac(a));
     at_boot.extend(ipv6::at_boot(env, mp));
-    at_boot.extend(gateways::at_boot(mp));
     let setup = hooks::user_data(env, (name, mp), USER, at_boot);
     m.commented(
         &format!("Machine `{name}`, at its fixed address {address}."),

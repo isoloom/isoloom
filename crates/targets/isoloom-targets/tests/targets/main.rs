@@ -22,6 +22,7 @@ mod disk;
 mod docker_vm_manifest;
 mod every_example;
 mod external;
+mod forwarding;
 mod generate;
 mod groups;
 mod hardware;

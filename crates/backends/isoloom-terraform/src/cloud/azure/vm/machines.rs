@@ -15,7 +15,7 @@ use super::{USER, image, machine_size, public_ip as address_of, size};
 use crate::Result;
 use crate::cloud::auto_stop;
 use crate::cloud::instance::{self, name_with};
-use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, own_image, reach};
+use crate::cloud::vm::{controller_setup, disks, hooks, interfaces, own_image, reach};
 use crate::machine::user_data::Capped;
 use crate::machine::{Remote, controller, user_data, windows};
 use crate::module::ident;
@@ -39,8 +39,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         .keys()
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
     let own = own_image::of(mp, own_image::azure);
-    let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
-    at_boot.extend(gateways::at_boot(mp));
+    let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
     let setup = hooks::capped_user_data(env, (name, mp), USER, at_boot, CAP)?;
     m.block(linux_vm(
         &id,

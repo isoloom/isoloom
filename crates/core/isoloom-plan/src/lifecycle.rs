@@ -43,6 +43,13 @@ pub enum Step {
         /// The default route's next hop.
         default: Option<Ipv4Addr>,
     },
+    /// A gateway's forwarding between its networks, on now and at every boot: IPv4, and IPv6
+    /// when the lab routes IPv6 ([`crate::routing::forwarding`]). Its own provisioning sets the
+    /// rules.
+    Forwarding {
+        /// The kernel parameters, each with its value.
+        sysctls: Vec<(&'static str, &'static str)>,
+    },
     /// Its IPv6 addresses, each on the interface holding its IPv4 address on that network,
     /// then its IPv6 routes through the router.
     Ipv6 {
@@ -194,6 +201,11 @@ pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) 
         routes: routing::routes(spec, name, m).into_iter().map(|(cidr, via)| Route { cidr, via }).collect(),
         default: routing::default_gateway(spec, name, m),
     });
+    if routing::is_gateway(spec, name) {
+        steps.push(Step::Forwarding {
+            sysctls: routing::forwarding(routing::routes_ipv6(spec)),
+        });
+    }
     steps.extend(ipv6_step(spec, m));
     let own: Vec<String> = m
         .volumes

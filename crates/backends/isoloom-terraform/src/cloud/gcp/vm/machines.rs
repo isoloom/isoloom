@@ -14,7 +14,7 @@ use super::network::vpc;
 use super::{NESTING, RULES, for_nics, image, machine_type, user};
 use crate::Result;
 use crate::cloud::instance::{name_with, set_up_once, tags};
-use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, nested, own_image, reach, seal};
+use crate::cloud::vm::{controller_setup, disks, hooks, interfaces, nested, own_image, reach, seal};
 use crate::machine::user_data::Capped;
 use crate::machine::{controller, user_data};
 use crate::module::{ident, resource};
@@ -41,11 +41,9 @@ fn mac(a: Ipv4Addr) -> Expression {
 }
 
 /// What every boot brings up: each interface beyond the first, by its MAC (Google's guest agent
-/// may have already), and forwarding on a gateway.
-fn at_boot(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>, gateway: Option<&MachinePlan>) -> Vec<Template> {
-    let mut out = interfaces::up(env, addresses, &|n| mac(addresses[n]));
-    out.extend(gateway.map(gateways::at_boot).unwrap_or_default());
-    out
+/// may have already).
+fn at_boot(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>) -> Vec<Template> {
+    interfaces::up(env, addresses, &|n| mac(addresses[n]))
 }
 
 /// A Linux machine: what may reach it, its instance, set up by its startup script.
@@ -61,7 +59,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     }
     let os = mp.os.as_deref().unwrap_or_default();
     m.blocks(disks::gcp(env, name, &mp.disks));
-    let setup = hooks::capped_user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses, Some(mp)), CAP)?;
+    let setup = hooks::capped_user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses), CAP)?;
     let mut vm = instance(&Instance {
         env,
         id: &id,
@@ -292,7 +290,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let (_, memory, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| user(os).to_owned(), WinrmAuth::Basic);
     let who_logs_in = |mp: &MachinePlan| user(mp.os.as_deref().unwrap_or_default()).to_owned();
-    let setup = controller_setup::set_up(env, &who_logs_in, inventory, &at_boot(env, &addresses, None));
+    let setup = controller_setup::set_up(env, &who_logs_in, inventory, &at_boot(env, &addresses));
     m.block(instance(&Instance {
         env,
         id,

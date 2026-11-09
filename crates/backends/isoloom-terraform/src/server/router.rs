@@ -16,13 +16,14 @@ use crate::cloud::vm::seal;
 use crate::machine::controller;
 use crate::module::output;
 
-/// Forwarding on: IPv4, and IPv6 when a network is IPv6.
-pub(crate) fn forwarding(env: &Environment) -> &'static str {
-    if env.networks.values().any(|n| n.ipv6.is_some()) {
-        "net.ipv4.ip_forward=1\nnet.ipv6.conf.all.forwarding=1\n"
-    } else {
-        "net.ipv4.ip_forward=1\n"
-    }
+/// Forwarding on, as a sysctl file: IPv4, and IPv6 when the lab routes IPv6
+/// (`isoloom_plan::routing::forwarding`).
+pub(crate) fn forwarding(env: &Environment) -> String {
+    let lines: Vec<String> = isoloom_plan::routing::forwarding(!env.router6.is_empty())
+        .into_iter()
+        .map(|(k, v)| format!("{k}={v}\n"))
+        .collect();
+    lines.concat()
 }
 
 /// The `/etc/nftables.conf` content: always the unsealed ruleset (the `reach` rules, the
