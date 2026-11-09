@@ -58,6 +58,8 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   the `minutes_from_now` expiry unit.
 - New, optional: each Vagrant VM's `machines[].native.boot_digest` (reload a running VM whose
   digest changed), each lab machine's `machines[].resources`.
+- A published port's output is named `<machine>__<port>` (`web__portal`, was `web_portal`),
+  and a manifest naming an output twice is refused (`duplicate_output`).
 - The controller is `isoloom-controller` in Proxmox's manifests and check output (was
   `controller`).
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.

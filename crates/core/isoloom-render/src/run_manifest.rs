@@ -326,8 +326,9 @@ pub fn terraform_output(name: &str, role: OutputRole, description: &str) -> Resu
     })
 }
 
-/// An output per published port of the lab's machines and tools: an HTTP port is an entry (the
-/// address a user opens first), the others information; each shown at the host's loopback.
+/// An output per published port of the lab's machines and tools, named `<machine>__<port>`: an
+/// HTTP port is an entry (the address a user opens first), the others information; each shown
+/// at the host's loopback.
 ///
 /// # Errors
 ///
@@ -369,11 +370,20 @@ pub fn outputs_with(machines: &[Machine], host: impl Fn(&Machine) -> Template) -
         .collect()
 }
 
+/// A published port's output name: its machine's name and its own in snake case, joined by
+/// `__` (`web-admin`'s `ui` is `web_admin__ui`, `web`'s `admin-ui` `web__admin_ui`). A machine's
+/// name has no `--`, so the first `__` ends it: no two ports share a name, and none takes a
+/// Terraform output's (`ip`, `address_web`), which has single `_` only.
+fn output_name(machine: &str, port: &str) -> Result<SnakeName, ManifestError> {
+    let snake = |name: &str| -> String {
+        name.chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+            .collect()
+    };
+    SnakeName::parse(&format!("{}__{}", snake(machine), snake(port)))
+}
+
 fn output(m: &Machine, p: &Port, host: &Template) -> Result<Output, ManifestError> {
-    let snake: String = format!("{}_{}", m.name, p.name)
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
-        .collect();
     let (role, scheme, after) = match p.kind {
         PortKind::Https => (OutputRole::Entry, "https://", "/"),
         PortKind::Http => (OutputRole::Entry, "http://", "/"),
@@ -386,7 +396,7 @@ fn output(m: &Machine, p: &Port, host: &Template) -> Result<Output, ManifestErro
     };
     let what = format!("{}'s {} (port {port})", m.name, p.name);
     Ok(Output {
-        name: SnakeName::parse(&snake)?,
+        name: output_name(m.name.as_str(), p.name.as_str())?,
         description: Some(format!("{what}.")),
         role,
         sensitive: false,

@@ -32,6 +32,12 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+- **Breaking: a published port's output is named `<machine>__<port>`** (`web__portal`, was
+  `web_portal`), in snake case. Joined by one `_`, two ports could take one name (`web-admin`'s
+  `ui` and `web`'s `admin-ui` were both `web_admin_ui`) or a Terraform output's (machine `ssh`'s
+  port `user` was `ssh_user`), and the run manifest listed both. A machine's name has no `--`, so
+  the names can't meet now, and `Manifest::validate` refuses an output named twice
+  (`Error::DuplicateOutput`, `duplicate_output`).
 - **Breaking: the run manifest is version 1, and stable.** `manifest_version` is `1`; a reader
   refuses `0`. The schema is `schemas/run-manifest-v1.schema.json`, its `$id` (and each
   manifest's `$schema`) the committed file on `main`

@@ -1,6 +1,6 @@
 //! What the types can't say on their own because it spans fields: the driver and its identity,
-//! unique step ids, references to steps, machines and published ports, and placeholders that
-//! name something the manifest declares.
+//! unique step ids and output names, references to steps, machines and published ports, and
+//! placeholders that name something the manifest declares.
 
 use std::collections::BTreeSet;
 
@@ -18,7 +18,8 @@ impl Manifest {
     /// The first of: [`Error::NoHosts`], [`Error::DriverIdentity`] (an identity
     /// for another driver), [`Error::DuplicateStep`], [`Error::UnknownStep`] (a
     /// delivery's step), [`Error::ReadyNotUp`], [`Error::DuplicateMachine`],
-    /// [`Error::DuplicatePort`], [`Error::UnknownMachine`] (the guest's VM among them),
+    /// [`Error::DuplicatePort`], [`Error::DuplicateOutput`], [`Error::UnknownMachine`] (the
+    /// guest's VM among them),
     /// [`Error::UnknownPublished`], [`Error::UnknownParam`] (the seal's param among them),
     /// [`Error::UnknownOutput`] and [`Error::PlaceholderOutOfPlace`].
     pub fn validate(&self) -> Result<()> {
@@ -35,6 +36,7 @@ impl Manifest {
         self.deliveries()?;
         self.ready_conditions()?;
         self.machine_references()?;
+        self.unique_outputs()?;
         if let Some(g) = &self.guest {
             self.machine_exists("guest.machine", g.machine.as_str())?;
         }
@@ -139,6 +141,14 @@ impl Manifest {
             }
         }
         Ok(())
+    }
+
+    fn unique_outputs(&self) -> Result<()> {
+        let mut seen = BTreeSet::new();
+        match self.outputs.iter().find(|o| !seen.insert(&o.name)) {
+            Some(dup) => Err(Error::DuplicateOutput { name: dup.name.to_string() }),
+            None => Ok(()),
+        }
     }
 
     fn placeholders(&self) -> Result<()> {

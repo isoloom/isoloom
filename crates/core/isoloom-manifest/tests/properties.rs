@@ -46,7 +46,7 @@ fn grammar_soup() -> impl Strategy<Value = String> {
         Just("run.title"),
         Just("params.DEMO_SECRET"),
         Just("params.1X"),
-        Just("outputs.web_portal"),
+        Just("outputs.web__portal"),
         Just("published.web.80"),
         Just("published.dns.53.udp"),
         Just("published.a.b.65535"),

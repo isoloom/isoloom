@@ -1365,7 +1365,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_http",
+      "name": "web__http",
       "description": "web's http (port 80).",
       "role": "entry",
       "sensitive": false,
@@ -2160,7 +2160,7 @@ systemctl enable --now isoloom-published.service
   ],
   "outputs": [
     {
-      "name": "web_http",
+      "name": "web__http",
       "description": "web's http (port 80).",
       "role": "entry",
       "sensitive": false,

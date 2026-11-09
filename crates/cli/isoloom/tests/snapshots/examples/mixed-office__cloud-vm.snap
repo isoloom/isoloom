@@ -879,7 +879,7 @@ resource "local_file" "isoloom_project" {
       }
     },
     {
-      "name": "intranet_web",
+      "name": "intranet__web",
       "description": "intranet's web (port 80).",
       "role": "entry",
       "sensitive": false,

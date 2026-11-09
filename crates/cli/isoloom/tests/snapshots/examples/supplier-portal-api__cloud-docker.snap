@@ -751,7 +751,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,
@@ -1636,7 +1636,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,
@@ -2411,7 +2411,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,
@@ -3285,7 +3285,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,
@@ -4036,7 +4036,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,
@@ -4862,7 +4862,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,

@@ -170,7 +170,7 @@ fn the_flag_reaches_the_start_steps_and_is_accepted_in_the_vm_never_written() ->
 fn the_containers_published_ports_answer_where_the_driver_says_the_vm_does() -> Outcome {
     let (_, local, server) = manifests()?;
     for m in [&local, &server] {
-        let site = m.outputs.iter().find(|o| o.name.as_str() == "web_site").unwrap();
+        let site = m.outputs.iter().find(|o| o.name.as_str() == "web__site").unwrap();
         assert_eq!(site.format.as_ref().map(ToString::to_string).as_deref(), Some("http://${host.web}:${value}/"));
         let web = m.machines.iter().find(|x| x.name.as_str() == "web").unwrap();
         let publish = web.ports[0].publish.as_ref().unwrap();

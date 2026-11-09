@@ -29,7 +29,8 @@ A run manifest holds only documented data — the driver does the work:
 
 - the **native commands** of the lifecycle and their order;
 - **readiness criteria** (a ready file, running machines, a port answering);
-- **outputs**: addresses, host ports and URLs, named per machine and port;
+- **outputs**: addresses, host ports and URLs; a published port's is named
+  `<machine>__<port>` in snake case (`web__portal`), and no two outputs share a name;
 - how to run the **checks**, with self-contained timeouts (waits + 15 s per check + 60 s), so a
   long-waiting lab is never cut off by a fixed cap;
 - **secret slots**: each secret's and input's name and destination, and an optional `default`,

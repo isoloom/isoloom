@@ -169,7 +169,7 @@ fn outputs_come_from_the_state_and_the_published_ports_from_the_router() {
     let m = manifest(&env(LAB)).unwrap();
     let ip = m.outputs.iter().find(|o| o.name.as_str() == "ip").unwrap();
     assert!(matches!(&ip.from, OutputSource::TerraformOutput { name, .. } if name.as_str() == "ip"));
-    let site = m.outputs.iter().find(|o| o.name.as_str() == "web_site").unwrap();
+    let site = m.outputs.iter().find(|o| o.name.as_str() == "web__site").unwrap();
     assert_eq!(site.format.as_ref().map(ToString::to_string).as_deref(), Some("http://${outputs.ip}:${value}/"));
     let web = m.machines.iter().find(|x| x.name.as_str() == "web").unwrap();
     assert_eq!(

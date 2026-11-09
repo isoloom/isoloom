@@ -1405,7 +1405,7 @@ output "ssh_user" {
       }
     },
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,
@@ -2231,7 +2231,7 @@ systemctl enable --now isoloom-published.service
   ],
   "outputs": [
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 3206).",
       "role": "entry",
       "sensitive": false,

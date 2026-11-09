@@ -214,7 +214,7 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
     ];
     let out = outputs(&shown).unwrap();
     let names: Vec<String> = out.iter().map(|o| o.name.to_string()).collect();
-    assert_eq!(names, ["web_site", "web_plain", "web_dns", "client_vnc", "shell_ttyd"]);
+    assert_eq!(names, ["web__site", "web__plain", "web__dns", "client__vnc", "shell__ttyd"]);
     let formats: Vec<String> = out.iter().map(|o| o.format.as_ref().map(ToString::to_string).unwrap_or_default()).collect();
     assert_eq!(formats[0], "https://127.0.0.1:${value}/");
     assert_eq!(formats[1], "http://127.0.0.1:${value}/");
@@ -224,8 +224,20 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
     assert_eq!(out[0].description.as_deref(), Some("web's site (port 443)."));
     assert!(matches!(&out[3].from, OutputSource::PublishedPort { machine, port } if machine.to_string() == "client" && port.to_string() == "vnc"));
     let odd = machine("my-box", Role::Target, vec![lab_port("a-b", 1, PortKind::Tcp, true)]);
-    assert_eq!(outputs(&[odd]).unwrap()[0].name.to_string(), "my_box_a_b");
+    assert_eq!(outputs(&[odd]).unwrap()[0].name.to_string(), "my_box__a_b");
     assert_eq!(Template::from_parts([Part::Placeholder(Placeholder::Value)]).to_string(), "${value}");
+}
+
+#[test]
+fn ports_whose_names_join_alike_get_outputs_of_their_own() {
+    let shown = [
+        machine("web-admin", Role::Target, vec![lab_port("ui", 80, PortKind::Http, true)]),
+        machine("web", Role::Target, vec![lab_port("admin-ui", 81, PortKind::Http, true)]),
+        machine("ssh", Role::Target, vec![lab_port("user", 22, PortKind::Tcp, true)]),
+    ];
+    let names: Vec<String> = outputs(&shown).unwrap().iter().map(|o| o.name.to_string()).collect();
+    // Not `ssh_user`, a Terraform output of the server labs.
+    assert_eq!(names, ["web_admin__ui", "web__admin_ui", "ssh__user"]);
 }
 
 #[test]

@@ -99,6 +99,17 @@ fn machines_and_their_ports_are_named_once() {
 }
 
 #[test]
+fn outputs_are_named_once() {
+    assert_eq!(
+        refused(|d| {
+            let output = d["outputs"][0].clone();
+            d["outputs"].as_array_mut().unwrap().push(output);
+        }),
+        "duplicate_output"
+    );
+}
+
+#[test]
 fn a_machine_reference_names_a_machine() {
     assert_eq!(refused(|d| d["machines"][0]["of"] = json!("db")), "unknown_machine");
     assert_eq!(read(|d| d["machines"][0]["of"] = json!("web")), Ok(()));

@@ -820,7 +820,7 @@ output "published" {
       }
     },
     {
-      "name": "web_web",
+      "name": "web__web",
       "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
@@ -1832,7 +1832,7 @@ output "published" {
       }
     },
     {
-      "name": "web_web",
+      "name": "web__web",
       "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
@@ -3103,7 +3103,7 @@ output "published" {
       }
     },
     {
-      "name": "web_web",
+      "name": "web__web",
       "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
@@ -3996,7 +3996,7 @@ output "published" {
       }
     },
     {
-      "name": "web_web",
+      "name": "web__web",
       "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,
@@ -4896,7 +4896,7 @@ output "published" {
       }
     },
     {
-      "name": "web_web",
+      "name": "web__web",
       "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,

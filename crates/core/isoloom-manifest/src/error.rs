@@ -208,6 +208,12 @@ pub enum Error {
         /// The port's name.
         port: String,
     },
+    /// An output name used twice.
+    #[error("outputs: `{name}` appears twice; an output's name is unique")]
+    DuplicateOutput {
+        /// The name.
+        name: String,
+    },
     /// A reference to a machine that doesn't exist.
     #[error("{at}: no machine `{machine}` in this manifest")]
     UnknownMachine {
@@ -291,6 +297,7 @@ impl Error {
             Error::ReadyNotUp { .. } => "ready_not_up",
             Error::DuplicateMachine { .. } => "duplicate_machine",
             Error::DuplicatePort { .. } => "duplicate_port",
+            Error::DuplicateOutput { .. } => "duplicate_output",
             Error::UnknownMachine { .. } => "unknown_machine",
             Error::UnknownPublished { .. } => "unknown_published",
             Error::UnknownParam { .. } => "unknown_param",

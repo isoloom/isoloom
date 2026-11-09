@@ -2292,7 +2292,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
   ],
   "outputs": [
     {
-      "name": "iis_http",
+      "name": "iis__http",
       "description": "iis's http (port 80).",
       "role": "entry",
       "sensitive": false,

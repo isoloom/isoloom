@@ -527,7 +527,7 @@ volumes:
   ],
   "outputs": [
     {
-      "name": "web_web",
+      "name": "web__web",
       "description": "web's web (port 80).",
       "role": "entry",
       "sensitive": false,

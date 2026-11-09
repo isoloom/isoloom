@@ -853,7 +853,7 @@ output "published" {
       }
     },
     {
-      "name": "dns_dns_udp",
+      "name": "dns__dns_udp",
       "description": "dns's dns-udp (port 53/udp).",
       "role": "info",
       "sensitive": false,
@@ -1834,7 +1834,7 @@ output "published" {
       }
     },
     {
-      "name": "dns_dns_udp",
+      "name": "dns__dns_udp",
       "description": "dns's dns-udp (port 53/udp).",
       "role": "info",
       "sensitive": false,
@@ -2995,7 +2995,7 @@ output "published" {
       }
     },
     {
-      "name": "dns_dns_udp",
+      "name": "dns__dns_udp",
       "description": "dns's dns-udp (port 53/udp).",
       "role": "info",
       "sensitive": false,
@@ -3901,7 +3901,7 @@ output "published" {
       }
     },
     {
-      "name": "dns_dns_udp",
+      "name": "dns__dns_udp",
       "description": "dns's dns-udp (port 53/udp).",
       "role": "info",
       "sensitive": false,
@@ -4839,7 +4839,7 @@ output "published" {
       }
     },
     {
-      "name": "dns_dns_udp",
+      "name": "dns__dns_udp",
       "description": "dns's dns-udp (port 53/udp).",
       "role": "info",
       "sensitive": false,

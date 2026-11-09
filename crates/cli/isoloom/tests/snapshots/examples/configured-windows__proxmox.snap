@@ -1091,7 +1091,7 @@ locals {
       }
     },
     {
-      "name": "iis_http",
+      "name": "iis__http",
       "description": "iis's http (port 80).",
       "role": "entry",
       "sensitive": false,

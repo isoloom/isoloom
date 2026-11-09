@@ -442,7 +442,7 @@
   ],
   "outputs": [
     {
-      "name": "web_portal",
+      "name": "web__portal",
       "description": "web's portal (port 80).",
       "role": "entry",
       "sensitive": false,

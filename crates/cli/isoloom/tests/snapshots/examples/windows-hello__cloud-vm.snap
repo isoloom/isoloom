@@ -822,7 +822,7 @@ resource "local_file" "isoloom_project" {
       }
     },
     {
-      "name": "web01_web",
+      "name": "web01__web",
       "description": "web01's web (port 80).",
       "role": "entry",
       "sensitive": false,
@@ -1720,7 +1720,7 @@ resource "local_file" "isoloom_project" {
       }
     },
     {
-      "name": "web01_web",
+      "name": "web01__web",
       "description": "web01's web (port 80).",
       "role": "entry",
       "sensitive": false,
