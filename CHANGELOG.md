@@ -113,7 +113,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   removes a listed file it no longer writes (every target's under `.isoloom/`; with `--target`,
   that target's folder only), then a folder that leaves empty; `check` fails on such a file.
   Isoloom owns exactly the listed files: what a runner or its tools write there
-  (`.terraform.lock.hcl`, `.isoloom-reach/`, `.vagrant/`) stays, and so does its folder.
+  (`.terraform.lock.hcl`, `.isoloom-reach/`, `.vagrant/`) stays, and so does its folder. A list
+  line that isn't a plain path under `.isoloom/` (absolute, or with `..`), or a file reached
+  through a symbolic link, is an error before anything is removed, so a removal never leaves
+  `.isoloom/`.
 - **The library takes the person's regions like the image table** (`Lab::with_regions`, from
   `Defaults::regions`; `Lab::plan`, `Environment::regions`), and says each cloud's built-in one
   (`isoloom_targets::default_regions`). Also: `isoloom_spec::MachineSize` (a machine's size in a

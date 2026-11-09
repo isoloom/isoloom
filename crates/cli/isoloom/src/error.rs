@@ -72,6 +72,15 @@ pub(crate) enum CliError {
         #[source]
         source: std::io::Error,
     },
+    /// A line of `.isoloom/.generated` names a file Isoloom won't remove: one outside
+    /// `.isoloom/`, or one reached through a symbolic link.
+    #[error("`.isoloom/.generated` lists `{entry}`, which {why}, so Isoloom won't remove it; delete that line")]
+    GeneratedList {
+        /// The line.
+        entry: String,
+        /// Why it is refused.
+        why: &'static str,
+    },
     /// The command's own output (stdout or stderr) can't be written.
     #[error("can't write the output")]
     Output(#[source] std::io::Error),

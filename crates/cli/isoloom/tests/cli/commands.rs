@@ -450,6 +450,75 @@ fn generating_one_target_leaves_the_others_files_alone() -> Outcome {
     Ok(())
 }
 
+/// A generated project whose list also names `entry`, and the file under `dir` it would reach.
+fn listing(name: &str, entry: &str) -> Outcome<std::path::PathBuf> {
+    let home = scratch(&format!("{name}-home"))?;
+    let dir = project(name, &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    let list = dir.join(".isoloom/.generated");
+    let text = std::fs::read_to_string(&list)?;
+    std::fs::write(&list, format!("{text}{entry}\n"))?;
+    Ok(dir)
+}
+
+/// `generate` and `check` on `dir` both refuse its list, naming `entry`, and leave `victim` be.
+fn refuses_the_list(dir: &std::path::Path, entry: &str, victim: &std::path::Path) -> Outcome {
+    let home = scratch("refused-list-home")?;
+    for command in ["generate", "check"] {
+        let o = isoloom(&home, &[&command, &dir])?;
+        assert_eq!(o.code, Some(2), "{command}: {o:?}");
+        assert!(o.stderr.contains(&format!("`.isoloom/.generated` lists `{entry}`")), "{command}: {}", o.stderr);
+        assert!(victim.is_file(), "{command} removed {}", victim.display());
+    }
+    Ok(())
+}
+
+#[test]
+fn generate_refuses_a_listed_path_that_climbs_out_of_the_output() -> Outcome {
+    let entry = ".isoloom/../outside.txt";
+    let dir = listing("list-dotdot", entry)?;
+    let victim = dir.join("outside.txt");
+    std::fs::write(&victim, "the project's own\n")?;
+    refuses_the_list(&dir, entry, &victim)
+}
+
+#[test]
+fn generate_refuses_a_listed_absolute_path() -> Outcome {
+    let victim = scratch("list-absolute-victim")?.join("victim.txt");
+    std::fs::write(&victim, "someone else's\n")?;
+    let entry = victim.to_string_lossy().into_owned();
+    let dir = listing("list-absolute", &entry)?;
+    refuses_the_list(&dir, &entry, &victim)
+}
+
+#[cfg(unix)]
+#[test]
+fn generate_refuses_a_listed_file_reached_through_a_symbolic_link() -> Outcome {
+    let elsewhere = scratch("list-link-target")?;
+    let victim = elsewhere.join("victim.txt");
+    std::fs::write(&victim, "someone else's\n")?;
+    let entry = ".isoloom/linked/victim.txt";
+    let dir = listing("list-link", entry)?;
+    std::os::unix::fs::symlink(&elsewhere, dir.join(".isoloom/linked"))?;
+    refuses_the_list(&dir, entry, &victim)
+}
+
+#[cfg(unix)]
+#[test]
+fn generate_refuses_to_remove_through_a_linked_output_folder() -> Outcome {
+    let elsewhere = scratch("list-linked-output-target")?;
+    let victim = elsewhere.join("victim.txt");
+    std::fs::write(&victim, "someone else's\n")?;
+    let entry = ".isoloom/victim.txt";
+    let dir = listing("list-linked-output", entry)?;
+    let list = std::fs::read_to_string(dir.join(".isoloom/.generated"))?;
+    std::fs::remove_dir_all(dir.join(".isoloom"))?;
+    std::fs::write(elsewhere.join(".generated"), list)?;
+    std::os::unix::fs::symlink(&elsewhere, dir.join(".isoloom"))?;
+    refuses_the_list(&dir, entry, &victim)
+}
+
 #[test]
 fn schema_prints_the_committed_schema_with_the_catalogues_rules() -> Outcome {
     let home = scratch("schema-home")?;
