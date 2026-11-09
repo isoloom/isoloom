@@ -12,7 +12,7 @@ use crate::error::Result;
 use crate::kustomize::{CHECK_SCRIPTS, Kustomization, key};
 use crate::layout::output;
 use crate::network::{self, CHECK_LABEL};
-use crate::objects::{Container, Image, JobSpec, Manifest, Metadata, PodSpec, PodTemplate, Selector, Volume, VolumeMount};
+use crate::objects::{Container, Image, JobSpec, Labels, Manifest, Metadata, PodSpec, PodTemplate, Selector, Volume, VolumeMount};
 use crate::pod::{config_map_volume, scripts_volume};
 use crate::render::{document, documents, generated};
 
@@ -142,7 +142,7 @@ impl Check<'_> {
 
 /// The plain checks' files in `.isoloom/kubernetes/checks/`: the runners, the Jobs (with how to
 /// run them) and their kustomization. None without checks.
-pub(crate) fn files(c: &Checks, namespace: &str) -> Result<Vec<GeneratedFile>> {
+pub(crate) fn files(c: &Checks, namespace: &str, labels: &Labels) -> Result<Vec<GeneratedFile>> {
     if c.jobs.is_empty() {
         return Ok(Vec::new());
     }
@@ -156,9 +156,9 @@ pub(crate) fn files(c: &Checks, namespace: &str) -> Result<Vec<GeneratedFile>> {
         "# The environment's checks, one Job per position. Run after the environment:\n#   kubectl -n {namespace} delete job {names} --ignore-not-found\n#   kubectl apply -k .isoloom/kubernetes/checks\n#   kubectl -n {namespace} wait --for=condition=complete job --all --timeout=300s; kubectl -n {namespace} logs -l {CHECK_LABEL}\n",
         names = names.join(" ")
     );
-    out.push(file("job.yaml", format!("{}{usage}{}", generated(), documents(&c.jobs)?)));
+    out.push(file("job.yaml", format!("{}{usage}{}", generated(), documents(&c.jobs, labels)?)));
     let runners = c.runners.iter().map(|(n, _)| n.clone()).collect();
-    let k = Kustomization::new(namespace, "job.yaml", CHECK_SCRIPTS, runners);
+    let k = Kustomization::new(namespace, "job.yaml", CHECK_SCRIPTS, runners, labels);
     out.push(file("kustomization.yaml", format!("{}{}", generated(), document(&k)?)));
     Ok(out)
 }

@@ -57,10 +57,10 @@ pub(crate) fn files(env: &Environment, r: &Rendered) -> Result<Vec<GeneratedFile
         file("templates/environment.yaml", environment(r)?),
     ];
     if !r.scripts.is_empty() {
-        out.push(file("templates/scripts.yaml", scripts(&r.scripts)?));
+        out.push(file("templates/scripts.yaml", scripts(&r.scripts, &r.labels)?));
     }
     if inputs {
-        out.push(file("templates/inputs.yaml", secret(env)?));
+        out.push(file("templates/inputs.yaml", secret(env, &r.labels)?));
     }
     if !r.checks.jobs.is_empty() {
         out.push(file("templates/tests/checks.yaml", tests(r)?));
@@ -97,7 +97,7 @@ fn values(env: &Environment, inputs: bool) -> Result<String> {
 /// The manifests but the namespace (the release's), each machine's image its value.
 fn environment(r: &Rendered) -> Result<String> {
     let objects: Vec<Manifest> = r.objects.iter().filter(|o| o.kind != "Namespace").map(with_image_values).collect();
-    Ok(format!("{}{}", generated(), helm_documents(&objects)?))
+    Ok(format!("{}{}", generated(), helm_documents(&objects, &r.labels)?))
 }
 
 /// `object` with its machine's image (in its containers, init jobs and seeds) the chart's value.
@@ -115,7 +115,7 @@ fn with_image_values(object: &Manifest) -> Manifest {
 }
 
 /// The project's scripts, from the chart's copies (a missing one fails the install, naming it).
-fn scripts(scripts: &[String]) -> Result<String> {
+fn scripts(scripts: &[String], labels: &Labels) -> Result<String> {
     let data = scripts.iter().map(|f| {
         let path = format!("{CHART_PROJECT_FILES}/{f}");
         let missing = go_string(&format!("{path} is missing: run isoloom generate"));
@@ -123,17 +123,21 @@ fn scripts(scripts: &[String]) -> Result<String> {
     });
     let map = Manifest::config_map(SCRIPTS, data.collect());
     let about = format!("# The project's scripts (init jobs, checks): copies in {CHART_PROJECT_FILES}/, written by `isoloom generate`.\n");
-    Ok(format!("{}{about}{}", generated(), helm_documents(&[map])?))
+    Ok(format!("{}{about}{}", generated(), helm_documents(&[map], labels)?))
 }
 
 /// The inputs' Secret, from the values (an unset one is empty).
-fn secret(env: &Environment) -> Result<String> {
+fn secret(env: &Environment, labels: &Labels) -> Result<String> {
     let data = env
         .spec()
         .inputs
         .iter()
         .map(|i| (i.clone(), Text::Helm(format!("get .Values.inputs {} | toString | b64enc", go_string(i)))));
-    Ok(format!("{}{}", generated(), helm_documents(&[Manifest::secret(INPUTS, data.collect())])?))
+    Ok(format!(
+        "{}{}",
+        generated(),
+        helm_documents(&[Manifest::secret(INPUTS, data.collect())], labels)?
+    ))
 }
 
 /// The checks as `helm test` hooks: their runners' `ConfigMap` (from the chart's files), then a
@@ -162,7 +166,7 @@ fn tests(r: &Rendered) -> Result<String> {
         }
     }
     let about = "# The checks: `helm test <release>` runs a Job per position; an `exec` check runs inside its\n# machine: kubectl -n <namespace> exec -i deploy/<machine> -- sh -s < .isoloom/kubernetes/checks/exec-<machine>.sh\n";
-    Ok(format!("{}{about}{}", generated(), helm_documents(&objects)?))
+    Ok(format!("{}{about}{}", generated(), helm_documents(&objects, &r.labels)?))
 }
 
 /// The message as written when it has no placeholders (filling them takes the resolved
@@ -199,8 +203,10 @@ fn literal(text: &str) -> String {
 }
 
 /// Chart templates, one file: every string as it is, but the Helm expressions.
-fn helm_documents(objects: &[Manifest]) -> Result<String> {
-    let docs: Vec<String> = objects.iter().map(helm_document).collect::<Result<_, _>>()?;
+/// Several objects as chart templates, one document each, in one file, each labelled with
+/// `labels`.
+fn helm_documents(objects: &[Manifest], labels: &Labels) -> Result<String> {
+    let docs: Vec<String> = objects.iter().map(|o| helm_document(&o.labelled(labels))).collect::<Result<_, _>>()?;
     Ok(docs.join("---\n"))
 }
 

@@ -5,7 +5,7 @@
 use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
 use isoloom_plan::Environment;
 
-use crate::cloud::instance::name_with;
+use crate::cloud::instance::{labels, name_with};
 use crate::cloud::vm::private_dns::{TTL, address, records};
 use crate::module::{ident, resource};
 
@@ -34,6 +34,7 @@ pub(super) fn write(env: &Environment, own_project: Expression, m: &mut Module) 
             .add_attribute(("name", name_with("-private")))
             .add_attribute(("dns_name", string(format!("{}.", zone.domain))))
             .add_attribute(("visibility", string("private")))
+            .add_attribute(("labels", labels(env)))
             .add_block(Block::builder("private_visibility_config").add_blocks(networks).build())
             .add_attribute(("depends_on", list([reference("google_project_service.dns")])))
             .build(),

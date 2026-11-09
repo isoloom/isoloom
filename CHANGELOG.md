@@ -90,8 +90,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   Isoloom builds (before its steps), and mounted into every container at
   `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
 - **`tags:`** in the spec and the defaults: cost tags on every cloud resource (AWS default tags,
-  Azure tags, Oracle Cloud free-form tags, Google Cloud labels, DigitalOcean and Linode
-  `key:value` tags) and every Kubernetes object (labels).
+  Azure tags, Oracle Cloud free-form tags, Google Cloud labels, its boot disks and private DNS
+  zone included, DigitalOcean and Linode `key:value` tags) and every Kubernetes object (labels:
+  the manifests, the checks' Jobs, the chart's templates and tests, and the `ConfigMap`s the
+  kustomizations generate, which carry `app.kubernetes.io/managed-by: isoloom` too).
 - **`.isoloom/.gitignore`**, written and listed like every generated file: Terraform's state,
   backups, cache, lock info and crash logs, Vagrant's machine folders and the runner's reach
   files stay out of version control; `.terraform.lock.hcl` is meant to be committed.

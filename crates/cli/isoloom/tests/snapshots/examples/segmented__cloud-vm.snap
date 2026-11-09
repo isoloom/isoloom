@@ -2882,7 +2882,13 @@ resource "google_compute_instance" "cache" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 10
+      labels = {
+        isoloom-environment = "segmented"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 10
     }
   }
   network_interface {
@@ -2950,7 +2956,13 @@ resource "google_compute_instance" "web" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "segmented"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -3006,7 +3018,13 @@ resource "google_compute_instance" "user" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "segmented"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {

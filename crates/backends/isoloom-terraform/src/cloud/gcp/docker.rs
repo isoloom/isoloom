@@ -91,6 +91,7 @@ fn host(env: &Environment, size: HostSize, setup: Expression) -> Block {
                     Block::builder("initialize_params")
                         .add_attribute(("image", string(image)))
                         .add_attribute(("size", number(size.disk_gb.into())))
+                        .add_attribute(("labels", instance::labels(env)))
                         .build(),
                 )
                 .build(),

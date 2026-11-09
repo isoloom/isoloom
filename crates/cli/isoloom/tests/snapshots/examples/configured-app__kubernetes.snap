@@ -1143,6 +1143,8 @@ resources:
 - job.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 configMapGenerator:
 - name: isoloom-check-runners
   files:
@@ -1636,6 +1638,8 @@ resources:
 - environment.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    app.kubernetes.io/managed-by: isoloom
 configMapGenerator:
 - name: isoloom-scripts
   files:

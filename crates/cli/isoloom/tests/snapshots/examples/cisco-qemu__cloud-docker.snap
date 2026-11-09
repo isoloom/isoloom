@@ -2480,6 +2480,12 @@ resource "google_compute_instance" "env" {
     initialize_params {
       image = "debian-cloud/debian-12"
       size  = 40
+      labels = {
+        isoloom-environment = "cisco-qemu"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
     }
   }
   network_interface {

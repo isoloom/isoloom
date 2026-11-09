@@ -3320,7 +3320,13 @@ resource "google_compute_instance" "intranet" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "vlan-office"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -3404,7 +3410,13 @@ resource "google_compute_instance" "staff" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "vlan-office"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -3460,7 +3472,13 @@ resource "google_compute_instance" "guest" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "vlan-office"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -3528,7 +3546,13 @@ resource "google_compute_instance" "admin" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "vlan-office"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {

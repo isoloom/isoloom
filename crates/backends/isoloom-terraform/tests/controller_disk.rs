@@ -13,6 +13,11 @@ fn lab(controller: &str) -> String {
     )
 }
 
+/// `hcl` with each run of spaces one space: an attribute as written, whatever its block aligns.
+fn aligned(hcl: &str) -> String {
+    hcl.split(' ').filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ")
+}
+
 #[test]
 fn the_controller_has_the_disk_the_spec_gives_it() -> Outcome {
     let sized = lab("controller: { resources: { disk_gb: 40 } }\n");
@@ -23,7 +28,7 @@ fn the_controller_has_the_disk_the_spec_gives_it() -> Outcome {
     );
     let gcp = cloud_vm(Cloud::Gcp, &sized)?;
     assert!(
-        resource_body(&gcp, "resource \"google_compute_instance\" \"isoloom_controller\"").contains("size  = 40"),
+        aligned(resource_body(&gcp, "resource \"google_compute_instance\" \"isoloom_controller\"")).contains("size = 40"),
         "{gcp}"
     );
     let azure = cloud_vm(Cloud::Azure, &sized)?;
@@ -44,7 +49,7 @@ fn without_one_every_target_gives_the_same_default() -> Outcome {
     );
     let gcp = cloud_vm(Cloud::Gcp, &plain)?;
     assert!(
-        resource_body(&gcp, "resource \"google_compute_instance\" \"isoloom_controller\"").contains("size  = 10"),
+        aligned(resource_body(&gcp, "resource \"google_compute_instance\" \"isoloom_controller\"")).contains("size = 10"),
         "{gcp}"
     );
     let pve = proxmox(&plain)?;

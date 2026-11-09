@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::layout::PROJECT_COPIES;
+use crate::objects::Labels;
 
 /// A `kustomization.yaml`, the fields Isoloom writes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,12 +28,15 @@ pub(crate) struct Kustomization {
     pub(crate) config_map_generator: Vec<ConfigMapGenerator>,
 }
 
-/// How generated `ConfigMap`s are named.
+/// How generated `ConfigMap`s are named and labelled.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GeneratorOptions {
     /// Their names as written (the pods name them), without kustomize's hash.
     pub(crate) disable_name_suffix_hash: bool,
+    /// Their labels, every other object's ([`crate::objects::common_labels`]).
+    #[serde(default, skip_serializing_if = "Labels::is_empty")]
+    pub(crate) labels: Labels,
 }
 
 /// A `ConfigMap` made from files.
@@ -51,17 +55,18 @@ pub(crate) const SCRIPTS: &str = "isoloom-scripts";
 pub(crate) const CHECK_SCRIPTS: &str = "isoloom-check-runners";
 
 impl Kustomization {
-    /// The objects in `resources`, in `namespace`, plus a `ConfigMap` `name` of `files` when
-    /// there are any.
-    pub(crate) fn new(namespace: &str, resource: &str, name: &str, files: Vec<String>) -> Kustomization {
+    /// The objects in `resources`, in `namespace`, plus a `ConfigMap` `name` of `files`, labelled
+    /// `labels`, when there are any.
+    pub(crate) fn new(namespace: &str, resource: &str, name: &str, files: Vec<String>, labels: &Labels) -> Kustomization {
         let generates = !files.is_empty();
         Kustomization {
             api_version: "kustomize.config.k8s.io/v1beta1".into(),
             kind: "Kustomization".into(),
             namespace: namespace.into(),
             resources: vec![resource.into()],
-            generator_options: generates.then_some(GeneratorOptions {
+            generator_options: generates.then(|| GeneratorOptions {
                 disable_name_suffix_hash: true,
+                labels: labels.clone(),
             }),
             config_map_generator: if generates {
                 vec![ConfigMapGenerator { name: name.into(), files }]
@@ -78,10 +83,11 @@ pub(crate) fn key(path: &str) -> String {
 }
 
 /// The environment's kustomization: its manifests, and the project's `scripts` (paths from the
-/// project folder) as the [`SCRIPTS`] `ConfigMap`, read from their copies in [`PROJECT_COPIES`].
-pub(crate) fn environment(namespace: &str, scripts: &[String]) -> Kustomization {
+/// project folder) as the [`SCRIPTS`] `ConfigMap`, labelled `labels`, read from their copies in
+/// [`PROJECT_COPIES`].
+pub(crate) fn environment(namespace: &str, scripts: &[String], labels: &Labels) -> Kustomization {
     let files = scripts.iter().map(|f| format!("{}={PROJECT_COPIES}/{f}", key(f))).collect();
-    Kustomization::new(namespace, "environment.yaml", SCRIPTS, files)
+    Kustomization::new(namespace, "environment.yaml", SCRIPTS, files, labels)
 }
 
 /// The project's scripts an environment's kustomization reads, as paths from the project folder.
@@ -106,13 +112,13 @@ mod tests {
     #[test]
     fn the_scripts_read_back_are_those_written() {
         let scripts = vec!["build/cache/seed.sh".to_owned(), "checks/up.sh".to_owned()];
-        let text = serde_yaml_ng::to_string(&environment("isoloom-x", &scripts)).unwrap();
+        let text = serde_yaml_ng::to_string(&environment("isoloom-x", &scripts, &Labels::new())).unwrap();
         assert_eq!(project_scripts(&text).unwrap(), scripts);
     }
 
     #[test]
     fn the_scripts_are_read_from_inside_the_kustomization_folder() {
-        let k = environment("isoloom-x", &["build/cache/seed.sh".to_owned()]);
+        let k = environment("isoloom-x", &["build/cache/seed.sh".to_owned()], &Labels::new());
         assert_eq!(
             k.config_map_generator[0].files,
             ["build__cache__seed.sh=chart/files/project/build/cache/seed.sh"]
@@ -122,7 +128,7 @@ mod tests {
 
     #[test]
     fn no_scripts_no_config_map() {
-        let k = environment("isoloom-x", &[]);
+        let k = environment("isoloom-x", &[], &Labels::new());
         assert!(k.generator_options.is_none() && k.config_map_generator.is_empty());
         let text = serde_yaml_ng::to_string(&k).unwrap();
         assert_eq!(project_scripts(&text).unwrap(), Vec::<String>::new());
@@ -131,7 +137,7 @@ mod tests {
     proptest! {
         #[test]
         fn any_scripts_read_back_are_those_written(scripts in prop::collection::vec("[a-z0-9_.-]{1,8}(/[a-z0-9_.-]{1,8}){0,2}", 0..4)) {
-            let text = serde_yaml_ng::to_string(&environment("isoloom-x", &scripts)).expect("writes");
+            let text = serde_yaml_ng::to_string(&environment("isoloom-x", &scripts, &Labels::new())).expect("writes");
             prop_assert_eq!(project_scripts(&text).expect("reads"), scripts);
         }
     }

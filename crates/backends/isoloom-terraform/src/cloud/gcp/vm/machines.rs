@@ -214,7 +214,9 @@ fn alias(address: Ipv4Addr) -> Block {
 fn instance(i: &Instance) -> Block {
     let (image, _) = image(i.os).unwrap_or_default();
     let user = user(i.os);
-    let mut params = Block::builder("initialize_params").add_attribute(("image", string(i.own.unwrap_or(image))));
+    let mut params = Block::builder("initialize_params")
+        .add_attribute(("image", string(i.own.unwrap_or(image))))
+        .add_attribute(("labels", labels(i.env)));
     if let Some(gb) = i.disk {
         params = params.add_attribute(("size", number(u64::from(gb))));
     }

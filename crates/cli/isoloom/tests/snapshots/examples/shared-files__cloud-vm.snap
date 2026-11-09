@@ -1980,7 +1980,13 @@ resource "google_compute_instance" "writer" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "shared-files"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -2040,7 +2046,13 @@ resource "google_compute_instance" "reader" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "shared-files"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {

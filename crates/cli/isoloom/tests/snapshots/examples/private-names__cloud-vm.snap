@@ -2055,6 +2055,12 @@ resource "google_dns_managed_zone" "private" {
   name       = "${local.name}-private"
   dns_name   = "corp.internal."
   visibility = "private"
+  labels = {
+    isoloom-environment = "private-names"
+    managed-by          = "isoloom"
+    isoloom-instance    = local.name
+    isoloom-expires-at  = var.expires_at
+  }
   private_visibility_config {
     networks {
       network_url = google_compute_network.office.id
@@ -2125,7 +2131,13 @@ resource "google_compute_instance" "web" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "private-names"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -2181,7 +2193,13 @@ resource "google_compute_instance" "client" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "private-names"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {

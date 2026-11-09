@@ -3601,7 +3601,13 @@ resource "google_compute_instance" "gateway" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "dmz-jump"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -3707,7 +3713,13 @@ resource "google_compute_instance" "app" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "dmz-jump"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -3808,7 +3820,13 @@ resource "google_compute_instance" "db" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "dmz-jump"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {
@@ -3864,7 +3882,13 @@ resource "google_compute_instance" "user" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      labels = {
+        isoloom-environment = "dmz-jump"
+        managed-by          = "isoloom"
+        isoloom-instance    = local.name
+        isoloom-expires-at  = var.expires_at
+      }
+      size = 20
     }
   }
   network_interface {

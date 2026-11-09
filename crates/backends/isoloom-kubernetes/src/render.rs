@@ -14,7 +14,7 @@ use crate::checks::{self, Checks};
 use crate::error::{Error, Result};
 use crate::layout::output;
 use crate::machine::{self, Machine};
-use crate::objects::Manifest;
+use crate::objects::{Labels, Manifest};
 use crate::pod::INPUTS;
 use crate::{chart, kustomize, network};
 
@@ -28,6 +28,8 @@ pub(crate) struct Rendered {
     pub(crate) checks: Checks,
     /// The project's scripts the pods run (init jobs, checks), sorted, each once.
     pub(crate) scripts: Vec<String>,
+    /// What every object written is labelled with ([`crate::objects::common_labels`]).
+    pub(crate) labels: Labels,
 }
 
 /// The files of `env` on Kubernetes: the manifests and their kustomization, the checks', then
@@ -50,7 +52,7 @@ pub(crate) fn render(env: &Environment) -> Result<Files> {
             contents: manifests(env, &r)?,
         },
     ];
-    files.extend(checks::files(&r.checks, &r.namespace)?);
+    files.extend(checks::files(&r.checks, &r.namespace, &r.labels)?);
     files.extend(chart::files(env, &r)?);
     files.extend(isoloom_render::configure::dockerfile::files(env));
     Ok(files)
@@ -79,11 +81,6 @@ fn objects(env: &Environment) -> Rendered {
     objects.extend(network::policies(env));
     let checks = checks::plan(env);
     objects.extend(checks.policies.iter().cloned());
-    // The spec's tags, as labels on every object.
-    let tags = isoloom_render::tags::labels(env.spec());
-    for o in &mut objects {
-        o.metadata.labels.extend(tags.iter().cloned());
-    }
     let mut scripts: Vec<String> = machines.iter().flat_map(|m| m.init().iter().cloned()).collect();
     scripts.extend(machines.iter().flat_map(crate::files::sources));
     scripts.extend(checks.scripts.iter().cloned());
@@ -94,6 +91,7 @@ fn objects(env: &Environment) -> Rendered {
         objects,
         checks,
         scripts,
+        labels: crate::objects::common_labels(env.spec()),
     }
 }
 
@@ -101,7 +99,7 @@ fn objects(env: &Environment) -> Rendered {
 /// inputs' Secret to create.
 fn manifests(env: &Environment, r: &Rendered) -> Result<String> {
     let usage = Usage { env, namespace: &r.namespace };
-    Ok(format!("{}{usage}\n{}", generated(), documents(&r.objects)?))
+    Ok(format!("{}{usage}\n{}", generated(), documents(&r.objects, &r.labels)?))
 }
 
 /// How to run the plain manifests, at their top: start and stop, the images built from the
@@ -156,7 +154,7 @@ fn kustomization(r: &Rendered) -> Result<String> {
     if !r.scripts.is_empty() {
         out.push_str("# The project's scripts the pods run (init jobs, checks), from the chart's copies (`isoloom generate` writes them).\n");
     }
-    out.push_str(&document(&kustomize::environment(&r.namespace, &r.scripts))?);
+    out.push_str(&document(&kustomize::environment(&r.namespace, &r.scripts, &r.labels))?);
     Ok(out)
 }
 
@@ -170,8 +168,8 @@ pub(crate) fn document<T: Serialize>(value: &T) -> Result<String> {
     serde_yaml_ng::to_string(value).map_err(|source| Error::Unwritable { source })
 }
 
-/// Several YAML documents, one file.
-pub(crate) fn documents(objects: &[Manifest]) -> Result<String> {
-    let docs: Vec<String> = objects.iter().map(document).collect::<Result<_>>()?;
+/// Several objects, one YAML document each, in one file, each labelled with `labels`.
+pub(crate) fn documents(objects: &[Manifest], labels: &Labels) -> Result<String> {
+    let docs: Vec<String> = objects.iter().map(|o| document(&o.labelled(labels))).collect::<Result<_>>()?;
     Ok(docs.join("---\n"))
 }

@@ -228,6 +228,24 @@ pub(crate) enum Spec {
 /// containers carry `isoloom.managed` and the clouds' resources `managed-by`.
 pub(crate) const MANAGED_BY: (&str, &str) = ("app.kubernetes.io/managed-by", "isoloom");
 
+/// What every object Isoloom writes is labelled with, whichever file holds it (the manifests,
+/// the checks' Jobs, the chart's templates and tests, a kustomization's generated `ConfigMap`s):
+/// [`MANAGED_BY`], then the spec's tags.
+pub(crate) fn common_labels(spec: &isoloom_spec::model::Spec) -> Labels {
+    std::iter::once((MANAGED_BY.0.to_owned(), MANAGED_BY.1.to_owned()))
+        .chain(isoloom_render::tags::labels(spec))
+        .collect()
+}
+
+impl Manifest {
+    /// This object with `labels` added to its own.
+    pub(crate) fn labelled(&self, labels: &Labels) -> Manifest {
+        let mut object = self.clone();
+        object.metadata.labels.extend(labels.iter().map(|(k, v)| (k.clone(), v.clone())));
+        object
+    }
+}
+
 /// An object's name, labels and annotations.
 #[derive(Debug, Clone, Default, Serialize)]
 pub(crate) struct Metadata {

@@ -39,10 +39,53 @@ fn every_cloud_tags_its_resources_with_the_specs_tags() -> Outcome {
 
 #[test]
 fn every_kubernetes_object_carries_the_tags_as_labels() -> Outcome {
-    let env = file(&tagged()?, Target::Kubernetes, "kubernetes/environment.yaml")?;
-    let objects = env.split("\n---\n").filter(|d| d.contains("kind: ")).count();
-    assert!(objects > 3, "{env}");
-    assert_eq!(env.matches("cost_center: r_d_42").count(), objects, "{env}");
+    // A container with set-up scripts, so the chart has its scripts' ConfigMap too.
+    let text = std::fs::read_to_string(examples().join("segmented/isoloom.yml"))?;
+    let scripted = text.replace("      steps: [{ run: provision/cache.sh }]", "    setup: [provision/cache.sh]");
+    let lab = valid(&format!("{scripted}\ntags:\n  Cost.Center: \"R&D 42\"\n"))?;
+    let files = isoloom_targets::generate(&lab, Target::Kubernetes)?;
+    let mut seen = Vec::new();
+    for f in files.iter().filter(|f| std::path::Path::new(&f.path).extension().is_some_and(|e| e == "yaml")) {
+        let objects = f
+            .contents
+            .split("\n---\n")
+            .filter(|d| d.contains("\nkind: ") || d.starts_with("kind: "))
+            .count();
+        if f.path.ends_with("kustomization.yaml") {
+            // Its generated ConfigMaps, labelled like every other object.
+            let generated = f.contents.contains("configMapGenerator:");
+            assert_eq!(f.contents.contains("    cost_center: r_d_42"), generated, "{}: {}", f.path, f.contents);
+        } else {
+            assert_eq!(f.contents.matches("cost_center: r_d_42").count(), objects, "{}: {}", f.path, f.contents);
+        }
+        seen.push(f.path.trim_start_matches(".isoloom/kubernetes/").to_owned());
+    }
+    for path in [
+        "checks/job.yaml",
+        "chart/templates/scripts.yaml",
+        "chart/templates/tests/checks.yaml",
+        "checks/kustomization.yaml",
+    ] {
+        assert!(seen.iter().any(|s| s == path), "{path}: {seen:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn google_cloud_labels_its_boot_disks_and_its_private_zone() -> Outcome {
+    let text = std::fs::read_to_string(examples().join("segmented/isoloom.yml"))?;
+    let lab = valid(&format!("{text}\ndns: {{ private: true }}\ntags:\n  team: platform\n"))?;
+    let vm = file(&lab, Target::CloudVm, "cloud-vm/gcp/main.tf")?;
+    let docker = file(&tagged()?, Target::CloudDocker, "cloud-docker/gcp/main.tf")?;
+    for tf in [vm.as_str(), docker.as_str()] {
+        assert!(tf.contains("initialize_params {"), "{tf}");
+        for disk in tf.split("initialize_params {").skip(1) {
+            let params = disk.split('}').next().unwrap_or_default();
+            assert!(params.contains("labels") && disk.contains("\"platform\""), "{params}");
+        }
+    }
+    let zone = vm.split("resource \"google_dns_managed_zone\"").nth(1).ok_or("no private zone")?;
+    assert!(zone.split("\nresource ").next().unwrap_or_default().contains("\"platform\""), "{zone}");
     Ok(())
 }
 
