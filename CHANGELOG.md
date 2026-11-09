@@ -171,6 +171,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Changed
 
+- **CI builds the Isothrum runner only at a pinned ref**: `ISOTHRUM_REF` is a release tag or a
+  commit SHA, never a branch (`.github/scripts/isothrum-ref.sh`); it no longer falls back to
+  `main`. Unset, CI's Compose real runs are skipped (the jobs that need `isoloom` alone still
+  run) and the real-host workflows fail before building.
 - **`isoloom_manifest::COMPATIBILITY` is the document's**, and the crate says what it means for
   its Rust types: they mirror the document and stay exhaustive, so a new optional field (a minor
   release) is a new struct field; building them by hand isn't part of the library promise, as

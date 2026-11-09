@@ -266,18 +266,33 @@ jobs:
           done
 
   # The binaries the real-run jobs below share: isoloom, and the Isothrum runner built from its
-  # repository at ISOTHRUM_REF (a repository variable; main by default), so each job doesn't build
-  # both again.
+  # repository at ISOTHRUM_REF (a repository variable: a release tag or a commit, never a branch,
+  # so a run is reproducible), so each job doesn't build both again. Without ISOTHRUM_REF the
+  # Compose real runs are skipped; the jobs that need isoloom alone still run.
   binaries:
     name: Binaries for the real runs
     runs-on: ubuntu-24.04
     env:
-      ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
+      ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF }}
+    outputs:
+      runner: ${{ steps.ref.outputs.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Isothrum's ref, pinned
+        id: ref
+        run: |
+          set -uo pipefail
+          status=0
+          .github/scripts/isothrum-ref.sh optional || status=$?
+          case "$status" in
+            0) echo "runner=true" >> "$GITHUB_OUTPUT" ;;
+            3) echo "runner=false" >> "$GITHUB_OUTPUT" ;;
+            *) exit 1 ;;
+          esac
       - name: Check out Isothrum (the runner)
+        if: steps.ref.outputs.runner == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Isothrum/isothrum
@@ -288,16 +303,18 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-          workspaces: |
-            . -> target
-            .isothrum-src -> target
       - name: Build
+        env:
+          RUNNER: ${{ steps.ref.outputs.runner }}
         run: |
           set -euo pipefail
           cargo build -q --locked -p isoloom
-          cargo build -q --locked -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
           mkdir -p bin
-          cp target/debug/isoloom .isothrum-src/target/debug/isothrum bin/
+          cp target/debug/isoloom bin/
+          if [ "$RUNNER" = true ]; then
+            cargo build -q --locked -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
+            cp .isothrum-src/target/debug/isothrum bin/
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binaries
@@ -311,6 +328,7 @@ jobs:
   docker:
     name: Compose, run for real (${{ matrix.example }})
     needs: binaries
+    if: needs.binaries.outputs.runner == 'true'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false

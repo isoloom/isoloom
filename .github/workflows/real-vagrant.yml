@@ -34,8 +34,9 @@ defaults:
 
 env:
   TARGET: vagrant
-  # The Isothrum runner is a separate repository; this ref is built to get the `isothrum` binary.
-  ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'main' }}
+  # The Isothrum runner is a separate repository; this ref, a release tag or a commit (checked by
+  # .github/scripts/isothrum-ref.sh), is built to get the `isothrum` binary.
+  ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF }}
 
 jobs:
   # Which (provider, example) pairs run: the chosen examples on every provider named in
@@ -91,6 +92,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Isothrum's ref, pinned
+        run: .github/scripts/isothrum-ref.sh required
       - name: Check out Isothrum (the runner)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -1,8 +1,8 @@
 //! The CI workflow runs what exists: every `cargo` command names a package of the workspace
 //! (`-p`), a test target it names (`--test`) is one of that package's, every `isoloom`
 //! subcommand it calls is one the command line has, a crate list it compares is the
-//! workspace's, no generation is let fail quietly, and every document the workflows point to is
-//! there.
+//! workspace's, no generation is let fail quietly, every document the workflows point to is
+//! there, and the Isothrum runner is built only at a pinned ref.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -214,5 +214,40 @@ fn every_document_the_workflows_point_to_is_there() -> Outcome {
         }
     }
     assert!(missing.is_empty(), "{missing:#?}");
+    Ok(())
+}
+
+/// What `.github/scripts/isothrum-ref.sh <mode>` says of `reference`: its exit code.
+#[cfg(unix)]
+fn pinned(mode: &str, reference: &str) -> Outcome<Option<i32>> {
+    let script = root().join(".github/scripts/isothrum-ref.sh");
+    Ok(Command::new("bash")
+        .arg(script)
+        .arg(mode)
+        .env("ISOTHRUM_REF", reference)
+        .output()?
+        .status
+        .code())
+}
+
+#[cfg(unix)]
+#[test]
+fn the_isothrum_runner_is_built_only_at_a_release_tag_or_a_commit() -> Outcome {
+    for reference in ["v2.0.0", "v2.0.0-rc.1", "0123456789abcdef0123456789abcdef01234567"] {
+        assert_eq!(pinned("required", reference)?, Some(0), "{reference}");
+    }
+    for reference in ["main", "release/2.0", "0123abc"] {
+        assert_eq!(pinned("optional", reference)?, Some(1), "{reference}");
+    }
+    assert_eq!(pinned("optional", "")?, Some(3), "unset: the runs that need it are skipped");
+    assert_eq!(pinned("required", "")?, Some(1));
+    // Every workflow that builds the runner checks its ref first, and none falls back to a branch.
+    for entry in std::fs::read_dir(root().join(".github/workflows"))? {
+        let text = std::fs::read_to_string(entry?.path())?;
+        if let Some(checkout) = text.find("repository: Isothrum/isothrum") {
+            let check = text.find(".github/scripts/isothrum-ref.sh").ok_or("no ref check")?;
+            assert!(check < checkout && !text.contains("ISOTHRUM_REF ||"), "{text}");
+        }
+    }
     Ok(())
 }

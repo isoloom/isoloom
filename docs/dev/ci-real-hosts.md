@@ -127,7 +127,7 @@ Each workflow builds the sibling binary from source:
 
 | Variable | In | Meaning |
 |---|---|---|
-| `ISOTHRUM_REF` | isoloom workflows | Git ref of `Isothrum/isothrum` to build the `isothrum` runner from (default `main`) |
+| `ISOTHRUM_REF` | isoloom workflows | The release tag (`vX.Y.Z`) or commit SHA of `Isothrum/isothrum` to build the `isothrum` runner from, never a branch (`.github/scripts/isothrum-ref.sh` checks it). Unset, CI's Compose real runs are skipped and the real-host workflows fail before building. |
 | `ISOLOOM_REF` | isothrum workflow | Git ref of `isoloom/isoloom` to build the `isoloom` generator from (default `main`) |
 
-Pin these to a released tag for a reproducible certification run.
+Pin `ISOLOOM_REF` to a released tag too for a reproducible certification run.
