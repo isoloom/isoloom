@@ -137,8 +137,9 @@ jobs:
           fail: true
           jobSummary: true
 
-  # The public API of the library crates, compared by cargo-semver-checks with each crate's latest
-  # version on crates.io. The release type comes from the workspace version: when it is still the
+  # The supported library API (docs/reference/policies.md: isoloom-spec, isoloom-targets and
+  # isoloom-manifest), compared by cargo-semver-checks with each crate's latest version on
+  # crates.io. The other published crates are building blocks whose API is not a promise. The release type comes from the workspace version: when it is still the
   # published one, the changes are checked as a patch, so a breaking change fails until the version
   # is raised on purpose. One exception, decided for the release after 1.x: while crates.io's
   # latest is a 1.x, the unreleased changes are checked as the 2.0.0 major they are (they remove
@@ -168,14 +169,12 @@ jobs:
             1.*) echo "args=--release-type major" >> "$GITHUB_OUTPUT" ;;
             *) echo "args=" >> "$GITHUB_OUTPUT" ;;
           esac
-      # `isoloom` is the command line (its library API is not a promise); xtask and xtask-quality
-      # are not published.
       - name: cargo semver-checks
         env:
           RELEASE_ARGS: ${{ steps.release.outputs.args }}
         run: |
           # shellcheck disable=SC2086 # RELEASE_ARGS is empty or one flag and its value.
-          cargo semver-checks --workspace --exclude isoloom --exclude xtask --exclude xtask-quality $RELEASE_ARGS
+          cargo semver-checks -p isoloom-spec -p isoloom-targets -p isoloom-manifest $RELEASE_ARGS
 
   # The published crates build with their declared rust-version (1.88, Cargo.toml). `+1.88`
   # overrides the rust-toolchain.toml pin for this check only (without it the pinned toolchain
@@ -311,7 +310,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, tuned-web, shared-files]
+        # The examples with a container form (tuned-web asks for a TPM: VM targets only).
+        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, shared-files]
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}
