@@ -35,9 +35,7 @@ body:
       options:
         - docker
         - hosted
-        - kubernetes
-        - helm
-        - kustomize
+        - kubernetes (manifests, Kustomize or the Helm chart)
         - vagrant
         - docker-vm
         - hybrid

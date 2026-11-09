@@ -6,3 +6,9 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/isoloom/isoloom/security/advisories/new
     about: Report it privately, never in a public issue. See SECURITY.md.
+  - name: Documentation
+    url: https://github.com/isoloom/isoloom/blob/main/docs/README.md
+    about: The guides, the spec reference, the target matrix and the policies.
+  - name: A problem while running an environment (Isothrum)
+    url: https://github.com/Isothrum/isothrum/issues
+    about: Bringing an environment up, its checks or its teardown with the Isothrum runner.

@@ -10,6 +10,26 @@ stable spec format.
 
 ## [Unreleased]
 
+The next release is **2.0.0**: it removes library API and refuses a few specs 1.x took.
+[Migrating to 2.0](docs/guide/migrating-to-2.0.md) says what to change.
+
+### Highlights
+
+- **Breaking:** the run manifest is `manifest_version: 1`, frozen with a compatibility policy;
+  a runner built for 1.x's version 0 refuses it (Isothrum 2.0 reads it).
+- **Breaking:** the `dvwa` and `juice-shop` catalogue entries are removed, and machine names
+  starting with `isoloom-` are refused.
+- **Breaking:** Kubernetes publishes a port as a ClusterIP Service by default, with a restricted
+  security context for the pods.
+- **Breaking:** the generated Terraform modules require Terraform 1.11 or later.
+- **Breaking (library):** many items of every crate are removed or crate-internal; the supported
+  API is `isoloom-spec`, `isoloom-targets` and `isoloom-manifest`.
+- Signed release binaries for Linux, macOS and Windows, with `SHA256SUMS`, a Sigstore signature,
+  build provenance and a CycloneDX SBOM; `install.sh` and the GitHub Action check every download.
+- `constraints.ca_certificates` (a corporate CA), a `tags:` map for cost allocation,
+  `isoloom check --quiet` and `--json`, and a `.isoloom/.gitignore` for the tools' state.
+- `isoloom generate` removes the files it no longer writes, and `isoloom check` reports them.
+
 ### Breaking
 
 - **Breaking: the run manifest is version 1, and stable.** `manifest_version` is `1`; a reader
@@ -73,6 +93,19 @@ stable spec format.
   --isoloom`, this checkout's by default; `Run::isoloom`).
 - Each published crate ships `LICENSE` and `NOTICE`; `cargo binstall isoloom` finds the release
   archives; the crates' homepage is the docs on GitHub.
+- **Release binaries, signed.** A `vX.Y.Z` tag builds `isoloom` for `x86_64` and `aarch64` Linux
+  (static, musl), `x86_64` and `aarch64` macOS and `x86_64` Windows, after the test gate and only
+  when the tag is the workspace version. The release carries the archives (with the licences,
+  `NOTICE` and the third-party licences), `SHA256SUMS`, a keyless cosign signature of it, a build
+  provenance attestation of every file and a CycloneDX SBOM, with the CHANGELOG's section as its
+  notes; then the published release is installed with `install.sh` and the Action and run. 1.x
+  releases had no binaries. [Verify a release](docs/guide/verify-a-release.md).
+- **Documentation by purpose** under `docs/`: guides (getting started, one per target, corporate
+  networks, golden images, offline, CI, committing `.isoloom/`, remote Terraform state,
+  troubleshooting), reference (configuration, tool versions, policies, examples), explanation
+  (architecture, security considerations, determinism) and maintainer pages; `SUPPORT.md`,
+  `GOVERNANCE.md`, `CODEOWNERS` and a Dependabot configuration.
+
 - **`isoloom generate` removes the files it no longer writes, and `isoloom check` reports them.**
   A lab that stopped allowing a target (a Debian machine made Windows: `docker`, `docker-vm`,
   `cloud-docker`, `kubernetes` and four clouds' `cloud-vm`) kept that target's old files and
@@ -129,6 +162,12 @@ stable spec format.
   `alpine:3.24` in place of the unsupported 3.20.
 - The ESXi module's header takes the password from `TF_VAR_esxi_password`, never a command line.
 - Examples, fixtures and tests use neutral words (`DEMO_SECRET`, `web-portal`, `admin`).
+- **`packaging/install.sh` and the GitHub Action check the archive against the release's
+  `SHA256SUMS`**, the Action on Windows too (it checked nothing there); the archives hold an
+  `isoloom-<target>/` folder. CI runs on every push to `main` and every pull request, with
+  SemVer checked against crates.io, the MSRV checked with Rust 1.88 itself, and the links between
+  the docs checked. Contributions no longer ask for a DCO sign-off, which nothing checked.
+
 - **A machine's size follows one rule everywhere**: its `resources`, each field left out the
   default of the form it runs as (a container 1 CPU, 512 MB, 5 GB; a VM 1 CPU, 1024 MB, 20 GB).
   Every lab machine of a run manifest carries `machines[].resources` as it runs on that target
@@ -606,7 +645,7 @@ for this release.
 
 **Isoloom 1.0 does not read 0.x specs.** There is no compatibility layer and no
 `isoloom migrate`: an old spec fails validation with an error naming the unknown
-field. See [`docs/migrating-to-1.0.md`](docs/migrating-to-1.0.md) for the field-by-field
+field. See [`docs/guide/migrating-to-1.0.md`](docs/guide/migrating-to-1.0.md) for the field-by-field
 changes and before/after examples.
 
 ### Added

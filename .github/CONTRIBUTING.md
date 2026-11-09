@@ -1,6 +1,6 @@
 # Contributing
 
-Everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability is reported as [SECURITY.md](SECURITY.md) says.
+Everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability is reported as [SECURITY.md](SECURITY.md) says. How decisions are made: [GOVERNANCE.md](GOVERNANCE.md). Questions: [SUPPORT.md](SUPPORT.md).
 
 ## Gates
 
@@ -15,6 +15,7 @@ cargo deny check                               # advisories, licenses, bans, sou
 RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps
 cargo machete                                  # no unused dependencies
 typos                                          # spelling; legitimate words go in _typos.toml
+lychee --offline README.md CHANGELOG.md ARCHITECTURE.md '.github/*.md' 'docs/**/*.md'   # links
 
 # The generated docs must stay current (their stale-file tests enforce this):
 cargo run -q -p isoloom -- docs --spec > docs/spec.md
@@ -31,7 +32,7 @@ When a change is meant to alter output, review the snapshot diffs with `cargo in
 commit the accepted snapshots, and explain each kind of difference in the pull request.
 
 Isoloom generates files; it runs nothing. To run an environment for real, generate it and hand
-its run manifest to a runner ([the runner contract](../docs/runner.md)), or run each tool's files
+its run manifest to a runner ([the run manifest](../docs/reference/run-manifest.md)), or run each tool's files
 by hand:
 
 ```sh
@@ -78,6 +79,14 @@ cd examples/hello-stack && isoloom generate
 - A pull request says what changed, links the issue (`Closes #N`), pastes how it was verified
   and lists what was deliberately left out.
 
+## Documentation
+
+The docs live under `docs/`, by purpose ([index](../docs/README.md)): `guide/` (tutorials and
+how-tos), `reference/`, `explanation/` and `dev/` (maintainers). `docs/spec.md`,
+`docs/matrix.md` and `docs/reference/cli.md` are generated: change the code, then regenerate
+them. Every link between the pages must resolve and every spec in a page (a YAML block whose
+first line is `# isoloom.yml`) must validate: `cargo test -p isoloom-spec --test docs` checks both.
+
 ## License
 
-By contributing, you agree that your contributions are licensed under the [Apache License, Version 2.0](../LICENSE), the project's license. Sign off each commit (`git commit -s`, the Developer Certificate of Origin).
+By contributing, you agree that your contributions are licensed under the [Apache License, Version 2.0](../LICENSE), the project's license.
