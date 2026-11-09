@@ -22,7 +22,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 3,
+  "resolved_version": 4,
   "name": "existing-hosts",
   "instance": null,
   "inputs": [],
@@ -65,9 +65,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [],
@@ -102,9 +104,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [],

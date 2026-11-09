@@ -1095,6 +1095,10 @@ output "ssh_user" {
       "name": "intranet",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.70.99.10"
       },
@@ -1123,6 +1127,10 @@ output "ssh_user" {
       "name": "staff",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.70.10.10"
       },
@@ -1144,6 +1152,10 @@ output "ssh_user" {
       "name": "guest",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan20": "10.70.20.10"
       },
@@ -1164,6 +1176,10 @@ output "ssh_user" {
       "name": "admin",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"
@@ -2059,6 +2075,10 @@ systemctl enable --now isoloom-published.service
       "name": "intranet",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.70.99.10"
       },
@@ -2087,6 +2107,10 @@ systemctl enable --now isoloom-published.service
       "name": "staff",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.70.10.10"
       },
@@ -2108,6 +2132,10 @@ systemctl enable --now isoloom-published.service
       "name": "guest",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan20": "10.70.20.10"
       },
@@ -2128,6 +2156,10 @@ systemctl enable --now isoloom-published.service
       "name": "admin",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"

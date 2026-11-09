@@ -26,21 +26,8 @@ pub(super) fn machines(env: &Environment, shape: &Shape, boot_digests: &BTreeMap
 }
 
 fn machine(env: &Environment, d: &Define, boot_digest: Option<String>) -> Result<Machine> {
-    let mut out = Machine {
-        name: Name::parse(&d.name)?,
-        role: Role::Infra,
-        of: None,
-        os: None,
-        windows: false,
-        arch: None,
-        resources: None,
-        addresses: BTreeMap::new(),
-        keep_running: false,
-        on_demand: false,
-        native: Some(native(env, d, boot_digest)?),
-        volumes: Vec::new(),
-        ports: Vec::new(),
-    };
+    let mut out = isoloom_render::run_manifest::machine(&d.name, Role::Infra)?;
+    out.native = Some(native(env, d, boot_digest)?);
     match d.kind {
         Kind::Lab => lab_machine(env, &d.name, &mut out)?,
         Kind::Router => {
@@ -87,11 +74,7 @@ fn lab_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
     out.os = mp.os.as_deref().map(OsName::parse).transpose()?;
     out.windows = mp.is_windows();
     out.arch = Some(arch(mp.arch));
-    let size = crate::vms::providers::Size::of(mp.size, isoloom_spec::DEFAULT_CPUS, isoloom_spec::DEFAULT_MEMORY_MB);
-    out.resources = Some(Resources {
-        cpus: Some(size.cpus),
-        memory_mb: Some(size.mem),
-    });
+    out.resources = Some(isoloom_render::run_manifest::resources(mp));
     out.addresses = addresses(mp)?;
     let loopback = Template::text(LOOPBACK);
     for p in &m.ports {

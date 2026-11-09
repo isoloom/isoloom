@@ -48,6 +48,21 @@ impl SecretFile {
     }
 }
 
+impl crate::MachinePlan {
+    /// Whether it reads the launch-time input `input`: in its environment, or as a file
+    /// (`files: [{ path, input }]`).
+    #[must_use]
+    pub fn reads_input(&self, input: &str) -> bool {
+        self.inputs.iter().any(|i| i == input) || self.reads_input_file(input)
+    }
+
+    /// Whether it reads the launch-time input `input` as a file (`files: [{ path, input }]`).
+    #[must_use]
+    pub fn reads_input_file(&self, input: &str) -> bool {
+        self.secrets.iter().any(|s| matches!(&s.source, ValueSource::Input(i) if i == input))
+    }
+}
+
 /// The mode a container's secret file has when the spec sets none: readable by every user of
 /// the container, as Compose and Kubernetes both default to. A container usually runs one
 /// process as one user, so this is what its image expects.

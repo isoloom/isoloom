@@ -101,21 +101,9 @@ pub(crate) fn terraform_env(extra: Vec<(&str, Template)>) -> Result<BTreeMap<Env
 
 /// A bare machine on its `addresses`: no OS, resources, ports or volumes set.
 pub(crate) fn machine(name: &str, role: Role, addresses: BTreeMap<Name, IpAddr>) -> Result<Machine, ManifestError> {
-    Ok(Machine {
-        name: Name::parse(name)?,
-        role,
-        of: None,
-        os: None,
-        windows: false,
-        arch: None,
-        resources: None,
-        addresses,
-        keep_running: false,
-        on_demand: false,
-        native: None,
-        volumes: Vec::new(),
-        ports: Vec::new(),
-    })
+    let mut m = isoloom_render::run_manifest::machine(name, role)?;
+    m.addresses = addresses;
+    Ok(m)
 }
 
 /// A target machine: a bare machine with its OS, Windows flag and architecture, then each spec
@@ -127,6 +115,7 @@ pub(crate) fn target_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::
     m.os = mp.os.as_deref().map(OsName::parse).transpose()?;
     m.windows = mp.is_windows();
     m.arch = Some(arch(mp.arch));
+    m.resources = Some(isoloom_render::run_manifest::resources(mp));
     for p in &spec.ports {
         let mut port = port(&spec.port_label(p), p, &mp.ports, at)?;
         if let Some(publish) = port.publish.as_mut() {

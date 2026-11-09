@@ -453,6 +453,10 @@ output "ssh_user" {
       "name": "dns",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -492,6 +496,10 @@ output "ssh_user" {
       "name": "client",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "users": "10.66.20.10"
       },
@@ -1327,6 +1335,10 @@ output "ssh_user" {
       "name": "dns",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -1366,6 +1378,10 @@ output "ssh_user" {
       "name": "client",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "users": "10.66.20.10"
       },
@@ -2080,6 +2096,10 @@ output "ssh_user" {
       "name": "dns",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -2119,6 +2139,10 @@ output "ssh_user" {
       "name": "client",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "users": "10.66.20.10"
       },
@@ -2936,6 +2960,10 @@ output "ssh_user" {
       "name": "dns",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -2975,6 +3003,10 @@ output "ssh_user" {
       "name": "client",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "users": "10.66.20.10"
       },
@@ -3672,6 +3704,10 @@ output "ssh_user" {
       "name": "dns",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -3711,6 +3747,10 @@ output "ssh_user" {
       "name": "client",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "users": "10.66.20.10"
       },
@@ -4475,6 +4515,10 @@ output "ssh_user" {
       "name": "dns",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -4514,6 +4558,10 @@ output "ssh_user" {
       "name": "client",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "users": "10.66.20.10"
       },

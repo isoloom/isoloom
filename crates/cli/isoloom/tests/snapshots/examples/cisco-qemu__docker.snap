@@ -570,6 +570,10 @@ volumes:
       "name": "vios",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.1",
         "wan": "10.92.0.2"
@@ -591,6 +595,10 @@ volumes:
       "name": "csr",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.1",
         "wan": "10.92.0.3"
@@ -612,6 +620,10 @@ volumes:
       "name": "host-a",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.10"
       },
@@ -632,6 +644,10 @@ volumes:
       "name": "host-b",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.10"
       },
@@ -914,7 +930,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 3,
+  "resolved_version": 4,
   "name": "cisco-qemu",
   "instance": null,
   "inputs": [],
@@ -972,9 +988,11 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        }
       },
       "gateway_of": [
         "site-a"
@@ -1011,9 +1029,11 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        }
       },
       "gateway_of": [
         "site-b"
@@ -1049,9 +1069,16 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [],
@@ -1086,9 +1113,11 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        }
       },
       "gateway_of": [],
       "routes": [],

@@ -541,6 +541,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.32"
       },
@@ -558,6 +562,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.31"
       },
@@ -1484,6 +1492,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.32"
       },
@@ -1501,6 +1513,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.31"
       },
@@ -2611,6 +2627,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.32"
       },
@@ -2628,6 +2648,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.31"
       },
@@ -3397,6 +3421,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.32"
       },
@@ -3414,6 +3442,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.31"
       },
@@ -4379,6 +4411,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.32"
       },
@@ -4396,6 +4432,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.20.0.31"
       },

@@ -182,8 +182,8 @@ pub struct Machine {
     /// Delivered by the runner when the machine starts.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub secrets: Vec<MachineSecret>,
-    /// CPUs, memory and disk for the machine (a VM's size, a container's limits). Default: 1
-    /// CPU, 1024 MB, 20 GB.
+    /// CPUs, memory and disk for the machine (a VM's size, a container's limits). Each left out
+    /// takes its form's default: 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB as a container.
     #[serde(default)]
     pub resources: Option<Resources>,
     /// The machine's own command, instead of its image's (`CMD`; the image's entrypoint still
@@ -362,10 +362,10 @@ pub struct Resources {
     /// CPUs (default 1).
     #[serde(default)]
     pub cpus: Option<u32>,
-    /// Memory in MB (default 1024).
+    /// Memory in MB (default 1024 as a VM, 512 as a container).
     #[serde(default)]
     pub memory_mb: Option<u32>,
-    /// Disk in GB, for a VM (default 20).
+    /// Disk in GB (default 20 as a VM, 5 as a container).
     #[serde(default)]
     pub disk_gb: Option<u32>,
 }

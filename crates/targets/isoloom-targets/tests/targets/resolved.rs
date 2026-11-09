@@ -12,7 +12,7 @@ use crate::testing::{Outcome, example, file as contents, generated};
 fn addresses_and_routers_match_the_generators() -> Outcome {
     let spec = example("segmented")?;
     let r = resolve(&spec);
-    assert_eq!(lookup(&r, "resolved_version").unwrap(), 3);
+    assert_eq!(lookup(&r, "resolved_version").unwrap(), 4);
     assert_eq!(lookup(&r, "machines.web.addresses.front").unwrap(), "10.61.10.10");
     assert_eq!(lookup(&r, "networks.back.router").unwrap(), "10.61.20.254");
     assert_eq!(lookup(&r, "networks.back.internet").unwrap(), false);

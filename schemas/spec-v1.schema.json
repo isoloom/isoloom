@@ -602,7 +602,7 @@
         },
         "resources": {
           "$ref": "#/$defs/Resources",
-          "description": "CPUs, memory and disk (default 1, 1024 MB, 20 GB)."
+          "description": "CPUs, memory and disk (default 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB as a\ncontainer)."
         },
         "hardware": {
           "$ref": "#/$defs/Hardware",
@@ -2342,13 +2342,13 @@
           "type": "integer",
           "format": "uint32",
           "minimum": 0,
-          "description": "Memory in MB (default 1024)."
+          "description": "Memory in MB (default 1024 as a VM, 512 as a container)."
         },
         "disk_gb": {
           "type": "integer",
           "format": "uint32",
           "minimum": 0,
-          "description": "Disk in GB, for a VM (default 20)."
+          "description": "Disk in GB (default 20 as a VM, 5 as a container)."
         }
       },
       "description": "What a machine is given to run on; each left out takes its default."
@@ -2843,7 +2843,7 @@
         },
         "resources": {
           "$ref": "#/$defs/Resources",
-          "description": "CPUs, memory and disk (default 1, 1024 MB, 20 GB)."
+          "description": "CPUs, memory and disk (default 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB as a\ncontainer)."
         },
         "hardware": {
           "$ref": "#/$defs/Hardware",
@@ -2984,7 +2984,7 @@
         },
         "resources": {
           "$ref": "#/$defs/Resources",
-          "description": "CPUs, memory and disk (default 1, 1024 MB, 20 GB)."
+          "description": "CPUs, memory and disk (default 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB as a\ncontainer)."
         },
         "hardware": {
           "$ref": "#/$defs/Hardware",

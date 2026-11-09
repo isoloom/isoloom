@@ -30,24 +30,45 @@ pub struct Totals {
     pub disk_gb: u32,
 }
 
-/// One machine's CPUs, memory and disk: its `resources`, each field it leaves out filled with
-/// the default for its kind (a container reserves less memory and disk than a VM).
+/// A machine's size as it runs in one form: what its `resources` say, each field they leave out
+/// the default of that form (a container reserves less memory and disk than a VM). The one rule
+/// every generated file and report sizes a machine by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MachineSize {
+    /// CPUs.
+    pub cpus: u32,
+    /// Memory, in MB.
+    pub memory_mb: u32,
+    /// Disk, in GB.
+    pub disk_gb: u32,
+}
+
+impl MachineSize {
+    /// The size of a machine whose `resources` are `r`, run as a container or as a VM.
+    #[must_use]
+    pub fn of(r: Option<Resources>, container: bool) -> MachineSize {
+        let r = r.unwrap_or(Resources {
+            cpus: None,
+            memory_mb: None,
+            disk_gb: None,
+        });
+        let (memory_default, disk_default) = if container {
+            (CONTAINER_MEMORY_MB, CONTAINER_DISK_GB)
+        } else {
+            (DEFAULT_MEMORY_MB, DEFAULT_DISK_GB)
+        };
+        MachineSize {
+            cpus: r.cpus.unwrap_or(DEFAULT_CPUS),
+            memory_mb: r.memory_mb.unwrap_or(memory_default),
+            disk_gb: r.disk_gb.unwrap_or(disk_default),
+        }
+    }
+}
+
+/// One machine's CPUs, memory and disk in a form ([`MachineSize::of`]).
 fn machine_size(m: &model::Machine, container: bool) -> (u32, u32, u32) {
-    let r = m.resources.unwrap_or(Resources {
-        cpus: None,
-        memory_mb: None,
-        disk_gb: None,
-    });
-    let (memory_default, disk_default) = if container {
-        (CONTAINER_MEMORY_MB, CONTAINER_DISK_GB)
-    } else {
-        (DEFAULT_MEMORY_MB, DEFAULT_DISK_GB)
-    };
-    (
-        r.cpus.unwrap_or(DEFAULT_CPUS),
-        r.memory_mb.unwrap_or(memory_default),
-        r.disk_gb.unwrap_or(disk_default),
-    )
+    let s = MachineSize::of(m.resources, container);
+    (s.cpus, s.memory_mb, s.disk_gb)
 }
 
 /// Whether `target` runs `m` as a container (lighter) rather than a VM. Hybrid and Proxmox

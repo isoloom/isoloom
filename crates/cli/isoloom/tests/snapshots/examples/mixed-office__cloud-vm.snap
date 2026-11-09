@@ -641,6 +641,10 @@ resource "local_file" "isoloom_project" {
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 3072
+      },
       "addresses": {
         "office": "192.168.58.10"
       },
@@ -658,6 +662,10 @@ resource "local_file" "isoloom_project" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "office": "192.168.58.20"
       },

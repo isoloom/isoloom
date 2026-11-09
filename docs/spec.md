@@ -1145,7 +1145,7 @@ Its permissions, in octal (`"1777"`, `"0700"`). Quote it: YAML reads `0700` unqu
 
 ### `machines.*.resources`
 
-CPUs, memory and disk (default 1, 1024 MB, 20 GB).
+CPUs, memory and disk (default 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB as a container).
 
 - **Type:** mapping
 
@@ -1157,13 +1157,13 @@ CPUs (default 1).
 
 ### `machines.*.resources.memory_mb`
 
-Memory in MB (default 1024).
+Memory in MB (default 1024 as a VM, 512 as a container).
 
 - **Type:** integer
 
 ### `machines.*.resources.disk_gb`
 
-Disk in GB, for a VM (default 20).
+Disk in GB (default 20 as a VM, 5 as a container).
 
 - **Type:** integer
 
@@ -1506,13 +1506,13 @@ CPUs (default 1).
 
 ### `controller.resources.memory_mb`
 
-Memory in MB (default 1024).
+Memory in MB (default 1024 as a VM, 512 as a container).
 
 - **Type:** integer
 
 ### `controller.resources.disk_gb`
 
-Disk in GB, for a VM (default 20).
+Disk in GB (default 20 as a VM, 5 as a container).
 
 - **Type:** integer
 

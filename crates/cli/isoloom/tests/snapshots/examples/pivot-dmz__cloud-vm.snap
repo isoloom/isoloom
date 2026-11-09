@@ -811,6 +811,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "dmz": "10.30.10.10",
         "internal": "10.30.20.10"
@@ -835,6 +839,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "internal": "10.30.20.20"
       },
@@ -852,6 +860,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "internal": "10.30.20.30"
       },
@@ -869,6 +881,10 @@ output "checks" {
       "role": "access",
       "os": "kali",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "access": "10.30.99.10"
       }

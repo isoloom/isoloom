@@ -140,6 +140,10 @@
       "name": "db",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.30.0.20"
       },

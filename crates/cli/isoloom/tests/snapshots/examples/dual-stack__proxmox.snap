@@ -1044,6 +1044,10 @@ locals {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "back": "10.67.20.10"
       },
@@ -1061,6 +1065,10 @@ locals {
       "role": "access",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "front": "10.67.10.10"
       }

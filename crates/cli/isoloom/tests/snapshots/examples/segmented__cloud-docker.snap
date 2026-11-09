@@ -493,6 +493,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.61.10.10"
       },
@@ -527,6 +531,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.61.99.10"
       },
@@ -1447,6 +1455,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.61.10.10"
       },
@@ -1481,6 +1493,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.61.99.10"
       },
@@ -2286,6 +2302,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.61.10.10"
       },
@@ -2320,6 +2340,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.61.99.10"
       },
@@ -3229,6 +3253,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.61.10.10"
       },
@@ -3263,6 +3291,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.61.99.10"
       },
@@ -4049,6 +4081,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.61.10.10"
       },
@@ -4083,6 +4119,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.61.99.10"
       },
@@ -4935,6 +4975,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.61.10.10"
       },
@@ -4969,6 +5013,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.61.99.10"
       },

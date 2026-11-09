@@ -1074,6 +1074,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "back": "10.67.20.10"
       },
@@ -1102,6 +1106,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.67.10.10"
       },
@@ -1876,6 +1884,10 @@ systemctl enable --now isoloom-published.service
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "back": "10.67.20.10"
       },
@@ -1904,6 +1916,10 @@ systemctl enable --now isoloom-published.service
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "front": "10.67.10.10"
       },

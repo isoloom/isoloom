@@ -194,7 +194,8 @@ pub(crate) struct MachineInput {
     /// Memory-backed mounts: a path, or `{ path, size, mode }`.
     #[serde(default)]
     tmpfs: Vec<Tmpfs>,
-    /// CPUs, memory and disk (default 1, 1024 MB, 20 GB).
+    /// CPUs, memory and disk (default 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB as a
+    /// container).
     #[serde(default)]
     resources: Option<Resources>,
     /// What it asks of the hardware: `arch`, `tpm`, `gpus`, `devices`, `nested_virtualization`,

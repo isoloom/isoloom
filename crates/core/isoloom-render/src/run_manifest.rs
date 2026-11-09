@@ -271,13 +271,25 @@ pub fn port(label: &str, p: &model::Port, published: &[PublishedPort], address: 
     })
 }
 
+/// A lab machine's size in its run manifest: its CPUs and memory as it runs on the target (a
+/// container or a VM), each the spec leaves out the default of that form
+/// (`isoloom_spec::MachineSize`).
+#[must_use]
+pub fn resources(mp: &MachinePlan) -> isoloom_manifest::Resources {
+    let size = mp.size.effective(mp.shape == isoloom_plan::MachineShape::Container);
+    isoloom_manifest::Resources {
+        cpus: Some(size.cpus),
+        memory_mb: Some(size.memory_mb),
+    }
+}
+
 /// A bare machine with the given `name` and `role`, every other field empty: a caller fills its
-/// resources, addresses, native name and ports.
+/// resources, addresses, native name and ports. Every backend's run-manifest machine starts here.
 ///
 /// # Errors
 ///
 /// Fails on a name the manifest refuses.
-pub(crate) fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
+pub fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
     Ok(Machine {
         name: Name::parse(name)?,
         role,

@@ -785,6 +785,10 @@ locals {
       "role": "target",
       "os": "ubuntu-24.04",
       "arch": "arm64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.70.0.10"
       },

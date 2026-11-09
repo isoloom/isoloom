@@ -2,12 +2,11 @@
 //! when it added the service (the names below are the ones it builds them with), and the outputs
 //! of the ports they publish.
 
-use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::num::NonZeroU16;
 
 use isoloom_manifest::{
-    Error as ManifestError, GuestPath, Machine, Name, Native, Placeholder, Port, PortKind, PortName, Publish, PublishMode, Resources, Role, Template, Volume,
+    Error as ManifestError, GuestPath, Machine, Name, Native, Placeholder, Port, PortKind, PortName, Publish, PublishMode, Role, Template, Volume,
 };
 use isoloom_plan::checks::{self, Position};
 use isoloom_plan::{Environment, Lifetime, MachinePlan};
@@ -110,29 +109,14 @@ pub(super) fn machines(env: &Environment, file: &ComposeFile, members: &[Member]
 
 fn machine(env: &Environment, file: &ComposeFile, member: &Member, project: &Project) -> Result<Machine> {
     let name = Name::parse(&member.name)?;
-    let mut out = Machine {
-        name: name.clone(),
-        role: member.role,
-        of: member.of.as_deref().map(Name::parse).transpose()?,
-        os: None,
-        windows: false,
-        arch: None,
-        resources: None,
-        addresses: BTreeMap::new(),
-        keep_running: false,
-        on_demand: false,
-        native: Some(Native::Compose { service: name }),
-        volumes: Vec::new(),
-        ports: Vec::new(),
-    };
+    let mut out = isoloom_render::run_manifest::machine(&member.name, member.role)?;
+    out.of = member.of.as_deref().map(Name::parse).transpose()?;
+    out.native = Some(Native::Compose { service: name });
     let spec = env.spec();
     if let (Some(mp), Some(m)) = (env.machines.get(&member.name), spec.machines.get(&member.name)) {
         out.on_demand = m.access;
         out.arch = Some(arch(mp.arch));
-        out.resources = (mp.size.cpus.is_some() || mp.size.memory_mb.is_some()).then_some(Resources {
-            cpus: mp.size.cpus,
-            memory_mb: mp.size.memory_mb,
-        });
+        out.resources = Some(isoloom_render::run_manifest::resources(mp));
         out.addresses = addresses(mp)?;
         out.volumes = volumes(mp, project)?;
         let address = publish_address()?;

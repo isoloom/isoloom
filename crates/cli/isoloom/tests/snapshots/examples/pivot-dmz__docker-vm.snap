@@ -1087,6 +1087,10 @@ output "ssh_user" {
       "name": "gateway",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.30.10.10",
         "internal": "10.30.20.10"
@@ -1122,6 +1126,10 @@ output "ssh_user" {
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "internal": "10.30.20.20"
       },
@@ -1150,6 +1158,10 @@ output "ssh_user" {
       "name": "db",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "internal": "10.30.20.30"
       },
@@ -1178,6 +1190,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.30.99.10"
       },
@@ -2113,6 +2129,10 @@ systemctl enable --now isoloom-published.service
       "name": "gateway",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.30.10.10",
         "internal": "10.30.20.10"
@@ -2148,6 +2168,10 @@ systemctl enable --now isoloom-published.service
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "internal": "10.30.20.20"
       },
@@ -2176,6 +2200,10 @@ systemctl enable --now isoloom-published.service
       "name": "db",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "internal": "10.30.20.30"
       },
@@ -2204,6 +2232,10 @@ systemctl enable --now isoloom-published.service
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "access": "10.30.99.10"
       },

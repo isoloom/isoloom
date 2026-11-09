@@ -1075,6 +1075,10 @@ output "ssh_user" {
       "name": "fw",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.70.10.1",
         "lan": "10.70.20.1",
@@ -1105,6 +1109,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.70.10.10"
       },
@@ -1133,6 +1141,10 @@ output "ssh_user" {
       "name": "cache",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.70.20.20"
       },
@@ -1161,6 +1173,10 @@ output "ssh_user" {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "outside": "10.70.0.10"
       },
@@ -2060,6 +2076,10 @@ systemctl enable --now isoloom-published.service
       "name": "fw",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.70.10.1",
         "lan": "10.70.20.1",
@@ -2090,6 +2110,10 @@ systemctl enable --now isoloom-published.service
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.70.10.10"
       },
@@ -2118,6 +2142,10 @@ systemctl enable --now isoloom-published.service
       "name": "cache",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.70.20.20"
       },
@@ -2146,6 +2174,10 @@ systemctl enable --now isoloom-published.service
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "outside": "10.70.0.10"
       },

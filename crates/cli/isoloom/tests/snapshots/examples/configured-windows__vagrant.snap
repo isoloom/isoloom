@@ -299,7 +299,7 @@ function Enable-IsoloomFirewallPort {
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 3,
+  "resolved_version": 4,
   "name": "configured-windows",
   "instance": null,
   "inputs": [],
@@ -345,9 +345,11 @@ function Enable-IsoloomFirewallPort {
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 2,
-        "memory_mb": 3072,
-        "disk_gb": 20
+        "vm": {
+          "cpus": 2,
+          "memory_mb": 3072,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [],

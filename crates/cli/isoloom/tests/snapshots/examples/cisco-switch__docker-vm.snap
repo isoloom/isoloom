@@ -1072,6 +1072,10 @@ output "ssh_user" {
       "name": "sw1",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {},
       "native": {
         "service": "sw1"
@@ -1090,6 +1094,10 @@ output "ssh_user" {
       "name": "files",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.92.10.10",
         "office-vlan20": "10.92.20.10"
@@ -1119,6 +1127,10 @@ output "ssh_user" {
       "name": "staff",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.92.10.20"
       },
@@ -1130,6 +1142,10 @@ output "ssh_user" {
       "name": "guest",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan20": "10.92.20.20"
       },
@@ -1902,6 +1918,10 @@ systemctl enable --now isoloom-published.service
       "name": "sw1",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {},
       "native": {
         "service": "sw1"
@@ -1920,6 +1940,10 @@ systemctl enable --now isoloom-published.service
       "name": "files",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.92.10.10",
         "office-vlan20": "10.92.20.10"
@@ -1949,6 +1973,10 @@ systemctl enable --now isoloom-published.service
       "name": "staff",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan10": "10.92.10.20"
       },
@@ -1960,6 +1988,10 @@ systemctl enable --now isoloom-published.service
       "name": "guest",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "office-vlan20": "10.92.20.20"
       },

@@ -1138,6 +1138,10 @@ locals {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.63.0.10"
       },
@@ -1155,6 +1159,10 @@ locals {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "10.63.0.20"
       },

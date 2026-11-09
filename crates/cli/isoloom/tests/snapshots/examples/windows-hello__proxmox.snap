@@ -897,6 +897,10 @@ locals {
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 3072
+      },
       "addresses": {
         "lab": "192.168.57.10"
       },

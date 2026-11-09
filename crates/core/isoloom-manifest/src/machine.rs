@@ -129,7 +129,7 @@ pub struct Network {
     pub native: Option<Template>,
 }
 
-/// A machine's size, when the spec sets one.
+/// A machine's size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resources {
@@ -278,7 +278,9 @@ pub struct Machine {
     /// Its CPU architecture, for the lab's own machines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arch: Option<Arch>,
-    /// Its size, when the spec sets one.
+    /// Its size: a lab machine's as it runs on this target, its `resources` each field they leave
+    /// out the default of its form (a container: 1 CPU, 512 MB; a VM: 1 CPU, 1024 MB); one of
+    /// Isoloom's own, its own size when it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
     /// Its static address on each lab network, by network name (what the status shows).

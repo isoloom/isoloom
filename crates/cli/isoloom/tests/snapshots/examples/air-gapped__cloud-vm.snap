@@ -521,6 +521,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.20"
       },
@@ -538,6 +542,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.10"
       },
@@ -1428,6 +1436,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.20"
       },
@@ -1445,6 +1457,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.10"
       },
@@ -2493,6 +2509,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.20"
       },
@@ -2510,6 +2530,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.10"
       },
@@ -3285,6 +3309,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.20"
       },
@@ -3302,6 +3330,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.10"
       },
@@ -4067,6 +4099,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.20"
       },
@@ -4084,6 +4120,10 @@ output "checks" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "lab": "192.168.62.10"
       },

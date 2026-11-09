@@ -440,6 +440,10 @@ output "ssh_user" {
       "name": "vios",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.1",
         "wan": "10.92.0.2"
@@ -461,6 +465,10 @@ output "ssh_user" {
       "name": "csr",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.1",
         "wan": "10.92.0.3"
@@ -482,6 +490,10 @@ output "ssh_user" {
       "name": "host-a",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.10"
       },
@@ -502,6 +514,10 @@ output "ssh_user" {
       "name": "host-b",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.10"
       },
@@ -1223,6 +1239,10 @@ output "ssh_user" {
       "name": "vios",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.1",
         "wan": "10.92.0.2"
@@ -1244,6 +1264,10 @@ output "ssh_user" {
       "name": "csr",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.1",
         "wan": "10.92.0.3"
@@ -1265,6 +1289,10 @@ output "ssh_user" {
       "name": "host-a",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.10"
       },
@@ -1285,6 +1313,10 @@ output "ssh_user" {
       "name": "host-b",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.10"
       },
@@ -1891,6 +1923,10 @@ output "ssh_user" {
       "name": "vios",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.1",
         "wan": "10.92.0.2"
@@ -1912,6 +1948,10 @@ output "ssh_user" {
       "name": "csr",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.1",
         "wan": "10.92.0.3"
@@ -1933,6 +1973,10 @@ output "ssh_user" {
       "name": "host-a",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.10"
       },
@@ -1953,6 +1997,10 @@ output "ssh_user" {
       "name": "host-b",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.10"
       },
@@ -2663,6 +2711,10 @@ output "ssh_user" {
       "name": "vios",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.1",
         "wan": "10.92.0.2"
@@ -2684,6 +2736,10 @@ output "ssh_user" {
       "name": "csr",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.1",
         "wan": "10.92.0.3"
@@ -2705,6 +2761,10 @@ output "ssh_user" {
       "name": "host-a",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.10"
       },
@@ -2725,6 +2785,10 @@ output "ssh_user" {
       "name": "host-b",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.10"
       },
@@ -3312,6 +3376,10 @@ output "ssh_user" {
       "name": "vios",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.1",
         "wan": "10.92.0.2"
@@ -3333,6 +3401,10 @@ output "ssh_user" {
       "name": "csr",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.1",
         "wan": "10.92.0.3"
@@ -3354,6 +3426,10 @@ output "ssh_user" {
       "name": "host-a",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.10"
       },
@@ -3374,6 +3450,10 @@ output "ssh_user" {
       "name": "host-b",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.10"
       },
@@ -4027,6 +4107,10 @@ output "ssh_user" {
       "name": "vios",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.1",
         "wan": "10.92.0.2"
@@ -4048,6 +4132,10 @@ output "ssh_user" {
       "name": "csr",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.1",
         "wan": "10.92.0.3"
@@ -4069,6 +4157,10 @@ output "ssh_user" {
       "name": "host-a",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-a": "10.92.1.10"
       },
@@ -4089,6 +4181,10 @@ output "ssh_user" {
       "name": "host-b",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "site-b": "10.92.2.10"
       },

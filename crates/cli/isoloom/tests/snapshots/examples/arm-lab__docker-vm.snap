@@ -1055,6 +1055,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "arm64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.60.0.10"
       },
@@ -1733,6 +1737,10 @@ systemctl enable --now isoloom-published.service
       "name": "web",
       "role": "target",
       "arch": "arm64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.60.0.10"
       },

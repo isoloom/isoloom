@@ -570,6 +570,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -598,6 +602,10 @@ output "published" {
       "role": "access",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "users": "10.66.20.10"
       }
@@ -1543,6 +1551,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -1571,6 +1583,10 @@ output "published" {
       "role": "access",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "users": "10.66.20.10"
       }
@@ -2696,6 +2712,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -2724,6 +2744,10 @@ output "published" {
       "role": "access",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "users": "10.66.20.10"
       }
@@ -3594,6 +3618,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -3622,6 +3650,10 @@ output "published" {
       "role": "access",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "users": "10.66.20.10"
       }
@@ -4524,6 +4556,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "servers": "10.66.10.53"
       },
@@ -4552,6 +4588,10 @@ output "published" {
       "role": "access",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "users": "10.66.20.10"
       }

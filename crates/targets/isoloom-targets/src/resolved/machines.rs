@@ -45,7 +45,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Map<String, V
     out.insert("depends_on".into(), json!(m.depends_on));
     out.insert("inputs".into(), json!(m.inputs));
     out.insert("volumes".into(), json!(m.volumes));
-    out.insert("resources".into(), resources(m));
+    out.insert("resources".into(), resources(m, &shapes));
     out.insert("gateway_of".into(), json!(gateway_of(spec, name)));
     out.insert("routes".into(), json!(routes));
     out.insert("default_gateway".into(), json!(default_gateway.map(|a| a.to_string())));
@@ -86,13 +86,17 @@ pub(super) fn add_services(machines: &mut Map<String, Value>, lab: &isoloom_plan
     }
 }
 
-/// The machine's size, the defaults filled in.
-fn resources(m: &Machine) -> Value {
-    json!({
-        "cpus": m.resources.and_then(|r| r.cpus).unwrap_or(isoloom_spec::DEFAULT_CPUS),
-        "memory_mb": m.resources.and_then(|r| r.memory_mb).unwrap_or(isoloom_spec::DEFAULT_MEMORY_MB),
-        "disk_gb": m.resources.and_then(|r| r.disk_gb).unwrap_or(isoloom_spec::DEFAULT_DISK_GB),
-    })
+/// The machine's size in each of its forms (`shapes`): its `resources`, each field they leave
+/// out the default of that form (`isoloom_spec::MachineSize`).
+fn resources(m: &Machine, shapes: &[&str]) -> Value {
+    shapes
+        .iter()
+        .map(|shape| {
+            let s = isoloom_spec::MachineSize::of(m.resources, *shape == "docker");
+            ((*shape).to_owned(), json!({ "cpus": s.cpus, "memory_mb": s.memory_mb, "disk_gb": s.disk_gb }))
+        })
+        .collect::<Map<String, Value>>()
+        .into()
 }
 
 /// The networks the machine is the gateway of.

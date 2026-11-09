@@ -419,6 +419,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "app": "10.80.0.10"
       },
@@ -1077,6 +1081,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "app": "10.80.0.10"
       },
@@ -1680,6 +1688,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "app": "10.80.0.10"
       },
@@ -2313,6 +2325,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "app": "10.80.0.10"
       },
@@ -2852,6 +2868,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "app": "10.80.0.10"
       },
@@ -3625,6 +3645,10 @@ output "published" {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "app": "10.80.0.10"
       },

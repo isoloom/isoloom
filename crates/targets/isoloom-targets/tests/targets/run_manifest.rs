@@ -487,3 +487,43 @@ fn checks_run_from_a_linux_vm_or_the_controller_on_proxmox_as_on_the_clouds() ->
     );
     Ok(())
 }
+
+#[test]
+fn a_machines_size_follows_one_rule_on_every_target_and_in_the_snapshot() -> Outcome {
+    // A machine that is a container or a VM, and says nothing of its size.
+    let lab = lab(
+        "version: 1\nname: sized\nnetworks: { lan: { cidr: 10.73.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: 10 }, app: { image: nginx, steps: [{ run: p.sh }] } }\n",
+    )?;
+    let size = |target: Target, path: &str| -> Outcome<(Option<u32>, Option<u32>)> {
+        let m = run_json(&generate(&lab, target)?, path)?;
+        let web = m.machines.iter().find(|x| x.name.as_str() == "web").ok_or("no web")?;
+        let r = web.resources.ok_or("no resources")?;
+        Ok((r.cpus, r.memory_mb))
+    };
+    let container = isoloom_spec::MachineSize::of(None, true);
+    let vm = isoloom_spec::MachineSize::of(None, false);
+    assert_eq!(
+        size(Target::Docker, ".isoloom/docker/run.json")?,
+        (Some(container.cpus), Some(container.memory_mb))
+    );
+    for (target, path) in [
+        (Target::Vagrant, ".isoloom/vagrant/run.json"),
+        (Target::Proxmox, ".isoloom/proxmox/run.json"),
+        (Target::CloudVm, ".isoloom/cloud-vm/aws/run.json"),
+    ] {
+        assert_eq!(size(target, path)?, (Some(vm.cpus), Some(vm.memory_mb)), "{path}");
+    }
+    // The snapshot gives its size in each form, as the totals count them.
+    let snapshot = isoloom_targets::resolved::resolve(&lab);
+    let of = |form: &str| {
+        snapshot
+            .pointer(&format!("/machines/web/resources/{form}/memory_mb"))
+            .and_then(serde_json::Value::as_u64)
+    };
+    assert_eq!((of("docker"), of("vm")), (Some(u64::from(container.memory_mb)), Some(u64::from(vm.memory_mb))));
+    assert_eq!(
+        isoloom_spec::totals_for(&lab.for_target(Target::Docker), Target::Docker).memory_mb,
+        container.memory_mb
+    );
+    Ok(())
+}

@@ -424,6 +424,10 @@ output "ssh_user" {
       "name": "bench",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.10"
       },
@@ -435,6 +439,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.11"
       },
@@ -1129,6 +1137,10 @@ output "ssh_user" {
       "name": "bench",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.10"
       },
@@ -1140,6 +1152,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.11"
       },
@@ -1719,6 +1735,10 @@ output "ssh_user" {
       "name": "bench",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.10"
       },
@@ -1730,6 +1750,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.11"
       },
@@ -2413,6 +2437,10 @@ output "ssh_user" {
       "name": "bench",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.10"
       },
@@ -2424,6 +2452,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.11"
       },
@@ -2984,6 +3016,10 @@ output "ssh_user" {
       "name": "bench",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.10"
       },
@@ -2995,6 +3031,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.11"
       },
@@ -3621,6 +3661,10 @@ output "ssh_user" {
       "name": "bench",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.10"
       },
@@ -3632,6 +3676,10 @@ output "ssh_user" {
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.90.0.11"
       },

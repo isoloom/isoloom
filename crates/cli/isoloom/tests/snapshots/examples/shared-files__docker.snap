@@ -582,6 +582,10 @@ volumes:
       "name": "writer",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.10"
       },
@@ -614,6 +618,10 @@ volumes:
       "name": "reader",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.11"
       },
@@ -1037,7 +1045,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 3,
+  "resolved_version": 4,
   "name": "shared-files",
   "instance": null,
   "inputs": [],
@@ -1078,9 +1086,16 @@ volumes:
         "shared": "/srv/shared"
       },
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [],
@@ -1113,9 +1128,16 @@ volumes:
         "shared": "/data/shared"
       },
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [],

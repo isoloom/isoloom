@@ -431,6 +431,10 @@ output "ssh_user" {
       "name": "writer",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.10"
       },
@@ -463,6 +467,10 @@ output "ssh_user" {
       "name": "reader",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.11"
       },
@@ -1263,6 +1271,10 @@ output "ssh_user" {
       "name": "writer",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.10"
       },
@@ -1295,6 +1307,10 @@ output "ssh_user" {
       "name": "reader",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.11"
       },
@@ -1980,6 +1996,10 @@ output "ssh_user" {
       "name": "writer",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.10"
       },
@@ -2012,6 +2032,10 @@ output "ssh_user" {
       "name": "reader",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.11"
       },
@@ -2801,6 +2825,10 @@ output "ssh_user" {
       "name": "writer",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.10"
       },
@@ -2833,6 +2861,10 @@ output "ssh_user" {
       "name": "reader",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.11"
       },
@@ -3499,6 +3531,10 @@ output "ssh_user" {
       "name": "writer",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.10"
       },
@@ -3531,6 +3567,10 @@ output "ssh_user" {
       "name": "reader",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.11"
       },
@@ -4263,6 +4303,10 @@ output "ssh_user" {
       "name": "writer",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.10"
       },
@@ -4295,6 +4339,10 @@ output "ssh_user" {
       "name": "reader",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "app": "10.84.0.11"
       },

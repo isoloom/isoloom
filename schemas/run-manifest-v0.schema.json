@@ -1317,7 +1317,7 @@
               "type": "null"
             }
           ],
-          "description": "Its size, when the spec sets one."
+          "description": "Its size: a lab machine's as it runs on this target, its `resources` each field they leave out the default of its form (a container: 1 CPU, 512 MB; a VM: 1 CPU, 1024 MB); one of Isoloom's own, its own size when it has one."
         },
         "addresses": {
           "type": "object",
@@ -1449,7 +1449,7 @@
           "description": "Memory, in MB."
         }
       },
-      "description": "A machine's size, when the spec sets one."
+      "description": "A machine's size."
     },
     "Native": {
       "type": "object",

@@ -427,6 +427,10 @@ output "ssh_user" {
       "name": "store",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.20"
       },
@@ -446,6 +450,10 @@ output "ssh_user" {
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.10"
       },
@@ -1196,6 +1204,10 @@ output "ssh_user" {
       "name": "store",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.20"
       },
@@ -1215,6 +1227,10 @@ output "ssh_user" {
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.10"
       },
@@ -1850,6 +1866,10 @@ output "ssh_user" {
       "name": "store",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.20"
       },
@@ -1869,6 +1889,10 @@ output "ssh_user" {
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.10"
       },
@@ -2608,6 +2632,10 @@ output "ssh_user" {
       "name": "store",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.20"
       },
@@ -2627,6 +2655,10 @@ output "ssh_user" {
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.10"
       },
@@ -3243,6 +3275,10 @@ output "ssh_user" {
       "name": "store",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.20"
       },
@@ -3262,6 +3298,10 @@ output "ssh_user" {
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.10"
       },
@@ -3944,6 +3984,10 @@ output "ssh_user" {
       "name": "store",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.20"
       },
@@ -3963,6 +4007,10 @@ output "ssh_user" {
       "name": "app",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lab": "10.62.0.10"
       },

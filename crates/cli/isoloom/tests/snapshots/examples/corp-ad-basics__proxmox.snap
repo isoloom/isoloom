@@ -1441,6 +1441,10 @@ locals {
       "os": "windows-server-2022",
       "windows": true,
       "arch": "amd64",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 4096
+      },
       "addresses": {
         "corp": "10.40.20.5"
       },
@@ -1477,6 +1481,10 @@ locals {
       "os": "windows-11",
       "windows": true,
       "arch": "amd64",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 4096
+      },
       "addresses": {
         "corp": "10.40.20.21"
       }
@@ -1487,6 +1495,10 @@ locals {
       "os": "windows-11",
       "windows": true,
       "arch": "amd64",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 4096
+      },
       "addresses": {
         "corp": "10.40.20.22"
       }
@@ -1496,6 +1508,10 @@ locals {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "corp": "10.40.20.10",
         "dmz": "10.40.10.10"
@@ -1513,6 +1529,10 @@ locals {
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "access": "10.40.99.10"
       }

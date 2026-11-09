@@ -600,6 +600,10 @@ resource "local_file" "isoloom_project" {
       "os": "windows-server-2022",
       "windows": true,
       "arch": "amd64",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 3072
+      },
       "addresses": {
         "lab": "10.67.0.10"
       },
@@ -1494,6 +1498,10 @@ resource "local_file" "isoloom_project" {
       "os": "windows-server-2022",
       "windows": true,
       "arch": "amd64",
+      "resources": {
+        "cpus": 2,
+        "memory_mb": 3072
+      },
       "addresses": {
         "lab": "10.67.0.10"
       },

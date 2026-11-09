@@ -939,6 +939,10 @@ volumes:
       "name": "fw",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.70.10.1",
         "lan": "10.70.20.1",
@@ -969,6 +973,10 @@ volumes:
       "name": "web",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "dmz": "10.70.10.10"
       },
@@ -997,6 +1005,10 @@ volumes:
       "name": "cache",
       "role": "target",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "lan": "10.70.20.20"
       },
@@ -1025,6 +1037,10 @@ volumes:
       "name": "user",
       "role": "access",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 512
+      },
       "addresses": {
         "outside": "10.70.0.10"
       },
@@ -1570,7 +1586,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 3,
+  "resolved_version": 4,
   "name": "edge-firewall",
   "instance": null,
   "inputs": [],
@@ -1651,9 +1667,16 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [
         "dmz",
@@ -1692,9 +1715,16 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [
@@ -1735,9 +1765,16 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [
@@ -1773,9 +1810,16 @@ volumes:
       "inputs": [],
       "volumes": {},
       "resources": {
-        "cpus": 1,
-        "memory_mb": 1024,
-        "disk_gb": 20
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
       },
       "gateway_of": [],
       "routes": [

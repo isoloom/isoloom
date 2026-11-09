@@ -1278,6 +1278,10 @@ locals {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "back": "10.61.20.20"
       },
@@ -1295,6 +1299,10 @@ locals {
       "role": "target",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "front": "10.61.10.10"
       },
@@ -1318,6 +1326,10 @@ locals {
       "role": "access",
       "os": "debian-12",
       "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
       "addresses": {
         "access": "10.61.99.10"
       }
