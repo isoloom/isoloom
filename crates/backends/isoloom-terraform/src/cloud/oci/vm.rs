@@ -25,7 +25,7 @@ mod published;
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, index, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::{SHAPE, availability_domain, availability_domains, owned, provider, ubuntu_images};
@@ -251,6 +251,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
         .add_block(vnic)
         .add_blocks(disks::oci(name, &mp.disks))
         .add_attribute(("metadata", metadata))
+        .add_block(hooks::set_up_once(entry(reference("metadata"), "user_data")).build())
         .build()
 }
 

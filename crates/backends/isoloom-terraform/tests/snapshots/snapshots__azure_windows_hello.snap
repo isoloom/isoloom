@@ -359,6 +359,9 @@ resource "azurerm_linux_virtual_machine" "isoloom_controller" {
     sku       = "12-gen2"
     version   = "latest"
   }
+  lifecycle {
+    ignore_changes = [custom_data]
+  }
 }
 
 output "machines" {

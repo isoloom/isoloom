@@ -238,6 +238,9 @@ resource "azurerm_linux_virtual_machine" "cache" {
     sku       = "12-gen2"
     version   = "latest"
   }
+  lifecycle {
+    ignore_changes = [custom_data]
+  }
 }
 
 # Machine `web`: what may reach it.
@@ -355,6 +358,9 @@ resource "azurerm_linux_virtual_machine" "web" {
     sku       = "12-gen2"
     version   = "latest"
   }
+  lifecycle {
+    ignore_changes = [custom_data]
+  }
 }
 
 # Machine `user`: what may reach it.
@@ -460,6 +466,9 @@ resource "azurerm_linux_virtual_machine" "user" {
     offer     = "debian-12"
     sku       = "12-gen2"
     version   = "latest"
+  }
+  lifecycle {
+    ignore_changes = [custom_data]
   }
 }
 

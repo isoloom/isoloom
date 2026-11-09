@@ -171,6 +171,9 @@ resource "google_compute_instance" "web" {
     isoloom-instance    = local.name
     isoloom-expires-at  = var.expires_at
   }
+  lifecycle {
+    ignore_changes = [metadata_startup_script]
+  }
 }
 
 output "machines" {

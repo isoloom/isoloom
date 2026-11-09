@@ -41,9 +41,11 @@ stable spec format.
 - **Compose's start removes the services the lab no longer has** (`up --remove-orphans`), on this
   computer and in a VM: a machine taken out of a lab, then the run brought up to date, goes.
   Services behind a profile that isn't started are still the file's, so they stay.
-- **An AWS machine sets itself up once, from its first boot's user data.** Its instance ignores
-  later changes to its user data (`lifecycle { ignore_changes }`): a later apply without the
-  launch's values, which a run never keeps, no longer stops and restarts it to change them.
+- **A `cloud-vm` machine sets itself up once, from its first boot's user data.** Its instance
+  ignores later changes to its user data (`lifecycle { ignore_changes }`): a later apply without
+  the launch's values, which a run never keeps, no longer stops and restarts it to change them
+  (AWS) or replaces it with a new VM (Azure's `custom_data`, GCP's `metadata_startup_script`,
+  DigitalOcean's `user_data`, Oracle Cloud's `metadata["user_data"]`). Linode's is unchanged.
 - **A `cloud-vm` Linux machine is named after itself**, as on every other target, not after its
   address or its image (Kali's names itself `kali`); kept through a reboot.
 - **A refusal for an OS AWS has no image of lists the ones it has from its image table**, Kali

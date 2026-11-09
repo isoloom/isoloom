@@ -149,7 +149,8 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.fingerprint")])))
         .add_attribute(("user_data", hooks::user_data(env, (name, mp), USER, Vec::new())))
-        .add_attribute(("tags", tag_list(env)));
+        .add_attribute(("tags", tag_list(env)))
+        .add_block(hooks::set_up_once(reference("user_data")).build());
     if !mp.disks.is_empty() {
         droplet = droplet.add_attribute(("volume_ids", disks::digitalocean_ids(name, &mp.disks)));
     }

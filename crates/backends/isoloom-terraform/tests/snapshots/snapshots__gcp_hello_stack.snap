@@ -192,6 +192,9 @@ resource "google_compute_instance" "cache" {
     isoloom-instance    = local.name
     isoloom-expires-at  = var.expires_at
   }
+  lifecycle {
+    ignore_changes = [metadata_startup_script]
+  }
 }
 
 # Machine `web`: what may reach it.
@@ -285,6 +288,9 @@ resource "google_compute_instance" "web" {
     managed-by          = "isoloom"
     isoloom-instance    = local.name
     isoloom-expires-at  = var.expires_at
+  }
+  lifecycle {
+    ignore_changes = [metadata_startup_script]
   }
 }
 

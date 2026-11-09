@@ -233,7 +233,8 @@ fn instance(i: &Instance) -> Block {
         .add_blocks(nics)
         .add_attribute(("metadata", object([("ssh-keys", key.into_expression())])))
         .add_attribute(("metadata_startup_script", i.setup.clone()))
-        .add_attribute(("labels", tags(i.env)));
+        .add_attribute(("labels", tags(i.env)))
+        .add_block(hooks::set_up_once(reference("metadata_startup_script")).build());
     let b = if i.on.1 { b.add_attribute(("can_ip_forward", boolean(true))) } else { b };
     hardware(b, i).build()
 }

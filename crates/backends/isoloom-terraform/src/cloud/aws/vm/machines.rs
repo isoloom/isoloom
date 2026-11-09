@@ -74,17 +74,14 @@ fn root_disk_gb(mp: &MachinePlan) -> u32 {
     wanted.max(image)
 }
 
-/// The instance's one `lifecycle` block (Terraform takes no second).
-///
-/// A machine sets itself up once, at its first boot, from its user data (`attribute`): a later
-/// apply with other values in it (the launch's inputs, which a run never keeps) leaves a machine
-/// that runs alone, where AWS would stop and start it to change the attribute.
+/// The instance's one `lifecycle` block (Terraform takes no second): set up once from its user
+/// data (`attribute`, [`hooks::set_up_once`]).
 ///
 /// A TPM on AWS is NitroTPM, which the AMI enables (`tpm_support`): with `tpm_ami`, the looked-up
 /// AMI of a machine that asks for one, the plan stops when the image has none rather than start
 /// a VM without.
 fn lifecycle(attribute: &str, tpm_ami: Option<&str>) -> Block {
-    let block = Block::builder("lifecycle").add_attribute(("ignore_changes", list([reference(attribute)])));
+    let block = hooks::set_up_once(reference(attribute));
     let Some(ami) = tpm_ami else { return block.build() };
     let condition = binary(reference(&format!("data.aws_ami.{ami}.tpm_support")), BinaryOperator::Eq, string("v2.0"));
     let precondition = Block::builder("precondition")

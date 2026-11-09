@@ -3,7 +3,7 @@
 //! and the machine's user data, the set-up it runs itself (`crate::machine::user_data`).
 
 use isoloom_plan::{Environment, MachinePlan, Step};
-use isoloom_render::hcl_builder::{Expression, Template};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Template, list};
 
 use crate::machine::linux::{self, Hooks};
 use crate::machine::user_data;
@@ -25,6 +25,17 @@ pub(crate) fn of(mp: &MachinePlan, at_boot: Vec<Template>) -> Hooks {
 pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>) -> Expression {
     let hooks = of(machine.1, at_boot);
     user_data::expression(&linux::set_up(env, machine, user, &hooks))
+}
+
+/// The `lifecycle` of a machine that sets itself up once, at its first boot, from its user data
+/// (`attribute`, as `ignore_changes` names it): a later apply with other values in it (the
+/// launch's inputs, which a run never keeps) leaves the machine as it is, where the cloud would
+/// replace it (Azure's `custom_data`, GCP's `metadata_startup_script`, DigitalOcean's
+/// `user_data`, Oracle Cloud's `metadata["user_data"]`: each forces a new VM) or stop and start it
+/// (AWS). Linode's isn't ignored: whether its provider replaces an instance whose metadata
+/// changed isn't settled here.
+pub(crate) fn set_up_once(attribute: Expression) -> BlockBuilder {
+    Block::builder("lifecycle").add_attribute(("ignore_changes", list([attribute])))
 }
 
 /// The steps a cloud's network does itself: it routes between its subnets, each VLAN its own.

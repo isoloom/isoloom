@@ -99,7 +99,9 @@ fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk
                 .build(),
         )
         .add_block(os_disk(disk));
-    with_image(vm, (os, own), tpm).build()
+    with_image(vm, (os, own), tpm)
+        .add_block(hooks::set_up_once(reference("custom_data")).build())
+        .build()
 }
 
 /// Trusted launch, when the VM has a TPM: a virtual TPM and secure boot (on a generation 2 image).
