@@ -7,7 +7,7 @@
 //! - [`recipe()`]: a machine's steps resolved for its family ([`Family`]), or the steps the family
 //!   can't carry at all ([`Unportable`]: a repository on Windows, a Windows file's ACL).
 //! - [`ContainerProcess`]: what its container runs, or why it can't ([`NoProcess`]).
-//! - [`DaemonTable`]: the daemons' units and foreground forms; [`unstarted()`]: the daemons a
+//! - [`DaemonTable`]: the daemons' units and foreground forms; `unstarted()`: the daemons a
 //!   recipe installs and no step starts.
 //! - [`fill`]: a template's placeholders filled in for one machine on one target.
 //!
@@ -30,4 +30,5 @@ pub use resources::{
     TemplatePlan, UserPlan,
 };
 pub use template::{Context, fill};
-pub use unstarted::{Unstarted, unstarted};
+pub use unstarted::Unstarted;
+pub(crate) use unstarted::unstarted;

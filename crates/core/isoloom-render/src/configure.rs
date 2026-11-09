@@ -119,7 +119,7 @@ pub(crate) fn compact(library: &str) -> String {
 
 /// Where template `from` of machine `machine`, filled in, is generated for its image's build.
 #[must_use]
-pub fn rendered_path(machine: &str, from: &ProjectPath) -> String {
+pub(crate) fn rendered_path(machine: &str, from: &ProjectPath) -> String {
     format!("{DIR}/{machine}/rendered/{from}")
 }
 
@@ -142,7 +142,7 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
 
 /// Whether a recipe has a step its library runs (not only scripts, reboots and playbooks).
 #[must_use]
-pub fn uses_library(recipe: &Recipe) -> bool {
+pub(crate) fn uses_library(recipe: &Recipe) -> bool {
     recipe
         .resources()
         .any(|r| !matches!(r, Resource::Run(_) | Resource::Reboot | Resource::Playbook(_)))

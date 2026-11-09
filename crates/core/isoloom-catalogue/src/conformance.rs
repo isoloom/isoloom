@@ -11,5 +11,5 @@
 mod lab;
 mod verdict;
 
-pub use lab::{ConformanceLab, FACT_PREFIX, LabError, MACHINE, PROBE};
+pub use lab::{ConformanceLab, LabError, MACHINE, PROBE};
 pub use verdict::{CaseVerdict, CheckOutcome, CheckVerdict, FactVerdict, Form, Run, verdict};

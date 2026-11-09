@@ -278,7 +278,7 @@ fn host_line(h: &Host<'_>, access: &Access<'_>) -> String {
 /// A value on a host line: Ansible splits the line like a shell, so a value with a space, a
 /// quote or a comment character is single-quoted; a plain one is written as is.
 #[must_use]
-pub fn host_value(v: &str) -> String {
+pub(crate) fn host_value(v: &str) -> String {
     let plain = !v.is_empty() && !v.chars().any(|c| c.is_whitespace() || matches!(c, '\'' | '"' | '\\' | '#' | ';'));
     if plain { v.to_owned() } else { single_quoted(v) }
 }

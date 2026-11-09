@@ -3,7 +3,7 @@
 //! waits for; each file is then written at its path with the same two readers and nobody else.
 //!
 //! The values come on the connection's standard input (WinRM's or OpenSSH's), after the
-//! receiving script itself: the command line the runner starts is [`BOOTSTRAP`], the same
+//! receiving script itself: the command line the runner starts is `BOOTSTRAP`, the same
 //! for every machine, which reads the script's first line and runs it. Nothing of a value is
 //! in a command line, a generated file or the output.
 //!
@@ -29,7 +29,7 @@ const PLACE_TASK: &str = "isoloom-apply-secrets";
 /// What the runner starts on the machine (as `powershell -EncodedCommand`): it reads the
 /// first line of its standard input, the receiving script in base64, and runs it. The script
 /// reads the values from the lines that follow.
-pub const BOOTSTRAP: &str = "$s = [Console]::In.ReadLine(); Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($s)))";
+pub(crate) const BOOTSTRAP: &str = "$s = [Console]::In.ReadLine(); Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($s)))";
 
 /// Limits a file or folder to SYSTEM (S-1-5-18) and Administrators (S-1-5-32-544), nothing
 /// inherited: a new access list replaces whatever the path had.
@@ -85,7 +85,7 @@ pub fn place(files: &[SecretFile]) -> String {
 }
 
 /// Waits for the delivery mark, saying so once; fails after
-/// [`DELIVERY_TIMEOUT`](super::DELIVERY_TIMEOUT) seconds with what to do.
+/// `DELIVERY_TIMEOUT` seconds with what to do.
 #[must_use]
 pub fn wait(who: &str) -> String {
     let (waiting, missing) = super::messages(who);
@@ -145,14 +145,14 @@ pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> St
 /// The line a `before` or command script starts with on a machine that gets secrets: the files
 /// put in place first, whichever startup task Windows ran first.
 #[must_use]
-pub fn place_first() -> String {
+pub(crate) fn place_first() -> String {
     format!(
         "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
         powershell::quote(PLACE_SCRIPT)
     )
 }
 
-/// The arguments of `powershell.exe` running [`BOOTSTRAP`], encoded (UTF-16LE in base64) so
+/// The arguments of `powershell.exe` running `BOOTSTRAP`, encoded (UTF-16LE in base64) so
 /// that no remote shell (cmd, PowerShell) reads anything into it.
 #[must_use]
 pub fn powershell_args() -> Vec<String> {

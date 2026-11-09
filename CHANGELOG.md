@@ -171,6 +171,20 @@ stable spec format.
 - **`isoloom_targets::matrix::Row::is_field`**, which only the matrix's own tests called.
 - **`isoloom_manifest::access::DEFAULT_IMAGE`** (Kali's image), which nothing could reach: an
   access machine's Compose service always has its planned image to fall back on.
+- **More items only their own crate used**, now crate-internal (nothing outside it, Isoloom's
+  consumers included, named them): `isoloom_ansible::configure::role_name`,
+  `isoloom_catalogue::{Catalogue::shared_daemons, ContractCheck::runs_in, Release::os_list,
+  Release::runs_on, conformance::FACT_PREFIX}`, `isoloom_plan::{DaemonTable::shipped_by,
+  configure::unstarted, checks::HTTP_MAX_REDIRECTS}`, `isoloom_manifest::SUPPORTED_VERSION`,
+  `isoloom_render::{configure::{rendered_path, uses_library, cloud_init::gz_b64},
+  constraints::linux_prelude, inventory::host_value, ipv6::egress_rule, trunks::vm_commands,
+  secrets::{DELIVERY_TIMEOUT, PLACE_SERVICE, windows::{BOOTSTRAP, place_first}},
+  hcl_builder::WIDTH}`, `isoloom_spec::{Host::text_vars, model::{mapping_id, DEFAULT_FILE_MODE,
+  SECRETS_DIR, TOOL_RECIPES, ULIMITS}, syntax::placeholder::Reference::is_run_time, validate::{DOCKER_BLOCK,
+  CONTAINER_SYSCTLS}}` and `isoloom_targets::{Matrix::column_tiers,
+  resolved::with_published}`; `Row::used_by` is the matrix tests' only. The cloud user-data caps
+  (`isoloom_render::configure::cloud_init::{Limit, TooBig}`) moved into `isoloom-terraform`,
+  crate-internal.
 
 ## [1.0.9] — 2026-11-08
 

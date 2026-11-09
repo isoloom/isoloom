@@ -7,7 +7,7 @@
 //! - containers: the machines (never Isoloom's own checks or router) get the proxy and the
 //!   package mirrors as environment variables ([`machine_env`]), their builds the proxy as build
 //!   arguments ([`build_args`]);
-//! - Linux VMs: a shell preamble run as root before anything else ([`linux_prelude`]) sets the
+//! - Linux VMs: a shell preamble run as root before anything else (`linux_prelude`) sets the
 //!   proxy for the shell, apt, dnf and Docker, rewrites the apt sources to the mirrors, writes
 //!   pip's and npm's configuration and the time servers.
 
@@ -92,7 +92,7 @@ pub fn build_args(spec: &Spec) -> Vec<(String, String)> {
 /// The shell (run as root, idempotent) that applies the constraints on a Linux VM, before its
 /// own set-up and steps. `None` when the spec has none.
 #[must_use]
-pub fn linux_prelude(spec: &Spec) -> Option<String> {
+pub(crate) fn linux_prelude(spec: &Spec) -> Option<String> {
     let c = of(spec)?;
     let mirrors = c.mirrors.as_ref().map(mirror_lines).unwrap_or_default();
     Some(format!("set -e\n{}{mirrors}{}", proxy(spec, c), ntp(&c.ntp)))

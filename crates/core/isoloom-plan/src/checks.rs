@@ -89,7 +89,7 @@ pub struct HttpRequest {
     pub body: Option<String>,
     /// Text the response body must contain.
     pub contains: Option<String>,
-    /// Follow redirects (up to [`HTTP_MAX_REDIRECTS`]) and compare the final status.
+    /// Follow redirects (up to `HTTP_MAX_REDIRECTS`) and compare the final status.
     pub follow: bool,
 }
 
@@ -102,7 +102,7 @@ impl HttpRequest {
 
 /// How many redirects an `http` check with `follow` goes through before giving up (the status
 /// compared is then that of the last answer, a redirect).
-pub const HTTP_MAX_REDIRECTS: u32 = 5;
+pub(crate) const HTTP_MAX_REDIRECTS: u32 = 5;
 
 /// What a `tcp` check writes and reads beyond connecting (both optional; `send` needs `contains`).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

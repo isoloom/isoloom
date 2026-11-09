@@ -45,7 +45,7 @@ pub struct HostPort {
 }
 
 /// [`render_message_on`] with the host ports the environment really got, so
-/// `{{ machines.web.ports.site.published }}` says where it answers (see [`with_published`]).
+/// `{{ machines.web.ports.site.published }}` says where it answers (see `with_published`).
 ///
 /// # Errors
 ///
@@ -58,7 +58,7 @@ pub fn render_message_at(lab: &Lab, instance: Option<u8>, target: Target, publis
 /// The snapshot with the host ports the environment really got: each port's `published` and
 /// `url`, and the `published` list's `host_port`.
 #[must_use]
-pub fn with_published(mut snapshot: Value, published: &[HostPort]) -> Value {
+pub(crate) fn with_published(mut snapshot: Value, published: &[HostPort]) -> Value {
     for HostPort { machine, port, host } in published {
         let entry = snapshot
             .pointer_mut(&format!("/machines/{machine}/ports/{port}"))

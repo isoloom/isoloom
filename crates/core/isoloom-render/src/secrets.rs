@@ -27,10 +27,10 @@ pub const DELIVERED: &str = "/var/lib/isoloom/secrets/.delivered";
 /// runs (the module's outputs come only once every set-up is done) and delivers there.
 pub const REACH_DIR: &str = ".isoloom-reach";
 /// Seconds the set-up waits for the runner to deliver the secrets.
-pub const DELIVERY_TIMEOUT: u32 = 1800;
+pub(crate) const DELIVERY_TIMEOUT: u32 = 1800;
 /// The boot service putting the secrets back in place (`/run` is emptied at every boot). Its
 /// name sorts before `before` and `command`, the order OpenRC runs `/etc/local.d` in.
-pub const PLACE_SERVICE: &str = "apply-secrets";
+pub(crate) const PLACE_SERVICE: &str = "apply-secrets";
 
 /// The script the runner runs as root on the machine. Its standard input holds one line per
 /// secret of `names`, in that order, each value in base64 (so any text fits on one line); the
@@ -72,7 +72,7 @@ pub fn place(files: &[SecretFile]) -> String {
         .concat()
 }
 
-/// Waits for the delivery mark, saying so once; fails after [`DELIVERY_TIMEOUT`] seconds with
+/// Waits for the delivery mark, saying so once; fails after `DELIVERY_TIMEOUT` seconds with
 /// what to do. `who` names the machine in the messages.
 #[must_use]
 pub fn wait(who: &str) -> String {

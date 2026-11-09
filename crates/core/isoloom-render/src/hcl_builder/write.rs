@@ -12,7 +12,7 @@ use hcl::{Block, BlockLabel, Body, Structure};
 use super::escape::{quoted_inside, strings_escaped};
 
 /// A list, an object or a call longer than this, on one line, is written across lines.
-pub const WIDTH: usize = 100;
+pub(crate) const WIDTH: usize = 100;
 
 /// A Terraform file: its preamble (comment lines), then top-level blocks, each with the comment
 /// above it.

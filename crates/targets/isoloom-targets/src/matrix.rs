@@ -15,9 +15,10 @@ mod probe;
 mod render;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
 mod uses;
 
-use isoloom_plan::{Environment, Feature, Lab};
+use isoloom_plan::{Feature, Lab};
 use isoloom_spec::model::Target;
 use serde_yaml_ng::Value;
 
@@ -67,7 +68,7 @@ pub enum Cell {
     NotApplicable,
 }
 
-/// A spec as its author wrote it, read as YAML: what [`Row::used_by`] looks into.
+/// A spec as its author wrote it, read as YAML: what `Row::used_by` looks into.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Authored(Value);
 
@@ -92,13 +93,13 @@ impl Row {
     /// Whether the spec `written` (whose lab is `lab`) uses the row on `target`: the row's
     /// field written in it (with its value, its count, the fields beside it), or, for a row
     /// about a combination the spec's text can't show, one of its features among what the lab
-    /// requires of `target`.
-    #[must_use]
-    pub fn used_by(&self, written: &Authored, lab: &Lab, target: Target) -> bool {
+    /// requires of `target`. The examples' check reads it (`examples`).
+    #[cfg(test)]
+    fn used_by(&self, written: &Authored, lab: &Lab, target: Target) -> bool {
         match &self.uses {
             Uses::Written(w) => uses::written_in(w, &written.0),
             Uses::Features => {
-                let env = Environment::build(&lab.for_target(target), target, None);
+                let env = isoloom_plan::Environment::build(&lab.for_target(target), target, None);
                 env.requirements.iter().any(|r| self.features.contains(&r.feature()))
             }
             Uses::Refusal => lab.refusal(target).is_some_and(|p| uses::path_matches(&self.field, p.path.as_str())),
@@ -199,7 +200,7 @@ impl Matrix {
     /// The tiers of `column`: its entry's, or every entry's of its target when it stands for
     /// them all (`docker-vm`), each tier once, lowest first.
     #[must_use]
-    pub fn column_tiers(&self, column: &Column) -> Vec<crate::tiers::Tier> {
+    pub(crate) fn column_tiers(&self, column: &Column) -> Vec<crate::tiers::Tier> {
         let mut found: Vec<_> = self
             .tiers
             .iter()

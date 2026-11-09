@@ -109,7 +109,7 @@ pub const PRIVATE: [Cidr; 3] = [
 
 /// Where the Docker target keeps its networks: 172.16.0.0/12 and 192.168.0.0/16 clash with
 /// Docker's own pools, Docker Desktop's network and home LANs.
-pub const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
+pub(crate) const DOCKER_BLOCK: Cidr = Cidr { base: 0x0a00_0000, len: 8 };
 
 /// Each network's block on the Docker target: its `docker.cidr` when set; its `cidr` when it's
 /// inside 10.0.0.0/8 or outside the environment (`external`, `bridged`); otherwise moved there

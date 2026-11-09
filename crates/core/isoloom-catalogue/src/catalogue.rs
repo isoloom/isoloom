@@ -147,7 +147,7 @@ impl Catalogue {
 
     /// The daemons no entry owns (`daemons.yml`).
     #[must_use]
-    pub fn shared_daemons(&self) -> &IndexMap<UnitName, Daemon> {
+    pub(crate) fn shared_daemons(&self) -> &IndexMap<UnitName, Daemon> {
         &self.daemons
     }
 

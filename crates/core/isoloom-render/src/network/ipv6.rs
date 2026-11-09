@@ -57,7 +57,7 @@ pub fn router_linux(addresses: &[(Ipv4Addr, Ipv6Addr)]) -> Option<String> {
 /// The egress ruleset's IPv6 line, as one more quoted `printf` argument (empty without IPv6
 /// networks): no new connection to an address outside the environment's IPv6 blocks.
 #[must_use]
-pub fn egress_rule(env: &Environment) -> String {
+pub(crate) fn egress_rule(env: &Environment) -> String {
     let blocks: Vec<&str> = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| v.cidr.as_str()).collect();
     if blocks.is_empty() {
         return String::new();

@@ -76,7 +76,7 @@ impl Virtiofs {
 /// Whether `id` can name a Proxmox directory mapping: a letter, then letters, digits, `-` and
 /// `_` (Proxmox's configuration ids), at most 64.
 #[must_use]
-pub fn mapping_id(id: &str) -> bool {
+pub(crate) fn mapping_id(id: &str) -> bool {
     id.len() <= 64 && id.starts_with(|c: char| c.is_ascii_alphabetic()) && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }
 

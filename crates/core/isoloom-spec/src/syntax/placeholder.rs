@@ -120,7 +120,7 @@ pub enum Place {
 impl Reference {
     /// Whether its value is only known once the lab runs (a published port, a URL).
     #[must_use]
-    pub fn is_run_time(&self) -> bool {
+    pub(crate) fn is_run_time(&self) -> bool {
         matches!(
             self,
             Reference::Port {

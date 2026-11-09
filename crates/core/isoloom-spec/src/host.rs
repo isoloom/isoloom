@@ -41,7 +41,7 @@ impl Host {
 
     /// The variables whose name and value are text, in name order.
     #[must_use]
-    pub fn text_vars(&self) -> Vec<(String, String)> {
+    pub(crate) fn text_vars(&self) -> Vec<(String, String)> {
         let mut out: Vec<(String, String)> = self
             .vars
             .iter()

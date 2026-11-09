@@ -100,7 +100,7 @@ impl DaemonTable {
 
     /// The daemon package `package` ships on `family`, when it ships one.
     #[must_use]
-    pub fn shipped_by(&self, package: &PackageName, family: Family) -> Option<(&DaemonEntry, &FamilyDaemon)> {
+    pub(crate) fn shipped_by(&self, package: &PackageName, family: Family) -> Option<(&DaemonEntry, &FamilyDaemon)> {
         self.entries.iter().find_map(|e| {
             let form = e.forms.iter().find(|f| f.family == family && f.package.as_ref() == Some(package))?;
             Some((e, form))

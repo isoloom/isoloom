@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// The mode a file gets when the spec gives none: readable by everyone, written by its owner.
-pub const DEFAULT_FILE_MODE: &str = "0644";
+pub(crate) const DEFAULT_FILE_MODE: &str = "0644";
 
 /// A file placed on the machine before its workload runs: a container gets it from its runtime
 /// (a Compose config, a Kubernetes ConfigMap), a VM from its set-up. On Compose, a project file

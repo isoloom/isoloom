@@ -69,7 +69,7 @@ pub use names::{EnvName, EnvironmentName, Identifier, Name, OsName, PinnedImage,
 pub use outputs::{Check, CheckKind, CheckProtocol, CheckRunner, Checks, Output, OutputRole, OutputSource};
 pub use path::{GuestPath, PathTemplate, RelPath};
 pub use port::{Port, PortKind, Protocol, Publish, PublishMode};
-pub use provenance::{EnvironmentRef, Generator, GeneratorName, Instance, ManifestVersion, SUPPORTED_VERSION};
+pub use provenance::{EnvironmentRef, Generator, GeneratorName, Instance, ManifestVersion};
 pub use schema::{SCHEMA_URL, schema};
 pub use slots::{Delivery, Param, SecretSlot, SecretSource, SetBy, SlotKind, StateFileFormat, Store, TfVarShape, Transport};
 pub use step::{Action, Failure, Run, Step, When};

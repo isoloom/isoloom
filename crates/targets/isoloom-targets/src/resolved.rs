@@ -20,7 +20,7 @@ use isoloom_spec::model::{Spec, Target};
 use serde_json::{Map, Value, json};
 
 pub(crate) use message::manifest_message;
-pub use message::{HostPort, fill, lookup, on_target, render_message, render_message_at, render_message_on, with_published};
+pub use message::{HostPort, fill, lookup, on_target, render_message, render_message_at, render_message_on};
 
 /// The format of the snapshot; bumped when a field changes meaning or goes away (3: a machine's
 /// `ports` keyed by name, each with its `protocol`, `published` and `url`).

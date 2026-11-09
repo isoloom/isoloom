@@ -7,7 +7,7 @@
 //!   interpolated, so nothing in a value can end the string or start an interpolation.
 //! - [`Module`] writes the blocks in the layout `terraform fmt` keeps: two-space indents, the
 //!   `=` of consecutive one-line attributes aligned, one blank line between top-level blocks. A
-//!   list, an object or a function call is written on one line when it fits in [`WIDTH`]
+//!   list, an object or a function call is written on one line when it fits in `WIDTH`
 //!   characters, else one item a line (a call keeps its last argument hugged: `f(a, [`).
 //! - Comments go above a top-level block ([`Module::commented`]): `hcl-rs` has none inside.
 
@@ -20,7 +20,7 @@ pub use expr::{attr, binary, boolean, call, conditional, entry, for_list, index,
 pub use hcl::expr::BinaryOperator;
 pub use hcl::{Attribute, Block, BlockBuilder, Body, Expression, Structure};
 pub use template::{Piece, Template};
-pub use write::{Module, WIDTH};
+pub use write::Module;
 
 /// Why a module couldn't be written (`hcl-rs` documents formatting as infallible: kept typed
 /// rather than assumed).

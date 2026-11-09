@@ -251,7 +251,7 @@ fn vm_peer(lan: &str) -> String {
 
 /// Commands that build a VM's trunk (once per boot: they do nothing when it's there).
 #[must_use]
-pub fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> Ipv4Addr) -> Vec<String> {
+pub(crate) fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> Ipv4Addr) -> Vec<String> {
     let name = interface(&t.lan);
     let peer = vm_peer(&t.lan);
     let mut steps = vec![

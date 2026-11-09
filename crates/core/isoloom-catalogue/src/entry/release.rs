@@ -67,13 +67,13 @@ impl Release {
 
     /// Whether it runs on `os`.
     #[must_use]
-    pub fn runs_on(&self, os: OsRef) -> bool {
+    pub(crate) fn runs_on(&self, os: OsRef) -> bool {
         self.os.contains(&os)
     }
 
     /// Its OSes, as messages list them (`debian@12, alpine@3.24`).
     #[must_use]
-    pub fn os_list(&self) -> String {
+    pub(crate) fn os_list(&self) -> String {
         self.os.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
     }
 

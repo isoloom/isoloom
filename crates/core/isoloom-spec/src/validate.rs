@@ -47,10 +47,10 @@ use std::collections::BTreeSet;
 use crate::model::{Machine, Spec};
 use crate::syntax::Code;
 
-pub use cidr::{Cidr, DOCKER_BLOCK, PRIVATE, docker_cidrs};
+pub(crate) use cidr::DOCKER_BLOCK;
+pub use cidr::{Cidr, PRIVATE, docker_cidrs};
 pub use cidr6::{Cidr6, PREFIX as IPV6_PREFIX};
 pub use files::validate_files;
-pub use settings::CONTAINER_SYSCTLS;
 
 /// One thing wrong with a lowered spec: the field's path and what to do about it. The plan
 /// places it at the field the author wrote, as a [`crate::syntax::Problem`].

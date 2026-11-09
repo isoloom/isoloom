@@ -124,7 +124,7 @@ pub fn after_drive(p: &str) -> Option<&str> {
 }
 
 /// Where secrets go when a machine names no path.
-pub const SECRETS_DIR: &str = "/run/secrets";
+pub(crate) const SECRETS_DIR: &str = "/run/secrets";
 
 impl MachineSecret {
     /// The secret it places.

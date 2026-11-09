@@ -17,7 +17,7 @@ pub const MACHINE: &str = "web";
 /// The access machine the checks run from.
 pub const PROBE: &str = "probe";
 /// What a fact's check is named after: `fact: <name>`.
-pub const FACT_PREFIX: &str = "fact: ";
+pub(crate) const FACT_PREFIX: &str = "fact: ";
 /// What a fact's check expects, which its output never holds: the check always reports its
 /// output.
 const NEVER: &str = "isoloom-fact-output-follows";

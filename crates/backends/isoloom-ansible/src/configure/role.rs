@@ -12,7 +12,7 @@ use super::tasks::{rendered, step_tasks};
 
 /// A machine's role name (`isoloom_machine_web`).
 #[must_use]
-pub fn role_name(machine: &str) -> String {
+pub(crate) fn role_name(machine: &str) -> String {
     format!("isoloom_machine_{machine}")
 }
 

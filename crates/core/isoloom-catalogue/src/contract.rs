@@ -91,7 +91,7 @@ impl ContractCheck {
 
     /// Whether it runs in case `case`.
     #[must_use]
-    pub fn runs_in(&self, case: &CaseName) -> bool {
+    pub(crate) fn runs_in(&self, case: &CaseName) -> bool {
         self.case.as_ref().is_none_or(|c| c == case)
     }
 }

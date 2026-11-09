@@ -132,7 +132,7 @@ pub struct Tool {
 }
 
 /// Built-in tool recipes.
-pub const TOOL_RECIPES: &[&str] = &["shell"];
+pub(crate) const TOOL_RECIPES: &[&str] = &["shell"];
 
 /// An existing machine's SSH endpoint, for the `external` target.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
@@ -215,7 +215,7 @@ impl Ulimit {
 }
 
 /// The process limits Linux knows (`ulimit`, `limits.conf`, systemd's `Limit*`).
-pub const ULIMITS: &[&str] = &[
+pub(crate) const ULIMITS: &[&str] = &[
     "core",
     "cpu",
     "data",

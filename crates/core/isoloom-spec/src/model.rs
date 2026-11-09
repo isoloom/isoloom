@@ -37,15 +37,17 @@ pub use implementation::{
 pub use ipv6::{Ipv6, Ipv6Addresses};
 pub(crate) use machine::scalars;
 pub use machine::{Arch, Machine, Octets, Port, Protocol, Resources, ScalarSchema, Seal};
-pub use machine_file::{DEFAULT_FILE_MODE, MachineFile};
+pub use machine_file::MachineFile;
 pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use private_dns::EnvironmentDns;
 pub use process::{CommandLine, Healthcheck, HttpCheck, seconds};
-pub use secrets::{MachineSecret, SECRETS_DIR, SecretMount, SecretSource, after_drive, is_drive_path, secret_variable};
-pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, TOOL_RECIPES, Tool, ULIMITS, Ulimit};
+pub use secrets::{MachineSecret, SecretMount, SecretSource, after_drive, is_drive_path, secret_variable};
+pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, Tool, Ulimit};
+pub(crate) use shared::{TOOL_RECIPES, ULIMITS};
 pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMount};
 pub use target::{Shape, Target};
-pub use virtiofs::{MAX_VIRTIOFS, Virtiofs, VirtiofsCache, mapping_id};
+pub(crate) use virtiofs::mapping_id;
+pub use virtiofs::{MAX_VIRTIOFS, Virtiofs, VirtiofsCache};
 
 use indexmap::IndexMap;
 use schemars::JsonSchema;

@@ -7,7 +7,7 @@
 //!
 //! - [`project`]: an environment's whole Ansible project (`site.yml`, the roles, and
 //!   `requirements.yml` when a role names a pinned collection), under a target's folder.
-//! - [`role_files`] and [`role_name`]: one machine's role, which the conformance harness renders
+//! - [`role_files`] and `role_name`: one machine's role, which the conformance harness renders
 //!   and runs on its own.
 //!
 //! Pure: it reads the planned environment and the embedded catalogue's pinned collections, and
@@ -26,7 +26,8 @@ use isoloom_render::inventory::hosts;
 use isoloom_render::{GeneratedFile, header};
 use serde_json::{Value, json};
 
-pub use role::{files as role_files, role_name};
+pub use role::files as role_files;
+pub(crate) use role::role_name;
 
 /// The project variable each play sets to the project folder, so a role's `copy` and `script`
 /// find a project file wherever `site.yml` is run from (relative to the playbook's own folder).

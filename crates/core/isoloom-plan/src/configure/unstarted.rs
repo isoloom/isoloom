@@ -23,7 +23,7 @@ pub struct Unstarted {
 /// The daemons machine `m` (on `os`) installs without a `service` step for them, in step order.
 /// Windows features aren't packages that start daemons: none there.
 #[must_use]
-pub fn unstarted(os: OsRef, m: &syntax::Machine, daemons: &DaemonTable) -> Vec<Unstarted> {
+pub(crate) fn unstarted(os: OsRef, m: &syntax::Machine, daemons: &DaemonTable) -> Vec<Unstarted> {
     let family = Family::from(os);
     let Some(app) = m.app().filter(|_| family != Family::Windows) else {
         return Vec::new();

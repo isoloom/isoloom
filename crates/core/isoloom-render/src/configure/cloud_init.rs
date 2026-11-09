@@ -77,7 +77,7 @@ pub fn configure(c: &Configured<'_>, resources: &[Resource], fresh: bool, index:
 /// `encoding: gz+b64`. Deterministic: the gzip header carries no modification time or name, so
 /// the same script gives the same bytes on every host.
 #[must_use]
-pub fn gz_b64(script: &str) -> String {
+pub(crate) fn gz_b64(script: &str) -> String {
     base64(&gzip(script))
 }
 

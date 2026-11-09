@@ -5,7 +5,7 @@ use super::{Problems, variable_name};
 use crate::model::Machine;
 
 /// The sysctls a container can set: those the kernel keeps per network or IPC namespace.
-pub const CONTAINER_SYSCTLS: &[&str] = &[
+pub(crate) const CONTAINER_SYSCTLS: &[&str] = &[
     "net.",
     "kernel.shm",
     "kernel.msgmax",

@@ -12,7 +12,7 @@ use crate::template::Template;
 use crate::{Error, Result};
 
 /// The manifest version this crate reads and writes.
-pub const SUPPORTED_VERSION: u64 = 0;
+pub(crate) const SUPPORTED_VERSION: u64 = 0;
 
 /// The contract's version: 0, read only by a runner built for exactly 0.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
