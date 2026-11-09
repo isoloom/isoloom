@@ -35,7 +35,7 @@ pub(crate) enum Command {
     /// Fail when the generated files under .isoloom/ don't match the spec (for CI).
     Check(check::Args),
     /// The defaults in effect here (built in, your file, the project's, the environment) and
-    /// where each comes from. See <https://www.isoloom.com/en/docs/defaults>
+    /// where each comes from. See <https://www.isoloom.com/en/docs/configuration#defaults>
     Defaults(defaults::Args),
     /// Draw the environment: networks, machines with their addresses and ports, reach rules,
     /// gateways and the access machine. D2 by default; `--format dot` for Graphviz. With

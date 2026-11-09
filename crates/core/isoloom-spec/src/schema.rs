@@ -26,7 +26,7 @@ pub fn schema() -> Value {
         &mut s,
         &[],
         "description",
-        json!("An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec-reference"),
+        json!("An Isoloom environment spec, version 1: https://www.isoloom.com/en/docs/spec"),
     );
     names(&mut s);
     networks(&mut s);
