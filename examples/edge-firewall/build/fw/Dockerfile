@@ -1,5 +1,5 @@
 # The same rules file the VM loads (provision/fw.sh).
-FROM alpine:3.20
+FROM alpine:3.24
 RUN apk add --no-cache nftables busybox-extras
 COPY rules.nft status.html /fw/
 # Rules first; the status page answers only once they're loaded.

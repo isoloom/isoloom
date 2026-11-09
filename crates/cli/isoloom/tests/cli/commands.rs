@@ -199,10 +199,10 @@ fn check_quiet_shows_only_failures_and_json_one_result_per_file() -> Outcome {
         quiet.stdout
     );
     std::fs::write(dir.join(".isoloom/docker/compose.yml"), "changed\n")?;
-    let quiet = isoloom(&dir, &[&"check", &dir, &"--target", &"docker", &"-q"])?;
-    assert_eq!(quiet.code, Some(1), "{quiet:?}");
+    let failing = isoloom(&dir, &[&"check", &dir, &"--target", &"docker", &"-q"])?;
+    assert_eq!(failing.code, Some(1), "{failing:?}");
     assert_eq!(
-        quiet.stdout,
+        failing.stdout,
         "✗ .isoloom/docker/compose.yml is out of date\nrun `isoloom generate` and commit the result\n"
     );
     let json = isoloom(&dir, &[&"check", &dir, &"--target", &"docker", &"--json"])?;
