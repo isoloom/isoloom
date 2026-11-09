@@ -1,6 +1,7 @@
 //! The image each target uses for an OS name: the built-in table, then the runner's own
-//! table ([`Table`]: a file given to `isoloom generate --images`, or a tool's own settings),
-//! then what a spec gives itself (`vm.image`).
+//! table ([`Table`]: a file given to `isoloom generate --images`, the defaults' `images:`, or a
+//! tool's own settings), then what a spec gives itself (a machine's image under its target's
+//! `overrides:`, `overrides.vagrant.machines.<m>.box`).
 
 use indexmap::IndexMap;
 use serde::de::Error as _;
@@ -9,7 +10,8 @@ use serde::{Deserialize, Deserializer};
 use crate::model::{DockerImpl, Spec, VmImage, VmImpl};
 use crate::{Error, Result};
 
-/// The runner's own image table, between the built-in one and the spec's `vm.image`:
+/// The runner's own image table, between the built-in one and the spec's own image for a
+/// machine (under `overrides:`):
 ///
 /// ```yaml
 /// os:                     # an OS's image, instead of the built-in one
@@ -80,7 +82,7 @@ impl Table {
     }
 
     /// The spec with this table applied: each VM's image from `os:` (unless the spec gives its
-    /// own `vm.image`), and the access machine's missing implementations from `access:`. The
+    /// own, under `overrides:`), and the access machine's missing implementations from `access:`. The
     /// generators then treat a supplied machine like any other, on every target.
     #[must_use]
     pub fn apply(&self, spec: &Spec) -> Spec {
@@ -158,7 +160,8 @@ pub enum HyperVBox {
         /// Its version (`None`: the latest).
         version: Option<String>,
     },
-    /// No Hyper-V build known for this OS: give one with `vm.image.hyperv`.
+    /// No Hyper-V build known for this OS: give one with
+    /// `overrides.vagrant.machines.<m>.boxes.hyperv`.
     Missing,
 }
 
