@@ -89,10 +89,12 @@ fn vagrant_ssh(command: &Template) -> Result<Run, ManifestError> {
     Ok(Run::Argv(HostArgv::Every(Argv::new(run_manifest::program("vagrant")?, args))))
 }
 
-/// The VM as Vagrant has it: its define, named as each provider names it, with the digest of
-/// what Vagrant applies to it only at boot (its Vagrantfile's, `guest` running in it).
+/// The VM as Vagrant has it: its define, named as each provider it is offered on names it, with
+/// the digest of what Vagrant applies to it only at boot (its Vagrantfile's, `guest` running in
+/// it).
 fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
-    let vm_names = super::machines::vm_names(label(env, "docker"), vm_name(env, "docker"), format!("{}_{DEFINE}", env.name));
+    let mut vm_names = super::machines::vm_names(label(env, "docker"), vm_name(env, "docker"), format!("{}_{DEFINE}", env.name));
+    vm_names.retain(|p, _| providers::docker_vm_offers(*p));
     let boot_digest = crate::boot_digest::of(&crate::docker_vm::boot(env, guest)).remove(DEFINE);
     Ok(Native::Vagrant {
         vagrant: Name::parse(DEFINE)?,

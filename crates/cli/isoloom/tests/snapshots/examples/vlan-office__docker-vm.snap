@@ -1977,7 +1977,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "vlan-office · docker",
           "vmware_desktop": "vlan-office · docker",
-          "hyperv": "vlan-office-docker",
           "parallels": "vlan-office · docker",
           "libvirt": "vlan-office_default",
           "utm": "vlan-office · docker",

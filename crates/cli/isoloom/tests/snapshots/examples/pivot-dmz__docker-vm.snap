@@ -2039,7 +2039,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "pivot-dmz · docker",
           "vmware_desktop": "pivot-dmz · docker",
-          "hyperv": "pivot-dmz-docker",
           "parallels": "pivot-dmz · docker",
           "libvirt": "pivot-dmz_default",
           "utm": "pivot-dmz · docker",

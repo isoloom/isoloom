@@ -1836,7 +1836,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "udp-dns · docker",
           "vmware_desktop": "udp-dns · docker",
-          "hyperv": "udp-dns-docker",
           "parallels": "udp-dns · docker",
           "libvirt": "udp-dns_default",
           "utm": "udp-dns · docker",

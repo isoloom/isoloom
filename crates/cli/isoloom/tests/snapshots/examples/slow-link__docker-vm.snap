@@ -1767,7 +1767,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "slow-link · docker",
           "vmware_desktop": "slow-link · docker",
-          "hyperv": "slow-link-docker",
           "parallels": "slow-link · docker",
           "libvirt": "slow-link_default",
           "utm": "slow-link · docker",

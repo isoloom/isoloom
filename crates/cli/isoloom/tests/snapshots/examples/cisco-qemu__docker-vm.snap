@@ -1760,7 +1760,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "cisco-qemu · docker",
           "vmware_desktop": "cisco-qemu · docker",
-          "hyperv": "cisco-qemu-docker",
           "parallels": "cisco-qemu · docker",
           "libvirt": "cisco-qemu_default",
           "utm": "cisco-qemu · docker",

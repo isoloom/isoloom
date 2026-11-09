@@ -1890,7 +1890,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "hello-stack · docker",
           "vmware_desktop": "hello-stack · docker",
-          "hyperv": "hello-stack-docker",
           "parallels": "hello-stack · docker",
           "libvirt": "hello-stack_default",
           "utm": "hello-stack · docker",

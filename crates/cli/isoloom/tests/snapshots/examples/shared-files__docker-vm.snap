@@ -1799,7 +1799,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "shared-files · docker",
           "vmware_desktop": "shared-files · docker",
-          "hyperv": "shared-files-docker",
           "parallels": "shared-files · docker",
           "libvirt": "shared-files_default",
           "utm": "shared-files · docker",

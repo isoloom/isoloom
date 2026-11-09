@@ -1737,7 +1737,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "private-names · docker",
           "vmware_desktop": "private-names · docker",
-          "hyperv": "private-names-docker",
           "parallels": "private-names · docker",
           "libvirt": "private-names_default",
           "utm": "private-names · docker",

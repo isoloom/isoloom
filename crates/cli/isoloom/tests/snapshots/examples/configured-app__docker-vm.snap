@@ -1817,7 +1817,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "configured-app · docker",
           "vmware_desktop": "configured-app · docker",
-          "hyperv": "configured-app-docker",
           "parallels": "configured-app · docker",
           "libvirt": "configured-app_default",
           "utm": "configured-app · docker",

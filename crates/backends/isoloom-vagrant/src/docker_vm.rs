@@ -125,10 +125,8 @@ fn written(env: &Environment, guest: &GuestCompose) -> Ruby {
 /// The VM: its box and name, the published ports, its size on every provider, then Docker, SSH
 /// accepting the values given at launch, the project and the environment.
 fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
-    // generic/debian12 has a build for every provider the docker-vm supports — virtualbox, vmware,
-    // parallels, libvirt, qemu and hyperv — so one box covers them all (UTM, which has none, is
-    // given its own below). bento/debian-12 had only virtualbox/vmware/parallels, so qemu and
-    // hyperv could not find their box.
+    // generic/debian12 has a build for the providers here but UTM and QEMU (VirtualBox, VMware,
+    // Parallels, libvirt); those two are given their own box below. Hyper-V isn't offered here.
     r.assign("config.vm.box", Value::str("generic/debian12"));
     r.assign("config.vm.hostname", Value::str(&env.name));
     r.call(

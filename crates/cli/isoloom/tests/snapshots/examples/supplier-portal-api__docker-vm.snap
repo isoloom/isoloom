@@ -1899,7 +1899,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "supplier-portal-api · docker",
           "vmware_desktop": "supplier-portal-api · docker",
-          "hyperv": "supplier-portal-api-docker",
           "parallels": "supplier-portal-api · docker",
           "libvirt": "supplier-portal-api_default",
           "utm": "supplier-portal-api · docker",

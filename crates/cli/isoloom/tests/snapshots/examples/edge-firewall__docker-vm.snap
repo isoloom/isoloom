@@ -1998,7 +1998,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "edge-firewall · docker",
           "vmware_desktop": "edge-firewall · docker",
-          "hyperv": "edge-firewall-docker",
           "parallels": "edge-firewall · docker",
           "libvirt": "edge-firewall_default",
           "utm": "edge-firewall · docker",

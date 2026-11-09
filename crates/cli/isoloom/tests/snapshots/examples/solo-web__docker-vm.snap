@@ -1674,7 +1674,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "solo-web · docker",
           "vmware_desktop": "solo-web · docker",
-          "hyperv": "solo-web-docker",
           "parallels": "solo-web · docker",
           "libvirt": "solo-web_default",
           "utm": "solo-web · docker",

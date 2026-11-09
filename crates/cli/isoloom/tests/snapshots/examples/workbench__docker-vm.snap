@@ -1668,7 +1668,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "workbench · docker",
           "vmware_desktop": "workbench · docker",
-          "hyperv": "workbench-docker",
           "parallels": "workbench · docker",
           "libvirt": "workbench_default",
           "utm": "workbench · docker",

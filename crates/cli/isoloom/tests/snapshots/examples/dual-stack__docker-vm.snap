@@ -1805,7 +1805,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "dual-stack · docker",
           "vmware_desktop": "dual-stack · docker",
-          "hyperv": "dual-stack-docker",
           "parallels": "dual-stack · docker",
           "libvirt": "dual-stack_default",
           "utm": "dual-stack · docker",

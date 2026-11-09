@@ -1933,7 +1933,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "segmented · docker",
           "vmware_desktop": "segmented · docker",
-          "hyperv": "segmented-docker",
           "parallels": "segmented · docker",
           "libvirt": "segmented_default",
           "utm": "segmented · docker",

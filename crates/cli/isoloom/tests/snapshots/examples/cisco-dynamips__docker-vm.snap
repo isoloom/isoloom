@@ -1762,7 +1762,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "cisco-dynamips · docker",
           "vmware_desktop": "cisco-dynamips · docker",
-          "hyperv": "cisco-dynamips-docker",
           "parallels": "cisco-dynamips · docker",
           "libvirt": "cisco-dynamips_default",
           "utm": "cisco-dynamips · docker",

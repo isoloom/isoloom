@@ -352,7 +352,6 @@
         "vm_names": {
           "virtualbox": "flag-portal · docker",
           "vmware_desktop": "flag-portal · docker",
-          "hyperv": "flag-portal-docker",
           "parallels": "flag-portal · docker",
           "libvirt": "flag-portal_default",
           "utm": "flag-portal · docker",

@@ -1734,7 +1734,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "air-gapped · docker",
           "vmware_desktop": "air-gapped · docker",
-          "hyperv": "air-gapped-docker",
           "parallels": "air-gapped · docker",
           "libvirt": "air-gapped_default",
           "utm": "air-gapped · docker",

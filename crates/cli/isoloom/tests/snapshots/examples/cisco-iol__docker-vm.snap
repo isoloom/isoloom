@@ -1764,7 +1764,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "cisco-iol · docker",
           "vmware_desktop": "cisco-iol · docker",
-          "hyperv": "cisco-iol-docker",
           "parallels": "cisco-iol · docker",
           "libvirt": "cisco-iol_default",
           "utm": "cisco-iol · docker",

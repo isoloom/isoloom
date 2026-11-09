@@ -1838,7 +1838,6 @@ systemctl enable --now isoloom-published.service
         "vm_names": {
           "virtualbox": "cisco-switch · docker",
           "vmware_desktop": "cisco-switch · docker",
-          "hyperv": "cisco-switch-docker",
           "parallels": "cisco-switch · docker",
           "libvirt": "cisco-switch_default",
           "utm": "cisco-switch · docker",

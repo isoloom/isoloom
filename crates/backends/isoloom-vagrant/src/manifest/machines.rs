@@ -111,11 +111,9 @@ fn on_every_network(env: &Environment, at: impl Fn(Cidr) -> std::net::Ipv4Addr) 
         .collect()
 }
 
-/// The define name, and the VM's name under each provider that names it: the display name on
-/// the desktop hypervisors, `<env>-<what>` on Hyper-V and ESXi, the domain on libvirt (its
-/// prefix is the environment's). QEMU names none.
-/// A VM's name under each provider that names one: the display name on the desktop hypervisors,
-/// `plain` on Hyper-V and ESXi, `libvirt` on libvirt. QEMU names none.
+/// A VM's name under each provider that names one: the display name (`shown`) on the desktop
+/// hypervisors, `plain` (`<env>-<what>`) on Hyper-V and ESXi, `libvirt` (the domain, its prefix
+/// the environment's) on libvirt. QEMU names none.
 pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMap<Provider, String> {
     BTreeMap::from([
         (Provider::Virtualbox, shown.clone()),

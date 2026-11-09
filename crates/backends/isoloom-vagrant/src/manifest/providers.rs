@@ -48,13 +48,18 @@ pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Iden
 pub(super) fn docker_vm_identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
     let providers = Vagrant::ALL
         .iter()
-        .filter(|k| k.manifest != Provider::Hyperv)
+        .filter(|k| docker_vm_offers(k.manifest))
         .map(|k| provider(k, Elevation::None, crate::host_folders::docker_vm_refusal(env, k.provider.id())))
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {
         providers,
         dotfile: Some(dotfile.clone()),
     }))
+}
+
+/// Whether `docker-vm` offers `provider`: all but Hyper-V.
+pub(super) fn docker_vm_offers(provider: Provider) -> bool {
+    provider != Provider::Hyperv
 }
 
 /// The oldest Vagrant a run takes: 2.4.0, the first that honours a box's architecture

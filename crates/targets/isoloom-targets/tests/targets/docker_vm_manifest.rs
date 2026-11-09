@@ -216,3 +216,22 @@ fn a_machine_named_docker_is_generated_on_every_target_that_takes_it() -> Outcom
     }
     Ok(())
 }
+
+#[test]
+fn the_vm_is_named_only_under_the_providers_offered() -> Outcome {
+    let (files, _, _) = manifests()?;
+    let m: serde_json::Value = serde_json::from_str(file(&files, ".isoloom/docker-vm/run.json")?)?;
+    let offered: Vec<&str> = m["identity"]["vagrant"]["providers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|p| p["id"].as_str())
+        .collect();
+    assert!(!offered.contains(&"hyperv"), "{offered:?}");
+    for machine in m["machines"].as_array().into_iter().flatten() {
+        for provider in machine["native"]["vm_names"].as_object().into_iter().flatten().map(|(p, _)| p) {
+            assert!(offered.contains(&provider.as_str()), "{provider} is named but not offered: {offered:?}");
+        }
+    }
+    Ok(())
+}
