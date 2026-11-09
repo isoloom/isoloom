@@ -40,7 +40,7 @@ pub(crate) fn file(inputs: &[String]) -> Expression {
 /// own set-up, from `var.inputs`, base64 on its way so no value can end the script it travels in
 /// (its `umask` in a subshell: the ready file the set-up writes next stays readable).
 pub(crate) fn written(names: &[String]) -> Template {
-    Template::text("mkdir -p /var/lib/isoloom && (umask 077 && echo ")
+    Template::text(format!("{} && (umask 077 && echo ", steps::MAKE_STATE_DIR))
         .with_expr(call("base64encode", [file(names)]))
         .with_text(format!(" | base64 -d > {})", steps::KEPT_INPUTS_FILE))
 }

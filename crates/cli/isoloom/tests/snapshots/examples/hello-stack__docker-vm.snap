@@ -595,7 +595,7 @@ variable "proxmox_insecure" {
 variable "proxmox_ssh_username" {
   type        = string
   default     = "root"
-  description = "Uploading the cloud-init snippet goes over SSH to the node"
+  description = "Uploading cloud-init snippets goes over SSH to the node"
 }
 
 variable "proxmox_ssh_private_key_file" {
@@ -621,13 +621,13 @@ variable "node" {
 variable "datastore" {
   type        = string
   default     = "local-lvm"
-  description = "Where the VM's disk goes"
+  description = "Where VM disks go"
 }
 
 variable "image_datastore" {
   type        = string
   default     = "local"
-  description = "A datastore with 'iso' content, for the cloud image"
+  description = "A datastore with 'iso' content, for cloud images"
 }
 
 variable "snippets_datastore" {
@@ -861,7 +861,7 @@ output "ssh_user" {
     },
     {
       "name": "proxmox_ssh_username",
-      "description": "Uploading the cloud-init snippet goes over SSH to the node.",
+      "description": "Uploading cloud-init snippets goes over SSH to the node.",
       "default": "root",
       "set_by": "embedder",
       "deliver": [
@@ -897,7 +897,7 @@ output "ssh_user" {
     },
     {
       "name": "datastore",
-      "description": "Where the VM's disk goes.",
+      "description": "Where VM disks go.",
       "default": "local-lvm",
       "set_by": "embedder",
       "deliver": [
@@ -909,7 +909,7 @@ output "ssh_user" {
     },
     {
       "name": "image_datastore",
-      "description": "A datastore with 'iso' content, for the cloud image.",
+      "description": "A datastore with 'iso' content, for cloud images.",
       "default": "local",
       "set_by": "embedder",
       "deliver": [
@@ -1278,7 +1278,7 @@ output "ssh_user" {
   "outputs": [
     {
       "name": "ip",
-      "description": "The Docker host's address: SSH reaches it there, and the published ports answer there.",
+      "description": "The Docker host's address: SSH reaches it there, and its containers' published ports answer there.",
       "role": "address",
       "sensitive": false,
       "from": {

@@ -405,3 +405,12 @@ fn a_mark_wait_ends_when_the_mark_is_there_and_gives_up_with_its_message_after_t
     assert!(there.status.success() && there.stdout.is_empty(), "{there:?}");
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn the_state_dirs_command_makes_the_state_dir() {
+    assert_eq!(super::MAKE_STATE_DIR, format!("mkdir -p {}", super::STATE_DIR));
+    assert_eq!(super::KEPT_INPUTS_FILE.rsplit_once('/').map(|(dir, _)| dir), Some(super::STATE_DIR));
+    assert_eq!(super::READY_FILE.rsplit_once('/').map(|(dir, _)| dir), Some(super::STATE_DIR));
+    let ready = isoloom_spec::windows::READY_FILE;
+    assert_eq!(ready.rsplit_once('\\').map(|(dir, _)| dir), Some(isoloom_spec::windows::ISOLOOM_DIR));
+}

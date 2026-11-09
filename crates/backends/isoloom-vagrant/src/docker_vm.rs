@@ -79,7 +79,7 @@ fn named(name: &str, kind: &str) -> Provision {
 const COMPOSE: &str = ".isoloom/docker/compose.yml";
 
 /// The CPUs and memory (MB) of the VM: the containers' host's.
-pub(crate) fn host_size(env: &Environment) -> (u32, u32) {
+fn host_size(env: &Environment) -> (u32, u32) {
     let size = docker::HostSize::of(env);
     (size.cpus, size.memory_mb)
 }
@@ -272,8 +272,9 @@ fn environment(r: &mut Ruby, env: &Environment, guest: &GuestCompose) {
     let start: Vec<String> = guest.start.iter().map(|c| c.command.to_string()).collect();
     let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
     let script = format!(
-        "{secrets}{} && mkdir -p /var/lib/isoloom && echo ready > {}",
+        "{secrets}{} && {} && echo ready > {}",
         start.join(" && "),
+        steps::MAKE_STATE_DIR,
         steps::READY_FILE
     );
     let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
@@ -293,10 +294,11 @@ fn checks(r: &mut Ruby, env: &Environment) {
     // The stand-ins go once the checks ran, whatever they found, so the access machine they
     // stand in for can take its addresses; failing to take them down fails no check.
     let script = format!(
-        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} {up} \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}[ $# -eq 0 ] || {profile} {down} \"$@\" || true; exit \"$failed\"",
+        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} {up} \"$@\"; for s in $({profile} config --services | grep '^{runners}'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}[ $# -eq 0 ] || {profile} {down} \"$@\" || true; exit \"$failed\"",
         exec_runs(env),
         up = docker::STAND_INS_UP.verb.join(" "),
         down = docker::STAND_INS_DOWN.verb.join(" "),
+        runners = docker::CHECK_RUNNER_PREFIX,
     );
     let derived = crate::vagrantfile::derived_from_host();
     let vars = if env.spec().inputs.is_empty() {

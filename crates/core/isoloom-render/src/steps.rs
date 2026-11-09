@@ -21,6 +21,10 @@ mod wait;
 
 /// Where the project is unpacked on a VM.
 pub const PROJECT_DIR: &str = "/opt/isoloom";
+/// Isoloom's own folder on a Linux VM: its marks, and what it keeps between boots.
+pub const STATE_DIR: &str = "/var/lib/isoloom";
+/// Makes [`STATE_DIR`]: the command before a mark is written there.
+pub const MAKE_STATE_DIR: &str = "mkdir -p /var/lib/isoloom";
 /// The project's archive, uploaded before the steps run.
 pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
 /// The inputs, uploaded before the steps run (`KEY=value` lines).
@@ -128,7 +132,7 @@ pub fn wait_for_mark(mark: &str, timeout_s: u32, waiting: &str, missing: &str) -
 
 /// Where the project is unpacked on a Windows VM, and the machine's own scripts with it; where
 /// a Windows recipe runs from too (see [`crate::configure::powershell`]).
-pub(crate) const WINDOWS_PROJECT_DIR: &str = "C:\\isoloom";
+pub(crate) const WINDOWS_PROJECT_DIR: &str = isoloom_spec::windows::ISOLOOM_DIR;
 
 /// Installs packages with the machine's own package manager (Debian and Ubuntu, or the RHEL
 /// family: Rocky, AlmaLinux, CentOS, Fedora).
@@ -158,7 +162,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         )),
         Step::Files { files } => Some(files::linux(files)),
         Step::Secrets => env.machines.get(machine).map(|mp| secrets::step(machine, &mp.secrets)),
-        Step::Inputs { persist } => persist.then(|| format!("mkdir -p /var/lib/isoloom && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
+        Step::Inputs { persist } => persist.then(|| format!("{MAKE_STATE_DIR} && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
         Step::WaitFor { machine: dep, ports } => Some(wait::linux(dep, ports)),
         Step::Run { path, kind, creates } => run(env, machine, path, *kind).map(|line| guarded(line, creates.as_deref())),
         Step::Configure { resources, fresh } => Configured::of(env, machine).map(|c| shell::script(&c, resources, *fresh)),
@@ -168,7 +172,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Command => process::command(env, machine),
         Step::Setup { paths } => process::setup(env, machine, paths),
         Step::Ready => Some(format!(
-            "{}mkdir -p /var/lib/isoloom && echo ready > {READY_FILE}\n",
+            "{}{MAKE_STATE_DIR} && echo ready > {READY_FILE}\n",
             process::healthy(env, machine).unwrap_or_default()
         )),
     }
@@ -211,8 +215,9 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Command => process::windows_command(env, machine),
         Step::Setup { paths } => Some(process::windows_setup(paths)),
         Step::Ready => Some(format!(
-            "{}New-Item -ItemType Directory -Force {WINDOWS_PROJECT_DIR} | Out-Null; Set-Content {WINDOWS_PROJECT_DIR}\\ready ready",
-            process::windows_healthy(env, machine).unwrap_or_default()
+            "{}New-Item -ItemType Directory -Force {WINDOWS_PROJECT_DIR} | Out-Null; Set-Content {} ready",
+            process::windows_healthy(env, machine).unwrap_or_default(),
+            isoloom_spec::windows::READY_FILE
         )),
         // Linux's alone: the constraints, trunks and impairment are Linux tools; a Windows VM's
         // volumes, inputs and reboots are its own scripts'.
@@ -264,7 +269,7 @@ fn inputs_file(env: &Environment, machine: &str) -> Option<&'static str> {
 /// (Terraform's `remote-exec`) runs it before restarting.
 #[must_use]
 pub fn record_boot() -> String {
-    format!("mkdir -p /var/lib/isoloom && cp {BOOT_ID} /var/lib/isoloom/boot-id\n")
+    format!("{MAKE_STATE_DIR} && cp {BOOT_ID} {STATE_DIR}/boot-id\n")
 }
 
 /// After a reboot step: fails when the machine didn't actually restart.

@@ -10,10 +10,12 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Check, CheckProtocol, CheckRunner, Checks, Condition, Delivery, Error as ManifestError, Failure, Machine, Name, Network, Param, PathTemplate,
-    PublishMode, RelPath, Run, SecretSlot, Step, StepId, Template,
+    Action, Check, CheckProtocol, CheckRunner, Checks, Condition, Delivery, Error as ManifestError, Failure, Guest, Machine, Name, Network, Output, OutputRole,
+    Param, PathTemplate, PublishMode, RelPath, Resources, Role, Run, SecretSlot, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
+
+use crate::container::{DOCKER_HOST, HostSize};
 
 use crate::steps::{CLOUD_INIT_WAIT, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE, install_docker};
 
@@ -199,6 +201,74 @@ impl GuestCompose {
         }
         machines
     }
+}
+
+/// The VM the containers run in, as a run manifest has it, the same on every target that makes
+/// one ([`GuestCompose::docker_host`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DockerHost {
+    /// The VM: Isoloom's own ([`DOCKER_HOST`], `infra`), sized for every container at once.
+    pub machine: Machine,
+    /// When the lab counts as ready: the step that made the VM succeeded, then the containers'.
+    pub ready: Vec<Condition>,
+    /// Where the runner reads the containers: in the VM, at its own address when it has one.
+    pub guest: Guest,
+}
+
+impl GuestCompose {
+    /// The VM the containers of `env` run in: ready once `made` (a step id, what its success
+    /// means) succeeded and the containers are; read through `way_in`, at `address` when the VM
+    /// has an address of its own (`None`: this computer's, through Vagrant).
+    ///
+    /// # Errors
+    ///
+    /// A name or step id the manifest refuses (a bug: they are fixed), or what `way_in` refuses.
+    pub fn docker_host(
+        &self,
+        env: &Environment,
+        made: (&str, &str),
+        address: Option<Template>,
+        way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>,
+    ) -> Result<DockerHost, ManifestError> {
+        let size = HostSize::of(env);
+        let mut machine = super::machine(DOCKER_HOST, Role::Infra)?;
+        machine.resources = Some(Resources {
+            cpus: Some(size.cpus),
+            memory_mb: Some(size.memory_mb),
+        });
+        let (step, means) = made;
+        let mut ready = vec![Condition::StepOk {
+            step: StepId::parse(step)?,
+            means: Some(means.to_owned()),
+        }];
+        ready.extend(self.ready.iter().cloned());
+        let guest = Guest {
+            machine: Name::parse(DOCKER_HOST)?,
+            host: address,
+            status: self.status.step(way_in)?,
+        };
+        Ok(DockerHost { machine, ready, guest })
+    }
+}
+
+/// The outputs of a Docker host Terraform made: its address (`ip`, where SSH reaches it and the
+/// published ports answer) and its SSH user (`ssh_user`), then each of `machines`' published
+/// ports at that address.
+///
+/// # Errors
+///
+/// A name the manifest refuses.
+pub fn docker_host_outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
+    let mut out = vec![
+        super::terraform_output(
+            "ip",
+            OutputRole::Address,
+            "The Docker host's address: SSH reaches it there, and its containers' published ports answer there.",
+        )?,
+        super::terraform_output("ssh_user", OutputRole::Info, "The user the runner's key lets in on the Docker host.")?,
+    ];
+    out.extend(super::outputs_on_their_hosts(machines)?);
+    Ok(out)
 }
 
 /// The way into a VM Terraform made: `ssh.run` to `host` (`${outputs.ip}`) as `user`, with the

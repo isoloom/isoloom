@@ -173,8 +173,10 @@ fn kebab(s: &str) -> bool {
             .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
 }
 
-/// Machine and network names become DNS names (machines resolve each other by name).
-fn dns_label(s: &str) -> bool {
+/// Machine and network names become DNS names (machines resolve each other by name): kebab
+/// case from a letter, at most 63 characters. The one rule the catalogue's names follow too.
+#[must_use]
+pub fn dns_label(s: &str) -> bool {
     kebab(s) && !s.starts_with(|c: char| c.is_ascii_digit())
 }
 

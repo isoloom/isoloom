@@ -33,12 +33,10 @@ mod sealed {
 /// A name of kind `K`: only ever a value `K` allows.
 pub struct Name<K: Kind>(String, PhantomData<K>);
 
-/// Kebab case: lowercase letters and digits in words joined by single dashes, from a letter.
+/// Kebab case: lowercase letters and digits in words joined by single dashes, from a letter, at
+/// most 63 characters: the spec's rule for a machine's name (`isoloom_spec::validate::dns_label`).
 fn kebab(s: &str) -> bool {
-    s.len() <= 63
-        && s.starts_with(|c: char| c.is_ascii_lowercase())
-        && s.split('-')
-            .all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
+    isoloom_spec::validate::dns_label(s)
 }
 
 /// Snake case: lowercase letters, digits and `_`, from a letter.

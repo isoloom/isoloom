@@ -1,9 +1,18 @@
 //! What a Windows guest asks of the VM that runs it: a virtual TPM (Windows 11 expects one),
 //! and how Isoloom reaches it (WinRM, or Windows' own OpenSSH). Each target reads these once,
-//! so a TPM is given, or refused, the same way everywhere.
+//! so a TPM is given, or refused, the same way everywhere. And Isoloom's folder on it, which
+//! every target and the catalogue write to.
 
 use crate::images::is_windows;
 use crate::model::VmImpl;
+
+/// Isoloom's folder on a Windows machine: the project unpacked, the machine's own scripts, its
+/// marks, the catalogue's values.
+pub const ISOLOOM_DIR: &str = "C:\\isoloom";
+
+/// The mark a Windows machine's set-up leaves in [`ISOLOOM_DIR`] once it is ready, which the
+/// controller and the runner wait for.
+pub const READY_FILE: &str = "C:\\isoloom\\ready";
 
 /// Why a VM gets a virtual TPM 2.0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

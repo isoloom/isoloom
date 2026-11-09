@@ -211,7 +211,8 @@ pub(crate) fn windows_waits(env: &Environment) -> Vec<String> {
         .filter(|(_, mp)| mp.is_windows())
         .map(|(name, _)| {
             format!(
-                "i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini {name} -m raw -a 'if (-not (Test-Path C:\\isoloom\\ready)) {{ exit 1 }}' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 10; done"
+                "i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini {name} -m raw -a 'if (-not (Test-Path {ready})) {{ exit 1 }}' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 10; done",
+                ready = isoloom_spec::windows::READY_FILE
             )
         })
         .collect()

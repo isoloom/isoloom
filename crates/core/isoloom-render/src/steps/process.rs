@@ -7,7 +7,7 @@ use isoloom_plan::{Environment, Health, HealthTest, MachinePlan};
 use isoloom_spec::model::CommandLine;
 use isoloom_spec::shell::quote;
 
-use super::{PROJECT_DIR, WINDOWS_PROJECT_DIR, inputs_file};
+use super::{MAKE_STATE_DIR, PROJECT_DIR, WINDOWS_PROJECT_DIR, inputs_file};
 use crate::boot::{self, Kind};
 use crate::powershell;
 use crate::secrets;
@@ -55,7 +55,7 @@ const SETUP_DONE: &str = "/var/lib/isoloom/setup.done";
 pub(super) fn setup(env: &Environment, machine: &str, paths: &[String]) -> Option<String> {
     let mp = env.machines.get(machine)?;
     Some(format!(
-        "[ -f {SETUP_DONE} ] || (\nset -e\n{}{}mkdir -p /var/lib/isoloom && touch {SETUP_DONE}\n)\n",
+        "[ -f {SETUP_DONE} ] || (\nset -e\n{}{}{MAKE_STATE_DIR} && touch {SETUP_DONE}\n)\n",
         prelude(env, machine, mp),
         scripts(paths)
     ))

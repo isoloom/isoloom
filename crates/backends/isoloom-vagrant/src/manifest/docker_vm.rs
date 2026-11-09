@@ -9,17 +9,16 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, Condition, Driver, Error as ManifestError, Guest, HostArgv, Lifecycle, Machine, Manifest, ManifestVersion, Name, Native, NonEmpty, Park,
-    PathTemplate, Provider, RelPath, Resources, Role, Run, SCHEMA_URL, Step, StepId, Template,
+    Action, Argv, Driver, Error as ManifestError, HostArgv, Lifecycle, Manifest, ManifestVersion, Name, Native, NonEmpty, Park, PathTemplate, Provider,
+    RelPath, Run, SCHEMA_URL, Step, Template,
 };
 use isoloom_plan::Environment;
-use isoloom_render::container::DOCKER_HOST as VM;
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 use isoloom_render::run_manifest::{self, act, noted, outputs_on_their_hosts, run};
 
 use super::lifecycle::{back_up, down, recovery};
 use super::{DOTFILE, on_provider, providers, slots, vagrant_argv};
-use crate::docker_vm::{DEFINE, host_size, prepares};
+use crate::docker_vm::{DEFINE, prepares};
 use crate::error::Result;
 use crate::vms::{label, vm_name};
 
@@ -36,17 +35,14 @@ const ESXI_STATUS_S: u32 = 90;
 /// message is left empty.
 pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manifest> {
     let way_in = |command: &Template| vagrant_ssh(command);
-    let mut machines = vec![vm(env, guest)?];
+    let mut host = guest.docker_host(env, (UP, "the VM booted with Docker and the project in it"), None, &way_in)?;
+    host.machine.native = Some(native(env, guest)?);
+    let mut machines = vec![host.machine];
     machines.extend(guest.machines_at(&Template::text(LOOPBACK)));
     let mut params = slots::remote_params()?;
     params.extend(guest.params.iter().cloned());
     let mut secrets = guest.slots.clone();
     secrets.push(slots::esxi_password()?);
-    let mut ready = vec![Condition::StepOk {
-        step: StepId::parse(UP)?,
-        means: Some("the VM booted with Docker and the project in it".into()),
-    }];
-    ready.extend(guest.ready.iter().cloned());
     Ok(Manifest {
         schema: Some(SCHEMA_URL.to_owned()),
         manifest_version: ManifestVersion,
@@ -64,15 +60,11 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
         outputs: outputs_on_their_hosts(&machines)?,
         machines,
         lifecycle: lifecycle(env, guest, &way_in)?,
-        ready,
+        ready: host.ready,
         checks: guest.checks(&way_in)?,
         recovery: Some(recovery()?),
         expiry: None,
-        guest: Some(Guest {
-            machine: Name::parse(VM)?,
-            host: None,
-            status: guest.status.step(&way_in)?,
-        }),
+        guest: Some(host.guest),
     })
 }
 
@@ -97,23 +89,16 @@ fn vagrant_ssh(command: &Template) -> Result<Run, ManifestError> {
     Ok(Run::Argv(HostArgv::Every(Argv::new(run_manifest::program("vagrant")?, args))))
 }
 
-/// The VM: Isoloom's own (`infra`), named as each provider names it, with the digest of what
-/// Vagrant applies to it only at boot (its Vagrantfile's, `guest` running in it).
-fn vm(env: &Environment, guest: &GuestCompose) -> Result<Machine> {
-    let (cpus, memory_mb) = host_size(env);
+/// The VM as Vagrant has it: its define, named as each provider names it, with the digest of
+/// what Vagrant applies to it only at boot (its Vagrantfile's, `guest` running in it).
+fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
     let vm_names = super::machines::vm_names(label(env, "docker"), vm_name(env, "docker"), format!("{}_{DEFINE}", env.name));
-    let mut vm = run_manifest::machine(VM, Role::Infra)?;
-    vm.resources = Some(Resources {
-        cpus: Some(cpus),
-        memory_mb: Some(memory_mb),
-    });
     let boot_digest = crate::boot_digest::of(&crate::docker_vm::boot(env, guest)).remove(DEFINE);
-    vm.native = Some(Native::Vagrant {
+    Ok(Native::Vagrant {
         vagrant: Name::parse(DEFINE)?,
         vm_names,
         boot_digest,
-    });
-    Ok(vm)
+    })
 }
 
 /// Up (the VM, then the lab in it), down, park (suspend only: the containers keep their memory),

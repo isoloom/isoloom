@@ -92,7 +92,7 @@ fn project_files() -> Template {
         .with_expr(content)
         .with_text("'")
         .into_expression();
-    Template::text("# The project, at C:\\isoloom.\nfunction Write-IsoloomFile($path, $b64) { $f = Join-Path 'C:\\isoloom' $path; New-Item -ItemType Directory -Force (Split-Path $f) | Out-Null; [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String($b64)) }\n")
+    Template::text(format!("# The project, at {dir}.\nfunction Write-IsoloomFile($path, $b64) {{ $f = Join-Path '{dir}' $path; New-Item -ItemType Directory -Force (Split-Path $f) | Out-Null; [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String($b64)) }}\n", dir = isoloom_spec::windows::ISOLOOM_DIR))
         .with_expr(call("join", [string("\n"), for_list("f", reference("local.project_paths"), line, None)]))
         .with_text("\n")
 }

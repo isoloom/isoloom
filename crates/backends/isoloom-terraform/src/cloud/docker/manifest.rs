@@ -11,13 +11,12 @@
 //! the runner reads the containers inside it (`Manifest.guest`).
 
 use isoloom_manifest::{
-    Condition, Driver, Error as ManifestError, Guest, Identity, Machine, Manifest, ManifestVersion, Name, Output, OutputRole, Placeholder, RelPath, Resources,
-    Role, Run, SCHEMA_URL, SnakeName, StateOwner, Step, Template, TerraformIdentity,
+    Driver, Error as ManifestError, Identity, Manifest, ManifestVersion, Placeholder, RelPath, Run, SCHEMA_URL, SnakeName, StateOwner, Step, Template,
+    TerraformIdentity,
 };
 use isoloom_plan::Environment;
-use isoloom_render::container::{DOCKER_HOST as HOST, HostSize};
-use isoloom_render::run_manifest::guest::{GuestCompose, into_vm, ssh_run};
-use isoloom_render::run_manifest::{environment, generator, machine, outputs_on_their_hosts};
+use isoloom_render::run_manifest::guest::{GuestCompose, docker_host_outputs, into_vm, ssh_run};
+use isoloom_render::run_manifest::{environment, generator};
 
 use super::super::Cloud;
 use super::super::manifest::{self, connection, steps};
@@ -36,18 +35,14 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
     let way_in = ssh_run(ip.clone(), driver.user());
     let up = up_steps(&way_in, guest)?;
     let guest_machines = guest.machines_at(&ip);
-    let mut machines = vec![host(env)?];
+    let host = guest.docker_host(env, ("apply", "the Docker host exists and booted"), Some(ip.clone()), &way_in)?;
+    let mut machines = vec![host.machine];
     machines.extend(guest_machines.iter().cloned());
     let mut params = connection::params(&driver_variables(env, driver), cloud)?;
     params.extend(guest.params.iter().cloned());
     let mut secrets = connection::slots(cloud, connection::terraform_steps(false))?;
     secrets.extend(guest.slots.iter().cloned());
-    let mut ready = vec![Condition::StepOk {
-        step: isoloom_manifest::StepId::parse("apply")?,
-        means: Some("the Docker host exists and booted".into()),
-    }];
-    ready.extend(guest.ready.iter().cloned());
-    let outputs = docker_outputs(&guest_machines)?;
+    let outputs = docker_host_outputs(&guest_machines)?;
     Ok(Manifest {
         schema: Some(SCHEMA_URL.to_owned()),
         manifest_version: ManifestVersion,
@@ -71,15 +66,11 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         machines,
         outputs,
         lifecycle: steps::terraform_lifecycle(up)?,
-        ready,
+        ready: host.ready,
         checks: guest.checks(&way_in)?,
         recovery: manifest::recovery()?,
         expiry: manifest::expiry()?,
-        guest: Some(Guest {
-            machine: Name::parse(HOST)?,
-            host: Some(ip),
-            status: guest.status.step(&way_in)?,
-        }),
+        guest: Some(host.guest),
     })
 }
 
@@ -106,21 +97,6 @@ fn up_steps(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, guest: &Gu
     Ok(up)
 }
 
-/// The outputs: the host's address and SSH user, then each container's published ports on the
-/// host (`outputs_on_their_hosts`).
-fn docker_outputs(guest_machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
-    let mut outputs = vec![
-        state_output(
-            IP,
-            OutputRole::Address,
-            "The Docker host's address: SSH reaches it there, and its containers' published ports answer there.",
-        )?,
-        state_output("ssh_user", OutputRole::Info, "The user the runner's key lets in on the Docker host.")?,
-    ];
-    outputs.extend(outputs_on_their_hosts(guest_machines)?);
-    Ok(outputs)
-}
-
 /// The first SSH step into the fresh VM retries while ssh can't connect yet (the VM is still
 /// booting): `with.wait_s`. Later steps run once it answered.
 fn boot_wait(steps: &mut [isoloom_manifest::Step]) -> Result<(), ManifestError> {
@@ -130,23 +106,6 @@ fn boot_wait(steps: &mut [isoloom_manifest::Step]) -> Result<(), ManifestError> 
         with.insert(SnakeName::parse("wait_s")?, Template::text(&SSH_BOOT_WAIT_S.to_string()));
     }
     Ok(())
-}
-
-/// The host VM, sized for every container at once: Isoloom's own machine (`infra`), where the
-/// containers run.
-fn host(env: &Environment) -> Result<Machine, ManifestError> {
-    let size = HostSize::of(env);
-    let mut host = machine(HOST, Role::Infra)?;
-    host.resources = Some(Resources {
-        cpus: Some(size.cpus),
-        memory_mb: Some(size.memory_mb),
-    });
-    Ok(host)
-}
-
-/// A Terraform output of the module's state.
-fn state_output(name: &str, role: OutputRole, what: &str) -> Result<Output, ManifestError> {
-    crate::module::manifest::state_output(name, role, what)
 }
 
 /// The module's variables, for the params: the cloud's own and its size, then the operator's

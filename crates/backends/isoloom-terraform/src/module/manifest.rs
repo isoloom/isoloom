@@ -8,8 +8,8 @@ use std::net::IpAddr;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Delivery, EnvName, Error as ManifestError, Identifier, Machine, Name, NonEmpty, OsName, Output, OutputRole, OutputSource, Param, Part, Placeholder,
-    PublishMode, Role, RunVar, SetBy, SnakeName, StepId, Template, TfVarShape,
+    Delivery, EnvName, Error as ManifestError, Machine, Name, NonEmpty, OsName, Param, Part, Placeholder, PublishMode, Role, RunVar, SetBy, SnakeName, StepId,
+    Template, TfVarShape,
 };
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::run_manifest::{addresses, arch, port};
@@ -152,19 +152,4 @@ pub(crate) fn input_readers(env: &Environment, name: &str) -> Result<Vec<Name>, 
         .filter(|(_, mp)| mp.inputs.iter().any(|i| i == name))
         .map(|(n, _)| Name::parse(n))
         .collect()
-}
-
-/// A Terraform output read from the module's state (`sensitive: false`, no format).
-pub(crate) fn state_output(name: &str, role: OutputRole, what: &str) -> Result<Output, ManifestError> {
-    Ok(Output {
-        name: SnakeName::parse(name)?,
-        description: Some(what.into()),
-        role,
-        sensitive: false,
-        format: None,
-        from: OutputSource::TerraformOutput {
-            name: Identifier::parse(name)?,
-            default: None,
-        },
-    })
 }

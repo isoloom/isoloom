@@ -176,9 +176,9 @@ impl SettingValue {
 #[must_use]
 pub fn value_file(family: Family, setting: &SettingName, item: Option<(usize, &SettingName)>) -> String {
     let (root, sep) = if family == Family::Windows {
-        ("C:\\isoloom\\with", "\\")
+        (format!("{}\\with", isoloom_spec::windows::ISOLOOM_DIR), "\\")
     } else {
-        ("/run/isoloom/with", "/")
+        ("/run/isoloom/with".to_owned(), "/")
     };
     match item {
         Some((index, field)) => format!("{root}{sep}{setting}{sep}{index}{sep}{field}"),

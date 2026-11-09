@@ -1,24 +1,13 @@
 //! The names of the services this backend adds beside the machines', each built in one place so
 //! the run manifest tells them apart by the same rule.
 
-use isoloom_plan::checks::Position;
 use isoloom_spec::model::Arch;
 
-pub(crate) use isoloom_render::container::{STAND_IN, routes_service};
+pub(crate) use isoloom_render::container::{STAND_IN, check_runner as check_runner_service, routes_service};
 
 /// The one-shot service that copies the probe for machines of this architecture.
 pub(crate) fn probe_service(arch: Arch) -> String {
     format!("isoloom-probe-{}", arch.id())
-}
-
-/// The check runner service of a position: `isoloom-check` where a user stands (`default`),
-/// `isoloom-check-<position>` for the others.
-pub(crate) fn check_runner_service(pos: &Position, default: &Position) -> String {
-    if pos == default {
-        "isoloom-check".to_owned()
-    } else {
-        format!("isoloom-check-{}", pos.id())
-    }
 }
 
 /// The service of a tool (`tools:`).
@@ -33,6 +22,8 @@ pub(crate) fn tool_of(service: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
+    use isoloom_plan::checks::Position;
+
     use super::*;
 
     #[test]

@@ -12,11 +12,7 @@ pub(super) fn section(spec: &Spec) -> Value {
     let positions: Vec<Value> = checks::by_position(spec, &plan)
         .into_iter()
         .map(|(pos, group)| {
-            let runner = if pos == default_pos {
-                "isoloom-check".to_owned()
-            } else {
-                format!("isoloom-check-{}", pos.id())
-            };
+            let runner = isoloom_render::container::check_runner(&pos, &default_pos);
             json!({
                 "position": pos.id(),
                 "machine": match &pos { Position::Machine(m) => Some(m.clone()), Position::Networks => None },

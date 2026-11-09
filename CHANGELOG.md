@@ -133,6 +133,13 @@ stable spec format.
   support IMDSv2.
 - **DigitalOcean's `cloud-docker` firewall lets ICMP out**, as `cloud-vm`'s does: ping and path
   MTU discovery from the containers (every other cloud lets everything out).
+- **One rule for what several crates wrote each their own way** (library): a check runner's name
+  (`isoloom_render::container::check_runner`, `CHECK_RUNNER_PREFIX`), Isoloom's folder on a Linux
+  VM (`isoloom_render::steps::STATE_DIR`, `MAKE_STATE_DIR`) and on a Windows one
+  (`isoloom_spec::windows::ISOLOOM_DIR`, `READY_FILE`), the containers' VM in a run manifest
+  (`run_manifest::guest::GuestCompose::docker_host`, `docker_host_outputs`), Proxmox's server
+  variables, and a name's DNS-label rule (`isoloom_spec::validate::dns_label`, which the catalogue
+  shares). The `docker-vm` Proxmox module's variables read as the `proxmox` module's.
 
 ### Fixed
 

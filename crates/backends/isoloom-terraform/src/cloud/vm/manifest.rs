@@ -11,7 +11,7 @@ use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Outpu
 use isoloom_plan::checks::{Position, by_position};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::OUTPUT_DIR;
-use isoloom_render::run_manifest::{check, outputs_with, timeout_s};
+use isoloom_render::run_manifest::{check, outputs_with, terraform_output as state, timeout_s};
 use isoloom_spec::model::Target;
 
 use super::{Driver, vms};
@@ -93,11 +93,6 @@ fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError> {
         out.push(manifest::machine(CONTROLLER, Role::Infra, addresses)?);
     }
     Ok(out)
-}
-
-/// A Terraform output of the module.
-fn state(name: &str, role: OutputRole, what: &str) -> Result<Output, ManifestError> {
-    manifest::state_output(name, role, what)
 }
 
 /// Where to stand (`ip`), the ready file, each machine's public address (the controller's too),

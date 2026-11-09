@@ -6,14 +6,10 @@
 //! and the containers' states are read inside it. A server lab isn't parked: it is made or
 //! destroyed.
 
-use isoloom_manifest::{
-    Condition, Driver, Error as ManifestError, Guest, Lifecycle, Machine, Manifest, ManifestVersion, Name, Output, OutputRole, Placeholder, RelPath, Resources,
-    Role, Run, SCHEMA_URL, SnakeName, StepId, Template,
-};
+use isoloom_manifest::{Driver, Error as ManifestError, Lifecycle, Manifest, ManifestVersion, Placeholder, RelPath, Run, SCHEMA_URL, SnakeName, Template};
 use isoloom_plan::Environment;
-use isoloom_render::container::{DOCKER_HOST as VM, HostSize};
-use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, into_vm, ssh_run};
-use isoloom_render::run_manifest::{self, environment, generator, outputs_on_their_hosts};
+use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, docker_host_outputs, into_vm, ssh_run};
+use isoloom_render::run_manifest::{self, environment, generator};
 use isoloom_spec::model::Target;
 
 use super::super::docker_host::{SETUP, USER, variables};
@@ -39,7 +35,8 @@ pub fn docker_vm(env: &Environment, guest: &GuestCompose) -> crate::Result<Manif
 fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestError> {
     let ip = Template::from(Placeholder::Output(SnakeName::parse(IP)?));
     let way_in = ssh_run(ip.clone(), USER);
-    let mut machines = vec![vm(env)?];
+    let host = guest.docker_host(env, ("apply", "the Docker host VM exists and booted"), Some(ip.clone()), &way_in)?;
+    let mut machines = vec![host.machine];
     machines.extend(guest.machines_at(&ip));
     let vars = variables();
     // docker-vm is a single Docker host VM with no router to seal.
@@ -48,11 +45,6 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
     let mut secrets = slots::connection(&vars)?;
     secrets.extend(guest.slots.iter().cloned());
     let lifecycle = lifecycle(guest, &way_in)?;
-    let mut ready = vec![Condition::StepOk {
-        step: StepId::parse("apply")?,
-        means: Some("the Docker host VM exists and booted".into()),
-    }];
-    ready.extend(guest.ready.iter().cloned());
     Ok(Manifest {
         schema: Some(SCHEMA_URL.to_owned()),
         manifest_version: ManifestVersion,
@@ -67,18 +59,14 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
         params,
         secrets,
         networks: guest.networks.clone(),
-        outputs: outputs(&machines)?,
+        outputs: docker_host_outputs(&machines)?,
         machines,
         lifecycle,
-        ready,
+        ready: host.ready,
         checks: guest.checks(&way_in)?,
         recovery: None,
         expiry: None,
-        guest: Some(Guest {
-            machine: Name::parse(VM)?,
-            host: Some(ip),
-            status: guest.status.step(&way_in)?,
-        }),
+        guest: Some(host.guest),
     })
 }
 
@@ -93,31 +81,6 @@ fn lifecycle(guest: &GuestCompose, way_in: &dyn Fn(&Template) -> Result<Run, Man
     up.extend(GuestCommand::steps(&guest.start, way_in)?);
     lifecycle.up = isoloom_manifest::NonEmpty::new(up, "lifecycle.up")?;
     Ok(lifecycle)
-}
-
-/// The Docker host's address (`ip`), the SSH user, then each published port at the host's address.
-fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
-    let mut out = vec![
-        run_manifest::terraform_output(
-            IP,
-            OutputRole::Address,
-            "The Docker host's address: SSH reaches it there, and the published ports answer there.",
-        )?,
-        run_manifest::terraform_output("ssh_user", OutputRole::Info, "The user the runner's key lets in on the Docker host.")?,
-    ];
-    out.extend(outputs_on_their_hosts(machines)?);
-    Ok(out)
-}
-
-/// The VM: Isoloom's own (`infra`), sized for the containers.
-fn vm(env: &Environment) -> Result<Machine, ManifestError> {
-    let size = HostSize::of(env);
-    let mut vm = run_manifest::machine(VM, Role::Infra)?;
-    vm.resources = Some(Resources {
-        cpus: Some(size.cpus),
-        memory_mb: Some(size.memory_mb),
-    });
-    Ok(vm)
 }
 
 #[cfg(test)]

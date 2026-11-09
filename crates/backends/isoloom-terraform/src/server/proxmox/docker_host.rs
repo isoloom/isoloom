@@ -16,12 +16,12 @@ use isoloom_render::run_manifest::guest::{self, GuestCompose};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::Target;
 
-use super::base::{connection, download, provider};
+use super::base::{download, provider};
 use super::machine::snippet;
 use crate::Result;
 use crate::machine::cloud_init::{self, CloudConfig};
 use crate::module::providers::{self, terraform};
-use crate::module::variable::{self, Variable};
+use crate::module::variable::Variable;
 use crate::module::{self, ProjectCopy, Usage, output, resource};
 use crate::server::{slotted, user};
 
@@ -80,26 +80,10 @@ fn setup(env: &Environment) -> GeneratedFile {
 /// The module's variables: the server, where the VM goes, its slot on the server, and the key the
 /// `isoloom` user takes.
 pub(super) fn variables() -> Vec<Variable> {
-    let s = |name: &str| Variable::new(name, "string");
-    let mut v = connection("Uploading the cloud-init snippet goes over SSH to the node");
-    v.extend([
-        super::base::node(),
-        s("datastore").default(string("local-lvm")).describe("Where the VM's disk goes"),
-        s("image_datastore")
-            .default(string("local"))
-            .describe("A datastore with 'iso' content, for the cloud image"),
-        s("snippets_datastore")
-            .default(string("local"))
-            .describe("A datastore with 'snippets' content, for cloud-init"),
-        s("uplink_bridge")
-            .default(string("vmbr0"))
-            .describe("The bridge the VM gets its address (DHCP) and the internet from"),
-        Variable::new("slot", "number")
-            .default(number(1))
-            .describe("1 to 99, unique per environment on this server"),
-        variable::ssh_public_key(true).default(string("")),
-    ]);
-    v
+    super::base::server(
+        "The bridge the VM gets its address (DHCP) and the internet from",
+        "1 to 99, unique per environment on this server",
+    )
 }
 
 /// The VM's address on the uplink: the guest agent's that isn't the loopback.

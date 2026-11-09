@@ -76,7 +76,10 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     // would recreate the router VM), so the seal is applied live by the manifest's seal-reload
     // step instead (`crate::server::router`).
     [
-        own_variables(),
+        server(
+            "The bridge the router reaches the internet through",
+            "1 to 99, unique per environment on this server (SDN ids are short)",
+        ),
         super::windows::variables(env),
         super::lxc::variables(env),
         super::virtiofs::variables(env),
@@ -84,7 +87,11 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     .concat()
 }
 
-fn own_variables() -> Vec<Variable> {
+/// The server's variables, the same in both modules (`proxmox`'s and `docker-vm`'s): the
+/// connection, the node, where the disks, images and snippets go, the uplink bridge (`uplink`
+/// says what it is for), the environment's slot (`slot` says how unique) and the key the
+/// `isoloom` user takes.
+pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
     let mut v = connection("Uploading cloud-init snippets goes over SSH to the node");
     v.extend([
@@ -96,12 +103,8 @@ fn own_variables() -> Vec<Variable> {
         s("snippets_datastore")
             .default(string("local"))
             .describe("A datastore with 'snippets' content, for cloud-init"),
-        s("uplink_bridge")
-            .default(string("vmbr0"))
-            .describe("The bridge the router reaches the internet through"),
-        Variable::new("slot", "number")
-            .default(number(1))
-            .describe("1 to 99, unique per environment on this server (SDN ids are short)"),
+        s("uplink_bridge").default(string("vmbr0")).describe(uplink),
+        Variable::new("slot", "number").default(number(1)).describe(slot),
         variable::ssh_public_key(true).default(string("")),
     ]);
     v

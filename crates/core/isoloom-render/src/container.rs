@@ -19,6 +19,7 @@ pub use project_files::{copied_from_project, host_environment, project_variables
 
 use isoloom_manifest::Failure;
 use isoloom_plan::Health;
+use isoloom_plan::checks::Position;
 use isoloom_spec::model::Machine;
 
 /// The check runner: a small image with `sh`, `curl` and busybox `nc`.
@@ -63,6 +64,21 @@ pub fn exec_runner(machine: &str) -> String {
 /// The service that stands in for an access machine the runner supplies, so checks run from its
 /// side (only the `check` profile starts it).
 pub const STAND_IN: &str = "isoloom-access";
+
+/// The prefix of every check runner's service ([`check_runner`]).
+pub const CHECK_RUNNER_PREFIX: &str = "isoloom-check";
+
+/// The check runner of a position: `isoloom-check` where a user stands (`default`),
+/// `isoloom-check-<position>` for the others. The one rule the Compose services, the resolved
+/// snapshot and the run manifest name them by.
+#[must_use]
+pub fn check_runner(pos: &Position, default: &Position) -> String {
+    if pos == default {
+        CHECK_RUNNER_PREFIX.to_owned()
+    } else {
+        format!("{CHECK_RUNNER_PREFIX}-{}", pos.id())
+    }
+}
 
 /// The VM the containers run in (`docker-vm`'s, `cloud-docker`'s, the hybrid target's), as run
 /// manifests and Vagrantfiles name it: Isoloom's own, under the prefix a lab's machines can't
