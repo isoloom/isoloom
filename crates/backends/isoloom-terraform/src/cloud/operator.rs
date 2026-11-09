@@ -1,8 +1,8 @@
 //! What the operator gives every cloud module, after the cloud's own variables: who may reach
-//! the machines, the runner's SSH key, the expiry and the launch-time inputs; and how a cloud
-//! module is started (through the runner, which sets most of them).
+//! the machines, the runner's SSH key, the expiry and the launch-time inputs. How a module is
+//! started is its cloud's (`Base::usage`).
 
-use isoloom_render::hcl_builder::string;
+use isoloom_render::hcl_builder::{Block, Module, string};
 
 use crate::module::Usage;
 use crate::module::variable::{self, Variable};
@@ -10,10 +10,18 @@ use crate::module::variable::{self, Variable};
 /// Who may reach the machines, as a module's usage tells the operator to give it.
 pub(crate) const ALLOWED: &str = "-var allowed_cidr=<your IP>/32 ";
 
-/// What a cloud module's first lines say: `apply` takes who may reach the machines and the key
-/// they let in; then the machines wait for the project, which the runner delivers.
-pub(crate) fn usage(folder: &str) -> Usage<'_> {
-    Usage::with_runner_key(folder, ALLOWED)
+/// The usage of a cloud whose provider reads its token from the environment: `auth` says which
+/// (`# Auth:` line), then `apply` takes who may reach the machines and their key.
+pub(crate) const fn with_token<'a>(folder: &'a str, auth: &'a str) -> Usage<'a> {
+    Usage {
+        before: auth,
+        ..Usage::with_runner_key(folder, ALLOWED)
+    }
+}
+
+/// A provider configured by the environment alone (its token): `provider "<name>" {}`.
+pub(crate) fn bare_provider(m: &mut Module, name: &str) {
+    m.block(Block::builder("provider").add_label(name).build());
 }
 
 /// Who may reach the machines, the runner's key and the run's expiry: the operator variables a

@@ -13,13 +13,12 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Block, Expression, Module, Template, boolean, call, list, reference, string};
 use isoloom_spec::DEFAULT_MEMORY_MB;
 
-use super::region;
+use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
-use crate::cloud::{Cloud, operator};
 use crate::limits::Limits;
-use crate::module::{self, Usage, ident, providers, resource};
+use crate::module::{self, ident, providers, resource};
 
 /// What Linode takes.
 const RULES: Rules = Rules {
@@ -58,7 +57,7 @@ const RULES: Rules = Rules {
 };
 
 /// The SSH user of every Linode: Linode's images log in as root.
-const USER: &str = "root";
+pub(super) const USER: &str = "root";
 
 /// Debian's Linode images have no `sudo`: installed before the steps (they run with it).
 const SUDO: &str = "command -v sudo >/dev/null || (apt-get update -qq && apt-get install -y -qq sudo)";
@@ -77,7 +76,7 @@ const IMAGES: OsImages<&str> = OsImages(&[
 ]);
 
 /// An OS's image, when there is one.
-fn image(os: &str) -> Option<&'static str> {
+pub(super) fn image(os: &str) -> Option<&'static str> {
     IMAGES.of(os)
 }
 
@@ -94,23 +93,14 @@ fn plan(memory_mb: u32) -> &'static str {
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage {
-        before: "# Auth:   export LINODE_TOKEN=<token> (the provider reads it).\n",
-        ..Usage::with_runner_key(folder, operator::ALLOWED)
-    },
+    base: super::BASE,
     requires: (&[providers::LINODE, providers::RANDOM], &[]),
-    variables: || vec![region()],
-    provider: |_, m| {
-        m.block(Block::builder("provider").add_label("linode").build());
-        Vec::new()
-    },
     refusal,
     // No cap on its user data that the module checks: its machines are written as they are.
     write: |env, m| {
         write(env, m);
         Ok(())
     },
-    user: |_| USER,
 };
 
 /// The module after its providers: the VPC and its subnets, the firewalls, each machine, the outputs.

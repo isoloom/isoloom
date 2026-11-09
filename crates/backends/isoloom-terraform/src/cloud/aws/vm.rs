@@ -28,14 +28,14 @@ use isoloom_render::hcl_builder::{Block, BlockBuilder, Module, string};
 use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 
-use super::{ami, ami_filter, instance_type, provider, region, zones};
+use super::{ami, ami_filter, instance_type, zones};
+use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
-use crate::cloud::{Cloud, instance, operator};
 use crate::limits::Limits;
 use crate::machine::{controller, vms};
+use crate::module::ident;
 use crate::module::providers;
-use crate::module::{Usage, ident};
 
 /// What AWS takes.
 const RULES: Rules = Rules {
@@ -188,7 +188,7 @@ pub(super) fn image_min_disk_gb(os: &str) -> u32 {
 }
 
 /// The SSH user of an OS's image (`admin` for an OS without one).
-fn image_user(os: &str) -> &'static str {
+pub(super) fn image_user(os: &str) -> &'static str {
     image(os).map_or("admin", |i| i.user)
 }
 
@@ -234,16 +234,10 @@ fn machines_refusal(env: &Environment) -> Option<String> {
 
 /// Its `cloud-vm` driver.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    base: super::BASE,
     requires: (&[providers::AWS], &[providers::RANDOM, providers::TIME, providers::LOCAL]),
-    variables: || vec![region()],
-    provider: |env, m| {
-        m.block(provider(instance::tags(env)));
-        Vec::new()
-    },
-    refusal,
     write,
-    user: image_user,
+    refusal,
 };
 
 /// The module's blocks after the providers, from the plan.
@@ -270,14 +264,16 @@ fn amis(env: &Environment) -> Vec<Block> {
     }
     oses.sort_unstable();
     oses.dedup();
-    oses.into_iter()
-        .filter_map(|os| Some((os, image(os)?)))
-        .map(|(os, i)| {
-            let lookup = ami(&ident(os), i.owner, i.filter).add_block(ami_filter("architecture", "x86_64"));
-            match i.product_code {
-                Some(code) => lookup.add_block(ami_filter("product-code", code)).build(),
-                None => lookup.build(),
-            }
-        })
-        .collect()
+    oses.into_iter().filter_map(ami_lookup).collect()
+}
+
+/// The AMI lookup of an OS from the image table (`data.aws_ami.<os>`), when AWS has an image of
+/// it: the `cloud-vm` machines' and the `cloud-docker` host's.
+pub(super) fn ami_lookup(os: &str) -> Option<Block> {
+    let i = image(os)?;
+    let lookup = ami(&ident(os), i.owner, i.filter).add_block(ami_filter("architecture", "x86_64"));
+    Some(match i.product_code {
+        Some(code) => lookup.add_block(ami_filter("product-code", code)).build(),
+        None => lookup.build(),
+    })
 }

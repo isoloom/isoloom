@@ -197,6 +197,10 @@ resource "aws_security_group" "iis" {
 
 # No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.
 resource "aws_instance" "iis" {
+  instance_initiated_shutdown_behavior = "terminate"
+  metadata_options {
+    http_tokens = "required"
+  }
   ami                         = data.aws_ami.windows_server_2022.id
   instance_type               = "c7i-flex.large"
   subnet_id                   = aws_subnet.lab.id
@@ -209,6 +213,8 @@ resource "aws_instance" "iis" {
   }
   root_block_device {
     volume_size = 50
+    volume_type = "gp3"
+    encrypted   = true
   }
   tags = { Name = "${local.name}-iis" }
 }
@@ -296,6 +302,10 @@ resource "aws_network_interface" "isoloom_controller_lab" {
 }
 
 resource "aws_instance" "isoloom_controller" {
+  instance_initiated_shutdown_behavior = "terminate"
+  metadata_options {
+    http_tokens = "required"
+  }
   ami              = data.aws_ami.debian_12.id
   instance_type    = "t3.micro"
   key_name         = aws_key_pair.env.key_name

@@ -7,8 +7,21 @@ pub(crate) mod vm;
 
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, boolean, index, list, number, reference, string};
 
-use crate::module::resource;
+use super::{Base, instance, operator};
 use crate::module::variable::Variable;
+use crate::module::{Usage, resource};
+
+/// What AWS's modules share: who may reach the machines and their key, the region, the provider
+/// tagging every resource ([`instance::tags`]), and its images' users.
+pub(crate) const BASE: Base = Base {
+    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    variables: || vec![region()],
+    provider: |env, m| {
+        m.block(provider(instance::tags(env)));
+        Vec::new()
+    },
+    user: vm::image_user,
+};
 
 /// The `region` variable: Paris by default.
 pub(crate) fn region() -> Variable {
@@ -21,6 +34,25 @@ pub(crate) fn provider(tags: Expression) -> Block {
         .add_label("aws")
         .add_attribute(("region", reference("var.region")))
         .add_block(Block::builder("default_tags").add_attribute(("tags", tags)).build())
+        .build()
+}
+
+/// `resource "aws_instance" "<id>"`, the same on both targets: it terminates when it shuts down
+/// (a machine's own expiry shutdown ends it, nothing is left stopped and billed for its disk),
+/// and its metadata service takes session tokens only (`IMDSv2`: a request forwarded by a lab's
+/// service can't read it).
+pub(crate) fn ec2_instance(id: &str) -> BlockBuilder {
+    resource("aws_instance", id)
+        .add_attribute(("instance_initiated_shutdown_behavior", string("terminate")))
+        .add_block(Block::builder("metadata_options").add_attribute(("http_tokens", string("required"))).build())
+}
+
+/// An instance's root disk of `gb` GB, the same on both targets: gp3, encrypted.
+pub(crate) fn root_disk(gb: u32) -> Block {
+    Block::builder("root_block_device")
+        .add_attribute(("volume_size", number(u64::from(gb))))
+        .add_attribute(("volume_type", string("gp3")))
+        .add_attribute(("encrypted", boolean(true)))
         .build()
 }
 

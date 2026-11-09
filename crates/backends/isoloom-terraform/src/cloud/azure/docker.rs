@@ -1,28 +1,27 @@
 //! Azure's `cloud-docker` module: a resource group holding a virtual network and subnet, a
-//! static public address, a security group, and a Debian VM.
+//! static public address, a security group, and a VM of the Docker host's OS, every resource
+//! tagged.
 
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, number, reference, string};
 use isoloom_spec::model::Protocol;
 
-use super::{provider, variables};
-use crate::cloud::docker::{Driver, SizeVariable};
+use super::vm::{self, USER};
+use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
 use crate::cloud::instance::set_up_once;
 use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
 pub(crate) const DRIVER: Driver = Driver {
+    base: super::BASE,
     requires: providers::AZURERM,
-    variables: || variables().into(),
     size: Some(SizeVariable {
         name: "size",
         default: |s| s.pick(["Standard_D2als_v6", "Standard_D2as_v6", "Standard_D4as_v6"]),
     }),
-    provider,
     resources,
-    user: "isoloom",
 };
 
 /// The cloud's resources, after the module's head, `custom_data` in the VM (read by
@@ -31,7 +30,7 @@ fn resources(env: &Environment, m: &mut Module, custom_data: Expression) -> Expr
     m.blocks(network());
     m.block(security_group(env));
     m.blocks(interface());
-    m.block(vm(HostSize::of(env), custom_data));
+    m.block(host(HostSize::of(env), custom_data));
     reference("azurerm_public_ip.env.ip_address")
 }
 
@@ -43,11 +42,12 @@ fn resource(kind: &str) -> BlockBuilder {
         .add_attribute(("name", reference("local.name")))
 }
 
-/// In the resource group, in the region.
+/// In the resource group, in the region, with the tags every resource carries.
 fn placed(kind: &str) -> BlockBuilder {
     resource(kind)
         .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
         .add_attribute(("location", reference("var.region")))
+        .add_attribute(("tags", reference("local.tags")))
 }
 
 /// The resource group, the network, its subnet and the public address.
@@ -118,36 +118,22 @@ fn interface() -> Vec<Block> {
     ]
 }
 
-/// Debian 12, the `isoloom` user with the runner's key, its expiry in its custom data, run once
-/// ([`set_up_once`]).
-fn vm(size: HostSize, custom_data: Expression) -> Block {
+/// The Docker host's OS from Azure's image table, the cloud's user with the runner's key, its
+/// disk as a `cloud-vm` machine's, its expiry in its custom data, run once ([`set_up_once`]).
+fn host(size: HostSize, custom_data: Expression) -> Block {
     placed("azurerm_linux_virtual_machine")
         .add_attribute(("size", reference("var.size")))
         .add_attribute(("custom_data", call("base64encode", [custom_data])))
-        .add_attribute(("admin_username", string("isoloom")))
+        .add_attribute(("admin_username", string(USER)))
         .add_attribute(("network_interface_ids", list([reference("azurerm_network_interface.env.id")])))
         .add_block(
             Block::builder("admin_ssh_key")
-                .add_attribute(("username", string("isoloom")))
+                .add_attribute(("username", string(USER)))
                 .add_attribute(("public_key", reference("var.ssh_public_key")))
                 .build(),
         )
-        .add_block(
-            Block::builder("os_disk")
-                .add_attribute(("caching", string("ReadWrite")))
-                .add_attribute(("storage_account_type", string("StandardSSD_LRS")))
-                .add_attribute(("disk_size_gb", number(size.disk_gb.into())))
-                .build(),
-        )
-        .add_block(
-            Block::builder("source_image_reference")
-                .add_attribute(("publisher", string("Debian")))
-                .add_attribute(("offer", string("debian-12")))
-                .add_attribute(("sku", string("12-gen2")))
-                .add_attribute(("version", string("latest")))
-                .build(),
-        )
-        .add_attribute(("tags", reference("local.tags")))
+        .add_block(vm::os_disk(size.disk_gb))
+        .add_block(vm::source_image(HOST_OS, false))
         .add_attribute(("depends_on", list([reference("azurerm_network_interface_security_group_association.env")])))
         .add_block(set_up_once(reference("custom_data")).build())
         .build()

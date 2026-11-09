@@ -1,42 +1,34 @@
 //! Oracle Cloud's `cloud-docker` module: a VCN with an internet gateway and its route, a
-//! security list, a subnet, and an Ubuntu instance (Oracle Cloud has no Debian image of its
-//! own).
+//! security list, a subnet, and an instance of the Docker host's OS from Oracle Cloud's image
+//! table: Ubuntu (Oracle Cloud has no Debian image of its own).
 
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
-use super::{SHAPE, availability_domain, availability_domains, owned, provider, route_out, ubuntu_images};
-use crate::cloud::docker::Driver;
+use super::{SHAPE, availability_domain, availability_domains, owned, route_out, ubuntu_images, vm};
+use crate::cloud::docker::{Driver, HOST_OS};
 use crate::cloud::instance;
 use crate::docker_host::published;
 use crate::module::providers;
-use crate::module::variable::Variable;
 
 /// Its `cloud-docker` driver: no size variable, its shape's OCPUs and memory follow the sizing.
 pub(crate) const DRIVER: Driver = Driver {
+    base: super::BASE,
     requires: providers::OCI,
-    variables: || {
-        vec![
-            Variable::new("compartment_id", "string"),
-            Variable::new("region", "string").default(string("eu-paris-1")),
-            super::profile(),
-        ]
-    },
     size: None,
-    provider,
     resources,
-    user: "ubuntu",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
 /// by cloud-init); the Docker host's address.
 fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
     m.block(availability_domains());
-    m.block(ubuntu_images("ubuntu", "24.04"));
+    let version = vm::ubuntu(HOST_OS);
+    m.block(ubuntu_images(&vm::image_source(version), version));
     m.blocks(network(env));
-    m.block(vm(env, user_data));
+    m.block(host(env, user_data));
     reference("oci_core_instance.env.public_ip")
 }
 
@@ -107,7 +99,7 @@ fn network(env: &Environment) -> Vec<Block> {
 
 /// The instance: Ubuntu on the flexible shape, sized for the containers, its expiry in its user
 /// data, run once ([`instance::set_up_once`]).
-fn vm(env: &Environment, user_data: Expression) -> Block {
+fn host(env: &Environment, user_data: Expression) -> Block {
     let (ocpus, memory) = HostSize::of(env).pick([(1, 4), (2, 8), (4, 16)]);
     resource("oci_core_instance")
         .add_attribute(("availability_domain", availability_domain()))
@@ -122,7 +114,13 @@ fn vm(env: &Environment, user_data: Expression) -> Block {
         .add_block(
             Block::builder("source_details")
                 .add_attribute(("source_type", string("image")))
-                .add_attribute(("source_id", attr(index(reference("data.oci_core_images.ubuntu.images"), 0), "id")))
+                .add_attribute((
+                    "source_id",
+                    attr(
+                        index(reference(&format!("data.oci_core_images.{}.images", vm::image_source(vm::ubuntu(HOST_OS)))), 0),
+                        "id",
+                    ),
+                ))
                 .build(),
         )
         .add_block(

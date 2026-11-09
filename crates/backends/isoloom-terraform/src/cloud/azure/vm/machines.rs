@@ -124,7 +124,8 @@ fn trusted_launch(b: BlockBuilder, tpm: bool) -> BlockBuilder {
     }
 }
 
-fn os_disk(gb: u32) -> Block {
+/// A VM's OS disk of `gb` GB, the same on both targets.
+pub(in crate::cloud::azure) fn os_disk(gb: u32) -> Block {
     Block::builder("os_disk")
         .add_attribute(("caching", string("ReadWrite")))
         .add_attribute(("storage_account_type", string("StandardSSD_LRS")))
@@ -141,7 +142,7 @@ fn with_image(vm: BlockBuilder, (os, own): (&str, Option<&str>), tpm: bool) -> B
 }
 
 /// An OS's Marketplace image; with a TPM, its generation 2 build (trusted launch needs one).
-fn source_image(os: &str, tpm: bool) -> Block {
+pub(in crate::cloud::azure) fn source_image(os: &str, tpm: bool) -> Block {
     let (publisher, offer, sku) = image(os).unwrap_or_default();
     let sku = if tpm { sku.strip_suffix("-gen1").unwrap_or(sku) } else { sku };
     Block::builder("source_image_reference")

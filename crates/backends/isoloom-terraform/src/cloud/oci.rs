@@ -8,8 +8,31 @@ pub(crate) mod vm;
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, index, reference, string};
 
+use super::Base;
 use crate::cloud::instance;
+use crate::module::Usage;
 use crate::module::variable::Variable;
+
+/// What Oracle Cloud's modules share: the compartment and who may reach the machines, its
+/// configuration, the compartment and region, the provider with the tags, and the user its
+/// (Ubuntu) images sign in as.
+pub(crate) const BASE: Base = Base {
+    usage: |folder| Usage {
+        after: "# Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.\n",
+        ..Usage::with_runner_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
+    },
+    variables: || {
+        vec![
+            Variable::new("compartment_id", "string").describe("The compartment the environment goes in"),
+            Variable::new("region", "string")
+                .default(string("eu-paris-1"))
+                .describe("The OCI region to launch in"),
+            profile(),
+        ]
+    },
+    provider,
+    user: |_| vm::USER,
+};
 
 /// The shape every instance has: AMD, sized by its configuration.
 pub(crate) const SHAPE: &str = "VM.Standard.E4.Flex";

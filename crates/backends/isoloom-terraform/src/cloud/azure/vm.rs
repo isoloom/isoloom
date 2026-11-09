@@ -22,10 +22,12 @@ mod network;
 mod private_dns;
 mod routing;
 
+pub(super) use machines::{os_disk, source_image};
+
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Expression, Module, reference};
 
-use super::{provider, variables};
+use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{
     self, Driver, gateways,
@@ -33,13 +35,12 @@ use crate::cloud::vm::{
     outputs::{self, Reach},
     own_image, windows,
 };
-use crate::cloud::{Cloud, operator};
 use crate::limits::Limits;
 use crate::machine::controller;
-use crate::module::{Usage, ident, providers};
+use crate::module::{ident, providers};
 
 /// Azure creates the administrator with the VM: a name it never reserves, on every machine.
-const USER: &str = "isoloom";
+pub(super) const USER: &str = "isoloom";
 
 /// What Azure takes.
 const RULES: Rules = Rules {
@@ -180,13 +181,10 @@ fn interfaces(env: &Environment) -> Option<String> {
 
 /// Its `cloud-vm` driver.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    base: super::BASE,
     requires: (&[providers::AZURERM], &[providers::RANDOM, providers::LOCAL]),
-    variables: || variables().into(),
-    provider,
     refusal,
     write,
-    user: |_| USER,
 };
 
 /// The module's blocks after the providers, from the plan.

@@ -13,7 +13,7 @@ use super::network::{controller_group, security_group};
 use super::{addresses, image_user, machine_type, nesting};
 use crate::Result;
 use crate::cloud::auto_stop;
-use crate::cloud::aws::instance_type;
+use crate::cloud::aws::{ec2_instance, instance_type, root_disk};
 use crate::cloud::instance::{self, name_with};
 use crate::cloud::vm::controller_setup;
 use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image};
@@ -56,7 +56,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
-    let instance = resource("aws_instance", &id)
+    let instance = ec2_instance(&id)
         .add_attribute(("ami", ami(mp)))
         .add_attribute(("instance_type", string(machine_type(mp, mem))))
         .add_blocks(disks::aws(&mp.disks));
@@ -121,7 +121,7 @@ fn one_network((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Bloc
         .add_attribute(("associate_public_ip_address", boolean(true)))
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
-        .add_block(disk(root_disk_gb(mp)))
+        .add_block(root_disk(root_disk_gb(mp)))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
         .build()
 }
@@ -146,7 +146,7 @@ fn several_networks((name, mp): (&str, &MachinePlan), instance: BlockBuilder) ->
         instance
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
             .add_block(primary(&first))
-            .add_block(disk(root_disk_gb(mp)))
+            .add_block(root_disk(root_disk_gb(mp)))
             .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
             .build(),
     );
@@ -167,12 +167,6 @@ fn interface(id: &str, net: &str, address: &str, group: Expression, mp: Option<&
 fn primary(interface: &str) -> Block {
     Block::builder("primary_network_interface")
         .add_attribute(("network_interface_id", reference(&format!("aws_network_interface.{interface}.id"))))
-        .build()
-}
-
-fn disk(gb: u32) -> Block {
-    Block::builder("root_block_device")
-        .add_attribute(("volume_size", number(u64::from(gb))))
         .build()
 }
 
@@ -214,7 +208,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
     let Some((net, addr)) = mp.addresses.first() else { return };
     // Windows wants 2 GB and more.
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB).max(2048);
-    let instance = resource("aws_instance", &id)
+    let instance = ec2_instance(&id)
         .add_attribute(("ami", ami(mp)))
         .add_attribute(("instance_type", string(machine_type(mp, mem))))
         .add_attribute(("subnet_id", reference(&format!("aws_subnet.{}.id", ident(net)))))
@@ -223,7 +217,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
         .add_attribute(("user_data", windows_user_data()))
         .add_block(lifecycle("user_data", None))
-        .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
+        .add_block(root_disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
         .add_blocks(disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));
     let instance = nesting(addresses::on_instance(instance, mp, net), mp).build();
@@ -277,7 +271,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let user = |mp: &MachinePlan| image_user(mp.os.as_deref().unwrap_or_default()).to_owned();
     let setup = controller_setup::set_up(env, &user, inventory, &at_boot);
     m.block(
-        resource("aws_instance", "isoloom_controller")
+        ec2_instance("isoloom_controller")
             .add_attribute(("ami", reference(&format!("data.aws_ami.{}.id", ident(controller::OS)))))
             .add_attribute(("instance_type", string(instance_type(mem))))
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))

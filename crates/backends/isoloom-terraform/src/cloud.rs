@@ -24,8 +24,8 @@ use std::fmt;
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Expression, Module};
 
-use crate::module::ProjectCopy;
 use crate::module::variable::Variable;
+use crate::module::{ProjectCopy, Usage};
 
 /// A cloud the `cloud-vm` and `cloud-docker` modules run on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -80,6 +80,23 @@ impl Cloud {
 /// A cloud's provider in its modules: writes the provider's configuration, and gives the locals
 /// it adds to the environment's (`instance::id_and_locals`).
 pub(crate) type ProviderConfig = fn(&Environment, &mut Module) -> Vec<(&'static str, Expression)>;
+
+/// What a cloud's modules share on both targets (`cloud-vm` and `cloud-docker`), so they never
+/// drift: how to start one, the cloud's variables, its provider, and the user each OS's image
+/// signs in as (`<cloud>::BASE`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Base {
+    /// How to start its module (the settings `apply` takes, how it authenticates), from its
+    /// folder.
+    pub(crate) usage: for<'a> fn(&'a str) -> Usage<'a>,
+    /// Its variables before the operator's: where it runs, which account.
+    pub(crate) variables: fn() -> Vec<Variable>,
+    /// Its provider's configuration.
+    pub(crate) provider: ProviderConfig,
+    /// The user the runner's key logs in as on a machine of this OS, from the cloud's image
+    /// table (it has `sudo`, or is root).
+    pub(crate) user: fn(&str) -> &'static str,
+}
 
 /// A cloud module's start after its `terraform` block, the same on every cloud and target: the
 /// cloud's `variables`, the operator's, then its provider and the environment's id and locals.

@@ -1,28 +1,25 @@
-//! DigitalOcean's `cloud-docker` module: a VPC, the operator's key, a Debian droplet, and a
-//! firewall.
+//! DigitalOcean's `cloud-docker` module: a VPC, the operator's key, a droplet of the Docker
+//! host's OS, and a firewall.
 
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, list, reference, string};
 use isoloom_spec::model::Protocol;
 
-use super::{Way, region, rule, ssh_key, vpc};
-use crate::cloud::docker::{Driver, SizeVariable};
+use super::{Way, rule, ssh_key, vm, vpc};
+use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
 use crate::cloud::instance::{self, tag_list};
 use crate::docker_host::published;
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
 pub(crate) const DRIVER: Driver = Driver {
+    base: super::BASE,
     requires: providers::DIGITALOCEAN,
-    variables: || vec![region()],
     size: Some(SizeVariable {
         name: "size",
         default: |s| s.pick(["s-2vcpu-4gb", "s-4vcpu-8gb", "s-8vcpu-16gb"]),
     }),
-    // No provider block: the provider reads its token from the environment.
-    provider: |_, _| Vec::new(),
     resources,
-    user: "root",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the droplet; the Docker
@@ -40,12 +37,12 @@ fn resource(kind: &str) -> BlockBuilder {
     crate::module::resource(kind, "env").add_attribute(("name", reference("local.name")))
 }
 
-/// Debian 12 with the runner's key, its expiry in its user data, run once ([`instance::set_up_once`]).
+/// The Docker host's OS from DigitalOcean's image table, with the runner's key, its expiry in its user data, run once ([`instance::set_up_once`]).
 fn droplet(env: &Environment, user_data: Expression) -> Block {
     resource("digitalocean_droplet")
         .add_attribute(("region", reference("var.region")))
         .add_attribute(("size", reference("var.size")))
-        .add_attribute(("image", string("debian-12-x64")))
+        .add_attribute(("image", string(vm::image(HOST_OS).unwrap_or_default())))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))
         .add_attribute(("user_data", user_data))
@@ -54,7 +51,8 @@ fn droplet(env: &Environment, user_data: Expression) -> Block {
         .build()
 }
 
-/// SSH and the published ports in from `allowed_cidr`, everything out.
+/// SSH and the published ports in from `allowed_cidr`, everything out (ICMP too, as on
+/// `cloud-vm`: ping and path MTU discovery from the containers).
 fn firewall(env: &Environment) -> Block {
     let allowed = || list([reference("var.allowed_cidr")]);
     let anywhere = || list([string("0.0.0.0/0"), string("::/0")]);
@@ -70,5 +68,6 @@ fn firewall(env: &Environment) -> Block {
     }
     b.add_block(rule(Way::Out, "tcp", Some("1-65535"), anywhere()))
         .add_block(rule(Way::Out, "udp", Some("1-65535"), anywhere()))
+        .add_block(rule(Way::Out, "icmp", None, anywhere()))
         .build()
 }

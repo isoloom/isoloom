@@ -6,8 +6,21 @@ pub(crate) mod vm;
 
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, reference, string};
 
+use super::{Base, operator};
 use crate::module::resource;
 use crate::module::variable::Variable;
+
+/// What DigitalOcean's modules share: its token and who may reach the machines, the region, the
+/// provider (its token read from the environment), and the user its images sign in as.
+pub(crate) const BASE: Base = Base {
+    user: |_| vm::USER,
+    usage: |folder| operator::with_token(folder, "# Auth:   export DIGITALOCEAN_TOKEN=<token>\n"),
+    provider: |_, m| {
+        operator::bare_provider(m, "digitalocean");
+        Vec::new()
+    },
+    variables: || vec![region()],
+};
 
 /// The `region` variable: Frankfurt by default.
 pub(crate) fn region() -> Variable {

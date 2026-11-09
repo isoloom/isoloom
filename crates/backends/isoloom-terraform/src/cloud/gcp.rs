@@ -10,8 +10,22 @@ use isoloom_render::hcl_builder::{
     BinaryOperator, Block, Expression, Module, Template, attr, binary, boolean, conditional, index, null, number, reference, string,
 };
 
-use crate::module::resource;
+use super::Base;
 use crate::module::variable::Variable;
+use crate::module::{Usage, resource};
+
+/// What Google Cloud's modules share: a billing account (or a project) and who may reach the
+/// machines, the project and region, the provider and project, and its images' users.
+pub(crate) const BASE: Base = Base {
+    usage: |folder| Usage::with_runner_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
+    variables: || variables().into(),
+    provider: |env, m| {
+        let mut locals = provider_and_project(env, m);
+        locals.push(("zone", Template::new().with_expr(reference("var.region")).with_text("-a").into_expression()));
+        locals
+    },
+    user: vm::user,
+};
 
 /// The `project`, `billing_account`, `org_id` and `region` variables: an existing project, or a
 /// billing account for a project of its own; Paris by default.

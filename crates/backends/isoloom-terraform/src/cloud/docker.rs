@@ -5,8 +5,11 @@
 //!   mounts), which `isoloom-targets` renders with the Compose backend before these modules: the
 //!   VM runs exactly what the `docker` target runs.
 //! - Each cloud brings its resources (`crate::cloud::<cloud>::docker`): its own network, a
-//!   firewall letting `allowed_cidr` in for SSH and the published ports, and one Debian (Ubuntu
-//!   on Oracle) VM sized for every container at once (`crate::docker_host::HostSize`).
+//!   firewall letting `allowed_cidr` in for SSH and the published ports, and one VM of
+//!   [`HOST_OS`] from the cloud's image table (Ubuntu on Oracle, which has no Debian), sized for
+//!   every container at once (`HostSize`).
+//! - What the module shares with the cloud's `cloud-vm` module is one source, the cloud's
+//!   [`Base`]: how to start it, its variables, its provider, the user its image signs in as.
 //! - Terraform makes the host and nothing else: the runner installs Docker and runs the Compose
 //!   file inside it over SSH ([`manifest`], the shared Compose-in-a-VM pieces), reading the
 //!   containers there. Its only user data schedules the run's expiry shutdown.
@@ -24,30 +27,47 @@ use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::Target;
 
-use super::{Cloud, ProviderConfig, aws, azure, digitalocean, gcp, linode, oci, operator};
+use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
 use crate::module::providers::{self, Provider};
 use crate::module::variable::Variable;
 use crate::module::{self, ProjectCopy, output};
 use crate::{Error, Result};
+
+/// The OS of the Docker host, as each cloud's image table names it: its image and the user it
+/// signs in as are the cloud's for that OS, as on `cloud-vm` (Oracle Cloud runs it on Ubuntu).
+pub(crate) const HOST_OS: &str = "debian-12";
 
 /// A cloud's own part of its `cloud-docker` module. The rest is the same on every cloud: the
 /// `terraform` block, the module's head (`cloud::head`), and the Docker host's set-up once its
 /// resources are there.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Driver {
+    /// What the cloud's modules share with its `cloud-vm` module: the usage, the variables, the
+    /// provider, the images' users.
+    pub(crate) base: Base,
     /// The provider it requires (beside `local`).
     pub(crate) requires: Provider,
-    /// Its variables before the operator's: where it runs, which account.
-    pub(crate) variables: fn() -> Vec<Variable>,
     /// Its VM size variable, when it has one.
     pub(crate) size: Option<SizeVariable>,
-    /// Its provider's configuration.
-    pub(crate) provider: ProviderConfig,
     /// Its resources, after the module's head, the host's user data (the expiry shutdown) in its
     /// VM; the public address of the Docker host they make, where the runner reaches it over SSH.
     pub(crate) resources: fn(&Environment, &mut Module, Expression) -> Expression,
-    /// The SSH user the runner's key logs in as (it has `sudo`).
-    pub(crate) user: &'static str,
+}
+
+impl Driver {
+    /// The SSH user the runner's key logs in as on the host (it has `sudo`, or is root).
+    pub(crate) fn user(&self) -> &'static str {
+        (self.base.user)(HOST_OS)
+    }
+
+    /// The cloud's variables, then its size variable sized for `env`'s containers.
+    pub(crate) fn variables(&self, env: &Environment) -> Vec<Variable> {
+        let mut variables = (self.base.variables)();
+        if let Some(SizeVariable { name, default }) = self.size {
+            variables.push(Variable::new(name, "string").default(string(default(HostSize::of(env)))));
+        }
+        variables
+    }
 }
 
 /// Why the clouds can't host the environment's containers, if they can't: arm64 (their images
@@ -55,6 +75,17 @@ pub(crate) struct Driver {
 #[must_use]
 pub fn refusal(env: &Environment) -> Option<String> {
     crate::limits::arm64_machine(env.spec()).map(|name| format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"))
+}
+
+/// [`refusal`] as an error, before anything is written.
+fn hosted(env: &Environment) -> Result<()> {
+    match refusal(env) {
+        Some(reason) => Err(Error::Refused {
+            target: Target::CloudDocker,
+            reason,
+        }),
+        None => Ok(()),
+    }
 }
 
 /// A Terraform module per cloud, in [`Cloud::ALL`]'s order: the Terraform side of the
@@ -65,12 +96,7 @@ pub fn refusal(env: &Environment) -> Option<String> {
 /// [`Error::Refused`] with the [`refusal`] when the clouds can't host the environment, or
 /// [`Error::Module`] when a module can't be written.
 pub fn modules(env: &Environment) -> Result<Files> {
-    if let Some(reason) = refusal(env) {
-        return Err(Error::Refused {
-            target: Target::CloudDocker,
-            reason,
-        });
-    }
+    hosted(env)?;
     Cloud::ALL.into_iter().map(|cloud| module(cloud, env)).collect()
 }
 
@@ -100,16 +126,12 @@ const fn driver(cloud: Cloud) -> Driver {
 pub(crate) fn module(cloud: Cloud, env: &Environment) -> Result<GeneratedFile> {
     let driver = driver(cloud);
     let folder = format!("{}/{}", Target::CloudDocker.id(), cloud.id());
-    let mut m = module::start(&operator::usage(&folder));
+    let mut m = module::start(&(driver.base.usage)(&folder));
     m.block(providers::terraform(&[driver.requires]));
-    let mut variables = (driver.variables)();
-    if let Some(SizeVariable { name, default }) = driver.size {
-        variables.push(Variable::new(name, "string").default(string(default(HostSize::of(env)))));
-    }
-    super::head(env, &mut m, variables, driver.provider, ProjectCopy::Runner);
+    super::head(env, &mut m, driver.variables(env), driver.base.provider, ProjectCopy::Runner);
     let address = (driver.resources)(env, &mut m, crate::machine::user_data::expiry_only());
     m.block(output("ip", address));
-    m.block(output("ssh_user", string(driver.user)));
+    m.block(output("ssh_user", string(driver.user())));
     module::file(Target::CloudDocker, &folder, m, ProjectCopy::Runner)
 }
 
@@ -131,12 +153,7 @@ fn setup_files(env: &Environment) -> Vec<GeneratedFile> {
 ///
 /// [`Error::Refused`] with the [`refusal`] when the clouds can't host the environment.
 pub fn setup(env: &Environment) -> Result<Files> {
-    if let Some(reason) = refusal(env) {
-        return Err(Error::Refused {
-            target: Target::CloudDocker,
-            reason,
-        });
-    }
+    hosted(env)?;
     Ok(setup_files(env))
 }
 
@@ -147,12 +164,7 @@ pub fn setup(env: &Environment) -> Result<Files> {
 ///
 /// [`Error::Refused`] with the [`refusal`], or [`Error::Manifest`] when a manifest can't be built.
 pub fn manifests(env: &Environment, guest: &GuestCompose) -> Result<Vec<Placed>> {
-    if let Some(reason) = refusal(env) {
-        return Err(Error::Refused {
-            target: Target::CloudDocker,
-            reason,
-        });
-    }
+    hosted(env)?;
     Cloud::ALL
         .into_iter()
         .map(|cloud| {

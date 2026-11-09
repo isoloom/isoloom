@@ -28,15 +28,14 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
-use super::{SHAPE, availability_domain, availability_domains, owned, provider, ubuntu_images};
+use super::{SHAPE, availability_domain, availability_domains, owned, ubuntu_images};
 use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with};
 use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::vms;
-use crate::module::variable::Variable;
-use crate::module::{Usage, ident, providers, resource};
+use crate::module::{ident, providers, resource};
 
 /// What Oracle Cloud takes: Ubuntu, and Debian on the newest Ubuntu LTS (it has no Debian image).
 /// Any other OS needs an image of its own (`vm.image.oci`) rather than running Ubuntu in its place.
@@ -74,7 +73,7 @@ const RULES: Rules = Rules {
 };
 
 /// The SSH user of every instance (Ubuntu's).
-const USER: &str = "ubuntu";
+pub(super) const USER: &str = "ubuntu";
 
 /// Why Oracle Cloud can't run this environment, if it can't: its rules, then what its VCN can't
 /// hold.
@@ -119,12 +118,12 @@ impl ImageTable for UbuntuImages {
 
 /// The Ubuntu version an OS runs on (the newest LTS for one Oracle Cloud has no image for, which
 /// the refusal already turned away).
-fn ubuntu(os: &str) -> &'static str {
+pub(super) fn ubuntu(os: &str) -> &'static str {
     IMAGES.0.of(os).unwrap_or(NEWEST_UBUNTU)
 }
 
 /// The `oci_core_images` data source of an Ubuntu version.
-fn image_source(version: &str) -> String {
+pub(super) fn image_source(version: &str) -> String {
     format!("ubuntu_{}", version.replace('.', ""))
 }
 
@@ -137,28 +136,14 @@ fn sizing(memory_mb: u32) -> (u32, u32) {
 /// Its `cloud-vm` driver: its module takes the compartment it goes in, and authenticates with
 /// the OCI CLI's configuration.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage {
-        after: "# Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.\n",
-        ..Usage::with_runner_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
-    },
+    base: super::BASE,
     requires: (&[providers::OCI], &[]),
-    variables: || {
-        vec![
-            Variable::new("compartment_id", "string").describe("The compartment the environment goes in"),
-            Variable::new("region", "string")
-                .default(string("eu-paris-1"))
-                .describe("The OCI region to launch in"),
-            super::profile(),
-        ]
-    },
-    provider,
     refusal,
     // No cap on its user data that the module checks: its machines are written as they are.
     write: |env, m| {
         write(env, m);
         Ok(())
     },
-    user: |_| USER,
 };
 
 /// The module after its providers: the images, the VCN, its security list and subnet, each machine, the outputs.

@@ -8,8 +8,19 @@ pub(crate) mod vm;
 use isoloom_plan::Environment;
 use isoloom_render::hcl_builder::{Block, Expression, Module, null, reference, string};
 
+use super::{Base, operator};
 use crate::cloud::instance;
+use crate::module::Usage;
 use crate::module::variable::Variable;
+
+/// What Azure's modules share: who may reach the machines and their key, the subscription and
+/// the region, the provider with the tags, and the one user every VM is given.
+pub(crate) const BASE: Base = Base {
+    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    variables: || variables().into(),
+    provider,
+    user: |_| vm::USER,
+};
 
 /// The `subscription_id` and `region` variables: the operator's default subscription, Sweden
 /// by default.

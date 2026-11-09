@@ -1,32 +1,28 @@
-//! AWS's `cloud-docker` module: a VPC with one public subnet, a security group, and a Debian
-//! instance set up from its user data (it terminates on shutdown, so its expiry ends it).
+//! AWS's `cloud-docker` module: a VPC with one public subnet, a security group, and an instance
+//! of the Docker host's OS from AWS's image table (it terminates on shutdown, so its expiry ends
+//! it), every resource tagged as on `cloud-vm` (the shared provider).
 
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, call, list, number, object, reference, string};
+use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, call, list, object, reference, string};
 use isoloom_spec::model::Protocol;
 
-use super::{ami, egress, first_zone, ingress, instance_type, key_pair, provider, region, route_out, zones};
-use crate::cloud::docker::{Driver, SizeVariable};
+use super::{ec2_instance, egress, first_zone, ingress, instance_type, key_pair, root_disk, route_out, vm, zones};
+use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
 use crate::cloud::instance;
 use crate::docker_host::published;
-use crate::module::providers;
+use crate::module::{ident, providers};
 
 /// Its `cloud-docker` driver.
 pub(crate) const DRIVER: Driver = Driver {
+    base: super::BASE,
     requires: providers::AWS,
-    variables: || vec![region()],
     // Free Tier eligible sizes where they fit (the AWS Free plan refuses other types).
     size: Some(SizeVariable {
         name: "instance_type",
         default: |s| instance_type(s.memory_mb),
     }),
-    provider: |env, m| {
-        m.block(provider(tags(env)));
-        Vec::new()
-    },
     resources,
-    user: "admin",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance; the Docker
@@ -34,20 +30,11 @@ pub(crate) const DRIVER: Driver = Driver {
 fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
     let size = HostSize::of(env);
     m.block(zones());
-    m.block(ami("debian", "136693071363", "debian-12-amd64-*").build());
+    m.blocks(vm::ami_lookup(HOST_OS));
     m.blocks(network());
     m.block(security_group(env));
-    m.block(vm(size, user_data));
+    m.block(host(size, user_data));
     reference("aws_instance.env.public_ip")
-}
-
-/// The tags on every resource: the environment's, who manages it, its expiry.
-fn tags(env: &Environment) -> Expression {
-    object([
-        ("isoloom:environment", string(env.name.as_str())),
-        ("managed-by", string("isoloom")),
-        ("isoloom-expires-at", reference("var.expires_at")),
-    ])
 }
 
 /// `resource "<kind>" "env"`.
@@ -107,26 +94,18 @@ fn security_group(env: &Environment) -> Block {
     b.add_block(egress()).build()
 }
 
-/// The instance: its expiry in its user data (gzipped: AWS takes 16 KB), run once
-/// ([`instance::set_up_once`]), terminated when it shuts down.
-fn vm(size: HostSize, user_data: Expression) -> Block {
-    resource("aws_instance")
-        .add_attribute(("ami", reference("data.aws_ami.debian.id")))
+/// The instance ([`ec2_instance`]: terminated when it shuts down): its expiry in its user data
+/// (gzipped: AWS takes 16 KB), run once ([`instance::set_up_once`]).
+fn host(size: HostSize, user_data: Expression) -> Block {
+    ec2_instance("env")
+        .add_attribute(("ami", reference(&format!("data.aws_ami.{}.id", ident(HOST_OS)))))
         .add_attribute(("instance_type", reference("var.instance_type")))
         .add_attribute(("subnet_id", reference("aws_subnet.env.id")))
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
         .add_attribute(("vpc_security_group_ids", list([reference("aws_security_group.env.id")])))
-        .add_attribute(("instance_initiated_shutdown_behavior", string("terminate")))
         .add_attribute(("user_data_base64", call("base64gzip", [user_data])))
         .add_block(instance::set_up_once(reference("user_data_base64")).build())
-        .add_block(
-            Block::builder("root_block_device")
-                .add_attribute(("volume_size", number(size.disk_gb.into())))
-                .add_attribute(("volume_type", string("gp3")))
-                .add_attribute(("encrypted", boolean(true)))
-                .build(),
-        )
-        .add_block(Block::builder("metadata_options").add_attribute(("http_tokens", string("required"))).build())
+        .add_block(root_disk(size.disk_gb))
         .add_attribute(("depends_on", list([reference("aws_route_table_association.env")])))
         .add_attribute(("tags", named()))
         .build()

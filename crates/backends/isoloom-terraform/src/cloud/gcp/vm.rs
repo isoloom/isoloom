@@ -24,11 +24,11 @@ mod private_dns;
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Environment, NetworkPlan};
-use isoloom_render::hcl_builder::{Module, Template, reference};
+use isoloom_render::hcl_builder::Module;
 use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 
-use super::{own_project, provider_and_project, public_ip, variables};
+use super::{own_project, public_ip};
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{Images, Kept, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{
@@ -39,7 +39,7 @@ use crate::cloud::vm::{
 };
 use crate::limits::Limits;
 use crate::machine::controller;
-use crate::module::{Usage, ident, providers};
+use crate::module::{ident, providers};
 
 /// What Google Cloud takes.
 const RULES: Rules = Rules {
@@ -100,12 +100,12 @@ const IMAGES: OsImages<(&str, &str)> = OsImages(&[
 ]);
 
 /// An OS's image, when there is one.
-fn image(os: &str) -> Option<(&'static str, &'static str)> {
+pub(super) fn image(os: &str) -> Option<(&'static str, &'static str)> {
     IMAGES.of(os)
 }
 
 /// The SSH user of an OS's image.
-fn user(os: &str) -> &'static str {
+pub(super) fn user(os: &str) -> &'static str {
     image(os).map_or("admin", |(_, user)| user)
 }
 
@@ -203,17 +203,10 @@ fn mtu(n: &NetworkPlan) -> u16 {
 
 /// Its `cloud-vm` driver: its module takes the billing account its project goes on.
 pub(crate) const DRIVER: Driver = Driver {
-    usage: |folder| Usage::with_runner_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
+    base: super::BASE,
     requires: (&[providers::GOOGLE], &[]),
-    variables: || variables().into(),
-    provider: |env, m| {
-        let mut locals = provider_and_project(env, m);
-        locals.push(("zone", Template::new().with_expr(reference("var.region")).with_text("-a").into_expression()));
-        locals
-    },
     refusal,
     write,
-    user,
 };
 
 /// The module's blocks after the providers, from the plan.

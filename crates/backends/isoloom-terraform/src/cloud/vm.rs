@@ -41,11 +41,11 @@ use isoloom_render::backend::{Backend, Files, Placed};
 use isoloom_render::hcl_builder::Module;
 use isoloom_spec::model::Target;
 
-use super::{Cloud, ProviderConfig, aws, azure, digitalocean, gcp, linode, oci};
+use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
 use crate::machine::{self, controller, vms};
 use crate::module::providers::{self, Provider, TLS};
 use crate::module::variable::Variable;
-use crate::module::{self, ProjectCopy, Usage};
+use crate::module::{self, ProjectCopy};
 use crate::{Result, checks, target};
 
 /// A cloud's own part of its `cloud-vm` module. The module's frame is the same on every cloud:
@@ -53,22 +53,16 @@ use crate::{Result, checks, target};
 /// file.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Driver {
-    /// How to start its module (the settings `apply` takes, how it authenticates), from its
-    /// folder.
-    pub(crate) usage: for<'a> fn(&'a str) -> Usage<'a>,
+    /// What the cloud's modules share with its `cloud-docker` module: the usage, the variables,
+    /// the provider, the images' users.
+    pub(crate) base: Base,
     /// The providers it requires, then those its Windows machines add.
     pub(crate) requires: (&'static [Provider], &'static [Provider]),
-    /// Its variables before the operator's: where it runs, which account.
-    pub(crate) variables: fn() -> Vec<Variable>,
-    /// Its provider's configuration.
-    pub(crate) provider: ProviderConfig,
     /// Why it can't run the environment, if it can't.
     pub(crate) refusal: fn(&Environment) -> Option<String>,
     /// Its blocks after the module's head; refused when a machine can't be written (its user
     /// data over the cloud's cap).
     pub(crate) write: fn(&Environment, &mut Module) -> Result<()>,
-    /// The user the runner's key logs in as on a machine of this OS (it has `sudo`, or is root).
-    pub(crate) user: fn(&str) -> &'static str,
 }
 
 /// The providers a cloud's module requires: `base` (the cloud's own), TLS for the controller's
@@ -87,7 +81,7 @@ fn required(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<P
 /// A cloud's own variables for `env`: the driver's, then the seal's switch when a machine has
 /// anything to seal.
 pub(crate) fn own_variables(env: &Environment, driver: &Driver) -> Vec<Variable> {
-    let mut v = (driver.variables)();
+    let mut v = (driver.base.variables)();
     v.extend(seal::variable(env));
     // cloud-vm reads the launch-time inputs in its machines' user data (the plain ones); the
     // cloud-docker host never does (its containers get them over SSH), so only cloud-vm declares
@@ -232,7 +226,7 @@ impl CloudVmModule {
     fn module(self, env: &Environment) -> Result<GeneratedFile> {
         let driver = self.driver();
         let folder = format!("{}/{}", Target::CloudVm.id(), self.0.id());
-        let mut m = module::start(&(driver.usage)(&folder));
+        let mut m = module::start(&(driver.base.usage)(&folder));
         let (base, windows) = driver.requires;
         m.block(providers::terraform(&required(env, base, windows)));
         // Only Terraform's WinRM set-up of a Windows machine still uploads the project (an
@@ -243,7 +237,7 @@ impl CloudVmModule {
         } else {
             ProjectCopy::Runner
         };
-        super::head(env, &mut m, own_variables(env, &driver), driver.provider, copy);
+        super::head(env, &mut m, own_variables(env, &driver), driver.base.provider, copy);
         (driver.write)(env, &mut m)?;
         module::file(Target::CloudVm, &folder, m, copy)
     }

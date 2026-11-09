@@ -33,7 +33,7 @@ const SSH_BOOT_WAIT_S: u32 = 300;
 /// caller.
 pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, guest: &GuestCompose) -> Result<Manifest, ManifestError> {
     let ip = Template::from(Placeholder::Output(SnakeName::parse(IP)?));
-    let way_in = ssh_run(ip.clone(), driver.user);
+    let way_in = ssh_run(ip.clone(), driver.user());
     let up = up_steps(&way_in, guest)?;
     let guest_machines = guest.machines_at(&ip);
     let mut machines = vec![host(env)?];
@@ -154,10 +154,7 @@ fn state_output(name: &str, role: OutputRole, what: &str) -> Result<Output, Mani
 /// containers over SSH, not a module variable, so `inputs` is left out; a cloud-docker host has
 /// internet, so there is no seal.
 fn driver_variables(env: &Environment, driver: &super::Driver) -> Vec<crate::module::variable::Variable> {
-    let mut v = (driver.variables)();
-    if let Some(super::SizeVariable { name, default }) = driver.size {
-        v.push(crate::module::variable::Variable::new(name, "string").default(isoloom_render::hcl_builder::string(default(HostSize::of(env)))));
-    }
+    let mut v = driver.variables(env);
     v.extend(super::super::operator::host_reaching());
     v
 }

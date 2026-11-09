@@ -114,6 +114,25 @@ stable spec format.
   param itself; the spec's examples, messages and the matrix say token where they said flag. The
   tier list's hosts are `linux-1`, `linux-2`, `macos-arm64` and `windows-11`, and its notes
   (`isoloom targets --json`, `isoloom matrix`) name no private lab or app.
+- **A cloud's `cloud-docker` and `cloud-vm` modules share one source** (its usage, variables,
+  provider, images and their users), so they no longer drift:
+  - AWS's `cloud-docker` tags every resource as `cloud-vm` does (`isoloom-environment`,
+    `isoloom-instance`; was `isoloom:environment` without the instance).
+  - `cloud-docker`'s usage says what its cloud needs (`-var billing_account` on Google Cloud,
+    `-var compartment_id` on Oracle Cloud, the `# Auth:` line on DigitalOcean, Linode and Oracle
+    Cloud), its Oracle Cloud variables have their descriptions, and DigitalOcean and Linode have
+    their `provider` block.
+  - The Docker host's image is its cloud's image of Debian 12 from the image table (Ubuntu 24.04
+    on Oracle Cloud), AWS's limited to x86-64; on Google Cloud its user is the image's, `admin`
+    (was `isoloom`), as on `cloud-vm`.
+  - Azure's Docker host takes `cloud-vm`'s OS disk and image, and every one of its resources the
+    tags.
+- **AWS `cloud-vm` instances are hardened as the `cloud-docker` host is**: an encrypted gp3 root
+  disk, instance metadata by session token only (IMDSv2), and terminated when they shut
+  themselves down (the run's expiry), not left stopped. A machine's own AMI (`vm.image.aws`) must
+  support IMDSv2.
+- **DigitalOcean's `cloud-docker` firewall lets ICMP out**, as `cloud-vm`'s does: ping and path
+  MTU discovery from the containers (every other cloud lets everything out).
 
 ### Fixed
 

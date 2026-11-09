@@ -40,7 +40,7 @@ fn at(machine: &str) -> Result<Template, ManifestError> {
 
 /// The run manifest of `env` on `cloud`, whose module `driver` writes.
 pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Result<isoloom_manifest::Manifest, ManifestError> {
-    let user = |mp: &MachinePlan| (driver.user)(mp.os.as_deref().unwrap_or_default()).to_owned();
+    let user = |mp: &MachinePlan| (driver.base.user)(mp.os.as_deref().unwrap_or_default()).to_owned();
     let mut guests: Vec<Guest> = vms(env)
         .filter(|(_, mp)| !mp.is_windows())
         .map(|(name, mp)| {
@@ -56,7 +56,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Resu
         guests.push(Guest {
             machine: CONTROLLER.to_owned(),
             address: at(CONTROLLER)?,
-            user: (driver.user)(controller::OS).to_owned(),
+            user: (driver.base.user)(controller::OS).to_owned(),
             setup_s: manifest::PLAYBOOKS_S,
         });
     }

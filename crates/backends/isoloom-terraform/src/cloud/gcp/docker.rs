@@ -1,35 +1,33 @@
 //! Google Cloud's `cloud-docker` module: a project of its own unless one is given, a network
-//! and subnet, a firewall, and a Debian instance.
+//! and subnet, a firewall, and an instance of the Docker host's OS.
 
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use isoloom_spec::model::Protocol;
 
-use super::{provider_and_project, public_ip, variables};
-use crate::cloud::docker::{Driver, SizeVariable};
+use super::{public_ip, vm};
+use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
 use crate::cloud::instance;
 use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
 pub(crate) const DRIVER: Driver = Driver {
+    base: super::BASE,
     requires: providers::GOOGLE,
-    variables: || variables().into(),
     size: Some(SizeVariable {
         name: "machine_type",
         default: |s| s.pick(["e2-medium", "e2-standard-2", "e2-standard-4"]),
     }),
-    provider: provider_and_project,
     resources,
-    user: "isoloom",
 };
 
 /// The cloud's resources, after the module's head, `setup` as the instance's startup script;
 /// the Docker host's address.
 fn resources(env: &Environment, m: &mut Module, setup: Expression) -> Expression {
     m.blocks(network(env));
-    m.block(vm(env, HostSize::of(env), setup));
+    m.block(host(env, HostSize::of(env), setup));
     public_ip("env")
 }
 
@@ -74,14 +72,15 @@ fn network(env: &Environment) -> Vec<Block> {
     ]
 }
 
-/// Debian 12 in the region's first zone, the `isoloom` user with the runner's key, set up by its
-/// startup script (Google's Debian images have no cloud-init; the script runs at every boot).
+/// The Docker host's OS from Google Cloud's image table in the region's first zone, its user
+/// (the image's, as on `cloud-vm`) with the runner's key, set up by its startup script (Google's Debian images have no cloud-init; the script runs at every boot).
 /// The script is an entry of `metadata`, which the provider updates in place (unlike
 /// `metadata_startup_script`, which forces a new VM): a later apply with another expiry neither
 /// replaces nor restarts the VM, and the next boot schedules the new expiry, so no lifecycle
 /// keeps it.
-fn vm(env: &Environment, size: HostSize, setup: Expression) -> Block {
-    let ssh_keys = Template::text("isoloom:").with_expr(reference("var.ssh_public_key"));
+fn host(env: &Environment, size: HostSize, setup: Expression) -> Block {
+    let ssh_keys = Template::text(format!("{}:", vm::user(HOST_OS))).with_expr(reference("var.ssh_public_key"));
+    let (image, _) = vm::image(HOST_OS).unwrap_or_default();
     resource("google_compute_instance")
         .add_attribute(("machine_type", reference("var.machine_type")))
         .add_attribute(("zone", Template::new().with_expr(reference("var.region")).with_text("-a").into_expression()))
@@ -90,7 +89,7 @@ fn vm(env: &Environment, size: HostSize, setup: Expression) -> Block {
             Block::builder("boot_disk")
                 .add_block(
                     Block::builder("initialize_params")
-                        .add_attribute(("image", string("debian-cloud/debian-12")))
+                        .add_attribute(("image", string(image)))
                         .add_attribute(("size", number(size.disk_gb.into())))
                         .build(),
                 )
