@@ -27,13 +27,13 @@ pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: 
     user_data::expression(&linux::set_up(env, machine, user, &hooks))
 }
 
-/// The `lifecycle` of a machine that sets itself up once, at its first boot, from its user data
-/// (`attribute`, as `ignore_changes` names it): a later apply with other values in it (the
-/// launch's inputs, which a run never keeps) leaves the machine as it is, where the cloud would
-/// replace it (Azure's `custom_data`, GCP's `metadata_startup_script`, DigitalOcean's
-/// `user_data`, Oracle Cloud's `metadata["user_data"]`: each forces a new VM) or stop and start it
-/// (AWS). Linode's isn't ignored: whether its provider replaces an instance whose metadata
-/// changed isn't settled here.
+/// The `lifecycle` of a machine whose user data (`attribute`, as `ignore_changes` names it) runs
+/// once, at its first boot: its set-up, or a Docker host's expiry. A later apply with other
+/// values in it (the launch's inputs, `var.expires_at` among them, which a run never keeps) leaves
+/// the machine as it is, where the cloud would replace it (Azure's `custom_data`, GCP's
+/// `metadata_startup_script`, DigitalOcean's `user_data`, Oracle Cloud's `metadata["user_data"]`,
+/// Linode's `metadata[0].user_data`: each forces a new VM in the provider version the modules
+/// require) or stop and start it (AWS's `user_data_base64`).
 pub(crate) fn set_up_once(attribute: Expression) -> BlockBuilder {
     Block::builder("lifecycle").add_attribute(("ignore_changes", list([attribute])))
 }

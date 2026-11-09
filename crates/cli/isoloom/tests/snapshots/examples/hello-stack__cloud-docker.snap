@@ -1,5 +1,6 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 240
 ---
 # isoloom targets
 ✓ cloud-docker
@@ -178,6 +179,9 @@ resource "aws_instance" "env" {
   vpc_security_group_ids               = [aws_security_group.env.id]
   instance_initiated_shutdown_behavior = "terminate"
   user_data_base64                     = base64gzip("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
+  lifecycle {
+    ignore_changes = [user_data_base64]
+  }
   root_block_device {
     volume_size = 40
     volume_type = "gp3"
@@ -1106,6 +1110,9 @@ resource "azurerm_linux_virtual_machine" "env" {
   }
   tags       = local.tags
   depends_on = [azurerm_network_interface_security_group_association.env]
+  lifecycle {
+    ignore_changes = [custom_data]
+  }
 }
 
 output "ip" {
@@ -1936,6 +1943,9 @@ resource "digitalocean_droplet" "env" {
   ssh_keys  = [digitalocean_ssh_key.env.id]
   user_data = "#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n"
   tags      = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
+  lifecycle {
+    ignore_changes = [user_data]
+  }
 }
 
 resource "digitalocean_firewall" "env" {
@@ -3630,6 +3640,9 @@ resource "linode_instance" "env" {
     user_data = base64encode("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
   }
   tags = concat(["isoloom", "hello-stack", local.name], var.expires_at == "" ? [] : ["isoloom-expires-${var.expires_at}"])
+  lifecycle {
+    ignore_changes = [metadata[0].user_data]
+  }
 }
 
 resource "linode_firewall" "env" {
@@ -4506,6 +4519,9 @@ resource "oci_core_instance" "env" {
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data           = base64encode("#!/bin/sh\ne=${var.expires_at}; if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi\n")
+  }
+  lifecycle {
+    ignore_changes = [metadata["user_data"]]
   }
 }
 

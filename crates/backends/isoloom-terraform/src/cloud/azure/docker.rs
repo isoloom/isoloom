@@ -8,6 +8,7 @@ use isoloom_spec::model::Protocol;
 
 use super::{provider, variables};
 use crate::cloud::docker::{Driver, SizeVariable};
+use crate::cloud::vm::hooks;
 use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
 
@@ -117,7 +118,8 @@ fn interface() -> Vec<Block> {
     ]
 }
 
-/// Debian 12, the `isoloom` user with the runner's key, set up from its custom data.
+/// Debian 12, the `isoloom` user with the runner's key, its expiry in its custom data, run once
+/// ([`hooks::set_up_once`]).
 fn vm(size: HostSize, custom_data: Expression) -> Block {
     placed("azurerm_linux_virtual_machine")
         .add_attribute(("size", reference("var.size")))
@@ -147,5 +149,6 @@ fn vm(size: HostSize, custom_data: Expression) -> Block {
         )
         .add_attribute(("tags", reference("local.tags")))
         .add_attribute(("depends_on", list([reference("azurerm_network_interface_security_group_association.env")])))
+        .add_block(hooks::set_up_once(reference("custom_data")).build())
         .build()
 }

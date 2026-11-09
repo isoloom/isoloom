@@ -1,5 +1,6 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
+assertion_line: 240
 ---
 # isoloom targets
 ✓ cloud-vm
@@ -3013,6 +3014,9 @@ resource "linode_instance" "store" {
       vpc = "192.168.62.20"
     }
   }
+  lifecycle {
+    ignore_changes = [metadata[0].user_data]
+  }
 }
 
 resource "random_password" "app" {
@@ -3044,6 +3048,9 @@ resource "linode_instance" "app" {
     ipv4 {
       vpc = "192.168.62.10"
     }
+  }
+  lifecycle {
+    ignore_changes = [metadata[0].user_data]
   }
 }
 

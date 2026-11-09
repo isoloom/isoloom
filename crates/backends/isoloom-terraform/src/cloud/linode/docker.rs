@@ -36,6 +36,7 @@ fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expres
             .add_attribute(("authorized_keys", list([call("trimspace", [reference("var.ssh_public_key")])])))
             .add_block(super::metadata(user_data))
             .add_attribute(("tags", tag_list(env)))
+            .add_block(super::set_up_once())
             .build(),
     );
     m.block(firewall(env));

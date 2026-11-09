@@ -52,7 +52,13 @@ stable spec format.
   ignores later changes to its user data (`lifecycle { ignore_changes }`): a later apply without
   the launch's values, which a run never keeps, no longer stops and restarts it to change them
   (AWS) or replaces it with a new VM (Azure's `custom_data`, GCP's `metadata_startup_script`,
-  DigitalOcean's `user_data`, Oracle Cloud's `metadata["user_data"]`). Linode's is unchanged.
+  DigitalOcean's `user_data`, Oracle Cloud's `metadata["user_data"]`, Linode's
+  `metadata[0].user_data`, which its provider replaces an instance for too). The controller
+  (Ansible) does the same, AWS's included.
+- **A `cloud-docker` host keeps its first boot's expiry** the same way: a later apply with another
+  `expires_at` no longer stops and starts the AWS host or replaces the Azure, DigitalOcean, Linode
+  or Oracle Cloud one. GCP's startup script is a `metadata` entry, which the provider updates in
+  place, and the next boot schedules the new expiry.
 - **A `cloud-vm` Linux machine is named after itself**, as on every other target, not after its
   address or its image (Kali's names itself `kali`); kept through a reboot.
 - **A refusal for an OS AWS has no image of lists the ones it has from its image table**, Kali

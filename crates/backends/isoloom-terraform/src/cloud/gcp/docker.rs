@@ -76,6 +76,10 @@ fn network(env: &Environment) -> Vec<Block> {
 
 /// Debian 12 in the region's first zone, the `isoloom` user with the runner's key, set up by its
 /// startup script (Google's Debian images have no cloud-init; the script runs at every boot).
+/// The script is an entry of `metadata`, which the provider updates in place (unlike
+/// `metadata_startup_script`, which forces a new VM): a later apply with another expiry neither
+/// replaces nor restarts the VM, and the next boot schedules the new expiry, so no lifecycle
+/// keeps it.
 fn vm(env: &Environment, size: HostSize, setup: Expression) -> Block {
     let ssh_keys = Template::text("isoloom:").with_expr(reference("var.ssh_public_key"));
     resource("google_compute_instance")

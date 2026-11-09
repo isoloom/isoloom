@@ -159,6 +159,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
             .add_block(super::metadata(setup))
             .add_block(Block::builder("interface").add_attribute(("purpose", string("public"))).build())
             .add_block(vpc.build())
+            .add_block(super::set_up_once())
             .build(),
     );
     m.blocks(disks::linode(name, &mp.disks));

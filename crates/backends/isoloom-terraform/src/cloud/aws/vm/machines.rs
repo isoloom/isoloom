@@ -272,6 +272,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
             .add_attribute(("instance_type", string(instance_type(mem))))
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
             .add_attribute(user_data(user_data::expression(&setup)))
+            .add_block(lifecycle("user_data_base64", None))
             .add_block(primary(&first))
             .add_attribute(("tags", object([("Name", name_with("-controller"))])))
             .build(),
