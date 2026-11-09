@@ -9,6 +9,8 @@
 //! applicable. Tests hold every feature of the plan to a row, and every example's refusals to
 //! the matrix's, so it can't claim more than the generators do.
 
+#[cfg(test)]
+mod examples;
 mod probe;
 mod render;
 #[cfg(test)]
@@ -85,13 +87,6 @@ impl Row {
             Some(v) => format!("{} = {v}", self.field),
             None => self.field.clone(),
         }
-    }
-
-    /// Whether the field `path` as written in a spec (`machines.web.app.image`) is the row's
-    /// field (`machines.*.app.image`).
-    #[must_use]
-    pub fn is_field(&self, path: &str) -> bool {
-        uses::path_matches(&self.field, path)
     }
 
     /// Whether the spec `written` (whose lab is `lab`) uses the row on `target`: the row's

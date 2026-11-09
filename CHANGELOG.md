@@ -96,6 +96,7 @@ stable spec format.
   guest delivery, the `dotenv` state-file format, the `generated` slot kind, the `ssh` and
   `credential` output roles, the `static` output source and the `minutes_from_now` expiry unit
   (`schemas/run-manifest-v0.schema.json` regenerated). A manifest holding one is refused.
+- **`isoloom_targets::matrix::Row::is_field`**, which only the matrix's own tests called.
 
 ## [1.0.9] — 2026-11-08
 

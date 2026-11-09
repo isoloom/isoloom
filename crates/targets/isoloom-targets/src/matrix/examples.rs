@@ -3,14 +3,21 @@
 //! the same step and reason; and no row an example uses is refused where that example is
 //! generated. So the matrix never claims more than the code does, and its refusals are real.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use isoloom_spec::model::Target;
-use isoloom_targets::decision::{Code, Column, Decision, Refused, decide};
-use isoloom_targets::matrix::{Authored, Cell, Matrix, Row, matrix};
-use isoloom_targets::{Lab, cloud_refusals, refusal, refusal_on};
 
-use crate::testing::{Outcome, examples};
+use super::{Authored, Cell, Matrix, Row, matrix, uses};
+use crate::decision::{Code, Column, Decision, Refused, decide};
+use crate::{Lab, cloud_refusals, refusal, refusal_on};
+
+/// A test's outcome: a failed step is its report.
+type Outcome<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+/// The repository's examples folder.
+fn examples() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
+}
 
 /// An example: its name, its lab and its spec as written.
 struct Example {
@@ -69,7 +76,7 @@ fn shown(matrix: &Matrix, example: &Example, column: &Column, given: &Refused) -
             return false;
         };
         let attributed = match given.code {
-            Code::Lowering => given.field.as_deref().is_some_and(|field| row.is_field(field)),
+            Code::Lowering => given.field.as_deref().is_some_and(|field| uses::path_matches(&row.field, field)),
             Code::Capability(feature) => row.features.contains(&feature),
             _ => row.used_by(&example.written, &example.lab, column.target),
         };
