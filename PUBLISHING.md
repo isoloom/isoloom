@@ -1,8 +1,8 @@
 # Publishing Isoloom
 
-The Isoloom crates are released to [crates.io](https://crates.io) so that consumers (the Isothrum
-runner, the desktop app, the Cyber CTF launcher and any external user) depend on published
-versions rather than git revisions. That way the 1.0 history squash can't break anyone, and each
+The Isoloom crates are released to [crates.io](https://crates.io) so that consumers (a runner, an
+app that generates labs, any program built on them) depend on published versions rather than git
+revisions. That way the 1.0 history squash can't break anyone, and each
 consumer upgrades on its own schedule.
 
 Everything here is licensed Apache-2.0.
@@ -13,7 +13,7 @@ All thirteen library/CLI crates are published, in this dependency order (leaf cr
 crate's dependencies are published before it):
 
 1. `isoloom-spec` — the spec model, parsing, normalization and validation.
-2. `isoloom-manifest` — the run manifest the Isothrum runner reads.
+2. `isoloom-manifest` — the run manifest a runner reads.
 3. `isoloom-catalogue` — the embedded service catalogue (depends on spec).
 4. `isoloom-plan` — the target-neutral plan (spec, catalogue).
 5. `isoloom-render` — the shared rendering layer (spec, plan, manifest).
@@ -81,8 +81,8 @@ later needs this first manual publish (confirm its name is free first).
 3. The tag runs `.github/workflows/publish-crates.yml`, which publishes the thirteen crates in
    order and skips any version already on crates.io (idempotent — safe to re-run after a partial
    failure). The same tag also runs `release.yml` for the CLI binaries.
-4. Publish Isoloom **before** Isothrum: the Isothrum crates depend on `isoloom-spec`,
-   `isoloom-targets` and `isoloom-manifest` from crates.io at this version.
+4. Publish Isoloom **before** the crates built on it: they depend on Isoloom's crates (such as
+   `isoloom-spec`, `isoloom-targets` and `isoloom-manifest`) from crates.io at this version.
 5. To publish without a tag, run the **Publish crates** workflow from the Actions tab
    (`workflow_dispatch`).
 
@@ -101,7 +101,6 @@ cargo publish --dry-run -p isoloom-manifest
 
 ## The npm / JavaScript side
 
-Isoloom itself ships no JavaScript package; it publishes Rust crates only. The browser engine
-(`isothrum-wasm`, a wasm-pack bundle) is released from the Isothrum repository, and the launcher's
-shared UI package `@cyber-courses/ui` already ships through GitHub Packages. Neither goes to
-crates.io.
+Isoloom ships no JavaScript package; it publishes Rust crates only. A program that builds on
+them (a browser bundle compiled to WebAssembly, an app's UI package) is released from its own
+repository, through its own registry.

@@ -31,11 +31,14 @@ When a change is meant to alter output, review the snapshot diffs with `cargo in
 commit the accepted snapshots, and explain each kind of difference in the pull request.
 
 Isoloom generates files; it runs nothing. To run an environment for real, generate it and hand
-it to the [Isothrum runner](https://github.com/Isothrum/isothrum):
+its run manifest to a runner ([the runner contract](../docs/runner.md)), or run each tool's files
+by hand:
 
 ```sh
 cargo build -q -p isoloom && export PATH=$PWD/target/debug:$PATH
-cd examples/hello-stack && isoloom generate && isothrum up && isothrum check && isothrum down
+cd examples/hello-stack && isoloom generate
+# a runner reads .isoloom/docker/run.json (up, check, down); by hand:
+(cd .isoloom/docker && docker compose up -d --build --wait && docker compose down)
 ```
 
 ## Conventions

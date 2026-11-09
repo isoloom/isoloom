@@ -80,6 +80,8 @@ stable spec format.
   and docker-vm on QEMU its own 40 GB whatever the containers needed; the size follows the
   containers beyond that, from the spec's defaults.
 - The run manifests' and the spec's docs no longer name a particular program running them.
+- The tier list's evidence notes (`isoloom targets --json`, `isoloom matrix --json`) name no
+  particular runner or build of one: "re-validated end to end through a runner".
 - **Every Terraform module describes `ssh_public_key` the same way** ("The SSH public key the
   machines let in: whoever holds its private key signs in, as the runner (run.json) does to
   deliver the project and run the checks"), from one definition: the Proxmox and ESXi modules
