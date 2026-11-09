@@ -302,23 +302,27 @@ mod tests {
 
     #[test]
     fn under_sh_the_steps_run_once_and_what_a_restart_undid_at_every_later_boot() {
+        use isoloom_render::test_support::{posix_sh, sh_path};
+        if posix_sh().is_none() {
+            return;
+        }
         let dir = std::env::temp_dir().join(format!("isoloom-setup-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let log = dir.join("log");
+        let log = sh_path(&dir.join("log"));
         let set_up = SetUp {
-            each_boot: vec![Template::text(format!("echo boot >> {}", log.display()))],
-            parts: vec![vec![Tracked::new("step", format!("echo step >> {}", log.display()))]],
-            again: vec![Template::text(format!("echo again >> {}", log.display()))],
+            each_boot: vec![Template::text(format!("echo boot >> {log}"))],
+            parts: vec![vec![Tracked::new("step", format!("echo step >> {log}"))]],
+            again: vec![Template::text(format!("echo again >> {log}"))],
         };
-        let sh = text(&body(&set_up)).replace(DIR, &dir.display().to_string());
+        let sh = text(&body(&set_up)).replace(DIR, &sh_path(&dir));
         let boot = || {
-            let out = std::process::Command::new("sh").arg("-c").arg(&sh).output().unwrap();
+            let out = posix_sh().unwrap().arg("-c").arg(&sh).output().unwrap();
             assert!(out.status.success(), "{out:?}");
         };
         boot();
         boot();
         boot();
-        let got = std::fs::read_to_string(&log).unwrap();
+        let got = std::fs::read_to_string(dir.join("log")).unwrap();
         std::fs::remove_dir_all(&dir).ok();
         assert_eq!(got, "boot\nstep\nboot\nagain\nboot\nagain\n");
     }

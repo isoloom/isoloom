@@ -217,7 +217,8 @@ machines:
 
     /// `sh -n`: the script parses.
     fn parses(sh: &str) {
-        let out = std::process::Command::new("sh").arg("-n").arg("-c").arg(sh).output().expect("sh runs");
+        let Some(mut posix) = crate::test_support::posix_sh() else { return };
+        let out = posix.arg("-n").arg("-c").arg(sh).output().expect("sh runs");
         assert!(out.status.success(), "{}\n{sh}", String::from_utf8_lossy(&out.stderr));
     }
 

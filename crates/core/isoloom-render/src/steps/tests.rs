@@ -389,19 +389,19 @@ fn a_mark_wait_ends_when_the_mark_is_there_and_gives_up_with_its_message_after_t
     let dir = std::env::temp_dir().join(format!("isoloom-mark-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mark = dir.join("delivered");
-    let mark = mark.to_str().unwrap();
+    let at = crate::test_support::sh_path(&mark);
     let run = |timeout_s| {
-        let line = wait_for_mark(mark, timeout_s, "waiting for it", "it never came");
-        std::process::Command::new("sh").args(["-c", &line]).output().unwrap()
+        let line = wait_for_mark(&at, timeout_s, "waiting for it", "it never came");
+        crate::test_support::posix_sh().map(|mut sh| sh.args(["-c", &line]).output().unwrap())
     };
+    let Some(missing) = run(0) else { return };
     // No mark, no time: it says it waits, then gives up at once with its message.
-    let missing = run(0);
     assert!(!missing.status.success());
     assert_eq!(String::from_utf8_lossy(&missing.stdout), "waiting for it\n");
     assert_eq!(String::from_utf8_lossy(&missing.stderr), "it never came\n");
     // The mark there: it ends at once, saying nothing.
-    std::fs::write(mark, "").unwrap();
-    let there = run(0);
+    std::fs::write(&mark, "").unwrap();
+    let there = run(0).unwrap();
     assert!(there.status.success() && there.stdout.is_empty(), "{there:?}");
     std::fs::remove_dir_all(&dir).ok();
 }

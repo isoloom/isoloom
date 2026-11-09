@@ -194,7 +194,8 @@ machines:
         let tricky = "secret{$(touch injected)`id`\"'}\n";
         let encoded = isoloom_spec::shell::base64(tricky.as_bytes());
         // As Vagrant runs it: the value in double quotes on the command line.
-        let status = std::process::Command::new("sh")
+        let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
+        let status = posix
             .arg("-c")
             .arg(format!("V=\"{encoded}\" sh -c '{}'", script.replace('\'', "'\\''")))
             .current_dir(&dir)
@@ -219,8 +220,12 @@ machines:
             .take_while(|l| !l.starts_with("touch"))
             .flat_map(|l| [l, "\n"])
             .collect();
+        if isoloom_render::test_support::posix_sh().is_none() {
+            return;
+        }
         let run = |value: &str| {
-            std::process::Command::new("sh")
+            isoloom_render::test_support::posix_sh()
+                .unwrap()
                 .arg("-c")
                 .arg(&script)
                 .current_dir(&dir)

@@ -120,8 +120,9 @@ fn the_step_waits_then_places_at_every_boot() {
     assert!(sh.starts_with("set -e\ni=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
     assert!(sh.contains("systemctl enable isoloom-apply-secrets.service"), "{sh}");
     assert!(sh.contains("install -D -o 0 -g 0 -m 0400"), "{sh}");
-    let check = std::process::Command::new("sh").arg("-n").arg("-c").arg(&sh).status().unwrap();
-    assert!(check.success());
+    if let Some(mut posix) = crate::test_support::posix_sh() {
+        assert!(posix.arg("-n").arg("-c").arg(&sh).status().unwrap().success(), "{sh}");
+    }
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.

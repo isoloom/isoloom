@@ -139,7 +139,8 @@ fn the_inputs_file_quotes_every_value() {
     let read_back = "set -a; . \"$OUT\"; set +a; printf %s \"$TOKEN\" > \"$OUT.read\"\n";
     std::fs::write(dir.join("inputs.sh"), format!("{script}{read_back}")).expect("the script written");
     let tricky = "it's $(not run) \"quoted\" `nor this`";
-    let status = std::process::Command::new("sh")
+    let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
+    let status = posix
         .arg("inputs.sh")
         .current_dir(&dir)
         .env("OUT", "./inputs.env")
