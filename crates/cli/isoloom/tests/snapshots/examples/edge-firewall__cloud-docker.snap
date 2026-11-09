@@ -768,7 +768,7 @@ output "ssh_user" {
           {
             "name": "the web page answers through the firewall",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           },
           {
@@ -804,7 +804,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "admin"
           },
-          "timeout_s": 225
+          "timeout_s": 285
         },
         "on_timeout": [
           {
@@ -1778,7 +1778,7 @@ output "ssh_user" {
           {
             "name": "the web page answers through the firewall",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           },
           {
@@ -1814,7 +1814,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
-          "timeout_s": 225
+          "timeout_s": 285
         },
         "on_timeout": [
           {
@@ -2670,7 +2670,7 @@ output "ssh_user" {
           {
             "name": "the web page answers through the firewall",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           },
           {
@@ -2706,7 +2706,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "root"
           },
-          "timeout_s": 225
+          "timeout_s": 285
         },
         "on_timeout": [
           {
@@ -3669,7 +3669,7 @@ output "ssh_user" {
           {
             "name": "the web page answers through the firewall",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           },
           {
@@ -3705,7 +3705,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
-          "timeout_s": 225
+          "timeout_s": 285
         },
         "on_timeout": [
           {
@@ -4545,7 +4545,7 @@ output "ssh_user" {
           {
             "name": "the web page answers through the firewall",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           },
           {
@@ -4581,7 +4581,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "root"
           },
-          "timeout_s": 225
+          "timeout_s": 285
         },
         "on_timeout": [
           {
@@ -5486,7 +5486,7 @@ output "ssh_user" {
           {
             "name": "the web page answers through the firewall",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           },
           {
@@ -5522,7 +5522,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
-          "timeout_s": 225
+          "timeout_s": 285
         },
         "on_timeout": [
           {

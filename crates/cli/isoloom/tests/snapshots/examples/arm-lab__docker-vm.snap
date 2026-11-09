@@ -1244,7 +1244,7 @@ output "ssh_user" {
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -1256,7 +1256,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {
@@ -1906,7 +1906,7 @@ systemctl enable --now isoloom-published.service
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -1920,7 +1920,7 @@ systemctl enable --now isoloom-published.service
             "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name arm-lab --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
             "default"
           ],
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {

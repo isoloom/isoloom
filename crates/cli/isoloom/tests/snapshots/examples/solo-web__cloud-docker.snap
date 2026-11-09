@@ -623,7 +623,7 @@ output "ssh_user" {
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -635,7 +635,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "admin"
           },
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {
@@ -1326,7 +1326,7 @@ output "ssh_user" {
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -1338,7 +1338,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {
@@ -1916,7 +1916,7 @@ output "ssh_user" {
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -1928,7 +1928,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "root"
           },
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {
@@ -2608,7 +2608,7 @@ output "ssh_user" {
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -2620,7 +2620,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {
@@ -3177,7 +3177,7 @@ output "ssh_user" {
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -3189,7 +3189,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "root"
           },
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {
@@ -3819,7 +3819,7 @@ output "ssh_user" {
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -3831,7 +3831,7 @@ output "ssh_user" {
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
-          "timeout_s": 75
+          "timeout_s": 135
         },
         "on_timeout": [
           {

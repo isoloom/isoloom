@@ -1,7 +1,6 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 44
-expression: example(&name).spec()
+expression: example(&name).unwrap().spec()
 ---
 version: 1
 name: edge-firewall
@@ -162,7 +161,7 @@ checks:
     exec: ~
     script: checks/web-through-firewall.sh
     expect: ~
-    wait: ~
+    wait: 60
   - name: the web server answers by its other name
     from: user
     http: "http://www.edge.test/"

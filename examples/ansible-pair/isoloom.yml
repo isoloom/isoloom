@@ -48,4 +48,4 @@ controller:
   resources: { memory_mb: 768 }
 
 checks:
-  - checks/web-answers.sh
+  - { script: checks/web-answers.sh, wait: 60 }   # its service may still be starting

@@ -1,7 +1,6 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 44
-expression: example(&name).spec()
+expression: example(&name).unwrap().spec()
 ---
 version: 1
 name: ansible-pair
@@ -111,5 +110,12 @@ controller:
     disk_gb: ~
   keep_running: false
 checks:
-  - checks/web-answers.sh
+  - name: ~
+    from: ~
+    http: ~
+    tcp: ~
+    exec: ~
+    script: checks/web-answers.sh
+    expect: ~
+    wait: 60
 targets: ~

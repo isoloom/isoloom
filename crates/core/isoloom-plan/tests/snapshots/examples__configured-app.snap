@@ -79,6 +79,20 @@ common: ~
 groups: {}
 provision: []
 checks:
-  - checks/web-answers.sh
-  - checks/api-answers.sh
+  - name: ~
+    from: ~
+    http: ~
+    tcp: ~
+    exec: ~
+    script: checks/web-answers.sh
+    expect: ~
+    wait: 60
+  - name: ~
+    from: ~
+    http: ~
+    tcp: ~
+    exec: ~
+    script: checks/api-answers.sh
+    expect: ~
+    wait: 60
 targets: ~

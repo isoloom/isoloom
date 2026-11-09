@@ -29,4 +29,4 @@ overrides:
         winrm: plaintext
 
 checks:
-  - checks/web01-answers.sh
+  - { script: checks/web01-answers.sh, wait: 60 }   # its service may still be starting

@@ -856,10 +856,10 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/web-answers.sh'
-if _retry 0 sh -c 'cd /isoloom/project && sh checks/web-answers.sh'; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /isoloom/project && sh checks/web-answers.sh'; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
 
 echo '== checks/api-answers.sh'
-if _retry 0 sh -c 'cd /isoloom/project && sh checks/api-answers.sh'; then pass 'checks/api-answers.sh'; else fail 'checks/api-answers.sh' "checks/api-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /isoloom/project && sh checks/api-answers.sh'; then pass 'checks/api-answers.sh'; else fail 'checks/api-answers.sh' "checks/api-answers.sh exited non-zero"; fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
@@ -1500,13 +1500,13 @@ volumes:
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           },
           {
             "name": "checks/api-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -1530,7 +1530,7 @@ volumes:
             "ISOLOOM_DERIVED",
             "isoloom-check"
           ],
-          "timeout_s": 90
+          "timeout_s": 210
         },
         "on_timeout": [
           {
@@ -1853,7 +1853,7 @@ volumes:
             "kind": "script",
             "target": "checks/web-answers.sh",
             "expect": "",
-            "wait": 0
+            "wait": 60
           },
           {
             "name": "checks/api-answers.sh",
@@ -1861,7 +1861,7 @@ volumes:
             "kind": "script",
             "target": "checks/api-answers.sh",
             "expect": "",
-            "wait": 0
+            "wait": 60
           }
         ]
       },

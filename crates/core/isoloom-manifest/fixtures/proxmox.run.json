@@ -427,7 +427,7 @@
           {
             "name": "checks/web-answers.sh",
             "kind": "script",
-            "wait_s": 0,
+            "wait_s": 60,
             "derived": false
           }
         ],
@@ -441,7 +441,7 @@
             "via": "isoloom@${outputs.ip}"
           },
           "stdin": "checks/networks.sh",
-          "timeout_s": 75
+          "timeout_s": 135
         }
       }
     ],

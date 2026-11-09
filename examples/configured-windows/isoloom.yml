@@ -30,4 +30,4 @@ machines:
         - service: W3SVC
 
 checks:
-  - checks/iis-answers.sh
+  - { script: checks/iis-answers.sh, wait: 60 }   # its service may still be starting

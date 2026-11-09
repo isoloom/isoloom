@@ -29,4 +29,4 @@ machines:
       steps: [{ run: provision/intranet.sh }]
 
 checks:
-  - checks/both-answer.sh
+  - { script: checks/both-answer.sh, wait: 60 }   # its service may still be starting

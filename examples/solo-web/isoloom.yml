@@ -18,4 +18,4 @@ machines:
       steps: [{ run: provision/web.sh }]   # the VM form: its script
 
 checks:
-  - checks/web-answers.sh
+  - { script: checks/web-answers.sh, wait: 60 }   # its service may still be starting

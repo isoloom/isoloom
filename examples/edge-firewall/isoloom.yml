@@ -50,6 +50,7 @@ checks:
   - name: the web page answers through the firewall
     from: user
     script: checks/web-through-firewall.sh
+    wait: 60   # its service may still be starting
   - name: the web server answers by its other name
     from: user
     http: http://www.edge.test/

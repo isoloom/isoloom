@@ -54,5 +54,5 @@ machines:
             cwd: /srv/api
 
 checks:
-  - checks/web-answers.sh
-  - checks/api-answers.sh
+  - { script: checks/web-answers.sh, wait: 60 }   # its service may still be starting
+  - { script: checks/api-answers.sh, wait: 60 }   # its service may still be starting

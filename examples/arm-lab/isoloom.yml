@@ -25,4 +25,4 @@ machines:
     app: { image: nginx:1.27 }
 
 checks:
-  - checks/web-answers.sh
+  - { script: checks/web-answers.sh, wait: 60 }   # its service may still be starting
