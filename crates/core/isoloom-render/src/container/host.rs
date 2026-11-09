@@ -45,7 +45,13 @@ impl HostSize {
         }
     }
 
-    /// One of three sizes of VM by its memory: up to 4 GB, up to 8 GB, more.
+    /// The most memory a containers' host on a cloud has: each cloud's largest size of the three
+    /// [`HostSize::pick`] chooses from. `cloud-docker` refuses an environment whose containers
+    /// need more.
+    pub const LARGEST_MEMORY_MB: u32 = 16384;
+
+    /// One of three sizes of VM by its memory: up to 4 GB, up to 8 GB, up to
+    /// [`HostSize::LARGEST_MEMORY_MB`] (the largest for more, which `cloud-docker` refuses).
     #[must_use]
     pub fn pick<T: Copy>(&self, [small, medium, large]: [T; 3]) -> T {
         match self.memory_mb {

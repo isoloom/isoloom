@@ -71,10 +71,32 @@ impl Driver {
 }
 
 /// Why the clouds can't host the environment's containers, if they can't: arm64 (their images
-/// and VM sizes are x86-64).
+/// and VM sizes are x86-64), or more memory than their largest Docker host has.
 #[must_use]
 pub fn refusal(env: &Environment) -> Option<String> {
-    crate::limits::arm64_machine(env.spec()).map(|name| format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"))
+    crate::limits::arm64_machine(env.spec())
+        .map(|name| format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"))
+        .or_else(|| too_big(env))
+}
+
+/// Why the containers don't fit the clouds' largest Docker host, if they don't: their memory and
+/// Docker's own gigabyte, naming the container that asks for the most.
+fn too_big(env: &Environment) -> Option<String> {
+    let needed = HostSize::of(env).memory_mb;
+    if needed <= HostSize::LARGEST_MEMORY_MB {
+        return None;
+    }
+    let (name, most) = env
+        .machines
+        .iter()
+        .filter(|(_, m)| m.shape == isoloom_plan::MachineShape::Container)
+        .map(|(n, m)| (n, m.size.memory_mb.unwrap_or(isoloom_spec::CONTAINER_MEMORY_MB)))
+        .max_by_key(|(_, mb)| *mb)?;
+    Some(format!(
+        "the containers' host needs {} MB of memory (Docker's 1024 MB and the containers', machine `{name}` asking for the most, {most} MB): the largest Docker host here has {} MB",
+        needed,
+        HostSize::LARGEST_MEMORY_MB
+    ))
 }
 
 /// [`refusal`] as an error, before anything is written.

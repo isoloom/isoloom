@@ -48,3 +48,25 @@ fn arm64_is_refused_by_the_clouds() {
     assert_eq!(why, "machine `w`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)");
     assert!(CloudDockerBackend.render(&e).unwrap_err().to_string().ends_with(&why));
 }
+
+#[test]
+fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
+    let env = |db_mb: u32| {
+        let lab = Lab::new(
+            isoloom_spec::parse(&format!(
+                "version: 1\nname: a\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  web:\n    networks: {{ lab: 10 }}\n    app: {{ image: nginx }}\n  db:\n    networks: {{ lab: 11 }}\n    resources: {{ memory_mb: {db_mb} }}\n    app: {{ image: postgres }}\n"
+            ))
+            .unwrap(),
+        );
+        Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None)
+    };
+    // 512 MB + 14 GB + Docker's 1 GB: 15.5 GB fits the 16 GB host.
+    assert_eq!(CloudDockerBackend.refusal(&env(14336)), None);
+    // 512 MB + 16 GB + 1 GB was given the 16 GB host all the same.
+    let why = CloudDockerBackend.refusal(&env(16384)).unwrap();
+    assert_eq!(
+        why,
+        "the containers' host needs 17920 MB of memory (Docker's 1024 MB and the containers', machine `db` asking for the most, 16384 MB): the largest Docker host here has 16384 MB"
+    );
+    assert!(CloudDockerBackend.render(&env(16384)).unwrap_err().to_string().ends_with(&why));
+}
