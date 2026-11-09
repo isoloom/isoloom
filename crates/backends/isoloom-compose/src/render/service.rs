@@ -106,9 +106,10 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
     }
     svc.networks.extend(outside::attachments(plan));
     if plan.is_gateway {
-        // It routes: forwarding on, and the right to set its own firewall rules.
+        // It routes: forwarding on (beside the spec's own kernel parameters), and the right to
+        // set its own firewall rules.
         svc.cap_add = vec!["NET_ADMIN".into()];
-        svc.sysctls = IndexMap::from([("net.ipv4.ip_forward".to_owned(), "1".to_owned())]);
+        svc.sysctls.extend(crate::ipv6::forwarding(env));
     }
     svc
 }
@@ -362,6 +363,17 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_gateway_keeps_its_own_kernel_parameters_beside_forwarding() {
+        let env = crate::testing::environment(
+            "version: 1\nname: t\nnetworks:\n  dmz: { cidr: 10.9.0.0/24, gateway: fw }\n  out: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { out: 5, dmz: 1 }\n    sysctls: { net.ipv4.tcp_syncookies: \"1\" }\n    app: { image: alpine }\n",
+        );
+        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        let fw = &file.services["fw"];
+        assert_eq!(fw.sysctls.get("net.ipv4.tcp_syncookies").map(String::as_str), Some("1"), "{:?}", fw.sysctls);
+        assert_eq!(fw.sysctls.get("net.ipv4.ip_forward").map(String::as_str), Some("1"), "{:?}", fw.sysctls);
+    }
 
     #[test]
     fn a_from_line_keeps_its_stage_name_and_other_lines_stay() {
