@@ -47,7 +47,7 @@ fn azure_has_the_shared_outputs() -> Outcome {
 #[test]
 fn azure_gives_a_machine_on_several_networks_an_interface_on_each() -> Outcome {
     let mut spec = example("pivot-dmz")?;
-    // Kali has no Azure image yet: the user lands on Debian here (as the AWS test does).
+    // Azure has no Kali image yet: the user lands on Debian here.
     kali_as_debian(&mut spec)?;
     let tf = azure(&spec)?;
     // The multi-homed gateway gets a NIC per network, forwarding on (AWS source/dest check off).

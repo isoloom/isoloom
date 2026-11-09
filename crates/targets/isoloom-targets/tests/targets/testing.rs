@@ -117,7 +117,7 @@ machines:
     )
 }
 
-/// `spec` with its Kali machines on Debian: the clouds have no Kali image yet.
+/// `spec` with its Kali machines on Debian, for a cloud with no Kali image (Azure; AWS has one).
 pub(crate) fn kali_as_debian(spec: &mut Spec) -> Outcome {
     for m in spec.machines.values_mut() {
         if m.os.is_some_and(|os| os.name() == "kali") {

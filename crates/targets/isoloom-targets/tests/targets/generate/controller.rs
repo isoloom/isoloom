@@ -4,14 +4,12 @@
 use isoloom_spec::{Target, parse};
 use isoloom_targets::Lab;
 
-use crate::testing::{Outcome, example, from, generated, kali_as_debian, lab, problems, source};
+use crate::testing::{Outcome, example, from, generated, lab, problems, source};
 
 #[test]
 fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() -> Outcome {
-    let mut spec = source("pivot-dmz")?;
-    // Kali has no AWS image yet: the user lands on Debian here.
-    kali_as_debian(&mut spec)?;
-    let tf = generated(&Lab::new(spec), Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
+    // As it is: its Kali user runs Kali's own AWS image.
+    let tf = generated(&Lab::new(source("pivot-dmz")?), Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
     assert!(tf.contains("resource \"aws_network_interface\" \"gateway_dmz\""), "{tf}");
     assert!(tf.contains("resource \"aws_network_interface\" \"gateway_internal\""));
     assert!(tf.contains("source_dest_check = false"));
