@@ -84,11 +84,24 @@ pub(crate) struct AffinityTerm {
     pub(crate) topology_key: &'static str,
 }
 
-/// A pod's security settings: its sysctls.
-#[derive(Debug, Clone, Serialize)]
+/// A pod's security settings: its seccomp profile and its sysctls.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct PodSecurity {
+    /// The system calls its containers may make: the runtime's default filter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) seccomp_profile: Option<SeccompProfile>,
     /// Kernel parameters, namespaced to the pod.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) sysctls: Vec<NameValue>,
+}
+
+/// A seccomp profile, by its type.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SeccompProfile {
+    /// `RuntimeDefault`.
+    #[serde(rename = "type")]
+    pub(crate) kind: &'static str,
 }
 
 /// A `name` and a `value` (a sysctl, a fixed environment variable).

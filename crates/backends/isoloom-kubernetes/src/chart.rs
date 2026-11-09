@@ -178,6 +178,15 @@ fn notes(env: &Environment) -> String {
         Some(_) => notes.push_str("How to use it: isoloom message --target kubernetes (in the project).\n\n"),
         None => {}
     }
+    let forwards = crate::machine::port_forwards(&Machine::all(env), "{{ .Release.Namespace }}");
+    if !forwards.is_empty() {
+        notes.push_str("Published ports, on this computer:\n");
+        for forward in forwards {
+            notes.push_str("  ");
+            notes.push_str(&forward);
+            notes.push('\n');
+        }
+    }
     notes.push_str("Checks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}\n");
     notes
 }

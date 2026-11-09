@@ -111,6 +111,7 @@ impl Check<'_> {
     fn spec(&self, metadata: Metadata) -> JobSpec {
         let mut check = Container::new("check", Image::Tool(self.image.clone()));
         check.command = vec!["/bin/sh".into(), format!("/isoloom/run/{}", self.runner)];
+        check.security_context = Some(crate::security::image_user());
         check.volume_mounts = vec![VolumeMount::at("runner", "/isoloom/run")];
         let mut volumes = vec![Volume {
             name: "runner".into(),
@@ -129,6 +130,7 @@ impl Check<'_> {
                 metadata,
                 spec: PodSpec {
                     restart_policy: Some("Never"),
+                    security_context: crate::security::pod(false, Vec::new()),
                     containers: vec![check],
                     volumes,
                     ..PodSpec::default()

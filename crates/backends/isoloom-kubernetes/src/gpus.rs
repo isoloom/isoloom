@@ -8,7 +8,7 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::{GpuCount, Gpus};
 
 use crate::machine::Machine;
-use crate::objects::{Container, EnvVar, Limits, NameValue, Resources};
+use crate::objects::{Container, EnvVar, NameValue, Resources};
 
 /// The environment variable NVIDIA's container toolkit reads the capabilities from.
 const NVIDIA_CAPABILITIES: &str = "NVIDIA_DRIVER_CAPABILITIES";
@@ -66,7 +66,7 @@ pub(crate) fn apply(gpus: Option<&Gpus>, c: &mut Container) {
     let (Some(name), Some(count)) = (resource(g.driver()), g.fixed_count()) else {
         return;
     };
-    let resources = c.resources.get_or_insert_with(|| Resources { limits: Limits::default() });
+    let resources = c.resources.get_or_insert_with(Resources::default);
     resources.limits.devices.insert(name.to_owned(), count.to_string());
     if !g.capabilities.is_empty() {
         c.env.push(EnvVar::Value(NameValue {

@@ -9,8 +9,13 @@
 //!   each other; `reach` rules open one network to another, on their ports). No router: the
 //!   cluster's network policy engine enforces them (k3s, Calico, Cilium; not every CNI does).
 //! - Offline machines: an egress policy keeps them inside the environment (and DNS).
-//! - `publish`: a `LoadBalancer` Service on the published port (local clusters such as OrbStack,
-//!   Docker Desktop and k3s answer on localhost).
+//! - `publish`: a cluster-internal Service on the published port, reached from this computer
+//!   with the `kubectl port-forward` the manifests' header gives (nothing opens a public load
+//!   balancer).
+//! - Security: Pod Security Standards' `baseline`, enforced by the namespace (`privileged` when a
+//!   machine needs it): the runtime's seccomp filter, no privilege escalation, capabilities
+//!   dropped (Isoloom's helpers run as `nobody` with none); each machine's CPU and memory limited
+//!   to its size, with a request the scheduler reserves.
 //! - Volumes: a `PersistentVolumeClaim` each, seeded from the image as Docker seeds a named
 //!   volume. `init:` jobs: a container in the machine's pod (same network and volumes), run once
 //!   the machine answers. `depends_on`: init containers that wait for the dependencies'
@@ -75,6 +80,7 @@ mod process;
 mod project;
 mod render;
 mod secrets;
+mod security;
 mod storage;
 #[cfg(test)]
 mod testing;

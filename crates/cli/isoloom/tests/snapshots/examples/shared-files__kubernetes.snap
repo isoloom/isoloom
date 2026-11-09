@@ -266,6 +266,9 @@ spec:
         net.isoloom.com/app: member
     spec:
       hostname: writer
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl
@@ -273,6 +276,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -287,6 +298,23 @@ spec:
         securityContext:
           runAsUser: 0
           runAsGroup: 0
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: vol-shared
           mountPath: /isoloom-seed
@@ -300,6 +328,31 @@ spec:
         command:
         - sleep
         - infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
@@ -312,6 +365,24 @@ spec:
         - sh
         - -c
         - sh /isoloom/scripts/steps__write.sh && exec sleep infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
@@ -389,6 +460,9 @@ spec:
               matchLabels:
                 isoloom.com/machine: writer
             topologyKey: kubernetes.io/hostname
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl
@@ -396,6 +470,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -406,6 +488,31 @@ spec:
         command:
         - sleep
         - infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared
@@ -416,6 +523,24 @@ spec:
         - sh
         - -c
         - sh /isoloom/scripts/steps__look.sh && exec sleep infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared
@@ -503,12 +628,33 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: check
     image: curlimages/curl:8.11.1
     command:
     - /bin/sh
     - /isoloom/run/writer.sh
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -531,12 +677,33 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: check
     image: curlimages/curl:8.11.1
     command:
     - /bin/sh
     - /isoloom/run/reader.sh
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -778,12 +945,33 @@ spec:
         isoloom.com/check: isoloom-check-writer
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: check
         image: curlimages/curl:8.11.1
         command:
         - /bin/sh
         - /isoloom/run/writer.sh
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -808,12 +996,33 @@ spec:
         isoloom.com/check: isoloom-check-reader
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: check
         image: curlimages/curl:8.11.1
         command:
         - /bin/sh
         - /isoloom/run/reader.sh
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1016,6 +1225,7 @@ metadata:
   name: isoloom-shared-files
   labels:
     app.kubernetes.io/managed-by: isoloom
+    pod-security.kubernetes.io/enforce: baseline
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1037,6 +1247,9 @@ spec:
         net.isoloom.com/app: member
     spec:
       hostname: writer
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl
@@ -1044,6 +1257,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -1058,6 +1279,23 @@ spec:
         securityContext:
           runAsUser: 0
           runAsGroup: 0
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: vol-shared
           mountPath: /isoloom-seed
@@ -1071,6 +1309,31 @@ spec:
         command:
         - sleep
         - infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
@@ -1083,6 +1346,24 @@ spec:
         - sh
         - -c
         - sh /isoloom/scripts/steps__write.sh && exec sleep infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: vol-shared
           mountPath: /srv/shared
@@ -1160,6 +1441,9 @@ spec:
               matchLabels:
                 isoloom.com/machine: writer
             topologyKey: kubernetes.io/hostname
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl
@@ -1167,6 +1451,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -1177,6 +1469,31 @@ spec:
         command:
         - sleep
         - infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared
@@ -1187,6 +1504,24 @@ spec:
         - sh
         - -c
         - sh /isoloom/scripts/steps__look.sh && exec sleep infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: vol-shared
           mountPath: /data/shared

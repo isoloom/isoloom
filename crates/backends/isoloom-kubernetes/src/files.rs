@@ -90,6 +90,8 @@ pub(crate) fn init_container(m: &Machine, project: &str) -> Option<Container> {
         .collect();
     let mut c = Container::new(FILES_VOLUME, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
     c.command = vec!["sh".into(), "-c".into(), script.join(" && ")];
+    // Root, to give each file its owner.
+    c.security_context = Some(crate::security::image_user());
     c.volume_mounts = vec![VolumeMount::at(FILES_VOLUME, format!("{DIR}/out"))];
     if config_map(m).is_some() {
         c.volume_mounts.push(VolumeMount::read_only(TEXT_VOLUME, format!("{DIR}/text")));

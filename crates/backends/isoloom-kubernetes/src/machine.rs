@@ -162,7 +162,6 @@ fn service(m: &Machine) -> Option<Manifest> {
         .collect();
     let (ip_family_policy, ip_families) = crate::ipv6::families(m.env, m.plan);
     let spec = ServiceSpec {
-        kind: None,
         ip_family_policy,
         ip_families,
         selector: m.selector(),
@@ -171,8 +170,28 @@ fn service(m: &Machine) -> Option<Manifest> {
     Some(Manifest::service(m.name, spec))
 }
 
-/// What it publishes: reachable from outside the cluster, a `LoadBalancer` Service on the
-/// published ports, and the policy letting anything in on them.
+/// The Service of its published ports, `<machine>-published`.
+fn published_service(m: &Machine) -> String {
+    format!("{}-published", m.name)
+}
+
+/// How to reach what each machine publishes from this computer, one command per machine:
+/// `kubectl port-forward` to its published Service, each published port on the same local port.
+/// `namespace` is the namespace as the command should name it (a Helm expression in the chart).
+pub(crate) fn port_forwards(machines: &[Machine], namespace: &str) -> Vec<String> {
+    machines
+        .iter()
+        .filter(|m| !m.plan.ports.is_empty())
+        .map(|m| {
+            let ports: Vec<String> = m.plan.ports.iter().map(|p| format!("{0}:{0}", p.publish)).collect();
+            format!("kubectl -n {namespace} port-forward svc/{} {}", published_service(m), ports.join(" "))
+        })
+        .collect()
+}
+
+/// What it publishes: a cluster-internal Service on the published ports, which
+/// [`port_forwards`] reaches from this computer (nothing is opened to the internet), and the
+/// policy letting anything in on them.
 fn published(m: &Machine) -> Vec<Manifest> {
     let ports: &[PublishedPort] = &m.plan.ports;
     if ports.is_empty() {
@@ -180,7 +199,6 @@ fn published(m: &Machine) -> Vec<Manifest> {
     }
     let (ip_family_policy, ip_families) = crate::ipv6::families(m.env, m.plan);
     let service = ServiceSpec {
-        kind: Some("LoadBalancer"),
         ip_family_policy,
         ip_families,
         selector: m.selector(),
@@ -217,7 +235,7 @@ fn published(m: &Machine) -> Vec<Manifest> {
         ..NetworkPolicySpec::default()
     };
     vec![
-        Manifest::service(&format!("{}-published", m.name), service),
+        Manifest::service(&published_service(m), service),
         Manifest::network_policy(&format!("publish-{}", m.name), policy),
     ]
 }

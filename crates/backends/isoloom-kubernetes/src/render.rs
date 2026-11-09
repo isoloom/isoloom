@@ -71,6 +71,9 @@ fn objects(env: &Environment) -> Rendered {
     let machines = Machine::all(env);
     let mut ns = Manifest::namespace(&namespace);
     ns.metadata.labels.extend(crate::storage::namespace_labels(&machines));
+    ns.metadata
+        .labels
+        .insert(crate::security::ENFORCE_LABEL.to_owned(), crate::security::level(&machines).to_owned());
     let mut objects = vec![ns];
     objects.extend(machines.iter().flat_map(machine::objects));
     objects.extend(network::policies(env));
@@ -127,6 +130,16 @@ impl fmt::Display for Usage<'_> {
         }
         if let Some(usage) = crate::secrets::usage(env, ns) {
             f.write_str(&usage)?;
+        }
+        let forwards = machine::port_forwards(&Machine::all(env), ns);
+        if !forwards.is_empty() {
+            f.write_str(
+                "# Published ports, on this computer (each command runs until stopped):
+",
+            )?;
+            for forward in &forwards {
+                writeln!(f, "#   {forward}")?;
+            }
         }
         Ok(())
     }

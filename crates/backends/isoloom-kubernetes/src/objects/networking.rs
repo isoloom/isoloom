@@ -8,9 +8,6 @@ use super::{Labels, Selector};
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ServiceSpec {
-    /// `LoadBalancer` when published; cluster-internal otherwise.
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub(crate) kind: Option<&'static str>,
     /// `PreferDualStack` or `SingleStack` on IPv6 networks; the cluster's default otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ip_family_policy: Option<&'static str>,

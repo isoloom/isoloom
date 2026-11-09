@@ -70,6 +70,8 @@ pub(crate) fn init_container(m: &Machine) -> Option<Container> {
     }
     let mut c = Container::new(OWNED, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
     c.command = vec!["sh".into(), "-c".into(), script.join(" && ")];
+    // Root, to give each secret its owner.
+    c.security_context = Some(crate::security::image_user());
     c.volume_mounts = vec![
         VolumeMount::read_only(VOLUME, format!("{DIR}/in")),
         VolumeMount::at(OWNED, format!("{DIR}/out")),

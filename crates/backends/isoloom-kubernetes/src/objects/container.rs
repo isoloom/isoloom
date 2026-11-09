@@ -88,6 +88,25 @@ pub(crate) struct ContainerSecurity {
     /// The group it runs as.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) run_as_group: Option<u32>,
+    /// Refused to start as root (`true` for Isoloom's own helpers, which need no root).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) run_as_non_root: Option<bool>,
+    /// `false`: no process in it gains more privileges than its parent (setuid binaries).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) allow_privilege_escalation: Option<bool>,
+    /// The capabilities it drops, then those it keeps.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) capabilities: Option<Capabilities>,
+}
+
+/// A container's Linux capabilities: every one dropped, then the few it needs added back.
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct Capabilities {
+    /// Dropped (`ALL`).
+    pub(crate) drop: Vec<&'static str>,
+    /// Added back.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) add: Vec<&'static str>,
 }
 
 /// A port a container serves.
@@ -177,10 +196,13 @@ pub(crate) struct SecretKey {
     pub(crate) optional: bool,
 }
 
-/// A container's limits.
-#[derive(Debug, Clone, Serialize)]
+/// What a container is given: what the scheduler reserves for it, and the most it may use.
+#[derive(Debug, Clone, Default, Serialize)]
 pub(crate) struct Resources {
-    /// CPU and memory at most.
+    /// CPU and memory reserved.
+    #[serde(skip_serializing_if = "Limits::is_empty")]
+    pub(crate) requests: Limits,
+    /// CPU and memory at most, and the devices it gets.
     pub(crate) limits: Limits,
 }
 
@@ -196,6 +218,13 @@ pub(crate) struct Limits {
     /// A count of each device plugin resource, by its name.
     #[serde(flatten)]
     pub(crate) devices: indexmap::IndexMap<String, String>,
+}
+
+impl Limits {
+    /// Whether it sets nothing.
+    fn is_empty(&self) -> bool {
+        self.cpu.is_none() && self.memory.is_none() && self.devices.is_empty()
+    }
 }
 
 /// Where a container sees a volume.

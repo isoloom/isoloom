@@ -253,6 +253,8 @@ echo "www.lab.test resolves through dns"
 ## .isoloom/kubernetes/chart/templates/NOTES.txt
 How to use it: isoloom message --target kubernetes (in the project).
 
+Published ports, on this computer:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/dns-published 10053:10053
 Checks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
 
 ## .isoloom/kubernetes/chart/templates/environment.yaml
@@ -278,6 +280,9 @@ spec:
         net.isoloom.com/servers: member
     spec:
       hostname: dns
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl
@@ -285,6 +290,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -292,6 +305,24 @@ spec:
       - name: dns
         image: '{{ index .Values.images "dns" }}'
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         ports:
         - containerPort: 53
           protocol: UDP
@@ -305,6 +336,13 @@ spec:
             - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 53
           periodSeconds: 5
           failureThreshold: 60
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
@@ -340,7 +378,6 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: isoloom
 spec:
-  type: LoadBalancer
   selector:
     isoloom.com/machine: dns
   ports:
@@ -412,6 +449,9 @@ spec:
         net.isoloom.com/users: member
     spec:
       hostname: client
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: wait-dns
         image: alpine:3.20
@@ -419,6 +459,14 @@ spec:
         - sh
         - -c
         - until nc -z dns 53; do sleep 2; done
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
       containers:
       - name: client
         image: '{{ index .Values.images "client" }}'
@@ -426,6 +474,31 @@ spec:
         command:
         - sleep
         - infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
       nodeSelector:
         kubernetes.io/arch: amd64
 ---
@@ -609,12 +682,33 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: check
     image: curlimages/curl:8.11.1
     command:
     - /bin/sh
     - /isoloom/run/client.sh
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -643,12 +737,33 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: check
     image: curlimages/curl:8.11.1
     command:
     - /bin/sh
     - /isoloom/run/dns.sh
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -901,12 +1016,33 @@ spec:
         isoloom.com/check: isoloom-check
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: check
         image: curlimages/curl:8.11.1
         command:
         - /bin/sh
         - /isoloom/run/client.sh
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -937,12 +1073,33 @@ spec:
         isoloom.com/check: isoloom-check-dns
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: check
         image: curlimages/curl:8.11.1
         command:
         - /bin/sh
         - /isoloom/run/dns.sh
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -978,6 +1135,8 @@ configMapGenerator:
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
 #   docker build -t isoloom/udp-dns-dns build/dns
 #   docker build -t isoloom/udp-dns-client -f .isoloom/docker/build/client/Dockerfile .
+# Published ports, on this computer (each command runs until stopped):
+#   kubectl -n isoloom-udp-dns port-forward svc/dns-published 10053:10053
 
 apiVersion: v1
 kind: Namespace
@@ -985,6 +1144,7 @@ metadata:
   name: isoloom-udp-dns
   labels:
     app.kubernetes.io/managed-by: isoloom
+    pod-security.kubernetes.io/enforce: baseline
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1006,6 +1166,9 @@ spec:
         net.isoloom.com/servers: member
     spec:
       hostname: dns
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl
@@ -1013,6 +1176,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -1020,6 +1191,24 @@ spec:
       - name: dns
         image: isoloom/udp-dns-dns
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         ports:
         - containerPort: 53
           protocol: UDP
@@ -1033,6 +1222,13 @@ spec:
             - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 53
           periodSeconds: 5
           failureThreshold: 60
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
@@ -1068,7 +1264,6 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: isoloom
 spec:
-  type: LoadBalancer
   selector:
     isoloom.com/machine: dns
   ports:
@@ -1140,6 +1335,9 @@ spec:
         net.isoloom.com/users: member
     spec:
       hostname: client
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: wait-dns
         image: alpine:3.20
@@ -1147,6 +1345,14 @@ spec:
         - sh
         - -c
         - until nc -z dns 53; do sleep 2; done
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
       containers:
       - name: client
         image: isoloom/udp-dns-client
@@ -1154,6 +1360,31 @@ spec:
         command:
         - sleep
         - infinity
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
       nodeSelector:
         kubernetes.io/arch: amd64
 ---

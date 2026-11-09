@@ -8,11 +8,11 @@ mod networking;
 mod pod;
 
 pub(crate) use container::{
-    Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, HttpGet, KeyToPath, Limits, Probe, Resources, SecretKey, SecretSource, Volume,
-    VolumeDevice, VolumeMount, VolumeSource,
+    Capabilities, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Exec, HttpGet, KeyToPath, Limits, Probe, Resources, SecretKey, SecretSource,
+    Volume, VolumeDevice, VolumeMount, VolumeSource,
 };
 pub(crate) use networking::{IpBlock, NetworkPolicySpec, Peer, PolicyPort, Rule, ServicePort, ServiceSpec};
-pub(crate) use pod::{Affinity, AffinityTerm, DnsConfig, DnsOption, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate};
+pub(crate) use pod::{Affinity, AffinityTerm, DnsConfig, DnsOption, NameValue, PodAffinity, PodSecurity, PodSpec, PodTemplate, SeccompProfile};
 
 use std::fmt::{self, Write as _};
 

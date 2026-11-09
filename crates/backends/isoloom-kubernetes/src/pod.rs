@@ -14,8 +14,8 @@ use crate::kustomize::{SCRIPTS, key};
 use crate::machine::{Machine, udp};
 use crate::network::MACHINE_LABEL;
 use crate::objects::{
-    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Image, Labels, Limits, NameValue, PodAffinity, PodSecurity, PodSpec,
-    Resources, SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
+    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Image, Labels, Limits, NameValue, PodAffinity, PodSpec, Resources,
+    SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
 };
 use crate::process::{self, SCRIPTS_DIR};
 use crate::storage;
@@ -55,9 +55,9 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
         hostname: Some(m.name.to_owned()),
         subdomain: crate::dns::subdomain(m.spec.dns.as_ref()),
         affinity: beside_owners(m),
-        // Namespaced sysctls are the pod's (the kubelet allows the safe ones; others need its
-        // --allowed-unsafe-sysctls).
-        security_context: (!sysctls.is_empty()).then_some(PodSecurity { sysctls }),
+        // The runtime's seccomp filter, and the namespaced sysctls (the kubelet allows the safe
+        // ones; others need its --allowed-unsafe-sysctls).
+        security_context: crate::security::pod(m.spec.privileged, sysctls),
         share_process_namespace: runs_supervisor(m),
         init_containers: init_containers(m),
         containers,
@@ -93,13 +93,7 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
         c.command = vec!["sleep".into(), "infinity".into()];
     }
     process::apply(m, &mut c);
-    if m.spec.privileged || m.spec.read_only {
-        c.security_context = Some(ContainerSecurity {
-            privileged: m.spec.privileged,
-            read_only_root_filesystem: m.spec.read_only,
-            ..ContainerSecurity::default()
-        });
-    }
+    c.security_context = Some(crate::security::machine(m));
     c.ports = m
         .spec
         .ports
@@ -113,21 +107,37 @@ fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
     // passes.
     process::probes(m, &mut c);
     c.env = env(m);
-    c.resources = limits(m);
+    c.resources = Some(resources(m));
     crate::gpus::apply(m.plan.hardware.gpus.as_ref(), &mut c);
     c.volume_mounts = mounts.to_vec();
     c.volume_devices = storage::devices(m);
     c
 }
 
-/// Its CPU and memory limits, if it has any.
-fn limits(m: &Machine) -> Option<Resources> {
-    let limits = Limits {
-        cpu: m.plan.size.cpus.map(|c| c.to_string()),
-        memory: m.plan.size.memory_mb.map(|mb| format!("{mb}Mi")),
-        ..Limits::default()
-    };
-    (limits.cpu.is_some() || limits.memory.is_some()).then_some(Resources { limits })
+/// What it reserves when it doesn't say: a tenth of a CPU and 128 MiB, so a small cluster still
+/// schedules an environment of many idle machines.
+const FLOOR_MILLICPU: u32 = 100;
+/// See [`FLOOR_MILLICPU`].
+const FLOOR_MEMORY_MB: u32 = 128;
+
+/// Its CPU and memory: the most it may use is its size (its `resources`, else a container's
+/// default size, `isoloom_spec::MachineSize`); the scheduler reserves what its `resources`
+/// declare, else a small floor.
+fn resources(m: &Machine) -> Resources {
+    let size = isoloom_spec::MachineSize::of(m.spec.resources, true);
+    let declared = m.plan.size;
+    Resources {
+        requests: Limits {
+            cpu: Some(declared.cpus.map_or_else(|| format!("{FLOOR_MILLICPU}m"), |c| c.to_string())),
+            memory: Some(format!("{}Mi", declared.memory_mb.unwrap_or(FLOOR_MEMORY_MB))),
+            ..Limits::default()
+        },
+        limits: Limits {
+            cpu: Some(size.cpus.to_string()),
+            memory: Some(format!("{}Mi", size.memory_mb)),
+            ..Limits::default()
+        },
+    }
 }
 
 /// The machine's environment: the spec's constraints (proxy, package mirrors), its own fixed
@@ -179,6 +189,7 @@ fn jobs_container(m: &Machine, mounts: &[VolumeMount]) -> Option<Container> {
     let steps: Vec<String> = wait.into_iter().chain(run).chain(["exec sleep infinity".to_owned()]).collect();
     let mut c = Container::new("init", m.image());
     c.image_pull_policy = IF_NOT_PRESENT;
+    c.security_context = Some(crate::security::image_user());
     c.command = vec!["sh".into(), "-c".into(), steps.join(" && ")];
     c.env = env(m);
     c.volume_mounts = mounts.to_vec();
@@ -198,6 +209,7 @@ fn init_containers(m: &Machine) -> Vec<Container> {
     if needs_probe(m) {
         let mut c = Container::new(PROBE_VOLUME, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
         c.command = vec!["/bin/cp".into(), "/bin/busybox".into(), "/probe/busybox".into()];
+        c.security_context = Some(crate::security::helper());
         c.volume_mounts = vec![VolumeMount::at(PROBE_VOLUME, "/probe")];
         out.push(c);
     }
@@ -218,6 +230,7 @@ fn wait_for(m: &Machine, dep: &str) -> Option<Container> {
     let cond = ports.iter().map(|p| format!("nc -z {dep} {p}")).collect::<Vec<_>>().join(" && ");
     let mut c = Container::new(format!("wait-{dep}"), Image::Tool(m.env.images.pull(UTILITY_IMAGE)));
     c.command = vec!["sh".into(), "-c".into(), format!("until {cond}; do sleep 2; done")];
+    c.security_context = Some(crate::security::helper());
     Some(c)
 }
 
@@ -232,7 +245,7 @@ fn seed_container(m: &Machine, v: &str, path: &str) -> Container {
     c.security_context = Some(ContainerSecurity {
         run_as_user: Some(0),
         run_as_group: Some(0),
-        ..ContainerSecurity::default()
+        ..crate::security::image_user()
     });
     c.volume_mounts = vec![VolumeMount::at(format!("vol-{v}"), SEED_DIR), VolumeMount::read_only(PROBE_VOLUME, PROBE_DIR)];
     c

@@ -80,10 +80,79 @@ fn kubernetes_seeds_a_volume_from_the_image_before_the_init_jobs() -> Outcome {
 fn kubernetes_publishes_and_keeps_offline_machines_inside() -> Outcome {
     let spec = example("hello-stack")?;
     let env = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/environment.yaml")?;
-    assert!(env.contains("type: LoadBalancer") && env.contains("port: 8080"), "{env}");
+    // A published port is a cluster-internal Service, reached through `kubectl port-forward`:
+    // nothing opens a public load balancer.
+    assert!(
+        !env.contains("LoadBalancer") && env.contains("name: web-published") && env.contains("port: 8080"),
+        "{env}"
+    );
+    assert!(
+        env.contains("#   kubectl -n isoloom-hello-stack port-forward svc/web-published 8080:8080\n"),
+        "{env}"
+    );
+    let notes = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/chart/templates/NOTES.txt")?;
+    assert!(
+        notes.contains("kubectl -n {{ .Release.Namespace }} port-forward svc/web-published 8080:8080"),
+        "{notes}"
+    );
     assert!(env.contains("name: offline-"));
     // The checks stand on those offline networks: offline too.
     assert!(env.contains("name: offline-isoloom-check"));
     assert!(env.contains("policyTypes:\n    - Egress") || env.contains("policyTypes:\n  - Egress"));
+    Ok(())
+}
+
+#[test]
+fn kubernetes_pods_run_under_the_baseline_pod_security_level() -> Outcome {
+    let env = generated(&example("segmented")?, Target::Kubernetes, ".isoloom/kubernetes/environment.yaml")?;
+    // The namespace enforces `baseline`; each pod the runtime's seccomp filter.
+    assert!(env.contains("pod-security.kubernetes.io/enforce: baseline"), "{env}");
+    assert!(
+        env.contains("securityContext:\n        seccompProfile:\n          type: RuntimeDefault"),
+        "{env}"
+    );
+    // A machine's container: no escalation, its capabilities dropped but what a root process of a
+    // stock image needs, never raw sockets.
+    let web = between(&env, "containers:\n      - name: web\n", "volumes:")?;
+    assert!(
+        web.contains("allowPrivilegeEscalation: false") && web.contains("drop:\n            - ALL"),
+        "{web}"
+    );
+    assert!(web.contains("- SETUID") && !web.contains("NET_RAW") && !web.contains("privileged"), "{web}");
+    // A machine that doesn't size itself is limited to a container's default size and reserves a
+    // small floor.
+    assert!(
+        web.contains("requests:\n            cpu: 100m\n            memory: 128Mi\n          limits:\n            cpu: '1'\n            memory: 512Mi"),
+        "{web}"
+    );
+    // Isoloom's busybox helpers run as nobody, with no capability.
+    let probe = between(&env, "- name: isoloom-probe\n", "volumeMounts")?;
+    assert!(probe.contains("runAsUser: 65534") && probe.contains("runAsNonRoot: true"), "{probe}");
+    // One that does is limited to its size (1 CPU, 1 GiB), all of it reserved.
+    let cache = between(&env, "containers:\n      - name: cache\n", "volumes:")?;
+    assert!(
+        cache.contains("requests:\n            cpu: '1'\n            memory: 1024Mi\n          limits:\n            cpu: '1'\n            memory: 1024Mi"),
+        "{cache}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_privileged_machine_stays_privileged_and_its_namespace_allows_it() -> Outcome {
+    let spec = lab(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  box: { networks: { lan: 10 }, privileged: true, app: { image: alpine } }\n  web: { networks: { lan: 11 }, app: { image: nginx } }\n",
+    )?;
+    let env = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/environment.yaml")?;
+    assert!(env.contains("pod-security.kubernetes.io/enforce: privileged"), "{env}");
+    let privileged = between(&env, "name: box\n", "---")?;
+    assert!(
+        privileged.contains("privileged: true") && !privileged.contains("seccompProfile") && !privileged.contains("drop:"),
+        "{privileged}"
+    );
+    let other = between(&env, "containers:\n      - name: web\n", "---")?;
+    assert!(
+        other.contains("allowPrivilegeEscalation: false") && !other.contains("privileged: true"),
+        "{other}"
+    );
     Ok(())
 }

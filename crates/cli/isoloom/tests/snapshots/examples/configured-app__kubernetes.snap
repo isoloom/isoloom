@@ -367,6 +367,8 @@ wget -qO- "http://web:80/" | grep -q "configured by isoloom"
 wget -qO- "http://web:80/api/" | grep -q "api ok"
 
 ## .isoloom/kubernetes/chart/templates/NOTES.txt
+Published ports, on this computer:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/web-published 8086:8086
 Checks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
 
 ## .isoloom/kubernetes/chart/templates/environment.yaml
@@ -392,6 +394,9 @@ spec:
         net.isoloom.com/lab: member
     spec:
       hostname: web
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       shareProcessNamespace: true
       initContainers:
       - name: isoloom-probe
@@ -400,6 +405,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -407,6 +420,24 @@ spec:
       - name: web
         image: '{{ index .Values.images "web" }}'
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         ports:
         - containerPort: 80
         readinessProbe:
@@ -418,6 +449,13 @@ spec:
             - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
           periodSeconds: 5
           failureThreshold: 60
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
@@ -449,7 +487,6 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: isoloom
 spec:
-  type: LoadBalancer
   selector:
     isoloom.com/machine: web
   ports:
@@ -494,6 +531,9 @@ spec:
         net.isoloom.com/lab: member
     spec:
       hostname: api
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       shareProcessNamespace: true
       initContainers:
       - name: isoloom-probe
@@ -502,6 +542,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -509,6 +557,24 @@ spec:
       - name: api
         image: '{{ index .Values.images "api" }}'
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         ports:
         - containerPort: 8080
         - containerPort: 8081
@@ -521,6 +587,13 @@ spec:
             - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8080 && /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8081
           periodSeconds: 5
           failureThreshold: 60
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
@@ -618,12 +691,33 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: check
     image: curlimages/curl:8.11.1
     command:
     - /bin/sh
     - /isoloom/run/networks.sh
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -652,12 +746,33 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: check
     image: curlimages/curl:8.11.1
     command:
     - /bin/sh
     - /isoloom/run/web.sh
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -680,12 +795,33 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   restartPolicy: Never
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: check
     image: curlimages/curl:8.11.1
     command:
     - /bin/sh
     - /isoloom/run/api.sh
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
     volumeMounts:
     - name: runner
       mountPath: /isoloom/run
@@ -845,12 +981,33 @@ spec:
         isoloom.com/check: isoloom-check
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: check
         image: curlimages/curl:8.11.1
         command:
         - /bin/sh
         - /isoloom/run/networks.sh
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -881,12 +1038,33 @@ spec:
         isoloom.com/check: isoloom-check-web
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: check
         image: curlimages/curl:8.11.1
         command:
         - /bin/sh
         - /isoloom/run/web.sh
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -911,12 +1089,33 @@ spec:
         isoloom.com/check: isoloom-check-api
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: check
         image: curlimages/curl:8.11.1
         command:
         - /bin/sh
         - /isoloom/run/api.sh
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         volumeMounts:
         - name: runner
           mountPath: /isoloom/run
@@ -1131,6 +1330,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # OrbStack, Docker Desktop; elsewhere, push them to a registry the cluster pulls from):
 #   docker build -t isoloom/configured-app-web -f .isoloom/docker/build/web/Dockerfile .
 #   docker build -t isoloom/configured-app-api -f .isoloom/docker/build/api/Dockerfile .
+# Published ports, on this computer (each command runs until stopped):
+#   kubectl -n isoloom-configured-app port-forward svc/web-published 8086:8086
 
 apiVersion: v1
 kind: Namespace
@@ -1138,6 +1339,7 @@ metadata:
   name: isoloom-configured-app
   labels:
     app.kubernetes.io/managed-by: isoloom
+    pod-security.kubernetes.io/enforce: baseline
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1159,6 +1361,9 @@ spec:
         net.isoloom.com/lab: member
     spec:
       hostname: web
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       shareProcessNamespace: true
       initContainers:
       - name: isoloom-probe
@@ -1167,6 +1372,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -1174,6 +1387,24 @@ spec:
       - name: web
         image: isoloom/configured-app-web
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         ports:
         - containerPort: 80
         readinessProbe:
@@ -1185,6 +1416,13 @@ spec:
             - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80
           periodSeconds: 5
           failureThreshold: 60
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
@@ -1216,7 +1454,6 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: isoloom
 spec:
-  type: LoadBalancer
   selector:
     isoloom.com/machine: web
   ports:
@@ -1261,6 +1498,9 @@ spec:
         net.isoloom.com/lab: member
     spec:
       hostname: api
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       shareProcessNamespace: true
       initContainers:
       - name: isoloom-probe
@@ -1269,6 +1509,14 @@ spec:
         - /bin/cp
         - /bin/busybox
         - /probe/busybox
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: isoloom-probe
           mountPath: /probe
@@ -1276,6 +1524,24 @@ spec:
       - name: api
         image: isoloom/configured-app-api
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
         ports:
         - containerPort: 8080
         - containerPort: 8081
@@ -1288,6 +1554,13 @@ spec:
             - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8080 && /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8081
           periodSeconds: 5
           failureThreshold: 60
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
         volumeMounts:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
