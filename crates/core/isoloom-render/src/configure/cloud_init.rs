@@ -17,8 +17,9 @@
 //! a service would not restart when the shell renderer would restart it. The library keeps one
 //! implementation, guarded and ordered, that every carrier runs the same way.
 //!
-//! **Size.** A provider that caps user data ([`Limit`]) measures the whole document; gzip keeps a
-//! recipe's script small, and [`Limit::fits`] refuses, naming the machine, what still overflows.
+//! **Size.** A cloud that caps user data ([`Limit`]) measures the whole document, as it receives
+//! it; gzip keeps a recipe's script small. The `cloud-vm` modules refuse a machine whose user data
+//! is still over its cloud's cap ([`Limit::fits`]), naming the machine.
 
 use std::io::Write as _;
 
@@ -77,23 +78,32 @@ pub fn configure(c: &Configured<'_>, resources: &[Resource], fresh: bool, index:
 /// the same script gives the same bytes on every host.
 #[must_use]
 pub fn gz_b64(script: &str) -> String {
+    base64(&gzip(script))
+}
+
+/// `script` gzip-compressed, deterministically (no modification time or name in the header).
+#[must_use]
+pub fn gzip(script: &str) -> Vec<u8> {
     let mut gz = GzEncoder::new(Vec::new(), Compression::best());
     // Writing to and flushing an in-memory `Vec` can't fail; the empty fallback is unreachable.
     let written = gz.write_all(script.as_bytes());
-    let bytes = written.and(gz.finish()).unwrap_or_default();
-    base64(&bytes)
+    written.and(gz.finish()).unwrap_or_default()
 }
 
-/// How large a provider lets a machine's user data be, in bytes of the document it receives
-/// (design §4.9 cloud design; a `docker-vm`, Proxmox or ESXi snippet has no such cap).
+/// How large a cloud lets a machine's user data be, in bytes of the document it receives once
+/// decoded from the base64 it travels in (a `docker-vm`, Proxmox or ESXi snippet has no such cap).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Limit {
-    /// AWS: 16 KiB of raw user data.
+    /// AWS: 16 KiB of user data, counted before its base64 (so, for gzipped user data, the
+    /// gzip's bytes).
+    /// <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html>
     Aws,
-    /// Azure: 64 KiB.
+    /// Azure: 65535 bytes of custom data, once decoded from its base64.
+    /// <https://learn.microsoft.com/rest/api/compute/virtual-machines/create-or-update#osprofile>
     Azure,
-    /// Google Cloud: 256 KiB.
+    /// Google Cloud: 256 KiB for one metadata value (the startup script).
+    /// <https://cloud.google.com/compute/docs/metadata/setting-custom-metadata#limitations>
     Gcp,
 }
 
@@ -103,7 +113,7 @@ impl Limit {
     pub fn bytes(self) -> usize {
         match self {
             Limit::Aws => 16 * 1024,
-            Limit::Azure => 64 * 1024,
+            Limit::Azure => 65_535,
             Limit::Gcp => 256 * 1024,
         }
     }
@@ -118,14 +128,15 @@ impl Limit {
         }
     }
 
-    /// `Ok` when `user_data` (the document the provider receives) fits; otherwise [`TooBig`],
-    /// which a caller turns into a refusal naming the machine.
+    /// `Ok` when `document` (the user data as the cloud counts it: gzipped when it is sent
+    /// gzipped, never base64) fits; otherwise [`TooBig`], which a caller turns into a refusal
+    /// naming the machine.
     ///
     /// # Errors
     ///
-    /// [`TooBig`] when the document is over the cap, with its size and the overflow.
-    pub fn fits(self, user_data: &str) -> Result<(), TooBig> {
-        let size = user_data.len();
+    /// [`TooBig`] when the document is over the cap, with its size and the cap.
+    pub fn fits(self, document: &[u8]) -> Result<(), TooBig> {
+        let size = document.len();
         let cap = self.bytes();
         if size <= cap {
             Ok(())
@@ -139,9 +150,9 @@ impl Limit {
     }
 }
 
-/// A machine's user data doesn't fit its provider's cap.
+/// A machine's user data doesn't fit its cloud's cap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error("its cloud-init user data is {size} bytes, over {provider}'s {cap}-byte limit: fewer or smaller files, or a smaller recipe")]
+#[error("its user data is {size} bytes as {provider} counts it, over its {cap}-byte limit: fewer or smaller steps, files or recipes")]
 #[non_exhaustive]
 pub struct TooBig {
     /// The provider whose cap it broke.

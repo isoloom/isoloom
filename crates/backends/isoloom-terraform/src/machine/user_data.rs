@@ -13,10 +13,13 @@
 //! script): a set-up that ended (`ready`, or `failed: …`) doesn't run again, and the script it
 //! is reading is never rewritten in place.
 
-use isoloom_render::hcl_builder::{Expression, Template, reference};
+use isoloom_render::configure::cloud_init::{Limit, gzip};
+use isoloom_render::hcl_builder::{Expression, Piece, Template, reference};
+use isoloom_spec::model::Target;
 use isoloom_spec::shell::quote;
 
 use super::cloud_init::READY_FILE;
+use crate::{Error, Result};
 
 /// Where the set-up writes its output: the runner shows its tail when a step failed.
 pub(crate) const SETUP_LOG: &str = "/var/log/isoloom-setup.log";
@@ -170,10 +173,46 @@ pub(crate) fn expression(s: &SetUp) -> Expression {
     script(s).into_expression()
 }
 
+/// How a cloud receives a machine's user data: its cap, and whether the module gzips the script
+/// (AWS's `base64gzip`: AWS counts the gzip's bytes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Capped {
+    /// The cloud's cap.
+    pub(crate) limit: Limit,
+    /// Whether the module sends the script gzipped.
+    pub(crate) gzipped: bool,
+}
+
+/// [`script`] as an expression on a cloud that caps its user data: refused, naming `who` (as a
+/// refusal reads: ``machine `web` ``, `the controller`), when it is over the cap as the cloud
+/// counts it.
+///
+/// What is measured is the text Isoloom writes; the values Terraform interpolates at apply (the
+/// launch's inputs, the expiry, an interface's address) are left out, so a refusal is certain,
+/// and a script within a few bytes of the cap may still be refused by the cloud.
+///
+/// # Errors
+///
+/// [`Error::Refused`] naming `who`, its size and the cap.
+pub(crate) fn capped(s: &SetUp, who: &str, cap: Capped) -> Result<Expression> {
+    let t = script(s);
+    let text: String = t
+        .pieces()
+        .filter_map(|p| match p {
+            Piece::Text(text) => Some(text),
+            Piece::Expr(_) => None,
+        })
+        .collect();
+    let document = if cap.gzipped { gzip(&text) } else { text.into_bytes() };
+    cap.limit.fits(&document).map_err(|too_big| Error::Refused {
+        target: Target::CloudVm,
+        reason: format!("{who}: {too_big}"),
+    })?;
+    Ok(t.into_expression())
+}
+
 #[cfg(test)]
 mod tests {
-    use isoloom_render::hcl_builder::Piece;
-
     use super::*;
 
     fn text(t: &Template) -> String {

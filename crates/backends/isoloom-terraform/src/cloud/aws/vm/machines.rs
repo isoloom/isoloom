@@ -2,6 +2,7 @@
 //! own user data through the VM core; the Windows machines' and the controller's.
 
 use isoloom_plan::{Environment, MachinePlan};
+use isoloom_render::configure::cloud_init::Limit;
 use isoloom_render::hcl_builder::{
     BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string,
 };
@@ -10,15 +11,23 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::{controller_group, security_group};
 use super::{addresses, image_user, machine_type, nesting};
+use crate::Result;
 use crate::cloud::auto_stop;
 use crate::cloud::aws::instance_type;
 use crate::cloud::instance::name_with;
 use crate::cloud::vm::controller_setup;
 use crate::cloud::vm::{disks, gateways, hooks, interfaces, own_image};
+use crate::machine::user_data::Capped;
 use crate::machine::{Remote, controller, user_data, windows};
 use crate::module::{ident, resource};
 
-/// An instance's user data: `script`, gzipped (AWS takes 16 KB).
+/// How AWS takes a Linux instance's user data: gzipped ([`user_data`]), 16 KB of it.
+const CAP: Capped = Capped {
+    limit: Limit::Aws,
+    gzipped: true,
+};
+
+/// An instance's user data: `script`, gzipped (AWS takes 16 KB: [`CAP`]).
 fn user_data(script: Expression) -> (&'static str, Expression) {
     ("user_data_base64", call("base64gzip", [script]))
 }
@@ -43,7 +52,7 @@ fn ami(mp: &MachinePlan) -> Expression {
 }
 
 /// A Linux machine: its security group, its instance, set up from its user data.
-pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
@@ -57,13 +66,14 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     at_boot.extend(gateways::at_boot(mp));
     let user = image_user(mp.os.as_deref().unwrap_or_default());
     let instance = nesting(instance, mp)
-        .add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot)))
+        .add_attribute(user_data(hooks::capped_user_data(env, (name, mp), user, at_boot, CAP)?))
         .add_block(lifecycle("user_data_base64", tpm_ami.as_deref()));
     if addresses::needs_interfaces(mp) {
         m.blocks(several_networks((name, mp), instance));
     } else {
         m.block(one_network((name, mp), instance));
     }
+    Ok(())
 }
 
 /// A Linux machine's root disk: what its spec asks for (the default otherwise), at least what its
@@ -250,7 +260,7 @@ fn windows_user_data() -> Expression {
 /// The controller: its security group, an interface on every network at the controller
 /// address, its instance and Elastic IP, set up from its user data (it waits for every machine's
 /// own set-up before the playbooks).
-pub(super) fn controller(env: &Environment, m: &mut Module) {
+pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     m.commented(
         "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
         controller_group(env),
@@ -271,7 +281,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
             .add_attribute(("ami", reference(&format!("data.aws_ami.{}.id", ident(controller::OS)))))
             .add_attribute(("instance_type", string(instance_type(mem))))
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
-            .add_attribute(user_data(user_data::expression(&setup)))
+            .add_attribute(user_data(user_data::capped(&setup, "the controller", CAP)?))
             .add_block(lifecycle("user_data_base64", None))
             .add_block(primary(&first))
             .add_attribute(("tags", object([("Name", name_with("-controller"))])))
@@ -279,6 +289,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
     );
     m.block(eip("isoloom_controller", &first));
     m.blocks(attachments("isoloom_controller", env.networks.keys().map(|n| nic(n))));
+    Ok(())
 }
 
 /// The address to stand at for the checks and a session when no Linux machine can.

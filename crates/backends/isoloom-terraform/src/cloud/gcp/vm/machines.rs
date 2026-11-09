@@ -5,16 +5,26 @@ use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
+use isoloom_render::configure::cloud_init::Limit;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::vpc;
 use super::{NESTING, RULES, for_nics, image, machine_type, user};
+use crate::Result;
 use crate::cloud::instance::{name_with, tags};
 use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, nested, own_image, reach, seal};
+use crate::machine::user_data::Capped;
 use crate::machine::{controller, user_data};
 use crate::module::{ident, resource};
+
+/// How Google Cloud takes a machine's user data: its startup script, a metadata value of 256 KB
+/// at most.
+const CAP: Capped = Capped {
+    limit: Limit::Gcp,
+    gzipped: false,
+};
 
 /// A machine's machine type: its GPUs', else a nesting one, else by its memory, with room for an
 /// interface per network.
@@ -39,10 +49,10 @@ fn at_boot(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>, gateway: O
 }
 
 /// A Linux machine: what may reach it, its instance, set up by its startup script.
-pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
     let id = ident(name);
     if mp.addresses.is_empty() {
-        return;
+        return Ok(());
     }
     let rules = firewalls(env, (name, mp));
     if let Some((first, rest)) = rules.split_first() {
@@ -51,7 +61,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     }
     let os = mp.os.as_deref().unwrap_or_default();
     m.blocks(disks::gcp(name, &mp.disks));
-    let setup = hooks::user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses, Some(mp)));
+    let setup = hooks::capped_user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses, Some(mp)), CAP)?;
     let mut vm = instance(&Instance {
         env,
         id: &id,
@@ -69,6 +79,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     });
     vm.body.extend(disks::gcp_attached(name, &mp.disks));
     m.block(vm);
+    Ok(())
 }
 
 /// Who may reach a machine, a rule per source (Google Cloud's firewall rules are a VPC's and
@@ -264,9 +275,9 @@ fn hardware(mut b: BlockBuilder, i: &Instance) -> BlockBuilder {
 /// The controller: what may reach it (every network, SSH from `allowed_cidr`), its instance
 /// with an interface on every network at the controller address, set up by its startup script
 /// (it waits for every machine's own set-up before the playbooks).
-pub(super) fn controller(env: &Environment, m: &mut Module) {
+pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let id = "isoloom_controller";
-    let Some(first) = env.networks.keys().next() else { return };
+    let Some(first) = env.networks.keys().next() else { return Ok(()) };
     let addresses = controller::addresses(env);
     let who = (id, "controller");
     let mut rules = env
@@ -295,6 +306,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
         on: (&addresses, addresses.len() > 1),
         more: &IndexMap::new(),
         tpm: false,
-        setup: user_data::expression(&setup),
+        setup: user_data::capped(&setup, "the controller", CAP)?,
     }));
+    Ok(())
 }

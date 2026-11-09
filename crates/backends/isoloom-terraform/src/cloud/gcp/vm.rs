@@ -83,7 +83,7 @@ const RULES: Rules = Rules {
 /// How the module writes its machines: Linux ones (its refusal declines Windows).
 const MACHINES: vm::Machines = vm::Machines {
     linux: machines::linux,
-    windows: machines::linux,
+    windows: None,
     controller: machines::controller,
 };
 
@@ -217,16 +217,17 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) {
+fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated_with(env, &|e, n, _| relocate(e, n));
     network::blocks(env, m);
     private_dns::write(env, own_project(), m);
     vm::credentials(env, m);
-    MACHINES.write(env, m);
+    MACHINES.write(env, m)?;
     let reach = Reach {
         public_ip: &|n| public_ip(&ident(n)),
         user: &|mp| user(mp.os.as_deref().unwrap_or_default()).to_owned(),
         controller: Some((public_ip("isoloom_controller"), user(controller::OS))),
     };
     outputs::write(env, &reach, m);
+    Ok(())
 }

@@ -105,7 +105,11 @@ pub(crate) const DRIVER: Driver = Driver {
         Vec::new()
     },
     refusal,
-    write,
+    // No cap on its user data that the module checks: its machines are written as they are.
+    write: |env, m| {
+        write(env, m);
+        Ok(())
+    },
     user: |_| USER,
 };
 

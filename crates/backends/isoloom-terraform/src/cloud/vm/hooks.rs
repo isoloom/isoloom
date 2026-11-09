@@ -5,8 +5,9 @@
 use isoloom_plan::{Environment, MachinePlan, Step};
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Template, list};
 
+use crate::Result;
 use crate::machine::linux::{self, Hooks};
-use crate::machine::user_data;
+use crate::machine::user_data::{self, Capped};
 
 /// A Linux machine's set-up hooks on a cloud: `at_boot` first (its interfaces after the first,
 /// a gateway's forwarding), the published-port redirects before the machine closes itself off.
@@ -25,6 +26,17 @@ pub(crate) fn of(mp: &MachinePlan, at_boot: Vec<Template>) -> Hooks {
 pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>) -> Expression {
     let hooks = of(machine.1, at_boot);
     user_data::expression(&linux::set_up(env, machine, user, &hooks))
+}
+
+/// [`user_data`] on a cloud that caps it: refused, naming the machine, when it is over the cap
+/// ([`user_data::capped`]).
+///
+/// # Errors
+///
+/// [`crate::Error::Refused`] when the machine's user data is over the cap.
+pub(crate) fn capped_user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>, cap: Capped) -> Result<Expression> {
+    let hooks = of(machine.1, at_boot);
+    user_data::capped(&linux::set_up(env, machine, user, &hooks), &format!("machine `{}`", machine.0), cap)
 }
 
 /// The `lifecycle` of a machine whose user data (`attribute`, as `ignore_changes` names it) runs

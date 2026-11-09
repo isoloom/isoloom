@@ -5,20 +5,29 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan};
+use isoloom_render::configure::cloud_init::Limit;
 use isoloom_render::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, reference, string};
 use isoloom_render::inventory::WinrmAuth;
 use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 
 use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{USER, image, machine_size, public_ip as address_of, size};
+use crate::Result;
 use crate::cloud::auto_stop;
 use crate::cloud::instance::name_with;
 use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, own_image, reach};
+use crate::machine::user_data::Capped;
 use crate::machine::{Remote, controller, user_data, windows};
 use crate::module::ident;
 
+/// How Azure takes a Linux VM's user data: its custom data, base64 only, 65535 bytes of it.
+const CAP: Capped = Capped {
+    limit: Limit::Azure,
+    gzipped: false,
+};
+
 /// A Linux machine: its security group, public IP, interfaces and VM, set up from its custom data.
-pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
     m.block(public_ip(&id, name));
@@ -32,7 +41,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     let own = own_image::of(mp, own_image::azure);
     let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
     at_boot.extend(gateways::at_boot(mp));
-    let setup = hooks::user_data(env, (name, mp), USER, at_boot);
+    let setup = hooks::capped_user_data(env, (name, mp), USER, at_boot, CAP)?;
     m.block(linux_vm(
         &id,
         name,
@@ -41,6 +50,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         (list(ids), setup),
     ));
     m.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
+    Ok(())
 }
 
 /// The MAC address of an Azure interface (uppercase, dash-separated), as `ip link` writes it.
@@ -257,7 +267,7 @@ fn reach_rules(mut g: Nsg, rule: &str, ports: &[u16], block: &str) -> Nsg {
 /// The controller: its security group (every network may reach it, and SSH from
 /// `allowed_cidr`), an interface on every network at the controller address, its VM, set up from
 /// its custom data (it waits for every machine's own set-up before the playbooks).
-pub(super) fn controller(env: &Environment, m: &mut Module) {
+pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let id = "isoloom_controller";
     let mut g = Nsg::new(id, "controller");
     for (n, p) in &env.networks {
@@ -281,6 +291,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) {
         "controller",
         (controller::OS, None),
         (size(memory, addresses.len()), disk, false),
-        (list(ids), user_data::expression(&setup)),
+        (list(ids), user_data::capped(&setup, "the controller", CAP)?),
     ));
+    Ok(())
 }

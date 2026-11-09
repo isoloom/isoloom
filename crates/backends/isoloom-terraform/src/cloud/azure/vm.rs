@@ -78,7 +78,7 @@ const RULES: Rules = Rules {
 /// How the module writes its machines.
 const MACHINES: vm::Machines = vm::Machines {
     linux: machines::linux,
-    windows: machines::windows,
+    windows: Some(machines::windows),
     controller: machines::controller,
 };
 
@@ -190,19 +190,20 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) {
+fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
     network::blocks(env, m);
     routing::blocks(env, m);
     private_dns::write(env, m);
     vm::credentials(env, m);
-    MACHINES.write(env, m);
+    MACHINES.write(env, m)?;
     let reach = Reach {
         public_ip: &|n| public_ip(&ident(n)),
         user: &|_| USER.to_owned(),
         controller: Some((public_ip("isoloom_controller"), USER)),
     };
     outputs::write(env, &reach, m);
+    Ok(())
 }
 
 /// The address Terraform reaches a machine at (`id`: its resource name).

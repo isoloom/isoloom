@@ -130,7 +130,7 @@ mod tests {
             oci::vm::DRIVER,
         ] {
             let mut m = Module::new("");
-            (driver.write)(&env, &mut m);
+            (driver.write)(&env, &mut m).unwrap();
             let text = m.render().unwrap();
             for (name, mp) in vms(&env) {
                 let user = (driver.user)(mp.os.as_deref().unwrap_or_default());

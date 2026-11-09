@@ -78,7 +78,7 @@ const RULES: Rules = Rules {
 /// How the module writes its machines.
 const MACHINES: vm::Machines = vm::Machines {
     linux: machines::linux,
-    windows: machines::windows,
+    windows: Some(machines::windows),
     controller: machines::controller,
 };
 
@@ -247,15 +247,16 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) {
+fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
     m.block(zones());
     network::blocks(env, m);
     private_dns::write(env, m);
     vm::credentials(env, m);
     m.blocks(amis(env));
-    MACHINES.write(env, m);
+    MACHINES.write(env, m)?;
     outputs::blocks(env, m);
+    Ok(())
 }
 
 /// An AMI lookup per OS (the controller's among them).

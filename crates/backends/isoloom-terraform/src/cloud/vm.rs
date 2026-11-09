@@ -64,8 +64,9 @@ pub(crate) struct Driver {
     pub(crate) provider: ProviderConfig,
     /// Why it can't run the environment, if it can't.
     pub(crate) refusal: fn(&Environment) -> Option<String>,
-    /// Its blocks after the module's head.
-    pub(crate) write: fn(&Environment, &mut Module),
+    /// Its blocks after the module's head; refused when a machine can't be written (its user
+    /// data over the cloud's cap).
+    pub(crate) write: fn(&Environment, &mut Module) -> Result<()>,
     /// The user the runner's key logs in as on a machine of this OS (it has `sudo`, or is root).
     pub(crate) user: fn(&str) -> &'static str,
 }
@@ -101,27 +102,39 @@ pub(crate) fn at_first_address(env: &Environment) -> impl Iterator<Item = ((&str
     vms(env).filter_map(|(name, mp)| mp.addresses.first().map(|(net, a)| ((name, mp), (net.as_str(), *a))))
 }
 
+/// How a cloud's module writes a Windows VM.
+pub(crate) type WriteWindows = fn(&Environment, (&str, &MachinePlan), &mut Module);
+
 /// How a cloud's module writes its machines: a Linux VM, a Windows VM, the controller.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Machines {
     /// A Linux VM's resources and set-up.
-    pub(crate) linux: fn(&Environment, (&str, &MachinePlan), &mut Module),
-    /// A Windows VM's resources and set-up.
-    pub(crate) windows: fn(&Environment, (&str, &MachinePlan), &mut Module),
+    pub(crate) linux: fn(&Environment, (&str, &MachinePlan), &mut Module) -> Result<()>,
+    /// A Windows VM's resources and set-up (its user data is fixed: the administrator, WinRM, the
+    /// auto-stop, nothing a cap could refuse); `None` on a cloud whose refusal declines Windows.
+    pub(crate) windows: Option<WriteWindows>,
     /// The controller's resources and set-up.
-    pub(crate) controller: fn(&Environment, &mut Module),
+    pub(crate) controller: fn(&Environment, &mut Module) -> Result<()>,
 }
 
 impl Machines {
     /// Each VM in start order, then the controller when the environment needs one.
-    pub(crate) fn write(&self, env: &Environment, m: &mut Module) {
+    ///
+    /// # Errors
+    ///
+    /// The first machine that can't be written ([`crate::Error::Refused`]).
+    pub(crate) fn write(&self, env: &Environment, m: &mut Module) -> Result<()> {
         for (name, mp) in vms(env) {
-            let machine = if mp.is_windows() { self.windows } else { self.linux };
-            machine(env, (name, mp), m);
+            match (mp.is_windows(), self.windows) {
+                (true, Some(windows)) => windows(env, (name, mp), m),
+                (true, None) => {}
+                (false, _) => (self.linux)(env, (name, mp), m)?,
+            }
         }
         if controller::needed(env) {
-            (self.controller)(env, m);
+            (self.controller)(env, m)?;
         }
+        Ok(())
     }
 }
 
@@ -186,9 +199,15 @@ impl CloudVmModule {
         }
     }
 
-    /// Why its cloud can't run `env` beyond the plan's requirements: the cloud's own rules.
+    /// Why its cloud can't run `env` beyond the plan's requirements: the cloud's own rules, then
+    /// a machine its module can't write (its user data over the cloud's cap, which only writing
+    /// it measures).
     fn own_refusal(self, env: &Environment) -> Option<String> {
-        (self.driver().refusal)(env)
+        let driver = self.driver();
+        (driver.refusal)(env).or_else(|| match (driver.write)(env, &mut Module::default()) {
+            Err(crate::Error::Refused { reason, .. }) => Some(reason),
+            _ => None,
+        })
     }
 
     /// Why its cloud can't run `env`: the plan's requirements the target lacks, else the
@@ -225,7 +244,7 @@ impl CloudVmModule {
             ProjectCopy::Runner
         };
         super::head(env, &mut m, own_variables(env, &driver), driver.provider, copy);
-        (driver.write)(env, &mut m);
+        (driver.write)(env, &mut m)?;
         module::file(Target::CloudVm, &folder, m, copy)
     }
 }
