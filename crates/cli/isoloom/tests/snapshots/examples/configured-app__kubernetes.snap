@@ -29,11 +29,13 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/build/api/Dockerfile
 ✓ .isoloom/configure/api/run
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 ✓ .isoloom/kubernetes/chart/files/project/checks/api-answers.sh
 ✓ .isoloom/kubernetes/chart/files/project/checks/web-answers.sh
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/configure/api/run
 .isoloom/configure/lib/configure.sh
 .isoloom/configure/web/rendered/conf/site.conf
@@ -60,6 +62,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/kubernetes/environment.yaml
 .isoloom/kubernetes/kustomization.yaml
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/configure/api/run: identical in the `docker` snapshot
 

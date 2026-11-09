@@ -8,12 +8,16 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/esxi/main.tf
 ✓ .isoloom/esxi/checks/networks.sh
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/esxi/checks/networks.sh
 .isoloom/esxi/main.tf
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `vagrant` snapshot
 
 ## .isoloom/esxi/checks/networks.sh
 #!/bin/sh

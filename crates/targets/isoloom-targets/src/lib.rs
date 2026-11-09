@@ -35,6 +35,7 @@ mod composite;
 mod decision;
 mod error;
 mod generation;
+pub mod gitignore;
 pub mod graph;
 pub mod matrix;
 mod refusal;

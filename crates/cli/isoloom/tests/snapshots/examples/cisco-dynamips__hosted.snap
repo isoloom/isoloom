@@ -12,9 +12,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/appliances/r2/base.cfg
 ✓ .isoloom/docker/appliances/r2/build/Dockerfile
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/docker/appliances/r1/base.cfg
 .isoloom/docker/appliances/r1/build/Dockerfile
 .isoloom/docker/appliances/r2/base.cfg
@@ -22,6 +24,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/docker/checks/host-a.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/docker/appliances/r1/base.cfg: identical in the `docker` snapshot
 

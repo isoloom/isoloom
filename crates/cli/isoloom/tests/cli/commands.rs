@@ -376,6 +376,24 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
 }
 
 #[test]
+fn generate_writes_a_gitignore_for_the_tools_state_and_lists_it() -> Outcome {
+    let home = scratch("gitignore-home")?;
+    let dir = project("gitignore", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    let run = isoloom(&home, &[&"generate", &dir])?;
+    assert_eq!(run.code, Some(0), "{run:?}");
+    let ignore = std::fs::read_to_string(dir.join(".isoloom/.gitignore"))?;
+    for pattern in [".terraform/", "*.tfstate", "*.tfstate.*", ".vagrant/", ".isoloom-reach/"] {
+        assert!(ignore.lines().any(|l| l == pattern), "{pattern}: {ignore}");
+    }
+    assert!(!ignore.contains(".terraform.lock.hcl"), "the lock file is committed: {ignore}");
+    // Isoloom's like every file it writes: listed, so `generate` manages it.
+    let list = std::fs::read_to_string(dir.join(".isoloom/.generated"))?;
+    assert!(list.lines().any(|l| l == ".isoloom/.gitignore"), "{list}");
+    Ok(())
+}
+
+#[test]
 fn generating_one_target_leaves_the_others_files_alone() -> Outcome {
     let home = scratch("stale-one-home")?;
     let dir = project("stale-one", &one_vm("debian@12"))?;

@@ -12,9 +12,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/configure/lib/configure.sh
 ✓ .isoloom/proxmox/run.json
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/configure/lib/configure.sh
 .isoloom/proxmox/checks/api.sh
 .isoloom/proxmox/checks/networks.sh
@@ -22,6 +24,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/proxmox/main.tf
 .isoloom/proxmox/run.json
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/configure/lib/configure.sh: identical in the `docker` snapshot
 

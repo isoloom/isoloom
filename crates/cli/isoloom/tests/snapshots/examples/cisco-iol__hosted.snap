@@ -14,9 +14,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/appliances/r2/NETMAP
 ✓ .isoloom/docker/appliances/r2/iouyap.ini
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/docker/appliances/r1/NETMAP
 .isoloom/docker/appliances/r1/base.txt
 .isoloom/docker/appliances/r1/iouyap.ini
@@ -26,6 +28,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/docker/checks/host-a.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/docker/appliances/r1/NETMAP: identical in the `docker` snapshot
 

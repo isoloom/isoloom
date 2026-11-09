@@ -10,14 +10,18 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/proxmox/checks/client.sh
 ✓ .isoloom/proxmox/run.json
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/proxmox/checks/client.sh
 .isoloom/proxmox/checks/decoy.sh
 .isoloom/proxmox/main.tf
 .isoloom/proxmox/run.json
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `vagrant` snapshot
 
 ## .isoloom/proxmox/checks/client.sh
 #!/bin/sh

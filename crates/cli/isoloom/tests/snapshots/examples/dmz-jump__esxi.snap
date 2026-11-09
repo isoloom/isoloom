@@ -11,15 +11,19 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/esxi/checks/app.sh
 ✓ .isoloom/esxi/checks/db.sh
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/esxi/checks/app.sh
 .isoloom/esxi/checks/db.sh
 .isoloom/esxi/checks/gateway.sh
 .isoloom/esxi/checks/user.sh
 .isoloom/esxi/main.tf
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/esxi/checks/app.sh
 #!/bin/sh

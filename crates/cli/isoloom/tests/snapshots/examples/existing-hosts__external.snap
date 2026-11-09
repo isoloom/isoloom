@@ -13,9 +13,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/external/roles/isoloom_machine_web/tasks/main.yml
 ✓ .isoloom/external/roles/isoloom_machine_cache/tasks/main.yml
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/external/checks/cache.sh
 .isoloom/external/checks/web.sh
 .isoloom/external/inventory.ini
@@ -24,6 +26,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/external/roles/isoloom_machine_web/tasks/main.yml
 .isoloom/external/site.yml
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `vagrant` snapshot
 
 ## .isoloom/external/checks/cache.sh
 #!/bin/sh

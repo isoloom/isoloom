@@ -9,7 +9,7 @@ use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::{Spec, Target};
 
 use crate::registry::backend;
-use crate::{Error, GenerateError, Result, resolved};
+use crate::{Error, GenerateError, Result, gitignore, resolved};
 
 /// The files for one target, the resolved snapshot among them.
 ///
@@ -21,11 +21,12 @@ pub fn generate(lab: &Lab, target: Target) -> Result<Vec<GeneratedFile>> {
     Ok(with_snapshot(lab, target)?)
 }
 
-/// A target's own files, then the resolved snapshot, which goes with every target (the same
-/// file each time).
+/// A target's own files, then the resolved snapshot and `.isoloom/.gitignore`, which go with
+/// every target (the same files each time).
 fn with_snapshot(lab: &Lab, target: Target) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
     let mut files = target_files(lab, target, None)?;
     files.push(resolved::file(lab));
+    files.push(gitignore::file());
     Ok(files)
 }
 
@@ -38,6 +39,7 @@ fn with_snapshot(lab: &Lab, target: Target) -> std::result::Result<Vec<Generated
 pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<GeneratedFile>> {
     let mut files = target_files(lab, target, Some(n))?;
     files.push(resolved::file_with(lab, n)?);
+    files.push(gitignore::file());
     Ok(files
         .into_iter()
         .map(|f| {
@@ -64,10 +66,12 @@ pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
                         files.push(file);
                     }
                 }
-                // The resolved snapshot is the same for every target (it asks each target
-                // whether it refuses the lab): written once, after the first target's files.
+                // The resolved snapshot (it asks each target whether it refuses the lab) and the
+                // .gitignore are the same for every target: written once, after the first
+                // target's files.
                 if first {
                     files.push(resolved::file(lab));
+                    files.push(gitignore::file());
                 }
             }
             Err(e) => skipped.push(e),

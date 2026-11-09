@@ -9,13 +9,17 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/checks/user.sh
 ✓ .isoloom/docker/checks/web.sh
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/docker/checks/user.sh
 .isoloom/docker/checks/web.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/user.sh: identical in the `docker` snapshot
 

@@ -11,15 +11,19 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/docker/checks/exec-reader.sh
 ✓ .isoloom/docker/checks/reader.sh
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
+.isoloom/.gitignore
 .isoloom/docker/checks/exec-reader.sh
 .isoloom/docker/checks/exec-writer.sh
 .isoloom/docker/checks/reader.sh
 .isoloom/docker/checks/writer.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/exec-reader.sh: identical in the `docker` snapshot
 

@@ -524,7 +524,12 @@ fn a_module_requires_the_terraform_its_run_manifest_names() -> Outcome {
             for file in manifests {
                 let manifest = isoloom_manifest::parse(&file.contents)?;
                 let terraform = manifest.tools.iter().find(|t| t.name.as_str() == "terraform").ok_or("no terraform tool")?;
-                assert_eq!(terraform.min_version.as_ref().map(|v| v.as_str()), Some(oldest), "{}", file.path);
+                assert_eq!(
+                    terraform.min_version.as_ref().map(isoloom_manifest::Version::as_str),
+                    Some(oldest),
+                    "{}",
+                    file.path
+                );
                 let module = file.path.replace("run.json", "main.tf");
                 assert!(
                     files

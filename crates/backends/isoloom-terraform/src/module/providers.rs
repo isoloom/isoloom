@@ -95,7 +95,7 @@ pub(crate) fn terraform(oldest: &str, providers: &[Provider]) -> Block {
         b.add_attribute((p.name, object([("source", string(p.source)), ("version", string(p.version))])))
     });
     Block::builder("terraform")
-        .add_attribute(("required_version", string(&format!(">= {oldest}"))))
+        .add_attribute(("required_version", string(format!(">= {oldest}"))))
         .add_block(Block::builder("backend").add_label("local").build())
         .add_block(required.build())
         .build()
