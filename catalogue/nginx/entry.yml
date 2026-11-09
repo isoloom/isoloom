@@ -117,7 +117,7 @@ recipe:
     # Rocky's firewalld would otherwise block the port on a VM. Nothing to do in a container.
     - firewall: { allow: [http] }
     # On VMs: enabled and started, restarted when a step above changed something. In a built
-    # container: the runner's one foreground process. On the official image: the image's own.
+    # container: the supervisor's one foreground process. On the official image: the image's own.
     - service: nginx
 
   # Nothing to prepare at start: nginx needs no secret and no first-start initialisation.

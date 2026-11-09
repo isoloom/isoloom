@@ -79,9 +79,9 @@ can't, and the [tier](targets.md) of each. `isoloom check` fails in CI when the 
 ## Run it
 
 Isoloom runs nothing itself. To bring the environment up, either run each tool's files directly
-(for the `docker` target, `docker compose -f .isoloom/docker/compose.yaml up`), or hand the run
-manifest (`.isoloom/<target>/run.json`) to a [runner](runner.md), which brings the environment
-up, runs the checks and tears it down.
+(for the `docker` target, `docker compose -f .isoloom/docker/compose.yml up`), or, on a target
+that writes a run manifest (`.isoloom/<target>/run.json`; [which do](runner.md)), hand it to a
+[runner](runner.md), which brings the environment up, runs the checks and tears it down.
 
 ## Next steps
 

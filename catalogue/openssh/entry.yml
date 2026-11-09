@@ -50,7 +50,7 @@ recipe:
     - command: ssh-keygen -A
       creates: /etc/ssh/ssh_host_ed25519_key
     # On a VM: enabled and started, restarted when a step above changed something. In a built
-    # container: the runner's one foreground process (the shared `ssh` daemon).
+    # container: the supervisor's one foreground process (the shared `ssh` daemon).
     - service: ssh
 
   start:

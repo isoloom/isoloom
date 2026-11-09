@@ -66,7 +66,7 @@ recipe:
     - copy: { from: "{{ with.root }}/", to: /var/www/html/ }
       when: { set: root }
     # On a VM: enabled and started, restarted when a step above changed something. In a built
-    # container: the runner's one foreground process.
+    # container: the supervisor's one foreground process.
     - service: php-fpm
 
   # Nothing to prepare at start: php-fpm needs no secret and no first-start initialisation.

@@ -55,7 +55,7 @@ recipe:
     # Rocky's firewalld would otherwise block the port on a VM. Nothing to do in a container.
     - firewall: { allow: [http] }
     # On a VM: enabled and started, restarted when a step above changed something. In a built
-    # container: the runner's one foreground process (the shared `apache` daemon).
+    # container: the supervisor's one foreground process (the shared `apache` daemon).
     - service: apache
 
   # Nothing to prepare at start: Apache needs no secret and no first-start initialisation.
