@@ -10,16 +10,14 @@
 //! secrets carried in over SSH (`SendEnv`). The published ports answer at the VM's address, and
 //! the runner reads the containers inside it (`Manifest.guest`).
 
-use std::collections::BTreeSet;
-
 use isoloom_manifest::{
-    Checks, Condition, Driver, Error as ManifestError, Guest, HostOs, Identity, Machine, Manifest, ManifestVersion, Name, Output, OutputRole, Placeholder,
-    RelPath, Resources, Role, Run, SCHEMA_URL, SnakeName, StateOwner, Step, Template, TerraformIdentity,
+    Condition, Driver, Error as ManifestError, Guest, Identity, Machine, Manifest, ManifestVersion, Name, Output, OutputRole, Placeholder, RelPath, Resources,
+    Role, Run, SCHEMA_URL, SnakeName, StateOwner, Step, Template, TerraformIdentity,
 };
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
 use isoloom_render::run_manifest::guest::{GuestCompose, into_vm, ssh_run};
-use isoloom_render::run_manifest::{environment, generator, outputs_on_their_hosts};
+use isoloom_render::run_manifest::{environment, generator, machine, outputs_on_their_hosts};
 
 use super::super::Cloud;
 use super::super::manifest::{self, connection, steps};
@@ -43,9 +41,6 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
     let guest_machines = guest.machines_at(&ip);
     let mut machines = vec![host(env)?];
     machines.extend(guest_machines.iter().cloned());
-    let runners = guest.runners.iter().map(|r| r.runner(&way_in)).collect::<Result<Vec<_>, _>>()?;
-    let over_ssh = |commands: &[isoloom_render::run_manifest::guest::GuestCommand]| commands.iter().map(|c| c.step(&way_in)).collect::<Result<Vec<_>, _>>();
-    let (setup, teardown) = (over_ssh(&guest.check_setup)?, over_ssh(&guest.check_teardown)?);
     let mut params = connection::params(&driver_variables(env, driver), cloud)?;
     params.extend(guest.params.iter().cloned());
     let mut secrets = connection::slots(cloud, connection::terraform_steps(false))?;
@@ -64,7 +59,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         target: isoloom_manifest::Target::CloudDocker,
         cloud: Some(manifest::cloud_of(cloud)),
         driver: Driver::Terraform,
-        hosts: BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows]),
+        hosts: isoloom_render::run_manifest::every_host(),
         tools: manifest::tools()?,
         identity: Identity::Terraform(TerraformIdentity {
             module: RelPath::parse(".")?,
@@ -80,17 +75,12 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         outputs,
         lifecycle: steps::terraform_lifecycle(up)?,
         ready,
-        checks: Checks {
-            protocol: isoloom_manifest::CheckProtocol::V1,
-            setup,
-            runners,
-            teardown,
-        },
+        checks: guest.checks(&way_in)?,
         recovery: manifest::recovery()?,
         expiry: manifest::expiry()?,
         guest: Some(Guest {
             machine: Name::parse(HOST)?,
-            host: Some(Template::from(Placeholder::Output(SnakeName::parse(IP)?))),
+            host: Some(ip),
             status: guest.status.step(&way_in)?,
         }),
     })
@@ -149,24 +139,12 @@ fn boot_wait(steps: &mut [isoloom_manifest::Step]) -> Result<(), ManifestError> 
 /// containers run.
 fn host(env: &Environment) -> Result<Machine, ManifestError> {
     let size = HostSize::of(env);
-    Ok(Machine {
-        name: Name::parse(HOST)?,
-        role: Role::Infra,
-        of: None,
-        os: None,
-        windows: false,
-        arch: None,
-        resources: Some(Resources {
-            cpus: Some(size.cpus),
-            memory_mb: Some(size.memory_mb),
-        }),
-        addresses: std::collections::BTreeMap::new(),
-        keep_running: false,
-        on_demand: false,
-        native: None,
-        volumes: Vec::new(),
-        ports: Vec::new(),
-    })
+    let mut host = machine(HOST, Role::Infra)?;
+    host.resources = Some(Resources {
+        cpus: Some(size.cpus),
+        memory_mb: Some(size.memory_mb),
+    });
+    Ok(host)
 }
 
 /// A Terraform output of the module's state.

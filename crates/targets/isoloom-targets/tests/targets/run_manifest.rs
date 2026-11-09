@@ -67,7 +67,7 @@ fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
 }
 
 /// cloud-docker lists the lab's networks as docker-vm does, by their Compose names in the VM: the
-/// runner reads them for the lab's status. An empty list left the launcher drawing networks
+/// runner reads them for the lab's status. An empty list left a runner's UI drawing networks
 /// guessed from the machines' addresses.
 #[test]
 fn cloud_docker_lists_the_labs_networks() -> Outcome {
@@ -335,22 +335,64 @@ checks:
   - { name: the page answers from the seat, from: user, http: \"http://web/\" }
 ";
 
+/// Every container target's run manifest, with where it is written.
+const CONTAINER_MANIFESTS: [(Target, &str); 4] = [
+    (Target::Docker, ".isoloom/docker/run.json"),
+    (Target::DockerVm, ".isoloom/docker-vm/run.json"),
+    (Target::DockerVm, ".isoloom/docker-vm/proxmox/run.json"),
+    (Target::CloudDocker, ".isoloom/cloud-docker/aws/run.json"),
+];
+
+fn ids(steps: &[isoloom_manifest::Step]) -> Vec<String> {
+    steps.iter().map(|s| s.id.as_str().to_owned()).collect()
+}
+
 #[test]
 fn the_check_stand_in_is_taken_down_after_the_checks_on_every_container_target() -> Outcome {
-    for (target, path) in [
-        (Target::Docker, ".isoloom/docker/run.json"),
-        (Target::DockerVm, ".isoloom/docker-vm/run.json"),
-        (Target::CloudDocker, ".isoloom/cloud-docker/aws/run.json"),
-    ] {
+    for (target, path) in CONTAINER_MANIFESTS {
         let m = run_json(&generate(&lab(ACCESS_SEAT)?, target)?, path)?;
-        let ids = |steps: &[isoloom_manifest::Step]| steps.iter().map(|s| s.id.as_str().to_owned()).collect::<Vec<_>>();
-        assert_eq!(ids(&m.checks.setup), ["stand-ins"], "{target:?}");
-        assert_eq!(ids(&m.checks.teardown), ["stand-ins-down"], "{target:?}");
+        assert_eq!(ids(&m.checks.setup), ["stand-ins"], "{path}");
+        assert_eq!(ids(&m.checks.teardown), ["stand-ins-down"], "{path}");
         let down = serde_json::to_string(&m.checks.teardown[0])?;
         assert!(
             down.contains("rm") && down.contains("--stop") && down.contains("isoloom-access"),
-            "{target:?}: {down}"
+            "{path}: {down}"
         );
+        // A stand-in that didn't start stops the checks; one left behind fails none of them.
+        assert_eq!(m.checks.setup[0].failure, isoloom_manifest::Failure::Fail, "{path}");
+        assert_eq!(m.checks.teardown[0].failure, isoloom_manifest::Failure::Tolerate, "{path}");
     }
     Ok(())
+}
+
+#[test]
+fn a_lab_without_an_access_machine_has_no_stand_in_to_start_or_take_down() -> Outcome {
+    let no_seat = ACCESS_SEAT
+        .replace("  user: { access: true, networks: { lab: 20 } }\n", "")
+        .replace(", from: user", "");
+    for (target, path) in CONTAINER_MANIFESTS {
+        let m = run_json(&generate(&lab(&no_seat)?, target)?, path)?;
+        assert!(!m.checks.runners.is_empty(), "{path}: the checks still run");
+        assert_eq!(ids(&m.checks.setup), Vec::<String>::new(), "{path}");
+        assert_eq!(ids(&m.checks.teardown), Vec::<String>::new(), "{path}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_vagrantfiles_checks_take_the_stand_ins_down_after_them() -> Outcome {
+    let files = generate(&lab(ACCESS_SEAT)?, Target::DockerVm)?;
+    let vf = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
+    let checks = vf.lines().find(|l| l.contains("name: \"checks\"")).ok_or("no checks provisioner")?;
+    let (up, down) = (at(checks, "up -d --wait --no-deps")?, at(checks, "rm --stop --force \\\"$@\\\"")?);
+    assert!(up < at(checks, "isoloom-check")? && at(checks, "isoloom-check")? < down, "{checks}");
+    assert!(checks.contains("grep -x -e isoloom-access -e isoloom-access-routes"), "{checks}");
+    // The checks' own result, not the stand-ins' removal, is the provisioner's.
+    assert!(checks.contains("|| true; exit \\\"$failed\\\"\""), "{checks}");
+    Ok(())
+}
+
+/// Where `what` is in `text`.
+fn at(text: &str, what: &str) -> Outcome<usize> {
+    Ok(text.find(what).ok_or_else(|| format!("no {what} in {text}"))?)
 }

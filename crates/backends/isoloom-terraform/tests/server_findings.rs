@@ -28,6 +28,7 @@ fn no_guest() -> Outcome<GuestCompose> {
         note: None,
         command: isoloom_manifest::Template::text("true"),
         timeout_s: 60,
+        failure: isoloom_manifest::Failure::Fail,
     }))
 }
 

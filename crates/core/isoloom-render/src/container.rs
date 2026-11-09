@@ -57,5 +57,15 @@ pub fn exec_runner(machine: &str) -> String {
     format!("exec-{machine}.sh")
 }
 
+/// The service that stands in for an access machine the runner supplies, so checks run from its
+/// side (only the `check` profile starts it).
+pub const STAND_IN: &str = "isoloom-access";
+
+/// The network sidecar of a machine (or of the [`STAND_IN`]), which sets its routes.
+#[must_use]
+pub fn routes_service(machine: &str) -> String {
+    format!("{machine}-routes")
+}
+
 #[cfg(test)]
 mod tests;

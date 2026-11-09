@@ -7,8 +7,8 @@
 //! destroyed.
 
 use isoloom_manifest::{
-    Checks, Condition, Driver, Error as ManifestError, Guest, Lifecycle, Machine, Manifest, ManifestVersion, Name, Output, OutputRole, Placeholder, RelPath,
-    Resources, Role, Run, SCHEMA_URL, SnakeName, Step, StepId, Template,
+    Condition, Driver, Error as ManifestError, Guest, Lifecycle, Machine, Manifest, ManifestVersion, Name, Output, OutputRole, Placeholder, RelPath, Resources,
+    Role, Run, SCHEMA_URL, SnakeName, StepId, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
@@ -63,7 +63,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
         target: isoloom_manifest::Target::DockerVm,
         cloud: None,
         driver: Driver::Terraform,
-        hosts: super::every_host(),
+        hosts: run_manifest::every_host(),
         tools: tools()?,
         identity: super::runner_identity()?,
         params,
@@ -73,12 +73,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
         machines,
         lifecycle,
         ready,
-        checks: Checks {
-            protocol: isoloom_manifest::CheckProtocol::V1,
-            setup: steps_of(&guest.check_setup, &way_in)?,
-            runners: guest.runners.iter().map(|r| r.runner(&way_in)).collect::<Result<_, _>>()?,
-            teardown: steps_of(&guest.check_teardown, &way_in)?,
-        },
+        checks: guest.checks(&way_in)?,
         recovery: None,
         expiry: None,
         guest: Some(Guest {
@@ -97,7 +92,7 @@ fn lifecycle(guest: &GuestCompose, way_in: &dyn Fn(&Template) -> Result<Run, Man
     let mut lifecycle = steps::lifecycle(false)?;
     let mut up = lifecycle.up.as_slice().to_vec();
     up.extend(into_vm(way_in, &RelPath::parse(SETUP)?, "../../..")?);
-    up.extend(steps_of(&guest.start, way_in)?);
+    up.extend(GuestCommand::steps(&guest.start, way_in)?);
     lifecycle.up = isoloom_manifest::NonEmpty::new(up, "lifecycle.up")?;
     Ok(lifecycle)
 }
@@ -114,11 +109,6 @@ fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
     ];
     out.extend(outputs_on_their_hosts(machines)?);
     Ok(out)
-}
-
-/// `commands` as steps through `way_in`.
-fn steps_of(commands: &[GuestCommand], way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Vec<Step>, ManifestError> {
-    commands.iter().map(|c| c.step(way_in)).collect()
 }
 
 /// The VM: Isoloom's own (`infra`), sized for the containers.

@@ -29,7 +29,7 @@ use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 
 use super::{ami, ami_filter, instance_type, provider, region, zones};
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes, listed};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::cloud::{Cloud, instance, operator};
 use crate::limits::Limits;
@@ -71,7 +71,7 @@ const RULES: Rules = Rules {
     images: Images {
         label: "AWS",
         has: |os| image(os).is_some(),
-        list: "Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025",
+        list: || listed(IMAGES.iter().map(|i| i.os)),
         own: own_image::aws,
     },
 };
@@ -107,46 +107,81 @@ fn nesting(b: BlockBuilder, mp: &MachinePlan) -> BlockBuilder {
     )
 }
 
-/// The AMI lookup and SSH user for an OS name: (owner, name filter, ssh user).
-fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
-    Some(match os {
-        "debian-12" => ("136693071363", "debian-12-amd64-*", "admin"),
-        "debian-13" => ("136693071363", "debian-13-amd64-*", "admin"),
-        "ubuntu-22.04" => ("099720109477", "ubuntu/images/hvm-ssd*/ubuntu-jammy-22.04-amd64-server-*", "ubuntu"),
-        "ubuntu-24.04" => ("099720109477", "ubuntu/images/hvm-ssd*/ubuntu-noble-24.04-amd64-server-*", "ubuntu"),
-        // Amazon's Windows Server images (license included, billed per hour).
-        "windows-server-2016" => ("801119661308", "Windows_Server-2016-English-Full-Base-*", "isoloom"),
-        "windows-server-2019" => ("801119661308", "Windows_Server-2019-English-Full-Base-*", "isoloom"),
-        "windows-server-2022" => ("801119661308", "Windows_Server-2022-English-Full-Base-*", "isoloom"),
-        "windows-server-2025" => ("801119661308", "Windows_Server-2025-English-Full-Base-*", "isoloom"),
-        // Kali's own image, on the AWS Marketplace (free; an account may have to accept its terms
-        // there once). Pinned to its product by [`product_code`].
-        "kali" => ("aws-marketplace", "debian-kali-last-snapshot-amd64-*", "kali"),
-        _ => return None,
-    })
+/// An OS's image on AWS: how its AMI is looked up, and what it needs.
+struct Image {
+    /// The OS, as the plan names it (`debian-12`).
+    os: &'static str,
+    /// The AMI's owner (an account, or `aws-marketplace`).
+    owner: &'static str,
+    /// The AMI's name filter (the latest match is taken).
+    filter: &'static str,
+    /// The image's SSH user.
+    user: &'static str,
+    /// The Marketplace product the AMI must belong to, when its owner is the Marketplace (any
+    /// seller lists there: the name alone could match a look-alike).
+    product_code: Option<&'static str>,
+    /// The smallest root disk the image takes, in GB (its snapshot's size), when it is more than
+    /// the default.
+    min_disk_gb: Option<u32>,
 }
 
-/// The smallest root disk an OS's image takes, in GB (its snapshot's size), when it is more than
-/// the default.
+impl Image {
+    /// An image looked up by owner and name only, with no disk of its own.
+    const fn new(os: &'static str, owner: &'static str, filter: &'static str, user: &'static str) -> Image {
+        Image {
+            os,
+            owner,
+            filter,
+            user,
+            product_code: None,
+            min_disk_gb: None,
+        }
+    }
+}
+
+/// The OSes AWS has images for.
+const IMAGES: &[Image] = &[
+    Image::new("debian-12", "136693071363", "debian-12-amd64-*", "admin"),
+    Image::new("debian-13", "136693071363", "debian-13-amd64-*", "admin"),
+    Image::new(
+        "ubuntu-22.04",
+        "099720109477",
+        "ubuntu/images/hvm-ssd*/ubuntu-jammy-22.04-amd64-server-*",
+        "ubuntu",
+    ),
+    Image::new(
+        "ubuntu-24.04",
+        "099720109477",
+        "ubuntu/images/hvm-ssd*/ubuntu-noble-24.04-amd64-server-*",
+        "ubuntu",
+    ),
+    // Amazon's Windows Server images (license included, billed per hour).
+    Image::new("windows-server-2016", "801119661308", "Windows_Server-2016-English-Full-Base-*", "isoloom"),
+    Image::new("windows-server-2019", "801119661308", "Windows_Server-2019-English-Full-Base-*", "isoloom"),
+    Image::new("windows-server-2022", "801119661308", "Windows_Server-2022-English-Full-Base-*", "isoloom"),
+    Image::new("windows-server-2025", "801119661308", "Windows_Server-2025-English-Full-Base-*", "isoloom"),
+    // Kali's own image, on the AWS Marketplace (free; an account may have to accept its terms
+    // there once), pinned to its product; its snapshot is 25 GB.
+    Image {
+        product_code: Some("7lgvy7mt78lgoi4lant0znp5h"),
+        min_disk_gb: Some(25),
+        ..Image::new("kali", "aws-marketplace", "debian-kali-last-snapshot-amd64-*", "kali")
+    },
+];
+
+/// An OS's image, when AWS has one.
+fn image(os: &str) -> Option<&'static Image> {
+    IMAGES.iter().find(|i| i.os == os)
+}
+
+/// The smallest root disk an OS's image takes, in GB (0 when the default is enough).
 pub(super) fn image_min_disk_gb(os: &str) -> u32 {
-    match os {
-        "kali" => 25,
-        _ => 0,
-    }
-}
-
-/// The Marketplace product an OS's image must belong to, when its owner is the Marketplace (any
-/// seller lists there: the name alone could match a look-alike).
-fn product_code(os: &str) -> Option<&'static str> {
-    match os {
-        "kali" => Some("7lgvy7mt78lgoi4lant0znp5h"),
-        _ => None,
-    }
+    image(os).and_then(|i| i.min_disk_gb).unwrap_or(0)
 }
 
 /// The SSH user of an OS's image (`admin` for an OS without one).
 fn image_user(os: &str) -> &'static str {
-    image(os).map_or("admin", |(_, _, user)| user)
+    image(os).map_or("admin", |i| i.user)
 }
 
 /// Why AWS can't run this environment, if it can't: its limits, then its address rules and
@@ -227,10 +262,10 @@ fn amis(env: &Environment) -> Vec<Block> {
     oses.sort_unstable();
     oses.dedup();
     oses.into_iter()
-        .filter_map(|o| image(o).map(|(owner, filter, _)| (o, owner, filter)))
-        .map(|(o, owner, filter)| {
-            let lookup = ami(&ident(o), owner, filter).add_block(ami_filter("architecture", "x86_64"));
-            match product_code(o) {
+        .filter_map(image)
+        .map(|i| {
+            let lookup = ami(&ident(i.os), i.owner, i.filter).add_block(ami_filter("architecture", "x86_64"));
+            match i.product_code {
                 Some(code) => lookup.add_block(ami_filter("product-code", code)).build(),
                 None => lookup.build(),
             }

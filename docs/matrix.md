@@ -625,8 +625,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = debian@11`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `debian-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `debian-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `debian-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `debian-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `debian-11` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `debian-11` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `debian-11` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -647,8 +647,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `proxmox`: target: machine `m`: no Proxmox image for `ubuntu-14.04` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `ubuntu-14.04` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-14.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-14.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-14.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-14.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `ubuntu-14.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `ubuntu-14.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `ubuntu-14.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -658,8 +658,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `esxi`: target: machine `m`: no ESXi image for `ubuntu-16.04` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-16.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-16.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-16.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-16.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `ubuntu-16.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `ubuntu-16.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `ubuntu-16.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -669,8 +669,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `esxi`: target: machine `m`: no ESXi image for `ubuntu-18.04` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-18.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-18.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-18.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-18.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `ubuntu-18.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `ubuntu-18.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `ubuntu-18.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -679,8 +679,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = ubuntu@20.04`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-20.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-20.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-20.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-20.04` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `ubuntu-20.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `ubuntu-20.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `ubuntu-20.04` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -697,8 +697,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = rocky@9`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -707,8 +707,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = alma@9`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `almalinux-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `almalinux-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `almalinux-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `almalinux-9` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `almalinux-9` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `almalinux-9` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `almalinux-9` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -719,8 +719,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `proxmox`: target: machine `m`: no Proxmox image for `alpine-3.19` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `alpine-3.19` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.19` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `alpine-3.19` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.19` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `alpine-3.19` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `alpine-3.19` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `alpine-3.19` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `alpine-3.19` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -732,8 +732,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `proxmox`: target: machine `m`: no Proxmox image for `alpine-3.24` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `alpine-3.24` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.24` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `alpine-3.24` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.24` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `alpine-3.24` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `alpine-3.24` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `alpine-3.24` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `alpine-3.24` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -744,7 +744,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `proxmox`: target: machine `m`: no Proxmox image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `kali` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -756,8 +756,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `proxmox`: target: machine `m`: no Proxmox image for `fedora-42` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `fedora-42` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `fedora-42` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `fedora-42` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `fedora-42` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `fedora-42` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `fedora-42` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `fedora-42` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `fedora-42` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -767,8 +767,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `esxi`: target: machine `m`: no ESXi image for `centos-7` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `centos-7` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `centos-7` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `centos-7` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `centos-7` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no GCP image for `centos-7` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `centos-7` yet (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `centos-7` yet (Debian 12/13, Ubuntu 22.04/24.04)
@@ -778,8 +778,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-10` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-10` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-10` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-10` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only so far
@@ -789,8 +789,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only so far
@@ -800,8 +800,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2008r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2008r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2008r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2008r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only so far
@@ -811,8 +811,8 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2012r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
-- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2012r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2012r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2012r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only so far

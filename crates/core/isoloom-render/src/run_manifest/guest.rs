@@ -10,8 +10,8 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Check, CheckRunner, Condition, Delivery, Error as ManifestError, Machine, Name, Network, Param, PathTemplate, PublishMode, RelPath, Run,
-    SecretSlot, Step, StepId, Template,
+    Action, Check, CheckProtocol, CheckRunner, Checks, Condition, Delivery, Error as ManifestError, Failure, Machine, Name, Network, Param, PathTemplate,
+    PublishMode, RelPath, Run, SecretSlot, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
 
@@ -35,11 +35,13 @@ pub struct GuestCommand {
     pub command: Template,
     /// How long it may run.
     pub timeout_s: u32,
+    /// What its failure does: the run stops, or it is only logged (a clean-up).
+    pub failure: Failure,
 }
 
 impl GuestCommand {
     /// The step running the command through `way_in` (the VM's: a `vagrant ssh` argv, an
-    /// `ssh.run`), with its id, note and time limit.
+    /// `ssh.run`), with its id, note, time limit and failure policy.
     ///
     /// # Errors
     ///
@@ -49,7 +51,17 @@ impl GuestCommand {
         s.run = way_in(&self.command)?;
         s.note.clone_from(&self.note);
         s.timeout_s = NonZeroU32::new(self.timeout_s);
+        s.failure = self.failure;
         Ok(s)
+    }
+
+    /// `commands` as steps through `way_in`, in order.
+    ///
+    /// # Errors
+    ///
+    /// What `way_in` refuses.
+    pub fn steps(commands: &[Self], way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Vec<Step>, ManifestError> {
+        commands.iter().map(|c| c.step(way_in)).collect()
     }
 }
 
@@ -117,6 +129,7 @@ pub struct GuestCompose {
 
 impl GuestCompose {
     /// A guest with nothing in it but `status`: no machines, slots, steps or checks.
+    #[doc(hidden)]
     #[must_use]
     pub fn empty(status: GuestCommand) -> Self {
         GuestCompose {
@@ -131,6 +144,21 @@ impl GuestCompose {
             runners: Vec::new(),
             status,
         }
+    }
+
+    /// The checks run in the VM through `way_in`: the stand-ins set up, the runners, then the
+    /// stand-ins taken down.
+    ///
+    /// # Errors
+    ///
+    /// What `way_in` refuses.
+    pub fn checks(&self, way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Checks, ManifestError> {
+        Ok(Checks {
+            protocol: CheckProtocol::V1,
+            setup: GuestCommand::steps(&self.check_setup, way_in)?,
+            runners: self.runners.iter().map(|r| r.runner(way_in)).collect::<Result<_, _>>()?,
+            teardown: GuestCommand::steps(&self.check_teardown, way_in)?,
+        })
     }
 
     /// The variables the start steps read from their environment, which the VM's way in must
@@ -172,6 +200,7 @@ impl GuestCompose {
                 "sudo mkdir -p {ACCEPT_ENV_DIR} && echo AcceptEnv {vars} | sudo tee {ACCEPT_ENV_DIR}/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\""
             )),
             timeout_s: 60,
+            failure: Failure::Fail,
         }))
     }
 
@@ -214,6 +243,7 @@ pub fn into_vm(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, setup: 
         note: Some("Installing Docker in the VM…".into()),
         command: Template::text("sudo sh -s"),
         timeout_s: SETUP_S,
+        failure: Failure::Fail,
     };
     let mut docker = docker.step(way_in)?;
     docker.stdin = Some(PathTemplate::relative(setup));
@@ -227,6 +257,7 @@ pub fn into_vm(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, setup: 
             "sudo rm -rf {PROJECT_DIR} && sudo mkdir -p {PROJECT_DIR} && sudo tar -xzf - -C {PROJECT_DIR}"
         )),
         timeout_s: 600,
+        failure: Failure::Fail,
     };
     let mut copy = copy.step(way_in)?;
     copy.stdin = Some(PathTemplate::in_state_dir(&RelPath::parse("project.tgz")?));
@@ -258,6 +289,7 @@ mod tests {
             note: Some("Starting…".into()),
             command: Template::text(text),
             timeout_s: 60,
+            failure: Failure::Fail,
         }
     }
 

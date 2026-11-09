@@ -1,8 +1,6 @@
 //! What the lowered spec answers about itself: whose a volume is, and a cloud environment's
 //! message.
 
-use indexmap::IndexMap;
-
 use super::Spec;
 use crate::testing::{lab, model};
 
@@ -28,14 +26,6 @@ fn a_shared_volume_is_held_by_its_owner_else_its_first_user() -> Result<(), Stri
     assert_eq!(s.volume_owner("data"), Some("web"));
     assert_eq!(spec("owner: db")?.volume_owner("data"), Some("db"));
     assert_eq!(s.volume_owner("logs"), None, "a machine's own volume isn't shared");
-    Ok(())
-}
-
-#[test]
-fn a_cloud_message_has_its_outputs_filled_in() -> Result<(), String> {
-    let s = model("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\nmessage: \"Open {{ cloud.outputs.url }} ({{ cloud.outputs.other }})\"\n")?;
-    let outputs: IndexMap<String, String> = [("url".to_owned(), "https://x.example".to_owned())].into_iter().collect();
-    assert_eq!(s.cloud_message(&outputs).as_deref(), Some("Open https://x.example ({{ cloud.outputs.other }})"));
     Ok(())
 }
 

@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, Checks, Condition, Driver, Error as ManifestError, Guest, HostArgv, HostOs, Lifecycle, Machine, Manifest, ManifestVersion, Name, Native,
-    NonEmpty, Park, PathTemplate, Provider, RelPath, Resources, Role, Run, SCHEMA_URL, Step, StepId, Template,
+    Action, Argv, Condition, Driver, Error as ManifestError, Guest, HostArgv, Lifecycle, Machine, Manifest, ManifestVersion, Name, Native, NonEmpty, Park,
+    PathTemplate, Provider, RelPath, Resources, Role, Run, SCHEMA_URL, Step, StepId, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
@@ -37,7 +37,6 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
     let way_in = |command: &Template| vagrant_ssh(command);
     let mut machines = vec![vm(env)?];
     machines.extend(guest.machines_at(&Template::text(LOOPBACK)));
-    let runners = guest.runners.iter().map(|r| r.runner(&way_in)).collect::<Result<Vec<_>, _>>()?;
     let mut params = slots::remote_params()?;
     params.extend(guest.params.iter().cloned());
     let mut secrets = guest.slots.clone();
@@ -55,7 +54,7 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
         target: isoloom_manifest::Target::DockerVm,
         cloud: None,
         driver: Driver::Vagrant,
-        hosts: BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows]),
+        hosts: isoloom_render::run_manifest::every_host(),
         tools: providers::tools()?,
         identity: providers::docker_vm_identity(&PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         params,
@@ -65,12 +64,7 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
         machines,
         lifecycle: lifecycle(env, guest, &way_in)?,
         ready,
-        checks: Checks {
-            protocol: isoloom_manifest::CheckProtocol::V1,
-            setup: steps(&guest.check_setup, &way_in)?,
-            runners,
-            teardown: steps(&guest.check_teardown, &way_in)?,
-        },
+        checks: guest.checks(&way_in)?,
         recovery: Some(recovery()?),
         expiry: None,
         guest: Some(Guest {
@@ -100,11 +94,6 @@ fn vagrant_ssh(command: &Template) -> Result<Run, ManifestError> {
         Template::text(DEFINE),
     ];
     Ok(Run::Argv(HostArgv::Every(Argv::new(run_manifest::program("vagrant")?, args))))
-}
-
-/// `commands` as steps through `way_in`.
-fn steps(commands: &[GuestCommand], way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Vec<Step>, ManifestError> {
-    commands.iter().map(|c| c.step(way_in)).collect()
 }
 
 /// The VM: Isoloom's own (`infra`), named as each provider names it.
@@ -147,7 +136,7 @@ fn lifecycle(env: &Environment, guest: &GuestCompose, way_in: &dyn Fn(&Template)
         ports,
         up_step(env, guest)?,
     ];
-    up.extend(steps(&guest.start, way_in)?);
+    up.extend(GuestCommand::steps(&guest.start, way_in)?);
     Ok(Lifecycle {
         up: NonEmpty::new(up, "lifecycle.up")?,
         down: NonEmpty::new(down()?, "lifecycle.down")?,

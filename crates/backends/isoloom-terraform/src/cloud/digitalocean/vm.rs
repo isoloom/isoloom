@@ -10,7 +10,7 @@ use isoloom_spec::DEFAULT_MEMORY_MB;
 
 use super::{Way, region, rule, ssh_key, vpc};
 use crate::cloud::instance::{name_with, tag_list};
-use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
+use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
 use crate::cloud::{Cloud, operator};
 use crate::limits::Limits;
@@ -44,7 +44,7 @@ const RULES: Rules = Rules {
     images: Images {
         label: "DigitalOcean",
         has: |os| image(os).is_some(),
-        list: "Debian 12/13, Ubuntu 22.04/24.04",
+        list: || IMAGES.listed(),
         own: own_image::digitalocean,
     },
 };
@@ -69,15 +69,17 @@ fn several_addresses(env: &Environment) -> Option<String> {
     ))
 }
 
-/// The droplet image slug for an OS.
+/// The droplet image slug of each OS.
+const IMAGES: OsImages<&str> = OsImages(&[
+    ("debian-12", "debian-12-x64"),
+    ("debian-13", "debian-13-x64"),
+    ("ubuntu-22.04", "ubuntu-22-04-x64"),
+    ("ubuntu-24.04", "ubuntu-24-04-x64"),
+]);
+
+/// An OS's image, when there is one.
 fn image(os: &str) -> Option<&'static str> {
-    Some(match os {
-        "debian-12" => "debian-12-x64",
-        "debian-13" => "debian-13-x64",
-        "ubuntu-22.04" => "ubuntu-22-04-x64",
-        "ubuntu-24.04" => "ubuntu-24-04-x64",
-        _ => return None,
-    })
+    IMAGES.of(os)
 }
 
 /// The droplet size for a machine's memory.

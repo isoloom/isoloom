@@ -26,14 +26,6 @@ pub struct Copy {
     pub mode: Option<Mode>,
 }
 
-impl Copy {
-    /// Whether it copies a folder (its `from` ends with `/`).
-    #[must_use]
-    pub fn is_folder(&self) -> bool {
-        self.from.as_str().ends_with('/')
-    }
-}
-
 /// A `template` step: a project file whose `{{ path }}` placeholders Isoloom fills in when it
 /// generates, so every CM tool installs the same bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]

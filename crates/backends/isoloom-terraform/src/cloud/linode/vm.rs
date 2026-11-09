@@ -15,7 +15,7 @@ use isoloom_spec::DEFAULT_MEMORY_MB;
 
 use super::region;
 use crate::cloud::instance::{name_with, tag_list};
-use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Volumes};
+use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
 use crate::cloud::{Cloud, operator};
 use crate::limits::Limits;
@@ -53,7 +53,7 @@ const RULES: Rules = Rules {
     images: Images {
         label: "Linode",
         has: |os| image(os).is_some(),
-        list: "Debian 12/13, Ubuntu 22.04/24.04",
+        list: || IMAGES.listed(),
         own: own_image::linode,
     },
 };
@@ -69,15 +69,17 @@ fn refusal(env: &Environment) -> Option<String> {
     RULES.linux_refusal(env)
 }
 
-/// The Linode image for an OS.
+/// The Linode image of each OS.
+const IMAGES: OsImages<&str> = OsImages(&[
+    ("debian-12", "linode/debian12"),
+    ("debian-13", "linode/debian13"),
+    ("ubuntu-22.04", "linode/ubuntu22.04"),
+    ("ubuntu-24.04", "linode/ubuntu24.04"),
+]);
+
+/// An OS's image, when there is one.
 fn image(os: &str) -> Option<&'static str> {
-    Some(match os {
-        "debian-12" => "linode/debian12",
-        "debian-13" => "linode/debian13",
-        "ubuntu-22.04" => "linode/ubuntu22.04",
-        "ubuntu-24.04" => "linode/ubuntu24.04",
-        _ => return None,
-    })
+    IMAGES.of(os)
 }
 
 /// The Linode plan for a machine's memory.

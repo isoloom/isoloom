@@ -26,7 +26,7 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::hcl_builder::{Expression, Module, reference};
 
 use super::{provider, variables};
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{
     self, Driver, gateways,
     gpus::GpuSizes,
@@ -71,7 +71,7 @@ const RULES: Rules = Rules {
     images: Images {
         label: "Azure",
         has: |os| image(os).is_some(),
-        list: "Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025",
+        list: || IMAGES.listed(),
         own: own_image::azure,
     },
 };
@@ -83,19 +83,27 @@ const MACHINES: vm::Machines = vm::Machines {
     controller: machines::controller,
 };
 
-/// The Azure Marketplace image for an OS: (publisher, offer, sku).
+/// The Azure Marketplace image of each OS: (publisher, offer, sku).
+const IMAGES: OsImages<(&str, &str, &str)> = OsImages(&[
+    ("debian-12", ("Debian", "debian-12", "12-gen2")),
+    ("debian-13", ("Debian", "debian-13", "13-gen2")),
+    ("ubuntu-22.04", ("Canonical", "0001-com-ubuntu-server-jammy", "22_04-lts-gen2")),
+    ("ubuntu-24.04", ("Canonical", "ubuntu-24_04-lts", "server-gen1")),
+    ("windows-server-2016", ("MicrosoftWindowsServer", "WindowsServer", "2016-datacenter-gensecond")),
+    ("windows-server-2019", ("MicrosoftWindowsServer", "WindowsServer", "2019-datacenter-gensecond")),
+    (
+        "windows-server-2022",
+        ("MicrosoftWindowsServer", "WindowsServer", "2022-datacenter-azure-edition"),
+    ),
+    (
+        "windows-server-2025",
+        ("MicrosoftWindowsServer", "WindowsServer", "2025-datacenter-azure-edition"),
+    ),
+]);
+
+/// An OS's image, when there is one.
 fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
-    Some(match os {
-        "debian-12" => ("Debian", "debian-12", "12-gen2"),
-        "debian-13" => ("Debian", "debian-13", "13-gen2"),
-        "ubuntu-22.04" => ("Canonical", "0001-com-ubuntu-server-jammy", "22_04-lts-gen2"),
-        "ubuntu-24.04" => ("Canonical", "ubuntu-24_04-lts", "server-gen1"),
-        "windows-server-2016" => ("MicrosoftWindowsServer", "WindowsServer", "2016-datacenter-gensecond"),
-        "windows-server-2019" => ("MicrosoftWindowsServer", "WindowsServer", "2019-datacenter-gensecond"),
-        "windows-server-2022" => ("MicrosoftWindowsServer", "WindowsServer", "2022-datacenter-azure-edition"),
-        "windows-server-2025" => ("MicrosoftWindowsServer", "WindowsServer", "2025-datacenter-azure-edition"),
-        _ => return None,
-    })
+    IMAGES.of(os)
 }
 
 /// The VM size for a machine: its GPUs' size when it asks for GPUs, else by its memory and its

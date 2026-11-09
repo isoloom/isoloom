@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    Action, Argv, Checks, Condition, Delivery, Driver, EnvName, Error as ManifestError, Expiry, ExpiryUnit, HostArgv, HostOs, Identifier, Identity, Lifecycle,
+    Action, Argv, Checks, Condition, Delivery, Driver, EnvName, Error as ManifestError, Expiry, ExpiryUnit, HostArgv, Identifier, Identity, Lifecycle,
     Manifest, ManifestVersion, NonEmpty, Output, OutputRole, OutputSource, Part, Placeholder, Program, Recovery, RelPath, Retries, Run, RunVar, SCHEMA_URL,
     SecretSlot, SlotKind, SnakeName, StateFileFormat, StateOwner, Step, StepId, Template, TerraformIdentity, Tool, ToolName,
 };
@@ -83,7 +83,7 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
         target: isoloom_manifest::Target::CloudServices,
         cloud: Some(crate::cloud::manifest::cloud_of(on)),
         driver: Driver::Terraform,
-        hosts: BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows]),
+        hosts: isoloom_render::run_manifest::every_host(),
         tools: tools(cloud)?,
         identity: Identity::Terraform(TerraformIdentity {
             module: RelPath::parse(".")?,

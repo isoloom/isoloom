@@ -28,7 +28,7 @@ fn the_approved_five_keep_their_syntax() {
     let Step::Copy(c) = step("{ copy: { from: site/, to: /var/www/html/, owner: www-data, mode: \"0755\" } }") else {
         panic!()
     };
-    assert!(c.is_folder() && c.owner.is_some_and(|o| o.as_str() == "www-data"));
+    assert!(c.from.as_str().ends_with('/') && c.owner.is_some_and(|o| o.as_str() == "www-data"));
     assert_eq!(step("reboot"), Step::Reboot);
     assert!(matches!(step("{ playbook: site.yml }"), Step::Playbook(p) if p.as_str() == "site.yml"));
 }

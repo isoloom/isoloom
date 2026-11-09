@@ -59,3 +59,59 @@ machines:
     assert!(tf.contains("lifecycle {\n    ignore_changes = [user_data_base64]\n  }"), "{tf}");
     Ok(())
 }
+
+/// The `lifecycle` blocks of `tf`'s resource `head` (Terraform takes one per resource).
+fn lifecycles(tf: &str, head: &str) -> Outcome<usize> {
+    let block = tf.split(head).nth(1).ok_or_else(|| format!("no {head}"))?;
+    let block = block.split("\n}\n").next().unwrap_or_default();
+    Ok(block.matches("\n  lifecycle {").count())
+}
+
+/// A machine that asks for a TPM and sets itself up once: both in the instance's one `lifecycle`
+/// block, the NitroTPM precondition beside `ignore_changes`.
+#[test]
+fn an_aws_machine_with_a_tpm_has_one_lifecycle_block() -> Outcome {
+    let tf = generated(&crate::testing::example("tuned-web")?, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
+    assert_eq!(lifecycles(&tf, "resource \"aws_instance\" \"web\" {")?, 1, "{tf}");
+    let block = crate::testing::between(&tf, "resource \"aws_instance\" \"web\" {", "\n}\n")?;
+    let lifecycle = crate::testing::from(block, "\n  lifecycle {")?;
+    assert!(
+        lifecycle.starts_with("\n  lifecycle {\n    ignore_changes = [user_data_base64]\n    precondition {"),
+        "{lifecycle}"
+    );
+    assert!(lifecycle.contains("data.aws_ami.debian_12.tpm_support == \"v2.0\""), "{lifecycle}");
+    Ok(())
+}
+
+/// A spec disk larger than the image's snapshot is the root volume's size; the image's is a floor.
+#[test]
+fn a_root_disk_larger_than_the_images_is_the_specs() -> Outcome {
+    let lab = lab("version: 1
+name: big-kali
+networks: { lan: { cidr: 10.70.0.0/24 } }
+machines:
+  attacker: { os: kali@rolling, access: true, networks: { lan: 20 }, resources: { disk_gb: 40 } }
+")?;
+    let tf = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
+    let tf = tf.split(' ').filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
+    assert!(tf.contains("volume_size = 40"), "{tf}");
+    assert!(!tf.contains("volume_size = 25"), "{tf}");
+    Ok(())
+}
+
+/// The host name is every cloud's set-up, not AWS's alone; a Windows machine names itself from
+/// its own set-up, with no Linux command.
+#[test]
+fn a_linux_machine_is_named_after_itself_on_another_cloud_and_windows_gets_no_linux_command() -> Outcome {
+    let lab = lab("version: 1
+name: named
+networks: { lan: { cidr: 10.70.0.0/24 } }
+machines:
+  web: { os: debian@12, networks: { lan: 10 } }
+")?;
+    let tf = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/azure/main.tf")?;
+    assert!(tf.contains("hostnamectl set-hostname web"), "{tf}");
+    let windows = generated(&crate::testing::example("windows-hello")?, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
+    assert!(!windows.contains("hostnamectl"), "{windows}");
+    Ok(())
+}

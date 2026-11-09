@@ -166,8 +166,8 @@ pub fn powershell_args() -> Vec<String> {
 
 /// The command line running [`BOOTSTRAP`] through a remote shell (OpenSSH's): `powershell`
 /// and [`powershell_args`], none of which a shell changes.
-#[must_use]
-pub fn command_line() -> String {
+#[cfg(test)]
+fn command_line() -> String {
     format!("powershell {}", powershell_args().join(" "))
 }
 

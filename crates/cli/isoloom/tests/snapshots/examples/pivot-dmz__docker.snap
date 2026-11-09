@@ -1625,7 +1625,8 @@ volumes:
           "isoloom-access",
           "isoloom-access-routes"
         ],
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },
@@ -1958,7 +1959,7 @@ volumes:
           "aws"
         ],
         "refused": {
-          "azure": "machine `user`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016 to 2025)",
+          "azure": "machine `user`: no Azure image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)",
           "gcp": "machine `user`: no GCP image for `kali` yet (Debian 12/13, Ubuntu 22.04/24.04)",
           "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
           "linode": "machine `gateway` is on several networks: a Linode instance has one VPC interface",

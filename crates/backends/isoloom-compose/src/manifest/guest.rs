@@ -6,7 +6,7 @@
 //! files Compose reads from its environment read from the VM's copy, and root's Docker (`sudo`,
 //! keeping the values the way in forwarded).
 
-use isoloom_manifest::{EnvName, Machine, Name, Part, Placeholder, PublishMode, StepId, Template};
+use isoloom_manifest::{EnvName, Failure, Machine, Name, Part, Placeholder, PublishMode, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_render::container::{exec_runner, host_environment};
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, GuestRunner};
@@ -15,15 +15,12 @@ use isoloom_render::{OUTPUT_DIR, steps};
 
 use super::Project;
 use super::checks::{Planned, STAND_INS_DOWN, STAND_INS_UP, StandInStep, planned, stand_ins};
-use super::lifecycle::{job_step, owner, publishes_a_built_image, ready};
+use super::lifecycle::{WAIT_TIMEOUT, job_step, owner, publishes_a_built_image, ready};
 use super::machines::{Member, classify, machines};
 use super::slots::{Starts, slots};
 use crate::error::Result;
 use crate::file::ComposeFile;
 use crate::start::StartPlan;
-
-/// How long `up --wait` waits for the services to answer, once they started.
-const WAIT_TIMEOUT: &str = "600";
 
 /// The commands of a project in the VM: `docker compose` as root under its name, with its file
 /// and its ports published on every address of the VM at their own numbers.
@@ -62,6 +59,7 @@ fn command(id: &str, note: Option<String>, command: Template, timeout_s: u32) ->
         note,
         command,
         timeout_s,
+        failure: Failure::Fail,
     })
 }
 
@@ -100,7 +98,7 @@ const START: &str = "start";
 /// Compose reads from its environment read from the VM's copy first.
 fn start(env: &Environment, vm: &InVm, plan: &StartPlan, members: &[Member]) -> Result<Vec<GuestCommand>> {
     let files = host_environment(env);
-    // As on the host: a lab that publishes a built image pulls it first (a student runs the
+    // As on the host: a lab that publishes a built image pulls it first (a user runs the
     // published image), so it drops `--build` and `up` builds only what could not be pulled; a
     // lab that only builds locally keeps `--build`.
     let pull_published = publishes_a_built_image(env);
@@ -180,13 +178,10 @@ fn stand_in_command(file: &ComposeFile, vm: &InVm, what: &StandInStep) -> Result
     if stand_ins.is_empty() {
         return Ok(Vec::new());
     }
-    let args = format!("--profile check {} {}", what.verb, stand_ins.join(" "));
-    Ok(vec![command(
-        what.id,
-        what.note.map(str::to_owned),
-        vm.compose("", &text(&args)),
-        what.timeout_s,
-    )?])
+    let args = what.args(&stand_ins).join(" ");
+    let mut command = command(what.id, what.note.map(str::to_owned), vm.compose("", &text(&args)), what.timeout_s)?;
+    command.failure = what.failure;
+    Ok(vec![command])
 }
 
 #[cfg(test)]

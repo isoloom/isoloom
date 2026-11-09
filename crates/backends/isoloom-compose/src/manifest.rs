@@ -12,11 +12,9 @@ mod slots;
 
 pub(crate) use guest::guest;
 
-use std::collections::BTreeSet;
-
 use isoloom_manifest::{
-    Argv, Checks, ComposeIdentity, Driver, HostArgv, HostOs, Identity, Manifest, ManifestVersion, NonEmpty, PathTemplate, Placeholder, Program, RelPath,
-    RunVar, SCHEMA_URL, Template, Tool, Version,
+    Argv, Checks, ComposeIdentity, Driver, HostArgv, Identity, Manifest, ManifestVersion, NonEmpty, PathTemplate, Placeholder, Program, RelPath, RunVar,
+    SCHEMA_URL, Template, Tool, Version,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest;
@@ -45,7 +43,7 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
         target: isoloom_manifest::Target::Docker,
         cloud: None,
         driver: Driver::Compose,
-        hosts: BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows]),
+        hosts: run_manifest::every_host(),
         tools: tools()?,
         identity: identity()?,
         params: slots::params(&machines, &runners.derived)?,
@@ -132,11 +130,11 @@ fn identity() -> Result<Identity> {
 const ENVIRONMENT_SECRETS: &str = "2.14.1";
 
 /// The first Compose with `up --wait-timeout`, which the start steps pass: v2.17.0.
-const WAIT_TIMEOUT: &str = "2.17.0";
+const WAIT_TIMEOUT_SINCE: &str = "2.17.0";
 
-/// The lowest Compose the run needs: the later of [`ENVIRONMENT_SECRETS`] and [`WAIT_TIMEOUT`].
+/// The lowest Compose the run needs: the later of [`ENVIRONMENT_SECRETS`] and [`WAIT_TIMEOUT_SINCE`].
 fn compose_min_version() -> Result<Version> {
-    Ok(Version::parse(ENVIRONMENT_SECRETS)?.max(Version::parse(WAIT_TIMEOUT)?))
+    Ok(Version::parse(ENVIRONMENT_SECRETS)?.max(Version::parse(WAIT_TIMEOUT_SINCE)?))
 }
 
 /// Docker's engine and Compose v2, at the version the run needs ([`compose_min_version`]).
@@ -160,7 +158,7 @@ mod tests {
     #[test]
     fn compose_is_new_enough_to_copy_environment_secrets_with_their_owner_and_mode() {
         let min = compose_min_version().unwrap();
-        assert_eq!(min.as_str(), WAIT_TIMEOUT);
+        assert_eq!(min.as_str(), WAIT_TIMEOUT_SINCE);
         assert!(min >= Version::parse(ENVIRONMENT_SECRETS).unwrap());
         let compose = tools().unwrap().into_iter().find(|t| t.name.as_str() == "docker-compose").unwrap();
         assert_eq!(compose.min_version, Some(min));

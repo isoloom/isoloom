@@ -178,39 +178,6 @@ impl Spec {
             None => self.volume_users(volume).first().copied(),
         }
     }
-
-    /// The spec with `{{ cloud.outputs.<name> }}` filled in (checks and message), from a
-    /// deployed cloud-services environment's outputs.
-    #[must_use]
-    pub fn with_cloud_outputs(&self, outputs: &IndexMap<String, String>) -> Spec {
-        let fill = |t: &str| {
-            outputs
-                .iter()
-                .fold(t.to_owned(), |acc, (k, v)| acc.replace(&format!("{{{{ cloud.outputs.{k} }}}}"), v))
-        };
-        let mut s = self.clone();
-        for c in &mut s.checks {
-            match c {
-                Check::Script(p) => *p = fill(p),
-                Check::Declared(d) => {
-                    for f in [&mut d.http, &mut d.tcp, &mut d.exec, &mut d.body, &mut d.contains].into_iter().flatten() {
-                        *f = fill(f);
-                    }
-                    for v in d.headers.values_mut() {
-                        *v = fill(v);
-                    }
-                }
-            }
-        }
-        s.message = s.message.as_deref().map(fill);
-        s
-    }
-
-    /// The message of a cloud-services environment, its outputs filled in.
-    #[must_use]
-    pub fn cloud_message(&self, outputs: &IndexMap<String, String>) -> Option<String> {
-        self.with_cloud_outputs(outputs).message
-    }
 }
 
 /// Whether `value` is its type's default: a field left out when it holds it.

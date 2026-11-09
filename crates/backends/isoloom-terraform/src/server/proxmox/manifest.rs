@@ -25,7 +25,7 @@ use isoloom_manifest::{
     Version,
 };
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::{argv, environment, generator, tool};
+use isoloom_render::run_manifest::{self, argv, environment, generator, tool};
 use isoloom_spec::model::Target;
 
 use crate::Error;
@@ -56,7 +56,7 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
         target: isoloom_manifest::Target::Proxmox,
         cloud: None,
         driver: Driver::Terraform,
-        hosts: every_host(),
+        hosts: run_manifest::every_host(),
         tools: tools()?,
         identity: runner_identity()?,
         params: slots::params(&super::base::variables(env), &runners, crate::cloud::vm::seal::any(env))?,
@@ -76,11 +76,6 @@ fn build(env: &Environment) -> Result<Manifest, ManifestError> {
         expiry: None,
         guest: None,
     })
-}
-
-/// Every host a Terraform target runs from.
-pub(super) fn every_host() -> BTreeSet<HostOs> {
-    BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows])
 }
 
 /// The module in place, its state the runner's.

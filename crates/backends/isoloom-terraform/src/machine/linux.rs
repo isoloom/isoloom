@@ -128,10 +128,6 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
     done.into_iter().map(|p| p.into_iter().map(Template::into_expression).collect()).collect()
 }
 
-/// Machine `name`'s set-up from its own user data, logging in as `user`: the project the runner
-/// delivers, the controller's key, the launch inputs, `hooks.at_boot`, then the steps the
-/// platform doesn't do itself (`hooks.skip`), `hooks.before_egress` before the machine closes
-/// itself off. A `reboot` step ends a part; the next one starts with what a restart undid.
 /// The machine named after itself, as on every other target (a cloud's image names it after its
 /// address, or its distribution): kept through a reboot, where cloud-init would name it again.
 fn host_name(name: &str) -> Template {
@@ -142,6 +138,10 @@ grep -q ' {name}$' /etc/hosts || echo '127.0.1.1 {name}' >> /etc/hosts; \
     ))
 }
 
+/// Machine `name`'s set-up from its own user data, logging in as `user`: the project the runner
+/// delivers, the controller's key, the launch inputs, `hooks.at_boot`, then the steps the
+/// platform doesn't do itself (`hooks.skip`), `hooks.before_egress` before the machine closes
+/// itself off. A `reboot` step ends a part; the next one starts with what a restart undid.
 pub(crate) fn set_up(env: &Environment, (name, mp): (&str, &MachinePlan), user: &str, hooks: &Hooks) -> SetUp {
     let mut first = vec![Tracked::new("its host name", host_name(name)), project_wait()];
     if controller::needed(env) {

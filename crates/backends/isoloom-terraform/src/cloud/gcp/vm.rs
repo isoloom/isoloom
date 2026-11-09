@@ -30,7 +30,7 @@ use isoloom_spec::validate::Cidr;
 
 use super::{own_project, provider_and_project, public_ip, variables};
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{Images, Kept, Mtu, Networks, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{Images, Kept, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
 use crate::cloud::vm::{
     self, Driver, gateways,
     gpus::GpuSizes,
@@ -76,7 +76,7 @@ const RULES: Rules = Rules {
     images: Images {
         label: "GCP",
         has: |os| image(os).is_some(),
-        list: "Debian 12/13, Ubuntu 22.04/24.04",
+        list: || IMAGES.listed(),
         own: own_image::gcp,
     },
 };
@@ -91,16 +91,18 @@ const MACHINES: vm::Machines = vm::Machines {
 /// The machine types whose CPUs nest (N2: E2 has no nested virtualization), by memory in MB.
 const NESTING: &[(u32, &str)] = &[(8192, "n2-standard-2"), (16384, "n2-standard-4"), (32768, "n2-standard-8")];
 
-/// The image family and SSH user for an OS. The user is created from the `ssh-keys` metadata,
+/// The image family and SSH user of each OS. The user is created from the `ssh-keys` metadata,
 /// so it is the AWS image's user and the inventory is the same.
+const IMAGES: OsImages<(&str, &str)> = OsImages(&[
+    ("debian-12", ("debian-cloud/debian-12", "admin")),
+    ("debian-13", ("debian-cloud/debian-13", "admin")),
+    ("ubuntu-22.04", ("ubuntu-os-cloud/ubuntu-2204-lts", "ubuntu")),
+    ("ubuntu-24.04", ("ubuntu-os-cloud/ubuntu-2404-lts-amd64", "ubuntu")),
+]);
+
+/// An OS's image, when there is one.
 fn image(os: &str) -> Option<(&'static str, &'static str)> {
-    Some(match os {
-        "debian-12" => ("debian-cloud/debian-12", "admin"),
-        "debian-13" => ("debian-cloud/debian-13", "admin"),
-        "ubuntu-22.04" => ("ubuntu-os-cloud/ubuntu-2204-lts", "ubuntu"),
-        "ubuntu-24.04" => ("ubuntu-os-cloud/ubuntu-2404-lts-amd64", "ubuntu"),
-        _ => return None,
-    })
+    IMAGES.of(os)
 }
 
 /// The SSH user of an OS's image.

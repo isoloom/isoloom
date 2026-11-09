@@ -25,6 +25,11 @@ fn refusal_reports_what_a_generator_would_refuse() -> Outcome {
     let ad = example("corp-ad-basics")?;
     let why = isoloom_targets::refusal(&ad, Target::CloudVm).ok_or("no cloud has a Windows 11 image")?;
     assert!(why.contains("no AWS image for `windows-11`"), "{why}");
+    // The images listed are the ones AWS has, Kali among them.
+    assert!(
+        why.contains("(Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)"),
+        "{why}"
+    );
     // A Windows lab of PowerShell steps clones a template on Proxmox.
     let windows = example("windows-hello")?;
     assert_eq!(isoloom_targets::refusal(&windows, Target::Proxmox), None);

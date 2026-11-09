@@ -10,8 +10,9 @@ use super::{Project, compose, program};
 use crate::error::Result;
 use crate::start::StartPlan;
 
-/// How long `up --wait` waits for the services to answer, once they started.
-const WAIT_TIMEOUT: &str = "600";
+/// How long `up --wait` waits for the services to answer, once they started (`--wait-timeout`,
+/// seconds): on this computer and in a VM.
+pub(super) const WAIT_TIMEOUT: &str = "600";
 
 /// A step running `argv` for at most `timeout_s`.
 fn run(id: &str, argv: HostArgv, timeout_s: u32) -> Result<Step> {
@@ -53,7 +54,7 @@ pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member])
 /// Pin the host ports, check they are free, clear stale networks, pull any published images,
 /// start everything but the leaf jobs and wait for it, then run each leaf job attached.
 fn up(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>> {
-    // A lab that publishes a built image (the build+image combo) pulls it first, so a student runs
+    // A lab that publishes a built image (the build+image combo) pulls it first, so a user runs
     // the published image rather than building it; `up` then builds only what could not be pulled.
     // A lab that only builds locally keeps `--build`, so an author's edits are always rebuilt.
     let pull_published = publishes_a_built_image(env);

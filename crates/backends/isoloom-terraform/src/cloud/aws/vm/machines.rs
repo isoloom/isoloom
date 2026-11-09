@@ -47,20 +47,18 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
     let mem = mp.size.memory_mb.unwrap_or(DEFAULT_MEMORY_MB);
-    let mut instance = resource("aws_instance", &id)
+    let instance = resource("aws_instance", &id)
         .add_attribute(("ami", ami(mp)))
         .add_attribute(("instance_type", string(machine_type(mp, mem))))
         .add_blocks(disks::aws(&mp.disks));
     // A looked-up AMI says whether it has NitroTPM; an own AMI is the author's to choose.
-    if mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none() {
-        instance = instance.add_block(nitro_tpm(&ident(mp.os.as_deref().unwrap_or_default())));
-    }
+    let tpm_ami = (mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none()).then(|| ident(mp.os.as_deref().unwrap_or_default()));
     let mut at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
     at_boot.extend(gateways::at_boot(mp));
     let user = image_user(mp.os.as_deref().unwrap_or_default());
     let instance = nesting(instance, mp)
         .add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot)))
-        .add_block(set_up_once("user_data_base64"));
+        .add_block(lifecycle("user_data_base64", tpm_ami.as_deref()));
     if addresses::needs_interfaces(mp) {
         m.blocks(several_networks((name, mp), instance));
     } else {
@@ -76,18 +74,18 @@ fn root_disk_gb(mp: &MachinePlan) -> u32 {
     wanted.max(image)
 }
 
+/// The instance's one `lifecycle` block (Terraform takes no second).
+///
 /// A machine sets itself up once, at its first boot, from its user data (`attribute`): a later
 /// apply with other values in it (the launch's inputs, which a run never keeps) leaves a machine
 /// that runs alone, where AWS would stop and start it to change the attribute.
-fn set_up_once(attribute: &str) -> Block {
-    Block::builder("lifecycle")
-        .add_attribute(("ignore_changes", list([reference(attribute)])))
-        .build()
-}
-
-/// A TPM on AWS is NitroTPM, which the AMI enables (`tpm_support`): the plan stops when the
-/// image has none rather than start a VM without.
-fn nitro_tpm(ami: &str) -> Block {
+///
+/// A TPM on AWS is NitroTPM, which the AMI enables (`tpm_support`): with `tpm_ami`, the looked-up
+/// AMI of a machine that asks for one, the plan stops when the image has none rather than start
+/// a VM without.
+fn lifecycle(attribute: &str, tpm_ami: Option<&str>) -> Block {
+    let block = Block::builder("lifecycle").add_attribute(("ignore_changes", list([reference(attribute)])));
+    let Some(ami) = tpm_ami else { return block.build() };
     let condition = binary(reference(&format!("data.aws_ami.{ami}.tpm_support")), BinaryOperator::Eq, string("v2.0"));
     let precondition = Block::builder("precondition")
         .add_attribute(("condition", condition))
@@ -96,7 +94,7 @@ fn nitro_tpm(ami: &str) -> Block {
             string("The machine asks for a TPM (hardware.tpm), and this AMI has no NitroTPM support."),
         ))
         .build();
-    Block::builder("lifecycle").add_block(precondition).build()
+    block.add_block(precondition).build()
 }
 
 /// The instance on its network, at its address.
@@ -217,7 +215,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
         .add_attribute(("associate_public_ip_address", boolean(true)))
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
         .add_attribute(("user_data", windows_user_data()))
-        .add_block(set_up_once("user_data"))
+        .add_block(lifecycle("user_data", None))
         .add_block(disk(mp.size.disk_gb.unwrap_or(DEFAULT_DISK_GB).max(50)))
         .add_blocks(disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));

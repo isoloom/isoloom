@@ -992,7 +992,8 @@ output "ssh_user" {
           "host": "${outputs.ip}",
           "user": "admin"
         },
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },
@@ -2042,7 +2043,8 @@ output "ssh_user" {
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },
@@ -2974,7 +2976,8 @@ output "ssh_user" {
           "host": "${outputs.ip}",
           "user": "root"
         },
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },
@@ -4013,7 +4016,8 @@ output "ssh_user" {
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },
@@ -4929,7 +4933,8 @@ output "ssh_user" {
           "host": "${outputs.ip}",
           "user": "root"
         },
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },
@@ -5910,7 +5915,8 @@ output "ssh_user" {
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },

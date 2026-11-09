@@ -16,11 +16,9 @@
 pub(crate) mod connection;
 pub(crate) mod steps;
 
-use std::collections::BTreeSet;
-
 use isoloom_manifest::{
-    CheckRunner, Checks, Driver, Error as ManifestError, Expiry, ExpiryUnit, HostOs, Identity, Machine, Manifest, ManifestVersion, Output, Recovery, RelPath,
-    Retries, SCHEMA_URL, SecretSlot, SnakeName, StateOwner, TerraformIdentity, Tool, Version,
+    CheckRunner, Checks, Driver, Error as ManifestError, Expiry, ExpiryUnit, Identity, Machine, Manifest, ManifestVersion, Output, Recovery, RelPath, Retries,
+    SCHEMA_URL, SecretSlot, SnakeName, StateOwner, TerraformIdentity, Tool, Version,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{argv, environment, generator, networks, tool};
@@ -73,7 +71,7 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
         target: frame.target,
         cloud: Some(cloud_of(frame.cloud)),
         driver: Driver::Terraform,
-        hosts: BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows]),
+        hosts: isoloom_render::run_manifest::every_host(),
         tools: tools()?, // Terraform and ssh.
         identity: Identity::Terraform(TerraformIdentity {
             module: RelPath::parse(".")?,

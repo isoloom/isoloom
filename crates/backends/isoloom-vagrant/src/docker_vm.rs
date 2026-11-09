@@ -263,9 +263,12 @@ fn checks(r: &mut Ruby, env: &Environment) {
         return;
     }
     let profile = format!("docker compose -f {COMPOSE} --profile check");
-    let access = docker::as_arguments(&format!("{profile} config --services | grep -x -e isoloom-access -e isoloom-access-routes"));
+    let (stand_in, routes) = (docker::STAND_IN, docker::routes_service(docker::STAND_IN));
+    let access = docker::as_arguments(&format!("{profile} config --services | grep -x -e {stand_in} -e {routes}"));
+    // The stand-ins go once the checks ran, whatever they found, so the access machine they
+    // stand in for can take its addresses; failing to take them down fails no check.
     let script = format!(
-        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} up -d --wait --no-deps \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}exit \"$failed\"",
+        "cd /opt/isoloom && failed=0; {access}; [ $# -eq 0 ] || {profile} up -d --wait --no-deps \"$@\"; for s in $({profile} config --services | grep '^isoloom-check'); do {profile} run --rm --no-deps -e {DERIVED} \"$s\" || failed=1; done; {}[ $# -eq 0 ] || {profile} rm --stop --force \"$@\" || true; exit \"$failed\"",
         exec_runs(env)
     );
     let derived = crate::vagrantfile::derived_from_host();

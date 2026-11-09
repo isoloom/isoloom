@@ -1049,7 +1049,8 @@ volumes:
           "isoloom-access",
           "isoloom-access-routes"
         ],
-        "timeout_s": 120
+        "timeout_s": 120,
+        "failure": "tolerate"
       }
     ]
   },

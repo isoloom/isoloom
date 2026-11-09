@@ -88,8 +88,8 @@ pub(crate) struct Images {
     pub(crate) label: &'static str,
     /// Whether it has an image for an OS.
     pub(crate) has: fn(&str) -> bool,
-    /// The OSes it has images for, as the refusal lists them.
-    pub(crate) list: &'static str,
+    /// The OSes it has images for, as the refusal lists them (see [`listed`]).
+    pub(crate) list: fn() -> String,
     /// The field of `vm.image` naming a machine's own image there, which stands in for its OS's.
     pub(crate) own: own_image::Field,
 }
@@ -97,8 +97,58 @@ pub(crate) struct Images {
 impl Images {
     /// Why machine `name` has no image here: none for its OS, and none of its own.
     pub(crate) fn missing(&self, name: &str, os: &str, own: Option<&str>) -> Option<String> {
-        (!(self.has)(os) && own.is_none()).then(|| format!("machine `{name}`: no {} image for `{os}` yet ({})", self.label, self.list))
+        (!(self.has)(os) && own.is_none()).then(|| format!("machine `{name}`: no {} image for `{os}` yet ({})", self.label, (self.list)()))
     }
+}
+
+/// The images a cloud has, by the OS each is for (its plan name, `debian-12`).
+pub(crate) struct OsImages<T: 'static>(pub(crate) &'static [(&'static str, T)]);
+
+impl<T: Copy> OsImages<T> {
+    /// The OS's image, when there is one.
+    pub(crate) fn of(&self, os: &str) -> Option<T> {
+        self.0.iter().find(|(o, _)| *o == os).map(|(_, i)| *i)
+    }
+
+    /// The OSes, as a refusal lists them ([`listed`]).
+    pub(crate) fn listed(&self) -> String {
+        listed(self.0.iter().map(|(os, _)| *os))
+    }
+}
+
+/// OSes as a refusal lists them, from their plan names: each family once, in the order it first
+/// comes, with its versions (`debian-12`, `debian-13`, `kali`: `Debian 12/13, Kali`).
+pub(crate) fn listed<'a>(oses: impl IntoIterator<Item = &'a str>) -> String {
+    let mut families: Vec<(String, Vec<&str>)> = Vec::new();
+    for os in oses {
+        let (family, version) = match os.rsplit_once('-') {
+            Some((f, v)) if v.starts_with(|c: char| c.is_ascii_digit()) => (f, Some(v)),
+            _ => (os, None),
+        };
+        let name = family
+            .split('-')
+            .map(|w| {
+                let mut c = w.chars();
+                c.next().map(|f| f.to_uppercase().chain(c).collect::<String>()).unwrap_or_default()
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        match families.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, versions)) => versions.extend(version),
+            None => families.push((name, version.into_iter().collect())),
+        }
+    }
+    families
+        .into_iter()
+        .map(|(name, versions)| {
+            if versions.is_empty() {
+                name
+            } else {
+                format!("{name} {}", versions.join("/"))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// What a cloud takes.

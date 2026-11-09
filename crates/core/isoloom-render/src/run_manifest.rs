@@ -12,7 +12,7 @@ use std::num::{NonZeroU16, NonZeroU32};
 
 use isoloom_manifest::{
     Action, Arch, Argv, Check, CheckKind, Cidr, Delivery, EnvName, EnvironmentName, EnvironmentRef, Error as ManifestError, Generator, GeneratorName, HostArgv,
-    Machine, Name, Network, NonEmpty, Output, OutputRole, OutputSource, Param, Part, Placeholder, Port, PortKind, PortName, Program, Protocol, Publish,
+    HostOs, Machine, Name, Network, NonEmpty, Output, OutputRole, OutputSource, Param, Part, Placeholder, Port, PortKind, PortName, Program, Protocol, Publish,
     PublishMode, Role, Run, SetBy, SnakeName, Step, StepId, StepSelection, Template, Tool, ToolName, Version, When,
 };
 use isoloom_plan::checks::{Probe, Resolved};
@@ -131,6 +131,12 @@ pub fn derived_switch(steps: Vec<StepId>) -> Result<Option<Param>, ManifestError
 
 /// The derived checks' switch, as a runner reads it.
 pub const DERIVED: &str = isoloom_plan::checks::DERIVED;
+
+/// Every host a run starts from: Linux, macOS and Windows.
+#[must_use]
+pub fn every_host() -> BTreeSet<HostOs> {
+    BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows])
+}
 
 /// `s` as a clean-up: it runs whatever happened before it, and its failure is only logged.
 #[must_use]

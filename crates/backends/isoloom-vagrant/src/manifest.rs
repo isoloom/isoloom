@@ -12,11 +12,7 @@ mod machines;
 mod providers;
 mod slots;
 
-use std::collections::BTreeSet;
-
-use isoloom_manifest::{
-    Argv, Checks, Driver, HostArgv, HostOs, Manifest, ManifestVersion, Part, PathTemplate, Placeholder, RelPath, RunVar, SCHEMA_URL, Template,
-};
+use isoloom_manifest::{Argv, Checks, Driver, HostArgv, Manifest, ManifestVersion, Part, PathTemplate, Placeholder, RelPath, RunVar, SCHEMA_URL, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest;
 
@@ -36,7 +32,7 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
         target: isoloom_manifest::Target::Vagrant,
         driver: Driver::Vagrant,
         cloud: None,
-        hosts: BTreeSet::from([HostOs::Linux, HostOs::Macos, HostOs::Windows]),
+        hosts: isoloom_render::run_manifest::every_host(),
         tools: providers::tools()?,
         identity: providers::identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         schema: Some(SCHEMA_URL.to_owned()),

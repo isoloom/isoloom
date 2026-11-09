@@ -69,7 +69,7 @@ const RULES: Rules = Rules {
     images: Images {
         label: "Oracle Cloud",
         has: |os| matches!(os, "debian-12" | "debian-13" | "ubuntu-22.04" | "ubuntu-24.04"),
-        list: "Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04",
+        list: || "Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04".to_owned(),
         own: own_image::oci,
     },
 };
