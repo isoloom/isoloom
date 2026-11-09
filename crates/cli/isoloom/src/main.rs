@@ -3,7 +3,8 @@
 //! `cli` defines the command line and `commands` holds one module per subcommand. What they
 //! share: the spec as a command loads it (`spec`), the target named (`target`), the files written
 //! for a target (`generated`), the console a command writes to (`console`), the error that stops
-//! a command (`error`), how it reads on stderr (`diagnostic`) and the exit code it gives (`exit`).
+//! a command (`error`), how it reads on stderr (`diagnostic`), the exit code it gives (`exit`),
+//! and the command-line reference written from `cli` (`reference`).
 
 use std::io::Write as _;
 use std::process::ExitCode;
@@ -17,6 +18,7 @@ mod diagnostic;
 mod error;
 mod exit;
 mod generated;
+mod reference;
 mod spec;
 mod target;
 

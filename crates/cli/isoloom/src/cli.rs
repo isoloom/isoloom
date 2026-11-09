@@ -59,7 +59,7 @@ pub(crate) enum Command {
     #[command(subcommand)]
     Import(import::Import),
     /// Print a reference page generated from the code: `--spec` for docs/spec.md, `--matrix` for
-    /// docs/matrix.md.
+    /// docs/matrix.md, `--cli` for docs/reference/cli.md.
     Docs(docs::Args),
     /// Show what each target does with each spec field (✓ generated, ✗ refused, with the step
     /// that refuses and why, – not applicable), worked out from the generators themselves, and

@@ -463,3 +463,21 @@ fn schema_prints_the_committed_schema_with_the_catalogues_rules() -> Outcome {
     assert!(printed.pointer("/$defs/Machine/allOf").is_some(), "each entry's `with:` rule");
     Ok(())
 }
+
+#[test]
+fn the_cli_reference_page_is_what_docs_cli_prints() -> Outcome {
+    let home = scratch("docs-cli-home")?;
+    let run = isoloom(&home, &[&"docs", &"--cli"])?;
+    assert_eq!(run.code, Some(0), "{run:?}");
+    let page = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../docs/reference/cli.md");
+    let on_disk = std::fs::read_to_string(&page).unwrap_or_default();
+    assert!(
+        on_disk == run.stdout,
+        "docs/reference/cli.md is stale; run `cargo run -q -p isoloom -- docs --cli > docs/reference/cli.md`"
+    );
+    for command in ["validate", "generate", "check", "import compose", "docs"] {
+        assert!(run.stdout.contains(&format!("## `isoloom {command}`")), "{command}");
+    }
+    assert!(run.stdout.contains("| `--quiet`") || run.stdout.contains("| `-q, --quiet`"), "check's options");
+    Ok(())
+}

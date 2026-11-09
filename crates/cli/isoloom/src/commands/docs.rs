@@ -1,6 +1,7 @@
 //! `isoloom docs`: the reference pages generated from the code, for the repository's `docs/`
 //! folder. `--spec` prints `docs/spec.md`, every field of the spec from its JSON schema;
-//! `--matrix` prints `docs/matrix.md`, what each target does with each field, and the tiers.
+//! `--matrix` prints `docs/matrix.md`, what each target does with each field, and the tiers;
+//! `--cli` prints `docs/reference/cli.md`, every command and its arguments.
 
 use super::{Console, Result, Verdict};
 
@@ -15,6 +16,9 @@ pub(crate) struct Args {
     /// each target's tier with its evidence.
     #[arg(long)]
     matrix: bool,
+    /// The command-line reference (docs/reference/cli.md): every command and its arguments.
+    #[arg(long)]
+    cli: bool,
 }
 
 /// Prints the page asked for.
@@ -24,6 +28,9 @@ pub(crate) fn run(a: &Args, console: &mut Console) -> Result<Verdict> {
     }
     if a.matrix {
         console.print(isoloom_targets::matrix::matrix()?.markdown())?;
+    }
+    if a.cli {
+        console.print(crate::reference::markdown())?;
     }
     Ok(Verdict::Pass)
 }

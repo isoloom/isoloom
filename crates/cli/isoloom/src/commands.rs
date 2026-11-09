@@ -31,6 +31,7 @@ use crate::spec::{self, Profile};
 // flattened into each command's arguments (no doc comment: clap would print it in `--help`).
 #[derive(Debug, clap::Args)]
 pub(crate) struct Project {
+    /// The project folder (holding isoloom.yml).
     #[arg(default_value = ".")]
     pub(crate) dir: PathBuf,
 }
