@@ -10,9 +10,6 @@ use isoloom_render::steps;
 use crate::machine::user_data::{SetUp, Tracked, expiry_shutdown, project_wait};
 use crate::machine::{Shell, controller};
 
-/// The packages the controller needs before Ansible.
-const PACKAGES: &str = "DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd openssh-client >/dev/null";
-
 /// `content` written owner-only at `path`, base64 on its way (a key, the inventory).
 fn written(path: &str, mode: &str, content: Expression) -> Template {
     Template::text("mkdir -p /etc/isoloom && (umask 077 && echo ")
@@ -41,7 +38,7 @@ pub(crate) fn set_up(env: &Environment, user: &dyn Fn(&MachinePlan) -> String, i
     if let Some(hosts) = root(controller::hosts(env)) {
         part.push(Tracked::new("hosts file", hosts));
     }
-    part.push(Tracked::new("packages", Shell::Root.command(PACKAGES)));
+    part.push(Tracked::new("packages", Shell::Root.command(&controller::install_packages())));
     part.push(Tracked::new("installing Ansible", Shell::Root.command(controller::ANSIBLE)));
     for (name, wait) in controller::linux_waits(env, user) {
         part.push(Tracked::new(format!("waiting for {name}"), wait));

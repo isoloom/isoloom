@@ -153,7 +153,7 @@ fn controller(env: &Environment, m: &mut Module) {
         name: "controller".to_owned(),
         index: CONTROLLER_INDEX,
         os: SERVICE_OS.to_owned(),
-        size: (cpus, memory, disk.unwrap_or(10)),
+        size: (cpus, memory, disk),
         nics,
         dns: (vec![RESOLVER.to_owned()], None),
         user_data: CloudConfig::new("isoloom-controller", reference("local.users")).document(),

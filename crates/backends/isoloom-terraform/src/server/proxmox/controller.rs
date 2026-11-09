@@ -16,7 +16,7 @@ use crate::module::ident;
 /// The controller's snippet and VM.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
     let mut config = CloudConfig::new("isoloom-controller", reference("local.users"));
-    config.packages = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"].map(String::from).to_vec();
+    config.packages = controller::PACKAGES.map(String::from).to_vec();
     config.bootcmd.extend(cloud_init::prelude(env));
     config.file_lists.push(reference("local.project_files"));
     let inventory = controller::inventory_template(env, isoloom_render::inventory::Access::proxmox).into_expression();
@@ -61,7 +61,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         id: "isoloom_controller".to_owned(),
         snippet: "controller".to_owned(),
         name: "controller".to_owned(),
-        size: (cpus, memory, disk.unwrap_or(8)),
+        size: (cpus, memory, disk),
         boot: Boot::Image(ident(controller::OS)),
         tpm: false,
         own_boot: None,

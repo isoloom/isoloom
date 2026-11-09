@@ -265,7 +265,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
         m.block(interface(&nic(n), n, &at.to_string(), reference("aws_security_group.isoloom_controller.id"), None).build());
     }
     let first = env.networks.keys().next().map(|n| nic(n)).unwrap_or_default();
-    let (_, mem, _) = controller::size(env);
+    let (_, mem, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Basic);
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n))));
     let user = |mp: &MachinePlan| image_user(mp.os.as_deref().unwrap_or_default()).to_owned();
@@ -278,6 +278,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
             .add_attribute(user_data(user_data::capped(&setup, "the controller", CAP)?))
             .add_block(lifecycle("user_data_base64", None))
             .add_block(primary(&first))
+            .add_block(root_disk(disk))
             .add_attribute(("tags", object([("Name", name_with("-controller"))])))
             .build(),
     );

@@ -302,7 +302,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
         machine_type: for_nics(machine_type(memory), addresses.len()),
         gpus: false,
         nested: false,
-        disk,
+        disk: Some(disk),
         on: (&addresses, addresses.len() > 1),
         more: &IndexMap::new(),
         tpm: false,

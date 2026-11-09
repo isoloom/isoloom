@@ -283,7 +283,8 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     m.blocks(controller_nics(id, "controller", (&addresses, &IndexMap::new(), &IndexMap::new()), false));
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, memory, disk) = controller::size(env);
-    let disk = disk.unwrap_or(30).max(30);
+    // Azure's Debian image is a 30 GB disk: the least it takes.
+    let disk = disk.max(30);
     let inventory = controller::cloud_inventory(env, |_| USER.to_owned(), WinrmAuth::Ntlm);
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&nic_id(id, n)));
     let setup = controller_setup::set_up(env, &|_| USER.to_owned(), inventory, &at_boot);

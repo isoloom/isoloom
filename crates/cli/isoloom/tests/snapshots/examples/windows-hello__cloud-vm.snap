@@ -315,6 +315,11 @@ resource "aws_instance" "isoloom_controller" {
   primary_network_interface {
     network_interface_id = aws_network_interface.isoloom_controller_lab.id
   }
+  root_block_device {
+    volume_size = 10
+    volume_type = "gp3"
+    encrypted   = true
+  }
   tags = { Name = "${local.name}-controller" }
 }
 

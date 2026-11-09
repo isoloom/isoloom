@@ -35,10 +35,28 @@ pub(crate) fn needed(env: &Environment) -> bool {
     env.controller.is_some() || (!env.checks.is_empty() && !linux)
 }
 
-/// Its (CPUs, memory in MB, disk in GB if set): 1 CPU and 512 MB unless the spec says otherwise.
-pub(crate) fn size(env: &Environment) -> (u32, u32, Option<u32>) {
-    env.controller
-        .map_or((Controller::CPUS, Controller::MEMORY_MB, None), |c| (c.cpus, c.memory_mb, c.disk_gb))
+/// The Debian packages it needs before Ansible: a virtual environment for it, `curl` and `nc` for
+/// its waits, the SSH client for the playbooks.
+pub(crate) const PACKAGES: [&str; 4] = ["python3-venv", "curl", "netcat-openbsd", "openssh-client"];
+
+/// [`PACKAGES`] installed with apt, as a root script.
+pub(crate) fn install_packages() -> String {
+    format!(
+        "DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq {} >/dev/null\n",
+        PACKAGES.join(" ")
+    )
+}
+
+/// Its disk in GB when the spec leaves it out, on every target: Debian, Python, Ansible and the
+/// project fit, with room for their logs.
+pub(crate) const DISK_GB: u32 = 10;
+
+/// Its (CPUs, memory in MB, disk in GB): 1 CPU, 512 MB and [`DISK_GB`] unless the spec says
+/// otherwise.
+pub(crate) fn size(env: &Environment) -> (u32, u32, u32) {
+    env.controller.map_or((Controller::CPUS, Controller::MEMORY_MB, DISK_GB), |c| {
+        (c.cpus, c.memory_mb, c.disk_gb.unwrap_or(DISK_GB))
+    })
 }
 
 /// Its key, `tls_private_key.controller`, when the environment needs a controller.
@@ -153,8 +171,8 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     let install = format!(
         "mkdir -p /etc/isoloom && install -m 0600 {KEY_UPLOAD} /etc/isoloom/id_ed25519 && install -m 0644 {INVENTORY_UPLOAD} /etc/isoloom/inventory.ini && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"
     );
-    let packages = "DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd >/dev/null\n";
-    for script in [install.as_str(), packages, ANSIBLE] {
+    let packages = install_packages();
+    for script in [install.as_str(), packages.as_str(), ANSIBLE] {
         cmds.push(Shell::Sudo.command(script).into());
     }
     cmds.extend(waits.iter().map(|w| Template::from(Shell::Sudo.command(w))));

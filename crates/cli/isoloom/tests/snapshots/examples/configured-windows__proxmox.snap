@@ -555,7 +555,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_controller" {
     datastore_id = var.datastore
     file_id      = proxmox_download_file.debian_12.id
     interface    = "virtio0"
-    size         = 8
+    size         = 10
   }
   network_device {
     bridge = var.uplink_bridge
