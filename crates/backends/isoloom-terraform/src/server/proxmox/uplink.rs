@@ -68,7 +68,8 @@ pub(super) fn checked(what: &str, own: &[String]) -> Block {
     crate::server::router::postcondition(condition, message)
 }
 
-#[cfg(test)]
+/// The command run through a POSIX shell with stand-in tools: Unix only, like the guest it runs on.
+#[cfg(all(test, unix))]
 mod tests {
     use std::process::Command;
 
