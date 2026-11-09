@@ -3823,8 +3823,9 @@ resource "oci_core_instance" "env" {
     memory_in_gbs = 4
   }
   source_details {
-    source_type = "image"
-    source_id   = data.oci_core_images.ubuntu_2404.images[0].id
+    source_type             = "image"
+    source_id               = data.oci_core_images.ubuntu_2404.images[0].id
+    boot_volume_size_in_gbs = 50
   }
   create_vnic_details {
     subnet_id        = oci_core_subnet.env.id

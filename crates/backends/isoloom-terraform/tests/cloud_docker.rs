@@ -74,3 +74,12 @@ fn rendering_twice_gives_the_same_files() -> Outcome {
     assert_eq!(CloudServicesBackend.render(&e), CloudServicesBackend.render(&e));
     Ok(())
 }
+
+#[test]
+fn every_clouds_host_has_the_disk_its_containers_need() -> Outcome {
+    let disk = isoloom_render::container::HostSize::of(&env("hello-stack", Target::CloudDocker)?).disk_gb;
+    assert!(cloud("aws")?.contains(&format!("volume_size = {disk}")));
+    // Oracle Cloud's boot volumes start at 50 GB.
+    assert!(cloud("oci")?.contains(&format!("boot_volume_size_in_gbs = {}", disk.max(50))));
+    Ok(())
+}

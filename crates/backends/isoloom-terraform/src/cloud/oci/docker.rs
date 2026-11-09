@@ -97,10 +97,12 @@ fn network(env: &Environment) -> Vec<Block> {
     ]
 }
 
-/// The instance: Ubuntu on the flexible shape, sized for the containers, its expiry in its user
-/// data, run once ([`instance::set_up_once`]).
+/// The instance: Ubuntu on the flexible shape, sized for the containers (its boot volume too, 50
+/// GB at least, as Oracle Cloud makes them), its expiry in its user data, run once
+/// ([`instance::set_up_once`]).
 fn host(env: &Environment, user_data: Expression) -> Block {
-    let (ocpus, memory) = HostSize::of(env).pick([(1, 4), (2, 8), (4, 16)]);
+    let size = HostSize::of(env);
+    let (ocpus, memory) = size.pick([(1, 4), (2, 8), (4, 16)]);
     resource("oci_core_instance")
         .add_attribute(("availability_domain", availability_domain()))
         .add_attribute(("display_name", reference("local.name")))
@@ -121,6 +123,7 @@ fn host(env: &Environment, user_data: Expression) -> Block {
                         "id",
                     ),
                 ))
+                .add_attribute(("boot_volume_size_in_gbs", number(u64::from(size.disk_gb.max(50)))))
                 .build(),
         )
         .add_block(
