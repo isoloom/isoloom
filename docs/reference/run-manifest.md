@@ -1,4 +1,4 @@
-# The run manifest and the runner
+# The run manifest
 
 Isoloom converts a spec into files, and alongside the files of most targets it writes a **run
 manifest** (`run.json`, under the target's folder): a versioned, self-contained description of how
@@ -18,7 +18,8 @@ Which targets have one, and where:
 | `cloud-services` | `.isoloom/cloud-services/run.json`, when the spec has `cloud:`, unless it has `before` steps (host scripts) or a variable holding a launch value inside a larger value |
 | `kubernetes`, `hybrid`, `esxi`, `external`, `hosted` | none yet: their files are run by hand |
 
-A runner executes it: any program that reads the manifest and follows this contract. You can
+A runner executes it: any program that reads the manifest and follows this contract.
+[Isothrum](https://github.com/Isothrum/isothrum) is the reference runner. You can
 also run each tool's files by hand (`docker compose up`, `kubectl apply -k`, `vagrant up`, `terraform apply`,
 `ansible-playbook`); the manifest exists so a runner doesn't have to know each tool's commands.
 
@@ -35,8 +36,20 @@ A run manifest holds only documented data — the driver does the work:
   **never a value**.
 
 The manifest is strict (`additionalProperties: false`) and carries its own version. Its JSON
-schema is committed at [`schemas/run-manifest-v1.schema.json`](../schemas/run-manifest-v1.schema.json),
+schema is committed at [`schemas/run-manifest-v1.schema.json`](../../schemas/run-manifest-v1.schema.json),
 and `isoloom-manifest` holds the types and fixtures runners can test against.
+
+## Versions and compatibility
+
+`manifest_version` is the contract's version: **1** from Isoloom 2.0. Within version 1, a release
+only adds what a version-1 reader may ignore: an optional field, a new kind of step that a runner
+can skip. Anything a version-1 reader would misread (a field removed, renamed or given another
+meaning, a new required field) raises `manifest_version`, in a major release of Isoloom.
+
+A runner reads the versions it was built for and refuses any other before running anything.
+Isothrum's release notes say which `manifest_version` each of its releases reads. Isoloom 1.x
+wrote `manifest_version: 0`, an unstable contract read only by runners built for exactly that
+release line.
 
 ## The lifecycle
 
@@ -121,6 +134,7 @@ with it.
 
 ## See also
 
-- [Spec reference](spec.md) — secrets, inputs, `files:` and checks.
+- [Spec reference](../spec.md) — secrets, inputs, `files:` and checks.
 - [Targets and tiers](targets.md) — each target's run manifest.
-- [Getting started](getting-started.md).
+- [Getting started](../guide/getting-started.md).
+- [Policies](policies.md) — what is stable, and how each surface is versioned.

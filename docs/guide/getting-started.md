@@ -1,95 +1,144 @@
 # Getting started
 
-Isoloom converts one environment spec into the native files of every infrastructure and
-configuration tool, and emits a run manifest describing how to bring it up and check it. This
-guide takes you from installing the CLI to generating and running your first environment.
+This tutorial takes you from installing `isoloom` to running a small environment (a web server
+and a cache) with Docker Compose, then with the Isothrum runner. It takes about ten minutes.
 
-## Install
+You need:
+
+- `isoloom` ([install it](../../README.md#install));
+- Docker with Compose 2.17 or later, to run the environment;
+- `git`, to fetch the example.
+
+## 1. Get the example
+
+The `hello-stack` example is a complete project: its spec (`isoloom.yml`), the build recipe of
+its web server, its set-up scripts and its checks. Take it from the release that matches your
+`isoloom`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/install.sh | sh
+version="$(isoloom --version | cut -d' ' -f2)"
+git clone --depth 1 --branch "v$version" https://github.com/isoloom/isoloom.git isoloom-src
+cp -R isoloom-src/examples/hello-stack .
+cd hello-stack
 ```
 
-The installer puts the `isoloom` binary on your `PATH`. Release binaries for macOS, Linux and
-Windows are also on the [releases page](https://github.com/isoloom/isoloom/releases). The current
-release is 1.0.9.
+Open `isoloom.yml`. Each machine says what it *is*: an OS, the ports it serves, and an `app:`
+(an image, or a build recipe, plus the `steps` that set up the same machine as a VM). It never
+says how a platform runs it, so there are no `docker:` or `vm:` blocks. The `checks:` say how the
+environment must behave, on every target.
 
-Check it works:
-
-```sh
-isoloom --version
-```
-
-## Write a spec
-
-An environment lives in one `isoloom.yml`. Each machine says what it *is* — an OS plus an `app:`
-(its own image, a build recipe, or an appliance) or a catalogue `service:` — and which networks
-and ports it has. It never says how a platform runs it, so there are no `docker:` or `vm:`
-blocks.
-
-```yaml
-# isoloom.yml
-version: 1
-name: hello
-networks:
-  app: { cidr: 10.60.0.0/24, internet: false }
-machines:
-  web:
-    os: debian@12
-    networks: { app: 10 }
-    ports: { web: { port: 80, protocol: http, publish: 8080 } }
-    app:
-      build: build/web
-      steps: [{ run: provision/web.sh }]
-checks:
-  - name: the page answers
-    http: http://web/
-    expect: 200
-message: |
-  The page answers at {{ machines.web.ports.web.url }}.
-```
-
-The `app:` carries both forms of the machine: on a container target it builds an image from
-`build/web`; on a VM target it runs the same `steps:` natively. The checks are run from inside
-the environment, on every target.
-
-## Validate
+## 2. Validate it
 
 ```sh
 isoloom validate
 ```
 
-`validate` parses the spec, checks every field, and confirms every file it names exists
-(`build/web`, `provision/web.sh`, the check scripts). Problems are printed with a code, the field
-path as written, the line and column, the reason and a fix. See the
-[spec reference](spec.md) for every field.
-
-## Generate
-
-```sh
-isoloom generate                 # every target the spec can be generated for
-isoloom generate --target docker # or just one
+```text
+✓ hello-stack is valid
 ```
 
-Each target's files are written under `.isoloom/<target>/`, ready to run by hand, commit, or hand
-to the runner. `isoloom targets` lists the targets this spec can be generated for, why the others
-can't, and the [tier](targets.md) of each. `isoloom check` fails in CI when the files under
-`.isoloom/` drift from the spec. `isoloom generate` lists what it wrote in `.isoloom/.generated`
-and removes a file of that list it no longer writes (a target the spec no longer allows, a
-machine renamed), which `isoloom check` reports; anything else there (what a runner or its tools
-write) is left alone.
+`validate` checks every field and that every file the spec names exists (`build/web`,
+`provision/web.sh`, the check scripts). A problem is printed with a code, the field's path, its
+line and column, the reason and a fix.
 
-## Run it
+## 3. See where it can run
 
-Isoloom runs nothing itself. To bring the environment up, either run each tool's files directly
-(for the `docker` target, `docker compose -f .isoloom/docker/compose.yml up`), or, on a target
-that writes a run manifest (`.isoloom/<target>/run.json`; [which do](runner.md)), hand it to a
-[runner](runner.md), which brings the environment up, runs the checks and tears it down.
+```sh
+isoloom targets
+```
+
+It lists the targets this spec can be generated for (`docker`, `kubernetes`, `vagrant`,
+`proxmox`, the clouds...), why the others can't take it, and each target's
+[tier](../reference/targets.md#tiers-how-far-a-target-is-proven): how far it has been proven by
+real runs.
+
+## 4. Generate the Compose files
+
+```sh
+isoloom generate --target docker
+```
+
+```text
+✓ .isoloom/docker/compose.yml
+✓ .isoloom/docker/checks/networks.sh
+...
+✓ .isoloom/docker/run.json
+✓ .isoloom/resolved.json
+```
+
+Everything is written under `.isoloom/`. `compose.yml` is a plain Compose file: read it, run it
+by hand, or commit it. `run.json` is the run manifest a runner reads. `isoloom generate` with no
+`--target` writes every target the spec allows.
+
+## 5. Run it with Docker Compose
+
+```sh
+docker compose -f .isoloom/docker/compose.yml up -d --wait
+docker compose -f .isoloom/docker/compose.yml port web 80
+```
+
+The second command prints the address the web server is published on, such as
+`127.0.0.1:52673`. Published ports bind to `127.0.0.1` only, on a free port (set
+`ISOLOOM_PUBLISH_FIXED=1` to use the spec's `publish: 8080`). Open it:
+
+```sh
+curl http://127.0.0.1:52673/
+```
+
+Run the environment's checks, from inside it:
+
+```sh
+docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
+```
+
+```text
+isoloom-check: PASS the page greets
+...
+isoloom-check: END 7 passed, 0 failed
+```
+
+Take it down, volumes included:
+
+```sh
+docker compose -f .isoloom/docker/compose.yml down -v
+```
+
+## 6. Run it with Isothrum
+
+A runner reads `run.json` and does all of the above for you: it checks the tools' versions,
+brings the environment up, waits until it is ready, runs every check (from each machine's
+position too), and removes everything at the end. [Isothrum](https://github.com/Isothrum/isothrum)
+is the reference runner; install it from its releases or with `cargo install --locked
+isothrum-cli`.
+
+```sh
+isothrum up . --target docker
+isothrum check . --target docker
+isothrum down . --target docker
+```
+
+`isothrum up` prints the published URLs and the spec's `message`. `isothrum check` exits 1 when a
+check fails.
+
+## 7. Change it
+
+Edit `isoloom.yml`, for example add a check:
+
+```yaml
+  - name: the cache answers
+    tcp: cache:6379
+```
+
+Then `isoloom validate`, `isoloom generate --target docker` and run it again. In CI,
+`isoloom check` fails when the files under `.isoloom/` no longer match the spec
+([CI guide](ci.md)).
 
 ## Next steps
 
-- [Spec reference](spec.md) — every field, generated from the schema.
-- [Targets and tiers](targets.md) — what each target does, and how far each is proven.
-- [Catalogue services](catalogue.md) — use a packaged service with `service:`, or write an entry.
-- [The runner](runner.md) — the lifecycle a runner drives over a run manifest.
-- [Architecture](../ARCHITECTURE.md) — how the pipeline and the crates fit together.
+- Run the same spec as VMs: [Vagrant](targets/vagrant.md); on a server:
+  [Proxmox](targets/proxmox.md); in a cloud account: [Clouds](targets/cloud.md).
+- Every field: [the spec reference](../spec.md). Every command: [the CLI
+  reference](../reference/cli.md).
+- Use a packaged service instead of your own image: [catalogue services](catalogue.md).
+- Write your own: [the examples](../reference/examples.md) cover networks, reach rules,
+  Windows, gateways and more.

@@ -28,7 +28,7 @@ apply with the module's seal variable on:
 The run manifest carries the seal as an optional `seal` step, left out when empty so other
 manifests stay byte-identical. The seal **fails closed** (a failed seal means the run is not
 ready), and every later operation replays the recorded value, so a later apply can't silently undo
-it. See the [run manifest guide](../runner.md).
+it. See the [run manifest reference](../../reference/run-manifest.md).
 
 ## Consequences
 

@@ -1,0 +1,112 @@
+# Security considerations
+
+What Isoloom does to keep a generated environment as isolated as its spec says, and what you
+decide when you run it. To report a vulnerability: [SECURITY.md](../../.github/SECURITY.md).
+
+## Trust model
+
+- **A spec is code.** Its steps run as root in the machines; `cloud.before` steps and a
+  `cloud-services` module run on the computer that applies them; a playbook step runs whatever it
+  holds. Review a spec, and the scripts it names, as you would a script.
+- **`isoloom` itself runs nothing** from the spec. It reads files and writes files, opens no
+  network connection and starts no program, except `d2`/`dot` for `isoloom graph -o` and Ruby for
+  `isoloom import vagrant`, which evaluates the Vagrantfile it imports (import only Vagrantfiles
+  you trust).
+- **The generated files and the run manifest are trusted input** for whatever runs them: they name
+  the commands that run.
+
+## Secrets never land in a file
+
+A secret or input is declared by name and source (`env`, `file`, Vault, SOPS). Its value is never
+in the spec, a generated file, `resolved.json` or the run manifest: the manifest holds a slot (a
+name and a destination). A runner reads the value at run time and delivers it as the slot says,
+usually as a file in the machine over SSH standard input, never on a command line. Cloud
+credentials reach only the Terraform steps' environment.
+
+Two exceptions are by design, and worth knowing:
+
+- **`user` steps' `password` is a literal**, lab content written into the generated files:
+  hashed (SHA-512 crypt) for Linux users, in clear in the PowerShell that creates a Windows user.
+  A secret or input is refused there. For a real credential, use a catalogue entry's `users`
+  setting with `{ secret }`, or a secret delivered as a file.
+- **Terraform state holds what Terraform makes**: a generated Windows administrator password, the
+  controller's SSH private key. Keep state where only the people who run the environment can read
+  it ([remote state](../guide/remote-terraform-state.md)).
+
+## Published ports
+
+- **Compose**: published on `127.0.0.1` only, on a free port, unless you set
+  `ISOLOOM_PUBLISH_ADDRESS`.
+- **Vagrant**: forwarded ports bind to `127.0.0.1`.
+- **Kubernetes**: a published port is a ClusterIP Service by default; exposing it outside the
+  cluster is your cluster's decision ([Kubernetes](../guide/targets/kubernetes.md)).
+- **Clouds**: reachable only from `allowed_cidr` (below).
+
+## Kubernetes
+
+`reach` and `internet: false` become NetworkPolicies, which only a network plugin that enforces
+them (egress included) applies: on a cluster without one they are silently ignored, and the
+derived checks fail. The pods run with a restricted security context unless a machine asks for
+`privileged` or capabilities; a namespace enforcing the `restricted` Pod Security Standard refuses
+those. Every object is labelled `app.kubernetes.io/managed-by: isoloom`.
+
+## Public IP addresses on cloud VMs
+
+Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: the runner reaches
+the machines over SSH to deliver the project and secrets and to run the checks. Their security
+groups or firewalls accept SSH (22), WinRM (5985, Windows) and the published ports only from
+`allowed_cidr`, which has no default: set it to your address or your egress range. Nothing is
+open to `0.0.0.0/0` inbound. Where policy forbids public addresses, run the environment on
+Proxmox, ESXi or Vagrant, or apply the module from inside the cloud network with your own changes
+on top.
+
+## The egress seal
+
+An `internet: false` network is a guarantee, not a convention. On Compose, the containers have no
+route out and a privileged container on such a network is refused unless it accepts a best-effort
+seal. On the clouds, machines need the internet while they set themselves up, so the runner seals
+the network at the cloud's own level once they are ready (a second apply with `isoloom_sealed`):
+egress is then limited to the environment's networks. The seal fails closed, and every later
+apply keeps it. [ADR 0004](adr/0004-egress-seal.md) explains the design and its one residual
+channel (the cloud's DNS resolver).
+
+## Expiry
+
+A cloud run has an expiry (240 minutes by default, set by the runner): every resource is tagged
+with it, the machines shut themselves down at that time, and a reaper (`isothrum reap`) destroys
+the runs past it. A module applied by hand has no expiry unless you set `expires_at`.
+
+## Proxmox TLS
+
+The Proxmox module's `proxmox_insecure` defaults to `true`, which accepts the server's
+self-signed certificate. It relaxes verification of the Proxmox API endpoint only. With a
+certificate your machines trust, set `proxmox_insecure=false`. Use an API token with a role
+limited to what the module creates ([Proxmox](../guide/targets/proxmox.md#credentials)).
+
+## WinRM
+
+Windows machines are set up over WinRM. Its default is plain HTTP on port 5985 with basic
+authentication, as Vagrant's Windows boxes and cloudbase-init images expect:
+
+- on Vagrant, on the host's private network;
+- on AWS and Azure `cloud-vm`, from `allowed_cidr` only;
+- on Proxmox and ESXi, cloudbase-init opens 5985 at the Windows firewall, on the environment's
+  networks;
+- on `external`, to the hosts you name.
+
+An image whose box answers WinRM over HTTPS takes `winrm: ssl` in the image table (NTLM, the
+certificate not verified), or `winssh` for OpenSSH ([golden images](../guide/golden-images.md)).
+Vagrant's Windows boxes sign in with the well-known `vagrant`/`vagrant` account: keep those VMs
+off networks other people reach.
+
+## Supply chain
+
+- Container images of the catalogue and the OS base images are pinned by digest; Isoloom's helper
+  images are pinned by digest too; Ansible Galaxy collections by `sha256`; the Docker install in
+  VMs uses the official repository with a pinned key.
+- Terraform providers are pinned to a patch range ([tool versions](../reference/tool-versions.md)).
+- `constraints.registries` and `constraints.mirrors` send every pull through your own mirrors
+  ([corporate network](../guide/corporate-network.md)).
+- The release binaries come with checksums, a Sigstore signature, build provenance and an SBOM
+  ([verify a release](../guide/verify-a-release.md)). The crates forbid `unsafe` code, and
+  `cargo deny` checks advisories and licences in CI.

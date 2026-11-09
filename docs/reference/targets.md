@@ -2,7 +2,7 @@
 
 A **target** is one tool Isoloom converts the spec into. The authoritative, always-current grid
 of what each target does with each spec field — and each target's tier with its evidence — is the
-[target matrix](matrix.md), generated from the generators themselves (`isoloom matrix`). This page
+[target matrix](../matrix.md), generated from the generators themselves (`isoloom matrix`). This page
 is the prose around it.
 
 ## The targets
@@ -47,16 +47,16 @@ Two targets fan out:
 A Vagrant run manifest is one file for every provider, chosen when the runner brings it up; the
 cloud targets write one per cloud (`.isoloom/cloud-vm/<cloud>/run.json`). `kubernetes`,
 `hybrid`, `esxi`, `external` and `hosted` write no run manifest yet, and `cloud-services` none
-without `cloud:`: [the runner](runner.md) lists which target has one, and where.
+without `cloud:`: [the run manifest](run-manifest.md) lists which target has one, and where.
 
 ## Tiers: how far a target is proven
 
 Each target sits in a tier that states how far it has been proven. Tiers are worked out from
-recorded real runs, never written by hand, and the [matrix](matrix.md) shows each with its
+recorded real runs, never written by hand, and the [matrix](../matrix.md) shows each with its
 evidence.
 
 - **Tier 1** — proven by a full real run (up, checks, down) from every host OS the target exists
-  on. These are the targets 1.0 commits to.
+  on.
 - **Tier 2** — generated and validated: every generated file passes its format's official
   validator (`cargo xtask verify`), but a full real run from every host isn't yet recorded.
 - **Tier 3** — experimental.
@@ -64,9 +64,23 @@ evidence.
 A later failing run takes a target's Tier 1 back; a target aiming for Tier 1 lists the host OSes
 still pending.
 
+### Tier 1 today
+
+| Target | Proven from |
+|---|---|
+| `docker` | Linux, macOS, Windows |
+| `vagrant` on Hyper-V | Windows |
+| `vagrant` on libvirt | Linux |
+
+Every other target, provider and cloud is Tier 2: its files pass their official validators, and
+some have real runs from one host OS (`proxmox`, `vagrant` on VirtualBox and remote ESXi,
+`docker-vm` on VirtualBox, and `cloud-vm`, `cloud-docker` and `cloud-services` on AWS, from
+macOS). No target is Tier 3. `isoloom targets` shows the tiers of a spec's targets, and
+`isoloom matrix` all of them, with their evidence.
+
 ### What is proven
 
-`isoloom matrix` (and the [target matrix](matrix.md) generated from it) lists each target's tier
+`isoloom matrix` (and the [target matrix](../matrix.md) generated from it) lists each target's tier
 with its evidence: the real runs recorded, from which host OS and when, and the host OSes a target
 aiming for Tier 1 still needs.
 
@@ -75,6 +89,10 @@ matrix, so the published tiers always reflect the evidence.
 
 ## See also
 
-- [Spec reference](spec.md) — the fields each target reads.
-- [The target matrix](matrix.md) — the generated grid and the full tier table.
-- [The runner](runner.md) — how a target's run manifest is executed.
+- [Spec reference](../spec.md) — the fields each target reads.
+- [The target matrix](../matrix.md) — the generated grid and the full tier table.
+- [The run manifest](run-manifest.md) — how a target's run manifest is executed.
+- The guide of each target: [Docker](../guide/targets/docker.md),
+  [Kubernetes](../guide/targets/kubernetes.md), [Vagrant](../guide/targets/vagrant.md),
+  [Proxmox](../guide/targets/proxmox.md), [ESXi](../guide/targets/esxi.md),
+  [clouds](../guide/targets/cloud.md), [existing hosts](../guide/targets/external.md).

@@ -72,8 +72,8 @@ themselves, so it can never claim more than they do.
 
 Isoloom converts; it runs nothing. A runner executes the run manifest, and an app may embed a
 runner behind its own interface. The run manifest is the contract between Isoloom and any runner.
-See the [run manifest guide](docs/runner.md).
+See the [run manifest reference](docs/reference/run-manifest.md).
 
 ## Decisions
 
-Architecture decision records live in [`docs/adr/`](docs/adr/).
+Architecture decision records live in [`docs/explanation/adr/`](docs/explanation/adr/README.md).

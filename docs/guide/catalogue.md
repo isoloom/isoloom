@@ -117,6 +117,6 @@ runner's command line (one taking `up`, `check --json` and `down`),
 
 ## See also
 
-- [Spec reference](spec.md) — `service:`, `with:` and the ports a service machine takes.
-- [Targets and tiers](targets.md) — the forms each target gives a service machine.
+- [Spec reference](../spec.md) — `service:`, `with:` and the ports a service machine takes.
+- [Targets and tiers](../reference/targets.md) — the forms each target gives a service machine.
 - [Getting started](getting-started.md).

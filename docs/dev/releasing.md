@@ -1,106 +1,117 @@
-# Publishing Isoloom
+# Releasing
 
-The Isoloom crates are released to [crates.io](https://crates.io) so that consumers (a runner, an
-app that generates labs, any program built on them) depend on published versions rather than git
-revisions. That way the 1.0 history squash can't break anyone, and each
-consumer upgrades on its own schedule.
+How a maintainer releases Isoloom: the crates to crates.io and the `isoloom` binaries to a GitHub
+release, both from one tag `vX.Y.Z`. Only maintainers push release tags
+([governance](../../.github/GOVERNANCE.md)).
 
-Everything here is licensed Apache-2.0.
+## What a release publishes
 
-## Publishable crates
+| What | Workflow | Where |
+|---|---|---|
+| The 13 published crates | [`publish-crates.yml`](../../.github/workflows/publish-crates.yml) | crates.io, through Trusted Publishing (OIDC, no stored token) |
+| The `isoloom` binaries for five targets, the SBOM, `SHA256SUMS`, its Sigstore signature, build provenance | [`release.yml`](../../.github/workflows/release.yml) | the GitHub release of the tag |
 
-All thirteen library/CLI crates are published, in this dependency order (leaf crates first; each
-crate's dependencies are published before it):
+Both start with the release gate ([`gate.yml`](../../.github/workflows/gate.yml): rustfmt, clippy,
+the tests, the API docs, the quality ratchet). A tag that fails it publishes nothing.
 
-1. `isoloom-spec` — the spec model, parsing, normalization and validation.
-2. `isoloom-manifest` — the run manifest a runner reads.
-3. `isoloom-catalogue` — the embedded service catalogue (depends on spec).
-4. `isoloom-plan` — the target-neutral plan (spec, catalogue).
-5. `isoloom-render` — the shared rendering layer (spec, plan, manifest).
-6. `isoloom-compose` — the Docker Compose backend.
-7. `isoloom-kubernetes` — the Kubernetes backend.
-8. `isoloom-terraform` — the Terraform backends.
-9. `isoloom-vagrant` — the Vagrant backends.
-10. `isoloom-ansible` — the Ansible backend.
-11. `isoloom-targets` — the backend registry, targets, tiers and matrix (depends on every backend).
-12. `isoloom-import` — drafting a spec from existing IaC (spec, plan).
-13. `isoloom` — the command-line tool (spec, targets, import).
+`release.yml` then:
 
-Not published (`publish = false`, the workspace default; each crate opts in with `publish = true`):
+1. checks that the tag is `v` + the workspace version, and takes the release notes from the
+   CHANGELOG's `## [X.Y.Z]` section (it fails when there is none);
+2. builds `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`,
+   `aarch64-apple-darwin` and `x86_64-pc-windows-msvc`, each archive holding the binary,
+   `LICENSE`, `NOTICE`, `README.md` and `THIRD-PARTY-LICENSES.md` (cargo-about);
+3. writes the CycloneDX SBOM (`isoloom.cdx.json`) and `SHA256SUMS`, signs `SHA256SUMS` keylessly
+   with cosign and attests the provenance of every file;
+4. creates the GitHub release, in the `release` environment (where approvals can be required);
+5. installs the published release with `packaging/install.sh` (Linux x86_64 and arm64, macOS) and
+   with the Action (Linux, macOS, Windows), runs it, and checks the signature and the provenance
+   as [verify a release](../guide/verify-a-release.md) says. A failure here means the published
+   release is broken: fix it with a patch release.
 
-- `xtask` — the repo's development tasks; of no use to consumers.
-- `xtask-quality` — the clean-code ratchet behind `cargo xtask quality`; development tooling too.
-- `fuzz` — the fuzz targets; a nightly/libFuzzer workspace, excluded from the main workspace.
+The asset names (`isoloom-<target>.tar.gz`, `.zip` on Windows) are read by `install.sh`, the
+Action, cargo-binstall and the verification guide: change them together.
 
-## The catalogue crate
+## Before the tag
 
-`isoloom-catalogue`'s `build.rs` embeds the repository's top-level `catalogue/` folder. That folder
-lives outside the crate, so it would be missing from a published package and the embedded table
-would be empty. To fix this, the crate carries a directory symlink `catalogue ->
-../../../catalogue`: cargo copies the symlinked files into the package, and `build.rs` falls back
-to that vendored copy (`$CARGO_MANIFEST_DIR/catalogue`) when the repository copy is absent. In the
-repository it still reads the real `catalogue/`, so nothing changes for development.
+1. **Version.** Raise `[workspace.package].version` and every `version` of the
+   `[workspace.dependencies]` path dependencies (crates.io refuses a path dependency without
+   one). The [policies](../reference/policies.md) say which part to raise; CI's `semver` job
+   fails when a supported crate breaks its API without a major.
+2. **CHANGELOG.** Rename `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD`, with breaking items
+   marked **Breaking:** and, for a major, a migration guide under `docs/guide/`. Open a new empty
+   `## [Unreleased]`.
+3. **Generated pages.** `cargo run -q -p isoloom -- docs --spec > docs/spec.md`, the same with
+   `--matrix > docs/matrix.md`, and `docs/reference/cli.md`; `git diff --exit-code docs`.
+4. **Docs that name the version.** The examples in `README.md`, `action.yml`,
+   `packaging/install.sh` and the guides name `vX.Y.Z` where a version is shown: update them for a
+   new major.
+5. **Green CI on `main`** for the commit you tag, including the Compose and Kubernetes runs.
+6. **Dry run** the crates (below) when dependencies or packaging changed.
 
-## Versioning
+## Tag
 
-All crates share one version through `[workspace.package].version`. Bump that single field and
-every crate moves together. The intra-workspace path
-dependencies in `[workspace.dependencies]` each carry `version = "<the workspace version>"`
-(crates.io rejects a bare path dependency); update those to match when you bump.
-
-## Authentication: crates.io Trusted Publishing (OIDC)
-
-No long-lived API token is stored. `publish-crates.yml` authenticates with crates.io
-[Trusted Publishing](https://crates.io/docs/trusted-publishing): the job declares
-`permissions: id-token: write`, the official `rust-lang/crates-io-auth-action` mints a short-lived
-token over GitHub's OIDC at run time, and `cargo publish` uses it for that run only.
-
-**One-time setup by the maintainer, per publishable crate:** on crates.io, open the crate's
-*Settings → Trusted Publishing* and add a GitHub publisher pointing at:
-
-- repository owner/name: `isoloom/isoloom`
-- workflow filename: `publish-crates.yml`
-- environment: `crates-io` (the job runs in that environment)
-
-**First publish of a new crate name.** Trusted Publishing cannot *create* a crate that does not
-exist yet, so the very first publish of each new name must be done manually, once:
-
-```
-cargo login            # paste a token from https://crates.io/settings/tokens
-cargo publish -p <crate>
+```sh
+git tag -a vX.Y.Z -m "Isoloom X.Y.Z"    # -s instead of -a to sign it
+git push origin vX.Y.Z
 ```
 
-after which the crate exists and the Trusted Publisher (added above) handles every later version
-from the workflow. The thirteen crates above are all on crates.io already; only a crate added
-later needs this first manual publish (confirm its name is free first).
+Then watch both workflows. For a major release, move the Action's major tag once the release is
+verified, so `isoloom/isoloom@vX` users get it:
 
-## Release flow
+```sh
+git tag -f vX vX.Y.Z && git push -f origin vX
+```
 
-1. Bump `[workspace.package].version` and the matching `version`s in `[workspace.dependencies]`.
-2. Commit, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. The tag runs `.github/workflows/publish-crates.yml`, which publishes the thirteen crates in
-   order and skips any version already on crates.io (idempotent — safe to re-run after a partial
-   failure). The same tag also runs `release.yml` for the CLI binaries.
-4. Publish Isoloom **before** the crates built on it: they depend on Isoloom's crates (such as
-   `isoloom-spec`, `isoloom-targets` and `isoloom-manifest`) from crates.io at this version.
-5. To publish without a tag, run the **Publish crates** workflow from the Actions tab
-   (`workflow_dispatch`).
+Publish Isoloom **before** the crates built on it (a runner, an app): they depend on Isoloom's
+crates from crates.io at this version.
+
+## The crates
+
+All crates share one version. They are published in dependency order, and the workflow skips any
+crate whose version is already on crates.io, so re-running it after a partial failure is safe:
+
+1. `isoloom-spec`, 2. `isoloom-manifest`, 3. `isoloom-catalogue`, 4. `isoloom-plan`,
+5. `isoloom-render`, 6. `isoloom-compose`, 7. `isoloom-kubernetes`, 8. `isoloom-terraform`,
+9. `isoloom-vagrant`, 10. `isoloom-ansible`, 11. `isoloom-targets`, 12. `isoloom-import`,
+13. `isoloom` (the command line).
+
+Not published (`publish = false`, the workspace default): `xtask`, `xtask-quality` and the fuzz
+workspace.
+
+### Trusted Publishing
+
+No long-lived token is stored. `publish-crates.yml` runs in the `crates-io` environment with
+`id-token: write`; `rust-lang/crates-io-auth-action` exchanges the OIDC token for a short-lived
+crates.io token. Each crate's *Settings → Trusted Publishing* on crates.io names repository
+`isoloom/isoloom`, workflow `publish-crates.yml` and environment `crates-io`.
+
+A **new crate name** can't be created by Trusted Publishing: publish its first version by hand
+(`cargo login`, `cargo publish -p <crate>`), then add the Trusted Publisher.
+
+### The catalogue in a package
+
+`isoloom-catalogue`'s `build.rs` embeds the repository's `catalogue/` folder, which lives outside
+the crate. The crate carries a symlink `catalogue -> ../../../catalogue`: cargo packages the files
+it points at, and `build.rs` reads that copy when the repository's isn't there.
 
 ### Dry run
 
-Every crate can be dry-run locally. The leaf crates verify against crates.io directly; the rest
-depend on sibling Isoloom crates that aren't published yet, so point those at the local checkout
-with a `[patch.crates-io]` passed to cargo (e.g. `cargo --config patch.toml publish --dry-run -p
-<crate>`), where `patch.toml` maps each `isoloom-*` to its path.
-
-```
+```sh
 cargo publish --dry-run -p isoloom-spec
 cargo publish --dry-run -p isoloom-manifest
-# …the remaining crates, in the order above, with the patch
 ```
 
-## The npm / JavaScript side
+The other crates depend on sibling crates not yet on crates.io at the new version: point those at
+the checkout with a `[patch.crates-io]` table passed to cargo
+(`cargo --config patch.toml publish --dry-run -p <crate>`).
 
-Isoloom ships no JavaScript package; it publishes Rust crates only. A program that builds on
-them (a browser bundle compiled to WebAssembly, an app's UI package) is released from its own
-repository, through its own registry.
+To publish the crates without a tag, run **Publish crates** from the Actions tab.
+
+## After the release
+
+- Check the release page: five archives, `isoloom.cdx.json`, `SHA256SUMS`,
+  `SHA256SUMS.sigstore.json`, and the notes.
+- Bump the consumers (Isothrum's `isoloom-*` dependencies) when the run manifest or the supported
+  API changed.
+- A security fix: publish the GitHub security advisory ([SECURITY.md](../../.github/SECURITY.md)).

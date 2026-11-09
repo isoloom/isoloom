@@ -1,6 +1,6 @@
 # Real-host certification CI
 
-These workflows run real labs on real hosts and record tier evidence (`#145`). They are what turns a
+These workflows run real environments on real hosts and record tier evidence. They are what turns a
 target from "generated and validated" (Tier 2) into "proven by real runs" (Tier 1). They are
 **manual only** — `workflow_dispatch` is the sole trigger, with no push, pull_request or schedule,
 matching the manual-only cross-platform decision — and **opt-in**: a job whose runner or credentials
@@ -25,8 +25,8 @@ list. The isothrum workflow certifies the runner binary on the targets it unique
 cloud); it has no tier list of its own and uploads its evidence for a maintainer to record into
 Isoloom's `tiers.json`.
 
-AWS is the only cloud with real runs for 1.0; the other clouds ship generate+validate (Tier 2) and
-get real runs at 1.1, so no Azure/GCP/DigitalOcean/Linode/OCI job is wired.
+AWS is the only cloud with a real-run job; the other clouds are generated and validated (Tier 2),
+and no Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud job is wired yet.
 
 ## Self-hosted runners
 
@@ -113,7 +113,7 @@ the tier list knows it:
 
 | Variable | Meaning |
 |---|---|
-| `REAL_TIERS_HOST` | The host name in `tiers.json`'s `hosts` (`mac`, `jarvis`, `karen`, `friday`, …). Unset means the run is not recorded, only logged. |
+| `REAL_TIERS_HOST` | The host name in `tiers.json`'s `hosts` (`linux-1`, `linux-2`, `macos-arm64`, `windows-11`, …). Unset means the run is not recorded, only logged. |
 | `REAL_TIERS_OS` | The host's OS (`linux`, `macos`, `windows`), used with `--os` to add a host the list does not name yet |
 | `REAL_PROXMOX_SERVER` | The server name recorded for the proxmox run (default `pve-lab`) |
 
