@@ -257,10 +257,10 @@ stable spec format.
   the matrix's `Authored` and `Matrix::cell` are test-only; `isoloom_targets::decision`, the
   matrix's `columns`, `rows`, `Row` and `Cell`, `isoloom_render::configure::supervisor`,
   `isoloom_plan::ansible`, `PortKind::tls`, `isoloom_render::secrets::KEPT_DIR` (and Windows'),
-  the configure libraries' `LIBRARY`, `LIBRARY_PATH` and `library_file`, and
-  `hcl_builder::Template::is_text` are crate-internal; `isoloom_spec::derive`,
-  `isoloom_spec::model::after_drive`, `isoloom_catalogue::value_file` and
-  `isoloom_plan::configure::codename` leave their re-exports.
+  the configure libraries' `LIBRARY`, `LIBRARY_PATH` and `library_file`,
+  `hcl_builder::Template::is_text` and `network::trunks::vms` (the Linux VMs' set-up reads it)
+  are crate-internal; `isoloom_spec::derive`, `isoloom_spec::model::after_drive`,
+  `isoloom_catalogue::value_file` and `isoloom_plan::configure::codename` leave their re-exports.
 
 ## [1.0.9] — 2026-11-08
 

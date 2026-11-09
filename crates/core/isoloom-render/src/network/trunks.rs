@@ -55,7 +55,7 @@ pub fn containers(spec: &Spec) -> Vec<Trunk> {
 
 /// The trunks of the machines run as Linux VMs: each on two or more VLANs of one LAN.
 #[must_use]
-pub fn vms(spec: &Spec) -> Vec<Trunk> {
+pub(crate) fn vms(spec: &Spec) -> Vec<Trunk> {
     of_machines(spec, |m| m.vm.as_ref().is_some_and(|vm| !is_windows(&vm.os)))
 }
 
