@@ -24,6 +24,7 @@ use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{argv, environment, generator, networks, tool};
 
 use super::Cloud;
+use crate::module::manifest::DEFAULT_LIFE_MIN;
 use crate::module::variable::Variable;
 
 pub(crate) use steps::Guest;
@@ -31,9 +32,6 @@ pub(crate) use steps::Guest;
 /// The oldest Terraform the cloud modules take: write-only attributes fed by ephemeral variables
 /// (the secrets' values reach the clouds' stores without landing in the state).
 pub(crate) const TERRAFORM_MIN: &str = "1.11.0";
-
-/// How long a run lives when the embedder sets nothing, in minutes.
-const DEFAULT_LIFE_MIN: u32 = 240;
 
 /// One cloud module's run, as its target describes it.
 #[derive(Debug, Clone)]

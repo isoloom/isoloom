@@ -30,6 +30,7 @@ use isoloom_spec::model::{CloudProvider, CloudServices};
 
 use crate::cloud::Cloud;
 use crate::cloud::manifest::connection;
+use crate::module::manifest::DEFAULT_LIFE_MIN;
 
 /// From `.isoloom/cloud-services/` back to the project folder.
 const ROOT: &str = "../..";
@@ -42,9 +43,6 @@ const INPUTS_FILE: &str = "inputs.tfvars.json";
 
 /// The fixed variables, beside the manifest.
 const VARS_FILE: &str = "terraform.tfvars.json";
-
-/// How long a run lives when the embedder sets nothing, in minutes: the reaper's.
-const DEFAULT_LIFE_MIN: u32 = 240;
 
 /// The most applies again a manifest takes (`Retries`).
 const MAX_RETRIES: u8 = 3;

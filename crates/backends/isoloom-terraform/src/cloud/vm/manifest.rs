@@ -23,10 +23,6 @@ use crate::module::{ident, manifest};
 /// The controller, as the manifest names it.
 const CONTROLLER: &str = "isoloom-controller";
 
-/// How long a machine's set-up may take once the project is in, and the controller's playbooks.
-const SETUP_S: u32 = 2400;
-const PLAYBOOKS_S: u32 = 7200;
-
 /// The output holding `machine`'s public address.
 pub(crate) fn address_output(machine: &str) -> String {
     format!("address_{}", ident(machine).to_ascii_lowercase())
@@ -52,7 +48,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Resu
                 machine: name.to_owned(),
                 address: at(name)?,
                 user: user(mp),
-                setup_s: SETUP_S,
+                setup_s: manifest::SETUP_S,
             })
         })
         .collect::<Result<_, ManifestError>>()?;
@@ -61,7 +57,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Resu
             machine: CONTROLLER.to_owned(),
             address: at(CONTROLLER)?,
             user: (driver.user)(controller::OS).to_owned(),
-            setup_s: PLAYBOOKS_S,
+            setup_s: manifest::PLAYBOOKS_S,
         });
     }
     let machines = machines(env)?;

@@ -17,6 +17,18 @@ use isoloom_render::run_manifest::{addresses, arch, port};
 use crate::machine::vms;
 use crate::module::variable::Variable;
 
+/// How long a run lives when the embedder sets nothing, in minutes: the reaper's.
+pub(crate) const DEFAULT_LIFE_MIN: u32 = 240;
+
+/// How long a machine's set-up may take once it can run (after the apply, the project in).
+pub(crate) const SETUP_S: u32 = 2400;
+
+/// How long the controller's playbooks may take.
+pub(crate) const PLAYBOOKS_S: u32 = 7200;
+
+/// How long a machine may stay out of reach over SSH, once it answered, before the run fails.
+pub(crate) const UNREACHABLE_S: u32 = 600;
+
 /// A step id.
 pub(crate) fn id(text: &str) -> Result<StepId, ManifestError> {
     StepId::parse(text)

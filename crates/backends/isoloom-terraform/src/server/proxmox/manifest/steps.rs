@@ -13,7 +13,7 @@ use isoloom_render::run_manifest::{action_with, check, noted, run, timeout_s};
 
 use super::slots::SEALED;
 use crate::machine::{controller, vms};
-use crate::module::manifest::{id, output, run_var, secs, terraform_env, words};
+use crate::module::manifest::{PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, run_var, secs, terraform_env, words};
 use crate::server::router::check_host;
 
 /// The user every Linux VM and the router let in with the runner's key.
@@ -21,13 +21,6 @@ const USER: &str = "isoloom";
 
 /// Where cloud-init writes the set-up's output: its tail explains a failed step.
 const SETUP_LOG: &str = "/var/log/cloud-init-output.log";
-
-/// How long a machine's set-up may take after the apply, and its controller's playbooks.
-const SETUP_S: u32 = 2400;
-const PLAYBOOKS_S: u32 = 7200;
-
-/// How long a machine may stay out of reach over SSH before the run fails.
-const UNREACHABLE_S: u32 = 600;
 
 /// A `terraform` step running `args` (`init`'s last one names the runner's state): its data
 /// folder in the run's state folder, no prompt, and the values the runner gives the module (its

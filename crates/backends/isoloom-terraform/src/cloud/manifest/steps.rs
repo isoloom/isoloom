@@ -14,14 +14,11 @@ use isoloom_render::steps::PROJECT_DIR;
 
 use super::connection::SEALED;
 use crate::machine::user_data::{DELIVERED, SETUP_LOG};
-use crate::module::manifest::{id, output, run_var, secs, terraform_env, words};
+use crate::module::manifest::{UNREACHABLE_S, id, output, run_var, secs, terraform_env, words};
 
 /// How long the runner retries a machine still booting before the delivery gives up, in
 /// seconds: within the time its set-up waits for the project.
 const BOOT_WAIT_S: u32 = 900;
-
-/// How long a machine may stay out of reach over SSH, once it answered, before the run fails.
-const UNREACHABLE_S: u32 = 600;
 
 /// `0`: the checks derived from the spec are skipped.
 use isoloom_render::run_manifest::DERIVED;
