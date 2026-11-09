@@ -16,7 +16,7 @@
 //!   os: { debian-12: { vagrant: my-org/debian-12 } }
 //!   access: { docker: kalilinux/kali-rolling, vm: kali }
 //! vagrant:
-//!   provider: libvirt     # `isothrum up` passes --provider
+//!   provider: libvirt     # a runner passes --provider
 //! cloud:
 //!   aws: { region: eu-west-1 }
 //!   azure: { region: westeurope }
@@ -43,7 +43,7 @@ pub struct Defaults {
     /// The image table: OS images and the access machine the runner supplies.
     #[serde(default)]
     pub images: Table,
-    /// How `isothrum up` runs Vagrant.
+    /// How a runner runs Vagrant.
     #[serde(default)]
     pub vagrant: Vagrant,
     /// Per cloud (`aws`, `azure`, `gcp`, `digitalocean`, `linode`, `oci`).
@@ -55,7 +55,7 @@ pub struct Defaults {
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Vagrant {
-    /// The provider `isothrum up` asks for (`virtualbox`, `libvirt`, `vmware_desktop`,
+    /// The provider a runner asks for (`virtualbox`, `libvirt`, `vmware_desktop`,
     /// `parallels`, `utm`, `qemu`, `hyperv`, `vmware_esxi`). Default: Vagrant's own choice.
     #[serde(default)]
     pub provider: Option<String>,

@@ -18,7 +18,7 @@ pub struct CloudServices {
     /// The module's variables: any value (a string, number, boolean, list or map). A string
     /// holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the
     /// launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:
-    /// required at `isothrum up`, kept for `isothrum down`.
+    /// required when a runner brings the environment up, kept for taking it down.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[schemars(with = "IndexMap<String, serde_json::Value>")]
     pub vars: IndexMap<String, serde_json::Value>,
@@ -27,15 +27,15 @@ pub struct CloudServices {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub outputs: IndexMap<String, String>,
     /// About what the environment costs per hour while it exists, in US dollars: the author's
-    /// estimate, for whoever runs it. `isothrum up` says it before applying, and the resolved
+    /// estimate, for whoever runs it. A runner can say it before applying, and the resolved
     /// snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a
     /// budget. Isoloom doesn't bill or stop anything by it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hourly_usd: Option<f64>,
     /// Steps run on this machine before Terraform applies the module (a key pair the module
     /// reads, a build): scripts in the project, run in order from the module's copy, with the
-    /// spec's inputs and `env` in their environment. They run at every `isothrum up`: make them
-    /// idempotent.
+    /// spec's inputs and `env` in their environment. They run every time a runner brings the
+    /// environment up: make them idempotent.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub before: Vec<String>,
     /// Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`).
@@ -48,7 +48,7 @@ pub struct CloudServices {
     pub apply_retries: u8,
     /// What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)
     /// that must be on the PATH, or a shell command that must succeed
-    /// (`python3 -c 'import boto3'`). `isothrum up` checks them before applying.
+    /// (`python3 -c 'import boto3'`). A runner checks them before applying.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<String>,
 }

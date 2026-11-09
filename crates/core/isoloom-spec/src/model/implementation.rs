@@ -271,7 +271,7 @@ pub struct Controller {
     #[serde(default)]
     pub resources: Option<Resources>,
     /// Keep it running once provisioning is done (to use it as a jump host). By default it
-    /// halts, keeping its disk: `isothrum check` and `isothrum provision` boot it when they need it.
+    /// halts, keeping its disk: a runner's checks and provisioning boot it when they need it.
     #[serde(default)]
     pub keep_running: bool,
 }

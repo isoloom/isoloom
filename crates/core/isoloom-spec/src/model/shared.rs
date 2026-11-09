@@ -163,8 +163,8 @@ pub struct SharedVolume {
     /// first machine that mounts it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
-    /// Keep its data when the environment is torn down: `isothrum down` leaves it, and the next
-    /// `isothrum up` finds it again (remove it by hand). Docker and Kubernetes; a VM's storage
+    /// Keep its data when the environment is torn down: taking it down leaves it, and the next
+    /// time it is brought up finds it again (remove it by hand). Docker and Kubernetes; a VM's storage
     /// goes with the VM.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub persistent: bool,

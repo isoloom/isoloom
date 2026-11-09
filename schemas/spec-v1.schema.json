@@ -454,7 +454,7 @@
           "description": "A value in a SOPS-encrypted file, decrypted with the `sops` command."
         }
       ],
-      "description": "Where the runner (`isothrum up`) reads a secret's value: one store, written as a map with\none key (`{ env: DB_PASSWORD }`). Another store is a new variant here and a reader of its\nown in the runtime."
+      "description": "Where a runner reads a secret's value: one store, written as a map with\none key (`{ env: DB_PASSWORD }`). Another store is a new variant here and a reader of its\nown in the runtime."
     },
     "SharedVolume": {
       "type": "object",
@@ -466,7 +466,7 @@
         },
         "persistent": {
           "type": "boolean",
-          "description": "Keep its data when the environment is torn down: `isothrum down` leaves it, and the next\n`isothrum up` finds it again (remove it by hand). Docker and Kubernetes; a VM's storage\ngoes with the VM."
+          "description": "Keep its data when the environment is torn down: taking it down leaves it, and the next\ntime it is brought up finds it again (remove it by hand). Docker and Kubernetes; a VM's storage\ngoes with the VM."
         }
       },
       "description": "A volume of the environment, mounted by one machine or several (see [`Spec::volumes`]): one\nnamed volume on Docker, one claim on Kubernetes (its users on its owner's node), and on VMs\nthe owner's directory served over NFS to the others, mounted at their own paths. Declared\nhere, a volume can also outlive the environment (`persistent`) or be one that exists already\n(`external`)."
@@ -3151,7 +3151,7 @@
         },
         "keep_running": {
           "type": "boolean",
-          "description": "Keep it running once provisioning is done (to use it as a jump host). By default it\nhalts, keeping its disk: `isothrum check` and `isothrum provision` boot it when they need it.",
+          "description": "Keep it running once provisioning is done (to use it as a jump host). By default it\nhalts, keeping its disk: a runner's checks and provisioning boot it when they need it.",
           "default": false
         }
       },
@@ -3895,7 +3895,7 @@
         "vars": {
           "type": "object",
           "additionalProperties": true,
-          "description": "The module's variables: any value (a string, number, boolean, list or map). A string\nholding `{{ inputs.NAME }}`, at any depth (`[\"{{ inputs.PLAYER_IP }}/32\"]`), takes the\nlaunch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:\nrequired at `isothrum up`, kept for `isothrum down`."
+          "description": "The module's variables: any value (a string, number, boolean, list or map). A string\nholding `{{ inputs.NAME }}`, at any depth (`[\"{{ inputs.PLAYER_IP }}/32\"]`), takes the\nlaunch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list:\nrequired when a runner brings the environment up, kept for taking it down."
         },
         "outputs": {
           "type": "object",
@@ -3907,14 +3907,14 @@
         "hourly_usd": {
           "type": "number",
           "format": "double",
-          "description": "About what the environment costs per hour while it exists, in US dollars: the author's\nestimate, for whoever runs it. `isothrum up` says it before applying, and the resolved\nsnapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a\nbudget. Isoloom doesn't bill or stop anything by it."
+          "description": "About what the environment costs per hour while it exists, in US dollars: the author's\nestimate, for whoever runs it. A runner can say it before applying, and the resolved\nsnapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a\nbudget. Isoloom doesn't bill or stop anything by it."
         },
         "before": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Steps run on this machine before Terraform applies the module (a key pair the module\nreads, a build): scripts in the project, run in order from the module's copy, with the\nspec's inputs and `env` in their environment. They run at every `isothrum up`: make them\nidempotent."
+          "description": "Steps run on this machine before Terraform applies the module (a key pair the module\nreads, a build): scripts in the project, run in order from the module's copy, with the\nspec's inputs and `env` in their environment. They run every time a runner brings the\nenvironment up: make them idempotent."
         },
         "env": {
           "type": "object",
@@ -3935,7 +3935,7 @@
           "items": {
             "type": "string"
           },
-          "description": "What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)\nthat must be on the PATH, or a shell command that must succeed\n(`python3 -c 'import boto3'`). `isothrum up` checks them before applying."
+          "description": "What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)\nthat must be on the PATH, or a shell command that must succeed\n(`python3 -c 'import boto3'`). A runner checks them before applying."
         }
       },
       "required": [

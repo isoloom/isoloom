@@ -1,4 +1,4 @@
-//! The run manifest, version 0: the contract between Isoloom and the Isothrum runner.
+//! The run manifest, version 0: the contract between Isoloom and a runner.
 //!
 //! Isoloom writes one `run.json` next to a target's generated files; the runner executes it and
 //! reads nothing else. The manifest holds the native commands in order (argv, never a shell), the

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::machine::ScalarSchema;
 use crate::syntax::Mode;
 
-/// Where the runner (`isothrum up`) reads a secret's value: one store, written as a map with
+/// Where a runner reads a secret's value: one store, written as a map with
 /// one key (`{ env: DB_PASSWORD }`). Another store is a new variant here and a reader of its
 /// own in the runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

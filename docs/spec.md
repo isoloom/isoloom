@@ -314,7 +314,7 @@ The machine that holds the data (serves it over NFS on the VM targets). Default:
 
 ### `volumes.*.persistent`
 
-Keep its data when the environment is torn down: `isothrum down` leaves it, and the next `isothrum up` finds it again (remove it by hand). Docker and Kubernetes; a VM's storage goes with the VM.
+Keep its data when the environment is torn down: taking it down leaves it, and the next time it is brought up finds it again (remove it by hand). Docker and Kubernetes; a VM's storage goes with the VM.
 
 - **Type:** boolean
 
@@ -1518,7 +1518,7 @@ Disk in GB, for a VM (default 20).
 
 ### `controller.keep_running`
 
-Keep it running once provisioning is done (to use it as a jump host). By default it halts, keeping its disk: `isothrum check` and `isothrum provision` boot it when they need it.
+Keep it running once provisioning is done (to use it as a jump host). By default it halts, keeping its disk: a runner's checks and provisioning boot it when they need it.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -2150,7 +2150,7 @@ A Terraform root module in the project (a folder holding `.tf` files), used as i
 
 ### `cloud.vars`
 
-The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list: required at `isothrum up`, kept for `isothrum down`.
+The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.PLAYER_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. the user's IP for an allow-list: required when a runner brings the environment up, kept for taking it down.
 
 - **Type:** mapping
 
@@ -2162,13 +2162,13 @@ What the environment exposes, by name: a module output each. Checks and the mess
 
 ### `cloud.hourly_usd`
 
-About what the environment costs per hour while it exists, in US dollars: the author's estimate, for whoever runs it. `isothrum up` says it before applying, and the resolved snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a budget. Isoloom doesn't bill or stop anything by it.
+About what the environment costs per hour while it exists, in US dollars: the author's estimate, for whoever runs it. A runner can say it before applying, and the resolved snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a budget. Isoloom doesn't bill or stop anything by it.
 
 - **Type:** number
 
 ### `cloud.before`
 
-Steps run on this machine before Terraform applies the module (a key pair the module reads, a build): scripts in the project, run in order from the module's copy, with the spec's inputs and `env` in their environment. They run at every `isothrum up`: make them idempotent.
+Steps run on this machine before Terraform applies the module (a key pair the module reads, a build): scripts in the project, run in order from the module's copy, with the spec's inputs and `env` in their environment. They run every time a runner brings the environment up: make them idempotent.
 
 - **Type:** list of strings
 
@@ -2186,6 +2186,6 @@ How many times to apply again when an apply fails (a module that only converges 
 
 ### `cloud.requires`
 
-What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`) that must be on the PATH, or a shell command that must succeed (`python3 -c 'import boto3'`). `isothrum up` checks them before applying.
+What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`) that must be on the PATH, or a shell command that must succeed (`python3 -c 'import boto3'`). A runner checks them before applying.
 
 - **Type:** list of strings
