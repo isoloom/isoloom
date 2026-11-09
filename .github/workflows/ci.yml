@@ -104,7 +104,7 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: cargo test -p isoloom-targets --test determinism
+      - run: cargo test -p isoloom-targets --test targets determinism
       - name: The command line, twice
         run: |
           cargo build -q -p isoloom
@@ -112,15 +112,15 @@ jobs:
             n=$(basename "$e")
             for run in 1 2; do
               rm -rf "$e.isoloom"
-              target/debug/isoloom generate "$e" > /dev/null 2>&1 || true
-              mkdir -p "$RUNNER_TEMP/$run/$n" && cp -R "$e.isoloom" "$RUNNER_TEMP/$run/$n/" 2>/dev/null || true
+              target/debug/isoloom generate "$e" > /dev/null
+              mkdir -p "$RUNNER_TEMP/$run/$n"
+              cp -R "$e.isoloom" "$RUNNER_TEMP/$run/$n/"
             done
           done
-          git checkout -- examples
           diff -r "$RUNNER_TEMP/1" "$RUNNER_TEMP/2"
 
-  # The public API of the crates tools embed (isoloom-spec, isoloom-plan, isoloom-targets,
-  # isoloom-runtime: README, "Using the library"), compared by cargo-semver-checks: with the pull
+  # The public API of the crates tools embed (isoloom-spec, isoloom-plan, isoloom-targets:
+  # README, "Using the library"), compared by cargo-semver-checks: with the pull
   # request's base (what this change does to the API) and with the last release tag (what the
   # next release must bump for), when the crate exists there. Reported in the job summary, with a
   # warning annotation; not enforced: the model's structs mirror the spec and are public with
@@ -146,7 +146,8 @@ jobs:
         run: |
           tag=$(git describe --tags --abbrev=0 --match 'v*')
           compare() { # $1: crate, $2: baseline rev, $3: its label
-            if ! git cat-file -e "$2:crates/$1/Cargo.toml" 2>/dev/null; then
+            # Crates sit in group folders (crates/core/, crates/targets/, ...).
+            if ! git ls-tree -r --name-only "$2" -- crates | grep -E "^crates/([^/]+/)?$1/Cargo.toml\$" > /dev/null; then
               echo "### $1: not in $3, nothing to compare" >> "$GITHUB_STEP_SUMMARY"
               return
             fi
@@ -159,7 +160,7 @@ jobs:
             fi
             cat "$RUNNER_TEMP/semver.txt"
           }
-          for crate in isoloom-spec isoloom-plan isoloom-targets isoloom-runtime; do
+          for crate in isoloom-spec isoloom-plan isoloom-targets; do
             if [ -n "$BASE" ]; then compare "$crate" "$BASE" "the pull request's base"; fi
             compare "$crate" "$tag" "$tag"
           done
@@ -220,7 +221,6 @@ jobs:
         if: always() && steps.down.outcome != 'success'
         run: docker compose -f .isoloom/docker/compose.yml --profile check down -v || true
 
-  # A Compose file, imported, generated and started: the draft runs.
   # The Kubernetes output on a real (throwaway) cluster: built images loaded, the environment
   # applied and Available, then its checks as a Job (segmented's "cache is blocked" proves the
   # network policies are enforced).
@@ -291,6 +291,7 @@ jobs:
           kubectl -n "$NS" describe pods || true
           kubectl -n "$NS" logs --all-containers --prefix -l isoloom.com/machine --tail=50 || true
 
+  # A Compose file, imported, generated and started: the draft runs.
   import:
     runs-on: ubuntu-latest
     steps:
