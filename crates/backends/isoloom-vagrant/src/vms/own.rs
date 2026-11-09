@@ -152,8 +152,7 @@ pub(crate) fn tools(r: &mut Ruby, ctx: &Ctx) {
 fn tool_shell(r: &mut Ruby, ctx: &Ctx, index: usize) {
     let env = ctx.env;
     let link = ctx.links.get(TOOL_SHELL).unwrap_or(&Link::None);
-    let define = crate::ruby::Call::new("config.vm.define").arg(Value::str(TOOL_SHELL));
-    r.block(define, "m", |r| {
+    r.define(TOOL_SHELL, true, |r| {
         r.assign("m.vm.box", Value::str(HELPER_BOX));
         r.assign("m.vm.hostname", Value::str("shell"));
         networks(r, env, |c| c.tool(index));

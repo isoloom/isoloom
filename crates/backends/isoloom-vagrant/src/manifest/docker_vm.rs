@@ -106,7 +106,7 @@ fn vm(env: &Environment, guest: &GuestCompose) -> Result<Machine> {
         cpus: Some(cpus),
         memory_mb: Some(memory_mb),
     });
-    let boot_digest = crate::boot_digest::of(&crate::docker_vm::vagrantfile(env, guest).contents).remove(DEFINE);
+    let boot_digest = crate::boot_digest::of(&crate::docker_vm::boot(env, guest)).remove(DEFINE);
     vm.native = Some(Native::Vagrant {
         vagrant: Name::parse(DEFINE)?,
         vm_names,

@@ -1770,7 +1770,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-iol · docker",
           "vmware_esxi": "cisco-iol-docker"
         },
-        "boot_digest": "sha256:59f405260ff88a685a289f013a136320d985eaa869ee31c798ea255a5c4a745f"
+        "boot_digest": "sha256:786a16485d4366b2f66b12a4cb5c064bfde7c762003069fd27b0ad4a80804a8b"
       }
     },
     {

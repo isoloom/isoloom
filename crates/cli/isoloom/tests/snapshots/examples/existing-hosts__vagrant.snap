@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1608,7 +1607,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "existing-hosts · web",
           "vmware_esxi": "existing-hosts-web"
         },
-        "boot_digest": "sha256:a628a7a067ea1d66c3caf9f20de0c1448387d8ad9c9cb8dd67c5f13c418f8498"
+        "boot_digest": "sha256:1ad936fd463b0702dcb84ade2e97a69d0c5c63f4704566acac789fc85015e4eb"
       },
       "ports": [
         {
@@ -1642,7 +1641,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "existing-hosts · cache",
           "vmware_esxi": "existing-hosts-cache"
         },
-        "boot_digest": "sha256:5a7012e8ade16aee4d1eaa7391dc697047f24d6826596a2715b32b97c3aca726"
+        "boot_digest": "sha256:2a0cb5cf18b06a7fd5dd644f53fec1ba0a29a31e56a954b64767f4dc33422283"
       },
       "ports": [
         {

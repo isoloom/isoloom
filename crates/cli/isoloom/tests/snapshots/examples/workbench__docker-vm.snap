@@ -1674,7 +1674,7 @@ systemctl enable --now isoloom-published.service
           "utm": "workbench · docker",
           "vmware_esxi": "workbench-docker"
         },
-        "boot_digest": "sha256:e7c0e19972abd4fdab80f0b5e9c89975f6fc88bd6bb1b365c764a93f54ccd8a6"
+        "boot_digest": "sha256:6a76953c6ebd2c7c0956f546cd0eccd96af2fcbeed298410bea493ee1feea45c"
       }
     },
     {

@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1805,7 +1804,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · cache",
           "vmware_esxi": "hello-stack-cache"
         },
-        "boot_digest": "sha256:5287a2c074a9e6aa677e20a9fb78f19f40676a9c092d60910ae7a25942a62075"
+        "boot_digest": "sha256:5ac56a5c69cb46086c31c8ce3a6e03e5bd206a2e753832852f627d1f17848481"
       },
       "ports": [
         {
@@ -1839,7 +1838,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · web",
           "vmware_esxi": "hello-stack-web"
         },
-        "boot_digest": "sha256:480ddcd02d2f4edffe1595367744d49322b00db162a462e3eba46c8073c07422"
+        "boot_digest": "sha256:78e1922d0e3b9fd9d8bcbd7dd2962574bb1a67d80cff19eff0a9e1fabe2d2941"
       },
       "ports": [
         {
@@ -1876,7 +1875,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · controller",
           "vmware_esxi": "hello-stack-controller"
         },
-        "boot_digest": "sha256:e7666be7f6c4c47e4c74bae601ca1ca54052d9b82018b7edd017e3dae2059e35"
+        "boot_digest": "sha256:09431de621e080195b18cb6113d13acb7a109ccfd05d08ec3dc7bd16ab3679f4"
       }
     }
   ],

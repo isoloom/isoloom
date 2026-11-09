@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -2308,7 +2307,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · router",
           "vmware_esxi": "pivot-dmz-router"
         },
-        "boot_digest": "sha256:18ac83bb3d1c30a87213e7ed06c4dd1fcd563a55771c197465e917c15aa1407d"
+        "boot_digest": "sha256:5030176a6293047ac61df18711a0bea2070763019d6cdb6a906c2314b39cb166"
       }
     },
     {
@@ -2335,7 +2334,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · gateway",
           "vmware_esxi": "pivot-dmz-gateway"
         },
-        "boot_digest": "sha256:d9c9cd57d5ff9cce85fa535561a5b298d4213c19fdc4ad76d2b5d91dd4e5abba"
+        "boot_digest": "sha256:121fe5e7f63b9180a576886ec2afa273669c8b5e793bd35d5251357348099330"
       },
       "ports": [
         {
@@ -2375,7 +2374,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · app",
           "vmware_esxi": "pivot-dmz-app"
         },
-        "boot_digest": "sha256:ecdb4635e2ec29a280020870c7a337bebc360e25b6a5363f86f71d432295da06"
+        "boot_digest": "sha256:d141a13647aa76ad66b1e2b99f18a06a3ffa6d8198447ca6855cc3a4223b8219"
       },
       "ports": [
         {
@@ -2409,7 +2408,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · db",
           "vmware_esxi": "pivot-dmz-db"
         },
-        "boot_digest": "sha256:7ab610268f3ec648b1e1bdb54a66b2d0a9a8e391b8b318890ffbd3dc96b6d2dc"
+        "boot_digest": "sha256:c05483c5b5a20157ed2e3627173274e9f9cd9b8c045c572db6fb6ad24069ab6d"
       },
       "ports": [
         {
@@ -2444,7 +2443,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "pivot-dmz · user",
           "vmware_esxi": "pivot-dmz-user"
         },
-        "boot_digest": "sha256:ac4e954e3e641db5199efd8e0c2c791a4daa84c65fa22b7451f9bdc9d1e88374"
+        "boot_digest": "sha256:46550d9c5fec8d4ccc3e5f61eb909488880d62aa0ee539b084843930e59e3f7c"
       }
     }
   ],

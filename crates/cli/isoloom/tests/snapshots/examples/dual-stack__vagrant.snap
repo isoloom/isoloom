@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1793,7 +1792,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "dual-stack · router",
           "vmware_esxi": "dual-stack-router"
         },
-        "boot_digest": "sha256:ef06e01227c260ab34c838d89e0a02f4a9c07fcbe82e0edbd2ff1d1abd88127b"
+        "boot_digest": "sha256:7fcc69b8d29ff9aa203f9e7b0657b40c2e4b29e7a774c2c9b07760036da867a9"
       }
     },
     {
@@ -1819,7 +1818,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "dual-stack · web",
           "vmware_esxi": "dual-stack-web"
         },
-        "boot_digest": "sha256:47e2a4c8ce84bf8c344496af6ff0d64dc120a77fee11e259504695802d9b4f2e"
+        "boot_digest": "sha256:1ff7e2561173d5e0630bcb17982ac222d60de448f023cad783b0696b2e64c607"
       },
       "ports": [
         {
@@ -1854,7 +1853,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "dual-stack · user",
           "vmware_esxi": "dual-stack-user"
         },
-        "boot_digest": "sha256:56383e175bd3f2500e42543baf58178eacee7929507f09217b614d142a562a02"
+        "boot_digest": "sha256:04296f107df80af6efa8746b32e518e9bb8f7faea88a85aa8cced935961c4e66"
       }
     }
   ],

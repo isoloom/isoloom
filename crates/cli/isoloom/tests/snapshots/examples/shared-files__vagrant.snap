@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1462,7 +1461,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "shared-files · writer",
           "vmware_esxi": "shared-files-writer"
         },
-        "boot_digest": "sha256:2629095671cf0b10959551deb4992337567085fd4c3532da81e41c271f85af8d"
+        "boot_digest": "sha256:91fc0c982789c9673665f94bb5920175573c115c90ed977ec07136a86f06b89c"
       }
     },
     {
@@ -1488,7 +1487,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "shared-files · reader",
           "vmware_esxi": "shared-files-reader"
         },
-        "boot_digest": "sha256:41d2e3a847a09b5c9d0da1b1948833b3147cfa44710cf8f4d7863dd06ded0e2e"
+        "boot_digest": "sha256:783bd02134a4bfac0404061a5d1efaa2b229fd35a5400b2c53f20d72a8ee75e0"
       }
     }
   ],

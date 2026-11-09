@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1720,7 +1719,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · router",
           "vmware_esxi": "udp-dns-router"
         },
-        "boot_digest": "sha256:bb1538669f3b65e85c9aa4fe965ea0f05b7430f0e1c071c3fb571599a5f80d59"
+        "boot_digest": "sha256:0c981af6cc4ad88f5806866b54f32ebd013fc7c9e15070506f37c95f1890db2b"
       }
     },
     {
@@ -1746,7 +1745,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · dns",
           "vmware_esxi": "udp-dns-dns"
         },
-        "boot_digest": "sha256:8efd365fb2e6cd6dcac1860bc55e534e0a0bb1db35200fdc34bc1138ab147369"
+        "boot_digest": "sha256:c36666614203055cd203d007c1900a484e482033238fa7ba667415d9e7ebbd7d"
       },
       "ports": [
         {
@@ -1792,7 +1791,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns · client",
           "vmware_esxi": "udp-dns-client"
         },
-        "boot_digest": "sha256:5b172f07f6445e04eadc28f42e43e52906c54ff5a46003fc5d3a5c65ff8a63c2"
+        "boot_digest": "sha256:4949ccb68f0ee3412be92cb4d462481923fd0015d91be9f713e57ab7f25e06e9"
       }
     }
   ],

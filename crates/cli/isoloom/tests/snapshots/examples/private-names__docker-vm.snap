@@ -1743,7 +1743,7 @@ systemctl enable --now isoloom-published.service
           "utm": "private-names · docker",
           "vmware_esxi": "private-names-docker"
         },
-        "boot_digest": "sha256:1a99ef1dff7f9616547a1105616911e7eacb2b9026b74b6b64af6212b6443fd5"
+        "boot_digest": "sha256:f786835344116c69a992dd749b4ae77c80a43c611f0aaaac0cbd3728dd51770c"
       }
     },
     {

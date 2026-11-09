@@ -1811,7 +1811,7 @@ systemctl enable --now isoloom-published.service
           "utm": "dual-stack · docker",
           "vmware_esxi": "dual-stack-docker"
         },
-        "boot_digest": "sha256:6933f8c7cfcf3a30c317412b8c63a07f137c64f315c0031d3bda96b19f9f8f8b"
+        "boot_digest": "sha256:03ff21833f3f202f82174b03918fafeba2661c6492c54c58b91823394ac8515b"
       }
     },
     {

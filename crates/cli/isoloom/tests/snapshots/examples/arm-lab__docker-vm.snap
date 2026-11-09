@@ -1680,7 +1680,7 @@ systemctl enable --now isoloom-published.service
           "utm": "arm-lab · docker",
           "vmware_esxi": "arm-lab-docker"
         },
-        "boot_digest": "sha256:244a87d4dda34afa5a051df2c501ea1c6e7457cbb81b227a13024b39bc21ef0d"
+        "boot_digest": "sha256:d5697b52c4ac620b971c31611b54f5393a90d835b955f1faf79a3be0bb56901f"
       }
     },
     {

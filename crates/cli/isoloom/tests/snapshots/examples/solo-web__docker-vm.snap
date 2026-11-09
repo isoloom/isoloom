@@ -1680,7 +1680,7 @@ systemctl enable --now isoloom-published.service
           "utm": "solo-web · docker",
           "vmware_esxi": "solo-web-docker"
         },
-        "boot_digest": "sha256:beb9b8a43b769a309947dbb59dac7eb0f11975dd7d5e629d59f2205534c8b8e7"
+        "boot_digest": "sha256:ae306b246548fbcce025b2a825653cd212c8edb49f9af4edb903b0e88823647c"
       }
     },
     {

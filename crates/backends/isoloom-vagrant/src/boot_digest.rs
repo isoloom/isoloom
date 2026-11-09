@@ -4,110 +4,38 @@
 //! --provision` on a running VM only runs its provisioners. A runner that finds a running VM's
 //! digest changed since it booted reloads it first.
 //!
-//! The digest is of the Vagrantfile Isoloom just wrote, the way its [`Ruby`](crate::ruby::Ruby)
-//! builder lays it out: each `config.vm.define` block of the `Vagrant.configure` block, with the
-//! statements of that block outside every define (what all its VMs share), but every provisioner
-//! (`<var>.vm.provision ...`, its block or heredoc with it) and every comment. A Vagrantfile with
-//! no define has Vagrant's one implicit machine, `default`.
+//! The digest is of the statements the [`Ruby`](crate::ruby::Ruby) builder recorded while it wrote
+//! the Vagrantfile ([`BootStatements`]): those of the VM's `config.vm.define` block, after those of
+//! the `Vagrant.configure` block outside every define (what all its VMs share); never a comment or
+//! a provisioner. A Vagrantfile with no define has Vagrant's one implicit machine, `default`.
 
 use std::collections::BTreeMap;
-use std::iter::Peekable;
 
 use sha2::{Digest, Sha256};
+
+use crate::ruby::BootStatements;
 
 /// Vagrant's name for the one machine of a Vagrantfile with no `config.vm.define`.
 const IMPLICIT: &str = "default";
 
-/// Each VM's boot digest (`sha256:<hex>`), by define name, of `vagrantfile`'s text.
-pub(crate) fn of(vagrantfile: &str) -> BTreeMap<String, String> {
-    let mut body = configure_body(vagrantfile);
-    let mut shared = Vec::new();
-    let mut defines: Vec<(String, Vec<&str>)> = Vec::new();
-    while let Some(line) = body.next() {
-        match define_name(line).filter(|_| indent(line) == 1) {
-            Some(name) => defines.push((name, until_closed(&mut body, 1, "end"))),
-            None => shared.push(line),
-        }
+/// Each VM's boot digest (`sha256:<hex>`), by define name, of what its Vagrantfile applies at
+/// boot.
+pub(crate) fn of(boot: &BootStatements) -> BTreeMap<String, String> {
+    if boot.defines.is_empty() {
+        return BTreeMap::from([(IMPLICIT.to_owned(), digest(&boot.shared, &[]))]);
     }
-    let shared = boot_lines(shared);
-    if defines.is_empty() {
-        return BTreeMap::from([(IMPLICIT.to_owned(), digest(&shared, &[]))]);
-    }
-    defines.into_iter().map(|(name, own)| (name, digest(&shared, &boot_lines(own)))).collect()
+    boot.defines.iter().map(|(name, own)| (name.clone(), digest(&boot.shared, own))).collect()
 }
 
-/// The lines inside `Vagrant.configure("2") do |config|` ... its `end`.
-fn configure_body(vagrantfile: &str) -> impl Iterator<Item = &str> {
-    vagrantfile
-        .lines()
-        .skip_while(|l| !l.starts_with("Vagrant.configure("))
-        .skip(1)
-        .take_while(|l| *l != "end")
-}
-
-/// The lines of `lines` up to the one closing a statement at `depth` (`close` alone at that
-/// depth: `end`, a heredoc's tag), which is consumed too.
-fn until_closed<'a>(lines: &mut impl Iterator<Item = &'a str>, depth: usize, close: &str) -> Vec<&'a str> {
-    lines.take_while(|l| l.is_empty() || indent(l) != depth || l.trim() != close).collect()
-}
-
-/// The define name of `config.vm.define "<name>"...`, if `line` is one.
-fn define_name(line: &str) -> Option<String> {
-    let rest = line.trim_start().strip_prefix("config.vm.define \"")?;
-    Some(rest.split('"').next()?.to_owned())
-}
-
-/// `lines` but blank lines, comments and provisioners (with what they span).
-fn boot_lines(lines: Vec<&str>) -> Vec<&str> {
-    let mut out = Vec::new();
-    let mut lines = lines.into_iter().peekable();
-    while let Some(line) = lines.next() {
-        let code = line.trim_start();
-        if code.is_empty() || code.starts_with('#') {
-            continue;
-        }
-        if is_provisioner(code) {
-            skip_spanned(&mut lines, line);
-        } else {
-            out.push(line);
-        }
-    }
-    out
-}
-
-/// Whether `code` (a statement, unindented) adds a provisioner: `<var>.vm.provision ...`.
-fn is_provisioner(code: &str) -> bool {
-    code.split_once('.')
-        .is_some_and(|(var, rest)| !var.contains(' ') && (rest.starts_with("vm.provision ") || rest == "vm.provision"))
-}
-
-/// Consumes what the statement `head` spans: the deeper lines (a block's body, a heredoc's
-/// script, blank lines among them), then its `end` or its heredoc's tag.
-fn skip_spanned<'a, I: Iterator<Item = &'a str>>(lines: &mut Peekable<I>, head: &str) {
-    let depth = indent(head);
-    while lines.next_if(|l| l.is_empty() || indent(l) > depth).is_some() {}
-    let code = head.trim_end();
-    let close = heredoc_tag(code).or_else(|| (code.ends_with(" do") || code.ends_with('|')).then_some("end"));
-    if let Some(close) = close {
-        lines.next_if(|l| indent(l) == depth && l.trim() == close);
-    }
-}
-
-/// The tag of the heredoc `code` opens (`<<~'SH'`), if it opens one.
-fn heredoc_tag(code: &str) -> Option<&str> {
-    let (_, after) = code.rsplit_once("<<~'")?;
-    after.split('\'').next()
-}
-
-/// The depth of `line`: two spaces a level, as the builder indents.
-fn indent(line: &str) -> usize {
-    (line.len() - line.trim_start_matches(' ').len()) / 2
-}
-
-/// `sha256:<hex>` of the shared lines, then the VM's own, each unindented to its depth.
-fn digest(shared: &[&str], own: &[&str]) -> String {
+/// `sha256:<hex>` of the shared statements, then the VM's own.
+fn digest(shared: &[String], own: &[String]) -> String {
     let mut h = Sha256::new();
-    for l in shared.iter().chain(std::iter::once(&"--")).chain(own) {
+    for l in shared
+        .iter()
+        .map(String::as_str)
+        .chain(std::iter::once("--"))
+        .chain(own.iter().map(String::as_str))
+    {
         h.update(l.as_bytes());
         h.update(b"\n");
     }
@@ -119,74 +47,125 @@ fn digest(shared: &[&str], own: &[&str]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::of;
+    use crate::ruby::{Call, Ruby, Value};
 
-    const TWO: &str = "# header
-ROOT = 1
-Vagrant.configure(\"2\") do |config|
-  config.vm.boot_timeout = 900
-  config.vm.provision \"shell\", inline: \"shared\"
+    /// The words a test varies in [`two`]'s Vagrantfile.
+    struct Words {
+        timeout: u32,
+        shared_script: &'static str,
+        folder: Option<&'static str>,
+        step: &'static str,
+        comment: &'static str,
+    }
 
-  config.vm.define \"web\" do |m|
-    m.vm.box = \"debian\"
-    # a comment
-    m.vm.provider \"utm\" do |_, o|
-      o.vm.synced_folder File.expand_path(\"a\", ROOT), \"/a\", type: \"utm\", create: true
-    end
-    m.vm.provision \"shell\", name: \"one\", inline: <<~'SH'
-      echo one
+    const BASE: Words = Words {
+        timeout: 900,
+        shared_script: "shared",
+        folder: Some("/a"),
+        step: "echo one",
+        comment: "a comment",
+    };
 
-      end
-    SH
-    m.vm.provision \"shell\" do |s|
-      s.inline = \"two\"
-    end
-    m.vm.provision \"checks\", type: \"shell\", run: \"never\"
-  end
-
-  config.vm.define \"db\" do |m|
-    m.vm.box = \"debian\"
-  end
-end
-";
+    /// A Vagrantfile of two VMs, `web` and `db`, written as the generators write theirs, with a
+    /// shared setting and provisioner, and in `web` a comment, a synced folder in a provider block
+    /// and provisioners of every form; its digests.
+    fn two(w: &Words) -> BTreeMap<String, String> {
+        let mut r = Ruby::new();
+        r.assign("ROOT", Value::raw("1"));
+        r.configure(|r| {
+            r.assign("config.vm.boot_timeout", Value::raw(w.timeout.to_string()));
+            r.call(
+                Call::new("config.vm.provision")
+                    .arg(Value::str("shell"))
+                    .kw("inline", Value::str(w.shared_script)),
+            );
+            r.define("web", true, |r| {
+                r.assign("m.vm.box", Value::str("debian"));
+                r.comment(w.comment);
+                if let Some(folder) = w.folder {
+                    r.block(Call::new("m.vm.provider").arg(Value::str("utm")), "_, o", |r| {
+                        r.line(format_args!("o.vm.synced_folder \"a\", \"{folder}\", type: \"utm\", create: true"));
+                    });
+                }
+                r.heredoc(
+                    Call::new("m.vm.provision").arg(Value::str("shell")).kw("name", Value::str("one")),
+                    "inline",
+                    "SH",
+                    w.step,
+                );
+                r.block(Call::new("m.vm.provision").arg(Value::str("shell")), "s", |r| {
+                    r.assign("s.inline", Value::str(w.step));
+                });
+            });
+            r.define("db", true, |r| {
+                r.assign("m.vm.box", Value::str("debian"));
+            });
+        });
+        of(r.boot())
+    }
 
     #[test]
     fn each_define_has_its_own_and_its_provisioners_and_comments_count_for_nothing() {
-        let d = of(TWO);
+        let d = two(&BASE);
         assert_eq!(d.keys().collect::<Vec<_>>(), ["db", "web"]);
         assert!(d["web"].starts_with("sha256:") && d["web"].len() == 7 + 64, "{}", d["web"]);
         assert_ne!(d["web"], d["db"]);
-        let reworded = TWO
-            .replace("echo one", "echo uno")
-            .replace("\"two\"", "\"dos\"")
-            .replace("# a comment", "# another")
-            .replace("inline: \"shared\"", "inline: \"common\"");
-        assert_eq!(of(&reworded), d);
-        // Without its provisioners, web is db plus its shared folder.
-        let bare = TWO.replace(
-            "    m.vm.provider \"utm\" do |_, o|\n      o.vm.synced_folder File.expand_path(\"a\", ROOT), \"/a\", type: \"utm\", create: true\n    end\n",
-            "",
-        );
-        assert_eq!(of(&bare)["web"], d["db"]);
+        let reworded = two(&Words {
+            step: "echo uno",
+            comment: "another",
+            shared_script: "common",
+            ..BASE
+        });
+        assert_eq!(reworded, d);
+        // Without its synced folder (its only boot setting but the box), web is db.
+        assert_eq!(two(&Words { folder: None, ..BASE })["web"], d["db"]);
     }
 
     #[test]
     fn a_boot_setting_changes_its_vm_and_a_shared_one_every_vm() {
-        let d = of(TWO);
-        let folder = of(&TWO.replace("\"/a\"", "\"/b\""));
+        let d = two(&BASE);
+        let folder = two(&Words { folder: Some("/b"), ..BASE });
         assert_ne!(folder["web"], d["web"]);
         assert_eq!(folder["db"], d["db"]);
-        let shared = of(&TWO.replace("boot_timeout = 900", "boot_timeout = 600"));
+        let shared = two(&Words { timeout: 600, ..BASE });
         assert_ne!(shared["web"], d["web"]);
         assert_ne!(shared["db"], d["db"]);
     }
 
     #[test]
     fn a_file_without_a_define_is_vagrants_default_machine() {
-        let one = "Vagrant.configure(\"2\") do |config|\n  config.vm.box = \"x\"\n  config.vm.provision \"docker\", type: \"shell\", inline: \"a\"\nend\n";
-        let d = of(one);
+        let one = |box_name: &str, script: &str| {
+            let mut r = Ruby::new();
+            r.configure(|r| {
+                r.assign("config.vm.box", Value::str(box_name));
+                r.call(
+                    Call::new("config.vm.provision")
+                        .arg(Value::str("docker"))
+                        .kw("type", Value::str("shell"))
+                        .kw("inline", Value::str(script)),
+                );
+            });
+            of(r.boot())
+        };
+        let d = one("x", "a");
         assert_eq!(d.keys().collect::<Vec<_>>(), ["default"]);
-        assert_eq!(of(&one.replace("inline: \"a\"", "inline: \"b\"")), d);
-        assert_ne!(of(&one.replace("\"x\"", "\"y\""))["default"], d["default"]);
+        assert_eq!(one("x", "b"), d);
+        assert_ne!(one("y", "a")["default"], d["default"]);
+    }
+
+    #[test]
+    fn nothing_written_outside_the_configure_block_counts() {
+        let digest = |root: &str| {
+            let mut r = Ruby::new();
+            r.assign("ROOT", Value::raw(root));
+            r.configure(|r| {
+                r.assign("config.vm.box", Value::str("x"));
+            });
+            of(r.boot())
+        };
+        assert_eq!(digest("1"), digest("2"));
     }
 }

@@ -25,8 +25,7 @@ const DOTFILE: &str = "vagrant";
 /// The vagrant target's run manifest for `env`; its message is left empty.
 pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
     let shape = Shape::of(env);
-    let vagrantfile = crate::vms::render(env)?.into_iter().next().map(|f| f.contents).unwrap_or_default();
-    let machines = machines::machines(env, &shape, &crate::boot_digest::of(&vagrantfile))?;
+    let machines = machines::machines(env, &shape, &crate::boot_digest::of(&crate::vms::boot(env)?))?;
     let runners = checks::runners(&shape)?;
     let lifecycle = lifecycle::lifecycle(env, &shape)?;
     Ok(Manifest {

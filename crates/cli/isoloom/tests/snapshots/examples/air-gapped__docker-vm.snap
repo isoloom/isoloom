@@ -1740,7 +1740,7 @@ systemctl enable --now isoloom-published.service
           "utm": "air-gapped · docker",
           "vmware_esxi": "air-gapped-docker"
         },
-        "boot_digest": "sha256:fc630d174863834562653cc9cf09efb82058f19a268fade9bca64e8c32a666d1"
+        "boot_digest": "sha256:6a690b668c8c595dc9e3a9bbe7296cc52873a100d9eac7bb69f7f60acd8c7f4d"
       }
     },
     {

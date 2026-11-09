@@ -1844,7 +1844,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-switch · docker",
           "vmware_esxi": "cisco-switch-docker"
         },
-        "boot_digest": "sha256:dd22ee45738d8e91e8b2b52c95ec43b977aed7a0bbbc79db466a154eae608875"
+        "boot_digest": "sha256:6e7afc725e9da8dc2f8318a4f7b43103f9d6d8c0aa1264b8a20993873b3e3feb"
       }
     },
     {

@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1999,7 +1998,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · router",
           "vmware_esxi": "segmented-router"
         },
-        "boot_digest": "sha256:16cafd4a4c0b1bb9fadc13b6dfe65589f247353fb1cb26827655e51b443bc70e"
+        "boot_digest": "sha256:8ce5d20c944109e6f3dbdaf9440daef8d9f5afcb1bf7ff5974490ec8dacc0e1e"
       }
     },
     {
@@ -2025,7 +2024,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · cache",
           "vmware_esxi": "segmented-cache"
         },
-        "boot_digest": "sha256:00e33f8bc16c1962015d02d041ca7525b7f51e4f7f5f7cd711e365d71db5b271"
+        "boot_digest": "sha256:45afde34c129a0b8edd1039fd298e07c5858b2381158c1ca867cae5b2db0b6ad"
       },
       "ports": [
         {
@@ -2059,7 +2058,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · web",
           "vmware_esxi": "segmented-web"
         },
-        "boot_digest": "sha256:b37884ba8cdf8afcdcd62da3a4cdcf0b74afd27eca29dd95a5dd9eaf46ae6980"
+        "boot_digest": "sha256:b46ddd1b72d5ae16582bcdb47c087fd0c39108f1e8d872ea68383df4a74cc512"
       },
       "ports": [
         {
@@ -2100,7 +2099,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · user",
           "vmware_esxi": "segmented-user"
         },
-        "boot_digest": "sha256:57b988d7c7dbcd90f98fd0983d34cb4f24403d6fad652f49da90cbc27a2e1343"
+        "boot_digest": "sha256:0b25f4900e975ac249963128a968f0bcb1a1b14d2f99fe870232f0e2a64d1e74"
       }
     }
   ],

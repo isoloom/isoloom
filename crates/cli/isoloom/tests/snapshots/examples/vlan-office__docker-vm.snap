@@ -1983,7 +1983,7 @@ systemctl enable --now isoloom-published.service
           "utm": "vlan-office · docker",
           "vmware_esxi": "vlan-office-docker"
         },
-        "boot_digest": "sha256:49913528061a65060b3e12ebb630a5e9e76504aff7a155053aade3cf7feb4ceb"
+        "boot_digest": "sha256:f21c2ffc1d68fcdd19b8509d0bb81b3a609e98efb8531c3862a323831625e7a8"
       }
     },
     {

@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1984,7 +1983,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-windows · iis",
           "vmware_esxi": "configured-windows-iis"
         },
-        "boot_digest": "sha256:e464edc988dd710577d37bee5a412a2b5c604b6f7f32d7fb2dbfd15493824956"
+        "boot_digest": "sha256:1cf52c42b0b942464e55da898eb3d5ae0ec3dfa5663a1ef377b74cb36040eb2f"
       },
       "ports": [
         {
@@ -2021,7 +2020,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-windows · controller",
           "vmware_esxi": "configured-windows-controller"
         },
-        "boot_digest": "sha256:73ee5db98eaec856ea99a9f76d40b868c0f90fedfded220334fcad45bf8d70f7"
+        "boot_digest": "sha256:c86f9bf3b28c60454b99e4bfbc390b4b73ccf7255b4b60a1fb4ba5cf2ac28654"
       }
     }
   ],

@@ -20,7 +20,7 @@ use crate::vms::{Define, Kind, Shape, label, vm_name};
 const LOOPBACK: &str = "127.0.0.1";
 
 /// The Vagrantfile's VMs, in its order, each with its boot digest among `boot_digests` (by define
-/// name, [`crate::boot_digest::of`] the Vagrantfile).
+/// name, [`crate::boot_digest::of`] what its Vagrantfile applies at boot).
 pub(super) fn machines(env: &Environment, shape: &Shape, boot_digests: &BTreeMap<String, String>) -> Result<Vec<Machine>> {
     shape.defines.iter().map(|d| machine(env, d, boot_digests.get(&d.name).cloned())).collect()
 }

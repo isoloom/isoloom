@@ -1805,7 +1805,7 @@ systemctl enable --now isoloom-published.service
           "utm": "shared-files · docker",
           "vmware_esxi": "shared-files-docker"
         },
-        "boot_digest": "sha256:7748ba6c4f884049c5382fc4ecbadbfc9a3a62c4634067c923b36d11876c1274"
+        "boot_digest": "sha256:e1ffbbcbe34174662b462836678dd08216971c4aef637e5df83f5b2c744c2275"
       }
     },
     {

@@ -1896,7 +1896,7 @@ systemctl enable --now isoloom-published.service
           "utm": "hello-stack · docker",
           "vmware_esxi": "hello-stack-docker"
         },
-        "boot_digest": "sha256:af7c5b31670f1fc85cc0b5ddfbf1b8c9e97576e97aabd214fc9f4ab1b7a827df"
+        "boot_digest": "sha256:e5eced74a7948866755d4a94b578f0dcd6b7c2da2d3ede1ad892880ae8b4a7b7"
       }
     },
     {

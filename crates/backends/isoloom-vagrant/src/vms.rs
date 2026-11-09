@@ -58,7 +58,7 @@ use isoloom_spec::model::{Spec, Target};
 
 use crate::backend::capabilities;
 use crate::error::{Error, Result};
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{BootStatements, Call, Ruby, Value};
 use crate::vagrantfile;
 
 /// The folder of the target's files, under [`OUTPUT_DIR`].
@@ -83,12 +83,12 @@ pub(crate) fn project_rb() -> String {
 
 /// Where a Vagrantfile goes and what it carries besides the environment's VMs: `hybrid` writes
 /// its VMs to `.isoloom/hybrid/`, with its Docker host as one more `config.vm.define` block.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) struct Layout<'a> {
     /// The folder under `.isoloom/`.
     pub(crate) dir: &'a str,
-    /// Ruby added at the end of the `configure` block (complete statements, indented for it).
-    pub(crate) extra: &'a str,
+    /// What it writes at the end of the `configure` block, after the VMs.
+    pub(crate) extra: &'a dyn Fn(&mut Ruby),
 }
 
 /// What rendering the VMs needs at hand.
@@ -104,16 +104,25 @@ struct Ctx<'a> {
 
 /// The Vagrantfile of `env` and the check runners it uploads.
 pub(crate) fn render(env: &Environment) -> Result<Files> {
-    render_in(env, &Layout { dir: DIR, extra: "" })
+    Ok(render_in(env, &VAGRANT)?.0)
 }
+
+/// What the Vagrantfile of `env` applies to each VM only when it boots ([`BootStatements`]), as
+/// its builder records it while writing it.
+pub(crate) fn boot(env: &Environment) -> Result<BootStatements> {
+    Ok(render_in(env, &VAGRANT)?.1)
+}
+
+/// The `vagrant` target's layout: its folder, nothing after the VMs.
+const VAGRANT: Layout<'static> = Layout { dir: DIR, extra: &|_| {} };
 
 /// The VMs of `spec` (the `vagrant` target's plan of it) into `layout`: the `hybrid` target's.
 pub(crate) fn render_spec_in(spec: &Spec, layout: &Layout) -> Result<Files> {
-    render_in(&Environment::build(spec, Target::Vagrant, None), layout)
+    Ok(render_in(&Environment::build(spec, Target::Vagrant, None), layout)?.0)
 }
 
-/// [`render`], into `layout`.
-fn render_in(env: &Environment, layout: &Layout) -> Result<Files> {
+/// [`render`], into `layout`, with what its Vagrantfile applies at boot.
+fn render_in(env: &Environment, layout: &Layout) -> Result<(Files, BootStatements)> {
     if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
         return Err(Error::Refused {
             target: Target::Vagrant,
@@ -140,7 +149,7 @@ fn render_in(env: &Environment, layout: &Layout) -> Result<Files> {
     preamble(&mut r, env, layout.dir);
     qemu_preamble(&mut r, env, &links);
     let mut runners = Vec::new();
-    r.block("Vagrant.configure(\"2\")", "config", |r| {
+    r.configure(|r| {
         settings(r, env);
         own::router_vm(r, &ctx);
         let vms = env
@@ -154,14 +163,15 @@ fn render_in(env: &Environment, layout: &Layout) -> Result<Files> {
         if with_controller {
             runners.extend(own::controller_vm(r, &ctx));
         }
-        r.text(layout.extra);
+        (layout.extra)(r);
     });
+    let boot = r.boot().clone();
     let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{}/Vagrantfile", layout.dir),
         contents: r.finish(),
     }];
     files.extend(runners);
-    Ok(files)
+    Ok((files, boot))
 }
 
 /// Before `Vagrant.configure`: how to run it, the constants and helpers the VMs use.

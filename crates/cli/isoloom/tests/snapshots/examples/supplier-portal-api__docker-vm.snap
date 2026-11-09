@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ docker-vm
@@ -1906,7 +1905,7 @@ systemctl enable --now isoloom-published.service
           "utm": "supplier-portal-api · docker",
           "vmware_esxi": "supplier-portal-api-docker"
         },
-        "boot_digest": "sha256:90866f5349f1139428b413ce2b90373c6a03cf23d0b0ee077a78f4ce80c41364"
+        "boot_digest": "sha256:e5437bf6ecd6bf9ee4134bffdb56bcbdce71fbd6e0d6b6e3b0a3e7e51fa4801a"
       }
     },
     {

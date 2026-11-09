@@ -2004,7 +2004,7 @@ systemctl enable --now isoloom-published.service
           "utm": "edge-firewall · docker",
           "vmware_esxi": "edge-firewall-docker"
         },
-        "boot_digest": "sha256:7b2369625451a957213d50aac22efdf180650e29b245b1b63074fc43844e5d34"
+        "boot_digest": "sha256:b91d4645719b955412c356d63e3906d520dbb2ddee4bdd0e79a2b607f31dc237"
       }
     },
     {

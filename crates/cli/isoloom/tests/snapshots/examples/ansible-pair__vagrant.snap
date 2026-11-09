@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1985,7 +1984,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · web",
           "vmware_esxi": "ansible-pair-web"
         },
-        "boot_digest": "sha256:6bb3c2620ec81fad02354c5184a0f5612835cd1603d250f7ef4aaac668e12f36"
+        "boot_digest": "sha256:c8dfa35ed3753662a5d1ce768cc82768cd1f0727ef02deee30ede9f4401b628a"
       },
       "ports": [
         {
@@ -2019,7 +2018,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · cache",
           "vmware_esxi": "ansible-pair-cache"
         },
-        "boot_digest": "sha256:f933c87805e9bf15993089cdf7e987cec6c844a715275c23615f855873d0e214"
+        "boot_digest": "sha256:e814814e6d82085e2178f0930114db7fce867cc4f7d28e6bc9b7669f152f8097"
       },
       "ports": [
         {
@@ -2051,7 +2050,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · controller",
           "vmware_esxi": "ansible-pair-controller"
         },
-        "boot_digest": "sha256:58923aca0d5544831a265f3ecf4f1d6022f83eed392a48a2caf27d55013cee38"
+        "boot_digest": "sha256:66c14b6a0ff1cd701dc03967840624e2a17aebe391f1176500226c4890c0543e"
       }
     }
   ],

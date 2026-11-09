@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1286,7 +1285,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "arm-vm · box",
           "vmware_esxi": "arm-vm-box"
         },
-        "boot_digest": "sha256:3671e3bc3fd7dc4a4cf41f184e12546d98c8f7b7e77a990ec2e01b977155aabd"
+        "boot_digest": "sha256:9332c3d421be8f70027e7666b613ac6aba98755726a988c6ca8834e19dca61d2"
       },
       "ports": [
         {

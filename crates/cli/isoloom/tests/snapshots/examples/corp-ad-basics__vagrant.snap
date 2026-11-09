@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -2126,7 +2125,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · router",
           "vmware_esxi": "corp-ad-basics-router"
         },
-        "boot_digest": "sha256:a1cfb09cde097e38bcb14a2d73861a35b733cdd7591c2e286944034ea506e052"
+        "boot_digest": "sha256:56d30a2785ed34518d755ae6f2f6053ad631bf09fe6b2f6591cb78f2d5c6c26b"
       }
     },
     {
@@ -2153,7 +2152,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:57adb0077379bb85f027c2c425cddd6ab0a2e4796a51d613772d79f9e69a26e0"
+        "boot_digest": "sha256:460df6185345c5bc696f9805e29077fa200f095fb3d2626be7b87f01d5ace4a7"
       },
       "ports": [
         {
@@ -2206,7 +2205,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:d630714398e3f7117bcf33415283c1eca33456fbe78460a7db777d140f3feef1"
+        "boot_digest": "sha256:4cc359b7e159db627d4ba8a2cb0cb84c478ee9a9da7d57cdc778e0948d245e70"
       }
     },
     {
@@ -2233,7 +2232,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:cde50b11cbd40d79dc2c98927f2ed866ad2c52624ae710180e65f1ccaaf3fb34"
+        "boot_digest": "sha256:8bb03330851b0e3a18c45dca4e6761efffbcd7005553ccc340bb9f7392f1b6c4"
       }
     },
     {
@@ -2260,7 +2259,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · web01",
           "vmware_esxi": "corp-ad-basics-web01"
         },
-        "boot_digest": "sha256:1d94305c0b014bf87478c4d246e6ea65777efbb27685fe4c2d384e3bf306f086"
+        "boot_digest": "sha256:512f7a2778715a151df4e5d105e6cc284e463e29fc6e50521c942638bd86b40b"
       },
       "ports": [
         {
@@ -2294,7 +2293,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · controller",
           "vmware_esxi": "corp-ad-basics-controller"
         },
-        "boot_digest": "sha256:372c42099052bc92c8b419712d0eb6818cad9ab19053c35dd42868a5cdabe473"
+        "boot_digest": "sha256:9a0aae77f4e5b359059e4bf8ffe13d34a1e5b4bba4a188936a0fb721023add13"
       }
     }
   ],

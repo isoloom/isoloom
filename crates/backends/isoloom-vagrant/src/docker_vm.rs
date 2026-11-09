@@ -34,7 +34,7 @@ use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::images;
 
 use crate::host_folders::Share;
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{BootStatements, Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
 const DIR: &str = "docker-vm";
@@ -89,6 +89,20 @@ pub(crate) fn host_size(env: &Environment) -> (u32, u32) {
 /// and its checks.
 #[must_use]
 pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
+    GeneratedFile {
+        path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
+        contents: written(env, guest).finish(),
+    }
+}
+
+/// What the Vagrantfile of `env` applies to its VM only when it boots ([`BootStatements`]), as
+/// its builder records it while writing it.
+pub(crate) fn boot(env: &Environment, guest: &GuestCompose) -> BootStatements {
+    written(env, guest).boot().clone()
+}
+
+/// The Vagrantfile of `env`, written.
+fn written(env: &Environment, guest: &GuestCompose) -> Ruby {
     let mut r = Ruby::new();
     r.text(&header("#"));
     r.comment(&format!(
@@ -105,11 +119,8 @@ pub fn vagrantfile(env: &Environment, guest: &GuestCompose) -> GeneratedFile {
     // VM's own SSH forward port from it, so the hash must be defined even when no container port is.
     vagrantfile::chosen_ports(&mut r);
     r.blank();
-    r.block("Vagrant.configure(\"2\")", "config", |r| configure(r, env, guest));
-    GeneratedFile {
-        path: format!("{OUTPUT_DIR}/{DIR}/Vagrantfile"),
-        contents: r.finish(),
-    }
+    r.configure(|r| configure(r, env, guest));
+    r
 }
 
 /// The VM: its box and name, the published ports, its size on every provider, then Docker, SSH

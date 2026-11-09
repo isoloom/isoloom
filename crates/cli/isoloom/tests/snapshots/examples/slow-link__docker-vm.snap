@@ -1773,7 +1773,7 @@ systemctl enable --now isoloom-published.service
           "utm": "slow-link · docker",
           "vmware_esxi": "slow-link-docker"
         },
-        "boot_digest": "sha256:063bd3d409ddc67579cf3a0c1fd19d0d5ec549b7bcdd8670331cd82a802eb752"
+        "boot_digest": "sha256:a26381f58382226a17f508d4f803c2c88049f0a632dbf53aa594b11ba2fc4e62"
       }
     },
     {

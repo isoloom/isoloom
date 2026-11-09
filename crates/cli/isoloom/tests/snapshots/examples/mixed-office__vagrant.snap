@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1564,7 +1563,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · files01",
           "vmware_esxi": "mixed-office-files01"
         },
-        "boot_digest": "sha256:d76c03f9a118e7c000c4fad813284d5d96b037fe458bbc49ea49180fbb7746e7"
+        "boot_digest": "sha256:9e0ebdd29dd37b29c1e31d804d0b5349ab3ae1da606a088cd6c87c8ef3981756"
       },
       "ports": [
         {
@@ -1598,7 +1597,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · intranet",
           "vmware_esxi": "mixed-office-intranet"
         },
-        "boot_digest": "sha256:e1975251e7ffe4dc8780f534d0ec3233ac57259fccfc16def445d1b88d7ebcd1"
+        "boot_digest": "sha256:f8bd21e72d7102381736142c036a8209bf97648bd81a7a71e1e8dbb7dc9050a5"
       },
       "ports": [
         {
@@ -1635,7 +1634,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · controller",
           "vmware_esxi": "mixed-office-controller"
         },
-        "boot_digest": "sha256:99a9a091910013999b9359ac582efae61ff694b4cb3689d1f424504a8fd3b4e3"
+        "boot_digest": "sha256:b6a0b2d11bd02aa544a1d51e3ad111c5d96ffc42accd870e56b2797c70e02da8"
       }
     }
   ],

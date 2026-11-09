@@ -77,11 +77,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
 /// access box) is defined `autostart: false`, so `vagrant up` skips it and the runner hot-adds it.
 pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnce(&mut Ruby)) {
     r.blank();
-    let mut call = Call::new("config.vm.define").arg(Value::str(name));
-    if on_demand {
-        call = call.kw("autostart", false);
-    }
-    r.block(call, "m", body);
+    r.define(name, !on_demand, body);
 }
 
 /// The box and its version and architecture. The access box reads its box from the runner's

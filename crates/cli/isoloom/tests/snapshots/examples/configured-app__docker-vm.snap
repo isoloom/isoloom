@@ -1823,7 +1823,7 @@ systemctl enable --now isoloom-published.service
           "utm": "configured-app · docker",
           "vmware_esxi": "configured-app-docker"
         },
-        "boot_digest": "sha256:94cbe16e33d9f069405f1ac7b10e4c63b8b790e49cc4c968c713fc35b31c7091"
+        "boot_digest": "sha256:0d1fd385026ac1eb460572209307bc5802b7d12044e1a7466906a9237323d13b"
       }
     },
     {

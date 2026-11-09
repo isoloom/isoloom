@@ -16,7 +16,7 @@ use crate::vagrantfile::{self, shell};
 const HOST: &str = "isoloom-docker";
 
 /// One lab network on the host: its interface and the macvlan network on it.
-struct Nic {
+pub(super) struct Nic {
     /// The address Vagrant requires on a private network (the host takes none itself).
     ip: String,
     /// The interface's MAC address, as VirtualBox takes it (`0A15...`).
@@ -29,19 +29,16 @@ struct Nic {
     name: String,
 }
 
-/// The host's `config.vm.define` block, one level deep in the Vagrantfile, after a blank line.
-pub(super) fn block(env: &Environment, containers: &Containers) -> Result<String> {
-    let nics = containers
-        .networks
-        .iter()
-        .enumerate()
-        .map(|(i, net)| nic(env, net, i))
-        .collect::<Result<Vec<_>>>()?;
-    let mut r = Ruby::at_depth(1);
+/// The host's interface on each of the containers' networks.
+pub(super) fn nics(env: &Environment, containers: &Containers) -> Result<Vec<Nic>> {
+    containers.networks.iter().enumerate().map(|(i, net)| nic(env, net, i)).collect()
+}
+
+/// The host's `config.vm.define` block, in the Vagrantfile's configure block, after a blank line.
+pub(super) fn write(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]) {
     r.blank();
     r.comment("The containers' host: on their networks, letting Docker give each its own address there.");
-    r.block(Call::new("config.vm.define").arg(Value::str(HOST)), "m", |r| define(r, env, containers, &nics));
-    Ok(r.finish())
+    r.define(HOST, true, |r| define(r, env, containers, nics));
 }
 
 /// The host's VM: its box, published ports and lab interfaces, its size, then Docker, the

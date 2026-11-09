@@ -1939,7 +1939,7 @@ systemctl enable --now isoloom-published.service
           "utm": "segmented · docker",
           "vmware_esxi": "segmented-docker"
         },
-        "boot_digest": "sha256:3ebe5bacfcbf66e6198e595d251180c883566c76722f7d59c79795c18996b97b"
+        "boot_digest": "sha256:8b7e1dca5457adab5c90a3f30ee0073d510c629094855b12e3326da438ed702f"
       }
     },
     {

@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -2301,7 +2300,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · router",
           "vmware_esxi": "vlan-office-router"
         },
-        "boot_digest": "sha256:adb31b7f0d70e95cad2fb26e2b1abf25e07359738cfd7657c99385fd4956b88e"
+        "boot_digest": "sha256:1c2dcd4a8fa99ee3bec751ebb49cb8ac0a1632d581cc28f6fed175b894ea3fd1"
       }
     },
     {
@@ -2327,7 +2326,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · intranet",
           "vmware_esxi": "vlan-office-intranet"
         },
-        "boot_digest": "sha256:b857b965728a71884d203063ac67e74e4ccaed1c7ea23ad13185754d3c607f83"
+        "boot_digest": "sha256:e432fe1dee4fee869b51d939dc4d0b5d79334c22e12b970a5d1303ecad04bee4"
       },
       "ports": [
         {
@@ -2362,7 +2361,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · staff",
           "vmware_esxi": "vlan-office-staff"
         },
-        "boot_digest": "sha256:94c0ebfd52e43cd07953c81b50375068b35c220a74f320edd1663b2b1ac6d8fe"
+        "boot_digest": "sha256:c8dc20f0897fe67b416ce28d92f3671d302fe3609ac935f0a75606bc312f3bec"
       }
     },
     {
@@ -2388,7 +2387,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · guest",
           "vmware_esxi": "vlan-office-guest"
         },
-        "boot_digest": "sha256:d9c931109f0ffd16791dd865999082db58df674cec7c2732911510061e03a2f0"
+        "boot_digest": "sha256:51f1c8c470f9ee780ddde7a140f83334abc4ce569b9706be4f8a59fc3cebce23"
       }
     },
     {
@@ -2415,7 +2414,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · admin",
           "vmware_esxi": "vlan-office-admin"
         },
-        "boot_digest": "sha256:db181b9da748f27061182d342b90aa289bc38f5f67965565150ebac06ed02877"
+        "boot_digest": "sha256:16de310f5fab71da08783b09f8c812dc52d12cbe958425e40cb91c9ef7e20b75"
       }
     }
   ],

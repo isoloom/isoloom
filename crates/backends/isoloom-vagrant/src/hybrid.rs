@@ -67,8 +67,11 @@ pub fn capabilities() -> Capabilities {
 /// a step it can't run), or a network the containers are on isn't a block of addresses; each
 /// reported as the `hybrid` target's.
 pub fn render(env: &Environment, containers: HybridContainers) -> Result<Files> {
-    let host = host::block(env, &containers)?;
-    let layout = Layout { dir: DIR, extra: &host };
+    let nics = host::nics(env, &containers)?;
+    let layout = Layout {
+        dir: DIR,
+        extra: &|r| host::write(r, env, &containers, &nics),
+    };
     let mut files = vms::render_spec_in(&vms_only(env.spec()), &layout).map_err(|e| e.on(Target::Hybrid))?;
     files.insert(1.min(files.len()), containers.file);
     Ok(files)

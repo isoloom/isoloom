@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -1785,7 +1784,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api · database",
           "vmware_esxi": "supplier-portal-api-database"
         },
-        "boot_digest": "sha256:0b3cb8119ad52d38054815208789b8e3533fbff65d48254d7fd95b13928e7368"
+        "boot_digest": "sha256:01b6fdc21013f8974a4aa0baad0ed95c365e5889417e2908c247043284ed19d6"
       },
       "ports": [
         {
@@ -1819,7 +1818,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api · web",
           "vmware_esxi": "supplier-portal-api-web"
         },
-        "boot_digest": "sha256:eaa621237009c9e4675451ededca8c8fd5fe3ca75103e5e6f6eea51a802d0925"
+        "boot_digest": "sha256:6ac393f69d07c7d8cf9654a21c13a22c0de4246ef962c9f4f342025302630fee"
       },
       "ports": [
         {
@@ -1856,7 +1855,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api · controller",
           "vmware_esxi": "supplier-portal-api-controller"
         },
-        "boot_digest": "sha256:4d6e82a8f33aeb6e3a64f8ce72c2449a4dcf711d7e258fd65f496d3a87700847"
+        "boot_digest": "sha256:b666043a51d0058e2b1fc47a4e3920df50fa5dedb3097f54304a6dd0b2ed8848"
       }
     }
   ],

@@ -1,6 +1,5 @@
 ---
 source: crates/cli/isoloom/tests/example_snapshots.rs
-assertion_line: 240
 ---
 # isoloom targets
 ✓ vagrant
@@ -2103,7 +2102,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · fw",
           "vmware_esxi": "edge-firewall-fw"
         },
-        "boot_digest": "sha256:7e02ad2ce4948889418b56a1cdc67d75fc211d4e9c01846406f838cf7b898706"
+        "boot_digest": "sha256:214463480c61a9094a673d38a31478b166319d3156ae12cadf75784622ac0f01"
       },
       "ports": [
         {
@@ -2137,7 +2136,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · web",
           "vmware_esxi": "edge-firewall-web"
         },
-        "boot_digest": "sha256:1418aaf53d3706c29c8f056b86a19fe059e5097b83eec74ab4a93a57fed9ad00"
+        "boot_digest": "sha256:7e1c71f6293791f7cbb855d7ae18f32c2ef9a2b08a3e960e19d90c258ebfbc61"
       },
       "ports": [
         {
@@ -2171,7 +2170,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · cache",
           "vmware_esxi": "edge-firewall-cache"
         },
-        "boot_digest": "sha256:0f1bb648143f1087fd2d625c3c73be241b5b69af07cf26f412f6772d9aea9a88"
+        "boot_digest": "sha256:5f2e3dbfa9c94491d9fdec97b976fef7d7aa4eaa57217285219af38f5fd69cf2"
       },
       "ports": [
         {
@@ -2206,7 +2205,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · user",
           "vmware_esxi": "edge-firewall-user"
         },
-        "boot_digest": "sha256:6fa0ea5102e362d9c9cc0ad22a3205325ed38f72d3f169eb21a6ce6db0812040"
+        "boot_digest": "sha256:7966b96028525b16ca783906e50eaa4b20d25b19c007ce222abc55bc9c4445ed"
       }
     }
   ],
