@@ -45,6 +45,29 @@ The runner keeps each run's record, lock, event log and pinned host ports under 
 (`~/.isothrum` for the CLI), never in the lab folder. A secret or input value reaches only the
 steps its delivery names, and every sensitive value is masked (`***`) in events, logs and errors.
 
+## The checks
+
+`check` runs the manifest's `checks` in three phases, and a runner keeps to them:
+
+1. **`checks.setup`**, in order: what the check runners need first, such as the stand-in for an
+   access machine the lab brings up on demand (`stand-ins`: the checks that run from its seat run
+   from the stand-in's addresses). A failed set-up step fails the checks: no runner runs, but the
+   teardown still does.
+2. **`checks.runners`**, in order: each runner's step, under its own time limit, prints its
+   results in the `checks.protocol` line format. A runner cut off by its limit runs its
+   `on_timeout` steps (the one-off container it leaves behind removed); the next runner still
+   runs. A check its runner never reported fails.
+3. **`checks.teardown`**, after the runners **whatever happened** — every check passed, one
+   failed, a runner timed out, or the set-up failed. It takes the stand-ins down
+   (`stand-ins-down`), so the access machine they stand in for can take its addresses when it is
+   brought up. A teardown step is a clean-up: Isoloom marks it `failure: tolerate`, so its
+   failure is logged and fails no check (a step's `failure` is `fail` unless it says so).
+
+Compose in a VM (`docker-vm`, `cloud-docker`) has the same steps, each run in the VM through the
+manifest's way in. The docker-vm Vagrantfile's `checks` provisioner, for running the checks without
+a runner, does the same by itself: the stand-ins up, the runners, then the stand-ins down whatever
+the runners found.
+
 ## Secrets and inputs
 
 The spec names secrets and inputs and where each reaches a machine (usually a file); the manifest
