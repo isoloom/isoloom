@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use isoloom_spec::model::Target;
 use isoloom_targets::generate;
-use isoloom_targets::tiers::{self, os_id};
+use isoloom_targets::tiers;
 use serde_json::Value;
 
 use crate::testing::{Outcome, example, file};
@@ -14,7 +14,13 @@ use crate::testing::{Outcome, example, file};
 /// The host OSes of an entry, by name.
 fn exists_on(entries: &[tiers::TierEntry], id: &str) -> Outcome<BTreeSet<String>> {
     let entry = entries.iter().find(|e| e.id() == id).ok_or_else(|| format!("no tier entry `{id}`"))?;
-    Ok(entry.exists_on.iter().map(|o| os_id(*o).to_owned()).collect())
+    // A host OS by the name the tier list and the run manifest write it with.
+    let named = |o| serde_json::to_value(o).ok().and_then(|v| v.as_str().map(str::to_owned));
+    entry
+        .exists_on
+        .iter()
+        .map(|o| named(o).ok_or_else(|| "a host OS without a name".into()))
+        .collect()
 }
 
 #[test]

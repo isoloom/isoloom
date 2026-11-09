@@ -13,8 +13,7 @@ mod literals;
 
 fuzz_target!(|data: &[u8]| {
     let Ok(text) = std::str::from_utf8(data) else { return };
-    let hcl = literals::hcl_string(text).expect("the HCL builder writes any text");
-    assert_eq!(literals::hcl_decode(&hcl).as_deref(), Some(text), "HCL");
+    assert_eq!(literals::hcl_decode(&isoloom_terraform::hcl_quote(text)).as_deref(), Some(text), "HCL");
     assert_eq!(literals::rb_decode(&isoloom_vagrant::ruby_quote(text)).as_deref(), Some(text), "Ruby");
     assert_eq!(literals::sh_decode(&isoloom_spec::shell::quote(text)).as_deref(), Some(text), "sh");
     assert_eq!(

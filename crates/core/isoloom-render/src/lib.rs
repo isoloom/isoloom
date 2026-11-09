@@ -16,8 +16,8 @@
 //!   PowerShell), the scripts kept across restarts ([`boot`]), [`secrets`] delivered at run time,
 //!   the network's [`constraints`], the [`controller`] that runs the playbooks, and the
 //!   [`project`] copied in.
-//! - **The network pieces:** [`router`], VLAN [`trunks`], [`ipv6`] and a VM's
-//!   [`more_addresses`].
+//! - **The network pieces:** [`router`], VLAN [`trunks`], [`ipv6`] and a VM's more
+//!   addresses.
 //! - **The containers' shared parts:** [`container`]; where a check reaches its host:
 //!   [`checks`].
 //! - **The run manifest's pieces** every target's `run.json` is built from: [`run_manifest`].
@@ -61,5 +61,5 @@ pub mod test_support;
 mod testing;
 
 pub use error::{Error, Result};
-pub use network::{ipv6, more_addresses, router, trunks};
+pub use network::{ipv6, router, trunks};
 pub use output::{GeneratedFile, OUTPUT_DIR, header};

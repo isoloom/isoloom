@@ -758,7 +758,6 @@ name = "isoloom-targets"
 version = "1.0.9"
 dependencies = [
  "criterion",
- "hcl-rs",
  "insta",
  "isoloom-ansible",
  "isoloom-compose",

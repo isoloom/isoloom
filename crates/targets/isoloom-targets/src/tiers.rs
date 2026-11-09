@@ -231,7 +231,7 @@ fn shown(run: &Run) -> String {
 
 /// A host OS by the name `tiers.json` and the run manifest write it with.
 #[must_use]
-pub fn os_id(os: HostOs) -> &'static str {
+pub(crate) fn os_id(os: HostOs) -> &'static str {
     match os {
         HostOs::Linux => "linux",
         HostOs::Macos => "macos",

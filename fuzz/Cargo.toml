@@ -28,11 +28,6 @@ isoloom-terraform = { path = "../crates/backends/isoloom-terraform" }
 isoloom-vagrant = { path = "../crates/backends/isoloom-vagrant" }
 isoloom-manifest = { path = "../crates/core/isoloom-manifest" }
 
-# The quoting target reads the HCL builder through the shared literals module
-# (`crates/targets/isoloom-targets/tests/quoting/literals.rs`, by `#[path]`), out of machete's sight.
-[package.metadata.cargo-machete]
-ignored = ["isoloom-terraform"]
-
 [lints.rust]
 missing_docs = "deny"
 unused = { level = "deny", priority = -1 }

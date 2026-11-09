@@ -7,13 +7,13 @@ use super::escape::{quoted_inside, strings_escaped};
 /// A quoted HCL template: text, escaped when written, and expressions, interpolated as
 /// `${...}`. Text can never become an interpolation, whatever it holds.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Template {
+pub(crate) struct Template {
     parts: Vec<Part>,
 }
 
 /// A piece of a template: text, or an interpolated expression.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Piece<'a> {
+pub(crate) enum Piece<'a> {
     /// Text, as it reads (unescaped).
     Text(&'a str),
     /// An expression.
@@ -29,13 +29,13 @@ enum Part {
 impl Template {
     /// An empty template.
     #[must_use]
-    pub fn new() -> Template {
+    pub(crate) fn new() -> Template {
         Template::default()
     }
 
     /// A template made of `text` only.
     #[must_use]
-    pub fn text(text: impl Into<String>) -> Template {
+    pub(crate) fn text(text: impl Into<String>) -> Template {
         let mut t = Template::new();
         t.push_text(text);
         t
@@ -43,20 +43,20 @@ impl Template {
 
     /// The template with `text` appended.
     #[must_use]
-    pub fn with_text(mut self, text: impl Into<String>) -> Template {
+    pub(crate) fn with_text(mut self, text: impl Into<String>) -> Template {
         self.push_text(text);
         self
     }
 
     /// The template with `expr` interpolated at its end.
     #[must_use]
-    pub fn with_expr(mut self, expr: Expression) -> Template {
+    pub(crate) fn with_expr(mut self, expr: Expression) -> Template {
         self.push_expr(expr);
         self
     }
 
     /// Appends `text`.
-    pub fn push_text(&mut self, text: impl Into<String>) {
+    pub(crate) fn push_text(&mut self, text: impl Into<String>) {
         let text = text.into();
         match self.parts.last_mut() {
             Some(Part::Text(t)) => t.push_str(&text),
@@ -66,12 +66,12 @@ impl Template {
     }
 
     /// Appends an interpolation of `expr`.
-    pub fn push_expr(&mut self, expr: Expression) {
+    pub(crate) fn push_expr(&mut self, expr: Expression) {
         self.parts.push(Part::Expr(expr));
     }
 
     /// Appends `other`.
-    pub fn append(&mut self, other: Template) {
+    pub(crate) fn append(&mut self, other: Template) {
         for p in other.parts {
             match p {
                 Part::Text(t) => self.push_text(t),
@@ -81,7 +81,7 @@ impl Template {
     }
 
     /// Its text and expressions, in order (for a caller that writes the template another way).
-    pub fn pieces(&self) -> impl Iterator<Item = Piece<'_>> {
+    pub(crate) fn pieces(&self) -> impl Iterator<Item = Piece<'_>> {
         self.parts.iter().map(|p| match p {
             Part::Text(t) => Piece::Text(t),
             Part::Expr(e) => Piece::Expr(e),
@@ -98,7 +98,7 @@ impl Template {
     /// expression itself when it is one interpolation and nothing else (`"${x}"` is a form
     /// Terraform deprecates for `x`, which it converts where a string is wanted).
     #[must_use]
-    pub fn into_expression(mut self) -> Expression {
+    pub(crate) fn into_expression(mut self) -> Expression {
         if let [Part::Expr(_)] = self.parts.as_slice()
             && let Some(Part::Expr(e)) = self.parts.pop()
         {

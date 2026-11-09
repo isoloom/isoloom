@@ -17,7 +17,7 @@ pub(crate) const WIDTH: usize = 100;
 /// A Terraform file: its preamble (comment lines), then top-level blocks, each with the comment
 /// above it.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Module {
+pub(crate) struct Module {
     preamble: String,
     sections: Vec<Section>,
 }
@@ -32,7 +32,7 @@ impl Module {
     /// A module starting with `preamble`, written as it is (comment lines, each ending with a
     /// newline).
     #[must_use]
-    pub fn new(preamble: impl Into<String>) -> Module {
+    pub(crate) fn new(preamble: impl Into<String>) -> Module {
         Module {
             preamble: preamble.into(),
             sections: Vec::new(),
@@ -40,12 +40,12 @@ impl Module {
     }
 
     /// Adds a top-level block.
-    pub fn block(&mut self, block: Block) {
+    pub(crate) fn block(&mut self, block: Block) {
         self.sections.push(Section::Block { comment: None, block });
     }
 
     /// Adds a top-level block with a comment above it (each line of `comment` becomes a `#` line).
-    pub fn commented(&mut self, comment: &str, block: Block) {
+    pub(crate) fn commented(&mut self, comment: &str, block: Block) {
         self.sections.push(Section::Block {
             comment: Some(comment.to_owned()),
             block,
@@ -53,7 +53,7 @@ impl Module {
     }
 
     /// Adds blocks.
-    pub fn blocks(&mut self, blocks: impl IntoIterator<Item = Block>) {
+    pub(crate) fn blocks(&mut self, blocks: impl IntoIterator<Item = Block>) {
         for b in blocks {
             self.block(b);
         }
@@ -61,7 +61,7 @@ impl Module {
 
     /// Adds a fixed fragment of HCL, written as it is: for the static parts shared with modules
     /// not built here yet (the `.isoloomignore` lists).
-    pub fn fragment(&mut self, hcl: &str) {
+    pub(crate) fn fragment(&mut self, hcl: &str) {
         self.sections.push(Section::Fragment(hcl.trim_matches('\n').to_owned()));
     }
 
@@ -71,7 +71,7 @@ impl Module {
     ///
     /// What `hcl-rs` reports when it can't write an expression (its formatting is documented as
     /// infallible: the error is kept typed rather than assumed away).
-    pub fn render(&self) -> Result<String, hcl::Error> {
+    pub(crate) fn render(&self) -> Result<String, hcl::Error> {
         let mut out = self.preamble.clone();
         for s in &self.sections {
             // A blank line after the preamble and between sections (each ends with a newline).

@@ -7,32 +7,32 @@ use hcl::expr::{
 
 /// A string value (escaped when written).
 #[must_use]
-pub fn string(s: impl Into<String>) -> Expression {
+pub(crate) fn string(s: impl Into<String>) -> Expression {
     Expression::String(s.into())
 }
 
 /// A whole number.
 #[must_use]
-pub fn number(n: u64) -> Expression {
+pub(crate) fn number(n: u64) -> Expression {
     Expression::from(n)
 }
 
 /// `true` or `false`.
 #[must_use]
-pub fn boolean(b: bool) -> Expression {
+pub(crate) fn boolean(b: bool) -> Expression {
     Expression::Bool(b)
 }
 
 /// `null`.
 #[must_use]
-pub fn null() -> Expression {
+pub(crate) fn null() -> Expression {
     Expression::Null
 }
 
 /// A reference by its dotted path: `var.node`, `aws_vpc.env.id`. Each part is an identifier
 /// (resource names come from `res`, which keeps them so).
 #[must_use]
-pub fn reference(path: &str) -> Expression {
+pub(crate) fn reference(path: &str) -> Expression {
     let mut parts = path.split('.');
     let root = Variable::sanitized(parts.next().unwrap_or_default());
     let ops: Vec<TraversalOperator> = parts.map(|p| TraversalOperator::GetAttr(Identifier::sanitized(p))).collect();
@@ -45,25 +45,25 @@ pub fn reference(path: &str) -> Expression {
 
 /// `expr[i]`.
 #[must_use]
-pub fn index(expr: Expression, i: u64) -> Expression {
+pub(crate) fn index(expr: Expression, i: u64) -> Expression {
     Traversal::new(expr, [TraversalOperator::Index(number(i))]).into()
 }
 
 /// `expr["key"]`: a map's entry by its key.
 #[must_use]
-pub fn entry(expr: Expression, key: &str) -> Expression {
+pub(crate) fn entry(expr: Expression, key: &str) -> Expression {
     Traversal::new(expr, [TraversalOperator::Index(string(key))]).into()
 }
 
 /// `expr.name`: an attribute of an expression that isn't a plain path (`list[0].id`).
 #[must_use]
-pub fn attr(expr: Expression, name: &str) -> Expression {
+pub(crate) fn attr(expr: Expression, name: &str) -> Expression {
     Traversal::new(expr, [TraversalOperator::GetAttr(Identifier::sanitized(name))]).into()
 }
 
 /// A function call.
 #[must_use]
-pub fn call(name: &str, args: impl IntoIterator<Item = Expression>) -> Expression {
+pub(crate) fn call(name: &str, args: impl IntoIterator<Item = Expression>) -> Expression {
     let mut c = FuncCall::new(Identifier::sanitized(name));
     c.args = args.into_iter().collect();
     c.into()
@@ -71,7 +71,7 @@ pub fn call(name: &str, args: impl IntoIterator<Item = Expression>) -> Expressio
 
 /// A list.
 #[must_use]
-pub fn list(items: impl IntoIterator<Item = Expression>) -> Expression {
+pub(crate) fn list(items: impl IntoIterator<Item = Expression>) -> Expression {
     Expression::Array(items.into_iter().collect())
 }
 
@@ -80,7 +80,7 @@ const KEYWORDS: [&str; 6] = ["for", "if", "in", "null", "true", "false"];
 
 /// An object, in the order given. A key that is an identifier is written bare, any other quoted.
 #[must_use]
-pub fn object<K: AsRef<str>>(items: impl IntoIterator<Item = (K, Expression)>) -> Expression {
+pub(crate) fn object<K: AsRef<str>>(items: impl IntoIterator<Item = (K, Expression)>) -> Expression {
     let object: Object<ObjectKey, Expression> = items
         .into_iter()
         .map(|(k, v)| {
@@ -97,25 +97,25 @@ pub fn object<K: AsRef<str>>(items: impl IntoIterator<Item = (K, Expression)>) -
 
 /// `cond ? yes : no`.
 #[must_use]
-pub fn conditional(cond: Expression, yes: Expression, no: Expression) -> Expression {
+pub(crate) fn conditional(cond: Expression, yes: Expression, no: Expression) -> Expression {
     Conditional::new(cond, yes, no).into()
 }
 
 /// `lhs <op> rhs`.
 #[must_use]
-pub fn binary(lhs: Expression, op: BinaryOperator, rhs: Expression) -> Expression {
+pub(crate) fn binary(lhs: Expression, op: BinaryOperator, rhs: Expression) -> Expression {
     BinaryOp::new(lhs, op, rhs).into()
 }
 
 /// `!expr`.
 #[must_use]
-pub fn not(expr: Expression) -> Expression {
+pub(crate) fn not(expr: Expression) -> Expression {
     UnaryOp::new(UnaryOperator::Not, expr).into()
 }
 
 /// `[for <var> in <collection> : <value> if <cond>]`.
 #[must_use]
-pub fn for_list(var: &str, collection: Expression, value: Expression, cond: Option<Expression>) -> Expression {
+pub(crate) fn for_list(var: &str, collection: Expression, value: Expression, cond: Option<Expression>) -> Expression {
     let f = ForExpr::new(Identifier::sanitized(var), collection, value);
     match cond {
         Some(c) => f.with_cond_expr(c).into(),

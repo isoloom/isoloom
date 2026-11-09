@@ -34,7 +34,7 @@ mod checks;
 mod cloud;
 mod docker_host;
 mod error;
-pub mod hcl_builder;
+mod hcl_builder;
 mod limits;
 mod machine;
 mod module;
@@ -48,6 +48,14 @@ pub use cloud::docker::{manifests as cloud_docker_manifests, modules as cloud_do
 pub use cloud::services::CloudServicesBackend;
 pub use cloud::vm::{CloudVmBackend, CloudVmModule};
 pub use error::{Error, Result};
+
+/// The HCL string literal the modules hold for `text` (`"..."`: quotes, backslashes and line
+/// breaks escaped, `${` and `%{` made literal), as Vagrant's `ruby_quote` is for Ruby: what the
+/// quoting properties and the fuzz target read back.
+#[must_use]
+pub fn hcl_quote(text: &str) -> String {
+    hcl_builder::quote(text)
+}
 pub use server::esxi::EsxiBackend;
 pub use server::proxmox::ProxmoxBackend;
 pub use server::proxmox::docker_host::{manifest as docker_vm_manifest, module as docker_vm_module};

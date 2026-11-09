@@ -9,7 +9,7 @@ use isoloom_spec::shell::quote;
 /// Shell that puts each further address on the interface holding the primary one. Idempotent
 /// (`replace`): a transport runs it again at every boot and whenever a link comes up.
 #[must_use]
-pub fn linux(addresses: &[MoreAddresses]) -> String {
+pub(crate) fn linux(addresses: &[MoreAddresses]) -> String {
     addresses
         .iter()
         .map(|a| {
@@ -30,7 +30,7 @@ pub fn linux(addresses: &[MoreAddresses]) -> String {
 /// further one added once (Windows keeps them across restarts) and never used as a source, so
 /// the machine's own connections still leave from its primary address.
 #[must_use]
-pub fn windows(addresses: &[MoreAddresses]) -> String {
+pub(crate) fn windows(addresses: &[MoreAddresses]) -> String {
     addresses
         .iter()
         .flat_map(|a| {

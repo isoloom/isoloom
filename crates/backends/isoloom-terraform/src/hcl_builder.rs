@@ -1,5 +1,5 @@
 //! The HCL builder: a Terraform module is built as `hcl-rs` structures ([`Block`],
-//! [`Attribute`], [`Expression`]) and written once.
+//! attributes, [`Expression`]) and written once.
 //!
 //! - Values go in as values: a string is an [`Expression::String`], escaped by `hcl-rs` (quotes,
 //!   backslashes, newlines, and Terraform's `${` and `%{` markers). Text that holds Terraform
@@ -16,12 +16,20 @@ mod expr;
 mod template;
 mod write;
 
-pub use expr::{attr, binary, boolean, call, conditional, entry, for_list, index, list, not, null, number, object, reference, string};
-pub use hcl::expr::BinaryOperator;
-pub use hcl::{Attribute, Block, BlockBuilder, Body, Expression, Structure};
-pub use template::{Piece, Template};
-pub use write::Module;
+pub(crate) use expr::{attr, binary, boolean, call, conditional, entry, for_list, index, list, not, null, number, object, reference, string};
+pub(crate) use hcl::expr::BinaryOperator;
+pub(crate) use hcl::{Block, BlockBuilder, Expression};
+pub(crate) use template::{Piece, Template};
+pub(crate) use write::Module;
+
+/// The literal a module holds for the string `text`.
+pub(crate) fn quote(text: &str) -> String {
+    format!("\"{}\"", escape::quoted_inside(text))
+}
 
 /// Why a module couldn't be written (`hcl-rs` documents formatting as infallible: kept typed
 /// rather than assumed).
-pub type Error = hcl::Error;
+pub(crate) type Error = hcl::Error;
+
+#[cfg(test)]
+mod tests;

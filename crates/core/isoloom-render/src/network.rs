@@ -2,6 +2,6 @@
 //! a VM, and a VM's further addresses on a network.
 
 pub mod ipv6;
-pub mod more_addresses;
+pub(crate) mod more_addresses;
 pub mod router;
 pub mod trunks;

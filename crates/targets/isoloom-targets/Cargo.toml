@@ -31,8 +31,6 @@ thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
-# The quoting properties read the HCL builder's output back with `hcl-rs`'s parser.
-hcl.workspace = true
 proptest.workspace = true
 jsonschema.workspace = true
 criterion.workspace = true
