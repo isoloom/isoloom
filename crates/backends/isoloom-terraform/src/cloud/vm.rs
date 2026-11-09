@@ -240,7 +240,7 @@ impl CloudVmModule {
         let folder = format!("{}/{}", Target::CloudVm.id(), self.0.id());
         let mut m = module::start(&(driver.base.usage)(&folder));
         let (base, windows) = driver.requires;
-        m.block(providers::terraform(&required(env, base, windows)));
+        m.block(providers::terraform(super::manifest::TERRAFORM_MIN, &required(env, base, windows)));
         // Only Terraform's WinRM set-up of a Windows machine still uploads the project (an
         // archive it reads from `local.root`); otherwise the runner delivers it and no local is
         // read.

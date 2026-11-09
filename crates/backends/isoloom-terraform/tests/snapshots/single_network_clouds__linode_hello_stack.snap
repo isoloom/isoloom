@@ -12,7 +12,7 @@ expression: "module(Cloud::Linode, \"hello-stack\")?"
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.11.0"
   backend "local" {}
   required_providers {
     linode = { source = "linode/linode", version = "~> 4.7.0" }

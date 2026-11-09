@@ -511,3 +511,29 @@ fn a_machines_size_follows_one_rule_on_every_target_and_in_the_snapshot() -> Out
     );
     Ok(())
 }
+
+/// Each Terraform module asks for the Terraform its run manifest needs: 1.11 for a cloud's (its
+/// write-only attributes), 1.6 for a server's.
+#[test]
+fn a_module_requires_the_terraform_its_run_manifest_names() -> Outcome {
+    for (target, oldest) in [(Target::CloudDocker, "1.11.0"), (Target::CloudVm, "1.11.0"), (Target::Proxmox, "1.6.0")] {
+        for (name, spec) in examples(target)?.into_iter().take(3) {
+            let files = generate(&spec, target)?;
+            let manifests: Vec<&GeneratedFile> = files.iter().filter(|f| f.path.ends_with("/run.json")).collect();
+            assert!(!manifests.is_empty(), "{name} ({target:?}): no run manifest");
+            for file in manifests {
+                let manifest = isoloom_manifest::parse(&file.contents)?;
+                let terraform = manifest.tools.iter().find(|t| t.name.as_str() == "terraform").ok_or("no terraform tool")?;
+                assert_eq!(terraform.min_version.as_ref().map(|v| v.as_str()), Some(oldest), "{}", file.path);
+                let module = file.path.replace("run.json", "main.tf");
+                assert!(
+                    files
+                        .iter()
+                        .any(|f| f.path == module && f.contents.contains(&format!("required_version = \">= {oldest}\""))),
+                    "{module} doesn't require Terraform {oldest}"
+                );
+            }
+        }
+    }
+    Ok(())
+}

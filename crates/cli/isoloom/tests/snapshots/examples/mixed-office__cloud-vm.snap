@@ -34,7 +34,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.11.0"
   backend "local" {}
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 5.8.0" }

@@ -10,7 +10,7 @@ expression: "esxi(\"dual-stack\")?"
 # Stop:   terraform -chdir=.isoloom/esxi destroy (same variables)
 
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     esxi  = { source = "josenk/esxi", version = "~> 1.10.3" }

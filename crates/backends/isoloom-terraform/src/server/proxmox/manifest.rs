@@ -34,9 +34,6 @@ use crate::Error;
 /// (proven on a Proxmox server).
 const TERRAFORM_IMAGE: &str = "hashicorp/terraform:1.9.8@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd";
 
-/// The oldest Terraform the module takes (its `required_version`).
-const TERRAFORM_MIN: &str = "1.6.0";
-
 /// The run manifest of `env` on Proxmox; its message is left to the caller.
 pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
     build(env).map_err(|source| Error::Manifest {
@@ -90,7 +87,7 @@ pub(super) fn runner_identity() -> Result<Identity, ManifestError> {
 /// Terraform (from its image on macOS) and `ssh`.
 pub(super) fn tools() -> Result<Vec<Tool>, ManifestError> {
     let mut terraform = tool("terraform", argv("terraform", &["version"])?)?;
-    terraform.min_version = Some(Version::parse(TERRAFORM_MIN)?);
+    terraform.min_version = Some(Version::parse(crate::server::TERRAFORM_MIN)?);
     terraform.container = Some(PinnedImage::parse(TERRAFORM_IMAGE)?);
     terraform.container_hosts = BTreeSet::from([HostOs::Macos]);
     Ok(vec![terraform, tool("ssh", argv("ssh", &["-V"])?)?])

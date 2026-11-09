@@ -353,7 +353,7 @@
         {
           "type": "string",
           "const": "terraform",
-          "description": "Terraform (or OpenTofu)."
+          "description": "Terraform (`terraform` on the PATH; OpenTofu is untested)."
         }
       ],
       "description": "The runner driver that implements the manifest's actions, reads its status and clears its leftovers. The native commands themselves are in `lifecycle`."

@@ -11,7 +11,7 @@ expression: "gcp(\"hello-stack\")?"
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.11.0"
   backend "local" {}
   required_providers {
     google = { source = "hashicorp/google", version = "~> 8.5.0" }

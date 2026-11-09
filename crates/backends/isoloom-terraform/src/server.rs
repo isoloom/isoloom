@@ -22,6 +22,9 @@ use crate::module::providers::{self, Provider};
 use crate::module::{ProjectCopy, Usage, inputs};
 use crate::{Result, checks};
 
+/// The oldest Terraform the server modules take (their `required_version`).
+pub(crate) const TERRAFORM_MIN: &str = "1.6.0";
+
 /// What a server target renders: the VM core's features (`machine::FEATURES`), and networks
 /// outside the environment (an existing bridge or port group, `external`, or the server's LAN,
 /// `bridged`) and a machine's own firmware (`vm.boot`, each target refusing what its hypervisor
@@ -99,7 +102,7 @@ pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variable
     if windows::any(env) {
         required.push(providers::RANDOM);
     }
-    m.block(providers::terraform(&required));
+    m.block(providers::terraform(TERRAFORM_MIN, &required));
     m.blocks(variables);
     m.blocks(inputs::variable(env));
     m.block(provider);

@@ -62,7 +62,7 @@ pub enum Driver {
     Compose,
     /// Vagrant.
     Vagrant,
-    /// Terraform (or OpenTofu).
+    /// Terraform (`terraform` on the PATH; OpenTofu is untested).
     Terraform,
 }
 

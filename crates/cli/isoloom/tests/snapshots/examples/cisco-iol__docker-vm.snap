@@ -627,7 +627,7 @@ end
 # Then:   setup.sh piped into `sudo sh -s` over SSH, the project in /opt/isoloom, and Compose (run.json)
 
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     proxmox = { source = "bpg/proxmox", version = "~> 0.115.0" }

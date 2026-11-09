@@ -8,7 +8,7 @@ expression: "proxmox(\"ansible-pair\")?"
 # Stop:   terraform -chdir=.isoloom/proxmox destroy (same variables)
 
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     proxmox = { source = "bpg/proxmox", version = "~> 0.115.0" }

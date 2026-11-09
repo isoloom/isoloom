@@ -49,7 +49,7 @@ pub fn module(env: &Environment, guest: &GuestCompose) -> Result<Vec<GeneratedFi
         after: "# Then:   setup.sh piped into `sudo sh -s` over SSH, the project in /opt/isoloom, and Compose (run.json)\n",
         ..Usage::with_key(&folder, "")
     });
-    m.block(terraform(&[providers::PROXMOX]));
+    m.block(terraform(crate::server::TERRAFORM_MIN, &[providers::PROXMOX]));
     m.blocks(variables().into_iter().map(Variable::block));
     m.block(provider());
     m.commented("The VM's address on the uplink, from the guest agent (not the loopback).", locals());

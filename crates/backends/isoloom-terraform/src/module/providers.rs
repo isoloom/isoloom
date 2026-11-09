@@ -88,13 +88,14 @@ pub(crate) const TIME: Provider = Provider {
     version: "~> 0.14.2",
 };
 
-/// The `terraform` block: Terraform 1.6 or later, a local state, the providers.
-pub(crate) fn terraform(providers: &[Provider]) -> Block {
+/// The `terraform` block: Terraform `oldest` or later (a version, `1.11.0`), a local state, the
+/// providers.
+pub(crate) fn terraform(oldest: &str, providers: &[Provider]) -> Block {
     let required = providers.iter().fold(Block::builder("required_providers"), |b, p| {
         b.add_attribute((p.name, object([("source", string(p.source)), ("version", string(p.version))])))
     });
     Block::builder("terraform")
-        .add_attribute(("required_version", string(">= 1.6")))
+        .add_attribute(("required_version", string(&format!(">= {oldest}"))))
         .add_block(Block::builder("backend").add_label("local").build())
         .add_block(required.build())
         .build()
