@@ -102,7 +102,7 @@ fn own_variables() -> Vec<Variable> {
         Variable::new("slot", "number")
             .default(number(1))
             .describe("1 to 99, unique per environment on this server (SDN ids are short)"),
-        variable::ssh_public_key().default(string("")),
+        variable::ssh_public_key(true).default(string("")),
     ]);
     v
 }

@@ -67,11 +67,12 @@ impl SecretFile {
     }
 }
 
-/// Why a target with no machine to deliver to refuses machine `machine`'s secrets.
+/// Why a target that can't deliver a value at start refuses machine `machine`'s secrets (an
+/// input's file is one): it has no run manifest yet, so nothing would hand the values over.
 pub(crate) fn no_delivery(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` gets `secrets`, and this target has no machine the runner can hand them to"
+        "machine `{machine}` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them"
     )
 }
 

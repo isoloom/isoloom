@@ -93,6 +93,15 @@ stable spec format.
   deliver the project and run the checks"), from one definition: the Proxmox and ESXi modules
   each had their own ("Installed for the user `isoloom`..."). It stays required on the clouds and
   ESXi and empty by default on Proxmox.
+- **`esxi` refuses a secret's or an input's value as a file** (`files: [{ path, secret }]`,
+  `files: [{ path, input }]`): its machine waited for a runner to deliver the value, and ESXi
+  writes no run manifest yet, so the apply failed after half an hour. The capability matrix says
+  ✗ for `files[].secret`, `files[].input` and `files[].uid` on `esxi`.
+- **The files of a target without a run manifest point at the by-hand way, not the runner.**
+  Kubernetes' checks Job and Helm chart say how to pipe an `exec` check into its machine (`kubectl
+  exec -i deploy/<machine> -- sh -s`) and its Secret's usage how to create it; ESXi's
+  `ssh_public_key` says Terraform signs in with it. A check runner's header says what it prints
+  ("each prints a PASS or FAIL line"), not who runs it.
 
 ### Fixed
 

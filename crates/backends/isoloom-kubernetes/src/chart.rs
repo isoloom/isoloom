@@ -1,7 +1,7 @@
 //! The environment as a Helm chart in `.isoloom/kubernetes/chart/`, written from the same
 //! objects as the plain manifests: the namespace is the release's, each machine's image a value
 //! (`images.<machine>`, typed by `values.schema.json`), the inputs a Secret from `inputs.<NAME>`, the checks `helm test` Pods
-//! (the `exec` ones, run inside a machine, stay with the runner's `check`), and the project's scripts
+//! (the `exec` ones run inside a machine, piped in with `kubectl exec`), and the project's scripts
 //! read from `files/project/` (see [`project_copies`](crate::project_copies)).
 //!
 //! The chart's templates are valid YAML before Helm renders them: what Helm fills in is a
@@ -10,7 +10,6 @@
 
 use indexmap::IndexMap;
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::RUNNER;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use serde::Serialize;
 use serde_yaml_ng::Value;
@@ -162,7 +161,7 @@ fn tests(r: &Rendered) -> Result<String> {
             objects.push(Manifest::pod(metadata, j.template.spec.clone()));
         }
     }
-    let about = format!("# The checks: `helm test <release>` runs a Job per position; the `exec` checks, run inside a\n# machine, stay with {RUNNER}.\n");
+    let about = "# The checks: `helm test <release>` runs a Job per position; an `exec` check runs inside its\n# machine: kubectl -n <namespace> exec -i deploy/<machine> -- sh -s < .isoloom/kubernetes/checks/exec-<machine>.sh\n";
     Ok(format!("{}{about}{}", generated(), helm_documents(&objects)?))
 }
 

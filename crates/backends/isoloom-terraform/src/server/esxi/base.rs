@@ -51,7 +51,7 @@ fn variables(env: &Environment) -> Vec<Block> {
             .block(),
         slot(),
         images(env),
-        variable::ssh_public_key().block(),
+        variable::ssh_public_key(false).block(),
         s("ssh_private_key_file")
             .describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router")
             .block(),

@@ -81,7 +81,7 @@ variable "images" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The SSH public key the machines let in: whoever holds its private key signs in, as the runner (run.json) does to deliver the project and run the checks"
+  description = "The SSH public key the machines let in: whoever holds its private key signs in, as Terraform does to set them up (`ssh_private_key_file`), and the checks by hand"
 }
 
 variable "ssh_private_key_file" {

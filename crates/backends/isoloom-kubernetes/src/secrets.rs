@@ -1,5 +1,5 @@
-//! Secrets on Kubernetes: one Secret, `isoloom-secrets`, created in the namespace by
-//! the runner from the secrets' stores (never written in the manifests), and each machine's
+//! Secrets on Kubernetes: one Secret, `isoloom-secrets`, created in the namespace from the
+//! secrets' stores (`kubectl create secret`, never written in the manifests), and each machine's
 //! secrets mounted from it as files, one key at its path.
 //!
 //! A Secret volume's files belong to root: the fields that would give them an owner
@@ -11,7 +11,6 @@
 use isoloom_plan::Environment;
 use isoloom_plan::secrets::{DEFAULT_MODE, SecretFile};
 use isoloom_render::container::PROBE_IMAGE;
-use isoloom_render::run_manifest::RUNNER;
 
 use crate::machine::Machine;
 use crate::objects::{Container, EmptyDir, Image, KeyToPath, Volume, VolumeMount, VolumeSource};
@@ -123,7 +122,7 @@ pub(crate) fn usage(env: &Environment, namespace: &str) -> Option<String> {
     }
     let files: Vec<String> = names.iter().map(|n| format!(" --from-file={n}=<file>")).collect();
     Some(format!(
-        "# Secrets: {RUNNER} creates {SECRETS} from their stores; by hand, once the namespace exists (the pods wait for it):\n#   kubectl -n {namespace} create secret generic {SECRETS}{}\n",
+        "# Secrets: create {SECRETS} from their stores once the namespace exists (the pods wait for it):\n#   kubectl -n {namespace} create secret generic {SECRETS}{}\n",
         files.concat()
     ))
 }

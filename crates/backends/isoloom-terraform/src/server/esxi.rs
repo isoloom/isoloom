@@ -23,8 +23,10 @@
 //! - The host, its datastore, the uplink port group and a `slot` (unique per environment on
 //!   the host: it names the vSwitches and the VMs, and makes the MACs) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`): the `machines`
-//!   output gives their addresses, and the runner pipes the check runners in
-//!   `.isoloom/esxi/checks/<position>.sh` to them.
+//!   output gives their addresses, and the check runners in
+//!   `.isoloom/esxi/checks/<position>.sh` are piped to them (the module's usage says how).
+//! - Secrets and inputs as files are refused: a machine would wait for a runner to deliver them,
+//!   and ESXi has no run manifest yet.
 
 mod base;
 mod boot;
@@ -36,7 +38,7 @@ mod outside;
 mod router;
 mod windows;
 
-use isoloom_plan::{Capabilities, Environment};
+use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
@@ -136,9 +138,10 @@ impl Backend for EsxiBackend {
 
     /// What a server target gives (`crate::server::features`): the router, the controller, the
     /// machines' own steps and the provider. The rest (own images, TPM, GPUs, nesting, rate
-    /// limits, which the provider has no setting for) is refused.
+    /// limits, which the provider has no setting for) is refused, and so are secrets and inputs
+    /// as files: a machine waits for a runner to deliver them, and ESXi has no run manifest yet.
     fn capabilities(&self) -> Capabilities {
-        Capabilities::of(super::features())
+        Capabilities::of(super::features().filter(|f| !matches!(f, Feature::Secrets | Feature::SecretOwners)))
     }
 
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {

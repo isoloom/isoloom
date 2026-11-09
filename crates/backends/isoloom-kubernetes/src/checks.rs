@@ -7,7 +7,6 @@ use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::container::{CHECK_IMAGE, exec_runner};
-use isoloom_render::run_manifest::RUNNER;
 
 use crate::error::Result;
 use crate::kustomize::{CHECK_SCRIPTS, Kustomization, key};
@@ -152,7 +151,7 @@ pub(crate) fn files(c: &Checks, namespace: &str) -> Result<Vec<GeneratedFile>> {
     let mut out: Vec<GeneratedFile> = c.files.iter().map(|(n, text)| file(n, text.clone())).collect();
     let names: Vec<&str> = c.jobs.iter().map(|j| j.metadata.name.as_str()).collect();
     let usage = format!(
-        "# The environment's checks, one Job per position. Run after the environment, or through {RUNNER}:\n#   kubectl -n {namespace} delete job {names} --ignore-not-found\n#   kubectl apply -k .isoloom/kubernetes/checks\n#   kubectl -n {namespace} wait --for=condition=complete job --all --timeout=300s; kubectl -n {namespace} logs -l {CHECK_LABEL}\n",
+        "# The environment's checks, one Job per position. Run after the environment:\n#   kubectl -n {namespace} delete job {names} --ignore-not-found\n#   kubectl apply -k .isoloom/kubernetes/checks\n#   kubectl -n {namespace} wait --for=condition=complete job --all --timeout=300s; kubectl -n {namespace} logs -l {CHECK_LABEL}\n",
         names = names.join(" ")
     );
     out.push(file("job.yaml", format!("{}{usage}{}", generated(), documents(&c.jobs)?)));

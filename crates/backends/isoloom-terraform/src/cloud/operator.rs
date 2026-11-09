@@ -22,7 +22,7 @@ pub(crate) fn usage(folder: &str) -> Usage<'_> {
 pub(crate) fn host_reaching() -> Vec<Variable> {
     vec![
         Variable::new("allowed_cidr", "string").describe("Who may reach the machines (SSH and the published ports), e.g. your IP/32"),
-        variable::ssh_public_key(),
+        variable::ssh_public_key(true),
         expires_at(),
     ]
 }

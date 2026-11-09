@@ -98,11 +98,10 @@ fn esxi_dual_stack() -> Outcome {
 
 /// What no example has on ESXi: a machine's own firmware, a network's MTU, bridged networks
 /// (on a NIC of their own, tagged, and on the host's own vSwitch by DHCP), an existing port
-/// group, secrets, and data disks, one of them raw.
+/// group, and data disks, one of them raw. (Secrets are refused: ESXi has no run manifest yet.)
 const LAB: &str = "
 version: 1
 name: lab
-secrets: { db-password: { env: DB_PASSWORD } }
 networks:
   lan: { cidr: 10.30.0.0/24, mtu: 9000 }
   office: { cidr: 192.168.10.0/24, bridged: { interface: vmnic1, vlan: 20 } }
@@ -111,7 +110,7 @@ networks:
 machines:
   web:
     networks: { lan: 10, office: 10, home: 0, corp: 5 }
-    files: [{ path: /run/secrets/db-password, secret: db-password }]
+    files: [{ path: /etc/motd, content: web }]
     disks: { data: { size_gb: 20, mount: /data }, scratch: { size_gb: 5, fs: raw } }
     os: debian@12
     app: { steps: [{ run: s.sh }] }

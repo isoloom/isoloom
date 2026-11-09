@@ -82,3 +82,20 @@ fn windows_and_ipv6_are_hosted_within_limits() {
     assert!(no_image.contains("no ESXi image for `kali`"), "{no_image}");
     assert_eq!(EsxiBackend.refusal(&env(PAIR)), None);
 }
+
+/// A secret's or an input's value as a file is refused: the machine would wait for a runner to
+/// deliver it, and ESXi has no run manifest yet. A file written in the spec is not.
+#[test]
+fn secrets_and_inputs_as_files_are_refused() {
+    let secret = ("secrets: { token: { env: TOKEN } }", "{ path: /etc/token, secret: token }");
+    let input = ("inputs: [TOKEN]", "{ path: /etc/token, input: TOKEN }");
+    for (top, file) in [secret, input] {
+        let spec = format!(
+            "version: 1\nname: s\n{top}\nnetworks: {{ lan: {{ cidr: 10.20.1.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12, files: [{file}] }}\n"
+        );
+        let why = EsxiBackend.refusal(&env(&spec)).unwrap();
+        assert!(why.contains("writes no run manifest"), "{why}");
+    }
+    let written = "version: 1\nname: s\nnetworks: { lan: { cidr: 10.20.1.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, files: [{ path: /etc/motd, content: hi }] }\n";
+    assert_eq!(EsxiBackend.refusal(&env(written)), None);
+}
