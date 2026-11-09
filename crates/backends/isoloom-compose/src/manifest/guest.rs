@@ -16,7 +16,7 @@ use isoloom_render::{OUTPUT_DIR, steps};
 use super::Project;
 use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
 
-use super::checks::{Planned, planned, stand_ins};
+use super::checks::{Planned, inside, planned, stand_ins};
 use super::lifecycle::{self, ready};
 use super::machines::{Member, classify, machines};
 use super::slots::{Starts, slots};
@@ -134,13 +134,12 @@ fn runners(env: &Environment, vm: &InVm) -> Result<(Vec<GuestRunner>, Vec<StepId
         derived.push(runner.command.id.clone());
         out.push(runner);
         if let Some((machine, execs)) = &p.execs {
-            let id = format!("check-exec-{}", p.pos.id());
             let piped = format!("exec -T {machine} sh -s < {OUTPUT_DIR}/docker/checks/{}", exec_runner(machine));
             out.push(GuestRunner {
-                id: Name::parse(&format!("exec-{}", p.pos.id()))?,
-                from: format!("inside {machine}"),
+                id: Name::parse(&p.exec_id())?,
+                from: inside(machine),
                 checks: execs.iter().map(|c| check(c)).collect(),
-                command: command(&id, None, vm.compose("", &text(&piped)), timeout_s(execs))?,
+                command: command(&p.exec_step_id(), None, vm.compose("", &text(&piped)), timeout_s(execs))?,
                 on_timeout: Vec::new(),
             });
         }
@@ -149,9 +148,8 @@ fn runners(env: &Environment, vm: &InVm) -> Result<(Vec<GuestRunner>, Vec<StepId
 }
 
 fn compose_runner(vm: &InVm, p: &Planned<'_>) -> Result<GuestRunner> {
-    let id = format!("check-{}", p.pos.id());
     let run = [
-        Part::Text(format!("--profile check run --rm --no-deps --env {}=", isoloom_render::run_manifest::DERIVED)),
+        Part::Text(format!("--profile check run --rm --no-deps --env {DERIVED}=")),
         Part::Placeholder(Placeholder::Param(EnvName::parse(DERIVED)?)),
         Part::Text(format!(" {}", p.service)),
     ];
@@ -164,8 +162,8 @@ fn compose_runner(vm: &InVm, p: &Planned<'_>) -> Result<GuestRunner> {
         id: Name::parse(&p.service)?,
         from: p.pos.label(),
         checks: p.checks.iter().map(|c| check(c)).collect(),
-        command: command(&id, None, vm.compose("", &run), timeout_s(&p.checks))?,
-        on_timeout: vec![command(&format!("rm-{id}"), None, Template::text(&leftover), 60)?],
+        command: command(&p.step_id(), None, vm.compose("", &run), timeout_s(&p.checks))?,
+        on_timeout: vec![command(&p.leftover_id(), None, Template::text(&leftover), 60)?],
     })
 }
 
