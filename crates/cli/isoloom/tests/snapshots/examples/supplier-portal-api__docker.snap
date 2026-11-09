@@ -1222,11 +1222,11 @@ secrets:
       "cloud-docker",
       "kubernetes",
       "vagrant",
-      "proxmox",
       "cloud-vm"
     ],
     "refused": {
-      "esxi": "machine `database` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them"
+      "proxmox": "machine `database` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target",
+      "esxi": "machine `database` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",

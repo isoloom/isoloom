@@ -94,7 +94,7 @@ fn secrets_and_inputs_as_files_are_refused() {
             "version: 1\nname: s\n{top}\nnetworks: {{ lan: {{ cidr: 10.20.1.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12, files: [{file}] }}\n"
         );
         let why = EsxiBackend.refusal(&env(&spec)).unwrap();
-        assert!(why.contains("writes no run manifest"), "{why}");
+        assert!(why.contains("nothing delivers them"), "{why}");
     }
     let written = "version: 1\nname: s\nnetworks: { lan: { cidr: 10.20.1.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, files: [{ path: /etc/motd, content: hi }] }\n";
     assert_eq!(EsxiBackend.refusal(&env(written)), None);

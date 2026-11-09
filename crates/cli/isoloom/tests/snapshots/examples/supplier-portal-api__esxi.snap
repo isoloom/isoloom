@@ -2,7 +2,7 @@
 source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
-✗ esxi (machine `database` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them)
+✗ esxi (machine `database` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target)
 
 # isoloom generate --target esxi (exit 1)
-· esxi: machine `database` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them
+· esxi: machine `database` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target

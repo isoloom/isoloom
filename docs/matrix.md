@@ -96,9 +96,9 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.files[].source` | a project file placed on the machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.files[].content` | a file written in the spec | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.files[].mode` | a project file with its own owner or mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.volumes` | data kept until the environment is destroyed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `volumes` | a volume two machines share | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `volumes` | a volume a container and a VM share | – | – | – | – | – | ✗ | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – |
@@ -422,17 +422,17 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.files[].input`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them
+- `proxmox`, `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
 
 ### `machines.*.files[].secret`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them
+- `proxmox`, `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
 
 ### `machines.*.files[].uid`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them
+- `proxmox`, `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
 
 ### `machines.*.volumes`
 

@@ -81,11 +81,12 @@ impl SecretFile {
 }
 
 /// Why a target that can't deliver a value at start refuses machine `machine`'s secrets (an
-/// input's file is one): it has no run manifest yet, so nothing would hand the values over.
+/// input's file is one): nothing of its run would hand the values over (ESXi writes no run
+/// manifest yet; a Proxmox machine sits behind its router, which guest delivery doesn't cross).
 pub(crate) fn no_delivery(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` gets `secrets` (a secret's or an input's value as a file), and this target writes no run manifest yet, so nothing would deliver them"
+        "machine `{machine}` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target"
     )
 }
 

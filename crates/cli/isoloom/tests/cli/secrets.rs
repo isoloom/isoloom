@@ -1,8 +1,7 @@
 //! Secrets never reach a generated file: with every store's value set on the runner, nothing
 //! `isoloom generate` writes (any target's files, the VM targets' and Docker hosts' included,
-//! the resolved snapshot) holds one. A CTF lab's flags (one input per objective) are optional,
-//! sensitive slots, empty when the runner has no value, and files in the machine, never its
-//! environment.
+//! the resolved snapshot) holds one. Inputs read as files are optional, sensitive slots, empty
+//! when the runner has no value, and files in the machine, never its environment.
 
 use std::path::{Path, PathBuf};
 
@@ -186,8 +185,10 @@ fn no_secret_value_reaches_a_generated_file() -> Outcome {
 #[test]
 fn no_secret_value_reaches_a_vm_target_file() -> Outcome {
     let generated = generated(VMS, "vms")?;
-    // The VM targets' set-up waits for the secrets the runner delivers.
-    for vm in ["vagrant/Vagrantfile", "hybrid/Vagrantfile", "proxmox/main.tf", "cloud-vm/aws/main.tf"] {
+    // The VM targets' set-up waits for the secrets the runner delivers (Proxmox refuses them:
+    // nothing could deliver them behind its router).
+    assert!(find(&generated, "proxmox/main.tf").is_err(), "proxmox refuses secrets");
+    for vm in ["vagrant/Vagrantfile", "hybrid/Vagrantfile", "cloud-vm/aws/main.tf"] {
         assert!(
             find(&generated, vm)?.contains("/var/lib/isoloom/secrets/.delivered"),
             "{vm} doesn't wait for the secrets"
@@ -201,7 +202,7 @@ fn no_secret_value_reaches_a_windows_machines_file() -> Outcome {
     let generated = generated(WINDOWS, "windows")?;
     // Each VM target's Windows set-up waits for the delivery, then registers the startup task
     // that puts the files back at every boot.
-    for target in ["vagrant", "proxmox", "cloud-vm/aws", "cloud-vm/azure"] {
+    for target in ["vagrant", "cloud-vm/aws", "cloud-vm/azure"] {
         let set_up = generated
             .iter()
             .filter(|(p, _)| p.starts_with(target))

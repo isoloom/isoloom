@@ -405,7 +405,9 @@ name: values
 networks: { lan: { cidr: 10.72.0.0/24 } }
 secrets:
   db-password: { env: DB_PASSWORD }
-inputs: [LAUNCH_TOKEN, API_URL]
+inputs:
+  LAUNCH_TOKEN: {}
+  API_URL: { sensitive: false }
 machines:
   db:
     os: debian@12
@@ -447,5 +449,22 @@ fn a_secret_and_an_input_get_the_same_slot_on_every_target() -> Outcome {
     ] {
         assert_eq!(shape(&run_json(&generate(&lab, target)?, path)?), docker, "{path}");
     }
+    Ok(())
+}
+
+#[test]
+fn proxmox_refuses_values_as_files_it_could_never_deliver() -> Outcome {
+    // Its machines sat waiting half an hour for a delivery the run manifest had no slot for.
+    let why = isoloom_targets::refusal(&lab(VALUES)?, Target::Proxmox).ok_or("proxmox takes the lab")?;
+    assert!(why.contains("machine `db` gets `secrets`") && why.contains("nothing delivers them"), "{why}");
+    // An input in a machine's environment still goes in through the module's `inputs`.
+    let env_only = VALUES
+        .replace(
+            "      - { path: /run/db-password, secret: db-password }\n      - { path: /run/launch-token, input: LAUNCH_TOKEN }\n",
+            "",
+        )
+        .replace("    files:\n", "");
+    let m = run_json(&generate(&lab(&env_only)?, Target::Proxmox)?, ".isoloom/proxmox/run.json")?;
+    assert!(m.secrets.iter().any(|s| s.name.as_str() == "API_URL"), "{:?}", m.secrets);
     Ok(())
 }
