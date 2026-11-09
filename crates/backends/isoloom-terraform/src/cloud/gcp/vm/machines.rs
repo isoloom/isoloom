@@ -13,7 +13,7 @@ use isoloom_spec::{DEFAULT_DISK_GB, DEFAULT_MEMORY_MB};
 use super::network::vpc;
 use super::{NESTING, RULES, for_nics, image, machine_type, user};
 use crate::Result;
-use crate::cloud::instance::{self, name_with, tags};
+use crate::cloud::instance::{name_with, set_up_once, tags};
 use crate::cloud::vm::{controller_setup, disks, gateways, hooks, interfaces, nested, own_image, reach, seal};
 use crate::machine::user_data::Capped;
 use crate::machine::{controller, user_data};
@@ -245,7 +245,7 @@ fn instance(i: &Instance) -> Block {
         .add_attribute(("metadata", object([("ssh-keys", key.into_expression())])))
         .add_attribute(("metadata_startup_script", i.setup.clone()))
         .add_attribute(("labels", tags(i.env)))
-        .add_block(instance::set_up_once(reference("metadata_startup_script")).build());
+        .add_block(set_up_once(reference("metadata_startup_script")).build());
     let b = if i.on.1 { b.add_attribute(("can_ip_forward", boolean(true))) } else { b };
     hardware(b, i).build()
 }

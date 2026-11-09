@@ -4,7 +4,7 @@
 //! [`refusal_on`] and [`cloud_refusals`], per [`Column`], so the capability matrix
 //! ([`crate::matrix`]) is what the generators decide and nothing more.
 //!
-//! [`refusal`]: crate::refusal
+//! [`refusal`]: crate::refusal()
 //! [`refusal_on`]: crate::refusal_on
 //! [`cloud_refusals`]: crate::cloud_refusals
 

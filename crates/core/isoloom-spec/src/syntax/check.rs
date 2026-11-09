@@ -2,7 +2,7 @@
 //! catalogue service's fields the spec alone rules on), where its values come from (inputs, secrets, sensitive values), and what
 //! its names refer to (ports, overrides, the message's placeholders). The checks on the parts
 //! this format keeps from the earlier one (networks, addresses, reach, volumes, checks) run on
-//! the lowered spec ([`crate::validate`]).
+//! the lowered spec ([`crate::validate()`]).
 
 mod messages;
 mod overrides;

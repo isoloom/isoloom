@@ -1,6 +1,6 @@
 //! The router of a server's environment (Proxmox, ESXi): a VM on the server's own network
 //! (DHCP) and on every network at its router address. It forwards between networks with the
-//! `reach` rules and gives them the internet ([`ruleset`], [`forwarding`]), and everything is
+//! `reach` rules and gives them the internet ([`ruleset_content`], [`forwarding`]), and everything is
 //! reached through it from outside ([`outputs`]): each published service at its uplink address,
 //! each machine over SSH by it. Each platform makes the VM itself.
 

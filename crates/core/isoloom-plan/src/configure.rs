@@ -4,10 +4,10 @@
 //! libraries, the
 //! Dockerfile, cloud-init, Ansible) render a [`Recipe`]; they never read the authored steps.
 //!
-//! - [`recipe`]: a machine's steps resolved for its family ([`Family`]), or the steps the family
+//! - [`recipe()`]: a machine's steps resolved for its family ([`Family`]), or the steps the family
 //!   can't carry at all ([`Unportable`]: a repository on Windows, a Windows file's ACL).
 //! - [`ContainerProcess`]: what its container runs, or why it can't ([`NoProcess`]).
-//! - [`DaemonTable`]: the daemons' units and foreground forms; [`unstarted`]: the daemons a
+//! - [`DaemonTable`]: the daemons' units and foreground forms; [`unstarted()`]: the daemons a
 //!   recipe installs and no step starts.
 //! - [`fill`]: a template's placeholders filled in for one machine on one target.
 //!

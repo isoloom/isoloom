@@ -1,7 +1,7 @@
 //! Isoloom's targets: the composition root above the backends. It holds the registry of every
 //! target's backend ([`backend`]), puts together the targets made of two backends
 //! ([`CloudDockerBackend`], [`DockerVmBackend`], [`HybridBackend`]), and works out what spans
-//! them: a lab's files for a target ([`generate`]), why a target refuses a lab ([`refusal`], and
+//! them: a lab's files for a target ([`generate`]), why a target refuses a lab ([`refusal()`], and
 //! typed, at which step: [`decision`]), the resolved snapshot ([`resolved`]), the tables and
 //! diagram drawn from it ([`report`], [`graph`]), the tiers ([`tiers`]) and the capability matrix
 //! ([`matrix`]). It holds no backend's logic: each backend renders its own files.

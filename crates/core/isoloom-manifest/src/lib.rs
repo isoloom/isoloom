@@ -9,7 +9,7 @@
 //! no `${secrets.…}` placeholder, no absolute or climbing path, no port name with a dot, no UDP
 //! port that speaks HTTP and no other version than 0. [`Manifest::validate`] then checks what
 //! spans fields (step references, machines, placeholders).
-//! The JSON Schema ([`schema`]) is generated from the types and committed at
+//! The JSON Schema ([`schema()`]) is generated from the types and committed at
 //! `schemas/run-manifest-v0.schema.json`; the fixtures under `fixtures/` are shared with the
 //! runner, which tests against the same files.
 //!

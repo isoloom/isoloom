@@ -1,5 +1,5 @@
 //! The placeholders of the message and of an app's templates, read with the spec's one grammar
-//! ([`placeholder`](super::super::placeholder)) and resolved against the spec at validation: a
+//! ([`placeholder`]) and resolved against the spec at validation: a
 //! typo or an index (`ports.0`) fails here, not at run time. The message may use
 //! `machines.<m>.ports.<name>.port`, `.published` and `.url` (an `http` or `https` port's),
 //! `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`; a template the machine's own

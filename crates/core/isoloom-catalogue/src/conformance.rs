@@ -1,5 +1,5 @@
 //! The parity contract's conformance runs, the pure part: the small lab each case
-//! is run as ([`crate::Entry::conformance_lab`]), and the verdict on its two runs ([`verdict`]): every
+//! is run as ([`crate::Entry::conformance_lab`]), and the verdict on its two runs ([`verdict()`]): every
 //! check passes in both forms, every fact reads the same in both. `cargo xtask catalogue check`
 //! generates the lab, runs it through a runner on a container target and a VM target,
 //! and reads the runs' check results back.

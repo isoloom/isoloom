@@ -8,7 +8,7 @@ Every change passes these, locally and in CI. `cargo xtask check-all` runs them 
 
 ```sh
 cargo fmt --all --check
-cargo clippy --workspace --all-targets         # deny-level lints fail it
+cargo clippy --workspace --all-targets -- -D warnings   # as CI runs it: any warning fails
 cargo xtask quality                            # the ratchet: no per-crate count may go up
 cargo xtask test                               # the tests under cargo-nextest, then the doctests
 cargo deny check                               # advisories, licenses, bans, sources
@@ -22,9 +22,10 @@ cargo run -q -p isoloom -- docs --matrix > docs/matrix.md
 git diff --exit-code docs
 ```
 
-Clippy runs **without** `-D warnings`: fourteen lints are at warn with counted baselines in
-`quality-baseline.json`, and `cargo xtask quality` fails if any count goes up. Drive counts down,
-never up. Deny-level lints still fail `cargo clippy`.
+Clippy runs with `-D warnings`, as CI does: any lint that warns fails it. A lint silenced where
+the fix reads worse is an `#[expect(lint, reason = "…")]`, and `quality-baseline.json` counts
+those per crate (`exception/expect`) with the ratchet's other counts: `cargo xtask quality` fails
+if any count goes up. Drive counts down, never up.
 
 When a change is meant to alter output, review the snapshot diffs with `cargo insta review`,
 commit the accepted snapshots, and explain each kind of difference in the pull request.

@@ -1,7 +1,7 @@
 //! A mistake a typed read finds, with the code, the field and the fix an author reads. Serde
 //! carries a read's error as text only, so a mistake travels encoded in that text: its reason
 //! first (what a raw error shows), then its code, field and fix after a separator no spec text
-//! holds. The parser decodes it into a [`Problem`](super::Problem) at the field it names.
+//! holds. The parser decodes it into a [`Problem`] at the field it names.
 
 use std::fmt;
 

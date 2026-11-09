@@ -29,6 +29,7 @@ crate's dependencies are published before it):
 Not published (`publish = false`, the workspace default; each crate opts in with `publish = true`):
 
 - `xtask` — the repo's development tasks; of no use to consumers.
+- `xtask-quality` — the clean-code ratchet behind `cargo xtask quality`; development tooling too.
 - `fuzz` — the fuzz targets; a nightly/libFuzzer workspace, excluded from the main workspace.
 
 ## The catalogue crate
@@ -42,15 +43,10 @@ repository it still reads the real `catalogue/`, so nothing changes for developm
 
 ## Versioning
 
-All crates share one version through `[workspace.package].version` (currently `0.10.1` in the
-working tree). Bump that single field and every crate moves together. The intra-workspace path
+All crates share one version through `[workspace.package].version`. Bump that single field and
+every crate moves together. The intra-workspace path
 dependencies in `[workspace.dependencies]` each carry `version = "<the workspace version>"`
 (crates.io rejects a bare path dependency); update those to match when you bump.
-
-The first public release is the **`v0.9.0`** release candidate. Setting `0.9.0` is a coordinated
-bump: it changes the version every Isothrum crate requests of Isoloom, so Isoloom and Isothrum
-(and their committed lockfiles / dev-link pins) must move together. That bump is left to the
-maintainer/coordinator rather than done piecemeal here.
 
 ## Authentication: crates.io Trusted Publishing (OIDC)
 
@@ -75,11 +71,8 @@ cargo publish -p <crate>
 ```
 
 after which the crate exists and the Trusted Publisher (added above) handles every later version
-from the workflow. **New vs existing:** none of the thirteen crates are on crates.io yet, so all of
-them (`isoloom-spec`, `-manifest`, `-catalogue`, `-plan`, `-render`, `-compose`, `-kubernetes`,
-`-terraform`, `-vagrant`, `-ansible`, `-targets`, `-import`, `isoloom`) are new names and need the
-one-time manual first publish for the `v0.9.0` release candidate. Confirm each name is free (or
-already owned) before the first release. From `v0.9.1` onward the tag workflow does everything.
+from the workflow. The thirteen crates above are all on crates.io already; only a crate added
+later needs this first manual publish (confirm its name is free first).
 
 ## Release flow
 

@@ -14,7 +14,7 @@ use crate::naming::{label, unique};
 use crate::{Error, Result};
 use isoloom_spec::validate::{Cidr, PRIVATE};
 
-/// Where re-addressed networks go: 10.88.<n>.0/24.
+/// Where re-addressed networks go: `10.88.<n>.0/24`.
 const READDRESS_BASE: &str = "10.88";
 
 /// One network of the draft: its name, block, whether it reaches the internet, and the last
@@ -102,10 +102,10 @@ fn net(blocks: &mut Blocks, taken: &[String], compose_name: &str, def: Option<&V
 }
 
 /// The blocks networks get: their own subnet when the draft can use it, else the next
-/// 10.88.<n>.0/24.
+/// `10.88.<n>.0/24`.
 #[derive(Debug)]
 struct Blocks {
-    /// The next 10.88.<n>.0/24 block to hand out.
+    /// The next `10.88.<n>.0/24` block to hand out.
     next: u32,
 }
 
@@ -117,7 +117,7 @@ impl Default for Blocks {
 
 impl Blocks {
     /// The network's block: its subnet when that's a private /24 to /29, else the next
-    /// 10.88.<n>.0/24, with a note.
+    /// `10.88.<n>.0/24`, with a note.
     fn of(&mut self, at: &str, def: Option<&Value>, notes: &mut Notes) -> Result<Cidr> {
         let subnet = def
             .and_then(|d| d.get("ipam"))

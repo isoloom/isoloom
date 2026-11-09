@@ -28,7 +28,7 @@ pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: 
     user_data::expression(&linux::set_up(env, machine, user, &hooks))
 }
 
-/// [`user_data`] on a cloud that caps it: refused, naming the machine, when it is over the cap
+/// [`user_data()`] on a cloud that caps it: refused, naming the machine, when it is over the cap
 /// ([`user_data::capped`]).
 ///
 /// # Errors
