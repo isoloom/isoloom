@@ -110,6 +110,15 @@ fn terraform_runs_from_its_pinned_image_on_macos() {
     let tf = m.tools.iter().find(|t| t.name.as_str() == "terraform").unwrap();
     assert!(tf.container.is_some() && tf.container_hosts.contains(&HostOs::Macos));
     assert_eq!(tf.min_version.as_ref().map(Version::as_str), Some("1.6.0"));
+    // The image is a Terraform every module takes, the clouds' write-only attributes included.
+    let image = tf.container.as_ref().map(ToString::to_string).unwrap_or_default();
+    let tag = image
+        .split_once(':')
+        .and_then(|(_, rest)| rest.split_once('@'))
+        .map(|(tag, _)| tag)
+        .unwrap_or_default();
+    let numbers: Vec<u32> = tag.split('.').filter_map(|n| n.parse().ok()).collect();
+    assert!(numbers.len() == 3 && numbers[..2] >= [1, 11][..], "{image}");
 }
 
 #[test]

@@ -866,7 +866,7 @@ output "ssh_user" {
         "version"
       ],
       "min_version": "1.6.0",
-      "container": "hashicorp/terraform:1.9.8@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd",
+      "container": "hashicorp/terraform:1.16.7@sha256:c9c77f5b9820832cbc7b88d16df406ac6e75fee5a9077e5437db0c54e5ff33e3",
       "container_hosts": [
         "macos"
       ]
