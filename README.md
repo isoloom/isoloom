@@ -103,8 +103,8 @@ targets are Tier 1 for 1.0, the rest Tier 2 (generated and validated).
 
 ## Running what Isoloom generates
 
-Isoloom doesn't run anything. Each target writes a run manifest (`.isoloom/<target>/run.json`)
-alongside its files — the native commands, readiness criteria, outputs and checks. A
+Isoloom doesn't run anything. Most targets write a run manifest (`.isoloom/<target>/run.json`,
+or one per cloud; [which ones](docs/runner.md)) alongside their files — the native commands, readiness criteria, outputs and checks. A
 [runner](docs/runner.md) executes it (up, check, park, resume, down), or you run each tool's
 files by hand (`docker compose up`,
 `kubectl apply -k`, `vagrant up`, `terraform apply`, `ansible-playbook`).

@@ -46,8 +46,10 @@ Two targets fan out:
 - **`cloud-vm`, `cloud-docker` and `cloud-services`** target six clouds: AWS, Azure, Google
   Cloud, DigitalOcean, Linode and Oracle Cloud.
 
-The run manifest is one file per target; the provider or cloud is chosen when the runner brings
-it up, not baked into the manifest.
+A Vagrant run manifest is one file for every provider, chosen when the runner brings it up; the
+cloud targets write one per cloud (`.isoloom/cloud-vm/<cloud>/run.json`). `kubernetes`,
+`hybrid`, `esxi`, `external` and `hosted` write no run manifest yet, and `cloud-services` none
+without `cloud:`: [the runner](runner.md) lists which target has one, and where.
 
 ## Tiers: how far a target is proven
 

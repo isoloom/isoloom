@@ -1,9 +1,22 @@
 # The run manifest and the runner
 
-Isoloom converts a spec into files, and alongside each target's files it writes a **run
-manifest** (`.isoloom/<target>/run.json`): a versioned, self-contained description of how to bring
-the environment up, check it and tear it down. Isoloom runs nothing itself. The run manifest is
-the contract between Isoloom and a runner.
+Isoloom converts a spec into files, and alongside the files of most targets it writes a **run
+manifest** (`run.json`, under the target's folder): a versioned, self-contained description of how
+to bring the environment up, check it and tear it down. Isoloom runs nothing itself. The run
+manifest is the contract between Isoloom and a runner.
+
+Which targets have one, and where:
+
+| Target | Run manifest |
+|---|---|
+| `docker` | `.isoloom/docker/run.json` |
+| `vagrant` | `.isoloom/vagrant/run.json` (one for every provider) |
+| `docker-vm` | `.isoloom/docker-vm/run.json` (the VM made by Vagrant), and `.isoloom/docker-vm/proxmox/run.json` (made on a Proxmox server) unless a container mounts a folder of the computer that runs the lab |
+| `proxmox` | `.isoloom/proxmox/run.json` |
+| `cloud-vm` | `.isoloom/cloud-vm/<cloud>/run.json`, one per cloud that takes the lab |
+| `cloud-docker` | `.isoloom/cloud-docker/<cloud>/run.json`, one per cloud that takes the lab |
+| `cloud-services` | `.isoloom/cloud-services/run.json`, when the spec has `cloud:`, unless it has `before` steps (host scripts) or a variable holding a launch value inside a larger value |
+| `kubernetes`, `hybrid`, `esxi`, `external`, `hosted` | none yet: their files are run by hand |
 
 A runner executes it: any program that reads the manifest and follows this contract. You can
 also run each tool's files by hand (`docker compose up`, `kubectl apply -k`, `vagrant up`, `terraform apply`,
@@ -11,8 +24,7 @@ also run each tool's files by hand (`docker compose up`, `kubectl apply -k`, `va
 
 ## What the manifest holds
 
-The run manifest is one `run.json` per target, holding only documented data — the driver does the
-work:
+A run manifest holds only documented data — the driver does the work:
 
 - the **native commands** of the lifecycle and their order;
 - **readiness criteria** (a ready file, running machines, a port answering);
@@ -100,8 +112,9 @@ operation replays it, so a later apply can't silently undo it.
 
 ## Running it
 
-`isoloom generate` writes `.isoloom/<target>/{files…, run.json}`; a runner then reads the
-`run.json` of the target it runs. Its own commands, options and messages are its own, documented
+`isoloom generate` writes each target's files under `.isoloom/<target>/`, with its run
+manifest where the target has one (see the table above); a runner then reads the `run.json` of
+the target it runs. Its own commands, options and messages are its own, documented
 with it.
 
 ## See also
