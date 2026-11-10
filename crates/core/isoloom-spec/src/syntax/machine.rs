@@ -147,7 +147,8 @@ pub(crate) struct MachineInput {
     #[serde(default)]
     access: bool,
     /// Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,
-    /// dormant }`. Messages and checks reach them as `machines.<m>.ports.<name>.published`.
+    /// dormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and
+    /// `.port`, `.url`); a check names the machine and the port's number (`web:80`).
     #[serde(default)]
     ports: IndexMap<PortName, Port>,
     /// Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:

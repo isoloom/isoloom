@@ -1,6 +1,6 @@
 //! A machine's ports: a map keyed by name, each port a number (TCP) or `{ port, protocol,
-//! publish, dormant }`. Messages and checks reach them by name
-//! (`machines.web.ports.site.published`), so reordering never breaks a reference.
+//! publish, dormant }`. The message reaches them by name (`machines.web.ports.site.published`),
+//! so reordering never breaks a reference.
 
 use std::fmt;
 use std::num::NonZeroU16;

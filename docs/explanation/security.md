@@ -27,8 +27,9 @@ Two exceptions are by design, and worth knowing:
 
 - **`user` steps' `password` is a literal**, lab content written into the generated files:
   hashed (SHA-512 crypt) for Linux users, in clear in the PowerShell that creates a Windows user.
-  A secret or input is refused there. For a real credential, use a catalogue entry's `users`
-  setting with `{ secret }`, or a secret delivered as a file.
+  A secret or input is refused there. For a real credential, use a catalogue entry's password
+  setting with `{ secret: <name> }` (`openssh`'s `password`, `mysql`'s `user_password`), or a
+  secret delivered as a file.
 - **Terraform state holds what Terraform makes**: a generated Windows administrator password, the
   controller's SSH private key. Keep state where only the people who run the environment can read
   it ([remote state](../guide/remote-terraform-state.md)).

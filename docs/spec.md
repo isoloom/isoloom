@@ -134,7 +134,7 @@ On a LAN split into `vlans`: a switch appliance of the environment (`app.applian
 
 ### `networks.*.tc`
 
-Link impairment on traffic entering this network through Isoloom's router (a slow or lossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule touching it, no `gateway` machine).
+Link impairment on traffic entering this network (a slow or lossy link): delay, jitter, loss, rate. Each member applies it on its interface into the network, so traffic between two machines of the network is impaired too, and so does Isoloom's router when one is on the network, for what it forwards in.
 
 - **Type:** mapping
 
@@ -842,7 +842,7 @@ The machine the user lands on (at most one). Without `os`, the runner supplies i
 
 ### `machines.*.ports`
 
-Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant }`. Messages and checks reach them as `machines.<m>.ports.<name>.published`.
+Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and `.port`, `.url`); a check names the machine and the port's number (`web:80`).
 
 - **Type:** map of name to integer or mapping
 
@@ -1157,19 +1157,19 @@ CPUs, memory and disk (default 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB
 
 ### `machines.*.resources.cpus`
 
-CPUs (default 1).
+CPUs.
 
 - **Type:** integer
 
 ### `machines.*.resources.memory_mb`
 
-Memory in MB (default 1024 as a VM, 512 as a container).
+Memory in MB.
 
 - **Type:** integer
 
 ### `machines.*.resources.disk_gb`
 
-Disk in GB (default 20 as a VM, 5 as a container).
+Disk in GB.
 
 - **Type:** integer
 
@@ -1500,25 +1500,25 @@ The controller added for `provision:` and playbook checks: `{ resources, keep_ru
 
 ### `controller.resources`
 
-CPUs, memory (and disk on Proxmox), for many forks against a large environment.
+CPUs, memory and disk, for many forks against a large environment (default 1 CPU, 512 MB, and a 10 GB disk where a target sizes it: Vagrant keeps its box's own).
 
 - **Type:** mapping
 
 ### `controller.resources.cpus`
 
-CPUs (default 1).
+CPUs.
 
 - **Type:** integer
 
 ### `controller.resources.memory_mb`
 
-Memory in MB (default 1024 as a VM, 512 as a container).
+Memory in MB.
 
 - **Type:** integer
 
 ### `controller.resources.disk_gb`
 
-Disk in GB (default 20 as a VM, 5 as a container).
+Disk in GB.
 
 - **Type:** integer
 

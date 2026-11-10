@@ -75,5 +75,7 @@ helm uninstall env -n isoloom-<name>     # for the chart
 
 ## Cost
 
-Whatever your cluster costs. The pods set no CPU or memory requests; `isoloom resources` adds up
-what the machines ask for (1 CPU, 512 MB and 5 GB each as containers, unless the spec says).
+Whatever your cluster costs. Each pod requests what its machine's `resources` declare, else a
+small floor (100m CPU, 128 MiB), so a small cluster schedules many idle machines; its limits are
+its size (1 CPU and 512 MB as a container, unless the spec says). `isoloom resources` adds up what
+the machines ask for (1 CPU, 512 MB and 5 GB each as containers, unless the spec says).

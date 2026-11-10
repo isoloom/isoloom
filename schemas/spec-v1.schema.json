@@ -183,7 +183,7 @@
           "description": "On a LAN split into `vlans`: a switch appliance of the environment (`app.appliance:\ncisco-iol-l2` or `cisco-vios-l2`) that switches it, instead of Isoloom's own Linux switch.\nIts ports are derived, so the machine lists no `networks`: an access port per VLAN, then\na trunk per machine on several of the LAN's VLANs. Docker targets only."
         },
         "tc": {
-          "description": "Link impairment on traffic entering this network through Isoloom's router (a slow or\nlossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule\ntouching it, no `gateway` machine).",
+          "description": "Link impairment on traffic entering this network (a slow or lossy link): delay, jitter,\nloss, rate. Each member applies it on its interface into the network, so traffic between\ntwo machines of the network is impaired too, and so does Isoloom's router when one is on\nthe network, for what it forwards in.",
           "$ref": "#/$defs/Tc"
         },
         "ipv6": {
@@ -262,7 +262,7 @@
           "description": "The bandwidth cap on traffic entering the network, as `tc` writes a rate, e.g. `10mbit`,\n`512kbit`."
         }
       },
-      "description": "Link impairment (Linux netem on the router's interface into the network)."
+      "description": "Link impairment (Linux netem on each interface into the network: its members' and Isoloom's\nrouter's)."
     },
     "Ipv6": {
       "type": "object",
@@ -540,7 +540,7 @@
               "$ref": "#/$defs/Port"
             }
           },
-          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant }`. Messages and checks reach them as `machines.<m>.ports.<name>.published`."
+          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and\n`.port`, `.url`); a check names the machine and the port's number (`web:80`)."
         },
         "command": {
           "description": "Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:\nthe image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.",
@@ -2348,19 +2348,19 @@
           "type": "integer",
           "format": "uint32",
           "minimum": 0,
-          "description": "CPUs (default 1)."
+          "description": "CPUs."
         },
         "memory_mb": {
           "type": "integer",
           "format": "uint32",
           "minimum": 0,
-          "description": "Memory in MB (default 1024 as a VM, 512 as a container)."
+          "description": "Memory in MB."
         },
         "disk_gb": {
           "type": "integer",
           "format": "uint32",
           "minimum": 0,
-          "description": "Disk in GB (default 20 as a VM, 5 as a container)."
+          "description": "Disk in GB."
         }
       },
       "description": "What a machine is given to run on; each left out takes its default."
@@ -3111,7 +3111,7 @@
       "properties": {
         "resources": {
           "$ref": "#/$defs/Resources",
-          "description": "CPUs, memory (and disk on Proxmox), for many forks against a large environment."
+          "description": "CPUs, memory and disk, for many forks against a large environment (default 1 CPU,\n512 MB, and a 10 GB disk where a target sizes it: Vagrant keeps its box's own)."
         },
         "keep_running": {
           "type": "boolean",

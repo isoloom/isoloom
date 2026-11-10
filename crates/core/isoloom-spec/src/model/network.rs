@@ -46,9 +46,10 @@ pub struct Network {
     #[serde(skip)]
     #[schemars(skip)]
     pub vlan: Option<(String, u16)>,
-    /// Link impairment on traffic entering this network through Isoloom's router (a slow or
-    /// lossy link): delay, jitter, loss, rate. Needs the router on the network (a `reach` rule
-    /// touching it, no `gateway` machine).
+    /// Link impairment on traffic entering this network (a slow or lossy link): delay, jitter,
+    /// loss, rate. Each member applies it on its interface into the network, so traffic between
+    /// two machines of the network is impaired too, and so does Isoloom's router when one is on
+    /// the network, for what it forwards in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tc: Option<Tc>,
     /// The network's IPv6 block: dual-stack beside `cidr`, or IPv6-only (`only: true`).
@@ -88,7 +89,8 @@ impl Network {
     }
 }
 
-/// Link impairment (Linux netem on the router's interface into the network).
+/// Link impairment (Linux netem on each interface into the network: its members' and Isoloom's
+/// router's).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Tc {

@@ -360,13 +360,13 @@ impl Machine {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resources {
-    /// CPUs (default 1).
+    /// CPUs.
     #[serde(default)]
     pub cpus: Option<u32>,
-    /// Memory in MB (default 1024 as a VM, 512 as a container).
+    /// Memory in MB.
     #[serde(default)]
     pub memory_mb: Option<u32>,
-    /// Disk in GB (default 20 as a VM, 5 as a container).
+    /// Disk in GB.
     #[serde(default)]
     pub disk_gb: Option<u32>,
 }

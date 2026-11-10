@@ -286,7 +286,8 @@ pub struct Controller {
     #[serde(default)]
     #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
     pub image: Option<VmImage>,
-    /// CPUs, memory (and disk on Proxmox), for many forks against a large environment.
+    /// CPUs, memory and disk, for many forks against a large environment (default 1 CPU,
+    /// 512 MB, and a 10 GB disk where a target sizes it: Vagrant keeps its box's own).
     #[serde(default)]
     pub resources: Option<Resources>,
     /// Keep it running once provisioning is done (to use it as a jump host). By default it
