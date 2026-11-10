@@ -112,28 +112,39 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     let backend = backend(target).ok_or(GenerateError::NoGenerator(target))?;
     let spec = lowered(lab, target, instance)?;
     let env = lab.plan(&spec, target, instance);
-    let mut files = backend.render(&env)?;
-    if let Some(path) = written_twice(&files) {
-        return Err(GenerateError::Internal {
-            target,
-            what: format!("the backend wrote `{path}` twice"),
-            source: std::sync::Arc::new(WrittenTwice),
-        });
-    }
-    // The configuration renderers' own files (the libraries a VM's set-up embeds, a container's
-    // runner and templates), once each: a backend may have written some already.
-    for f in isoloom_render::configure::files(&env) {
-        if !files.iter().any(|x| x.path == f.path) {
-            files.push(f);
-        }
-    }
-    for placed in backend.run_manifests(&env)? {
-        files.push(run_manifest(lab, instance, target, placed)?);
-    }
-    Ok(files)
+    let rendered = backend.render(&env)?;
+    let manifests = backend
+        .run_manifests(&env)?
+        .into_iter()
+        .map(|placed| run_manifest(lab, instance, target, placed))
+        .collect::<Result<Vec<_>, _>>()?;
+    assembled(target, rendered, isoloom_render::configure::files(&env), manifests)
 }
 
-/// Two of a backend's files at one path, the second of which would replace the first.
+/// A target's files: its backend's, then the configuration renderers' own (the libraries a VM's
+/// set-up embeds, a container's runner and templates; once each, since a backend may have
+/// written some already), then its run manifests. Two at one path, the second of which would
+/// replace the first, is a bug of the backend: an error.
+fn assembled(
+    target: Target,
+    mut files: Vec<GeneratedFile>,
+    configure: Vec<GeneratedFile>,
+    manifests: Vec<GeneratedFile>,
+) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
+    let own: Vec<GeneratedFile> = configure.into_iter().filter(|f| !files.iter().any(|x| x.path == f.path)).collect();
+    files.extend(own);
+    files.extend(manifests);
+    match written_twice(&files) {
+        Some(path) => Err(GenerateError::Internal {
+            target,
+            what: format!("the target's files hold `{path}` twice"),
+            source: std::sync::Arc::new(WrittenTwice),
+        }),
+        None => Ok(files),
+    }
+}
+
+/// Two of a target's files at one path, the second of which would replace the first.
 #[derive(Debug, thiserror::Error)]
 #[error("two generated files at one path")]
 struct WrittenTwice;
@@ -172,6 +183,38 @@ pub fn default_regions() -> Vec<(&'static str, &'static str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn file(path: &str, contents: &str) -> GeneratedFile {
+        GeneratedFile {
+            path: path.to_owned(),
+            contents: contents.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_run_manifest_or_a_backend_file_written_twice_is_an_error() {
+        let compose = file(".isoloom/docker/compose.yml", "a");
+        let manifest = file(".isoloom/docker/run.json", "{}");
+        // A configuration file the backend wrote already is the backend's, once.
+        let fine = assembled(
+            Target::Docker,
+            vec![compose.clone()],
+            vec![file(".isoloom/docker/compose.yml", "b")],
+            vec![manifest.clone()],
+        );
+        assert_eq!(fine.map(|f| f.len()).ok(), Some(2));
+        // A run manifest at a path the backend wrote is caught, as two of the backend's are.
+        for (rendered, manifests) in [
+            (vec![compose.clone(), file(".isoloom/docker/run.json", "x")], vec![manifest.clone()]),
+            (vec![compose.clone(), compose.clone()], vec![]),
+        ] {
+            let e = assembled(Target::Docker, rendered, vec![], manifests)
+                .err()
+                .map(|e| e.to_string())
+                .unwrap_or_default();
+            assert!(e.contains("twice"), "{e}");
+        }
+    }
 
     fn at(path: &str) -> GeneratedFile {
         GeneratedFile {

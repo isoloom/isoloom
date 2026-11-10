@@ -117,3 +117,37 @@ fn a_cloud_refusing_for_size_drops_only_its_module() -> Outcome {
     assert!(files.iter().any(|f| f.path.ends_with("cloud-vm/azure/main.tf")), "Azure takes it");
     Ok(())
 }
+
+/// A lab whose environment-level playbook carries `bytes` of noise in its vars: the controller's
+/// set-up runs it, so its user data carries them.
+fn controller_lab(bytes: usize) -> String {
+    format!(
+        "version: 1
+name: caps
+networks:
+  lab: {{ cidr: 10.66.0.0/24, internet: true }}
+machines:
+  web:
+    os: debian@12
+    networks: {{ lab: 10 }}
+provision:
+  - ansible: site.yml
+    vars: {{ noise: \"{}\" }}
+",
+        noise(bytes)
+    )
+}
+
+#[test]
+fn the_controllers_user_data_is_capped_too_naming_it() -> Outcome {
+    let yaml = controller_lab(40_000);
+    let aws = refusal(Cloud::Aws, &yaml)?.ok_or("AWS takes it")?;
+    assert!(aws.starts_with("the controller: its user data is "), "{aws}");
+    assert!(aws.contains("as AWS counts it, over its 16384-byte limit"), "{aws}");
+    let bigger = controller_lab(70_000);
+    let azure = refusal(Cloud::Azure, &bigger)?.ok_or("Azure takes it")?;
+    assert!(azure.starts_with("the controller: ") && azure.contains("as Azure counts it"), "{azure}");
+    let gcp = refusal(Cloud::Gcp, &controller_lab(270_000))?.ok_or("GCP takes it")?;
+    assert!(gcp.starts_with("the controller: ") && gcp.contains("as Google Cloud counts it"), "{gcp}");
+    Ok(())
+}
