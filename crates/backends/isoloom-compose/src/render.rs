@@ -13,10 +13,11 @@ pub(crate) use service::readiness;
 use std::fmt;
 
 use indexmap::IndexMap;
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_render::container::PROBE_IMAGE;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, trunks};
+use isoloom_render::{GeneratedFile, header, trunks};
 use isoloom_spec::model::{Arch, Target};
 use isoloom_spec::validate::Cidr;
 

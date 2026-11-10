@@ -2,6 +2,7 @@
 //! controller that runs the environment's playbooks and the checks standing on every network.
 //! Their set-up goes through the same step renderings and transport as the lab's machines.
 
+use isoloom_manifest::contract::HALTING;
 use isoloom_spec::linux::CONFIG_DIR;
 use std::net::Ipv4Addr;
 
@@ -266,7 +267,7 @@ fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     // Done: it halts (its disk kept) unless the spec keeps it running. Detached, so that the
     // provisioner returns before the VM goes; the runner's `check` boots it again for the checks.
     if !spec.controller.as_ref().is_some_and(|c| c.keep_running) {
-        shell(r, "halt", "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &");
+        shell(r, "halt", &format!("touch {HALTING}; (sleep 5; poweroff) >/dev/null 2>&1 &"));
     }
 }
 

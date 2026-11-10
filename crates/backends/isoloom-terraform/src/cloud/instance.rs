@@ -3,20 +3,21 @@
 //! carries (what a reaper reads), and the `lifecycle` of a VM set up once from its user data.
 
 use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Template, binary, call, conditional, list, number, object, reference, string};
+use isoloom_manifest::contract::{EXPIRES_TAG, EXPIRES_WORD, INSTANCE_TAG};
 use isoloom_plan::Environment;
 
 /// The tags on every resource: the spec's own (`tags:`), then the environment, who manages it,
 /// its instance and its expiry (what a reaper reads).
 pub(crate) fn tags(env: &Environment) -> Expression {
     let mut tags = named(env);
-    tags.push(("isoloom-expires-at", reference("var.expires_at")));
+    tags.push((EXPIRES_TAG, reference("var.expires_at")));
     with_own(isoloom_spec::tags::written(env.spec()), tags)
 }
 
 /// The same as labels (Google Cloud's): the spec's own made labels, then Isoloom's.
 pub(crate) fn labels(env: &Environment) -> Expression {
     let mut tags = named(env);
-    tags.push(("isoloom-expires-at", reference("var.expires_at")));
+    tags.push((EXPIRES_TAG, reference("var.expires_at")));
     with_own(isoloom_spec::tags::labels(env.spec()), tags)
 }
 
@@ -30,7 +31,7 @@ fn with_own(own: Vec<(String, String)>, tags: Vec<(&'static str, Expression)>) -
 /// Cloud's free-form tags): the expiry only when the environment has one.
 pub(crate) fn tags_when_set(env: &Environment) -> Expression {
     let none = binary(reference("var.expires_at"), BinaryOperator::Eq, string(""));
-    let expiry = object([("isoloom-expires-at", reference("var.expires_at"))]);
+    let expiry = object([(EXPIRES_TAG, reference("var.expires_at"))]);
     call(
         "merge",
         [
@@ -45,7 +46,7 @@ fn named(env: &Environment) -> Vec<(&'static str, Expression)> {
     vec![
         ("isoloom-environment", string(env.name.as_str())),
         ("managed-by", string("isoloom")),
-        ("isoloom-instance", reference("local.name")),
+        (INSTANCE_TAG, reference("local.name")),
     ]
 }
 
@@ -85,7 +86,7 @@ pub(crate) fn id_and_locals(env: &Environment, extra: Vec<(&str, Expression)>, w
 /// The tags of a cloud whose tags are a list of words: `isoloom`, the environment, its
 /// instance's name, and `isoloom-expires-<time>` when it has an end.
 pub(crate) fn tag_list(env: &Environment) -> Expression {
-    let expires = Template::text("isoloom-expires-").with_expr(reference("var.expires_at")).into_expression();
+    let expires = Template::text(EXPIRES_WORD).with_expr(reference("var.expires_at")).into_expression();
     let none = binary(reference("var.expires_at"), BinaryOperator::Eq, string(""));
     call(
         "concat",

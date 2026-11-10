@@ -16,12 +16,14 @@ use isoloom_render::run_manifest::derived_switch;
 
 use super::lifecycle::{PROVISION, PROVISION_MACHINE, UP};
 use crate::error::Result;
+use crate::settings::{self, Setting};
+use isoloom_manifest::contract;
 
 /// A param: what it is, its default, the values it takes, and whom it concerns.
 struct Wanted<'a> {
     name: &'a str,
     description: &'a str,
-    default: Option<&'a str>,
+    default: Option<String>,
     values: &'a [&'a str],
     required: bool,
     hosts: &'a [HostOs],
@@ -41,7 +43,7 @@ fn param(p: &Wanted<'_>, steps: StepSelection) -> Result<Param> {
     Ok(Param {
         name: EnvName::parse(p.name)?,
         description: p.description.into(),
-        default: p.default.map(String::from),
+        default: p.default.clone(),
         values: p.values.iter().map(|v| (*v).to_owned()).collect(),
         required: p.required,
         hosts: p.hosts.iter().copied().collect(),
@@ -52,15 +54,14 @@ fn param(p: &Wanted<'_>, steps: StepSelection) -> Result<Param> {
 }
 
 /// What the Vagrantfile reads of ESXi's host (vagrant-vmware-esxi), besides its password.
-const ESXI: [(&str, &str, Option<&str>, bool); 5] = [
-    ("ESXI_HOSTNAME", "The ESXi host.", None, true),
-    ("ESXI_HOSTPORT", "Its SSH port.", Some("22"), false),
-    ("ESXI_USERNAME", "The ESXi user.", Some("root"), false),
-    ("ESXI_DATASTORE", "The datastore the VMs' disks go on (default: ESXi's first).", None, false),
+const ESXI: [(Setting, &str, bool); 5] = [
+    (settings::ESXI_HOSTNAME, "The ESXi host.", true),
+    (settings::ESXI_HOSTPORT, "Its SSH port.", false),
+    (settings::ESXI_USERNAME, "The ESXi user.", false),
+    (settings::ESXI_DATASTORE, "The datastore the VMs' disks go on (default: ESXi's first).", false),
     (
-        "ESXI_VIRTUAL_NETWORK",
-        "Port groups, comma-separated: the management network, then one per lab network.",
-        Some("VM Network"),
+        settings::ESXI_VIRTUAL_NETWORK,
+        "Port groups, comma-separated: the management network, then one per environment network.",
         false,
     ),
 ];
@@ -80,7 +81,7 @@ pub(super) fn params(runners: &[CheckRunner]) -> Result<Vec<Param>> {
 fn publish_fixed() -> Result<Param> {
     param(
         &Wanted {
-            name: "ISOLOOM_PUBLISH_FIXED",
+            name: contract::PUBLISH_FIXED,
             description: "Forward each published port from its own `publish` number on the host, instead of a free port the runner picks.",
             default: None,
             values: &["1"],
@@ -97,9 +98,9 @@ fn publish_fixed() -> Result<Param> {
 fn hyperv_switch() -> Result<Param> {
     param(
         &Wanted {
-            name: "ISOLOOM_HYPERV_SWITCH",
+            name: settings::HYPERV_SWITCH.name,
             description: "The Hyper-V virtual switch each VM's first adapter (Vagrant's connection, and the internet) goes on.",
-            default: Some("Default Switch"),
+            default: settings::HYPERV_SWITCH.default(),
             values: &[],
             required: false,
             hosts: &[HostOs::Windows],
@@ -115,9 +116,9 @@ fn hyperv_switch() -> Result<Param> {
 pub(super) fn remote_params() -> Result<Vec<Param>> {
     let mut out = vec![param(
         &Wanted {
-            name: "ISOLOOM_SSH_PROXY_COMMAND",
+            name: settings::SSH_PROXY_COMMAND.name,
             description: "The command Vagrant's SSH to the VMs goes through (an SSH `ProxyCommand`), when this computer can't reach them directly; unset, it connects straight to them.",
-            default: None,
+            default: settings::SSH_PROXY_COMMAND.default(),
             values: &[],
             required: false,
             hosts: &[],
@@ -126,11 +127,11 @@ pub(super) fn remote_params() -> Result<Vec<Param>> {
         },
         StepSelection::Every,
     )?];
-    for (name, description, default, required) in ESXI {
+    for (setting, description, required) in ESXI {
         let spec = Wanted {
-            name,
+            name: setting.name,
             description,
-            default,
+            default: setting.default(),
             values: &[],
             required,
             hosts: &[],

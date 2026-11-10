@@ -3,9 +3,10 @@
 
 use indexmap::IndexMap;
 use isoloom_manifest as manifest;
+use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_FIXED};
 use isoloom_plan::{Environment, Image, PublishedPort};
 use isoloom_render::container::{PROBE_DIR, init_names};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, constraints, steps::PROJECT_DIR, trunks};
+use isoloom_render::{GeneratedFile, constraints, steps::PROJECT_DIR, trunks};
 use isoloom_spec::model;
 
 use super::{Out, configs, hardware, process, secrets};
@@ -146,7 +147,7 @@ fn port(p: &PublishedPort) -> String {
     if p.fixed {
         format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{publish}:{port}{proto}")
     } else {
-        format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{ISOLOOM_PUBLISH_FIXED:+{publish}}}:{port}{proto}")
+        format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{{PUBLISH_FIXED}:+{publish}}}:{port}{proto}")
     }
 }
 

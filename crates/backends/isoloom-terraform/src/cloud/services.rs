@@ -9,10 +9,11 @@
 
 mod manifest;
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::Error as RenderError;
+use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{self, Backend, Files, Placed};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::{CloudServices, Target};
 
 /// The `cloud-services` backend.

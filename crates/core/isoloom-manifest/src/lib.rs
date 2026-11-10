@@ -11,7 +11,8 @@
 //! spans fields (step references, machines, placeholders).
 //! The JSON Schema ([`schema()`]) is generated from the types and committed at
 //! `schemas/run-manifest-v1.schema.json`, published at [`SCHEMA_URL`]; runners can test against
-//! the fixtures under `fixtures/`. [`CheckLine::parse`] reads the lines a check runner prints.
+//! the fixtures under `fixtures/`. [`CheckLine::parse`] reads the lines a check runner prints, and
+//! [`contract`] holds the names the generated files and a runner share outside `run.json`.
 //!
 //! # Compatibility
 //!
@@ -50,6 +51,7 @@
 pub mod access;
 mod argv;
 mod check_line;
+pub mod contract;
 mod error;
 mod guest;
 mod identity;

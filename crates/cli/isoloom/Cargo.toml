@@ -27,6 +27,7 @@ pkg-fmt = "tgz"
 pkg-fmt = "zip"
 
 [dependencies]
+isoloom-manifest.workspace = true
 isoloom-spec.workspace = true
 isoloom-catalogue.workspace = true
 isoloom-targets.workspace = true

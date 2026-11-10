@@ -4,11 +4,12 @@
 //! `exec` checks run inside it (`docker compose exec`), from a script of their own.
 
 use indexmap::IndexMap;
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
+use isoloom_render::GeneratedFile;
 use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, UTILITY_IMAGE, exec_runner, init_names};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 
 use crate::file::{Condition, NetworkMode, Service};
 use crate::layout::{DIR, ROOT};

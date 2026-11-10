@@ -1,7 +1,7 @@
 //! Where the target's files go: `.isoloom/kubernetes/` in the project, the chart in its `chart/`
 //! folder, and the paths they read the project by.
 
-use isoloom_render::OUTPUT_DIR;
+use isoloom_manifest::contract::OUTPUT_DIR;
 
 /// The target's folder, under `.isoloom/`.
 pub(crate) const DIR: &str = "kubernetes";

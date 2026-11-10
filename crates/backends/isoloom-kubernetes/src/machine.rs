@@ -173,7 +173,7 @@ fn service(m: &Machine) -> Option<Manifest> {
 /// The Service of its published ports, `isoloom-<machine>`: under Isoloom's own prefix, which no
 /// machine's name (its own Service's) takes.
 fn published_service(m: &Machine) -> String {
-    format!("{}{}", isoloom_spec::validate::RESERVED_PREFIX, m.name)
+    format!("{}{}", isoloom_manifest::contract::RESERVED_PREFIX, m.name)
 }
 
 /// How to reach what each machine publishes from this computer, one command per machine:

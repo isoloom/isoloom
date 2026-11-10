@@ -8,6 +8,7 @@ use isoloom_render::steps;
 use isoloom_spec::model::Protocol;
 
 use crate::ruby::{Call, Provision, Ruby, Value};
+use crate::settings;
 
 /// Vagrant's host-port check, corrected for macOS 27 (`vagrant_port_check.rb`): Vagrant's own
 /// reads every port as in use there (Ruby bug #22223), so a VM's fixed forwarded ports fail as
@@ -47,8 +48,8 @@ pub(crate) fn inputs(r: &mut Ruby, inputs: &[String], secrets: bool) {
 /// network) sets `ISOLOOM_SSH_PROXY_COMMAND`, e.g. "/usr/bin/nc %h %p", and Vagrant's SSH goes
 /// through it. Unset: Vagrant connects directly.
 pub(crate) fn ssh_proxy(r: &mut Ruby, var: &str) {
-    let proxy = "ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"]";
-    r.assign_if(&format!("{var}.ssh.proxy_command"), Value::raw(proxy), proxy);
+    let proxy = settings::SSH_PROXY_COMMAND.raw();
+    r.assign_if(&format!("{var}.ssh.proxy_command"), Value::raw(&proxy), &proxy);
 }
 
 /// libvirt names a domain `<prefix><machine>`, the prefix defaulting to the folder's name: the
@@ -60,8 +61,9 @@ pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, env: &str) {
 }
 
 /// The Ruby hash of the host ports the runner chose for this run, read once at a VM Vagrantfile's
-/// top (see [`chosen_ports`]); each forwarded port looks its own number up in it.
-pub(crate) const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
+/// top (see [`chosen_ports`]) under the variable's own name; each forwarded port looks its own
+/// number up in it.
+const HOSTPORTS: &str = settings::HOSTPORTS.name;
 
 /// The runner's chosen host ports, read once at the top of a VM's Vagrantfile: a JSON object
 /// `{"<machine>/<port>": <host port>}` in `ISOLOOM_HOSTPORTS`, empty when it set none (a run with
@@ -70,10 +72,7 @@ pub(crate) const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
 pub(crate) fn chosen_ports(r: &mut Ruby) {
     r.text("require \"json\"\n");
     r.comment("The host ports the runner chose for this run; each forward defaults to its own number.");
-    r.assign(
-        HOSTPORTS,
-        Value::raw(format!("(JSON.parse(ENV.fetch({}, {})) rescue {{}})", Value::str(HOSTPORTS), Value::str("{}"))),
-    );
+    r.assign(HOSTPORTS, Value::raw(format!("(JSON.parse({}) rescue {{}})", settings::HOSTPORTS.fetch())));
 }
 
 /// A published port's host number as the Vagrantfile reads it: the runner's choice for this run,
@@ -117,11 +116,12 @@ pub(crate) fn prelude(r: &mut Ruby, env: &Environment, var: &str) {
 /// The ESXi host a VM goes on (vagrant-vmware-esxi), from the host's environment:
 /// `ESXI_HOSTNAME`, `ESXI_HOSTPORT`, `ESXI_USERNAME`, `ESXI_PASSWORD` and `ESXI_DATASTORE`.
 pub(crate) fn esxi_host(r: &mut Ruby) {
-    r.assign("v.esxi_hostname", Value::raw("ENV.fetch(\"ESXI_HOSTNAME\", \"\")"));
-    r.assign("v.esxi_hostport", Value::raw("ENV.fetch(\"ESXI_HOSTPORT\", \"22\").to_i"));
-    r.assign("v.esxi_username", Value::raw("ENV.fetch(\"ESXI_USERNAME\", \"root\")"));
+    r.assign("v.esxi_hostname", Value::raw(settings::ESXI_HOSTNAME.fetch()));
+    r.assign("v.esxi_hostport", Value::raw(format!("{}.to_i", settings::ESXI_HOSTPORT.fetch())));
+    r.assign("v.esxi_username", Value::raw(settings::ESXI_USERNAME.fetch()));
     r.assign("v.esxi_password", Value::str("env:ESXI_PASSWORD"));
-    r.assign_if("v.esxi_disk_store", Value::raw("ENV[\"ESXI_DATASTORE\"]"), "ENV[\"ESXI_DATASTORE\"]");
+    let store = settings::ESXI_DATASTORE.raw();
+    r.assign_if("v.esxi_disk_store", Value::raw(&store), &store);
 }
 
 #[cfg(test)]

@@ -22,10 +22,6 @@ use isoloom_spec::shell::quote;
 
 use crate::inventory::CONTROLLER_INVENTORY;
 
-/// The controller's name on every target: its host name, its VM's, and its machine in a run
-/// manifest. Under Isoloom's own prefix, which no machine of the spec takes.
-pub const NAME: &str = "isoloom-controller";
-
 /// Ansible in a virtual environment at `/opt/ansible` (pywinrm for the Windows machines), once:
 /// the one pin of the Ansible every controller runs.
 pub const INSTALL_ANSIBLE: &str =

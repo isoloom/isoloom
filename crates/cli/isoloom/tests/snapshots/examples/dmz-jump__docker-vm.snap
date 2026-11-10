@@ -2097,7 +2097,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "ESXI_VIRTUAL_NETWORK",
-      "description": "Port groups, comma-separated: the management network, then one per lab network.",
+      "description": "Port groups, comma-separated: the management network, then one per environment network.",
       "default": "VM Network",
       "providers": [
         "vmware_esxi"

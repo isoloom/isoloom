@@ -10,7 +10,8 @@ mod usage;
 pub(crate) mod variable;
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, number};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, project};
+use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_render::{GeneratedFile, project};
 use isoloom_spec::model::Target;
 
 pub(crate) use usage::Usage;

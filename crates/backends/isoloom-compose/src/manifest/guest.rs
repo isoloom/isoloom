@@ -6,13 +6,14 @@
 //! files Compose reads from its environment read from the VM's copy, and root's Docker (through
 //! `sudo` keeping the values the way in forwarded, unless the way in is root: [`AsRoot`]).
 
+use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_FIXED};
 use isoloom_manifest::{EnvName, Failure, Machine, Name, Part, Placeholder, PublishMode, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_render::container::{exec_runner, host_environment, host_folders};
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, GuestRunner};
 use isoloom_render::run_manifest::{DERIVED, check, derived_switch, networks, timeout_s};
+use isoloom_render::steps;
 use isoloom_render::steps::AsRoot;
-use isoloom_render::{OUTPUT_DIR, steps};
 
 use super::Project;
 use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
@@ -41,7 +42,7 @@ impl InVm {
     /// in forwarded and `before` exported (no `sudo` for root).
     fn compose(&self, before: &str, rest: &[Part]) -> Template {
         let head = format!(
-            "cd {} && {before}{}env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 {}docker compose --project-name {} --file {OUTPUT_DIR}/docker/compose.yml ",
+            "cd {} && {before}{}env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 {PUBLISH_FIXED}=1 {}docker compose --project-name {} --file {OUTPUT_DIR}/docker/compose.yml ",
             steps::PROJECT_DIR,
             self.as_root.keeping_env(),
             self.folders,

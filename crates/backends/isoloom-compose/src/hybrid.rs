@@ -5,9 +5,10 @@
 //! (Docker's DNS only knows containers).
 
 use indexmap::IndexMap;
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::{Environment, MachineShape, PublishedPort};
 use isoloom_render::container::{DOCKER_HOST, HybridContainers, docker_net};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, router};
+use isoloom_render::{GeneratedFile, header, router};
 use isoloom_spec::model::{Protocol, Spec, Target};
 
 use crate::error::Result;

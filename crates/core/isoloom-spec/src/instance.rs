@@ -10,6 +10,7 @@ use crate::model::{NetworkDocker, Spec};
 use crate::validate::docker_cidrs;
 use crate::validate::{Cidr, Cidr6};
 use crate::{Error, Result};
+use isoloom_manifest::contract::OUTPUT_DIR;
 
 /// The highest instance number.
 pub const MAX: u8 = 99;
@@ -18,8 +19,8 @@ pub const MAX: u8 = 99;
 #[must_use]
 pub fn output_dir(instance: Option<u8>) -> String {
     match instance {
-        Some(n) => format!(".isoloom-{n}"),
-        None => ".isoloom".to_owned(),
+        Some(n) => format!("{OUTPUT_DIR}-{n}"),
+        None => OUTPUT_DIR.to_owned(),
     }
 }
 

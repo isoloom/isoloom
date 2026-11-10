@@ -46,6 +46,7 @@ mod host_folders;
 pub mod hybrid;
 mod manifest;
 mod ruby;
+mod settings;
 #[cfg(test)]
 mod testing;
 mod vagrantfile;

@@ -91,11 +91,11 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
     }
 }
 
-/// What Isoloom's own machines, services and files beside a machine's are named with (its
-/// controller, the check stand-in, the check runners and their scripts, the route sidecars, the
-/// init jobs, a machine's published Kubernetes Service): a spec's machine or alias starting so
-/// would collide with them.
-pub const RESERVED_PREFIX: &str = "isoloom-";
+// What Isoloom's own machines, services and files beside a machine's are named with (its
+// controller, the check stand-in, the check runners and their scripts, the route sidecars, the
+// init jobs, a machine's published Kubernetes Service): a spec's machine or alias starting so
+// would collide with them.
+use isoloom_manifest::contract::RESERVED_PREFIX;
 
 /// The longest machine name: its published ports' Kubernetes Service, `isoloom-<name>`, is a
 /// 63-character DNS label.

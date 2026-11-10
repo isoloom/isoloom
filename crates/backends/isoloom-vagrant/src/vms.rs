@@ -52,15 +52,17 @@ pub fn network_name(environment: &str, network: &str) -> String {
 }
 
 use indexmap::IndexMap;
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::checks::{Position, Resolved};
 use isoloom_plan::{Controller, Environment, MachineShape};
 use isoloom_render::backend::Files;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, powershell, router, steps};
+use isoloom_render::{GeneratedFile, header, powershell, router, steps};
 use isoloom_spec::model::{Spec, Target};
 
 use crate::backend::capabilities;
 use crate::error::{Error, Result};
 use crate::ruby::{BootStatements, Call, Ruby, Value};
+use crate::settings;
 use crate::vagrantfile;
 
 /// The folder of the target's files, under [`OUTPUT_DIR`].
@@ -68,7 +70,7 @@ const DIR: &str = "vagrant";
 /// The define names of Isoloom's own VMs (the router's is `router::NAME`), which are also their
 /// display names, step ids and file names: under the prefix a lab machine can't take, so none is
 /// ever a machine's.
-pub(crate) const CONTROLLER: &str = isoloom_render::controller::NAME;
+pub(crate) const CONTROLLER: &str = isoloom_manifest::contract::CONTROLLER;
 const TOOL_SHELL: &str = "isoloom-tool-shell";
 /// Whether the host is an ARM one, in Ruby.
 const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
@@ -209,7 +211,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
         Value::raw(format!("{ARM_HOST} ? {} : {}", Value::str("aarch64"), Value::str("x86_64"))),
     );
     r.text(&project_rb());
-    r.text(hyperv::HYPERV_RB);
+    r.text(&hyperv::hyperv_rb());
     r.text(vagrantfile::PORT_CHECK_RB);
     utm::constant(r);
     r.blank();
@@ -252,7 +254,7 @@ fn esxi(r: &mut Ruby, env: &Environment) {
     ));
     r.assign(
         "ESXI_NETWORKS",
-        Value::raw("ENV.fetch(\"ESXI_VIRTUAL_NETWORK\", \"VM Network\").split(\",\").map(&:strip)"),
+        Value::raw(format!("{}.split(\",\").map(&:strip)", settings::ESXI_VIRTUAL_NETWORK.fetch())),
     );
     r.text("def esxi_networks(indexes)\n  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }\nend\n");
 }

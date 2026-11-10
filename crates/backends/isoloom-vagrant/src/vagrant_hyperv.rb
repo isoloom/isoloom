@@ -11,7 +11,6 @@
 # - published ports aren't forwarded to the host (Hyper-V can't): Windows' port proxy relays each
 #   one (TCP) from 127.0.0.1 to the VM's address, set at every start (the address may change)
 #   and removed with the VM.
-HYPERV_SWITCH = ENV.fetch("ISOLOOM_HYPERV_SWITCH", "Default Switch")
 module IsoloomHyperV
   def self.fail!(message)
     raise Class.new(Vagrant::Errors::VagrantError) { define_method(:error_message) { "Hyper-V: #{message}" } }

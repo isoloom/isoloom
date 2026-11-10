@@ -30,9 +30,17 @@ use super::providers::Size;
 use crate::ruby::{Call, Ruby, Value};
 use isoloom_render::stable_hash;
 
-/// The Ruby that gives VMs their networks on Hyper-V (`vagrant_hyperv.rb`): `HYPERV_SWITCH`
-/// and the `IsoloomHyperV` module the triggers call.
-pub(crate) const HYPERV_RB: &str = include_str!("../vagrant_hyperv.rb");
+/// The Ruby that gives VMs their networks on Hyper-V: `HYPERV_SWITCH`
+/// ([`settings::HYPERV_SWITCH`](crate::settings::HYPERV_SWITCH)), then `vagrant_hyperv.rb`, the
+/// `IsoloomHyperV` module the triggers call.
+pub(crate) fn hyperv_rb() -> String {
+    let rb = include_str!("../vagrant_hyperv.rb");
+    let (about, module) = rb.split_once("module IsoloomHyperV").unwrap_or(("", rb));
+    format!(
+        "{about}HYPERV_SWITCH = {}\nmodule IsoloomHyperV{module}",
+        crate::settings::HYPERV_SWITCH.fetch()
+    )
+}
 
 /// How a VM runs under Vagrant's Hyper-V provider.
 #[derive(Debug, Clone)]

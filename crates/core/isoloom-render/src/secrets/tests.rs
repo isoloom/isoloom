@@ -196,3 +196,8 @@ fn values_from_the_environment_are_kept_and_an_empty_one_keeps_the_kept_value() 
     assert_eq!(std::fs::read_to_string(kept_dir.join("db")).unwrap(), "kept");
     std::fs::remove_dir_all(&kept_dir).ok();
 }
+
+#[test]
+fn the_secrets_are_kept_in_isoloom_s_own_linux_folder() {
+    assert!(KEPT_DIR.starts_with(&format!("{}/", isoloom_spec::linux::STATE_DIR)), "{KEPT_DIR}");
+}

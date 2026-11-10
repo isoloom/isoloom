@@ -3,10 +3,11 @@
 //! (Proxmox, ESXi, `cloud-vm`).
 
 use crate::hcl_builder::{Block, Expression, list, object, string};
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position};
+use isoloom_render::GeneratedFile;
 use isoloom_render::checks::{Render, address_of, script, script_command};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 
 use crate::module::output;
 

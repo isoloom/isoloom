@@ -28,11 +28,13 @@
 
 use crate::boxes;
 use crate::error::Result;
+use crate::settings;
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_manifest::{Error as ManifestError, Failure, Manifest, Part, Placeholder};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container::{self as docker, DOCKER_HOST as VM};
 use isoloom_render::run_manifest::guest::{COMPOSE_OUTPUTS, GuestCommand, GuestCompose};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
+use isoloom_render::{GeneratedFile, header, steps};
 use isoloom_spec::model::Target;
 use isoloom_spec::shell::quote;
 
@@ -255,7 +257,7 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
         vagrantfile::esxi_host(r);
         r.assign(
             "v.esxi_virtual_network",
-            Value::array([Value::raw("ENV.fetch(\"ESXI_VIRTUAL_NETWORK\", \"VM Network\").split(\",\").first.strip")]),
+            Value::array([Value::raw(format!("{}.split(\",\").first.strip", settings::ESXI_VIRTUAL_NETWORK.fetch()))]),
         );
         r.assign("v.guest_name", Value::str(guest));
         r.assign("v.guest_numvcpus", cpus);

@@ -2,11 +2,12 @@
 //! stands, and one for the controller (on every network), each run on demand
 //! (`vagrant provision --provision-with checks`).
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_plan::{Environment, MachineShape};
+use isoloom_render::GeneratedFile;
 use isoloom_render::inventory::CONTROLLER_INVENTORY;
 use isoloom_render::steps::PROJECT_DIR;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::images;
 use isoloom_spec::shell::quote;
 

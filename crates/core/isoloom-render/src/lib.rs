@@ -66,4 +66,4 @@ pub mod windows;
 
 pub use error::{Error, Result};
 pub use network::{ipv6, router, trunks};
-pub use output::{GeneratedFile, OUTPUT_DIR, header};
+pub use output::{GeneratedFile, header};

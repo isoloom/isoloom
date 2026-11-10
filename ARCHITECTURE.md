@@ -36,7 +36,9 @@ Supporting the backbone:
   container pieces. A builder only one backend uses is that backend's: the HCL builder is
   `isoloom-terraform`'s, the Ruby one (string quoting included) `isoloom-vagrant`'s.
 - **`isoloom-manifest`** — the run manifest types, its generated JSON schema and the fixtures
-  runners can test against.
+  runners can test against, and the contract's names outside `run.json` (`contract`: the output
+  folder, the Vagrantfile's variables, the cloud tags, the machines' marks). It depends on no
+  other crate of the workspace; the spec builds on it for those names.
 - **`isoloom-import`** — the reverse direction: a spec drafted from Compose, Vagrant or Terraform
   files.
 - **`isoloom-targets`** — every backend behind one call, the composite targets, refusals, the

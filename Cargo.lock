@@ -609,6 +609,7 @@ dependencies = [
  "insta",
  "isoloom-catalogue",
  "isoloom-import",
+ "isoloom-manifest",
  "isoloom-spec",
  "isoloom-targets",
  "serde",
@@ -623,6 +624,7 @@ version = "1.0.9"
 dependencies = [
  "insta",
  "isoloom-catalogue",
+ "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -671,6 +673,7 @@ version = "1.0.9"
 dependencies = [
  "hcl-rs",
  "indexmap",
+ "isoloom-manifest",
  "isoloom-plan",
  "isoloom-spec",
  "proptest",
@@ -686,6 +689,7 @@ version = "1.0.9"
 dependencies = [
  "indexmap",
  "insta",
+ "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -746,6 +750,7 @@ version = "1.0.9"
 dependencies = [
  "indexmap",
  "insta",
+ "isoloom-manifest",
  "jsonschema",
  "proptest",
  "saphyr-parser",

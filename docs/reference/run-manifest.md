@@ -41,6 +41,14 @@ The manifest is strict (`additionalProperties: false`) and carries its own versi
 schema is committed at [`schemas/run-manifest-v1.schema.json`](../../schemas/run-manifest-v1.schema.json),
 and `isoloom-manifest` holds the types and fixtures runners can test against.
 
+A few names the generated files and a runner share live outside `run.json`: the output folder
+(`.isoloom`), the controller's machine, the variables a Vagrantfile reads (the ESXi host and
+port, the SSH proxy command, the chosen host ports, `ISOLOOM_PUBLISH_FIXED`), the cloud tags a
+reaper reads (`isoloom-instance`, `isoloom-expires-at`), and the paths a machine's set-up uses
+(its secrets folder and their delivery mark, the controller's halting mark). They are part of
+the contract too, each defined once in `isoloom_manifest::contract`, which the backends write
+from and a runner reads from.
+
 ## Versions and compatibility
 
 `manifest_version` is the contract's version: **1** from Isoloom 2.0. Within version 1, a minor

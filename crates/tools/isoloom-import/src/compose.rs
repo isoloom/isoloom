@@ -340,7 +340,7 @@ impl<'a> Import<'a> {
                 if name == svc.name || name == m.name || m.aliases.contains(&name) {
                     continue;
                 }
-                if !isoloom_spec::validate::dns_name(&name) || name.starts_with(isoloom_spec::validate::RESERVED_PREFIX) {
+                if !isoloom_spec::validate::dns_name(&name) || name.starts_with(isoloom_manifest::contract::RESERVED_PREFIX) {
                     self.notes
                         .add(&at, NoteKind::Changed, format!("`{alias}` left out: not a name a machine can answer to"));
                 } else if self.names.values().any(|other| *other == name) {

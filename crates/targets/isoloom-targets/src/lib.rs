@@ -50,7 +50,7 @@ pub use composite::{CloudDockerBackend, DockerVmBackend, HybridBackend};
 pub use error::{Error, GenerateError, Result};
 pub use generation::{default_regions, generate, generate_all, generate_instance, project_copies};
 pub use isoloom_plan::Lab;
-pub use isoloom_render::{GeneratedFile, OUTPUT_DIR};
+pub use isoloom_render::GeneratedFile;
 pub use refusal::{CloudRefusal, Clouds, cloud_refusals, not_possible_reason, refusal, refusal_on};
 #[doc(hidden)]
 pub use registry::backend;

@@ -22,7 +22,9 @@ use std::fs::Metadata;
 use std::io::Write as _;
 use std::path::{Component, Path, PathBuf};
 
-use isoloom_targets::{GeneratedFile, Lab, OUTPUT_DIR};
+use isoloom_targets::{GeneratedFile, Lab};
+
+use isoloom_manifest::contract::OUTPUT_DIR;
 
 use crate::error::{CliError, Result};
 

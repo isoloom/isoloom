@@ -8,9 +8,9 @@
 use crate::ssh::Login;
 use std::net::IpAddr;
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SecretSlot, SnakeName, Template};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::OUTPUT_DIR;
 use isoloom_render::run_manifest::{outputs_with, timeout_s};
 
 use crate::module::manifest::terraform_output as state;

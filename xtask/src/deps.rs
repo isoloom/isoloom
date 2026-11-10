@@ -2,7 +2,8 @@
 //! `cargo metadata` says: spec → plan → render → backends → targets → cli. A crate depends only
 //! on crates below it, so no backend depends on another backend, the tools (import) depend on
 //! the core alone, the manifest crate depends on no other crate of the workspace (it is the
-//! serde-only contract the runner reads too), and nothing depends on the xtask (which may use
+//! serde-only contract the runner reads too, whose names the spec uses), and nothing depends on
+//! the xtask (which may use
 //! any crate: the catalogue's refresh reads the catalogue's types).
 
 use serde_json::Value;
@@ -37,13 +38,14 @@ impl Level {
     }
 }
 
-/// The core crates, in their order; the manifest crate sits at the bottom with the spec.
+/// The core crates, in their order; the manifest crate sits at the bottom, under the spec (which
+/// reads the contract's names: its reserved prefix, the output folder).
 const CORE: [(&str, u8); 5] = [
-    ("isoloom-spec", 0),
     ("isoloom-manifest", 0),
-    ("isoloom-catalogue", 1),
-    ("isoloom-plan", 2),
-    ("isoloom-render", 3),
+    ("isoloom-spec", 1),
+    ("isoloom-catalogue", 2),
+    ("isoloom-plan", 3),
+    ("isoloom-render", 4),
 ];
 
 /// What the manifest crate may build on: serde and its schema, nothing else, so the runner reads
@@ -167,7 +169,7 @@ mod tests {
         ]);
         assert_eq!(upward.len(), 1, "{upward:?}");
         assert!(
-            upward[0].starts_with("isoloom-spec (Core(0)) depends on isoloom-plan (Core(2)) (dev)"),
+            upward[0].starts_with("isoloom-spec (Core(1)) depends on isoloom-plan (Core(3)) (dev)"),
             "{upward:?}"
         );
     }

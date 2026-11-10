@@ -10,10 +10,11 @@
 pub use super::manifest::docker_vm::docker_vm as manifest;
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, boolean, list, number, reference, string};
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
 use isoloom_render::run_manifest::guest::GuestCompose;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, steps};
+use isoloom_render::{GeneratedFile, steps};
 use isoloom_spec::model::Target;
 
 use super::base::{download, provider};

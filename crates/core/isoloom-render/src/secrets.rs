@@ -1,7 +1,8 @@
 //! Secrets on a VM and on a Docker host. The generated set-up never holds a value: it waits
 //! for the runner to deliver them over the machine's own connection (SSH), then puts each
 //! file in place. Delivery writes a root-only copy of each value under `KEPT_DIR` (it outlives
-//! a reboot, which empties `/run/secrets`) and the mark [`DELIVERED`] the set-up waits for.
+//! a reboot, which empties `/run/secrets`) and the mark `DELIVERED` the set-up waits for
+//! ([`isoloom_manifest::contract::SECRETS_DIR`], [`isoloom_manifest::contract::DELIVERED`]).
 //!
 //! The order is the plan's `Secrets` step: after the machine's files, before what may read a
 //! secret (its `provision` steps, its `before` steps and its command). The set-up runs inside
@@ -18,10 +19,10 @@ use crate::run_manifest::RUNNER;
 
 pub mod windows;
 
-/// Where a machine keeps the secrets delivered to it: root-only, on disk.
-pub(crate) const KEPT_DIR: &str = isoloom_spec::linux_state_path!("/secrets");
 /// The mark delivery leaves once every secret is kept.
-pub const DELIVERED: &str = isoloom_spec::linux_state_path!("/secrets/.delivered");
+pub(crate) use isoloom_manifest::contract::DELIVERED;
+/// Where a machine keeps the secrets delivered to it: root-only, on disk.
+pub(crate) use isoloom_manifest::contract::SECRETS_DIR as KEPT_DIR;
 /// Seconds the set-up waits for the runner to deliver the secrets.
 pub(crate) const DELIVERY_TIMEOUT: u32 = 1800;
 /// The boot service putting the secrets back in place (`/run` is emptied at every boot). Its

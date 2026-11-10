@@ -9,8 +9,9 @@
 //! in a manifest (a script, the message) is printed as it is.
 
 use indexmap::IndexMap;
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR};
+use isoloom_render::GeneratedFile;
 use serde::Serialize;
 use serde_yaml_ng::Value;
 

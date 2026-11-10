@@ -1,11 +1,12 @@
 //! The `external` target as a backend: what hosts that already exist can run, and the files
 //! that reach them.
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_render::inventory::{self, Access, Vars};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
+use isoloom_render::{GeneratedFile, header};
 use isoloom_spec::model::Target;
 
 use crate::checks;

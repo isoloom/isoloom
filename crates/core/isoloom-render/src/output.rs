@@ -21,9 +21,6 @@ impl GeneratedFile {
     }
 }
 
-/// Where generated files go, relative to the project folder.
-pub const OUTPUT_DIR: &str = ".isoloom";
-
 /// The first lines of every generated file: it is generated and how to change it (`comment`
 /// is the file's comment marker, `#` or `//`).
 #[must_use]
