@@ -148,8 +148,8 @@ fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, St
 }
 
 /// The image table every row's lab is read with, as a runner gives one: it supplies the access
-/// machine a spec leaves to the runner (no `os`), in both forms. Without it, every target but
-/// `external` refuses that machine.
+/// machine a spec leaves to the runner (no `os`), in both forms. Without it, every target that
+/// creates the machines (all but `external` and `cloud-services`) refuses that machine.
 const RUNNER_IMAGES: &str = "access: { docker: registry.example.com/workstation:1, vm: debian@12 }\n";
 
 /// A row: its labs, then each column's decision about the one it reads.
