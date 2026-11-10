@@ -1,12 +1,27 @@
 //! The spec of a project as a command sees it: with the profile asked for, the command's `-s`
 //! overrides and the image table, checked, and as the instance when one is named.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use isoloom_spec::defaults::Resolved;
 use isoloom_targets::Lab;
 
 use crate::error::{CliError, Result};
+
+// What every command that reads the lab reads it with besides the spec and the profile, so each
+// judges the lab `generate` writes; flattened into its arguments (no doc comment: clap would print
+// it in `--help`).
+#[derive(Debug, Clone, Default, clap::Args)]
+pub(crate) struct Settings {
+    /// Your own image table (YAML): OS images, and the access machine when the spec leaves
+    /// it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>
+    #[arg(long, value_name = "FILE")]
+    pub(crate) images: Option<PathBuf>,
+    /// Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec,
+    /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
+    #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
+    pub(crate) sets: Vec<String>,
+}
 
 /// The profile a command runs with: `--profile`, else `ISOLOOM_PROFILE` when it isn't empty.
 /// Worked out once in `main` and handed to every command that reads the spec.
@@ -65,10 +80,12 @@ pub(crate) fn defaults_of<'a>(
 
 /// The lab with `-s` overrides, the image table, the clouds' regions and the defaults' tags
 /// applied, and the defaults in effect: the lab every command reads, as `generate` writes it.
-pub(crate) fn with_settings(profile: &Profile, dir: &Path, images: Option<&Path>, sets: &[String]) -> Result<(Lab, Resolved)> {
+pub(crate) fn with_settings(profile: &Profile, dir: &Path, given: &Settings) -> Result<(Lab, Resolved)> {
     let profile = profile.load(dir)?;
+    let sets = &given.sets;
     let mut spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
-    let settings = isoloom_spec::defaults::load(&defaults_of(dir, images, profile.as_ref(), sets)).map_err(CliError::Defaults)?;
+    let settings =
+        isoloom_spec::defaults::load(&defaults_of(dir, given.images.as_deref(), profile.as_ref(), sets)).map_err(CliError::Defaults)?;
     spec.tags = settings.tags_under(&spec.tags).map_err(CliError::Defaults)?;
     let lab = Lab::new(spec)
         .with_images(settings.defaults.images.clone())
@@ -101,21 +118,20 @@ pub(crate) fn checked(lab: Lab, dir: &Path) -> Result<Lab> {
     }
 }
 
-/// The lab with `-s` overrides, checked, and checked that instance `instance` can be made of it
-/// when one is asked.
-pub(crate) fn valid(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Result<Lab> {
-    let (lab, _) = with_settings(profile, dir, None, sets)?;
+/// The lab read with `settings` ([`with_settings`]), checked, and checked that instance
+/// `instance` can be made of it when one is asked; with the defaults in effect.
+pub(crate) fn valid(profile: &Profile, dir: &Path, instance: Option<u8>, settings: &Settings) -> Result<(Lab, Resolved)> {
+    let (lab, resolved) = with_settings(profile, dir, settings)?;
     let lab = checked(lab, dir)?;
     if let Some(number) = instance {
         isoloom_spec::instance::apply(&lab.spec(), number).map_err(|error| CliError::Instance { number, error })?;
     }
-    Ok(lab)
+    Ok((lab, resolved))
 }
 
-/// The resolved snapshot of a project (as an instance when asked), once it is valid.
-pub(crate) fn snapshot(profile: &Profile, dir: &Path, instance: Option<u8>, sets: &[String]) -> Result<serde_json::Value> {
-    let lab = valid(profile, dir, instance, sets)?;
-    Ok(isoloom_targets::resolved::resolve_with(&lab, instance)?)
+/// The resolved snapshot of the lab [`valid`] reads (as an instance when asked).
+pub(crate) fn snapshot(lab: &Lab, instance: Option<u8>) -> Result<serde_json::Value> {
+    Ok(isoloom_targets::resolved::resolve_with(lab, instance)?)
 }
 
 #[cfg(test)]

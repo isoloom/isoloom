@@ -1,6 +1,6 @@
 //! `isoloom report <name>`: a table about the environment, as text or Markdown.
 
-use std::path::Path;
+use isoloom_spec::defaults::Resolved;
 
 use super::{Console, Project, Result, Verdict, spec};
 
@@ -16,9 +16,8 @@ pub(crate) struct Args {
     /// Report on instance N.
     #[arg(long, value_name = "N")]
     instance: Option<u8>,
-    /// Overrides, as for `generate`.
-    #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
-    sets: Vec<String>,
+    #[command(flatten)]
+    settings: spec::Settings,
 }
 
 /// Prints the report asked for (`list` names them all).
@@ -29,11 +28,12 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
         }
         return Ok(Verdict::Pass);
     }
-    let snapshot = spec::snapshot(profile, &a.project.dir, a.instance, &a.sets)?;
+    let (lab, resolved) = spec::valid(profile, &a.project.dir, a.instance, &a.settings)?;
+    let snapshot = spec::snapshot(&lab, a.instance)?;
     console.print(isoloom_targets::report::report(&a.name, &snapshot, a.md)?)?;
     // Published ports on Hyper-V (the provider the defaults or Vagrant pick): not forwarded.
     if matches!(a.name.as_str(), "ports" | "services")
-        && vagrant_provider(profile, &a.project.dir).as_deref() == Some("hyperv")
+        && vagrant_provider(&resolved).as_deref() == Some("hyperv")
         && let Some(note) = isoloom_targets::report::hyperv_ports_note(&snapshot)
     {
         console.print(format_args!("\n{note}"))?;
@@ -41,11 +41,13 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     Ok(Verdict::Pass)
 }
 
-/// The Vagrant provider the project's files are for: the defaults' (`vagrant.provider`), else
-/// Vagrant's own `VAGRANT_DEFAULT_PROVIDER`.
-fn vagrant_provider(profile: &spec::Profile, dir: &Path) -> Option<String> {
-    spec::with_settings(profile, dir, None, &[])
-        .ok()
-        .and_then(|(_, r)| r.defaults.vagrant.provider)
+/// The Vagrant provider the project's files are for: the defaults' (`vagrant.provider`, as the
+/// command read them), else Vagrant's own `VAGRANT_DEFAULT_PROVIDER`.
+fn vagrant_provider(resolved: &Resolved) -> Option<String> {
+    resolved
+        .defaults
+        .vagrant
+        .provider
+        .clone()
         .or_else(|| std::env::var("VAGRANT_DEFAULT_PROVIDER").ok().filter(|v| !v.is_empty()))
 }

@@ -37,7 +37,7 @@ pub(crate) struct Project {
 }
 
 // The arguments of the commands that read a project and answer as text or `--json`
-// (`profiles`, `resources`, `targets`).
+// (`profiles`, `resources`, `targets`), with what the lab is read with besides the spec.
 #[derive(Debug, clap::Args)]
 pub(crate) struct Listing {
     #[command(flatten)]
@@ -45,6 +45,8 @@ pub(crate) struct Listing {
     /// JSON instead of text.
     #[arg(long)]
     pub(crate) json: bool,
+    #[command(flatten)]
+    pub(crate) settings: spec::Settings,
 }
 
 /// The targets `generate_all` left out, each a refusal of the lab; those left out for any other

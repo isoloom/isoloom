@@ -14,14 +14,13 @@ pub(crate) struct Args {
     /// single target, else the spec's addresses).
     #[arg(long)]
     target: Option<String>,
-    /// Overrides, as for `generate`.
-    #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
-    sets: Vec<String>,
+    #[command(flatten)]
+    settings: spec::Settings,
 }
 
 /// Prints the message as it reads where the environment runs.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
-    let lab = spec::valid(profile, &a.project.dir, a.instance, &a.sets)?;
+    let (lab, _) = spec::valid(profile, &a.project.dir, a.instance, &a.settings)?;
     // Where it runs decides the addresses (Docker blocks on the Compose targets).
     let on = match a.target.as_deref() {
         Some(id) => Some(target::by_id(id)?),

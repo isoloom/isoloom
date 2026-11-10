@@ -701,3 +701,33 @@ fn the_cli_reference_page_is_what_docs_cli_prints() -> Outcome {
     assert!(run.stdout.contains("| `--quiet`") || run.stdout.contains("| `-q, --quiet`"), "check's options");
     Ok(())
 }
+
+/// The access machine left to the runner: a target refuses it unless the image table gives it a
+/// form there. Every command that judges the lab takes the table and `-s` as `generate` does, so
+/// none says ✗ for a target `generate --images` writes.
+#[test]
+fn every_command_judges_the_lab_generate_writes() -> Outcome {
+    let home = scratch("judges-what-generate-writes")?;
+    let dir = project(
+        "judges-what-generate-writes",
+        "version: 1\nname: supplied\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: 10 }, ports: { web: 80 }, app: { image: nginx } }\n  user: { access: true, networks: { lan: 99 } }\n",
+    )?;
+    let table = dir.join("images.yml");
+    std::fs::write(&table, "access: { docker: registry.example.com/workstation:1 }\n")?;
+    let bare = isoloom(&home, &[&"targets", &dir])?;
+    assert!(bare.stdout.contains("✗ docker ("), "{bare:?}");
+    let with = isoloom(&home, &[&"targets", &dir, &"--images", &table])?;
+    assert!(with.stdout.contains("✓ docker\n"), "{with:?}");
+    let generated = isoloom(&home, &[&"generate", &dir, &"--target", &"docker", &"--images", &table])?;
+    assert_eq!(generated.code, Some(0), "{generated:?}");
+    // The snapshot's targets, the same way.
+    let inspected = isoloom(&home, &[&"inspect", &"targets.generated", &dir, &"--images", &table])?;
+    assert_eq!(inspected.code, Some(0), "{inspected:?}");
+    assert!(inspected.stdout.contains("\"docker\""), "{inspected:?}");
+    // `-s` too, on the commands that had none.
+    let set = isoloom(&home, &[&"resources", &dir, &"-s", &"machines.web.resources.cpus=3", &"--json"])?;
+    assert!(set.stdout.contains("\"cpus\":"), "{set:?}");
+    let renamed = isoloom(&home, &[&"validate", &dir, &"--skip-files", &"-s", &"name=renamed"])?;
+    assert!(renamed.stdout.contains("✓ renamed is valid"), "{renamed:?}");
+    Ok(())
+}

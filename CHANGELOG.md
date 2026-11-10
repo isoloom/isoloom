@@ -46,7 +46,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   (Vagrant, Proxmox, ESXi, the clouds) wrote no VM for it, and on Proxmox and the clouds no run
   manifest entry either, while every other machine's hosts file still listed it; Docker wrote its
   service with no image, which `docker compose --profile access` refuses. A target the table gives
-  none of the form it runs now refuses the lab at `machines.<m>.os` (`isoloom targets` says why),
+  none of the form it runs now refuses the lab at `machines.<m>.os` (`isoloom targets` says why,
+  given the same `--images`),
   and `isoloom validate` warns when the table gives none at all. Give the machine `os: debian@12`,
   or pass a table with `access: { docker: <image>, vm: <os> }`. The `corp-ad-basics` example's
   access machine is `os: debian@12` now: an on-demand VM on Vagrant, a VM on Proxmox and ESXi, a
@@ -414,6 +415,20 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   run, took the host port the runner chose (`ISOLOOM_HOSTPORTS`): the run's URL didn't answer.
   The relay, and its removal with the VM, now take the forward's own host number, written once
   for both, the `publish` number still the fallback when the runner chose none.
+- **Every command that reads the environment reads it as `generate` does.** `targets`,
+  `validate`, `resources` and `profiles` took neither `--images` nor `-s`, and `graph`, `report`,
+  `message` and `inspect` took `-s` but not `--images`: with an image table, `isoloom targets`
+  and the snapshot's `targets` said ✗ for a target `generate --images` writes. Each now takes
+  both, and `report` reads the Vagrant provider from the defaults it was given.
+- **hybrid's containers' host starts a set-up job nothing waits for after the rest is up.** A
+  container with `setup:` no other machine depends on has a one-shot job, and the host's
+  `docker compose up --wait` failed when it exited, so `vagrant up` failed. The host now waits for
+  everything else, then runs each such job attached, as the `docker` and `docker-vm` run manifests
+  do. The `# Start:` line atop the generated `compose.yml` does the same (and builds), so the
+  hand-run start works for such a spec.
+- **Proxmox's seal is one SSH step.** Its `terraform apply` with `isoloom_sealed` changed
+  nothing (the module has no such variable) and is gone; the router is sealed by the SSH step,
+  which also keeps the sealed ruleset for later boots.
 - **`isoloom generate` never writes through a symbolic link.** A clone holding
   `.isoloom/docker/run.json` (or `.isoloom/docker`) as a link elsewhere had the generated file
   written where the link led, outside the project. A generated file whose path goes through a

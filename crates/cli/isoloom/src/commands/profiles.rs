@@ -1,6 +1,7 @@
 //! `isoloom profiles`: each of the project's profiles, checked against the spec.
 
 use super::{Console, Listing, Result, Verdict};
+use crate::spec::Settings;
 use std::path::Path;
 
 /// A profile as listed: its name, target, description and problems.
@@ -15,7 +16,7 @@ struct Checked {
 /// Lists each profile with its problems; a no when one has any.
 pub(crate) fn run(a: &Listing, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
-    let out: Vec<Checked> = isoloom_spec::profile::list(dir).iter().map(|name| check(dir, name)).collect();
+    let out: Vec<Checked> = isoloom_spec::profile::list(dir).iter().map(|name| check(dir, name, &a.settings)).collect();
     let failed = out.iter().any(|c| !c.problems.is_empty());
     if a.json {
         let items: Vec<serde_json::Value> = out
@@ -46,8 +47,9 @@ pub(crate) fn run(a: &Listing, console: &mut Console) -> Result<Verdict> {
     Ok(Verdict::of(!failed))
 }
 
-/// A profile loaded, the spec it makes checked, and its target checked against that spec.
-fn check(dir: &Path, name: &str) -> Checked {
+/// A profile loaded, the spec it makes (with `settings`) checked, and its target checked against
+/// that spec.
+fn check(dir: &Path, name: &str, settings: &Settings) -> Checked {
     let profile = isoloom_spec::profile::load(dir, name);
     let (target, description) = match &profile {
         Ok(p) => (p.target.map(isoloom_spec::Target::id), p.description.clone()),
@@ -55,7 +57,7 @@ fn check(dir: &Path, name: &str) -> Checked {
     };
     let problems = match profile {
         Err(e) => vec![e.to_string()],
-        Ok(p) => problems_of(dir, &p),
+        Ok(p) => problems_of(dir, &p, settings),
     };
     Checked {
         name: name.to_owned(),
@@ -66,13 +68,13 @@ fn check(dir: &Path, name: &str) -> Checked {
 }
 
 /// What is wrong with the spec a profile makes, and with the target it pins.
-fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile) -> Vec<String> {
-    let spec = match isoloom_spec::load_profiled(dir, Some(p), &[]) {
+fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile, settings: &Settings) -> Vec<String> {
+    let spec = match isoloom_spec::load_profiled(dir, Some(p), &settings.sets) {
         Err(isoloom_spec::Error::Invalid { problems, .. }) => return problems.iter().map(|e| format!("the spec it makes: {}", e.line())).collect(),
         Err(e) => return e.to_string().lines().map(str::to_owned).collect(),
         Ok(spec) => spec,
     };
-    let lab = match isoloom_spec::defaults::load(&crate::spec::defaults_of(dir, None, Some(p), &[])) {
+    let lab = match isoloom_spec::defaults::load(&crate::spec::defaults_of(dir, settings.images.as_deref(), Some(p), &settings.sets)) {
         Err(e) => return vec![e.to_string()],
         Ok(r) => isoloom_targets::Lab::new(spec)
             .with_regions(r.defaults.regions())

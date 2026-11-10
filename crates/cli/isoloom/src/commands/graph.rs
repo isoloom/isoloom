@@ -18,9 +18,8 @@ pub(crate) struct Args {
     /// Draw instance N (its blocks and name).
     #[arg(long, value_name = "N")]
     instance: Option<u8>,
-    /// Overrides, as for `generate`.
-    #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
-    sets: Vec<String>,
+    #[command(flatten)]
+    settings: spec::Settings,
 }
 
 /// A diagram's format: its source language and the tool that renders it.
@@ -70,7 +69,8 @@ impl Format {
 /// Draws the environment: on stdout, into a source file, or rendered to an image.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let format = Format::named(&a.format)?;
-    let snapshot = spec::snapshot(profile, &a.project.dir, a.instance, &a.sets)?;
+    let (lab, _) = spec::valid(profile, &a.project.dir, a.instance, &a.settings)?;
+    let snapshot = spec::snapshot(&lab, a.instance)?;
     let text = match format {
         Format::D2 => isoloom_targets::graph::d2(&snapshot),
         Format::Dot => isoloom_targets::graph::dot(&snapshot),

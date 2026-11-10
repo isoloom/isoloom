@@ -1,27 +1,19 @@
 //! `isoloom check`: whether the generated files under .isoloom/ still match the spec (for CI).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use isoloom_targets::GeneratedFile;
 
 use super::{Console, Project, Result, Verdict};
-use crate::{generated, spec};
+use super::generate::{Generation, Planned, planned};
+use crate::spec;
 
 #[derive(Debug, clap::Args)]
 pub(crate) struct Args {
     #[command(flatten)]
     project: Project,
-    /// Only this target's files (any that `isoloom targets` lists); a profile's pinned target
-    /// when it has one.
-    #[arg(long)]
-    target: Option<String>,
-    /// The image table the files were generated with (see `generate --images`).
-    #[arg(long, value_name = "FILE")]
-    images: Option<PathBuf>,
-    /// Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec,
-    /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
-    #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
-    sets: Vec<String>,
+    #[command(flatten)]
+    generation: Generation,
     /// Only the files that fail, so a CI log shows what to fix.
     #[arg(long, short = 'q', conflicts_with = "json")]
     quiet: bool,
@@ -84,19 +76,12 @@ impl FileResult {
 /// nothing to vouch for: a no. One left out for any other reason (its backend failed) is an
 /// error, since its committed files can't be vouched for.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
-    let target = spec::pinned(profile, &a.project.dir, a.target.as_deref())?;
-    let (lab, _) = spec::with_settings(profile, &a.project.dir, a.images.as_deref(), &a.sets)?;
-    let lab = spec::checked(lab, &a.project.dir)?;
-    let (files, skipped) = super::generate::files(&lab, target.as_deref())?;
+    let Planned { files, stale, list, skipped } = planned(&a.generation, profile, &a.project.dir)?;
     if files.is_empty() {
         let refused: Vec<String> = skipped.iter().map(ToString::to_string).collect();
         report(a, console, &[], &refused)?;
         return Ok(Verdict::Fail);
     }
-    let files = generated::finish(files, &a.project.dir)?;
-    let stale = generated::stale(&a.project.dir, &files, &generated::scope(target.as_deref()))?;
-    let list = generated::list(&a.project.dir, &files, &stale)?;
-    generated::writable(&a.project.dir, files.iter().chain(&list))?;
     let mut results: Vec<FileResult> = files.iter().chain(&list).map(|f| compare(&a.project.dir, f)).collect();
     results.extend(stale.into_iter().map(|path| FileResult {
         path,

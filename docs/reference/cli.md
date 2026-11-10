@@ -25,6 +25,8 @@ Arguments:
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
 | `--skip-files` | Don't check that files mentioned by the spec exist. |
 | `--json` | Machine-readable output. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom targets`
 
@@ -40,6 +42,8 @@ Arguments:
 | --- | --- |
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
 | `--json` | JSON instead of text. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom resources`
 
@@ -55,6 +59,8 @@ Arguments:
 | --- | --- |
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
 | `--json` | JSON instead of text. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom generate`
 
@@ -69,7 +75,7 @@ Arguments:
 | Argument | Description |
 | --- | --- |
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
-| `--target <TARGET>` | Only this target (any that `isoloom targets` lists). |
+| `--target <TARGET>` | Only this target (any that `isoloom targets` lists); a profile's pinned target when it has one. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
@@ -86,8 +92,8 @@ Arguments:
 | Argument | Description |
 | --- | --- |
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
-| `--target <TARGET>` | Only this target's files (any that `isoloom targets` lists); a profile's pinned target when it has one. |
-| `--images <FILE>` | The image table the files were generated with (see `generate --images`). |
+| `--target <TARGET>` | Only this target (any that `isoloom targets` lists); a profile's pinned target when it has one. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 | `-q, --quiet` | Only the files that fail, so a CI log shows what to fix. |
 | `--json` | Machine-readable output: one result per file, then a summary. |
@@ -124,7 +130,8 @@ Arguments:
 | `--format <FORMAT>` | `d2` (default) or `dot`. Default: `d2`. |
 | `-o, --out <OUT>` | Write here instead of stdout; `.svg` and `.png` are rendered. |
 | `--instance <N>` | Draw instance N (its blocks and name). |
-| `-s, --set <KEY=VALUE>` | Overrides, as for `generate`. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom report`
 
@@ -142,7 +149,8 @@ Arguments:
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
 | `--md` | Markdown instead of aligned text. |
 | `--instance <N>` | Report on instance N. |
-| `-s, --set <KEY=VALUE>` | Overrides, as for `generate`. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom message`
 
@@ -159,7 +167,8 @@ Arguments:
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
 | `--instance <N>` | The message of instance N. |
 | `--target <TARGET>` | The target it runs on, for the addresses machines have there (default: the spec's single target, else the spec's addresses). |
-| `-s, --set <KEY=VALUE>` | Overrides, as for `generate`. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom inspect`
 
@@ -177,6 +186,7 @@ Arguments:
 | `[DIR]` | The project folder (holding isoloom.yml). |
 | `--yaml` | YAML instead of JSON. |
 | `--instance <N>` | The snapshot of instance N (1-99) of the spec: its own names, Docker blocks and published ports, as a runner makes them for several copies on one host. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom profiles`
@@ -193,6 +203,8 @@ Arguments:
 | --- | --- |
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
 | `--json` | JSON instead of text. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom schema`
 

@@ -17,10 +17,8 @@ pub(crate) struct Args {
     /// ports, as a runner makes them for several copies on one host.
     #[arg(long, value_name = "N")]
     instance: Option<u8>,
-    /// Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec,
-    /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
-    #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
-    sets: Vec<String>,
+    #[command(flatten)]
+    settings: spec::Settings,
 }
 
 /// The dotted path asked for and the project folder: `isoloom inspect examples/segmented` names
@@ -35,7 +33,8 @@ fn path_and_dir(what: Option<String>, dir: Option<PathBuf>) -> (Option<String>, 
 /// Prints the snapshot, or the part of it at the path asked for.
 pub(crate) fn run(a: Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let (what, dir) = path_and_dir(a.what, a.dir);
-    let all = spec::snapshot(profile, &dir, a.instance, &a.sets)?;
+    let (lab, _) = spec::valid(profile, &dir, a.instance, &a.settings)?;
+    let all = spec::snapshot(&lab, a.instance)?;
     let value = match &what {
         Some(path) => isoloom_targets::resolved::lookup(&all, path).ok_or_else(|| CliError::NothingAt(path.clone()))?,
         None => &all,
