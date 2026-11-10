@@ -144,15 +144,6 @@
           "refusal": null
         },
         {
-          "id": "utm",
-          "hosts": [
-            "macos"
-          ],
-          "plugin": "vagrant_utm",
-          "elevation": "none",
-          "refusal": "`dc01` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
-        },
-        {
           "id": "vmware_esxi",
           "hosts": [
             "linux",
@@ -411,7 +402,7 @@
           "utm": "mini-ad - dc01",
           "vmware_esxi": "mini-ad-dc01"
         },
-        "boot_digest": "sha256:140bdbb9db0e8f2932ef8278075d13ebaaacf0000cd78a3e675c26fca5058f2b"
+        "boot_digest": "sha256:2d5a644df52a67920885158e170d87e1dd19af6f1086393a3a1d875d0a1fadba"
       },
       "ports": [
         {
@@ -481,13 +472,6 @@
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -519,7 +503,7 @@
           "utm": "mini-ad - ws01",
           "vmware_esxi": "mini-ad-ws01"
         },
-        "boot_digest": "sha256:0da41046caaa4f337b7e6c20356e37367dd88a44be0c2f7893889d75fa50b0b0"
+        "boot_digest": "sha256:0bf5bd5ebf0c95ff51c5f7366ecd0ce7e5086db8bff001abd8e4bc0d0ae1d9fa"
       },
       "consoles": [
         {
@@ -575,13 +559,6 @@
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -610,7 +587,7 @@
           "utm": "mini-ad - isoloom-controller",
           "vmware_esxi": "mini-ad-isoloom-controller"
         },
-        "boot_digest": "sha256:95afb83e6e8a7692f2c7b0946fe3cca53285a48fed0c54d68d9fcb843c09f309"
+        "boot_digest": "sha256:cf7a450af3db3c5eddbb9fe7d61f724921f57a1cea53c43930cdde0150de7af2"
       }
     }
   ],

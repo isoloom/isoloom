@@ -11,7 +11,7 @@ use isoloom_spec::windows::Tpm;
 use super::hyperv::{self, HyperV};
 use super::provider::Provider;
 use super::qemu::{HubPort, Link};
-use super::{boot, nested, utm, windows};
+use super::{boot, nested, windows};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
@@ -127,10 +127,6 @@ pub(crate) struct Guest<'a> {
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
 /// resize the box's disk).
 pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
-    let linux = !g.hyperv.windows;
-    if linux {
-        utm::placeholder(r, "m");
-    }
     if let Some(d) = g.size.disk {
         r.call(
             Call::new("m.vm.disk")
@@ -140,7 +136,7 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
         );
     }
     // Data disks: Vagrant's own setting for VirtualBox, VMware and Hyper-V; libvirt and ESXi
-    // in their blocks. QEMU, Parallels and UTM attach none (refused for them).
+    // in their blocks. QEMU and Parallels attach none (refused for them).
     for (name, gb) in &g.disks {
         r.call(
             Call::new("m.vm.disk")
@@ -149,7 +145,7 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
                 .kw("size", Value::str(&format!("{gb}GB"))),
         );
     }
-    desktop(r, Provider::VirtualBox, g, true, |r| {
+    desktop(r, Provider::VirtualBox, g, |r| {
         if g.tpm.is_some() {
             windows::virtualbox_tpm(r);
         }
@@ -158,12 +154,7 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
         }
     });
     vmware(r, g);
-    desktop(r, Provider::Parallels, g, true, |_| {});
-    desktop(r, Provider::Utm, g, false, |r| {
-        if linux {
-            utm::override_in_block(r);
-        }
-    });
+    desktop(r, Provider::Parallels, g, |_| {});
     r.block(provider(Provider::Qemu), "v, o", |r| {
         qemu(r, g.size, &g.qemu);
         g.boot.into_iter().for_each(|b| boot::qemu(r, b));
@@ -188,16 +179,12 @@ fn provider(p: Provider<'_>) -> Call {
     Call::new("m.vm.provider").arg(Value::str(p.id()))
 }
 
-/// VirtualBox, Parallels and UTM: a name, CPUs and memory (and linked clones where offered),
-/// then what only that provider sets (`more`; on UTM, `o` is the VM's config).
-fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, linked_clone: bool, more: impl FnOnce(&mut Ruby)) {
-    // UTM's block overrides a provisioner of the VM's (`utm`): it takes the VM's config too.
-    let params = if p == Provider::Utm && !g.hyperv.windows { "v, o" } else { "v" };
-    r.block(provider(p), params, |r| {
+/// VirtualBox and Parallels: a name, CPUs, memory and linked clones, then what only that
+/// provider sets (`more`).
+fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, more: impl FnOnce(&mut Ruby)) {
+    r.block(provider(p), "v", |r| {
         r.assign("v.name", Value::str(&g.label));
-        if linked_clone {
-            r.assign("v.linked_clone", true);
-        }
+        r.assign("v.linked_clone", true);
         r.assign("v.cpus", g.size.cpus);
         r.assign("v.memory", g.size.mem);
         more(r);

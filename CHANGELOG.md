@@ -34,7 +34,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
-
+- **Breaking: the `vagrant` target has no UTM provider.** `vagrant_utm` gives a VM no private
+  network (it only forwards ports), and every machine of an environment is on one, so UTM could
+  run no environment's VMs: the column showed ✗ in every row and still sat at tier 2. The
+  Vagrantfile has no `utm` block, the run manifest offers no `utm` provider, and `refusal_on(…,
+  Some("utm"))` says so. UTM keeps running `docker-vm`'s one VM.
 - **Breaking: `isoloom generate` stops on a template or a copied check script it can't read**, with
   the read error, instead of writing files that failed later and said to run `isoloom generate`.
   `isoloom validate` still lists a missing one as a problem.
@@ -206,7 +210,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   runner's port and password (`ISOLOOM_CONSOLES`), VirtualBox's remote display when the Oracle
   extension pack is installed. Proxmox's module outputs each VM's id (`vm_id_<machine>`) for its
   console; a cloud Windows VM opening 3389/tcp gets Remote Desktop turned on, reached through an
-  SSH tunnel, and the module's sensitive `windows_password` output. Hyper-V, Parallels, UTM, ESXi
+  SSH tunnel, and the module's sensitive `windows_password` output. Hyper-V, Parallels, ESXi
   and cloud Linux VMs say why they have none. `isoloom_manifest::{Console, ConsoleProtocol,
   ConsoleSource, ConsoleAccount}`, `Machine::console`, `Provider::id`,
   `contract::CONSOLES`, the errors `console_shape`, `console_twice` and `unknown_slot`, and the

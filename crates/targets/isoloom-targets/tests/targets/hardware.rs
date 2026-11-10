@@ -75,7 +75,7 @@ fn vms_nest_on_vagrant_proxmox_and_three_clouds() -> Outcome {
         "\"--nested-hw-virt\", \"on\"",
         "v.vmx[\"vhv.enable\"] = \"TRUE\"",
         "v.nested = true",
-        "if %i[qemu utm].include?(machine.provider_name)",
+        "if machine.provider_name == :qemu",
     ] {
         assert!(v.contains(switch), "{switch}");
     }

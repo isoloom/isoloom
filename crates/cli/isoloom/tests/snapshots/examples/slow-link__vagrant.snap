@@ -502,67 +502,6 @@ module IsoloomConsole
     @vrde = false
   end
 end
-# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
-ISOLOOM_NAT_ROUTE = <<~'SH'
-set -eu
-gw=10.0.2.2
-dev_of() { awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}'; }
-via_of() { awk '{for (i = 1; i < NF; i++) if ($i == "via") { print $(i + 1); exit }}'; }
-nat=$(ip -4 route show default via "$gw" | dev_of)
-# No default route through the emulated network, or no shared one to prefer: nothing to do.
-[ -n "$nat" ] || exit 0
-up=$(ip -4 route show default | grep -v "via $gw dev $nat " | dev_of)
-[ -n "$up" ] || exit 0
-# The shared network leads only when it reaches the internet; otherwise the emulated one does.
-metric=200
-for probe in 1.1.1.1 8.8.8.8 9.9.9.9; do
-  if ping -c 1 -W 2 -I "$up" "$probe" >/dev/null 2>&1; then metric=50; break; fi
-done
-[ "$metric" = 50 ] || echo "nat-route: the shared network ($up) reaches no public resolver; the emulated network keeps the traffic"
-# Waits (up to 30 s) for the shared card's default route after its configuration was applied.
-route_back() {
-  i=0
-  until ip -4 route show default dev "$up" | grep -q .; do
-    i=$((i + 1))
-    [ "$i" -lt 30 ] || return 1
-    sleep 1
-  done
-}
-netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
-if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
-  con=$(nmcli -g GENERAL.CONNECTION device show "$up")
-  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != "$metric" ]; then
-    nmcli connection modify "$con" ipv4.route-metric "$metric"
-    nmcli device reapply "$up"
-  fi
-elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$up" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
-  own="$netd/05-isoloom-uplink.network"
-  want=$(printf '[Match]\nName=%s\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=%s\n' "$up" "$metric")
-  if [ "$file" != "$own" ] || [ "$(cat "$own")" != "$want" ]; then
-    mkdir -p "$netd"
-    printf '%s\n' "$want" > "$own"
-    networkctl reload
-    networkctl reconfigure "$up"
-  fi
-elif [ -f /etc/network/interfaces ]; then
-  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
-    [ -f "$f" ] && grep -q "^iface $up inet dhcp" "$f" || continue
-    sed -i "/^iface $up inet dhcp/,/^[^ \t]/{/^[ \t]*metric /d}" "$f"
-    sed -i "/^iface $up inet dhcp/a\\    metric $metric" "$f"
-  done
-fi
-if ! route_back; then
-  echo "nat-route: the shared card has no default route any more; the emulated network carries the traffic"
-  exit 0
-fi
-# The route as it is now, whatever the configuration does at its next renewal.
-upgw=$(ip -4 route show default dev "$up" | via_of)
-ip -4 route show default dev "$up" | grep -q " metric $metric " ||
-  ip -4 route replace default via "$upgw" dev "$up" metric "$metric"
-for m in $(ip -4 route show default dev "$up" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
-  [ "$m" = "$metric" ] || ip -4 route del default via "$upgw" dev "$up" metric "$m"
-done
-SH
 
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (branch, far); a missing one reuses the last.
@@ -673,7 +612,6 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "isoloom-router"
     m.vm.network "private_network", ip: "10.75.1.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-branch", libvirt__network_name: "isoloom-slow-link-branch", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.75.2.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-far", libvirt__network_name: "isoloom-slow-link-far", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "slow-link - isoloom-router"
       v.linked_clone = true
@@ -690,12 +628,6 @@ Vagrant.configure("2") do |config|
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "slow-link - isoloom-router"
-      v.cpus = 1
-      v.memory = 512
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -855,7 +787,6 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.75.2.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-far", libvirt__network_name: "isoloom-slow-link-far", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "slow-link - web"
       v.linked_clone = true
@@ -879,12 +810,6 @@ Vagrant.configure("2") do |config|
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "slow-link - web"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1106,7 +1031,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
     m.vm.network "private_network", ip: "10.75.1.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-branch", libvirt__network_name: "isoloom-slow-link-branch", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "slow-link - user"
       v.linked_clone = true
@@ -1130,12 +1054,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "slow-link - user"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1326,7 +1244,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.hostname = "shell"
     m.vm.network "private_network", ip: "10.75.1.252", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-branch", libvirt__network_name: "isoloom-slow-link-branch", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.75.2.252", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-far", libvirt__network_name: "isoloom-slow-link-far", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "slow-link - isoloom-tool-shell"
       v.linked_clone = true
@@ -1343,12 +1260,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "slow-link - isoloom-tool-shell"
-      v.cpus = 1
-      v.memory = 512
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1691,15 +1602,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "refusal": "`isoloom-router` is on 2 networks, and QEMU gives a VM one"
         },
         {
-          "id": "utm",
-          "hosts": [
-            "macos"
-          ],
-          "plugin": "vagrant_utm",
-          "elevation": "none",
-          "refusal": "`isoloom-router` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
-        },
-        {
           "id": "vmware_esxi",
           "hosts": [
             "linux",
@@ -1941,7 +1843,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - isoloom-router",
           "vmware_esxi": "slow-link-isoloom-router"
         },
-        "boot_digest": "sha256:113b337d9b9124ed5cf8fcd14bc82bab5d26a993c955760c291ec4b78d58fbd8"
+        "boot_digest": "sha256:0248c3dbef0285a2c4d7a6ab455a3ff1fe4776dd8ef41ddc2c911fdd6fb2d0ff"
       }
     },
     {
@@ -1967,7 +1869,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - web",
           "vmware_esxi": "slow-link-web"
         },
-        "boot_digest": "sha256:3b6a3a5e3144b7179588d62427018a0f7ae2c62f1bb8f485c3c90233326f7b0d"
+        "boot_digest": "sha256:79e7adf1c0e6445cab117015e57fb3b6cf26e0cb416ad1a30ff2681c8b7a6110"
       },
       "ports": [
         {
@@ -2031,13 +1933,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -2069,7 +1964,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - user",
           "vmware_esxi": "slow-link-user"
         },
-        "boot_digest": "sha256:f45501aff402934e9e4eddfb7db4a91b2c9ede5c92d1c130937b33d4f3cd0a69"
+        "boot_digest": "sha256:d21c2ca2b626986a4f6436a366146893b7a7b933a4d62847ed5a5d9fecc7f978"
       },
       "consoles": [
         {
@@ -2125,13 +2020,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -2161,7 +2049,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - isoloom-tool-shell",
           "vmware_esxi": "slow-link-isoloom-tool-shell"
         },
-        "boot_digest": "sha256:93d9891f5b419c251a0ff017c9a4089e6e51d04eda0d037e667af6fe081b7c97"
+        "boot_digest": "sha256:291df059f62345b8d40b0f9de4d8f5676dece99d3de5eecb1cc64a9e1675e312"
       }
     }
   ],

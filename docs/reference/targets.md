@@ -38,9 +38,10 @@ refused (naming the field at fault), and the tier of each generated target.
 Two targets fan out:
 
 - **`vagrant`** generates one Vagrantfile that every local provider reads: VirtualBox, VMware,
-  Parallels, libvirt, Hyper-V, UTM and QEMU, plus the remote `vmware_esxi` provider. A provider
-  exists only on the hosts that have it (Hyper-V on Windows, libvirt on Linux, Parallels and UTM
-  on macOS, QEMU on Linux and macOS); the others run on all three.
+  Parallels, libvirt, Hyper-V and QEMU, plus the remote `vmware_esxi` provider. A provider
+  exists only on the hosts that have it (Hyper-V on Windows, libvirt on Linux, Parallels on
+  macOS, QEMU on Linux and macOS); the others run on all three. UTM (macOS) runs `docker-vm`'s
+  one VM only: `vagrant_utm` gives a VM no private network, and every machine is on one.
 - **`cloud-vm`, `cloud-docker` and `cloud-services`** target six clouds: AWS, Azure, Google
   Cloud, DigitalOcean, Linode and Oracle Cloud.
 

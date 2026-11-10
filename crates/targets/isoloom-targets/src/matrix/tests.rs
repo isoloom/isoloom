@@ -65,8 +65,6 @@ fn the_lab_every_row_changes_is_generated_everywhere_but_where_a_network_is_refu
     for (column, cell) in columns().iter().zip(&row.cells) {
         let expected = match column.id().as_str() {
             "cloud-services" => Cell::NotApplicable,
-            // vagrant_utm gives a VM no private network: every machine is on one.
-            "vagrant/utm" => continue,
             _ => Cell::Supported,
         };
         assert_eq!(*cell, expected, "{}", column.id());
@@ -227,6 +225,22 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
         }
     }
     assert_eq!(by_the_run, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
+}
+
+/// A column that generates nothing has no place in the matrix nor a tier: a provider or cloud
+/// every row refuses isn't a way to run an environment. `vagrant/utm` was such a column (UTM
+/// gives a VM no private network, and every machine is on one) and sat at tier 2.
+#[test]
+fn every_column_generates_some_row() {
+    let m = built();
+    for (i, column) in m.columns.iter().enumerate() {
+        let generated = m.rows.iter().filter(|row| row.cells[i] == Cell::Supported).count();
+        assert!(generated > 0, "{}: no row is generated there, yet it is a column", column.id());
+    }
+    let tiers = crate::tiers::tiers().unwrap();
+    for entry in tiers.iter().filter(|e| e.target == Target::Vagrant) {
+        assert!(m.columns.iter().any(|c| c.id() == entry.id()), "{}: a tier entry with no column", entry.id());
+    }
 }
 
 /// A row about a step shows what each target does with the step, the container targets

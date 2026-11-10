@@ -98,7 +98,6 @@ mod tests {
         assert_eq!(row("vagrant/libvirt").linux, "VNC, libvirt's display");
         assert_eq!(row("vagrant/qemu").windows, "VNC, QEMU's display");
         assert!(row("vagrant/virtualbox").linux.starts_with("RDP, VirtualBox's"));
-        assert!(row("vagrant/utm").linux.starts_with("none: UTM shows a VM's screen over SPICE only"));
         assert_eq!(row("proxmox").linux, "VNC, Proxmox's console through its API");
         assert!(row("esxi").windows.starts_with("none: "));
         assert!(row("cloud-vm/aws").linux.starts_with("none: a Linux cloud VM"));

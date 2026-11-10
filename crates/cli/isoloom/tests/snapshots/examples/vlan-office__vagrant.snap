@@ -508,67 +508,6 @@ module IsoloomConsole
     @vrde = false
   end
 end
-# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
-ISOLOOM_NAT_ROUTE = <<~'SH'
-set -eu
-gw=10.0.2.2
-dev_of() { awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}'; }
-via_of() { awk '{for (i = 1; i < NF; i++) if ($i == "via") { print $(i + 1); exit }}'; }
-nat=$(ip -4 route show default via "$gw" | dev_of)
-# No default route through the emulated network, or no shared one to prefer: nothing to do.
-[ -n "$nat" ] || exit 0
-up=$(ip -4 route show default | grep -v "via $gw dev $nat " | dev_of)
-[ -n "$up" ] || exit 0
-# The shared network leads only when it reaches the internet; otherwise the emulated one does.
-metric=200
-for probe in 1.1.1.1 8.8.8.8 9.9.9.9; do
-  if ping -c 1 -W 2 -I "$up" "$probe" >/dev/null 2>&1; then metric=50; break; fi
-done
-[ "$metric" = 50 ] || echo "nat-route: the shared network ($up) reaches no public resolver; the emulated network keeps the traffic"
-# Waits (up to 30 s) for the shared card's default route after its configuration was applied.
-route_back() {
-  i=0
-  until ip -4 route show default dev "$up" | grep -q .; do
-    i=$((i + 1))
-    [ "$i" -lt 30 ] || return 1
-    sleep 1
-  done
-}
-netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
-if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
-  con=$(nmcli -g GENERAL.CONNECTION device show "$up")
-  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != "$metric" ]; then
-    nmcli connection modify "$con" ipv4.route-metric "$metric"
-    nmcli device reapply "$up"
-  fi
-elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$up" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
-  own="$netd/05-isoloom-uplink.network"
-  want=$(printf '[Match]\nName=%s\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=%s\n' "$up" "$metric")
-  if [ "$file" != "$own" ] || [ "$(cat "$own")" != "$want" ]; then
-    mkdir -p "$netd"
-    printf '%s\n' "$want" > "$own"
-    networkctl reload
-    networkctl reconfigure "$up"
-  fi
-elif [ -f /etc/network/interfaces ]; then
-  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
-    [ -f "$f" ] && grep -q "^iface $up inet dhcp" "$f" || continue
-    sed -i "/^iface $up inet dhcp/,/^[^ \t]/{/^[ \t]*metric /d}" "$f"
-    sed -i "/^iface $up inet dhcp/a\\    metric $metric" "$f"
-  done
-fi
-if ! route_back; then
-  echo "nat-route: the shared card has no default route any more; the emulated network carries the traffic"
-  exit 0
-fi
-# The route as it is now, whatever the configuration does at its next renewal.
-upgw=$(ip -4 route show default dev "$up" | via_of)
-ip -4 route show default dev "$up" | grep -q " metric $metric " ||
-  ip -4 route replace default via "$upgw" dev "$up" metric "$metric"
-for m in $(ip -4 route show default dev "$up" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
-  [ "$m" = "$metric" ] || ip -4 route del default via "$upgw" dev "$up" metric "$m"
-done
-SH
 
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (office-vlan10, office-vlan20, servers); a missing one reuses the last.
@@ -681,7 +620,6 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan10", libvirt__network_name: "isoloom-vlan-office-office-vlan10", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-servers", libvirt__network_name: "isoloom-vlan-office-servers", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office - isoloom-router"
       v.linked_clone = true
@@ -698,12 +636,6 @@ Vagrant.configure("2") do |config|
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office - isoloom-router"
-      v.cpus = 1
-      v.memory = 512
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -833,7 +765,6 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "intranet"
     m.vm.network "private_network", ip: "10.70.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-servers", libvirt__network_name: "isoloom-vlan-office-servers", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office - intranet"
       v.linked_clone = true
@@ -857,12 +788,6 @@ Vagrant.configure("2") do |config|
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office - intranet"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1089,7 +1014,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "staff"
     m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan10", libvirt__network_name: "isoloom-vlan-office-office-vlan10", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office - staff"
       v.linked_clone = true
@@ -1113,12 +1037,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office - staff"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1344,7 +1262,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "guest"
     m.vm.network "private_network", ip: "10.70.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office - guest"
       v.linked_clone = true
@@ -1368,12 +1285,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office - guest"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1564,7 +1475,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.hostname = "admin"
     m.vm.network "private_network", ip: "10.70.10.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan10", libvirt__network_name: "isoloom-vlan-office-office-vlan10", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.20.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office - admin"
       v.linked_clone = true
@@ -1588,12 +1498,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office - admin"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -2308,15 +2212,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "refusal": "`isoloom-router` is on 3 networks, and QEMU gives a VM one"
         },
         {
-          "id": "utm",
-          "hosts": [
-            "macos"
-          ],
-          "plugin": "vagrant_utm",
-          "elevation": "none",
-          "refusal": "`isoloom-router` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
-        },
-        {
           "id": "vmware_esxi",
           "hosts": [
             "linux",
@@ -2568,7 +2463,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office - isoloom-router",
           "vmware_esxi": "vlan-office-isoloom-router"
         },
-        "boot_digest": "sha256:6fdefea0017a56abf4f51c1a7581818182c5097e37af2d2712fa96f2b01ad780"
+        "boot_digest": "sha256:cb3b35d4b881ce0c0c7f3078a33884e4c41fed45e05238cfaf9a1e645eadfa5c"
       }
     },
     {
@@ -2594,7 +2489,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office - intranet",
           "vmware_esxi": "vlan-office-intranet"
         },
-        "boot_digest": "sha256:3f1eebccfc6e9aef97786bc0a5cdf942c4a1474cb3cb7bd978badddde057b32a"
+        "boot_digest": "sha256:e518ac89bc73593bfe3305f45507bcbdefd345c98038ba72a3878c943170b433"
       },
       "ports": [
         {
@@ -2658,13 +2553,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -2696,7 +2584,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office - staff",
           "vmware_esxi": "vlan-office-staff"
         },
-        "boot_digest": "sha256:a2fa12b279d115a582e3aa02c6df754c4c6980660807c750b32fc33208f7f7eb"
+        "boot_digest": "sha256:86e9b85f7fd33abbb26ffeda4f533be99ae5c302295aa039e551f29302dc85ea"
       },
       "consoles": [
         {
@@ -2749,13 +2637,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "source": {
             "from": "qemu_monitor"
           }
-        },
-        {
-          "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
         },
         {
           "providers": [
@@ -2789,7 +2670,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office - guest",
           "vmware_esxi": "vlan-office-guest"
         },
-        "boot_digest": "sha256:223d83d45d318b6c9242181da2b719f88f7dbdc7f6e2ca4f6e7df33ff61d7566"
+        "boot_digest": "sha256:20286df92abbdd76053053f82f975c62cfccdca8f3dc3173279a26bc150bd3ce"
       },
       "consoles": [
         {
@@ -2842,13 +2723,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "source": {
             "from": "qemu_monitor"
           }
-        },
-        {
-          "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
         },
         {
           "providers": [
@@ -2883,7 +2757,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office - admin",
           "vmware_esxi": "vlan-office-admin"
         },
-        "boot_digest": "sha256:0ea6337d99a6ec03eb0a775992cab4c626e9ab751d69f0c602385c5b5c0be7af"
+        "boot_digest": "sha256:73457e5815f47bc164e9baf3052205659144709595a1dbd423359f28f920053e"
       },
       "consoles": [
         {
@@ -2936,13 +2810,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "source": {
             "from": "qemu_monitor"
           }
-        },
-        {
-          "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
         },
         {
           "providers": [

@@ -16,13 +16,13 @@
 | Hyper-V | Windows | none | **1** (Windows) |
 | VMware Desktop (Workstation, Fusion) | Linux, macOS, Windows | `vagrant-vmware-desktop` and the VMware Utility | 2 |
 | Parallels | macOS | `vagrant-parallels` | 2 |
-| UTM | macOS | `vagrant_utm` | 2 |
 | QEMU | Linux, macOS | `vagrant-qemu` | 2 |
 | Remote ESXi | any | `vagrant-vmware-esxi` | 2 (real runs from macOS) |
 
-`docker-vm` is Tier 2 on every provider (real runs on VirtualBox from macOS); `hybrid` is Tier 2.
-The [target matrix](../../matrix.md) lists what each provider refuses (UTM gives a VM no private
-network, for one).
+`docker-vm` is Tier 2 on every provider, UTM (`vagrant_utm`, macOS) included (real runs on
+VirtualBox from macOS); `hybrid` is Tier 2. UTM runs `docker-vm` only: `vagrant_utm` gives a VM
+no private network, and every machine of an environment is on one, so the `vagrant` target has
+no UTM provider. The [target matrix](../../matrix.md) lists what each provider refuses.
 
 ## Prerequisites
 

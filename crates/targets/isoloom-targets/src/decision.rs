@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn vagrant_and_cloud_vm_have_a_column_per_provider_and_per_cloud() {
         let ids: Vec<String> = columns().iter().map(Column::id).collect();
-        assert_eq!(ids.len(), Target::ALL.len() - 2 + 8 + 6);
+        assert_eq!(ids.len(), Target::ALL.len() - 2 + 7 + 6);
         assert!(ids.contains(&"vagrant/libvirt".to_owned()) && ids.contains(&"cloud-vm/oci".to_owned()));
         assert!(!ids.contains(&"vagrant".to_owned()) && ids.contains(&"docker-vm".to_owned()));
     }
@@ -233,7 +233,10 @@ mod tests {
         );
         let lacking = refused_on(&aliased, on(Target::Kubernetes, None));
         assert_eq!(lacking.code, Code::Capability(Feature::MachineAliases), "{lacking:?}");
-        let provider = refused_on(&two, on(Target::Vagrant, Some("utm")));
+        let two_networks = lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 }, wan: { cidr: 10.9.1.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lan: 10, wan: 10 }, app: { steps: [{ run: a.sh }] } }\n",
+        );
+        let provider = refused_on(&two_networks, on(Target::Vagrant, Some("qemu")));
         assert_eq!(provider.code, Code::Provider, "{provider:?}");
     }
 

@@ -259,8 +259,9 @@ pub fn of(entries: &[TierEntry], target: Target) -> Vec<&TierEntry> {
 }
 
 /// The Vagrant providers the Vagrantfile has a block for, as `vagrant up --provider` names them,
-/// in the order a runner offers them.
-pub(crate) const VAGRANT_PROVIDERS: [&str; 8] = ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "utm", "vmware_esxi"];
+/// in the order a runner offers them (no UTM: it gives a VM no private network, so it runs
+/// `docker-vm`'s VM only).
+pub(crate) const VAGRANT_PROVIDERS: [&str; 7] = ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "vmware_esxi"];
 
 /// Where `docker-vm`'s VM runs: the Vagrant providers its Vagrantfile has a block for (no
 /// Hyper-V), then the Proxmox module.

@@ -125,13 +125,24 @@ fn docker_vm_boots_the_cloud_image_on_qemu_with_room_for_docker() -> Outcome {
 }
 
 #[test]
-fn utm_refuses_vms_on_a_network() -> Outcome {
+fn the_vagrant_target_has_no_utm_provider() -> Outcome {
+    // Every machine is on a network (validation asks it), and vagrant_utm gives a VM none: UTM
+    // could run no environment's VMs, so the Vagrantfile has no block for it, the run manifest
+    // doesn't offer it, and asking for it says so; the other providers run the environment.
     let spec = lab(THREE)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("utm")).expect("UTM has no private networks");
-    assert!(why.contains("`a` is on a network, and vagrant_utm gives a VM no private network"), "{why}");
-    // Every machine is on a network (validation asks it), so UTM runs no environment's VMs;
-    // the other providers do.
+    let why = refusal_on(&spec, Target::Vagrant, Some("utm")).ok_or("UTM taken")?;
+    assert!(
+        why.starts_with("the `vagrant` target has no `utm` provider: vagrant_utm gives a VM no private network"),
+        "{why}"
+    );
     assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
+    let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
+    assert!(!vf.contains("\"utm\"") && !vf.contains("ISOLOOM_NAT_ROUTE"), "{vf}");
+    let manifest = isoloom_manifest::parse(&generated(&spec, Target::Vagrant, "vagrant/run.json")?)?;
+    let isoloom_manifest::Identity::Vagrant(v) = manifest.identity else {
+        return Err("a vagrant identity".into());
+    };
+    assert!(v.providers.iter().all(|p| p.id != isoloom_manifest::Provider::Utm), "{:?}", v.providers);
     Ok(())
 }
 
@@ -145,24 +156,9 @@ fn vmware_runs_a_machine_with_nested_virtualization() -> Outcome {
 }
 
 #[test]
-fn on_utm_a_linux_vms_default_route_leaves_the_emulated_network_and_nothing_changes_elsewhere() -> Outcome {
-    // A Linux VM and a Windows one, with no network (UTM gives none), and the docker-vm VM.
-    let spec = "version: 1\nname: t\nmachines:\n  web:\n    os: debian@12\n    app: { steps: [{ run: p.sh }] }\n  win:\n    os: windows-server@2022\n    app: { steps: [{ run: p.ps1 }] }\n";
-    let vf = vagrantfile(spec)?;
-    assert!(vf.contains("ISOLOOM_NAT_ROUTE = <<~'SH'\nset -eu\ngw=10.0.2.2\n"), "{vf}");
-    let web = define(&vf, "web")?;
-    let first = web.lines().find(|l| l.contains(".vm.provision")).ok_or("no provisioner")?;
-    assert_eq!(first.trim(), "m.vm.provision \"nat-route\", type: \"shell\", run: \"always\", inline: \":\"");
-    let utm = provider_block(&vf, "web", "utm")?;
-    assert!(
-        utm.contains("o.vm.provision \"nat-route\", type: \"shell\", run: \"always\", preserve_order: true, inline: ISOLOOM_NAT_ROUTE"),
-        "{utm}"
-    );
-    for other in ["virtualbox", "vmware_desktop", "parallels", "qemu", "libvirt"] {
-        assert!(!provider_block(&vf, "web", other)?.contains("nat-route"), "{other}");
-    }
-    assert!(!define(&vf, "win")?.contains("nat-route"), "a Windows VM has no such provisioner");
+fn on_utm_the_docker_vm_hosts_default_route_leaves_the_emulated_network() -> Outcome {
     let dvm = generated(&crate::testing::example("hello-stack")?, Target::DockerVm, "docker-vm/Vagrantfile")?;
+    assert!(dvm.contains("ISOLOOM_NAT_ROUTE = <<~'SH'\nset -eu\ngw=10.0.2.2\n"), "{dvm}");
     let dvm_utm = between(&dvm, "config.vm.provider \"utm\"", "\n  end\n")?;
     assert!(dvm_utm.contains("preserve_order: true, inline: ISOLOOM_NAT_ROUTE"), "{dvm_utm}");
     let dvm_first = dvm

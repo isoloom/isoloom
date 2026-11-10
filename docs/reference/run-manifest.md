@@ -178,7 +178,7 @@ runner can tell a user why there is no screen to show. A container lists none.
 ```json
 "consoles": [
   { "providers": ["libvirt"], "protocol": "vnc", "source": { "from": "libvirt" } },
-  { "providers": ["utm"], "protocol": "none", "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay" }
+  { "providers": ["parallels"], "protocol": "none", "note": "Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)" }
 ]
 ```
 
@@ -200,7 +200,7 @@ What each target gives a Linux and a Windows VM is in the [capability matrix](..
   (`RemoteDisplay.vnc.*`, at the runner's port and password); VirtualBox its remote display (RDP),
   only with the Oracle extension pack, which brings the server (without it, it stays off and a
   runner says so). Hyper-V has no VNC or remote display server of its own; Parallels' VNC server
-  stays off; UTM shows a VM's screen over SPICE only; an ESXi VM's console goes through ESXi's own
+  stays off; an ESXi VM's console goes through ESXi's own
   API (a WebMKS ticket), which Isoloom doesn't use.
 - **Proxmox**: every VM but an Arm one (whose console is the serial port) has Proxmox's own
   console, through its API; the module outputs each VM's id (`vm_id_<machine>`).

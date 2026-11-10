@@ -10,7 +10,7 @@ a runner checks them before it creates anything.
 |---|---|---|
 | `docker`, `hosted` | Docker, Docker Compose | Compose 2.17.0 |
 | `kubernetes` | `kubectl` (with Kustomize), or Helm for the chart | none set |
-| `vagrant`, `docker-vm` (local) | Vagrant, and the provider's hypervisor (VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU) | Vagrant 2.4.0 |
+| `vagrant`, `docker-vm` (local) | Vagrant, and the provider's hypervisor (VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU; UTM for `docker-vm`) | Vagrant 2.4.0 |
 | `hybrid` | Docker Compose and Vagrant | as above |
 | `proxmox`, `docker-vm` on Proxmox | Terraform, an OpenSSH client | Terraform 1.6.0 |
 | `esxi` | Terraform, `ovftool`, an OpenSSH client | Terraform 1.6.0 |

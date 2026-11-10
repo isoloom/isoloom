@@ -504,67 +504,6 @@ module IsoloomConsole
     @vrde = false
   end
 end
-# On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
-ISOLOOM_NAT_ROUTE = <<~'SH'
-set -eu
-gw=10.0.2.2
-dev_of() { awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}'; }
-via_of() { awk '{for (i = 1; i < NF; i++) if ($i == "via") { print $(i + 1); exit }}'; }
-nat=$(ip -4 route show default via "$gw" | dev_of)
-# No default route through the emulated network, or no shared one to prefer: nothing to do.
-[ -n "$nat" ] || exit 0
-up=$(ip -4 route show default | grep -v "via $gw dev $nat " | dev_of)
-[ -n "$up" ] || exit 0
-# The shared network leads only when it reaches the internet; otherwise the emulated one does.
-metric=200
-for probe in 1.1.1.1 8.8.8.8 9.9.9.9; do
-  if ping -c 1 -W 2 -I "$up" "$probe" >/dev/null 2>&1; then metric=50; break; fi
-done
-[ "$metric" = 50 ] || echo "nat-route: the shared network ($up) reaches no public resolver; the emulated network keeps the traffic"
-# Waits (up to 30 s) for the shared card's default route after its configuration was applied.
-route_back() {
-  i=0
-  until ip -4 route show default dev "$up" | grep -q .; do
-    i=$((i + 1))
-    [ "$i" -lt 30 ] || return 1
-    sleep 1
-  done
-}
-netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
-if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
-  con=$(nmcli -g GENERAL.CONNECTION device show "$up")
-  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != "$metric" ]; then
-    nmcli connection modify "$con" ipv4.route-metric "$metric"
-    nmcli device reapply "$up"
-  fi
-elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$up" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
-  own="$netd/05-isoloom-uplink.network"
-  want=$(printf '[Match]\nName=%s\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=%s\n' "$up" "$metric")
-  if [ "$file" != "$own" ] || [ "$(cat "$own")" != "$want" ]; then
-    mkdir -p "$netd"
-    printf '%s\n' "$want" > "$own"
-    networkctl reload
-    networkctl reconfigure "$up"
-  fi
-elif [ -f /etc/network/interfaces ]; then
-  for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
-    [ -f "$f" ] && grep -q "^iface $up inet dhcp" "$f" || continue
-    sed -i "/^iface $up inet dhcp/,/^[^ \t]/{/^[ \t]*metric /d}" "$f"
-    sed -i "/^iface $up inet dhcp/a\\    metric $metric" "$f"
-  done
-fi
-if ! route_back; then
-  echo "nat-route: the shared card has no default route any more; the emulated network carries the traffic"
-  exit 0
-fi
-# The route as it is now, whatever the configuration does at its next renewal.
-upgw=$(ip -4 route show default dev "$up" | via_of)
-ip -4 route show default dev "$up" | grep -q " metric $metric " ||
-  ip -4 route replace default via "$upgw" dev "$up" metric "$metric"
-for m in $(ip -4 route show default dev "$up" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
-  [ "$m" = "$metric" ] || ip -4 route del default via "$upgw" dev "$up" metric "$m"
-done
-SH
 
 # ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the
 # management network first, then one per network, in order (dmz, corp, access); a missing one reuses the last.
@@ -676,7 +615,6 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-dmz", libvirt__network_name: "isoloom-corp-ad-basics-dmz", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics - isoloom-router"
       v.linked_clone = true
@@ -693,12 +631,6 @@ Vagrant.configure("2") do |config|
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics - isoloom-router"
-      v.cpus = 1
-      v.memory = 512
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -862,11 +794,6 @@ Vagrant.configure("2") do |config|
       v.cpus = 2
       v.memory = 4096
     end
-    m.vm.provider "utm" do |v|
-      v.name = "corp-ad-basics - dc01"
-      v.cpus = 2
-      v.memory = 4096
-    end
     m.vm.provider "qemu" do |v, o|
       o.vm.box_architecture = "amd64"
       v.arch = "x86_64"
@@ -1006,11 +933,6 @@ Vagrant.configure("2") do |config|
     m.vm.provider "parallels" do |v|
       v.name = "corp-ad-basics - ws-01"
       v.linked_clone = true
-      v.cpus = 2
-      v.memory = 4096
-    end
-    m.vm.provider "utm" do |v|
-      v.name = "corp-ad-basics - ws-01"
       v.cpus = 2
       v.memory = 4096
     end
@@ -1160,11 +1082,6 @@ Vagrant.configure("2") do |config|
       v.cpus = 2
       v.memory = 4096
     end
-    m.vm.provider "utm" do |v|
-      v.name = "corp-ad-basics - ws-02"
-      v.cpus = 2
-      v.memory = 4096
-    end
     m.vm.provider "qemu" do |v, o|
       o.vm.box_architecture = "amd64"
       v.arch = "x86_64"
@@ -1277,7 +1194,6 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "web01"
     m.vm.network "private_network", ip: "10.40.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-dmz", libvirt__network_name: "isoloom-corp-ad-basics-dmz", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics - web01"
       v.linked_clone = true
@@ -1301,12 +1217,6 @@ Vagrant.configure("2") do |config|
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics - web01"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1492,7 +1402,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
     m.vm.network "private_network", ip: "10.40.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics - user"
       v.linked_clone = true
@@ -1516,12 +1425,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics - user"
-      v.cpus = 1
-      v.memory = 1024
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -1713,7 +1616,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.network "private_network", ip: "10.40.10.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-dmz", libvirt__network_name: "isoloom-corp-ad-basics-dmz", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.20.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
-    m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics - isoloom-controller"
       v.linked_clone = true
@@ -1730,12 +1632,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
-    end
-    m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics - isoloom-controller"
-      v.cpus = 1
-      v.memory = 512
-      o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
     end
     m.vm.provider "qemu" do |v, o|
       o.vm.box = "cloud-image/debian-12"
@@ -2348,15 +2244,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "refusal": "`isoloom-router` is on 3 networks, and QEMU gives a VM one"
         },
         {
-          "id": "utm",
-          "hosts": [
-            "macos"
-          ],
-          "plugin": "vagrant_utm",
-          "elevation": "none",
-          "refusal": "`isoloom-router` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
-        },
-        {
           "id": "vmware_esxi",
           "hosts": [
             "linux",
@@ -2606,7 +2493,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - isoloom-router",
           "vmware_esxi": "corp-ad-basics-isoloom-router"
         },
-        "boot_digest": "sha256:10584462ec0f9f40732fdd218cedf9f318fef63bf7b3d8bda8936b2f375bf0e8"
+        "boot_digest": "sha256:e2c0e53863f88a0381e63e5b6c260a7fa42ab988fdfaf8bb0b2cbc5d6da81245"
       }
     },
     {
@@ -2633,7 +2520,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:2b24ef4743eb1578cc765008f8fbb9637ffec47f599990f7c4fdc9153e128b3c"
+        "boot_digest": "sha256:df09ee104452cd7fb3a4b1ef1a01c2c5f7181eed56900bfc81082a71c09e14f4"
       },
       "ports": [
         {
@@ -2715,13 +2602,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -2753,7 +2633,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:f8a2354453635dac32a83a6174a2e18d4a759f0237669c2fe6d17a4c8968b7de"
+        "boot_digest": "sha256:04e0e1804390792a3de083caf0e8f9f3e659ea9ea47af076c86f4fed310f5f52"
       },
       "consoles": [
         {
@@ -2806,13 +2686,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "source": {
             "from": "qemu_monitor"
           }
-        },
-        {
-          "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
         },
         {
           "providers": [
@@ -2847,7 +2720,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:129dfbb76f18ed3e6e05ddad0caab29484f46518af7ddc0fc2822d2593d6c426"
+        "boot_digest": "sha256:2d9d62c3ec564f8d07778f1a3d9644a0ef42e6e145f03e37818c991a0fc70df0"
       },
       "consoles": [
         {
@@ -2903,13 +2776,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -2941,7 +2807,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - web01",
           "vmware_esxi": "corp-ad-basics-web01"
         },
-        "boot_digest": "sha256:c0e13cc40213cef791a73597fd45c21e25da96ec988e8fdd7b738832c4c5c2f7"
+        "boot_digest": "sha256:b2f9a4b40cb6527e5e92bff791195f92d8bd9cb2f8de4ab97506152e41ec9933"
       },
       "ports": [
         {
@@ -3005,13 +2871,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -3043,7 +2902,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - user",
           "vmware_esxi": "corp-ad-basics-user"
         },
-        "boot_digest": "sha256:ca3f25d69d07dc6f68c8db2cea1bf724ab5595919c43ca99f1b1e34f9ee2775c"
+        "boot_digest": "sha256:8589f46a7b3aa8653e6c2804165b0e185a853be52c9546161055af4e912bba86"
       },
       "consoles": [
         {
@@ -3099,13 +2958,6 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -3136,7 +2988,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - isoloom-controller",
           "vmware_esxi": "corp-ad-basics-isoloom-controller"
         },
-        "boot_digest": "sha256:9b95842e7dac24a2050ea848f98c40663a88196b8b9ca5a33f50b1aa48325640"
+        "boot_digest": "sha256:bc14afafc0935ea8032d18b4989ea5a0772b48743cbc2bbdce9496ab19e7919a"
       }
     }
   ],

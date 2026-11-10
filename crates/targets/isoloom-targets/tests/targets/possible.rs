@@ -55,7 +55,7 @@ fn an_access_machine_the_runner_supplies_counts_as_the_image_table_gives_it() ->
         bare.possible()
     );
     match bare.not_possible(Target::Docker) {
-        Some(NotPossible::MissingForm(p)) => assert_eq!(p.path.as_str(), "machines.me.os"),
+        Some(NotPossible::Unsupplied(p)) => assert_eq!(p.path.as_str(), "machines.me.os"),
         other => return Err(format!("{other:?}").into()),
     }
     let table = Table::parse("access: { vm: debian@12 }\n")?;

@@ -12,7 +12,8 @@
 //!   Vagrantfile in `ISOLOOM_CONSOLES`; off when it gave none (Vagrant run by hand).
 //! - **VirtualBox**: its remote display (VRDE, RDP) on `127.0.0.1`, only when the Oracle VM
 //!   VirtualBox Extension Pack is installed (VirtualBox alone has no VRDE server); off otherwise.
-//! - **Hyper-V, Parallels, UTM, ESXi**: none, each saying why ([`none_note`]).
+//! - **Hyper-V, Parallels, ESXi**: none, each saying why ([`none_note`]). UTM runs no
+//!   environment's VMs (the Vagrantfile has no block for it).
 
 use std::collections::BTreeSet;
 
@@ -45,10 +46,12 @@ pub(crate) fn none_note(provider: Provider<'_>) -> Option<&'static str> {
     }
 }
 
-/// An environment VM's consoles, one per provider of the Vagrantfile, in its order.
+/// An environment VM's consoles, one per provider of the Vagrantfile (every one that runs an
+/// environment's VMs: not UTM), in its order.
 pub(crate) fn consoles() -> Vec<Console> {
     Provider::ALL
         .iter()
+        .filter(|k| k.provider.runs_vms())
         .map(|k| {
             let only = BTreeSet::from([k.manifest]);
             if let Some(why) = none_note(k.provider) {
@@ -122,7 +125,8 @@ mod tests {
     #[test]
     fn every_provider_says_whether_a_vm_has_a_console_and_how() {
         let cs = consoles();
-        assert_eq!(cs.len(), Provider::ALL.len());
+        assert_eq!(cs.len(), Provider::ALL.iter().filter(|k| k.provider.runs_vms()).count());
+        assert!(!cs.iter().any(|c| c.providers.contains(&ManifestProvider::Utm)), "the Vagrantfile has no UTM block");
         let of = |p: ManifestProvider| cs.iter().find(|c| c.providers.contains(&p)).unwrap();
         assert_eq!(of(ManifestProvider::Libvirt).source, Some(ConsoleSource::Libvirt {}));
         assert_eq!(of(ManifestProvider::Qemu).source, Some(ConsoleSource::QemuMonitor {}));
@@ -133,14 +137,12 @@ mod tests {
         for p in [
             ManifestProvider::Hyperv,
             ManifestProvider::Parallels,
-            ManifestProvider::Utm,
             ManifestProvider::VmwareEsxi,
         ] {
             let c = of(p);
             assert_eq!(c.protocol, ConsoleProtocol::None, "{p:?}");
             assert!(c.note.is_some() && c.source.is_none(), "{p:?}");
         }
-        assert!(of(ManifestProvider::Utm).note.as_deref().is_some_and(|n| n.contains("SPICE")));
         assert!(
             cs.iter()
                 .all(|c| c.providers.len() == 1 && (c.protocol == ConsoleProtocol::None) == c.source.is_none())

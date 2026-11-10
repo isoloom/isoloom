@@ -144,15 +144,6 @@
           "refusal": null
         },
         {
-          "id": "utm",
-          "hosts": [
-            "macos"
-          ],
-          "plugin": "vagrant_utm",
-          "elevation": "none",
-          "refusal": "`web` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
-        },
-        {
           "id": "vmware_esxi",
           "hosts": [
             "linux",
@@ -427,7 +418,7 @@
           "utm": "web-vm - web",
           "vmware_esxi": "web-vm-web"
         },
-        "boot_digest": "sha256:4837f8adf1ba0fc9ac6d80e3aceb01479b9a0b44be55c61f696c2009d819fa01"
+        "boot_digest": "sha256:3c9c85001389ea1b9c2f855d99043eac2dcf39637096bdbceccb5b6e44acce59"
       },
       "ports": [
         {
@@ -496,13 +487,6 @@
         },
         {
           "providers": [
-            "utm"
-          ],
-          "protocol": "none",
-          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
-        },
-        {
-          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -531,7 +515,7 @@
           "utm": "web-vm - isoloom-controller",
           "vmware_esxi": "web-vm-isoloom-controller"
         },
-        "boot_digest": "sha256:75caff8bbaeba12a39e179a48c358f80ed668342ee0a9f59adcc1d55465bc484"
+        "boot_digest": "sha256:9a2d2597769fbc1fc933793840c265672a6c91ba9aed4ab85a4d15247700e1f7"
       }
     }
   ],

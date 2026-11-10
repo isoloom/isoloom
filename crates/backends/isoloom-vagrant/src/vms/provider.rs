@@ -147,21 +147,35 @@ impl<'a> Provider<'a> {
 
     /// Whether its plugin attaches a VM's data disks.
     fn attaches_disks(self) -> bool {
-        !matches!(self, Provider::Qemu | Provider::Parallels | Provider::Utm)
+        !matches!(self, Provider::Qemu | Provider::Parallels)
+    }
+
+    /// Whether the `vagrant` target has a block for it: every provider but UTM. `vagrant_utm`
+    /// (0.1.6) gives a VM no private network, only forwarded ports on its shared network, and
+    /// every machine of a spec is on a network (validation asks it), so UTM could run no
+    /// environment's VMs; it runs `docker-vm`'s one VM, which needs no private network.
+    pub(crate) fn runs_vms(self) -> bool {
+        self != Provider::Utm
     }
 }
 
 /// Why this environment's VMs can't all run under Vagrant's `provider` (as `vagrant up
-/// --provider` names it), if they can't: a machine requiring a TPM the provider doesn't give,
-/// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks, then a
-/// machine's own boot, which only libvirt (and QEMU, for UEFI's format) boots, then a machine's
-/// host folders, which Hyper-V and ESXi don't share (nor QEMU read-only), then a machine of
-/// another architecture than ESXi's on ESXi, then a machine's data disks, which QEMU's,
-/// Parallels' and UTM's plugins don't attach.
+/// --provider` names it), if they can't: a provider the target has no block for (UTM,
+/// [`Provider::runs_vms`]), a machine requiring a TPM the provider doesn't give, then QEMU's
+/// networks, Hyper-V's boxes and libvirt's bridged networks, then a machine's own boot, which
+/// only libvirt (and QEMU, for UEFI's format) boots, then a machine's host folders, which Hyper-V
+/// and ESXi don't share (nor QEMU read-only), then a machine of another architecture than ESXi's
+/// on ESXi, then a machine's data disks, which QEMU's and Parallels' plugins don't attach.
 #[must_use]
 pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
     let env = Environment::build(spec, Target::Vagrant, None);
     let provider = Provider::from(provider);
+    if !provider.runs_vms() {
+        return Some(format!(
+            "the `vagrant` target has no `{}` provider: vagrant_utm gives a VM no private network (it only forwards ports), and every machine is on one; UTM runs `docker-vm`",
+            provider.id()
+        ));
+    }
     windows::tpm_refusal(&env, provider)
         .or_else(|| networks_refusal(&env, provider))
         .or_else(|| boot::refusal(&env, provider))
@@ -181,8 +195,8 @@ fn arch_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
     Some(format!("machine `{name}` is {} (`hardware.arch`), and ESXi runs x86-64 VMs only", mp.arch.id()))
 }
 
-/// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,
-/// Parallels' and UTM's plugins attach none.
+/// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's and
+/// Parallels' plugins attach none.
 fn disk_refusal(spec: &Spec, provider: Provider<'_>) -> Option<String> {
     if provider.attaches_disks() {
         return None;
@@ -195,22 +209,14 @@ fn disk_refusal(spec: &Spec, provider: Provider<'_>) -> Option<String> {
 }
 
 /// What `provider` can't give the VMs of their networks and boxes: QEMU links a VM on one
-/// network only, `vagrant_utm` (0.1.6) sets up no private network (it only forwards ports to
-/// the VM's shared network, so a VM on one of the spec's networks would silently have none),
-/// Hyper-V needs a Hyper-V build of each box, and Isoloom bridges no network on QEMU, Hyper-V
-/// or libvirt.
+/// network only, Hyper-V needs a Hyper-V build of each box, and Isoloom bridges no network on
+/// QEMU, Hyper-V or libvirt.
 fn networks_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
     match provider {
         Provider::Qemu => qemu::refusal(super::qemu_links(env)).or_else(|| bridged::provider_refusal(env, "QEMU")),
-        Provider::Utm => {
-            let (name, _) = super::qemu_links(env).into_iter().find(|(_, l)| *l != qemu::Link::None)?;
-            Some(format!(
-                "`{name}` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)"
-            ))
-        }
         Provider::HyperV => hyperv::refusal(env).or_else(|| bridged::provider_refusal(env, "Hyper-V")),
         Provider::Libvirt => bridged::provider_refusal(env, "libvirt"),
-        Provider::VirtualBox | Provider::VmwareDesktop | Provider::VmwareEsxi | Provider::Parallels | Provider::Other(_) => None,
+        Provider::VirtualBox | Provider::VmwareDesktop | Provider::VmwareEsxi | Provider::Parallels | Provider::Utm | Provider::Other(_) => None,
     }
 }
 

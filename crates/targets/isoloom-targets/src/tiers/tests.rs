@@ -93,10 +93,10 @@ fn a_run_says_the_isoloom_version_whose_files_ran_when_it_was_recorded() {
 
 #[test]
 fn an_experimental_entry_is_tier_3_whatever_its_runs() {
-    let json = r#"{ "hosts": { "macos-arm64": "macos" }, "entries": [{ "entry": "vagrant/utm", "goal": 2, "exists_on": ["macos"], "experimental": true,
+    let json = r#"{ "hosts": { "macos-arm64": "macos" }, "entries": [{ "entry": "vagrant/qemu", "goal": 2, "exists_on": ["macos"], "experimental": true,
         "runs": [{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass" }] }] }"#;
-    let utm = file::parse(json).unwrap().pop().unwrap();
-    assert_eq!((utm.tier(), utm.evidence()), (Tier::Three, "experimental".to_owned()));
+    let qemu = file::parse(json).unwrap().pop().unwrap();
+    assert_eq!((qemu.tier(), qemu.evidence()), (Tier::Three, "experimental".to_owned()));
 }
 
 #[test]

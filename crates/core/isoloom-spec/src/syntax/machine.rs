@@ -185,13 +185,13 @@ pub(crate) struct MachineInput {
     /// Data disks beside its own, by name: `{ size_gb, fs, mount }`.
     #[serde(default)]
     disks: IndexMap<String, Disk>,
-    /// Folders of the computer that runs the lab, mounted in the machine both ways (what it writes
-    /// there lands on that computer): `{ from, path, read_only }`, `from` relative to the project
-    /// folder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose
-    /// machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own
-    /// shared folder: VirtualBox, VMware, Parallels, UTM, QEMU with `virtiofsd`, libvirt's
-    /// virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound). Hyper-V
-    /// (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.
+    /// Folders of the computer that runs the environment, mounted in the machine both ways (what
+    /// it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to
+    /// the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the
+    /// targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each
+    /// provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,
+    /// libvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;
+    /// UTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.
     #[serde(default)]
     host_folders: Vec<HostFolder>,
     /// Memory-backed mounts: a path, or `{ path, size, mode }`.

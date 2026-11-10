@@ -143,8 +143,8 @@ real runs: **Tier 1**, a full real run (up, checks, down) from every host OS it 
 | `docker` | A Compose project for your Docker | **1** (Linux, macOS, Windows) | yes | [Docker](docs/guide/targets/docker.md) |
 | `hosted` | The same Compose file, for a hosting service | 2 | no | [Docker](docs/guide/targets/docker.md) |
 | `kubernetes` | Manifests with NetworkPolicies for `reach`, a Kustomize overlay and a Helm chart | 2 | no | [Kubernetes](docs/guide/targets/kubernetes.md) |
-| `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, UTM, QEMU, remote ESXi | **1** on libvirt (Linux) and Hyper-V (Windows); 2 on the others | yes | [Vagrant](docs/guide/targets/vagrant.md) |
-| `docker-vm` | The containers on one VM (Vagrant, or Proxmox) | 2 | yes | [Vagrant](docs/guide/targets/vagrant.md), [Proxmox](docs/guide/targets/proxmox.md) |
+| `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU, remote ESXi | **1** on libvirt (Linux) and Hyper-V (Windows); 2 on the others | yes | [Vagrant](docs/guide/targets/vagrant.md) |
+| `docker-vm` | The containers on one VM (Vagrant, UTM included, or Proxmox) | 2 | yes | [Vagrant](docs/guide/targets/vagrant.md), [Proxmox](docs/guide/targets/proxmox.md) |
 | `hybrid` | Containers and VMs together on the same networks | 2 | no | [Vagrant](docs/guide/targets/vagrant.md) |
 | `proxmox` | A Terraform module: one VM per machine on Proxmox VE, with its SDN, router and firewall | 2 | yes | [Proxmox](docs/guide/targets/proxmox.md) |
 | `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | 2 | no | [ESXi](docs/guide/targets/esxi.md) |

@@ -24,11 +24,13 @@ fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<
     })
 }
 
-/// The providers, with this lab's refusal on each, and Vagrant's state folder for the run.
+/// The providers the Vagrantfile has a block for ([`Vagrant::runs_vms`]: all but UTM), with
+/// this lab's refusal on each, and Vagrant's state folder for the run.
 pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
     let spec = env.spec();
     let providers = Vagrant::ALL
         .iter()
+        .filter(|k| k.provider.runs_vms())
         .map(|k| {
             // Hyper-V takes management commands from an administrator only.
             let elevation = if k.manifest == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None };
@@ -117,7 +119,8 @@ machines:
         let Identity::Vagrant(v) = identity(&env, &dotfile).unwrap() else {
             panic!("a vagrant identity")
         };
-        assert_eq!(v.providers.len(), 8);
+        assert_eq!(v.providers.len(), 7, "every provider but UTM, which runs no VM on a network");
+        assert!(v.providers.iter().all(|p| p.id != Provider::Utm));
         let by = |p: Provider| v.providers.iter().find(|x| x.id == p).unwrap();
         assert_eq!(by(Provider::Hyperv).elevation, Elevation::Hyperv);
         assert_eq!(by(Provider::Hyperv).hosts, BTreeSet::from([HostOs::Windows]));

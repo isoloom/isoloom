@@ -33,7 +33,7 @@ pub(crate) fn switch(r: &mut Ruby, provider: Provider<'_>) {
         Provider::HyperV => {
             r.assign("v.enable_virtualization_extensions", true);
         }
-        // The Mac's providers stop the VM instead (`refuse_elsewhere`).
+        // QEMU stops the VM instead (`refuse_elsewhere`); UTM has no block in this Vagrantfile.
         Provider::Utm | Provider::Qemu | Provider::Other(_) => {}
     }
 }
@@ -43,12 +43,13 @@ fn modify(command: &str, flag: &str) -> Value {
     Value::array([Value::str(command), Value::sym("id"), Value::str(flag), Value::str("on")])
 }
 
-/// A trigger stopping `vagrant up` on the providers that can't nest, before the VM is created.
+/// A trigger stopping `vagrant up` on the provider that can't nest (QEMU), before the VM is
+/// created.
 pub(crate) fn refuse_elsewhere(r: &mut Ruby) {
     r.block(Call::new("m.trigger.before").arg(Value::sym("up")), "t", |r| {
         r.block("t.ruby", "_, machine", |r| {
             r.line(format_args!(
-                "abort(\"#{{machine.name}}: \" + {}) if %i[qemu utm].include?(machine.provider_name)",
+                "abort(\"#{{machine.name}}: \" + {}) if machine.provider_name == :qemu",
                 Value::str(NO_NESTING)
             ));
         });
@@ -84,6 +85,6 @@ mod tests {
             out.starts_with("m.trigger.before :up do |t|\n  t.ruby do |_, machine|\n    abort(\"#{machine.name}: \" + \"nested virtualization"),
             "{out}"
         );
-        assert!(out.contains("if %i[qemu utm].include?(machine.provider_name)\n"), "{out}");
+        assert!(out.contains("if machine.provider_name == :qemu\n"), "{out}");
     }
 }
