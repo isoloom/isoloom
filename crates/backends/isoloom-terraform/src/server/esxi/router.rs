@@ -1,9 +1,10 @@
 //! The router, as on Proxmox: an Ubuntu VM on the host's port group (DHCP) and on every network
 //! at its router address, forwarding between networks with the `reach` rules and to the
-//! internet (the same ruleset). VMware Tools reports its uplink address: the published ports
-//! are reached there, and Terraform reaches the machines through it. Unlike Proxmox's, it is
-//! never sealed: ESXi has no run manifest, so nothing closes the internet to the `internet:
-//! false` networks once the machines are set up, and the router keeps no sealed ruleset.
+//! internet (the same ruleset), and keeping the sealed one beside it from its first boot. VMware
+//! Tools reports its uplink address: the published ports are reached there, and Terraform and the
+//! runner reach the machines through it. Once the machines are set up, the run manifest's seal
+//! applies the sealed ruleset over SSH, which closes the internet to the `internet: false`
+//! networks (`crate::server::router`).
 
 use crate::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, list, not, reference, string};
 use isoloom_plan::{Environment, ipv6};
@@ -52,13 +53,13 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         windows: false,
         lifecycle: Some(uplink_checked(env)),
     };
-    let unsealed = if crate::seal::any(env) {
-        " Every network keeps the internet, the internet: false ones included: nothing seals them on ESXi."
+    let sealed = if crate::seal::any(env) {
+        " The run's seal closes the internet to the internet: false networks once the machines are set up."
     } else {
         ""
     };
     m.commented(
-        &format!("The router: forwards between networks with the reach rules, and to the internet.{unsealed} VMware Tools reports its uplink address."),
+        &format!("The router: forwards between networks with the reach rules, and to the internet.{sealed} VMware Tools reports its uplink address."),
         guest.block(&env.name),
     );
 }

@@ -5,14 +5,17 @@ The `esxi` target writes a Terraform module (`.isoloom/esxi/main.tf`, provider
 with a vSwitch and port groups for the networks and a router VM, then sets each machine up over
 SSH through the router.
 
-Tier 2, with a partial real run from macOS. There is no run manifest: run the module with
-Terraform. (VMs on a remote ESXi host through Vagrant are the `vagrant` target's `vmware_esxi`
-provider: [Vagrant](vagrant.md).)
+Tier 2, with a partial real run from macOS. It writes a run manifest
+(`.isoloom/esxi/run.json`), the same as Proxmox's: run the module with Terraform, or with a runner.
+(VMs on a remote ESXi host through Vagrant are the `vagrant` target's `vmware_esxi` provider:
+[Vagrant](vagrant.md).)
 
-An `internet: false` network keeps the internet on ESXi. The router gives every network the
-internet, so the machines can set themselves up. On Proxmox and the clouds, the runner then
-closes it to those networks (the run manifest's seal). ESXi has no run manifest, so nothing
-closes it there: use another target when a network must stay offline.
+An `internet: false` network is sealed on ESXi as on Proxmox. The router gives every network the
+internet while the machines set themselves up; once they are, the runner seals those networks
+(the run manifest's seal): it applies the sealed ruleset the router keeps from its first boot, over
+SSH, and keeps it for later boots. Their internet is then closed at the router, where root in a
+machine can't reopen it. A module applied by hand with Terraform alone is never sealed: apply the
+seal yourself (below), or use a runner.
 
 ## Prerequisites
 
@@ -33,7 +36,10 @@ closes it there: use another target when a network must stay offline.
 |---|---|
 | `esxi_hostname` | The host's name or address |
 | `esxi_username`, `esxi_password` | An ESXi account (default user `root`) |
-| `ssh_public_key`, `ssh_private_key_file` | The key the machines are set up with |
+| `ssh_public_key`, `ssh_private_key_file` | The key the machines are set up with (a runner gives its own) |
+
+A runner fills `esxi_password` from its own secret inputs, as `TF_VAR_esxi_password` in the
+Terraform steps' environment only.
 
 A dedicated ESXi account needs the rights to create and delete VMs, vSwitches and port groups, and
 to write to the datastore; a standalone host's built-in *Administrator* role on the host is the
@@ -60,7 +66,24 @@ images = {
 }
 ```
 
-The checks are scripts under `.isoloom/esxi/checks/`, run from the machines.
+The checks are scripts under `.isoloom/esxi/checks/`, run from the machines. Without a runner,
+seal the `internet: false` networks yourself once the apply is done, on the router (its address is
+the `ip` output):
+
+```sh
+ssh isoloom@"$(terraform -chdir=.isoloom/esxi output -raw ip)" \
+  "sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'"
+```
+
+Or with a runner, which gives the module its slot and key, waits for every set-up, seals offline
+networks and runs the checks (it runs Terraform, `ovftool` and `ssh` from the machine it runs on;
+secrets are refused on ESXi):
+
+```sh
+isothrum up . --target esxi
+isothrum check . --target esxi
+isothrum down . --target esxi
+```
 
 ## Security notes
 
@@ -71,7 +94,8 @@ and inputs delivered as files.
 
 ## Teardown
 
-`terraform -chdir=.isoloom/esxi destroy` with the same variables. ESXi runs have no expiry.
+`terraform -chdir=.isoloom/esxi destroy` with the same variables, or `isothrum down`. ESXi runs
+have no expiry.
 
 ## Cost
 

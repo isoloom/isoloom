@@ -46,7 +46,7 @@ Two targets fan out:
 
 A Vagrant run manifest is one file for every provider, chosen when the runner brings it up; the
 cloud targets write one per cloud (`.isoloom/cloud-vm/<cloud>/run.json`). `kubernetes`,
-`hybrid`, `esxi`, `external` and `hosted` write no run manifest yet, and `cloud-services` none
+`hybrid`, `external` and `hosted` write no run manifest yet, and `cloud-services` none
 without `cloud:`: [the run manifest](run-manifest.md) lists which target has one, and where.
 
 ## Tiers: how far a target is proven

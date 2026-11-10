@@ -15,8 +15,9 @@ use isoloom_render::run_manifest::{self, environment, generator};
 use isoloom_spec::model::Target;
 
 use super::super::docker_host::{SETUP, USER, variables};
-use super::{slots, steps, tools};
+use super::{PRIVATE_KEY, tools};
 use crate::Error;
+use crate::server::manifest::{runner_identity, slots, steps};
 
 /// The VM's address on the uplink: where SSH reaches it and the published ports answer.
 const IP: &str = "ip";
@@ -42,7 +43,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
     machines.extend(guest.machines_at(&ip));
     let vars = variables();
     // docker-vm is a single Docker host VM with no router to seal.
-    let mut params = slots::params(&vars, &[], false)?;
+    let mut params = slots::params(&vars, PRIVATE_KEY, &[], false)?;
     params.extend(guest.params.iter().cloned());
     let mut secrets = slots::connection(&vars)?;
     secrets.extend(guest.slots.iter().cloned());
@@ -57,7 +58,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
         driver: Driver::Terraform,
         hosts: run_manifest::every_host(),
         tools: tools()?,
-        identity: super::runner_identity()?,
+        identity: runner_identity()?,
         params,
         secrets,
         networks: guest.networks.clone(),
@@ -77,7 +78,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
 fn lifecycle(guest: &GuestCompose, way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Lifecycle, ManifestError> {
     // docker-vm is a single Docker host VM with no router to seal; the internet seal is the
     // Compose layer's (the guest), not a second apply here.
-    let mut lifecycle = steps::lifecycle(false)?;
+    let mut lifecycle = steps::lifecycle(PRIVATE_KEY, false)?;
     let mut up = lifecycle.up.as_slice().to_vec();
     up.extend(into_vm(way_in, &RelPath::parse(SETUP)?, "../../..")?);
     up.extend(GuestCommand::steps(&guest.start, way_in)?);

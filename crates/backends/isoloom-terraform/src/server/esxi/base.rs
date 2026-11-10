@@ -34,42 +34,36 @@ fn oses(env: &Environment) -> Vec<&str> {
     all
 }
 
-fn variables(env: &Environment) -> Vec<Block> {
+/// The module's variables, the run manifest's params and slots among them.
+pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
     let mut out = vec![
-        s("esxi_hostname").describe("The ESXi host's name or address").block(),
-        s("esxi_hostport")
-            .default(string("22"))
-            .describe("Its SSH port: the provider works over SSH")
-            .block(),
-        s("esxi_hostssl").default(string("443")).block(),
-        s("esxi_username").default(string("root")).block(),
-        s("esxi_password").sensitive().block(),
-        s("disk_store").default(string("datastore1")).describe("Where the VMs' disks go").block(),
+        s("esxi_hostname").describe("The ESXi host's name or address"),
+        s("esxi_hostport").default(string("22")).describe("Its SSH port: the provider works over SSH"),
+        s("esxi_hostssl").default(string("443")),
+        s("esxi_username").default(string("root")),
+        s("esxi_password").sensitive(),
+        s("disk_store").default(string("datastore1")).describe("Where the VMs' disks go"),
         s("uplink_port_group")
             .default(string("VM Network"))
-            .describe("The port group the router reaches the internet through (DHCP)")
-            .block(),
+            .describe("The port group the router reaches the internet through (DHCP)"),
         slot(),
         images(env),
-        variable::ssh_public_key(false).block(),
-        s("ssh_private_key_file")
-            .describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router")
-            .block(),
+        variable::ssh_public_key(false),
+        s("ssh_private_key_file").describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router"),
     ];
     if super::outside::on_host_vswitch(env) {
         out.push(
             s("uplink_vswitch")
                 .default(string("vSwitch0"))
-                .describe("The host's vSwitch on its LAN: the bridged networks' port groups go on it")
-                .block(),
+                .describe("The host's vSwitch on its LAN: the bridged networks' port groups go on it"),
         );
     }
     out
 }
 
 /// `slot`, checked: 1 to [`MAX_SLOT`].
-fn slot() -> Block {
+fn slot() -> Variable {
     let v = || reference("var.slot");
     let condition = binary(
         binary(v(), BinaryOperator::GreaterEq, number(1)),
@@ -80,12 +74,11 @@ fn slot() -> Block {
         .default(number(1))
         .describe("1 to 63, unique per environment on this host: it names the vSwitches and the VMs, and makes the MACs")
         .validated(condition, "slot is 1 to 63.")
-        .block()
 }
 
 /// `images`: an OVA (a path or a URL) per OS. Ubuntu's come with defaults; every other OS the
 /// environment runs must be given, which the validation says.
-fn images(env: &Environment) -> Block {
+fn images(env: &Environment) -> Variable {
     let oses = oses(env);
     let defaults = oses.iter().filter_map(|o| default_image(o).map(|url| (*o, string(url))));
     let needed = list(oses.iter().map(|o| string(*o)));
@@ -100,7 +93,6 @@ fn images(env: &Environment) -> Block {
         .default(object(defaults))
         .describe(&description)
         .validated(condition, &format!("images needs an OVA for each of: {}.", oses.join(", ")))
-        .block()
 }
 
 /// The connection: SSH to the host, which the provider runs its commands over.

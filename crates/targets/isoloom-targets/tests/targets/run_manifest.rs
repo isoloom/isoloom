@@ -1,8 +1,9 @@
 //! The run manifests the targets write (`.isoloom/<target>/run.json`): the design's web-portal
 //! spec and the solo-web example write the shared docker, docker-vm and proxmox fixtures the
-//! runner tests against, check runners get the time their waits need, and only `docker`,
-//! `vagrant`, `proxmox` and `docker-vm` (two: Vagrant's and Proxmox's) write one. Every example's manifest, on each, parses and matches the schema, and
-//! leaves the runner no slot it may skip.
+//! runner tests against, check runners get the time their waits need, and `hosted` and
+//! `kubernetes` write none. Every example's manifest on `docker`, `vagrant`, `proxmox`, `esxi`
+//! and `docker-vm` (two: Vagrant's and Proxmox's) parses and matches the schema, and leaves the
+//! runner no slot it may skip.
 
 use isoloom_manifest::{Manifest, OutputSource, Part, Placeholder};
 use isoloom_spec::{Target, load};
@@ -137,10 +138,11 @@ fn the_message_leaves_published_ports_to_the_runner() -> Outcome {
 
 /// The targets that write a run manifest, where they write it, and how many examples each
 /// generates at least.
-const WRITERS: [(Target, &str, usize); 5] = [
+const WRITERS: [(Target, &str, usize); 6] = [
     (Target::Docker, ".isoloom/docker/run.json", 15),
     (Target::Vagrant, ".isoloom/vagrant/run.json", 10),
     (Target::Proxmox, ".isoloom/proxmox/run.json", 10),
+    (Target::Esxi, ".isoloom/esxi/run.json", 10),
     (Target::DockerVm, ".isoloom/docker-vm/run.json", 10),
     (Target::DockerVm, ".isoloom/docker-vm/proxmox/run.json", 10),
 ];
@@ -231,7 +233,7 @@ fn every_examples_manifest_parses_and_matches_the_schema() -> Outcome {
 }
 
 #[test]
-fn only_docker_vagrant_proxmox_and_docker_vm_write_a_run_manifest_for_now() -> Outcome {
+fn hosted_and_kubernetes_write_no_run_manifest_for_now() -> Outcome {
     let spec = lab(WEB_PORTAL)?;
     for target in [Target::Hosted, Target::Kubernetes] {
         let files = generate(&spec, target).unwrap_or_default();

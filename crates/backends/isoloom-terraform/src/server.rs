@@ -1,11 +1,13 @@
 //! The targets on a server of your own: a Proxmox server
 //! ([`proxmox`]) and a standalone ESXi host ([`esxi`]). Both put the environment behind a router
 //! VM of their own ([`router`]), boot a machine's disk through the hypervisor's firmware
-//! ([`boot`]), and name what they create after the environment's `slot` on the server
-//! ([`slotted`]).
+//! ([`boot`]), name what they create after the environment's `slot` on the server
+//! ([`slotted`]), and write the same run manifest ([`manifest`]), which seals their `internet:
+//! false` networks at the router.
 
 pub(crate) mod boot;
 pub(crate) mod esxi;
+pub(crate) mod manifest;
 pub(crate) mod proxmox;
 pub(crate) mod router;
 
@@ -19,6 +21,7 @@ use isoloom_spec::model::Target;
 
 use crate::machine::{self, vms, windows};
 use crate::module::providers::{self, Provider};
+use crate::module::variable::Variable;
 use crate::module::{ProjectCopy, Usage, inputs};
 use crate::{Result, checks};
 
@@ -92,15 +95,15 @@ impl Parts {
 }
 
 /// A server module's start: the `terraform` block requiring the server's providers (`own`, and
-/// `random` for the Windows machines' password), the server's `variables`, the `inputs`
-/// variable, then its `provider`.
-pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variables: Vec<Block>, provider: Block) {
+/// `random` for the Windows machines' password), the server's `variables` (its run manifest's
+/// params and slots too), the `inputs` variable, then its `provider`.
+pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
     let mut required = own.to_vec();
     if windows::any(env) {
         required.push(providers::RANDOM);
     }
     m.block(providers::terraform(&required));
-    m.blocks(variables);
+    m.blocks(variables.into_iter().map(Variable::block));
     m.blocks(inputs::variable(env));
     m.block(provider);
 }

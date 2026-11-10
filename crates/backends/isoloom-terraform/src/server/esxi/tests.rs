@@ -92,7 +92,8 @@ fn windows_and_ipv6_are_hosted_within_limits() {
 }
 
 /// A secret's or an input's value as a file is refused: the machine would wait for a runner to
-/// deliver it, and ESXi has no run manifest yet. A file written in the spec is not.
+/// deliver it over SSH at the machine's own address, and an ESXi machine is reached only through
+/// the router. A file written in the spec is not.
 #[test]
 fn secrets_and_inputs_as_files_are_refused() {
     let secret = ("secrets: { token: { env: TOKEN } }", "{ path: /etc/token, secret: token }");

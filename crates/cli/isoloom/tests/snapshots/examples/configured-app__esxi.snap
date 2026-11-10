@@ -10,6 +10,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/esxi/checks/web.sh
 ✓ .isoloom/esxi/checks/api.sh
 ✓ .isoloom/configure/lib/configure.sh
+✓ .isoloom/esxi/run.json
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
 
@@ -21,6 +22,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/esxi/checks/isoloom-networks.sh
 .isoloom/esxi/checks/web.sh
 .isoloom/esxi/main.tf
+.isoloom/esxi/run.json
 .isoloom/resolved.json
 
 ## .isoloom/.gitignore: identical in the `docker` snapshot
@@ -700,6 +702,513 @@ locals {
 resource "local_file" "isoloom_project" {
   filename = "${path.module}/.isoloom-project-ignored.txt"
   content  = join("", [for f in local.project_ignored : "${replace("${basename(local.root)}/${f}", "/[\\\\*?\\[]/", "\\$0")}\n"])
+}
+
+## .isoloom/esxi/run.json
+{
+  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
+  "manifest_version": 1,
+  "generator": {
+    "name": "isoloom",
+    "version": "1.0.9"
+  },
+  "environment": {
+    "name": "configured-app",
+    "instance": null,
+    "message": null
+  },
+  "target": "esxi",
+  "driver": "terraform",
+  "hosts": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tools": [
+    {
+      "name": "terraform",
+      "probe": [
+        "terraform",
+        "version"
+      ],
+      "min_version": "1.6.0"
+    },
+    {
+      "name": "ovftool",
+      "probe": [
+        "ovftool",
+        "--version"
+      ]
+    },
+    {
+      "name": "ssh",
+      "probe": [
+        "ssh",
+        "-V"
+      ]
+    }
+  ],
+  "identity": {
+    "terraform": {
+      "module": ".",
+      "state": "runner"
+    }
+  },
+  "params": [
+    {
+      "name": "esxi_hostname",
+      "description": "The ESXi host's name or address.",
+      "required": true,
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "esxi_hostname"
+        }
+      ]
+    },
+    {
+      "name": "esxi_hostport",
+      "description": "Its SSH port: the provider works over SSH.",
+      "default": "22",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "esxi_hostport"
+        }
+      ]
+    },
+    {
+      "name": "esxi_hostssl",
+      "description": "The module's `esxi_hostssl`.",
+      "default": "443",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "esxi_hostssl"
+        }
+      ]
+    },
+    {
+      "name": "esxi_username",
+      "description": "The module's `esxi_username`.",
+      "default": "root",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "esxi_username"
+        }
+      ]
+    },
+    {
+      "name": "disk_store",
+      "description": "Where the VMs' disks go.",
+      "default": "datastore1",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "disk_store"
+        }
+      ]
+    },
+    {
+      "name": "uplink_port_group",
+      "description": "The port group the router reaches the internet through (DHCP).",
+      "default": "VM Network",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "uplink_port_group"
+        }
+      ]
+    },
+    {
+      "name": "images",
+      "description": "An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default; for another OS, an OVA with cloud-init and open-vm-tools.",
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "images"
+        }
+      ]
+    },
+    {
+      "name": "ISOLOOM_DERIVED",
+      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
+      "default": "1",
+      "values": [
+        "0",
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_DERIVED",
+          "steps": [
+            "check-isoloom-networks",
+            "check-web",
+            "check-api"
+          ]
+        }
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "name": "esxi_password",
+      "kind": "connection",
+      "required": false,
+      "sensitive": true,
+      "deliver": [
+        {
+          "via": "tf_var",
+          "var": "esxi_password"
+        }
+      ]
+    }
+  ],
+  "networks": [
+    {
+      "name": "lab",
+      "cidr": "10.66.0.0/24",
+      "internet": true,
+      "native": "iso${run.slot}-lab"
+    }
+  ],
+  "machines": [
+    {
+      "name": "web",
+      "role": "member",
+      "os": "debian-12",
+      "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
+      "addresses": {
+        "lab": "10.66.0.10"
+      },
+      "ports": [
+        {
+          "name": "http",
+          "port": 80,
+          "protocol": "tcp",
+          "http": true,
+          "publish": {
+            "mode": "fixed",
+            "preferred": 8086,
+            "address": "${outputs.ip}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "api",
+      "role": "member",
+      "os": "ubuntu-24.04",
+      "arch": "amd64",
+      "resources": {
+        "cpus": 1,
+        "memory_mb": 1024
+      },
+      "addresses": {
+        "lab": "10.66.0.20"
+      },
+      "ports": [
+        {
+          "name": "status",
+          "port": 8080,
+          "protocol": "tcp",
+          "http": true
+        },
+        {
+          "name": "health",
+          "port": 8081,
+          "protocol": "tcp",
+          "http": true
+        }
+      ]
+    },
+    {
+      "name": "isoloom-router",
+      "role": "infra",
+      "addresses": {
+        "lab": "10.66.0.254"
+      }
+    }
+  ],
+  "lifecycle": {
+    "up": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 900
+      },
+      {
+        "id": "apply",
+        "note": "Creating the environment's VMs on the server…",
+        "argv": [
+          "terraform",
+          "apply",
+          "-auto-approve",
+          "-input=false",
+          "-no-color"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 3600
+      }
+    ],
+    "down": [
+      {
+        "id": "clear-lock",
+        "action": "terraform.clear_lock"
+      },
+      {
+        "id": "init",
+        "note": "Preparing Terraform and its providers…",
+        "argv": [
+          "terraform",
+          "init",
+          "-input=false",
+          "-no-color",
+          "-backend-config=path=${run.state_dir}/terraform.tfstate"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 900
+      },
+      {
+        "id": "destroy",
+        "note": "Removing the environment from the server…",
+        "argv": [
+          "terraform",
+          "destroy",
+          "-auto-approve",
+          "-input=false",
+          "-no-color",
+          "-refresh=false"
+        ],
+        "env": {
+          "TF_DATA_DIR": "${run.state_dir}/.terraform",
+          "TF_INPUT": "0",
+          "TF_IN_AUTOMATION": "1",
+          "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
+          "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
+        },
+        "timeout_s": 1800
+      }
+    ],
+    "status": {
+      "id": "state",
+      "action": "terraform.read_state"
+    }
+  },
+  "ready": [
+    {
+      "kind": "step_ok",
+      "step": "apply",
+      "means": "the VMs exist, and Terraform set each Linux one up over SSH through the router"
+    },
+    {
+      "kind": "ready_file",
+      "host": "10.66.0.10",
+      "user": "isoloom",
+      "path": "${outputs.ready_file}",
+      "log": "/var/log/cloud-init-output.log",
+      "grammar": "isoloom-ready/1",
+      "via": "isoloom@${outputs.ip}",
+      "timeout_s": 2400,
+      "unreachable_timeout_s": 600,
+      "interval_s": 10
+    },
+    {
+      "kind": "ready_file",
+      "host": "10.66.0.20",
+      "user": "isoloom",
+      "path": "${outputs.ready_file}",
+      "log": "/var/log/cloud-init-output.log",
+      "grammar": "isoloom-ready/1",
+      "via": "isoloom@${outputs.ip}",
+      "timeout_s": 2400,
+      "unreachable_timeout_s": 600,
+      "interval_s": 10
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ip",
+      "description": "The router's uplink address: the published ports answer there, and SSH reaches the machines through it.",
+      "role": "address",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ip"
+      }
+    },
+    {
+      "name": "ssh_user",
+      "description": "The user every Linux VM and the router let in with the runner's key.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ssh_user"
+      }
+    },
+    {
+      "name": "ready_file",
+      "description": "Where each Linux machine's set-up says how far it got (isoloom-ready/1).",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "ready_file"
+      }
+    },
+    {
+      "name": "web__http",
+      "description": "web's http (port 80).",
+      "role": "entry",
+      "sensitive": false,
+      "format": "http://${outputs.ip}:${value}/",
+      "from": {
+        "kind": "published_port",
+        "machine": "web",
+        "port": "http"
+      }
+    }
+  ],
+  "checks": {
+    "protocol": "isoloom-check/1",
+    "setup": [],
+    "runners": [
+      {
+        "id": "isoloom-networks",
+        "from": "from web",
+        "checks": [
+          {
+            "name": "checks/web-answers.sh",
+            "kind": "script",
+            "wait_s": 60,
+            "derived": false
+          },
+          {
+            "name": "checks/api-answers.sh",
+            "kind": "script",
+            "wait_s": 60,
+            "derived": false
+          }
+        ],
+        "step": {
+          "id": "check-isoloom-networks",
+          "action": "ssh.run",
+          "with": {
+            "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
+            "host": "10.66.0.10",
+            "user": "isoloom",
+            "via": "isoloom@${outputs.ip}"
+          },
+          "stdin": "checks/isoloom-networks.sh",
+          "timeout_s": 210
+        }
+      },
+      {
+        "id": "web",
+        "from": "from web",
+        "checks": [
+          {
+            "name": "api:8080 from web",
+            "kind": "http",
+            "wait_s": 30,
+            "derived": true
+          },
+          {
+            "name": "api:8081 from web",
+            "kind": "http",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-web",
+          "action": "ssh.run",
+          "with": {
+            "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
+            "host": "10.66.0.10",
+            "user": "isoloom",
+            "via": "isoloom@${outputs.ip}"
+          },
+          "stdin": "checks/web.sh",
+          "timeout_s": 150
+        }
+      },
+      {
+        "id": "api",
+        "from": "from api",
+        "checks": [
+          {
+            "name": "web:80 from api",
+            "kind": "http",
+            "wait_s": 30,
+            "derived": true
+          }
+        ],
+        "step": {
+          "id": "check-api",
+          "action": "ssh.run",
+          "with": {
+            "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
+            "host": "10.66.0.20",
+            "user": "isoloom",
+            "via": "isoloom@${outputs.ip}"
+          },
+          "stdin": "checks/api.sh",
+          "timeout_s": 105
+        }
+      }
+    ],
+    "teardown": []
+  }
 }
 
 ## .isoloom/resolved.json: identical in the `docker` snapshot

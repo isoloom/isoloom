@@ -1,11 +1,11 @@
-//! The machines a Proxmox run creates (the lab's VMs and LXC containers, the router, the
-//! controller), its networks, and what it gives back: the router's uplink address (`ip`, the way
-//! in), the SSH user, the ready file, and each published port at the router's address.
+//! The machines a server's run creates (the lab's machines, the router, the controller), and what
+//! it gives back: the router's uplink address (`ip`, the way in), the SSH user, the ready file,
+//! and each published port at the router's address.
 
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 
-use isoloom_manifest::{Error as ManifestError, Machine, Name, Network, Output, OutputRole, Part, Placeholder, Role, RunVar, SnakeName, Template};
+use isoloom_manifest::{Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SnakeName, Template};
 use isoloom_plan::Environment;
 use isoloom_render::router;
 use isoloom_render::run_manifest::outputs_with;
@@ -19,18 +19,6 @@ use crate::machine::controller::NAME as CONTROLLER;
 use crate::server::router::NAME as ROUTER;
 /// The router's uplink address: every published port answers there.
 const IP: &str = "ip";
-
-/// The lab's networks, each named after the VNet (the node's bridge) it is, or whose VLAN it is:
-/// `i<slot>n<i>`, a LAN's `i<slot>l<j>`, the module's own ids (`links::vnet_ids`).
-pub(super) fn networks(env: &Environment) -> Result<Vec<Network>, ManifestError> {
-    let vnets: BTreeMap<&str, String> = crate::server::proxmox::links::vnet_ids(env).into_iter().collect();
-    let native = |net: &str| {
-        let on = env.networks.get(net).and_then(|n| n.vlan.as_ref().map(|(l, _)| l.as_str())).unwrap_or(net);
-        let id = vnets.get(on).cloned().unwrap_or_default();
-        Template::from_parts([Part::Text("i".into()), Part::Placeholder(Placeholder::Run(RunVar::Slot)), Part::Text(id)])
-    };
-    isoloom_render::run_manifest::networks(env, native)
-}
 
 /// The lab's machines in start order, then the router and the controller. A published port is
 /// forwarded by the router on its own `publish` number, at the router's address.

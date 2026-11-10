@@ -9,7 +9,8 @@
 //! - A router VM sits on the host's own port group (`uplink_port_group`, DHCP) and on every
 //!   network at its router address, as on Proxmox: it forwards between networks with the
 //!   `reach` rules (nftables), forwards the published ports, and gives the machines the
-//!   internet (NAT).
+//!   internet (NAT). Once the machines are set up, the run manifest's seal closes the internet
+//!   to the `internet: false` networks at the router, as on Proxmox.
 //! - Each machine is a VM deployed from an OVA (`images`, Ubuntu's cloud OVAs by default). Its
 //!   addresses (matched by MAC) and its `isoloom` user come from cloud-init's VMware data
 //!   source (`guestinfo`). Terraform then sets it up over SSH through the router: the core's
@@ -24,15 +25,21 @@
 //!   the host: it names the vSwitches and the VMs, and makes the MACs) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`): the `machines`
 //!   output gives their addresses, and the check runners in
-//!   `.isoloom/esxi/checks/<position>.sh` are piped to them (the module's usage says how).
-//! - Secrets and inputs as files are refused: a machine would wait for a runner to deliver them,
-//!   and ESXi has no run manifest yet.
+//!   `.isoloom/esxi/checks/<position>.sh` are piped to them by the runner (the module's usage
+//!   says how by hand).
+//! - The run manifest (`.isoloom/esxi/run.json`, see `manifest`) is the servers' own: Terraform
+//!   makes the environment and sets it up, the runner waits for every set-up, seals, and runs the
+//!   checks over SSH through the router.
+//! - Secrets and inputs as files are refused: a machine would wait for a runner to deliver them
+//!   over SSH at its own address, and an ESXi machine is reached only through the router, which a
+//!   run manifest's guest delivery doesn't go through.
 
 mod base;
 mod boot;
 mod disks;
 mod guest;
 mod machines;
+mod manifest;
 mod networks;
 mod outside;
 mod router;
@@ -139,7 +146,9 @@ impl Backend for EsxiBackend {
     /// What a server target gives (`crate::server::features`): the router, the controller, the
     /// machines' own steps and the provider. The rest (own images, TPM, GPUs, nesting, rate
     /// limits, which the provider has no setting for) is refused, and so are secrets and inputs
-    /// as files: a machine waits for a runner to deliver them, and ESXi has no run manifest yet.
+    /// as files: a machine waits for a runner to deliver them over SSH at its own address, and an
+    /// ESXi machine is reached only through the router, which a run manifest's guest delivery
+    /// doesn't go through.
     fn capabilities(&self) -> Capabilities {
         Capabilities::of(super::features().filter(|f| !matches!(f, Feature::Secrets | Feature::SecretOwners)))
     }
@@ -150,6 +159,13 @@ impl Backend for EsxiBackend {
 
     fn refusal(&self, env: &Environment) -> Option<String> {
         PARTS.refusal(&self.capabilities(), env)
+    }
+
+    /// The run manifest (`.isoloom/esxi/run.json`): Terraform makes the environment and sets its
+    /// machines up, the runner reads each machine's ready file, seals the `internet: false`
+    /// networks at the router and runs the checks, over SSH through the router.
+    fn run_manifest(&self, env: &Environment) -> std::result::Result<Option<isoloom_manifest::Manifest>, RenderError> {
+        Ok(Some(manifest::manifest(env)?))
     }
 }
 

@@ -79,11 +79,12 @@ on top.
 
 An `internet: false` network is a guarantee, not a convention. On Compose, the containers have no
 route out and a privileged container on such a network is refused unless it accepts a best-effort
-seal. On the clouds, machines need the internet while they set themselves up, so the runner seals
-the network at the cloud's own level once they are ready (a second apply with `isoloom_sealed`):
-egress is then limited to the environment's networks. The seal fails closed, and every later
-apply keeps it. [ADR 0004](adr/0004-egress-seal.md) explains the design and its one residual
-channel (the cloud's DNS resolver).
+seal. On the clouds and the servers (Proxmox, ESXi), machines need the internet while they set
+themselves up, so the runner seals the network once they are ready, where root in a machine can't
+undo it: at the cloud's own level (a second apply with `isoloom_sealed`), or at a server's router
+(its sealed ruleset applied over SSH). Egress is then limited to the environment's networks. The
+seal fails closed, and every later apply keeps it. [ADR 0004](adr/0004-egress-seal.md) explains
+the design and its one residual channel (the cloud's DNS resolver).
 
 ## Expiry
 

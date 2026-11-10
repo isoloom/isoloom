@@ -21,8 +21,7 @@ pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
 
 /// Everything before the router.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let variables = variables(env).into_iter().map(Variable::block).collect();
-    server::head(env, m, &[providers::PROXMOX, providers::TLS], variables, provider());
+    server::head(env, m, &[providers::PROXMOX, providers::TLS], variables(env), provider());
     m.commented(
         "The project, written to /opt/isoloom in each machine that has steps; the `isoloom` user on every VM.",
         locals(env),

@@ -1,4 +1,4 @@
-//! Helpers shared by the Terraform run-manifest builders (the clouds and the Proxmox server):
+//! Helpers shared by the Terraform run-manifest builders (the clouds and the servers):
 //! the small template and step-id utilities, a bare machine, a lab machine with its ports
 //! fixed, and a state-read output. Each builder differs in its lifecycle, credentials and the
 //! machines it makes; these are what they have in common, kept in one place so no copy drifts.
@@ -172,10 +172,10 @@ pub(crate) fn terraform_output(name: &str, role: OutputRole, description: &str) 
 
 /// The seal's run-manifest param (`crate::cloud::vm::seal`): the runner sets it `true` once the
 /// machines are set up (its default is `false`) and records it with the run. It is delivered as
-/// the `isoloom_sealed` Terraform variable: a cloud module's rules switch on it; the Proxmox
-/// module has no such variable (its router is sealed by the seal's SSH step), so Terraform
-/// ignores it there. `closed_at` names where the internet is closed for the description (the
-/// clouds' "network", a server's "router").
+/// the `isoloom_sealed` Terraform variable: a cloud module's rules switch on it; a server's module
+/// (Proxmox's, ESXi's) has no such variable (its router is sealed by the seal's SSH step), so
+/// Terraform ignores it there. `closed_at` names where the internet is closed for the description
+/// (the clouds' "network", a server's "router").
 pub(crate) fn seal_param(name: &str, closed_at: &str) -> Result<Param, ManifestError> {
     Ok(Param {
         name: EnvName::parse(name)?,

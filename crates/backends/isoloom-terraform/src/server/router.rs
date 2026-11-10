@@ -1,7 +1,8 @@
 //! The router of a server's environment (Proxmox, ESXi): a VM on the server's own network
 //! (DHCP) and on every network at its router address. It forwards between networks with the
-//! `reach` rules and gives them the internet ([`ruleset_content`], [`forwarding`]), and everything is
-//! reached through it from outside ([`outputs`]): each published service at its uplink address,
+//! `reach` rules and gives them the internet ([`ruleset_content`], [`forwarding`]), until the run
+//! manifest's seal closes it to the `internet: false` networks ([`sealed_reload`]); and everything
+//! is reached through it from outside ([`outputs`]): each published service at its uplink address,
 //! each machine over SSH by it. Each platform makes the VM itself.
 
 use crate::hcl_builder::{Block, Expression, Module, Template, object, reference, string};
@@ -33,14 +34,12 @@ pub(crate) struct Platform {
     /// The commands that bring the interfaces up: once forwarding is on, before the ruleset
     /// loads.
     pub(crate) up: &'static [&'static str],
-    /// Whether the platform seals the run: then the router keeps the sealed ruleset beside the
-    /// live one, from its first boot ([`sealed_file`]).
-    pub(crate) seals: bool,
 }
 
 /// The router's cloud-config, the same on every server: nftables with the ruleset
-/// ([`ruleset_content`]), forwarding on ([`forwarding`]), the site's certificate authorities and
-/// the prelude, with what the `platform` adds.
+/// ([`ruleset_content`]) and, when the run seals, the sealed one beside it from the first boot
+/// ([`sealed_file`]), forwarding on ([`forwarding`]), the site's certificate authorities and the
+/// prelude, with what the `platform` adds.
 pub(crate) fn cloud_config(env: &Environment, platform: Platform) -> CloudConfig {
     let mut config = CloudConfig::new(NAME, reference("local.users"));
     config.packages = std::iter::once("nftables").chain(platform.packages.iter().copied()).map(String::from).collect();
@@ -51,9 +50,7 @@ pub(crate) fn cloud_config(env: &Environment, platform: Platform) -> CloudConfig
         file("/etc/nftables.conf", None, ruleset_content(env)),
         file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
     ]);
-    if platform.seals {
-        config.files.extend(sealed_file(env));
-    }
+    config.files.extend(sealed_file(env));
     config.files.extend(platform.networks);
     config.runcmd = std::iter::once("sysctl -p /etc/sysctl.d/90-isoloom.conf")
         .chain(platform.up.iter().copied())

@@ -4,14 +4,15 @@
 //! images); from then on only the environment's own networks are reachable from them.
 //!
 //! What is sealed, and the switch's name, are the same everywhere; how differs. A cloud switches
-//! its own rules with a module variable (`crate::cloud::vm::seal`); Proxmox's router applies a
-//! sealed ruleset it keeps from its first boot (`crate::server::router`).
+//! its own rules with a module variable (`crate::cloud::vm::seal`); a server's router (Proxmox's,
+//! ESXi's) applies a sealed ruleset it keeps from its first boot (`crate::server::router`), over
+//! SSH (`crate::server::manifest`).
 
 use isoloom_plan::{Environment, MachinePlan};
 
 use crate::machine::vms;
 
-/// The run's seal switch: the cloud modules' Terraform variable, and on Proxmox the runner's
+/// The run's seal switch: the cloud modules' Terraform variable, and on a server the runner's
 /// recorded flag.
 pub(crate) const SEALED: &str = "isoloom_sealed";
 

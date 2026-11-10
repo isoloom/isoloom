@@ -150,3 +150,81 @@ fn a_refused_cell_says_which_step_refused_and_why() {
         "a target's every column named once"
     );
 }
+
+/// Where a target that takes an `internet: false` network closes the internet to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Sealed {
+    /// By the run, once the machines are set up: its run manifest's `lifecycle.seal`, out of a
+    /// guest's reach (a cloud's firewalls, a server's router).
+    ByTheRun,
+    /// By what the target makes, from the start (`why` says how): its run manifest, if it has
+    /// one, has no seal of its own.
+    AsMade(&'static str),
+}
+
+/// How `target` seals an `internet: false` network; `None` where the row means nothing (no
+/// machines of its own). A target added to the spec must say, so a ✓ can't go unexplained.
+fn sealed_by(target: Target) -> Option<Sealed> {
+    Some(match target {
+        Target::Proxmox | Target::Esxi | Target::CloudVm => Sealed::ByTheRun,
+        Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker => {
+            Sealed::AsMade("an internal Compose network: the containers have no route out")
+        }
+        Target::Kubernetes => Sealed::AsMade("an egress network policy on the offline pods"),
+        Target::Hybrid => Sealed::AsMade("an internal Compose network, and each VM's own egress step"),
+        Target::Vagrant | Target::External => Sealed::AsMade("each machine's own egress step, at the end of its set-up"),
+        Target::CloudServices => return None,
+    })
+}
+
+/// The matrix's ✓ for `networks.*.internet = false` is what the generators write: every column
+/// that takes it seals the network, and a target sealed by the run (a cloud, Proxmox, ESXi)
+/// writes the seal into its run manifest. ESXi's ✓ once stood for a router that never sealed.
+#[test]
+fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
+    let m = built();
+    let probes = probe::probes().unwrap();
+    let p = probes
+        .rows
+        .iter()
+        .find(|p| p.field == "networks.*.internet" && p.value.as_deref() == Some("false"))
+        .unwrap();
+    let row = m.rows.iter().find(|r| r.name() == "networks.*.internet = false").unwrap();
+    let labs = labs_of(p);
+    let mut by_the_run = BTreeSet::new();
+    for (column, cell) in m.columns.iter().zip(&row.cells) {
+        if *cell != Cell::Supported {
+            continue;
+        }
+        let how = sealed_by(column.target).unwrap_or_else(|| panic!("{}: takes the row, but says nothing of a seal", column.id()));
+        let lab = &labs.iter().find(|(t, _)| *t == column.target).unwrap().1;
+        let files = crate::generate(lab, column.target).unwrap();
+        // The column's own run manifests: a cloud's in its folder, every other target's in its own.
+        let folder = match column.variant.filter(|_| column.target == Target::CloudVm) {
+            Some(cloud) => format!(".isoloom/{}/{cloud}/", column.target.id()),
+            None => format!(".isoloom/{}/", column.target.id()),
+        };
+        let manifests: Vec<isoloom_manifest::Manifest> = files
+            .iter()
+            .filter(|f| f.path.starts_with(&folder) && f.path.ends_with("/run.json"))
+            .map(|f| isoloom_manifest::parse(&f.contents).unwrap())
+            .collect();
+        match how {
+            Sealed::ByTheRun => {
+                assert!(!manifests.is_empty(), "{}: sealed by the run, but it writes no run manifest", column.id());
+                for man in &manifests {
+                    let seal = man.lifecycle.seal.as_ref();
+                    assert!(seal.is_some(), "{}: ✓ in the matrix, but its run manifest has no seal", column.id());
+                    assert_eq!(seal.map(|s| s.param.as_str()), Some("isoloom_sealed"), "{}", column.id());
+                }
+                by_the_run.insert(column.target);
+            }
+            Sealed::AsMade(why) => {
+                for man in &manifests {
+                    assert!(man.lifecycle.seal.is_none(), "{}: said sealed by {why}, yet its run seals", column.id());
+                }
+            }
+        }
+    }
+    assert_eq!(by_the_run, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
+}

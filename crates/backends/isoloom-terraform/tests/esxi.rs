@@ -37,15 +37,30 @@ fn esxi_segmented() -> Outcome {
     Ok(())
 }
 
-/// ESXi has no run manifest, so no seal step: its router writes no sealed ruleset nothing would
-/// apply, and the module says the `internet: false` networks keep the internet.
+/// The router holds the sealed ruleset from its first boot, and the run manifest's seal applies
+/// that very file over SSH once the machines are set up: `internet: false` networks lose the
+/// internet on ESXi, as on Proxmox. A lab with nothing to seal has neither.
 #[test]
-fn the_router_holds_no_seal_nothing_applies() -> Outcome {
-    let sealed = esxi("segmented")?;
-    assert!(!sealed.contains("nftables.sealed"), "{sealed}");
-    assert!(sealed.contains("the internet: false ones included: nothing seals them on ESXi"), "{sealed}");
-    let open = esxi("ansible-pair")?;
-    assert!(!open.contains("nothing seals them"), "nothing to seal, nothing said");
+fn the_router_holds_the_sealed_ruleset_the_seal_applies() -> Outcome {
+    let e = env("segmented")?;
+    let sealed = module(&e)?;
+    assert!(sealed.contains("/etc/nftables.sealed.nft"), "{sealed}");
+    assert!(
+        sealed.contains("The run's seal closes the internet to the internet: false networks"),
+        "{sealed}"
+    );
+    // The `internet: false` networks' traffic from elsewhere dropped, and only the others
+    // forwarded out, in the sealed ruleset alone.
+    let closed: Vec<&str> = e.networks.values().filter(|n| !n.internet).map(|n| n.cidr.as_str()).collect();
+    assert!(!closed.is_empty(), "segmented has an internet: false network");
+    assert!(sealed.contains(&format!("ip daddr {{ {} }} drop", closed.join(", "))), "{sealed}");
+    let manifest = EsxiBackend.run_manifest(&e)?.ok_or("ESXi writes a run manifest")?;
+    let seal = serde_json::to_value(manifest.lifecycle.seal.ok_or("a seal")?)?;
+    let command = seal["steps"][0]["with"]["command"].as_str().unwrap_or_default();
+    assert!(command.starts_with("sudo sh -c 'nft -f /etc/nftables.sealed.nft "), "{seal:#}");
+    let open = env("ansible-pair")?;
+    assert!(!module(&open)?.contains("nftables.sealed"), "nothing to seal, no sealed ruleset");
+    assert!(EsxiBackend.run_manifest(&open)?.ok_or("a run manifest")?.lifecycle.seal.is_none());
     Ok(())
 }
 
@@ -110,7 +125,8 @@ fn esxi_dual_stack() -> Outcome {
 
 /// What no example has on ESXi: a machine's own firmware, a network's MTU, bridged networks
 /// (on a NIC of their own, tagged, and on the host's own vSwitch by DHCP), an existing port
-/// group, and data disks, one of them raw. (Secrets are refused: ESXi has no run manifest yet.)
+/// group, and data disks, one of them raw. (Secrets are refused: nothing delivers them to a machine
+/// behind the router.)
 const LAB: &str = "
 version: 1
 name: lab

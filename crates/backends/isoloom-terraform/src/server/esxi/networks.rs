@@ -7,10 +7,16 @@ use isoloom_plan::Environment;
 use crate::module::{ident, resource};
 use crate::server::slotted;
 
+/// What network `net`'s vSwitch and port group are named after the environment's slot
+/// (`iso<slot><suffix>`): the module's names, and the run manifest's.
+pub(super) fn suffix(net: &str) -> String {
+    format!("-{net}")
+}
+
 /// A vSwitch and a port group per network.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
     for (net, plan) in &env.networks {
-        let name = || slotted(&format!("-{net}"));
+        let name = || slotted(&suffix(net));
         let mut vswitch = resource("esxi_vswitch", &ident(net)).add_attribute(("name", name()));
         if let Some(mtu) = plan.mtu {
             vswitch = vswitch.add_attribute(("mtu", number(mtu.into())));

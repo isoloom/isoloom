@@ -1,7 +1,7 @@
-//! What a Proxmox run does: Terraform's `init` then `apply` (and `destroy`), each with the run's
+//! What a server's run does: Terraform's `init` then `apply` (and `destroy`), each with the run's
 //! own values in its environment; when it counts as ready (the apply, then each Linux machine's
-//! ready file, read through the router); and its check runners, each piped to its machine over
-//! SSH through the router.
+//! ready file, read through the router); its seal; and its check runners, each piped to its
+//! machine over SSH through the router.
 
 use isoloom_manifest::{
     Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Part, PathTemplate, Placeholder, RelPath, RunVar, Seal, SnakeName,
@@ -10,7 +10,6 @@ use isoloom_manifest::{
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{action_with, timeout_s};
 
-use super::slots::SEALED;
 use crate::machine::{controller, vms};
 use crate::module::manifest::{self, PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, secs, terraform, words};
 use crate::server::router::check_host;
@@ -20,18 +19,12 @@ use crate::machine::USER;
 /// Where cloud-init writes the set-up's output: its tail explains a failed step.
 const SETUP_LOG: &str = "/var/log/cloud-init-output.log";
 
-/// The values the runner gives the module: its slot on the server, its key.
-const VARS: &[(&str, RunVar)] = &[
-    ("TF_VAR_slot", RunVar::Slot),
-    ("TF_VAR_ssh_public_key", RunVar::SshPublicKey),
-    ("TF_VAR_proxmox_ssh_private_key_file", RunVar::SshKey),
-];
-
 /// The seal, over SSH: the runner applies the router's sealed ruleset (its `SEALED_NFT` file,
 /// written at boot) live and keeps it as `/etc/nftables.conf`, so later boots stay sealed
 /// (`crate::server::router::sealed_reload`). The module itself never changes for the seal, so no
 /// apply is needed. Reached directly at the router's uplink address (`${outputs.ip}`), the
-/// environment's way in, as `isoloom`.
+/// environment's way in, as `isoloom`: where the runner reaches every machine through, and, on
+/// ESXi, where Terraform does too.
 fn seal_reload() -> Result<Step, ManifestError> {
     let with = [
         ("host", output("ip")?),
@@ -44,13 +37,24 @@ fn seal_reload() -> Result<Step, ManifestError> {
     Ok(step)
 }
 
+/// The module's variables the runner sets itself, each from one of its own values: its slot on
+/// the server, its key's public half (the VMs let it in), and its private half's file
+/// (`private_key`, the module's name for that variable). Never params an embedder gives.
+pub(crate) fn runner_set(private_key: &str) -> [(&str, RunVar); 3] {
+    [("slot", RunVar::Slot), ("ssh_public_key", RunVar::SshPublicKey), (private_key, RunVar::SshKey)]
+}
+
 /// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`); when the run
 /// has an `internet: false` network to seal (`sealed`), the seal: one `ssh.run` applying the
 /// sealed ruleset to the running router once the machines are ready, and keeping it for later
-/// boots ([`seal_reload`]).
-pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
-    let (lock, init) = (manifest::clear_lock, || manifest::init(VARS));
-    let apply = |step, note| manifest::apply(step, note, VARS);
+/// boots ([`seal_reload`]). Each Terraform step has the runner's own values in its environment
+/// ([`runner_set`], `private_key` the module's variable for its key's file).
+pub(crate) fn lifecycle(private_key: &str, sealed: bool) -> Result<Lifecycle, ManifestError> {
+    let named: Vec<(String, RunVar)> = runner_set(private_key).iter().map(|(v, run)| (format!("TF_VAR_{v}"), *run)).collect();
+    let vars: Vec<(&str, RunVar)> = named.iter().map(|(v, run)| (v.as_str(), *run)).collect();
+    let vars = vars.as_slice();
+    let (lock, init) = (manifest::clear_lock, || manifest::init(vars));
+    let apply = |step, note| manifest::apply(step, note, vars);
     // No refresh: the state names everything to remove, and a router whose guest agent never
     // ran would hold a refresh for the agent's whole wait.
     let destroy = terraform(
@@ -58,12 +62,12 @@ pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
         words(&["destroy", "-auto-approve", "-input=false", "-no-color", "-refresh=false"]),
         1800,
         "Removing the environment from the server…",
-        VARS,
+        vars,
     )?;
     let seal = sealed
         .then(|| {
             Ok::<Seal, ManifestError>(Seal {
-                param: EnvName::parse(SEALED)?,
+                param: EnvName::parse(crate::seal::SEALED)?,
                 steps: NonEmpty::one(seal_reload()?),
             })
         })
@@ -82,11 +86,13 @@ pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
     })
 }
 
-/// The apply succeeded, then each Linux VM's set-up and the controller's playbooks are done.
-pub(super) fn ready(env: &Environment) -> Result<Vec<Condition>, ManifestError> {
+/// The apply succeeded (`applied` says how far the machines' set-up then is), then each Linux
+/// VM's set-up and the controller's playbooks are done (on ESXi, Terraform's own set-up wrote
+/// each ready file during the apply).
+pub(super) fn ready(env: &Environment, applied: &str) -> Result<Vec<Condition>, ManifestError> {
     let mut out = vec![Condition::StepOk {
         step: id("apply")?,
-        means: Some("the VMs exist and booted; each sets itself up from its cloud-init".into()),
+        means: Some(applied.into()),
     }];
     for (_, mp) in vms(env).filter(|(_, mp)| !mp.is_windows()) {
         if let Some(a) = mp.addresses.values().next() {

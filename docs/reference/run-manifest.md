@@ -13,10 +13,11 @@ Which targets have one, and where:
 | `vagrant` | `.isoloom/vagrant/run.json` (one for every provider) |
 | `docker-vm` | `.isoloom/docker-vm/run.json` (the VM made by Vagrant), and `.isoloom/docker-vm/proxmox/run.json` (made on a Proxmox server) unless a container mounts a folder of the computer that runs the lab |
 | `proxmox` | `.isoloom/proxmox/run.json` |
+| `esxi` | `.isoloom/esxi/run.json` |
 | `cloud-vm` | `.isoloom/cloud-vm/<cloud>/run.json`, one per cloud that takes the lab |
 | `cloud-docker` | `.isoloom/cloud-docker/<cloud>/run.json`, one per cloud that takes the lab |
 | `cloud-services` | `.isoloom/cloud-services/run.json`, when the spec has `cloud:`, unless it has `before` steps (host scripts) or a variable holding a launch value inside a larger value |
-| `kubernetes`, `hybrid`, `esxi`, `external`, `hosted` | none yet: their files are run by hand |
+| `kubernetes`, `hybrid`, `external`, `hosted` | none yet: their files are run by hand |
 
 A runner executes it: any program that reads the manifest and follows this contract.
 [Isothrum](https://github.com/Isothrum/isothrum) is the reference runner. You can
@@ -138,12 +139,14 @@ cloud's login for the machine's OS, the one rule that writes `ssh_user_<machine>
 
 ## The egress seal
 
-For a cloud target, an `internet: false` network is sealed at the network level **after** the
-machines are set up: the manifest carries an optional `seal` step that the runner applies once the
-environment is ready (a second Terraform apply with the module's seal variable on). Egress to the
-internet is then cut for those networks, while the runner's SSH and the published ports still
-answer. The seal fails closed — a failed seal means the run is not ready — and every later
-operation replays it, so a later apply can't silently undo it.
+For a cloud target and a server (`proxmox`, `esxi`), an `internet: false` network is sealed at
+the network level **after** the machines are set up: the manifest carries an optional `seal` step
+that the runner applies once the environment is ready. On a cloud it is a second Terraform apply
+with the module's seal variable on; on a server, one `ssh.run` on the router that applies the
+sealed ruleset it keeps from its first boot. Egress to the internet is then cut for those
+networks, while the runner's SSH and the published ports still answer. The seal fails closed — a
+failed seal means the run is not ready — and every later operation replays it, so a later apply
+can't silently undo it.
 
 ## Running it
 

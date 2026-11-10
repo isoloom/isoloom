@@ -24,8 +24,6 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             uplink: Some(file("/etc/systemd/network/10-wan.network", None, interface(mac(None), &["DHCP=yes"]))),
             networks: networks(env),
             up: &["systemctl enable systemd-networkd", "systemctl restart systemd-networkd"],
-            // The sealed ruleset as a second file, applied live by the runner's seal step.
-            seals: true,
         },
     );
     config.runcmd.push(super::uplink::start_agent_after_uplink(&own_addresses(env)));
