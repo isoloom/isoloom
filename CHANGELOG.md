@@ -31,6 +31,15 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+- **Breaking: Isoloom's own router and controller take Isoloom's names on Proxmox, ESXi and the
+  clouds.** A lab machine named `router` or `controller` wrote a second
+  `proxmox_virtual_environment_file` of the same name (invalid Terraform), and on ESXi and the
+  clouds a second VM, snippet or cloud resource of the same name. Their snippets, VMs and cloud
+  resources are named `isoloom-router`/`isoloom-controller` now (`iso<slot>-isoloom-router`,
+  `<env>-isoloom-controller`; Terraform labels `isoloom_router`, `isoloom_controller`), as their
+  run-manifest machines already were, and the `checks` output names the controller
+  `isoloom-controller`. A lab applied with 1.x has them under the old names: the next `terraform
+  apply` destroys and re-creates them.
 - **Breaking: what Isoloom names beside a machine is under `isoloom-`, which no machine takes.**
   The check runner of the networks' position is `isoloom-networks` (its script
   `checks/isoloom-networks.sh`, its run-manifest step `check-isoloom-networks`, its Compose
@@ -252,8 +261,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Every Kubernetes object carries `app.kubernetes.io/managed-by: isoloom`**, as Compose's
   containers carry `isoloom.managed` and the clouds' resources `managed-by`. Google Cloud's project
   of its own and Linode's firewalls carry the environment's labels and tags.
-- **The controller is `isoloom-controller` in Proxmox's run manifests and in Proxmox's and ESXi's
-  `checks` output** (was `controller`), as on the clouds.
+- **The controller is `isoloom-controller` in Proxmox's run manifests and in the `checks` output
+  of Proxmox, ESXi and the clouds** (was `controller`).
 - **`docker-vm`'s `up` provisions `nat-route` first** (`--provision-with nat-route,...`),
   and every Linux VM of the Vagrant target has that provisioner first: see Fixed.
 - The run manifest's `entry` output role is "the address a user opens first", and a dormant port
@@ -669,14 +678,6 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **The Proxmox and ESXi routers trust the site's certificate authorities** before they install
   their packages (cloud-init's `ca_certs`, each file read from the project), as the CHANGELOG's
   entry on Isoloom's own VMs said: only Vagrant's router did.
-- **Isoloom's own router and controller take Isoloom's names on Proxmox, ESXi and the clouds.**
-  A lab machine named `router` or `controller` wrote a second `proxmox_virtual_environment_file`
-  of the same name (invalid Terraform), and on ESXi and the clouds a second VM, snippet or cloud
-  resource of the same name. Their snippets, VMs and cloud resources are named
-  `isoloom-router`/`isoloom-controller` now (`iso<slot>-isoloom-router`,
-  `<env>-isoloom-controller`; Terraform labels `isoloom_router`, `isoloom_controller`), as their
-  run-manifest machines already were, and the `checks` output names the controller
-  `isoloom-controller`.
 
 - **QEMU's hub ports are one block per environment.** Each network had its own hashed base
   port, its VMs the ports after it, so two networks could hand one port to two hubs (`n9` and

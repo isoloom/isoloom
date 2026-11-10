@@ -84,8 +84,8 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 - Isoloom's own Compose services start with `isoloom-`: a route sidecar is
   `isoloom-routes-<machine>` (was `<machine>-routes`), an `init` job `isoloom-init-<machine>-<n>`
   (was `<machine>-init-<n>`) and its step `job-isoloom-init-<machine>-<n>`.
-- The controller is `isoloom-controller` in Proxmox's manifests and check output (was
-  `controller`).
+- The controller is `isoloom-controller` in Proxmox's run manifests and in the `checks` output
+  of Proxmox, ESXi and the clouds (was `controller`).
 - `docker-vm`'s VM is `isoloom-docker-host` in its run manifests (Vagrant's and Proxmox's; was
   `docker`), as `cloud-docker`'s is: read it from `guest.machine` and `machines[]`. On QEMU, the
   VM's SSH port is `ISOLOOM_HOSTPORTS`' `isoloom-docker-host/ssh` key (was `docker/ssh`). The
