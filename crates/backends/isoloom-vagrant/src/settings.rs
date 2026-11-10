@@ -13,12 +13,12 @@ pub(crate) struct Setting {
     /// The variable's name.
     pub(crate) name: &'static str,
     /// What the Vagrantfile reads when it is unset, if anything.
-    pub(crate) default: Default,
+    pub(crate) fallback: Fallback,
 }
 
-/// A setting's default.
+/// What a setting falls back to when the host leaves it unset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Default {
+pub(crate) enum Fallback {
     /// None: unset, the Vagrantfile reads it empty, or leaves the setting out.
     None,
     /// Text.
@@ -30,10 +30,10 @@ pub(crate) enum Default {
 impl Setting {
     /// Its default as the run manifest's param gives it.
     pub(crate) fn default(self) -> Option<String> {
-        match self.default {
-            Default::None => None,
-            Default::Text(text) => Some(text.to_owned()),
-            Default::Port(port) => Some(port.to_string()),
+        match self.fallback {
+            Fallback::None => None,
+            Fallback::Text(text) => Some(text.to_owned()),
+            Fallback::Port(port) => Some(port.to_string()),
         }
     }
 
@@ -52,56 +52,56 @@ impl Setting {
 /// The ESXi host the VMs go to.
 pub(crate) const ESXI_HOSTNAME: Setting = Setting {
     name: contract::ESXI_HOSTNAME,
-    default: Default::None,
+    fallback: Fallback::None,
 };
 
 /// The ESXi host's SSH port.
 pub(crate) const ESXI_HOSTPORT: Setting = Setting {
     name: contract::ESXI_HOSTPORT,
-    default: Default::Port(contract::ESXI_DEFAULT_SSH_PORT),
+    fallback: Fallback::Port(contract::ESXI_DEFAULT_SSH_PORT),
 };
 
 /// The ESXi user.
 pub(crate) const ESXI_USERNAME: Setting = Setting {
     name: "ESXI_USERNAME",
-    default: Default::Text("root"),
+    fallback: Fallback::Text("root"),
 };
 
 /// The ESXi user's password: a secret slot of the run manifest, read by the ESXi plugin itself
 /// (`env:ESXI_PASSWORD`), never by the Vagrantfile.
 pub(crate) const ESXI_PASSWORD: Setting = Setting {
     name: "ESXI_PASSWORD",
-    default: Default::None,
+    fallback: Fallback::None,
 };
 
 /// The datastore the VMs' disks go on (unset: ESXi's first).
 pub(crate) const ESXI_DATASTORE: Setting = Setting {
     name: "ESXI_DATASTORE",
-    default: Default::None,
+    fallback: Fallback::None,
 };
 
 /// The ESXi port groups, comma-separated: the management network, then one per network.
 pub(crate) const ESXI_VIRTUAL_NETWORK: Setting = Setting {
     name: "ESXI_VIRTUAL_NETWORK",
-    default: Default::Text("VM Network"),
+    fallback: Fallback::Text("VM Network"),
 };
 
 /// The Hyper-V switch each VM's first adapter goes on.
 pub(crate) const HYPERV_SWITCH: Setting = Setting {
     name: "ISOLOOM_HYPERV_SWITCH",
-    default: Default::Text("Default Switch"),
+    fallback: Fallback::Text("Default Switch"),
 };
 
 /// The command Vagrant's SSH to the guests goes through, when set.
 pub(crate) const SSH_PROXY_COMMAND: Setting = Setting {
     name: contract::SSH_PROXY_COMMAND,
-    default: Default::None,
+    fallback: Fallback::None,
 };
 
 /// The host ports the runner chose for this run, as a JSON object (unset: none).
 pub(crate) const HOSTPORTS: Setting = Setting {
     name: contract::HOSTPORTS,
-    default: Default::Text("{}"),
+    fallback: Fallback::Text("{}"),
 };
 
 #[cfg(test)]
