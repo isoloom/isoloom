@@ -9,7 +9,7 @@ pub struct HostSize {
     /// CPUs: one per container unless it says, at least 2, at most 16.
     pub cpus: u32,
     /// Memory in MB: 512 per container unless it says, plus 1 GB for Docker itself, at least
-    /// [`HostSize::MIN_MEMORY_MB`].
+    /// 2048.
     pub memory_mb: u32,
     /// Disk in GB: 5 per container unless it says, at least [`HostSize::MIN_DISK_GB`].
     pub disk_gb: u32,
@@ -25,7 +25,7 @@ impl HostSize {
 
     /// The smallest memory of a containers' host: Debian, Docker and a small lab's containers
     /// together, which 1.5 GB (one container and Docker's own gigabyte) leaves short.
-    pub const MIN_MEMORY_MB: u32 = 2048;
+    pub(crate) const MIN_MEMORY_MB: u32 = 2048;
 
     /// The host's size for the environment's containers.
     #[must_use]

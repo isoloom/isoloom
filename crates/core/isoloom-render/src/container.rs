@@ -69,7 +69,7 @@ pub fn exec_runner(machine: &str) -> String {
 }
 
 /// The prefix of every check runner's service ([`check_runner`]).
-pub const CHECK_RUNNER_PREFIX: &str = "isoloom-check";
+pub(crate) const CHECK_RUNNER_PREFIX: &str = "isoloom-check";
 
 /// The check runner of a position: `isoloom-check` where a user stands (`default`),
 /// `isoloom-check-<position>` for the others. The one rule the Compose services, the resolved

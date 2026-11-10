@@ -6,10 +6,10 @@ use isoloom_spec::syntax::has_extension;
 
 /// The longest Windows computer name: NetBIOS keeps 15 characters, so two longer names could
 /// end up one.
-pub const COMPUTER_NAME_MAX: usize = 15;
+pub(crate) const COMPUTER_NAME_MAX: usize = 15;
 
-/// Why Windows VM `name` of `env` can't be made on any target that makes it: a name over
-/// [`COMPUTER_NAME_MAX`] characters (it is the machine's computer name), or a provisioning step
+/// Why Windows VM `name` of `env` can't be made on any target that makes it: a name over 15
+/// characters (it is the machine's computer name), or a provisioning step
 /// that isn't a PowerShell script (`.ps1`), the one kind a Windows machine runs (the spec's
 /// validation says so first).
 #[must_use]

@@ -165,7 +165,7 @@ fn package_proxies((http, https): (&str, &str), env: &[(String, String)]) -> Str
 /// `update-ca-trust`, else appended to the bundle OpenSSL reads; then a running Docker daemon
 /// restarts to pull with them. Running it again changes nothing.
 #[must_use]
-pub fn trust_linux(sources: &[String]) -> String {
+pub(crate) fn trust_linux(sources: &[String]) -> String {
     let copies = |dir: &str, ext: &str| -> String {
         sources
             .iter()
@@ -202,7 +202,7 @@ pub fn trust_linux(sources: &[String]) -> String {
 /// Imports the certificate authorities at `sources` (paths on the machine) into a Windows
 /// machine's trusted root store.
 #[must_use]
-pub fn trust_windows(sources: &[String]) -> String {
+pub(crate) fn trust_windows(sources: &[String]) -> String {
     sources
         .iter()
         .map(|src| {
