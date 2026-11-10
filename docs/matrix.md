@@ -416,7 +416,7 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 
 ### `machines.*.tmpfs[].mode`
 
-- `kubernetes`, `external`: capability `tmpfs-modes`: machine `m` sets a tmpfs `mode`: Kubernetes' memory volumes have none
+- `kubernetes`, `external`: capability `tmpfs-modes`: machine `m` sets a tmpfs `mode`: this target sets no mode on a memory mount
 
 ### `machines.*.host_folders`
 

@@ -702,7 +702,7 @@ A system account (a low id, no ageing): a service's.
 
 ### `machines.*.app.steps[].user.password`
 
-Its password, a literal: lab content, written in the generated files (hashed on Linux). A secret or an input is refused here: a catalogue entry's `users` setting takes those.
+Its password, a literal: environment content, written in the generated files (hashed on Linux). A secret or an input is refused here: a catalogue entry's password setting takes those (`openssh`'s `password`, `mysql`'s `user_password`).
 
 - **Type:** value
 

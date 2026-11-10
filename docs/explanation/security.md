@@ -84,7 +84,8 @@ Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: 
 the machines over SSH to deliver the project and secrets and to run the checks. Their security
 groups or firewalls accept SSH (22), WinRM (5985, Windows) and the published ports only from
 `allowed_cidr`, which has no default: set it to your address or your egress range. Nothing is
-open to `0.0.0.0/0` inbound. Where policy forbids public addresses, run the environment on
+open to `0.0.0.0/0` inbound but one ICMP message on Oracle Cloud: "fragmentation needed" (and
+ICMPv6's "packet too big"), which path MTU discovery needs. Where policy forbids public addresses, run the environment on
 Proxmox, ESXi or Vagrant, or apply the module from inside the cloud network with your own changes
 on top.
 

@@ -139,9 +139,10 @@ pub(crate) fn no_raw_disks(f: &mut std::fmt::Formatter<'_>, machine: &str) -> st
     )
 }
 
-/// Why Kubernetes refuses machine `machine`'s tmpfs mode.
+/// Why a target that sets no mode on a memory mount (Kubernetes' memory volumes have none, nor
+/// does `external`) refuses machine `machine`'s tmpfs mode.
 pub(crate) fn no_tmpfs_modes(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
-    write!(f, "machine `{machine}` sets a tmpfs `mode`: Kubernetes' memory volumes have none")
+    write!(f, "machine `{machine}` sets a tmpfs `mode`: this target sets no mode on a memory mount")
 }
 
 /// Why a target whose machines don't run on the computer that runs the lab (or that doesn't

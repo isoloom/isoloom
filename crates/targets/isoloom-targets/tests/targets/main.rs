@@ -29,6 +29,7 @@ mod guides;
 mod hardware;
 mod helper_images;
 mod host_folders;
+mod inbound;
 mod instance;
 mod launch_values;
 mod machine_settings;

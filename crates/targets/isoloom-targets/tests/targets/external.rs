@@ -70,3 +70,16 @@ fn existing_hosts_behind_a_gateway_machine_are_still_generated() -> Outcome {
     assert!(generate(&spec, Target::External).is_ok());
     Ok(())
 }
+
+/// `external` refuses a tmpfs `mode` for itself, not as Kubernetes' (whose reason it once gave).
+#[test]
+fn external_refuses_a_tmpfs_mode_in_its_own_words() -> Outcome {
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 5 }\n    app: { image: x }\n    tmpfs: [{ path: /run/cache, mode: \"1777\" }]\noverrides: { external: { machines: { a: { ssh: { address: 192.168.1.5 } } } } }\n",
+    )?;
+    for target in [Target::External, Target::Kubernetes] {
+        let why = isoloom_targets::refusal(&spec, target).ok_or_else(|| format!("{} refuses a tmpfs mode", target.id()))?;
+        assert!(why.contains("tmpfs `mode`") && !why.contains("Kubernetes"), "{}: {why}", target.id());
+    }
+    Ok(())
+}

@@ -36,8 +36,9 @@ pub struct UserStep {
     /// A system account (a low id, no ageing): a service's.
     #[serde(default)]
     pub system: bool,
-    /// Its password, a literal: lab content, written in the generated files (hashed on Linux).
-    /// A secret or an input is refused here: a catalogue entry's `users` setting takes those.
+    /// Its password, a literal: environment content, written in the generated files (hashed on
+    /// Linux). A secret or an input is refused here: a catalogue entry's password setting takes
+    /// those (`openssh`'s `password`, `mysql`'s `user_password`).
     #[serde(default)]
     pub password: Option<Password>,
 }
@@ -104,9 +105,11 @@ impl<'de> Visitor<'de> for PasswordVisitor {
         Err(de::Error::custom(
             Mistake::new(
                 Code::SensitiveValue,
-                "steps have no secrets: a step's password is lab content, written in the generated files",
+                "steps have no secrets: a step's password is environment content, written in the generated files",
             )
-            .fix("a literal (lab content), or a catalogue entry's `users` setting for a secret or an input"),
+            .fix(
+                "a literal (environment content), or a catalogue entry's password setting for a secret or an input (`openssh`'s `password`, `mysql`'s `user_password`)",
+            ),
         ))
     }
 }

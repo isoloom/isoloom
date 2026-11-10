@@ -1703,7 +1703,7 @@
             "null"
           ],
           "minLength": 1,
-          "description": "Its password, a literal: lab content, written in the generated files (hashed on Linux).\nA secret or an input is refused here: a catalogue entry's `users` setting takes those."
+          "description": "Its password, a literal: environment content, written in the generated files (hashed on\nLinux). A secret or an input is refused here: a catalogue entry's password setting takes\nthose (`openssh`'s `password`, `mysql`'s `user_password`)."
         }
       },
       "required": [

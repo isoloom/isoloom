@@ -164,8 +164,9 @@ time overrides it too ([configuration](../../reference/configuration.md#defaults
 - Every machine gets a public IP address (AWS also an Elastic IP for a machine on several
   networks), so the runner can reach it.
 - SSH (22), WinRM (5985, Windows machines) and the published ports accept connections only from
-  `allowed_cidr`. Nothing is open to the whole internet. Set it to your address (`/32`) or your
-  egress range, never `0.0.0.0/0`.
+  `allowed_cidr`. Nothing else is open to the whole internet but, on Oracle Cloud, ICMP's
+  "fragmentation needed" (and ICMPv6's "packet too big"), which path MTU discovery needs. Set
+  `allowed_cidr` to your address (`/32`) or your egress range, never `0.0.0.0/0`.
 - An `internet: false` network is sealed once the machines are set up (the runner applies the
   module again with `isoloom_sealed = true`): its machines' egress is then limited to the
   environment's own networks, while SSH from `allowed_cidr` and the published ports keep working.

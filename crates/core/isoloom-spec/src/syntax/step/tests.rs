@@ -178,6 +178,26 @@ fn a_secret_password_in_a_step_is_refused_as_sensitive() {
 }
 
 #[test]
+fn the_password_fix_names_settings_the_catalogue_has() {
+    let found = mistakes("{ user: { name: alice, password: { secret: alice } } }");
+    let fix = found[0].2.clone().expect("a fix");
+    let catalogue = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../catalogue");
+    // Each `` `<entry>`'s `<setting>` `` the fix names.
+    let named: Vec<(&str, &str)> = fix
+        .split("`'s `")
+        .collect::<Vec<_>>()
+        .windows(2)
+        .filter_map(|w| Some((w[0].rsplit_once('`')?.1, w[1].split_once('`')?.0)))
+        .collect();
+    assert!(!named.is_empty(), "{fix}");
+    for (entry, setting) in named {
+        let text = std::fs::read_to_string(catalogue.join(entry).join("entry.yml")).expect(entry);
+        let yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text).expect(entry);
+        assert!(yaml["settings"].get(setting).is_some(), "{entry} has no `{setting}` setting: {fix}");
+    }
+}
+
+#[test]
 fn each_malformed_step_is_coded_at_its_field() {
     for (yaml, code, path) in [
         ("{ packages: [\"nginx=1.2\"] }", Code::InvalidValue, "machines.web.app.steps[1].packages[0]"),
