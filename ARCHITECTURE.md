@@ -42,9 +42,13 @@ holds by construction, and the catalogue's parity contract checks it for real.
 ## Functional core, imperative shell
 
 Parsing, validation, lowering, rendering and manifest building are pure functions over data — no
-I/O, no clock, no environment — so the core is unit-testable without mocks. All I/O sits in a thin
-shell at the edge (the CLI, and `cargo xtask`). Output is deterministic: ordered maps everywhere
-written, and a render-twice test.
+clock, no environment, no writes — so the core is unit-testable without mocks. Reading the project
+is kept to named entry points beside them: `isoloom_spec::load` (the spec and its includes),
+the defaults' and profiles' layers, the file checks of `isoloom validate` (does a referenced
+project file exist), and the project copies the targets add; everything else reads the data they
+return. Every write, the clock and the process environment sit in a thin shell at the edge (the
+CLI, and `cargo xtask`). Output is deterministic: ordered maps everywhere written, and a
+render-twice test.
 
 ## One-way dependencies
 

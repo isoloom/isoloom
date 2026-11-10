@@ -1,14 +1,19 @@
 //! Isoloom's Ansible backend: the `external` target, an environment on hosts that already
 //! exist (a hand-built Proxmox or ESXi set of VMs, a home lab, hardware). Isoloom creates
 //! nothing there; it provisions, checks and reaches the hosts over SSH at the addresses the
-//! spec gives (`machines.*.external`), from the files it writes in `.isoloom/external/`:
+//! spec gives (`overrides.external.machines.<m>.ssh`), from the files it writes in
+//! `.isoloom/external/`:
 //!
 //! - `inventory.ini`: every machine with its `external` address, user, port and key, in the
 //!   `linux` / `windows` groups and the inventory groups, for `provision:` playbooks run from
 //!   there ([`isoloom_render::inventory`] with [`Access::external`]).
+//! - `site.yml` and `roles/isoloom_machine_<m>/`: each configured machine's recipe as a play and
+//!   a role of native tasks ([`configure`]), and `requirements.yml` when a role needs a pinned
+//!   collection.
 //! - `checks/<machine>.sh`: the check runner of each machine that has an address (declared and
 //!   derived probes; scripts need the project on the machine and are left out, with a note).
-//! - `machines.json`: name to address, user, port and key, for the runner (its up, check and a session on a host).
+//! - `machines.json`: name to address, user, port and key, for the runner (its up, check and a
+//!   session on a host).
 //!
 //! Networks and `reach` are expected behaviour there (Isoloom adds no router), which the derived
 //! checks verify.
