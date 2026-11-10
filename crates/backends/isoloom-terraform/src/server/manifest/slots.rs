@@ -65,12 +65,11 @@ pub(crate) fn connection(variables: &[Variable]) -> Result<Vec<SecretSlot>, Mani
 pub(super) fn secrets(env: &Environment, variables: &[Variable]) -> Result<Vec<SecretSlot>, ManifestError> {
     let mut out = connection(variables)?;
     for input in &env.inputs {
-        let readers = crate::module::manifest::input_readers(env, input)?;
+        let readers = crate::module::manifest::input_readers(env, &input.name)?;
         if readers.is_empty() {
             continue;
         }
-        let sensitive = !env.spec().plain_inputs.contains(input);
-        let mut s = slot(input, SlotKind::Input, sensitive, readers, tf_var(INPUTS, TfVarShape::MapEntry)?)?;
+        let mut s = slot(&input.name, SlotKind::Input, input.sensitive, readers, tf_var(INPUTS, TfVarShape::MapEntry)?)?;
         // Left out, an input is an empty value in the map: the machines read it empty.
         s.default = Some(String::new());
         out.push(s);

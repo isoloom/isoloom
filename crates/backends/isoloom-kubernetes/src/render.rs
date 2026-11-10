@@ -123,7 +123,7 @@ impl fmt::Display for Usage<'_> {
             }
         }
         if env.machines.values().any(|m| !m.inputs.is_empty()) {
-            let literals: Vec<String> = env.inputs.iter().map(|n| format!("--from-literal={n}=…")).collect();
+            let literals: Vec<String> = env.inputs.iter().map(|i| format!("--from-literal={}=…", i.name)).collect();
             writeln!(
                 f,
                 "# Inputs (optional, unset ones are empty): kubectl -n {ns} create secret generic {INPUTS} {}",

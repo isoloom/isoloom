@@ -90,7 +90,7 @@ fn chart_file(env: &Environment) -> Result<String> {
 fn values(env: &Environment, inputs: bool) -> Result<String> {
     let values = Values {
         images: Machine::all(env).iter().map(|m| (m.name.to_owned(), m.reference.to_owned())).collect(),
-        inputs: inputs.then(|| env.inputs.iter().map(|i| (i.clone(), String::new())).collect()),
+        inputs: inputs.then(|| env.inputs.iter().map(|i| (i.name.clone(), String::new())).collect()),
     };
     let usage = "# images: each machine's image (images built from the project must be pushed where the\n# cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).\n";
     Ok(format!("{}{usage}{}", generated(), document(&values)?))
@@ -131,11 +131,12 @@ fn scripts(scripts: &[String], labels: &Labels) -> Result<String> {
 
 /// The inputs' Secret, from the values (an unset one is empty).
 fn secret(env: &Environment, labels: &Labels) -> Result<String> {
-    let data = env
-        .spec()
-        .inputs
-        .iter()
-        .map(|i| (i.clone(), Text::Helm(format!("get .Values.inputs {} | toString | b64enc", go_string(i)))));
+    let data = env.inputs.iter().map(|i| {
+        (
+            i.name.clone(),
+            Text::Helm(format!("get .Values.inputs {} | toString | b64enc", go_string(&i.name))),
+        )
+    });
     Ok(format!(
         "{}{}",
         generated(),

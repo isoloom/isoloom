@@ -124,7 +124,7 @@ fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
     // `IsoloomQemu.disk`, for the helper VM's disk on QEMU.
     r.text(crate::vms::qemu::QEMU_RB);
     crate::vms::utm::constant(&mut r);
-    vagrantfile::inputs(&mut r, &env.inputs, false);
+    vagrantfile::inputs(&mut r, &env.input_names(), false);
     // Always read the runner's chosen host ports: the QEMU provider block below reads the helper
     // VM's own SSH forward port from it, so the hash must be defined even when no container port is.
     vagrantfile::chosen_ports(&mut r);
@@ -320,7 +320,7 @@ fn in_vm_shell(c: &GuestCommand) -> std::result::Result<String, ManifestError> {
 /// decodes); the derived checks switched off with `ISOLOOM_DERIVED=0` on the host.
 fn checks(r: &mut Ruby, env: &Environment, script: &str) {
     let derived = crate::vagrantfile::derived_from_host();
-    let inputs = &env.inputs;
+    let inputs = &env.input_names();
     let vars = if inputs.is_empty() {
         derived
     } else {
@@ -350,7 +350,7 @@ fn checks_script(env: &Environment, guest: &GuestCompose) -> Result<Option<Strin
     };
     Ok(Some(format!(
         "{}failed=0\n{checked}{}exit \"$failed\"",
-        values::linux_decode(&env.inputs),
+        values::linux_decode(&env.input_names()),
         sequence(&guest.check_teardown)?
     )))
 }

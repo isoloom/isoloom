@@ -72,7 +72,7 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         super::host_folders::of_machine(&s, p);
         super::ports::of_machine(&s, &mut published, p);
         for (i, input) in m.inputs.iter().enumerate() {
-            if !spec.inputs.contains(input) {
+            if !spec.declares_input(input) {
                 p.unknown(format!("{}.inputs[{i}]", s.at), format!("`{input}` isn't declared in the spec's `inputs`"));
             }
         }

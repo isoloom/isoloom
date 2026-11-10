@@ -106,11 +106,10 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, sta
     let mut out = Vec::new();
     for input in &env.inputs {
         // A machine reads an input from its environment, or from a file Compose puts in place.
-        let readers: Vec<&str> = containers.iter().filter(|(_, m)| m.reads_input(input)).map(|(n, _)| n.as_str()).collect();
+        let readers: Vec<&str> = containers.iter().filter(|(_, m)| m.reads_input(&input.name)).map(|(n, _)| n.as_str()).collect();
         if !readers.is_empty() {
-            let mut s = slot(input, SlotKind::Input, None, input, reach(&readers, members, plan, starts)?)?;
-            // The spec's own word on it; an input it says nothing of is masked.
-            s.sensitive = !env.spec().plain_inputs.contains(input);
+            let mut s = slot(&input.name, SlotKind::Input, None, &input.name, reach(&readers, members, plan, starts)?)?;
+            s.sensitive = input.sensitive;
             // An input may be left out, but Compose won't create or start a container whose
             // secret's variable is unset: the runner delivers it empty instead (Compose keeps the
             // file, empty).

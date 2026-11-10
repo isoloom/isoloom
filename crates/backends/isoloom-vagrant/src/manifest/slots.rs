@@ -186,14 +186,13 @@ pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<Secr
     let spec = env.spec();
     let vms: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == isoloom_plan::MachineShape::Vm).collect();
     let mut out = Vec::new();
-    for input in &spec.inputs {
-        let readers: Vec<&str> = vms.iter().filter(|(_, m)| m.reads_input(input)).map(|(n, _)| n.as_str()).collect();
+    for input in &env.inputs {
+        let readers: Vec<&str> = vms.iter().filter(|(_, m)| m.reads_input(&input.name)).map(|(n, _)| n.as_str()).collect();
         if readers.is_empty() {
             continue;
         }
-        let mut s = slot(input, SlotKind::Input, &readers, env_var(input, provisioning(lifecycle)?)?)?;
-        // The spec's own word on it; an input it says nothing of is masked.
-        s.sensitive = !spec.plain_inputs.contains(input);
+        let mut s = slot(&input.name, SlotKind::Input, &readers, env_var(&input.name, provisioning(lifecycle)?)?)?;
+        s.sensitive = input.sensitive;
         // An input may be left out: the Vagrantfile reads it as empty, and so does the runner.
         s.required = false;
         s.default = Some(String::new());

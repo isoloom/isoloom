@@ -73,16 +73,11 @@ pub struct Spec {
     /// [`EnvironmentDns`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dns: Option<EnvironmentDns>,
-    /// Names of the values a runner provides at launch (a token, a licence key): from the
-    /// runner's environment, or a profile's `inputs`. A machine receives the ones its own
-    /// `inputs` lists. Never baked into images.
+    /// The values a runner provides at launch (a token, a licence key), each with whether it is
+    /// sensitive: from the runner's environment, or a profile's `inputs`. A machine receives the
+    /// ones its own `inputs` lists. Never baked into images.
     #[serde(default)]
-    pub inputs: Vec<String>,
-    /// The inputs the authored spec marks `sensitive: false` (an URL, a mode): shown in a runner's
-    /// events and logs. Every other input is masked. Set by lowering only.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[schemars(skip)]
-    pub plain_inputs: Vec<String>,
+    pub inputs: Vec<Input>,
     /// Secrets, by kebab-case name: where the runner reads each value on its host (`env`,
     /// `file`, `vault`, `sops`). A machine lists the ones it gets in its own `secrets`, as
     /// files. Values never reach a generated file, the resolved snapshot or a log.
@@ -153,7 +148,60 @@ pub struct Spec {
     pub clones: IndexMap<String, Vec<String>>,
 }
 
+/// A value a runner provides at launch, by its name: an environment variable name. Read from
+/// its name alone (a sensitive input) or from `{ name, sensitive }`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(from = "InputForm")]
+pub struct Input {
+    /// Its name.
+    pub name: String,
+    /// Whether the value must stay hidden: masked in a runner's events and logs. Every input is,
+    /// unless the authored spec marks it `sensitive: false` (an URL, a mode).
+    pub sensitive: bool,
+}
+
+/// An [`Input`] as written: its name alone, or the name with its sensitivity.
+#[derive(Deserialize, JsonSchema)]
+#[serde(untagged)]
+enum InputForm {
+    /// A sensitive input.
+    Name(String),
+    /// An input that says whether it is sensitive.
+    Full {
+        /// Its name.
+        name: String,
+        /// Whether it is sensitive.
+        sensitive: bool,
+    },
+}
+
+impl From<InputForm> for Input {
+    fn from(form: InputForm) -> Input {
+        match form {
+            InputForm::Name(name) => Input::new(name),
+            InputForm::Full { name, sensitive } => Input { name, sensitive },
+        }
+    }
+}
+
+impl Input {
+    /// A sensitive input named `name`.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Input {
+        Input {
+            name: name.into(),
+            sensitive: true,
+        }
+    }
+}
+
 impl Spec {
+    /// Whether the spec declares the input `name`.
+    #[must_use]
+    pub fn declares_input(&self, name: &str) -> bool {
+        self.inputs.iter().any(|i| i.name == name)
+    }
+
     /// An empty spec of format version 1 named `name`: what a program building one starts from
     /// (the struct grows with the format, so it isn't built field by field outside this crate).
     #[must_use]
@@ -165,7 +213,6 @@ impl Spec {
             reach: Vec::new(),
             dns: None,
             inputs: Vec::new(),
-            plain_inputs: Vec::new(),
             secrets: IndexMap::new(),
             machines: IndexMap::new(),
             cloud: None,

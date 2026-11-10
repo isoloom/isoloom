@@ -23,7 +23,7 @@ pub(crate) fn schema(env: &Environment, inputs: bool) -> Result<String> {
     let mut properties = Map::from_iter([("images".to_owned(), images)]);
     if inputs {
         let scalar = json!({ "type": ["string", "number", "boolean"] });
-        let names = env.inputs.iter().map(|i| (i.clone(), scalar.clone()));
+        let names = env.inputs.iter().map(|i| (i.name.clone(), scalar.clone()));
         let values = json!({
             "description": "The launch-time inputs, by name (an unset one is empty).",
             "type": "object",

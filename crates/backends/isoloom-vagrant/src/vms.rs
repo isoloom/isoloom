@@ -215,7 +215,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(vagrantfile::PORT_CHECK_RB);
     utm::constant(r);
     r.blank();
-    vagrantfile::inputs(r, &env.inputs, values::any_secret(env));
+    vagrantfile::inputs(r, &env.input_names(), values::any_secret(env));
     if env.machines.values().any(|m| !m.ports.is_empty()) {
         vagrantfile::chosen_ports(r);
     }

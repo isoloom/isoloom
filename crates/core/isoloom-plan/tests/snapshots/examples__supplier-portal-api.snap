@@ -12,10 +12,10 @@ networks:
     docker: ~
 reach: []
 inputs:
-  - API_URL
-  - LAUNCH_TOKEN
-plain_inputs:
-  - API_URL
+  - name: API_URL
+    sensitive: false
+  - name: LAUNCH_TOKEN
+    sensitive: true
 secrets:
   input-launch-token:
     input: LAUNCH_TOKEN

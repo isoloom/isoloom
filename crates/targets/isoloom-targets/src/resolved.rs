@@ -87,7 +87,7 @@ fn snapshot(lab: &Lab, spec: &Spec, instance: Option<u8>) -> Value {
     out.insert("resolved_version".into(), json!(RESOLVED_VERSION));
     out.insert("name".into(), json!(spec.name));
     out.insert("instance".into(), json!(instance));
-    out.insert("inputs".into(), json!(spec.inputs));
+    out.insert("inputs".into(), json!(spec.inputs.iter().map(|i| &i.name).collect::<Vec<_>>()));
     out.insert("networks".into(), networks::networks(spec, routed).into());
     out.insert(
         "reach".into(),

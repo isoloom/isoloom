@@ -150,17 +150,15 @@ fn runners(env: &Environment, guests: &[Guest]) -> Result<Vec<CheckRunner>, Mani
 /// machines reading it in their environment, delivered over SSH to those reading it as a file;
 /// then each secret a machine reads.
 fn inputs(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
-    let spec = env.spec();
     let mut out = Vec::new();
-    for input in &spec.inputs {
-        let env_readers = manifest::input_readers(env, input)?;
+    for input in &env.inputs {
+        let env_readers = manifest::input_readers(env, &input.name)?;
         let file_readers: Vec<Name> = env
             .vms()
-            .filter(|Vm { plan: mp, .. }| mp.reads_input_file(input))
+            .filter(|Vm { plan: mp, .. }| mp.reads_input_file(&input.name))
             .map(|Vm { name: n, .. }| Name::parse(n))
             .collect::<Result<_, _>>()?;
-        let sensitive = !spec.plain_inputs.contains(input);
-        out.extend(connection::input(input, sensitive, &env_readers, &file_readers)?);
+        out.extend(connection::input(&input.name, input.sensitive, &env_readers, &file_readers)?);
     }
     out.extend(machine_secrets(env)?);
     Ok(out)

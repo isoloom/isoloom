@@ -39,7 +39,7 @@ pub(super) fn tags(spec: &Spec, p: &mut Problems) {
 
 /// Inputs are environment variables: their names must be ones a shell accepts.
 pub(super) fn inputs(spec: &Spec, p: &mut Problems) {
-    for (i, input) in spec.inputs.iter().enumerate() {
+    for (i, input) in spec.inputs.iter().map(|i| &i.name).enumerate() {
         if !is_variable(input) {
             p.add(
                 format!("inputs[{i}]"),

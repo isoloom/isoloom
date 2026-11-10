@@ -14,7 +14,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use indexmap::IndexMap;
 use isoloom_spec::images;
 use isoloom_spec::model::{
-    Arch, Boot, Constraints, External, HostFolder, Machine, MachineFile, Network, Protocol, Resources, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
+    Arch, Boot, Constraints, External, HostFolder, Input, Machine, MachineFile, Network, Protocol, Resources, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
 };
 use isoloom_spec::net::{NetworkBlock, docker_cidrs};
 use isoloom_spec::windows::{self, Tpm};
@@ -69,8 +69,9 @@ pub struct Environment {
     pub controller: Option<Controller>,
     /// The spec's constraints (proxy, mirrors, registries, NTP), when it has any.
     pub constraints: Option<Constraints>,
-    /// The launch values it reads (`inputs`), in spec order: names only, never values.
-    pub inputs: Vec<String>,
+    /// The launch values it reads (`inputs`), in spec order, each with whether it is sensitive:
+    /// names only, never values.
+    pub inputs: Vec<Input>,
     /// What the environment asks of the backend rendering it.
     pub requirements: Vec<Requirement>,
     /// The image references to pull, through the registry mirrors.
@@ -374,6 +375,12 @@ impl Environment {
         &self.spec
     }
 
+    /// The names of the launch values it reads, in spec order.
+    #[must_use]
+    pub fn input_names(&self) -> Vec<String> {
+        self.inputs.iter().map(|i| i.name.clone()).collect()
+    }
+
     /// The address `from` reaches `to` at: on a network they share, else `to`'s first.
     #[must_use]
     pub fn address_for(&self, from: &str, to: &str) -> Ipv4Addr {
@@ -598,6 +605,17 @@ mod tests {
 
     fn controller(extra: &str) -> Option<Controller> {
         testing::environment(&format!("{NEEDS_ONE}{extra}"), Target::Vagrant).controller
+    }
+
+    #[test]
+    fn each_input_carries_the_sensitivity_the_spec_gives_it() {
+        let env = testing::environment(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\ninputs: { URL: { sensitive: false }, TOKEN: {} }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
+            Target::Vagrant,
+        );
+        let inputs: Vec<(&str, bool)> = env.inputs.iter().map(|i| (i.name.as_str(), i.sensitive)).collect();
+        assert_eq!(inputs, [("URL", false), ("TOKEN", true)]);
+        assert_eq!(env.input_names(), ["URL", "TOKEN"]);
     }
 
     #[test]
