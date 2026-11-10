@@ -61,11 +61,6 @@ pub(crate) struct Platform {
     pub(crate) before: Vec<Expression>,
 }
 
-/// Its Windows name: NetBIOS keeps 15 characters.
-pub(crate) fn computer_name(name: &str) -> String {
-    name.chars().take(15).collect()
-}
-
 /// The machine's resources: its renaming (`terraform_data.<id>_name`) and the pause while it
 /// restarts (`time_sleep.<id>_restart`) unless the platform names it, then its set-up
 /// (`terraform_data.<id>`).
@@ -115,7 +110,7 @@ pub(crate) fn blocks(w: Machine) -> Vec<Block> {
 /// (`time_sleep.<id>_restart`).
 fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
     let id = ident(w.remote.name);
-    let host = computer_name(w.remote.name);
+    let host = w.remote.name;
     let rename = Provisioner {
         name: format!("{id}_name"),
         replace_on: w.remote.replace_on.clone(),
@@ -149,7 +144,7 @@ fn setup_script(w: &Machine) -> String {
         "$ErrorActionPreference = 'Stop'".to_owned(),
         format!(
             "if ($env:COMPUTERNAME -ne '{}') {{ throw \"still named $env:COMPUTERNAME: the rename hasn't taken effect\" }}",
-            computer_name(name).to_uppercase()
+            name.to_uppercase()
         ),
     ];
     ps.extend(ports.iter().filter_map(port_proxy));

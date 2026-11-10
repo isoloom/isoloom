@@ -228,7 +228,7 @@ fn machines_refusal(env: &Environment) -> Option<String> {
         let vm = m.vm.as_ref()?;
         RULES
             .image(name, m)
-            .or_else(|| windows::refusal(name, m))
+            .or_else(|| windows::refusal(env, name, m))
             .or_else(|| {
                 (is_windows(&vm.os) && vm.tpm == Some(true))
                     .then(|| format!("machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later"))

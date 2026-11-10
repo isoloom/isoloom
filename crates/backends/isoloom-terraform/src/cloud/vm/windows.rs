@@ -1,17 +1,14 @@
-//! What no cloud does yet for a Windows machine.
+//! What no cloud does for a Windows machine.
 
+use isoloom_plan::Environment;
 use isoloom_spec::model::{Machine, Spec};
 
-/// What no cloud does yet for a Windows machine: several networks, steps other than `.ps1`.
-pub(crate) fn refusal(name: &str, m: &Machine) -> Option<String> {
-    let vm = m.vm.as_ref().filter(|v| isoloom_spec::images::is_windows(&v.os))?;
-    if m.networks.len() > 1 {
-        return Some(format!("machine `{name}`: Windows machines on several networks in the cloud come later"));
-    }
-    vm.provision
-        .iter()
-        .any(|p| !isoloom_spec::syntax::has_extension(p, "ps1"))
-        .then(|| format!("machine `{name}`: Windows steps are .ps1 scripts"))
+/// What no cloud does for a Windows machine: what no Windows VM has
+/// (`isoloom_render::windows`), and several networks.
+pub(crate) fn refusal(env: &Environment, name: &str, m: &Machine) -> Option<String> {
+    m.vm.as_ref().filter(|v| isoloom_spec::images::is_windows(&v.os))?;
+    isoloom_render::windows::guest_refusal(env, name)
+        .or_else(|| (m.networks.len() > 1).then(|| format!("machine `{name}`: a Windows machine in the cloud has one network")))
 }
 
 /// A Windows machine's UDP service published on another port: Windows' port proxy (`netsh

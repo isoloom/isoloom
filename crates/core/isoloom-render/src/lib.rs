@@ -62,6 +62,7 @@ pub mod steps;
 pub mod test_support;
 #[cfg(test)]
 mod testing;
+pub mod windows;
 
 pub use error::{Error, Result};
 pub use network::{ipv6, router, trunks};

@@ -9,34 +9,18 @@
 use crate::hcl_builder::{Expression, Template, call, for_list, reference, string};
 use isoloom_plan::{Environment, MachinePlan, Step};
 use isoloom_render::steps;
-use isoloom_spec::syntax::has_extension;
 
 use super::{vms, windows};
 
 /// Where the set-up records that it is done (a later boot runs nothing).
 const DONE: &str = "C:\\ProgramData\\isoloom\\done";
 
-/// What a Windows machine set up this way can't have yet on `platform` (Proxmox, ESXi): each
-/// reason after "machine `<name>`: ".
+/// What a Windows machine set up this way can't have on `platform` (Proxmox, ESXi): what no
+/// Windows VM set up at its own boot has, and inputs. Each reason after "machine `<name>`: ".
 pub(crate) fn refusal(env: &Environment, platform: &str) -> Option<String> {
-    let spec = env.spec();
     vms(env).filter(|(_, mp)| mp.is_windows()).find_map(|(name, mp)| {
-        let why = if name.len() > 15 {
-            "Windows computer names are at most 15 characters"
-        } else if spec.machines.get(name)?.vm.as_ref()?.provision.iter().any(|s| !has_extension(s, "ps1")) {
-            "Windows provisioning steps are PowerShell scripts (.ps1); Ansible runs from the controller (`provision:`)"
-        } else if mp.default_gateway.is_some() || mp.is_gateway {
-            "a gateway machine's routes on Windows come later"
-        } else if mp.addresses.keys().any(|n| env.networks.get(n).is_some_and(|p| !p.internet)) {
-            "`internet: false` on Windows comes later"
-        } else if !mp.volumes.is_empty() {
-            "volumes on Windows come later"
-        } else if !mp.inputs.is_empty() {
-            return Some(format!("machine `{name}`: inputs on a Windows machine on {platform} come later"));
-        } else {
-            return None;
-        };
-        Some(format!("machine `{name}`: {why}"))
+        isoloom_render::windows::set_up_at_boot_refusal(env, name)
+            .or_else(|| (!mp.inputs.is_empty()).then(|| format!("machine `{name}`: {platform} delivers no inputs to a Windows machine")))
     })
 }
 

@@ -225,7 +225,7 @@ fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
         .keys()
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
     let vm = trusted_launch(placed("azurerm_windows_virtual_machine", &id, name_with(&format!("-{name}"))), mp.tpm.is_some())
-        .add_attribute(("computer_name", string(windows::computer_name(name))))
+        .add_attribute(("computer_name", string(name)))
         .add_attribute(("size", string(RULES.size_of(mp))))
         .add_attribute(("admin_username", string(USER)))
         .add_attribute(("admin_password", reference(windows::PASSWORD)))

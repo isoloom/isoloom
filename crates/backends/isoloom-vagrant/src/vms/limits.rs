@@ -1,6 +1,6 @@
 //! What the `vagrant` target can't render besides the plan's requirements: a machine with no
 //! Vagrant box, a provisioning step Vagrant has no way to run, and what a Windows machine can't
-//! have yet (the set-up steps it has no PowerShell for). Found from the plan, without rendering.
+//! have (`isoloom_render::windows`). Found from the plan, without rendering.
 
 use crate::boxes;
 use isoloom_plan::{Environment, MachineShape};
@@ -26,7 +26,7 @@ fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
         ));
     }
     if images::is_windows(&vm.os) {
-        return windows(env, name, m);
+        return windows(env, name);
     }
     vm.provision
         .iter()
@@ -34,25 +34,7 @@ fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
         .map(|step| format!("machine `{name}`: provisioning step `{step}` isn't a .sh, .yml or .yaml file (or `reboot`)"))
 }
 
-/// What a Windows machine can't have on Vagrant yet.
-fn windows(env: &Environment, name: &str, m: &Machine) -> Option<String> {
-    let mp = env.machines.get(name)?;
-    if name.len() > 15 {
-        return Some(format!("machine `{name}`: Windows computer names are at most 15 characters"));
-    }
-    if let Some(step) = m.vm.as_ref()?.provision.iter().find(|s| !has_extension(s, "ps1")) {
-        return Some(format!(
-            "machine `{name}`: Windows provisioning steps are PowerShell scripts (.ps1); `{step}` isn't (Ansible runs from outside Windows: environment-level provisioning comes next)"
-        ));
-    }
-    if mp.default_gateway.is_some() || mp.is_gateway {
-        return Some(format!("machine `{name}`: a gateway machine's routes on Windows come later"));
-    }
-    if mp.addresses.keys().any(|n| env.networks.get(n).is_some_and(|p| !p.internet)) {
-        return Some(format!("machine `{name}`: `internet: false` on Windows comes later"));
-    }
-    if !mp.volumes.is_empty() {
-        return Some(format!("machine `{name}`: volumes on Windows come later"));
-    }
-    None
+/// What a Windows machine can't have on Vagrant: what no Windows VM set up at its own boot has.
+fn windows(env: &Environment, name: &str) -> Option<String> {
+    isoloom_render::windows::set_up_at_boot_refusal(env, name)
 }

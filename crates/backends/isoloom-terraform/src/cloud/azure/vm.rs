@@ -133,7 +133,10 @@ fn refusal(env: &Environment) -> Option<String> {
     let machine = || {
         spec.machines.iter().find_map(|(name, m)| {
             m.vm.as_ref()?;
-            RULES.image(name, m).or_else(|| windows::refusal(name, m)).or_else(|| RULES.kept(env, name, m))
+            RULES
+                .image(name, m)
+                .or_else(|| windows::refusal(env, name, m))
+                .or_else(|| RULES.kept(env, name, m))
         })
     };
     RULES

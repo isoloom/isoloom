@@ -51,3 +51,4 @@ mod tools;
 mod trunks;
 mod vagrant_manifest;
 mod vagrant_providers;
+mod windows_names;

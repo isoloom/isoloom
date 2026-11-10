@@ -108,15 +108,17 @@ fn an_arm64_access_machine_that_is_actually_built_is_still_refused_on_the_cloud(
 }
 
 #[test]
-fn windows_refuses_what_it_cant_do_yet() -> Outcome {
+fn windows_refuses_what_it_cant_do() -> Outcome {
     let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  NAME:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    app: { steps: [STEP] }\n";
     for (name, step, why) in [
         ("dc01", "{ playbook: setup.yml }", "PowerShell scripts"),
         ("averyveryverylongname", "{ run: a.ps1 }", "15 characters"),
     ] {
         let spec = lab(&base.replace("NAME", name).replace("STEP", step))?;
-        let err = generate(&spec, Target::Vagrant).unwrap_err().to_string();
-        assert!(err.contains(why), "{name}: {err}");
+        for target in [Target::Vagrant, Target::Proxmox, Target::CloudVm] {
+            let err = generate(&spec, target).unwrap_err().to_string();
+            assert!(err.contains(why), "{name} on {target:?}: {err}");
+        }
     }
     Ok(())
 }
