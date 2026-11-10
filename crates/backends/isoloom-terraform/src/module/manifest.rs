@@ -8,8 +8,8 @@ use std::net::IpAddr;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, Delivery, EnvName, Error as ManifestError, HostArgv, Machine, Name, NonEmpty, OsName, Output, OutputRole, OutputSource, Param, Part,
-    Placeholder, Program, PublishMode, Role, RunVar, SetBy, SnakeName, Step, StepId, Template, TfVarShape,
+    Action, Argv, Delivery, EnvName, Error as ManifestError, GoneError, HostArgv, Identity, Machine, Name, NonEmpty, OsName, Output, OutputRole, OutputSource,
+    Param, Part, Placeholder, Program, PublishMode, RelPath, Role, RunVar, SetBy, SnakeName, StateOwner, Step, StepId, Template, TerraformIdentity, TfVarShape,
 };
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::run_manifest::{addresses, arch, noted, port, run};
@@ -43,6 +43,17 @@ pub(crate) fn terraform(step: &str, args: Vec<Template>, timeout: u32, note: &st
     let mut s = noted(run(step, command, timeout)?, note);
     s.env = terraform_env(vars.iter().map(|(name, var)| (*name, Template::from(Placeholder::Run(*var)))).collect())?;
     Ok(s)
+}
+
+/// The module in place, its state the runner's, `gone` its providers' errors for a resource
+/// already gone (`identity.terraform.gone`).
+pub(crate) fn runner_identity(gone: Vec<GoneError>) -> Result<Identity, ManifestError> {
+    Ok(Identity::Terraform(TerraformIdentity {
+        module: RelPath::parse(".")?,
+        state: StateOwner::Runner,
+        var_files: Vec::new(),
+        gone,
+    }))
 }
 
 /// A stale Terraform state lock cleared (a crashed run's).

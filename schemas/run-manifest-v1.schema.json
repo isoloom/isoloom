@@ -783,6 +783,13 @@
             "$ref": "#/$defs/RelPath"
           },
           "description": "Variable files Isoloom generated, in order (`terraform.tfvars.json`)."
+        },
+        "gone": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GoneError"
+          },
+          "description": "The errors of the module's providers that say a resource of the state is already gone, where its delete fails instead of counting it done. A `down` whose destroy failed with one of them drops that resource from the state and destroys again."
         }
       },
       "required": [
@@ -805,6 +812,35 @@
         }
       ],
       "description": "Who keeps a Terraform state."
+    },
+    "GoneError": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/SnakeName",
+          "description": "The resource type (`proxmox_virtual_environment_firewall_ipset`)."
+        },
+        "error": {
+          "$ref": "#/$defs/GoneText",
+          "description": "What its delete prints for an instance that is gone (`no such IPSet '{id}'`)."
+        }
+      },
+      "required": [
+        "resource",
+        "error"
+      ],
+      "description": "A provider's error saying that a resource instance of the state is already gone (deleted outside Terraform, or lost with the server's reset), printed by a delete that fails on it rather than counting it done: bpg/proxmox's IP set, `no such IPSet 'iso1n0'`.\n\nWhen a destroy fails and one of its lines holds the text filled with an instance's attributes in the state, that instance is gone: the runner drops it from the state (`terraform state rm`), says which, and destroys again. An instance whose text no line holds stays, so the text must name the instance by its own attributes and in the provider's words, and only for a delete that is sure the instance is nowhere."
+    },
+    "SnakeName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "a lowercase letter, then lowercase letters, digits or `_` (`web_portal`)"
+    },
+    "GoneText": {
+      "type": "string",
+      "pattern": "^[^{}]*(\\{[a-z][a-z0-9_]*\\}[^{}]*)+$",
+      "description": "text naming at least one of the instance's attributes as `{name}` (`no such IPSet '{id}'`), with no other `{` or `}`"
     },
     "Param": {
       "type": "object",
@@ -1033,11 +1069,6 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
       "description": "a lowercase letter, then lowercase letters, digits or `-` (`pin-ports`)"
-    },
-    "SnakeName": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9_]*$",
-      "description": "a lowercase letter, then lowercase letters, digits or `_` (`web_portal`)"
     },
     "TfVarShape": {
       "oneOf": [

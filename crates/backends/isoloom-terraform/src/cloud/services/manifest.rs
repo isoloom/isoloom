@@ -87,6 +87,7 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
             module: RelPath::parse(".")?,
             state: StateOwner::Runner,
             var_files: vec![RelPath::parse(VARS_FILE)?],
+            gone: Vec::new(),
         }),
         params: params(cloud, on)?,
         secrets,

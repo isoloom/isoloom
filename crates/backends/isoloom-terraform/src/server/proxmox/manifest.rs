@@ -11,7 +11,7 @@ pub(super) mod docker_vm;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use isoloom_manifest::{Error as ManifestError, HostOs, Manifest, PinnedImage, Tool};
+use isoloom_manifest::{Error as ManifestError, GoneError, GoneText, HostOs, Manifest, PinnedImage, SnakeName, Tool};
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 
@@ -39,8 +39,39 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
         tools,
         native: &native,
         applied: "the VMs exist and booted; each sets itself up from its cloud-init",
+        gone,
     };
     shared::manifest(env, &server)
+}
+
+/// What bpg/proxmox prints for a resource the server no longer has (a reset server lost it, an
+/// apply was cut short), where the resource's delete fails rather than counting it done: the
+/// destroy runs without a refresh, whose read would have dropped it. Every other resource the
+/// modules make is done when it is gone: the SDN zone, VNet and pool on Proxmox's `does not exist`,
+/// the files on a missing volume, the firewall rules on `no rule at position`, and the firewall
+/// options and the SDN appliers delete nothing of their own.
+///
+/// - **An IP set** (`proxmox_virtual_environment_firewall_ipset`, the cluster's, by name): its
+///   delete reads its entries first, and Proxmox answers `no such IPSet '<name>'`.
+/// - **A container** (`proxmox_virtual_environment_container`): its delete looks for it on every
+///   node of the cluster, then reads its status on the node it is on, else on the state's, where
+///   Proxmox answers that its configuration file doesn't exist only when no node has it.
+pub(super) fn gone() -> Result<Vec<GoneError>, ManifestError> {
+    let gone = |resource: &str, error: &str| {
+        Ok(GoneError {
+            resource: SnakeName::parse(resource)?,
+            error: GoneText::parse(error)?,
+        })
+    };
+    vec![
+        gone("proxmox_virtual_environment_firewall_ipset", "no such IPSet '{id}'"),
+        gone(
+            "proxmox_virtual_environment_container",
+            "Configuration file 'nodes/{node_name}/lxc/{id}.conf' does not exist",
+        ),
+    ]
+    .into_iter()
+    .collect()
 }
 
 /// Terraform (from its image on macOS) and `ssh`.

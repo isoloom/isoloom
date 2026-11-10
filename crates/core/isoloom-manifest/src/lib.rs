@@ -75,13 +75,14 @@ pub use check_line::CheckLine;
 pub use error::{Error, Result};
 pub use guest::Guest;
 pub use identity::{
-    Cloud, ComposeIdentity, Driver, Elevation, HostOs, Identity, Provider, StateOwner, Target, TerraformIdentity, Tool, VagrantIdentity, VagrantProvider,
+    Cloud, ComposeIdentity, Driver, Elevation, GoneError, HostOs, Identity, Provider, StateOwner, Target, TerraformIdentity, Tool, VagrantIdentity,
+    VagrantProvider,
 };
 pub use lifecycle::{Condition, Expiry, ExpiryUnit, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries, Seal};
 pub use list::{NonEmpty, StepSelection};
 pub use machine::{Arch, Cidr, Machine, Native, Network, Resources, Role, Volume};
 pub use manifest::{Manifest, parse, to_json};
-pub use names::{EnvName, EnvironmentName, Identifier, Name, OsName, PinnedImage, PortName, SnakeName, StepId, ToolName, Version};
+pub use names::{EnvName, EnvironmentName, GoneText, Identifier, Name, OsName, PinnedImage, PortName, SnakeName, StepId, ToolName, Version};
 pub use outputs::{Check, CheckKind, CheckProtocol, CheckRunner, Checks, Output, OutputRole, OutputSource};
 pub use path::{GuestPath, PathTemplate, RelPath};
 pub use port::{Port, PortKind, Protocol, Publish, PublishMode};

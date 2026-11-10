@@ -17,8 +17,8 @@ pub(crate) mod connection;
 pub(crate) mod steps;
 
 use isoloom_manifest::{
-    CheckRunner, Checks, Driver, Error as ManifestError, Expiry, ExpiryUnit, Identity, Machine, Manifest, ManifestVersion, Output, Recovery, RelPath, Retries,
-    SCHEMA_URL, SecretSlot, SnakeName, StateOwner, TerraformIdentity, Tool, Version,
+    CheckRunner, Checks, Driver, Error as ManifestError, Expiry, ExpiryUnit, Machine, Manifest, ManifestVersion, Output, Recovery, Retries, SCHEMA_URL,
+    SecretSlot, SnakeName, Tool, Version,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{argv, environment, generator, networks, tool};
@@ -67,11 +67,7 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
         driver: Driver::Terraform,
         hosts: isoloom_render::run_manifest::every_host(),
         tools: tools()?, // Terraform and ssh.
-        identity: Identity::Terraform(TerraformIdentity {
-            module: RelPath::parse(".")?,
-            state: StateOwner::Runner,
-            var_files: Vec::new(),
-        }),
+        identity: crate::module::manifest::runner_identity(Vec::new())?,
         params,
         secrets,
         networks: networks(env, isoloom_manifest::Template::text)?,

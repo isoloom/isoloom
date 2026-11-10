@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::argv::HostArgv;
 use crate::list::NonEmpty;
-use crate::names::{PinnedImage, ToolName, Version};
+use crate::names::{GoneText, PinnedImage, SnakeName, ToolName, Version};
 use crate::path::{PathTemplate, RelPath};
 use crate::template::Template;
 
@@ -246,6 +246,29 @@ pub struct TerraformIdentity {
     /// Variable files Isoloom generated, in order (`terraform.tfvars.json`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub var_files: Vec<RelPath>,
+    /// The errors of the module's providers that say a resource of the state is already gone,
+    /// where its delete fails instead of counting it done. A `down` whose destroy failed with one
+    /// of them drops that resource from the state and destroys again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gone: Vec<GoneError>,
+}
+
+/// A provider's error saying that a resource instance of the state is already gone (deleted
+/// outside Terraform, or lost with the server's reset), printed by a delete that fails on it
+/// rather than counting it done: bpg/proxmox's IP set, `no such IPSet 'iso1n0'`.
+///
+/// When a destroy fails and one of its lines holds the text filled with an instance's attributes
+/// in the state, that instance is gone: the runner drops it from the state (`terraform state
+/// rm`), says which, and destroys again. An instance whose text no line holds
+/// stays, so the text must name the instance by its own attributes and in the provider's words,
+/// and only for a delete that is sure the instance is nowhere.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GoneError {
+    /// The resource type (`proxmox_virtual_environment_firewall_ipset`).
+    pub resource: SnakeName,
+    /// What its delete prints for an instance that is gone (`no such IPSet '{id}'`).
+    pub error: GoneText,
 }
 
 /// How the runner finds what a run created, without reading the generated files: one key, the

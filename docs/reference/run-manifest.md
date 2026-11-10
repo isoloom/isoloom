@@ -91,6 +91,25 @@ each VM was booted with and, when it brings a running run up to date with a rege
 reloads a running VM whose digest changed before it runs `up`'s steps again. A manifest written
 before the field existed has none.
 
+### A resource already gone
+
+A Terraform run's `down` is `terraform destroy` without a refresh (a refresh would wait on a VM
+whose guest agent never ran), so a resource the server lost meanwhile (a reset server, an apply
+cut short) reaches its provider's delete. Most deletes count a resource that is gone done; a
+few fail instead, and the destroy then fails every time. `identity.terraform.gone` names those
+errors, one per resource type, the instance's attributes in the state written `{<attribute>}`:
+
+```json
+"gone": [{ "resource": "proxmox_virtual_environment_firewall_ipset", "error": "no such IPSet '{id}'" }]
+```
+
+When the destroy fails, a runner fills each error with the attributes of each instance of that
+type in the state. An instance whose text one of the destroy's lines holds is gone: the runner
+drops it from the state (`terraform state rm`), says which, and destroys again; any other
+failure stays the `down`'s. The text names one instance, by its own attributes, in its
+provider's words, so a resource that might still exist is never forgotten. The Proxmox
+manifests name bpg/proxmox's IP set and container.
+
 ## The checks
 
 `check` runs the manifest's `checks` in three phases, and a runner keeps to them:

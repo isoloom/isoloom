@@ -10,10 +10,7 @@
 //! secrets carried in over SSH (`SendEnv`). The published ports answer at the VM's address, and
 //! the runner reads the containers inside it (`Manifest.guest`).
 
-use isoloom_manifest::{
-    Driver, Error as ManifestError, Identity, Manifest, ManifestVersion, Placeholder, RelPath, Run, SCHEMA_URL, SnakeName, StateOwner, Step, Template,
-    TerraformIdentity,
-};
+use isoloom_manifest::{Driver, Error as ManifestError, Manifest, ManifestVersion, Placeholder, RelPath, Run, SCHEMA_URL, SnakeName, Step, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::guest::GuestCompose;
 
@@ -55,11 +52,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         driver: Driver::Terraform,
         hosts: isoloom_render::run_manifest::every_host(),
         tools: manifest::tools()?,
-        identity: Identity::Terraform(TerraformIdentity {
-            module: RelPath::parse(".")?,
-            state: StateOwner::Runner,
-            var_files: Vec::new(),
-        }),
+        identity: crate::module::manifest::runner_identity(Vec::new())?,
         params,
         secrets,
         // The lab's networks as Compose names them in the VM, as docker-vm lists them: what the

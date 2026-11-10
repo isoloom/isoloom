@@ -21,8 +21,7 @@ pub(super) mod slots;
 pub(super) mod steps;
 
 use isoloom_manifest::{
-    Checks, Driver, Error as ManifestError, Identity, Manifest, ManifestVersion, Part, Placeholder, RelPath, RunVar, SCHEMA_URL, StateOwner, Template,
-    TerraformIdentity, Tool, Version,
+    Checks, Driver, Error as ManifestError, GoneError, Manifest, ManifestVersion, Part, Placeholder, RunVar, SCHEMA_URL, Template, Tool, Version,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{self, environment, generator};
@@ -48,6 +47,8 @@ pub(crate) struct Server<'a> {
     pub(crate) native: &'a dyn Fn(&str) -> Template,
     /// What a successful apply means of the machines: how far their set-up is then.
     pub(crate) applied: &'static str,
+    /// The errors of the server's provider for a resource already gone (`identity.terraform.gone`).
+    pub(crate) gone: fn() -> Result<Vec<GoneError>, ManifestError>,
 }
 
 /// The run manifest of `env` on `server`; its message is left to the caller.
@@ -69,7 +70,7 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
         driver: Driver::Terraform,
         hosts: run_manifest::every_host(),
         tools: (server.tools)()?,
-        identity: runner_identity()?,
+        identity: crate::module::manifest::runner_identity((server.gone)()?)?,
         params: slots::params(&server.variables, server.private_key, &runners, sealed)?,
         secrets: slots::secrets(env, &server.variables)?,
         networks: run_manifest::networks(env, server.native)?,
@@ -105,15 +106,6 @@ pub(super) fn ssh() -> Result<Tool, ManifestError> {
 /// (`iso${run.slot}-lan`, `i${run.slot}n0`).
 pub(super) fn slotted(before: &str, after: String) -> Template {
     Template::from_parts([Part::Text(before.into()), Part::Placeholder(Placeholder::Run(RunVar::Slot)), Part::Text(after)])
-}
-
-/// The module in place, its state the runner's.
-pub(crate) fn runner_identity() -> Result<Identity, ManifestError> {
-    Ok(Identity::Terraform(TerraformIdentity {
-        module: RelPath::parse(".")?,
-        state: StateOwner::Runner,
-        var_files: Vec::new(),
-    }))
 }
 
 #[cfg(test)]

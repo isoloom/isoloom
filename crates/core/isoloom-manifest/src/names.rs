@@ -238,6 +238,73 @@ pattern_type!(
     is_pinned
 );
 
+pattern_type!(
+    /// What a Terraform provider prints when one resource instance of the state is already gone,
+    /// that instance's attributes in the state written `{<attribute>}` (`no such IPSet '{id}'`):
+    /// filled with an instance's attributes, it names that instance and no other.
+    GoneText,
+    "gone error",
+    "^[^{}]*(\\{[a-z][a-z0-9_]*\\}[^{}]*)+$",
+    "text naming at least one of the instance's attributes as `{name}` (`no such IPSet '{id}'`), with no other `{` or `}`",
+    |v| pieces(v).is_some_and(|p| p.iter().any(|piece| matches!(piece, Piece::Attribute(_))))
+);
+
+impl GoneText {
+    /// The attributes it names, in order.
+    pub fn attributes(&self) -> impl Iterator<Item = &str> {
+        pieces(&self.0).unwrap_or_default().into_iter().filter_map(|p| match p {
+            Piece::Attribute(name) => Some(name),
+            Piece::Text(_) => None,
+        })
+    }
+
+    /// The text for one instance, each `{<attribute>}` its `value`; none when an attribute it
+    /// names has no value, or an empty one (the text would no longer name that instance).
+    pub fn fill(&self, value: impl Fn(&str) -> Option<String>) -> Option<String> {
+        let mut out = String::new();
+        for piece in pieces(&self.0)? {
+            match piece {
+                Piece::Text(text) => out.push_str(text),
+                Piece::Attribute(name) => out.push_str(&value(name).filter(|v| !v.is_empty())?),
+            }
+        }
+        Some(out)
+    }
+}
+
+/// A piece of a [`GoneText`].
+enum Piece<'a> {
+    /// Text as it is.
+    Text(&'a str),
+    /// `{<attribute>}`: the attribute's name.
+    Attribute(&'a str),
+}
+
+/// `v` in pieces; none when a `{` or a `}` isn't part of a `{<snake_case name>}`.
+fn pieces(v: &str) -> Option<Vec<Piece<'_>>> {
+    let snake = |name: &str| first_then(name, |c| c.is_ascii_lowercase(), |c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+    let mut out = Vec::new();
+    let mut rest = v;
+    while let Some((before, after)) = rest.split_once('{') {
+        let (name, next) = after.split_once('}')?;
+        if before.contains('}') || !snake(name) {
+            return None;
+        }
+        if !before.is_empty() {
+            out.push(Piece::Text(before));
+        }
+        out.push(Piece::Attribute(name));
+        rest = next;
+    }
+    if rest.contains('}') {
+        return None;
+    }
+    if !rest.is_empty() {
+        out.push(Piece::Text(rest));
+    }
+    Some(out)
+}
+
 /// Whether `v` is a first character `first` accepts followed by characters `rest` accepts.
 fn first_then(v: &str, first: fn(char) -> bool, rest: fn(char) -> bool) -> bool {
     let mut chars = v.chars();
@@ -452,6 +519,28 @@ mod tests {
         assert!(PinnedImage::parse(&format!("a@b@sha256:{digest}")).is_err());
         assert!(PinnedImage::parse(&format!("a@sha256:{}", "A".repeat(64))).is_err());
         assert!(PinnedImage::parse(&format!("a@sha256:{}", "a".repeat(63))).is_err());
+    }
+
+    #[test]
+    fn a_gone_error_names_its_instance_by_its_attributes() {
+        let text = GoneText::parse("Configuration file 'nodes/{node_name}/qemu-server/{id}.conf' does not exist").unwrap();
+        assert_eq!(text.attributes().collect::<Vec<_>>(), ["node_name", "id"]);
+        let attribute = |name: &str| match name {
+            "id" => Some("101".to_owned()),
+            "node_name" => Some("pve".to_owned()),
+            _ => None,
+        };
+        assert_eq!(
+            text.fill(attribute).as_deref(),
+            Some("Configuration file 'nodes/pve/qemu-server/101.conf' does not exist")
+        );
+        assert_eq!(text.fill(|name| (name == "id").then(|| "101".to_owned())), None, "an attribute it lacks");
+        assert_eq!(text.fill(|_| Some(String::new())), None, "an empty one names no instance");
+        let ipset = GoneText::parse("no such IPSet '{id}'").unwrap();
+        assert_eq!(ipset.fill(|_| Some("iso1n0".to_owned())).as_deref(), Some("no such IPSet 'iso1n0'"));
+        for bad in ["no such IPSet", "", "{Id}", "{}", "a {id", "a id}", "a }{id}", "{id}{", "{{id}}", "{node-name}"] {
+            assert_eq!(GoneText::parse(bad).map_err(|e| e.code()), Err("pattern"), "{bad}");
+        }
     }
 
     #[test]

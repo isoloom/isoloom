@@ -17,7 +17,8 @@ use isoloom_spec::model::Target;
 use super::super::docker_host::{SETUP, USER, variables};
 use super::{PRIVATE_KEY, tools};
 use crate::Error;
-use crate::server::manifest::{runner_identity, slots, steps};
+use crate::module::manifest::runner_identity;
+use crate::server::manifest::{slots, steps};
 
 /// The VM's address on the uplink: where SSH reaches it and the published ports answer.
 const IP: &str = "ip";
@@ -58,7 +59,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
         driver: Driver::Terraform,
         hosts: run_manifest::every_host(),
         tools: tools()?,
-        identity: runner_identity()?,
+        identity: runner_identity(super::gone()?)?,
         params,
         secrets,
         networks: guest.networks.clone(),

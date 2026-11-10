@@ -52,6 +52,29 @@ fn the_module_is_applied_with_the_runners_state_and_values() {
     assert!(destroy.contains("\"-refresh=false\""), "a destroy never waits on a router's missing agent");
 }
 
+/// Regression: a Proxmox host reset after a cut-short apply had lost the network's IP set, and
+/// every destroy of the lab failed on it (`-refresh=false`, so no read dropped it first).
+#[test]
+fn the_manifest_names_the_providers_errors_for_a_resource_already_gone() {
+    let m = manifest(&env(LAB)).unwrap();
+    let Identity::Terraform(t) = &m.identity else { panic!("a Terraform run") };
+    let named: Vec<(&str, &str)> = t.gone.iter().map(|g| (g.resource.as_str(), g.error.as_str())).collect();
+    assert_eq!(
+        named,
+        [
+            ("proxmox_virtual_environment_firewall_ipset", "no such IPSet '{id}'"),
+            (
+                "proxmox_virtual_environment_container",
+                "Configuration file 'nodes/{node_name}/lxc/{id}.conf' does not exist"
+            ),
+        ]
+    );
+    // The IP set's text, filled with the leftover's id, is the error the destroy printed.
+    let printed = "Error: error getting IPSet content: received an HTTP 500 response - Reason: no such IPSet 'iso1n0'";
+    let ipset = gone().unwrap().remove(0).error.fill(|a| (a == "id").then(|| "iso1n0".to_owned())).unwrap();
+    assert!(printed.contains(&ipset), "{ipset}");
+}
+
 #[test]
 fn terraform_runs_from_its_pinned_image_on_macos() {
     let m = manifest(&env(LAB)).unwrap();

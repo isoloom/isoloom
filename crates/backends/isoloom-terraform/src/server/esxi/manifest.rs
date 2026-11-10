@@ -24,6 +24,8 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
         tools,
         native: &native,
         applied: "the VMs exist, and Terraform set each Linux one up over SSH through the router",
+        // None named: no josenk/esxi delete is known to fail on a resource already gone.
+        gone: || Ok(Vec::new()),
     };
     shared::manifest(env, &server)
 }

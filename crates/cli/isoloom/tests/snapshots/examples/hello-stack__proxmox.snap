@@ -899,7 +899,17 @@ locals {
   "identity": {
     "terraform": {
       "module": ".",
-      "state": "runner"
+      "state": "runner",
+      "gone": [
+        {
+          "resource": "proxmox_virtual_environment_firewall_ipset",
+          "error": "no such IPSet '{id}'"
+        },
+        {
+          "resource": "proxmox_virtual_environment_container",
+          "error": "Configuration file 'nodes/{node_name}/lxc/{id}.conf' does not exist"
+        }
+      ]
     }
   },
   "params": [
