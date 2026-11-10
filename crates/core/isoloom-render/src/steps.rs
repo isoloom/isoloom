@@ -197,7 +197,7 @@ pub fn install_docker() -> String {
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:){madison}/ {{ print $3; exit }}')
   [ -n "$v" ] || {{ echo "docker-ce {DOCKER_VERSION} is not in Docker's apt repository" >&2; exit 1; }}
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin={COMPOSE_VERSION}-*"
-  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
+  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
   # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
   # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support

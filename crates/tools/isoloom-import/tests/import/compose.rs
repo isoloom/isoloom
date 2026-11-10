@@ -86,7 +86,7 @@ fn services_and_networks_named_alike_get_names_of_their_own() -> Outcome {
     let d = draft(compose, "x", "compose.yaml")?;
     let spec = spec(&d)?;
     assert_eq!(spec.machines.keys().map(String::as_str).collect::<Vec<_>>(), ["a-b", "a-b-2", "m-7"]);
-    assert_eq!(spec.networks.keys().map(String::as_str).collect::<Vec<_>>(), ["n-1", "n-1-2", "lab"]);
+    assert_eq!(spec.networks.keys().map(String::as_str).collect::<Vec<_>>(), ["n-1", "n-1-2", "net"]);
     assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
     Ok(())
 }

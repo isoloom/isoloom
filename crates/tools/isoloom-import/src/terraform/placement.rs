@@ -54,7 +54,7 @@ impl Placement {
             k.clone()
         } else {
             let key = FALLBACK_NETWORK.to_string();
-            self.used.insert(key.clone(), (FALLBACK_NETWORK, "lab".into()));
+            self.used.insert(key.clone(), (FALLBACK_NETWORK, crate::naming::DRAFT_NETWORK.into()));
             key
         };
         let mut taken: Vec<u8> = self.placed.iter().flatten().filter(|(k, _)| *k == key).map(|(_, o)| *o).collect();
@@ -83,7 +83,7 @@ impl Placement {
             name,
         });
         for (key, (cidr, _)) in &self.used {
-            y.network(names.get(key).map_or("lab", String::as_str), 0, *cidr, true);
+            y.network(names.get(key).map_or(crate::naming::DRAFT_NETWORK, String::as_str), 0, *cidr, true);
         }
         y.machines();
         let mut taken: Vec<String> = Vec::new();

@@ -854,7 +854,7 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 10.40.20.5/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.5/24 on $($a.Name)\""
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -906,7 +906,7 @@ Vagrant.configure("2") do |config|
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
             }
             if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
-            'lab network: ' + $n.ip + ' on ' + $c.Description
+            'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
       end
@@ -975,7 +975,7 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 10.40.20.21/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.21/24 on $($a.Name)\""
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -1030,7 +1030,7 @@ Vagrant.configure("2") do |config|
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
             }
             if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
-            'lab network: ' + $n.ip + ' on ' + $c.Description
+            'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
       end
@@ -1100,7 +1100,7 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 10.40.20.22/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.22/24 on $($a.Name)\""
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -1155,7 +1155,7 @@ Vagrant.configure("2") do |config|
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
             }
             if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
-            'lab network: ' + $n.ip + ' on ' + $c.Description
+            'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
       end
@@ -1504,7 +1504,7 @@ crash.*.log
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n \"$v\" ] || { echo \"docker-ce 29.9.0 is not in Docker's apt repository\" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades \"docker-ce=$v\" \"docker-ce-cli=$v\" containerd.io docker-buildx-plugin \"docker-compose-plugin=5.6.0-*\"
-  # A lab's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
+  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
   # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
   # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
   [ \"$(dpkg --print-architecture)\" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support

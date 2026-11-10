@@ -47,10 +47,19 @@ pub(crate) fn unique(base: &str, taken: impl Fn(&str) -> bool) -> String {
 
 /// Names for the draft's networks, keyed like the networks: the name the source gave, else
 /// `lab`, `lab-2`... by position, each one unique.
+/// The network a draft names when its source gives none: the first one's name, `net-2`... after.
+pub(crate) const DRAFT_NETWORK: &str = "net";
+
 pub(crate) fn network_names(networks: impl IntoIterator<Item = (String, Option<String>)>) -> indexmap::IndexMap<String, String> {
     let mut names = indexmap::IndexMap::new();
     for (i, (key, named)) in networks.into_iter().enumerate() {
-        let base = named.unwrap_or_else(|| if i == 0 { "lab".to_owned() } else { format!("lab-{}", i + 1) });
+        let base = named.unwrap_or_else(|| {
+            if i == 0 {
+                DRAFT_NETWORK.to_owned()
+            } else {
+                format!("{DRAFT_NETWORK}-{}", i + 1)
+            }
+        });
         let name = unique(&base, |n| names.values().any(|taken: &String| taken == n));
         names.insert(key, name);
     }
@@ -79,9 +88,9 @@ mod tests {
     }
 
     #[test]
-    fn unnamed_networks_are_lab_by_position_and_a_name_given_twice_is_numbered() {
-        let names = network_names([("a".to_owned(), None), ("b".to_owned(), Some("lab".to_owned())), ("c".to_owned(), None)]);
-        assert_eq!(names.values().map(String::as_str).collect::<Vec<_>>(), ["lab", "lab-2", "lab-3"]);
+    fn unnamed_networks_are_net_by_position_and_a_name_given_twice_is_numbered() {
+        let names = network_names([("a".to_owned(), None), ("b".to_owned(), Some("net".to_owned())), ("c".to_owned(), None)]);
+        assert_eq!(names.values().map(String::as_str).collect::<Vec<_>>(), ["net", "net-2", "net-3"]);
     }
 
     /// Whether `s` is a name the spec accepts for a machine.

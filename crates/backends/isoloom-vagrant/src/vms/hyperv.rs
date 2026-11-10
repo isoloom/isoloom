@@ -282,7 +282,7 @@ fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
         .collect::<Vec<_>>()
         .join(", ");
     format!(
-        "$ErrorActionPreference = 'Stop'\nforeach ($n in @({items})) {{\n  $c = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {{ $_.MACAddress -eq $n.mac }} | Select-Object -First 1\n  if (-not $c) {{ throw ('no network adapter with MAC ' + $n.mac) }}\n  if (@($c.IPAddress) -notcontains $n.ip) {{\n    $r = $c.EnableStatic(@($n.ip), @($n.mask))\n    if ($r.ReturnValue -gt 1) {{ throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }}\n  }}\n  if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) {{ Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }}\n  'lab network: ' + $n.ip + ' on ' + $c.Description\n}}\n"
+        "$ErrorActionPreference = 'Stop'\nforeach ($n in @({items})) {{\n  $c = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {{ $_.MACAddress -eq $n.mac }} | Select-Object -First 1\n  if (-not $c) {{ throw ('no network adapter with MAC ' + $n.mac) }}\n  if (@($c.IPAddress) -notcontains $n.ip) {{\n    $r = $c.EnableStatic(@($n.ip), @($n.mask))\n    if ($r.ReturnValue -gt 1) {{ throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }}\n  }}\n  if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) {{ Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }}\n  'environment network: ' + $n.ip + ' on ' + $c.Description\n}}\n"
     )
 }
 

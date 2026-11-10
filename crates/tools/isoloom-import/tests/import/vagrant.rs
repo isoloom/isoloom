@@ -22,9 +22,9 @@ fn a_vagrantfile_with_a_loop_becomes_a_draft_that_passes_validate() -> Outcome {
     let d = draft(&recorded("recorded.json")?, "classic", "Vagrantfile")?;
     assert_eq!(validate_in(&d, &fixture("vagrant-classic"))?, Vec::<String>::new(), "{}", d.yaml);
     let spec = spec(&d)?;
-    assert_eq!(spec.networks["lab"].cidr, "192.168.33.0/24");
+    assert_eq!(spec.networks["net"].cidr, "192.168.33.0/24");
     let web = &spec.machines["web"];
-    assert_eq!(web.networks["lab"], Octets::One(10));
+    assert_eq!(web.networks["net"], Octets::One(10));
     assert_eq!(ports(&spec, "web").first().map(|p| (p.1, p.2)), Some((80, Some(8080))));
     assert_eq!(web.resources.and_then(|r| r.memory_mb), Some(1024));
     assert_eq!(spec.machines["db"].resources.and_then(|r| r.memory_mb), Some(2048));

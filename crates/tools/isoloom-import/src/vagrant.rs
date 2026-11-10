@@ -469,7 +469,7 @@ mod tests {
             {"name":"network","args":["private_network",{"ip":"10.9.0.10"}]}]}}}"#
             .parse()?;
         let d = draft(&recorded, "solo", "Vagrantfile")?;
-        assert!(d.yaml.contains("  default:\n    networks: { lab: 10 }\n"), "{}", d.yaml);
+        assert!(d.yaml.contains("  default:\n    networks: { net: 10 }\n"), "{}", d.yaml);
         Ok(())
     }
 

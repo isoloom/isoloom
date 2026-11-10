@@ -90,7 +90,7 @@ fn net(blocks: &mut Blocks, taken: &[String], compose_name: &str, def: Option<&V
         notes.add(format!("{at}.{k}"), NoteKind::Changed, LEFT_OUT);
     }
     let base = if compose_name == DEFAULT_NETWORK {
-        "lab".to_owned()
+        crate::naming::DRAFT_NETWORK.to_owned()
     } else {
         label(compose_name)
     };

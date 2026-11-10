@@ -844,7 +844,7 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 10.40.20.5/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.5/24 on $($a.Name)\""
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -896,7 +896,7 @@ Vagrant.configure("2") do |config|
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
             }
             if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
-            'lab network: ' + $n.ip + ' on ' + $c.Description
+            'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
       end
@@ -965,7 +965,7 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 10.40.20.21/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.21/24 on $($a.Name)\""
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -1020,7 +1020,7 @@ Vagrant.configure("2") do |config|
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
             }
             if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
-            'lab network: ' + $n.ip + ' on ' + $c.Description
+            'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
       end
@@ -1090,7 +1090,7 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 10.40.20.22/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.22/24 on $($a.Name)\""
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -1145,7 +1145,7 @@ Vagrant.configure("2") do |config|
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
             }
             if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
-            'lab network: ' + $n.ip + ' on ' + $c.Description
+            'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
       end
@@ -2473,7 +2473,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:d42cc69afc59b00ff1bea6b0f134ed67b1be90ad4c826ec74d864faec61c9887"
+        "boot_digest": "sha256:19ddecdbb2e227a71d2f16e76abd7460441be3cc481d26cf94b06ca433c45757"
       },
       "ports": [
         {
@@ -2526,7 +2526,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:68f80318af3d26876bfa1bb83c1fc0484d8f6481a2db236a1579d9a88d31eb8d"
+        "boot_digest": "sha256:b31ba6a02d9a6f90c843a52d97c35cb468d05d81f6f02e3dc81b81771a1c7025"
       }
     },
     {
@@ -2553,7 +2553,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:ff9b0bbf07af24407405e078fc41406d55743605f8ce4d329c477216aa54f274"
+        "boot_digest": "sha256:ec24e46a299d51dc75ec83bec18e4cfd08fa74733711ed3943972914f2517677"
       }
     },
     {

@@ -1136,7 +1136,7 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "lab network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the lab network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.67.0.10 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.67.0.10 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"lab network: 10.67.0.10/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.67.0.10 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.67.0.10 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.67.0.10/24 on $($a.Name)\""
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("lab", QEMU_HUBS["lab"].values) }
@@ -1186,7 +1186,7 @@ Vagrant.configure("2") do |config|
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
             }
             if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
-            'lab network: ' + $n.ip + ' on ' + $c.Description
+            'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
         IsoloomHyperV.ports(machine, [[80, ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)]])
@@ -2110,7 +2110,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-windows - iis",
           "vmware_esxi": "configured-windows-iis"
         },
-        "boot_digest": "sha256:0e67b33a7fc7da34bf7c41333fae589790548b2d5d5676b8b3738812f520283f"
+        "boot_digest": "sha256:d71622e2168b0cd84979fc442dd7db39442c8c3f9667a342b24351ea792050a0"
       },
       "ports": [
         {

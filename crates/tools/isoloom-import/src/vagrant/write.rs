@@ -24,7 +24,7 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
         name,
     });
     for (key, net) in &import.nets {
-        let network = names.get(key).map_or("lab", String::as_str);
+        let network = names.get(key).map_or(crate::naming::DRAFT_NETWORK, String::as_str);
         match &net.bridged {
             Some(b) => y.bridged(network, net.cidr, &bridged(b)),
             None => y.network(network, 0, net.cidr, true),
