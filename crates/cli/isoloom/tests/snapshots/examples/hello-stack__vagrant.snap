@@ -633,24 +633,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.60.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "hello-stack · cache"
+      v.name = "hello-stack - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "hello-stack · cache"
+      v.vmx["displayName"] = "hello-stack - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "hello-stack · cache"
+      v.name = "hello-stack - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "hello-stack · cache"
+      v.name = "hello-stack - cache"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -829,24 +829,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "hello-stack · web"
+      v.name = "hello-stack - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "hello-stack · web"
+      v.vmx["displayName"] = "hello-stack - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "hello-stack · web"
+      v.name = "hello-stack - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "hello-stack · web"
+      v.name = "hello-stack - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1017,24 +1017,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.60.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "hello-stack · isoloom-controller"
+      v.name = "hello-stack - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "hello-stack · isoloom-controller"
+      v.vmx["displayName"] = "hello-stack - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "hello-stack · isoloom-controller"
+      v.name = "hello-stack - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "hello-stack · isoloom-controller"
+      v.name = "hello-stack - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1876,15 +1876,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "cache",
         "vm_names": {
-          "virtualbox": "hello-stack · cache",
-          "vmware_desktop": "hello-stack · cache",
+          "virtualbox": "hello-stack - cache",
+          "vmware_desktop": "hello-stack - cache",
           "hyperv": "hello-stack-cache",
-          "parallels": "hello-stack · cache",
+          "parallels": "hello-stack - cache",
           "libvirt": "hello-stack_cache",
-          "utm": "hello-stack · cache",
+          "utm": "hello-stack - cache",
           "vmware_esxi": "hello-stack-cache"
         },
-        "boot_digest": "sha256:ca0949ccfa3994f95b22c39d62bff104b98b9b7ba5e79f7b12d23fa5002fb88f"
+        "boot_digest": "sha256:c1dc5d1139ff4fd7b973e7029745b255d32acc980ad9584fe778f507c1a2b9be"
       },
       "ports": [
         {
@@ -1910,15 +1910,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "hello-stack · web",
-          "vmware_desktop": "hello-stack · web",
+          "virtualbox": "hello-stack - web",
+          "vmware_desktop": "hello-stack - web",
           "hyperv": "hello-stack-web",
-          "parallels": "hello-stack · web",
+          "parallels": "hello-stack - web",
           "libvirt": "hello-stack_web",
-          "utm": "hello-stack · web",
+          "utm": "hello-stack - web",
           "vmware_esxi": "hello-stack-web"
         },
-        "boot_digest": "sha256:f6812f77c58cccf6fe4439febd3b26418c9e3383fe2a92ac3324b87ccb08fe1c"
+        "boot_digest": "sha256:c751e771f9609d693dfc1e6c7c2304072626e4099c9fcf6e82971bdf740f6ebd"
       },
       "ports": [
         {
@@ -1947,15 +1947,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "hello-stack · isoloom-controller",
-          "vmware_desktop": "hello-stack · isoloom-controller",
+          "virtualbox": "hello-stack - isoloom-controller",
+          "vmware_desktop": "hello-stack - isoloom-controller",
           "hyperv": "hello-stack-isoloom-controller",
-          "parallels": "hello-stack · isoloom-controller",
+          "parallels": "hello-stack - isoloom-controller",
           "libvirt": "hello-stack_isoloom-controller",
-          "utm": "hello-stack · isoloom-controller",
+          "utm": "hello-stack - isoloom-controller",
           "vmware_esxi": "hello-stack-isoloom-controller"
         },
-        "boot_digest": "sha256:2768c70959fcd9093050423701b0b8d04e0d8192b69460a8a97b2d9eab33c719"
+        "boot_digest": "sha256:21107d1a075ad73510a7f535e4c2afb060138f5518eb3a1ffab9ebda55525a19"
       }
     }
   ],

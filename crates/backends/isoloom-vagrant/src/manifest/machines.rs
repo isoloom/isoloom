@@ -148,7 +148,7 @@ checks: [{ http: 'http://web/', wait: 30 }]
             panic!()
         };
         assert_eq!(boot_digest.as_deref(), Some("sha256:0"));
-        assert_eq!(vm_names[&Provider::Virtualbox], "shop · web");
+        assert_eq!(vm_names[&Provider::Virtualbox], "shop - web");
         assert_eq!(vm_names[&Provider::Hyperv], "shop-web");
         assert_eq!(vm_names[&Provider::Libvirt], "shop_web");
         assert!(!vm_names.contains_key(&Provider::Qemu));

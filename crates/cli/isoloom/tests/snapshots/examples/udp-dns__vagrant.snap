@@ -633,24 +633,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.66.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-users", libvirt__network_name: "isoloom-udp-dns-users", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "udp-dns · isoloom-router"
+      v.name = "udp-dns - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "udp-dns · isoloom-router"
+      v.vmx["displayName"] = "udp-dns - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "udp-dns · isoloom-router"
+      v.name = "udp-dns - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "udp-dns · isoloom-router"
+      v.name = "udp-dns - isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -785,24 +785,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 53, host: ISOLOOM_HOSTPORTS.fetch("dns/dns-udp", 10053), host_ip: "127.0.0.1", protocol: "udp" # not on libvirt: vagrant-libvirt skips UDP forwards
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "udp-dns · dns"
+      v.name = "udp-dns - dns"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "udp-dns · dns"
+      v.vmx["displayName"] = "udp-dns - dns"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "udp-dns · dns"
+      v.name = "udp-dns - dns"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "udp-dns · dns"
+      v.name = "udp-dns - dns"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1007,24 +1007,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.66.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-users", libvirt__network_name: "isoloom-udp-dns-users", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "udp-dns · client"
+      v.name = "udp-dns - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "udp-dns · client"
+      v.vmx["displayName"] = "udp-dns - client"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "udp-dns · client"
+      v.name = "udp-dns - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "udp-dns · client"
+      v.name = "udp-dns - client"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1790,15 +1790,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "udp-dns · isoloom-router",
-          "vmware_desktop": "udp-dns · isoloom-router",
+          "virtualbox": "udp-dns - isoloom-router",
+          "vmware_desktop": "udp-dns - isoloom-router",
           "hyperv": "udp-dns-isoloom-router",
-          "parallels": "udp-dns · isoloom-router",
+          "parallels": "udp-dns - isoloom-router",
           "libvirt": "udp-dns_isoloom-router",
-          "utm": "udp-dns · isoloom-router",
+          "utm": "udp-dns - isoloom-router",
           "vmware_esxi": "udp-dns-isoloom-router"
         },
-        "boot_digest": "sha256:5df4aa8a5e7f5ef633528ef4c2014621674094c9a2ebc17ca57fdae88e7e140a"
+        "boot_digest": "sha256:28695e3b1fa81fd4fc022ca280a8a47738424dfa5a92d2b5a001e88c2a4b15fc"
       }
     },
     {
@@ -1816,15 +1816,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "dns",
         "vm_names": {
-          "virtualbox": "udp-dns · dns",
-          "vmware_desktop": "udp-dns · dns",
+          "virtualbox": "udp-dns - dns",
+          "vmware_desktop": "udp-dns - dns",
           "hyperv": "udp-dns-dns",
-          "parallels": "udp-dns · dns",
+          "parallels": "udp-dns - dns",
           "libvirt": "udp-dns_dns",
-          "utm": "udp-dns · dns",
+          "utm": "udp-dns - dns",
           "vmware_esxi": "udp-dns-dns"
         },
-        "boot_digest": "sha256:2850ead10c0b0571a39de66185ae449743dcb1e3a34bd584384d1aabee24f2ee"
+        "boot_digest": "sha256:275bb8fbef5677b4451ecda44012fed05894fd714c4844eb74502801c986524f"
       },
       "ports": [
         {
@@ -1862,15 +1862,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "client",
         "vm_names": {
-          "virtualbox": "udp-dns · client",
-          "vmware_desktop": "udp-dns · client",
+          "virtualbox": "udp-dns - client",
+          "vmware_desktop": "udp-dns - client",
           "hyperv": "udp-dns-client",
-          "parallels": "udp-dns · client",
+          "parallels": "udp-dns - client",
           "libvirt": "udp-dns_client",
-          "utm": "udp-dns · client",
+          "utm": "udp-dns - client",
           "vmware_esxi": "udp-dns-client"
         },
-        "boot_digest": "sha256:f991bac209713560724dd1069a82a1106a6945c41e1109bd53e57abcf901161d"
+        "boot_digest": "sha256:7415ae66fb333b56d1af496788f1648fd2ca3062418912e65e2d2fcfc07c4305"
       }
     }
   ],

@@ -605,24 +605,24 @@ Vagrant.configure("2") do |config|
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.disk :disk, name: "data", size: "50GB"
     m.vm.provider "virtualbox" do |v|
-      v.name = "shared-files · writer"
+      v.name = "shared-files - writer"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "shared-files · writer"
+      v.vmx["displayName"] = "shared-files - writer"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "shared-files · writer"
+      v.name = "shared-files - writer"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "shared-files · writer"
+      v.name = "shared-files - writer"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -798,24 +798,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.84.0.11", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-shared-files-app", libvirt__network_name: "isoloom-shared-files-app", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "shared-files · reader"
+      v.name = "shared-files - reader"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "shared-files · reader"
+      v.vmx["displayName"] = "shared-files - reader"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "shared-files · reader"
+      v.name = "shared-files - reader"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "shared-files · reader"
+      v.name = "shared-files - reader"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE

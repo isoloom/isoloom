@@ -539,23 +539,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "cisco-iol · isoloom-docker-host"
+    v.name = "cisco-iol - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "cisco-iol · isoloom-docker-host"
+    v.vmx["displayName"] = "cisco-iol - isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "cisco-iol · isoloom-docker-host"
+    v.name = "cisco-iol - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "cisco-iol · isoloom-docker-host"
+    v.name = "cisco-iol - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1866,14 +1866,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "cisco-iol · isoloom-docker-host",
-          "vmware_desktop": "cisco-iol · isoloom-docker-host",
-          "parallels": "cisco-iol · isoloom-docker-host",
+          "virtualbox": "cisco-iol - isoloom-docker-host",
+          "vmware_desktop": "cisco-iol - isoloom-docker-host",
+          "parallels": "cisco-iol - isoloom-docker-host",
           "libvirt": "cisco-iol_default",
-          "utm": "cisco-iol · isoloom-docker-host",
+          "utm": "cisco-iol - isoloom-docker-host",
           "vmware_esxi": "cisco-iol-isoloom-docker-host"
         },
-        "boot_digest": "sha256:eb3a153268135f04999e35967f5886f2f2a2e80f8416cdcc78534238c662d318"
+        "boot_digest": "sha256:7df619515f671f57f29d228836e97e4eda4cab402763c21b809980389487a580"
       }
     },
     {

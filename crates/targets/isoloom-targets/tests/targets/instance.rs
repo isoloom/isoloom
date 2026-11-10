@@ -66,7 +66,7 @@ fn vagrant_instances_differ_by_name_only() -> Outcome {
     let files = generate_instance(&spec, Target::Vagrant, 1).unwrap();
     let vf = &files.iter().find(|f| f.path == ".isoloom-1/vagrant/Vagrantfile").unwrap().contents;
     // VM labels and internal network names carry the instance; addresses don't move.
-    assert!(vf.contains("isoloom-hello-stack-1-app") && vf.contains("hello-stack-1 · web"), "{vf}");
+    assert!(vf.contains("isoloom-hello-stack-1-app") && vf.contains("hello-stack-1 - web"), "{vf}");
     assert!(vf.contains("10.60.0.10"));
     // The runner picks each forward a free host port; the per-instance shift is the default it
     // falls back to, so two instances can both forward even without a runner choosing.

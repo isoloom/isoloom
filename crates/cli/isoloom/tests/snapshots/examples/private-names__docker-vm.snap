@@ -533,23 +533,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "private-names · isoloom-docker-host"
+    v.name = "private-names - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "private-names · isoloom-docker-host"
+    v.vmx["displayName"] = "private-names - isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "private-names · isoloom-docker-host"
+    v.name = "private-names - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "private-names · isoloom-docker-host"
+    v.name = "private-names - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1830,14 +1830,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "private-names · isoloom-docker-host",
-          "vmware_desktop": "private-names · isoloom-docker-host",
-          "parallels": "private-names · isoloom-docker-host",
+          "virtualbox": "private-names - isoloom-docker-host",
+          "vmware_desktop": "private-names - isoloom-docker-host",
+          "parallels": "private-names - isoloom-docker-host",
           "libvirt": "private-names_default",
-          "utm": "private-names · isoloom-docker-host",
+          "utm": "private-names - isoloom-docker-host",
           "vmware_esxi": "private-names-isoloom-docker-host"
         },
-        "boot_digest": "sha256:15a5a13ed0069b8ab363523fb401a71265af86c791ef18da52dc494c16f4b86f"
+        "boot_digest": "sha256:e40b192a8dfbde3c758a31055b1ceb26bb7584f1d2a9601281fe4e700dbe5562"
       }
     },
     {

@@ -84,10 +84,12 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.
 - On Vagrant (and `hybrid`), the controller's check runner step is `check-isoloom-controller`
   (was `check-controller`) and its runner script `checks/isoloom-controller.sh` (was
-  `checks/controller.sh`). Isoloom's own VMs show as `<lab> · isoloom-controller`,
-  `<lab> · isoloom-router` and `<lab> · isoloom-tool-shell` (`<lab>-isoloom-…` on Hyper-V and
+  `checks/controller.sh`). Isoloom's own VMs show as `<lab> - isoloom-controller`,
+  `<lab> - isoloom-router` and `<lab> - isoloom-tool-shell` (`<lab>-isoloom-…` on Hyper-V and
   ESXi; were `controller`, `router`, `tool shell`), the docker-vm and hybrid hosts as
   `isoloom-docker-host` (were `docker`, `containers`): read them from `machines[].native.vm_names`.
+- A Vagrant VM's display name (VirtualBox, VMware, Parallels, UTM) is `<lab> - <machine>`, ASCII
+  (was `<lab> · <machine>`): Vagrant renames an existing VM when it next boots it.
 
 ## Library users
 

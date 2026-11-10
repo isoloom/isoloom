@@ -634,24 +634,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.61.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented · isoloom-router"
+      v.name = "segmented - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented · isoloom-router"
+      v.vmx["displayName"] = "segmented - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented · isoloom-router"
+      v.name = "segmented - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "segmented · isoloom-router"
+      v.name = "segmented - isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -788,24 +788,24 @@ Vagrant.configure("2") do |config|
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.disk :disk, size: "10GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented · cache"
+      v.name = "segmented - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented · cache"
+      v.vmx["displayName"] = "segmented - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented · cache"
+      v.name = "segmented - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "segmented · cache"
+      v.name = "segmented - cache"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1035,24 +1035,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.61.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-front", libvirt__network_name: "isoloom-segmented-front", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented · web"
+      v.name = "segmented - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented · web"
+      v.vmx["displayName"] = "segmented - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented · web"
+      v.name = "segmented - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "segmented · web"
+      v.name = "segmented - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1223,24 +1223,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.61.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented · user"
+      v.name = "segmented - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented · user"
+      v.vmx["displayName"] = "segmented - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented · user"
+      v.name = "segmented - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "segmented · user"
+      v.name = "segmented - user"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2072,15 +2072,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "segmented · isoloom-router",
-          "vmware_desktop": "segmented · isoloom-router",
+          "virtualbox": "segmented - isoloom-router",
+          "vmware_desktop": "segmented - isoloom-router",
           "hyperv": "segmented-isoloom-router",
-          "parallels": "segmented · isoloom-router",
+          "parallels": "segmented - isoloom-router",
           "libvirt": "segmented_isoloom-router",
-          "utm": "segmented · isoloom-router",
+          "utm": "segmented - isoloom-router",
           "vmware_esxi": "segmented-isoloom-router"
         },
-        "boot_digest": "sha256:ecb6b27ca820958f1916e436ad6b01e725397cf7c8200f31699e019c89703fef"
+        "boot_digest": "sha256:1e3a5ef1d87e9038c9d74dae7e9b8d20fc3917631eee653aad9c20eede9123e9"
       }
     },
     {
@@ -2098,15 +2098,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "cache",
         "vm_names": {
-          "virtualbox": "segmented · cache",
-          "vmware_desktop": "segmented · cache",
+          "virtualbox": "segmented - cache",
+          "vmware_desktop": "segmented - cache",
           "hyperv": "segmented-cache",
-          "parallels": "segmented · cache",
+          "parallels": "segmented - cache",
           "libvirt": "segmented_cache",
-          "utm": "segmented · cache",
+          "utm": "segmented - cache",
           "vmware_esxi": "segmented-cache"
         },
-        "boot_digest": "sha256:17a6a7000bb047674fe2b6aa8b5041522f3d0cbc0ff8de7d111de6b252bddeff"
+        "boot_digest": "sha256:d98cabda1a30e22444bc98dae899a53162069b8f8dfcfbe413f9e862e796c683"
       },
       "ports": [
         {
@@ -2132,15 +2132,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "segmented · web",
-          "vmware_desktop": "segmented · web",
+          "virtualbox": "segmented - web",
+          "vmware_desktop": "segmented - web",
           "hyperv": "segmented-web",
-          "parallels": "segmented · web",
+          "parallels": "segmented - web",
           "libvirt": "segmented_web",
-          "utm": "segmented · web",
+          "utm": "segmented - web",
           "vmware_esxi": "segmented-web"
         },
-        "boot_digest": "sha256:7fba7e83c6a420932e843501792caa9113aa3f5a1629517964f9a41d441aea4c"
+        "boot_digest": "sha256:c347615f852a9b57ffabbc5d9baa486d7a04d7709c0518b581c1483cc7dca61e"
       },
       "ports": [
         {
@@ -2173,15 +2173,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "user",
         "vm_names": {
-          "virtualbox": "segmented · user",
-          "vmware_desktop": "segmented · user",
+          "virtualbox": "segmented - user",
+          "vmware_desktop": "segmented - user",
           "hyperv": "segmented-user",
-          "parallels": "segmented · user",
+          "parallels": "segmented - user",
           "libvirt": "segmented_user",
-          "utm": "segmented · user",
+          "utm": "segmented - user",
           "vmware_esxi": "segmented-user"
         },
-        "boot_digest": "sha256:8d728c4efd3815b9e78de115cfb86ba160c70275e13de2ffc392d3c206949d1a"
+        "boot_digest": "sha256:ac79e02f2f56c1720be8b50bd2e514df9809d2fcdc691c4fa73b762661a163f8"
       }
     }
   ],

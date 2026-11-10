@@ -872,24 +872,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair · web"
+      v.name = "ansible-pair - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair · web"
+      v.vmx["displayName"] = "ansible-pair - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair · web"
+      v.name = "ansible-pair - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "ansible-pair · web"
+      v.name = "ansible-pair - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1021,24 +1021,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair · cache"
+      v.name = "ansible-pair - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair · cache"
+      v.vmx["displayName"] = "ansible-pair - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair · cache"
+      v.name = "ansible-pair - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "ansible-pair · cache"
+      v.name = "ansible-pair - cache"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1170,24 +1170,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair · isoloom-controller"
+      v.name = "ansible-pair - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair · isoloom-controller"
+      v.vmx["displayName"] = "ansible-pair - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "768"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair · isoloom-controller"
+      v.name = "ansible-pair - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "ansible-pair · isoloom-controller"
+      v.name = "ansible-pair - isoloom-controller"
       v.cpus = 1
       v.memory = 768
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2085,15 +2085,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "ansible-pair · web",
-          "vmware_desktop": "ansible-pair · web",
+          "virtualbox": "ansible-pair - web",
+          "vmware_desktop": "ansible-pair - web",
           "hyperv": "ansible-pair-web",
-          "parallels": "ansible-pair · web",
+          "parallels": "ansible-pair - web",
           "libvirt": "ansible-pair_web",
-          "utm": "ansible-pair · web",
+          "utm": "ansible-pair - web",
           "vmware_esxi": "ansible-pair-web"
         },
-        "boot_digest": "sha256:dae9e0c2e482b87305bae3bf1fc30112d862919d6fe7b97b78f5ffb58fbb81a6"
+        "boot_digest": "sha256:8fc7bd0b03ad0b121f06048b29b4d34985289df6e5b3474b2edb4f330dcae3df"
       },
       "ports": [
         {
@@ -2119,15 +2119,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "cache",
         "vm_names": {
-          "virtualbox": "ansible-pair · cache",
-          "vmware_desktop": "ansible-pair · cache",
+          "virtualbox": "ansible-pair - cache",
+          "vmware_desktop": "ansible-pair - cache",
           "hyperv": "ansible-pair-cache",
-          "parallels": "ansible-pair · cache",
+          "parallels": "ansible-pair - cache",
           "libvirt": "ansible-pair_cache",
-          "utm": "ansible-pair · cache",
+          "utm": "ansible-pair - cache",
           "vmware_esxi": "ansible-pair-cache"
         },
-        "boot_digest": "sha256:bdda436e86485f92b1c5ac01914f5139841e9b3ce1bfb25bcc78774af0861b02"
+        "boot_digest": "sha256:60385d7583d916dcc4d8973845df1155e92b8e4321ccee59a95377a7eb3691b9"
       },
       "ports": [
         {
@@ -2151,15 +2151,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "ansible-pair · isoloom-controller",
-          "vmware_desktop": "ansible-pair · isoloom-controller",
+          "virtualbox": "ansible-pair - isoloom-controller",
+          "vmware_desktop": "ansible-pair - isoloom-controller",
           "hyperv": "ansible-pair-isoloom-controller",
-          "parallels": "ansible-pair · isoloom-controller",
+          "parallels": "ansible-pair - isoloom-controller",
           "libvirt": "ansible-pair_isoloom-controller",
-          "utm": "ansible-pair · isoloom-controller",
+          "utm": "ansible-pair - isoloom-controller",
           "vmware_esxi": "ansible-pair-isoloom-controller"
         },
-        "boot_digest": "sha256:20d9d7c53cc215f7eed7a492e1e8302b83b7f8b32630e1e9d43b0a99d6af582d"
+        "boot_digest": "sha256:eff312a21838bf3aa55a3bd44be3f820ae68c6f38142d5bd5d892914b7503cf8"
       }
     }
   ],

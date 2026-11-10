@@ -1085,24 +1085,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.67.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-windows-lab", libvirt__network_name: "isoloom-configured-windows-lab", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("iis/http", 8087), host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-windows · iis"
+      v.name = "configured-windows - iis"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-windows · iis"
+      v.vmx["displayName"] = "configured-windows - iis"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "3072"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-windows · iis"
+      v.name = "configured-windows - iis"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
     end
     m.vm.provider "utm" do |v|
-      v.name = "configured-windows · iis"
+      v.name = "configured-windows - iis"
       v.cpus = 2
       v.memory = 3072
     end
@@ -1428,24 +1428,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.67.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-windows-lab", libvirt__network_name: "isoloom-configured-windows-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-windows · isoloom-controller"
+      v.name = "configured-windows - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-windows · isoloom-controller"
+      v.vmx["displayName"] = "configured-windows - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-windows · isoloom-controller"
+      v.name = "configured-windows - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "configured-windows · isoloom-controller"
+      v.name = "configured-windows - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2067,15 +2067,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "iis",
         "vm_names": {
-          "virtualbox": "configured-windows · iis",
-          "vmware_desktop": "configured-windows · iis",
+          "virtualbox": "configured-windows - iis",
+          "vmware_desktop": "configured-windows - iis",
           "hyperv": "configured-windows-iis",
-          "parallels": "configured-windows · iis",
+          "parallels": "configured-windows - iis",
           "libvirt": "configured-windows_iis",
-          "utm": "configured-windows · iis",
+          "utm": "configured-windows - iis",
           "vmware_esxi": "configured-windows-iis"
         },
-        "boot_digest": "sha256:cf8902ca108ac9f6533b25b8a8adb325a5ea6aba4b41837c0db79b1014cac4a5"
+        "boot_digest": "sha256:6dbeff7ce8bb5100c81533996428145491d76070d13d5a77bd3e7b215ff92789"
       },
       "ports": [
         {
@@ -2104,15 +2104,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "configured-windows · isoloom-controller",
-          "vmware_desktop": "configured-windows · isoloom-controller",
+          "virtualbox": "configured-windows - isoloom-controller",
+          "vmware_desktop": "configured-windows - isoloom-controller",
           "hyperv": "configured-windows-isoloom-controller",
-          "parallels": "configured-windows · isoloom-controller",
+          "parallels": "configured-windows - isoloom-controller",
           "libvirt": "configured-windows_isoloom-controller",
-          "utm": "configured-windows · isoloom-controller",
+          "utm": "configured-windows - isoloom-controller",
           "vmware_esxi": "configured-windows-isoloom-controller"
         },
-        "boot_digest": "sha256:efd0318e49b4c988ef135787cae2e2b94d1ca7bf6fd0c70988c825bffb75422a"
+        "boot_digest": "sha256:c11e16af349513dd107399cc0e87a4337eb0c55bb83f5778b05902366275fb2f"
       }
     }
   ],

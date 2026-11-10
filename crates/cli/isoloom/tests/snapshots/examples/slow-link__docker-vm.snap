@@ -527,23 +527,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "slow-link · isoloom-docker-host"
+    v.name = "slow-link - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "slow-link · isoloom-docker-host"
+    v.vmx["displayName"] = "slow-link - isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "slow-link · isoloom-docker-host"
+    v.name = "slow-link - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "slow-link · isoloom-docker-host"
+    v.name = "slow-link - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1862,14 +1862,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "slow-link · isoloom-docker-host",
-          "vmware_desktop": "slow-link · isoloom-docker-host",
-          "parallels": "slow-link · isoloom-docker-host",
+          "virtualbox": "slow-link - isoloom-docker-host",
+          "vmware_desktop": "slow-link - isoloom-docker-host",
+          "parallels": "slow-link - isoloom-docker-host",
           "libvirt": "slow-link_default",
-          "utm": "slow-link · isoloom-docker-host",
+          "utm": "slow-link - isoloom-docker-host",
           "vmware_esxi": "slow-link-isoloom-docker-host"
         },
-        "boot_digest": "sha256:7ba5149cbacdbbb21003d294b9941da0addba914b0c4ebfa6a72ecca40729674"
+        "boot_digest": "sha256:f04e61dd507393bd431e80b80c6aa6e97d64e2ae26f7fd1e6679f657ccdf38ed"
       }
     },
     {

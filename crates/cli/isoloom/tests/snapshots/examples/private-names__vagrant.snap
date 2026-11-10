@@ -628,24 +628,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.84.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-private-names-office", libvirt__network_name: "isoloom-private-names-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "private-names · web"
+      v.name = "private-names - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "private-names · web"
+      v.vmx["displayName"] = "private-names - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "private-names · web"
+      v.name = "private-names - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "private-names · web"
+      v.name = "private-names - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -778,24 +778,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.84.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-private-names-office", libvirt__network_name: "isoloom-private-names-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "private-names · client"
+      v.name = "private-names - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "private-names · client"
+      v.vmx["displayName"] = "private-names - client"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "private-names · client"
+      v.name = "private-names - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "private-names · client"
+      v.name = "private-names - client"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1476,15 +1476,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "private-names · web",
-          "vmware_desktop": "private-names · web",
+          "virtualbox": "private-names - web",
+          "vmware_desktop": "private-names - web",
           "hyperv": "private-names-web",
-          "parallels": "private-names · web",
+          "parallels": "private-names - web",
           "libvirt": "private-names_web",
-          "utm": "private-names · web",
+          "utm": "private-names - web",
           "vmware_esxi": "private-names-web"
         },
-        "boot_digest": "sha256:45fe3a36f98800f6ca6ad5f32a1849b2271bfc1730b235733283c475b8345fe7"
+        "boot_digest": "sha256:0c7ff80165dfaa894471b9bbe3ceda8150c81f031ff10346983d840df579ab83"
       },
       "ports": [
         {
@@ -1510,15 +1510,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "client",
         "vm_names": {
-          "virtualbox": "private-names · client",
-          "vmware_desktop": "private-names · client",
+          "virtualbox": "private-names - client",
+          "vmware_desktop": "private-names - client",
           "hyperv": "private-names-client",
-          "parallels": "private-names · client",
+          "parallels": "private-names - client",
           "libvirt": "private-names_client",
-          "utm": "private-names · client",
+          "utm": "private-names - client",
           "vmware_esxi": "private-names-client"
         },
-        "boot_digest": "sha256:b31ce656a1e8bae74d400369ada451a210570b293ba0d7e8978cf34e5672483a"
+        "boot_digest": "sha256:ed8bc606fb112a83287b23e1361c4250132b3c34cc6ef8f27be2c81facbf333e"
       }
     }
   ],

@@ -539,23 +539,23 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 3206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 3206), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "supplier-portal-api · isoloom-docker-host"
+    v.name = "supplier-portal-api - isoloom-docker-host"
     v.cpus = 2
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "supplier-portal-api · isoloom-docker-host"
+    v.vmx["displayName"] = "supplier-portal-api - isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "supplier-portal-api · isoloom-docker-host"
+    v.name = "supplier-portal-api - isoloom-docker-host"
     v.cpus = 2
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "supplier-portal-api · isoloom-docker-host"
+    v.name = "supplier-portal-api - isoloom-docker-host"
     v.cpus = 2
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1983,14 +1983,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "supplier-portal-api · isoloom-docker-host",
-          "vmware_desktop": "supplier-portal-api · isoloom-docker-host",
-          "parallels": "supplier-portal-api · isoloom-docker-host",
+          "virtualbox": "supplier-portal-api - isoloom-docker-host",
+          "vmware_desktop": "supplier-portal-api - isoloom-docker-host",
+          "parallels": "supplier-portal-api - isoloom-docker-host",
           "libvirt": "supplier-portal-api_default",
-          "utm": "supplier-portal-api · isoloom-docker-host",
+          "utm": "supplier-portal-api - isoloom-docker-host",
           "vmware_esxi": "supplier-portal-api-isoloom-docker-host"
         },
-        "boot_digest": "sha256:cc23b4e5d326a53fd387e6eb0f20e680a5236dfe9af0ed9735df8f9221ca7d4c"
+        "boot_digest": "sha256:67f347bae939466896b84dd54204682697c51adca375125afb16c131e34bb5d6"
       }
     },
     {

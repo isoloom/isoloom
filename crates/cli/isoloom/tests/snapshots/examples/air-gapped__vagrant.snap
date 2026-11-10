@@ -628,24 +628,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.62.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "air-gapped · store"
+      v.name = "air-gapped - store"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "air-gapped · store"
+      v.vmx["displayName"] = "air-gapped - store"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "air-gapped · store"
+      v.name = "air-gapped - store"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "air-gapped · store"
+      v.name = "air-gapped - store"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -814,24 +814,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.62.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "air-gapped · app"
+      v.name = "air-gapped - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "air-gapped · app"
+      v.vmx["displayName"] = "air-gapped - app"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "air-gapped · app"
+      v.name = "air-gapped - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "air-gapped · app"
+      v.name = "air-gapped - app"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1557,15 +1557,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "store",
         "vm_names": {
-          "virtualbox": "air-gapped · store",
-          "vmware_desktop": "air-gapped · store",
+          "virtualbox": "air-gapped - store",
+          "vmware_desktop": "air-gapped - store",
           "hyperv": "air-gapped-store",
-          "parallels": "air-gapped · store",
+          "parallels": "air-gapped - store",
           "libvirt": "air-gapped_store",
-          "utm": "air-gapped · store",
+          "utm": "air-gapped - store",
           "vmware_esxi": "air-gapped-store"
         },
-        "boot_digest": "sha256:890fd5ff99405592651726335ecbcdf401f0966b7e8461e0be6c793cda5daf92"
+        "boot_digest": "sha256:067b1f97b7c075be779c8aa698da505703adbf8d3576dec73b6914ba44b96463"
       },
       "ports": [
         {
@@ -1591,15 +1591,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "app",
         "vm_names": {
-          "virtualbox": "air-gapped · app",
-          "vmware_desktop": "air-gapped · app",
+          "virtualbox": "air-gapped - app",
+          "vmware_desktop": "air-gapped - app",
           "hyperv": "air-gapped-app",
-          "parallels": "air-gapped · app",
+          "parallels": "air-gapped - app",
           "libvirt": "air-gapped_app",
-          "utm": "air-gapped · app",
+          "utm": "air-gapped - app",
           "vmware_esxi": "air-gapped-app"
         },
-        "boot_digest": "sha256:3cd5f0e9934fa957a1554b6929d03c556a02d87a2d28696512e3d160bc3f2574"
+        "boot_digest": "sha256:8dba9f7789f0a2086f27aa2d420ead9d7cd739d7f37a0d1bb6408649e201d8eb"
       },
       "ports": [
         {

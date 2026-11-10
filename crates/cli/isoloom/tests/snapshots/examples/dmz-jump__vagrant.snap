@@ -635,24 +635,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-access", libvirt__network_name: "isoloom-dmz-jump-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump · isoloom-router"
+      v.name = "dmz-jump - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump · isoloom-router"
+      v.vmx["displayName"] = "dmz-jump - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump · isoloom-router"
+      v.name = "dmz-jump - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "dmz-jump · isoloom-router"
+      v.name = "dmz-jump - isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -789,24 +789,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-internal", libvirt__network_name: "isoloom-dmz-jump-internal", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump · gateway"
+      v.name = "dmz-jump - gateway"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump · gateway"
+      v.vmx["displayName"] = "dmz-jump - gateway"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump · gateway"
+      v.name = "dmz-jump - gateway"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "dmz-jump · gateway"
+      v.name = "dmz-jump - gateway"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -971,24 +971,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-internal", libvirt__network_name: "isoloom-dmz-jump-internal", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump · app"
+      v.name = "dmz-jump - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump · app"
+      v.vmx["displayName"] = "dmz-jump - app"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump · app"
+      v.name = "dmz-jump - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "dmz-jump · app"
+      v.name = "dmz-jump - app"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1198,24 +1198,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.20.30", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-internal", libvirt__network_name: "isoloom-dmz-jump-internal", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump · db"
+      v.name = "dmz-jump - db"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump · db"
+      v.vmx["displayName"] = "dmz-jump - db"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump · db"
+      v.name = "dmz-jump - db"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "dmz-jump · db"
+      v.name = "dmz-jump - db"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1425,24 +1425,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.30.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-access", libvirt__network_name: "isoloom-dmz-jump-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump · user"
+      v.name = "dmz-jump - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump · user"
+      v.vmx["displayName"] = "dmz-jump - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump · user"
+      v.name = "dmz-jump - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "dmz-jump · user"
+      v.name = "dmz-jump - user"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2391,15 +2391,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "dmz-jump · isoloom-router",
-          "vmware_desktop": "dmz-jump · isoloom-router",
+          "virtualbox": "dmz-jump - isoloom-router",
+          "vmware_desktop": "dmz-jump - isoloom-router",
           "hyperv": "dmz-jump-isoloom-router",
-          "parallels": "dmz-jump · isoloom-router",
+          "parallels": "dmz-jump - isoloom-router",
           "libvirt": "dmz-jump_isoloom-router",
-          "utm": "dmz-jump · isoloom-router",
+          "utm": "dmz-jump - isoloom-router",
           "vmware_esxi": "dmz-jump-isoloom-router"
         },
-        "boot_digest": "sha256:6d35c3f319b8201de7c05231a9a6085db15d4b1cb2bcb7f8d42aafb7692f080f"
+        "boot_digest": "sha256:3beb9796aa7c99345508ad2a90bcb61d93249151b220c731aeb2ae77cfc604e9"
       }
     },
     {
@@ -2418,15 +2418,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "gateway",
         "vm_names": {
-          "virtualbox": "dmz-jump · gateway",
-          "vmware_desktop": "dmz-jump · gateway",
+          "virtualbox": "dmz-jump - gateway",
+          "vmware_desktop": "dmz-jump - gateway",
           "hyperv": "dmz-jump-gateway",
-          "parallels": "dmz-jump · gateway",
+          "parallels": "dmz-jump - gateway",
           "libvirt": "dmz-jump_gateway",
-          "utm": "dmz-jump · gateway",
+          "utm": "dmz-jump - gateway",
           "vmware_esxi": "dmz-jump-gateway"
         },
-        "boot_digest": "sha256:764cd8e7479b403bfa734e172c737627b44f6286f22e4b5ebf3588de4a34bb1f"
+        "boot_digest": "sha256:c4df4f545cce94f115d77775fc5618f125f340e25d4f5cb62a162f0f8c82f787"
       },
       "ports": [
         {
@@ -2458,15 +2458,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "app",
         "vm_names": {
-          "virtualbox": "dmz-jump · app",
-          "vmware_desktop": "dmz-jump · app",
+          "virtualbox": "dmz-jump - app",
+          "vmware_desktop": "dmz-jump - app",
           "hyperv": "dmz-jump-app",
-          "parallels": "dmz-jump · app",
+          "parallels": "dmz-jump - app",
           "libvirt": "dmz-jump_app",
-          "utm": "dmz-jump · app",
+          "utm": "dmz-jump - app",
           "vmware_esxi": "dmz-jump-app"
         },
-        "boot_digest": "sha256:faa045e2e858b5b30f75ec8ee281af1771d8fcd1d290fe6c7b798ae9f6b02512"
+        "boot_digest": "sha256:a5c07ad1f85bd4ecdb8336783341548327f5cdcaa9df0dfe63adb22b7d9aa12a"
       },
       "ports": [
         {
@@ -2492,15 +2492,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "db",
         "vm_names": {
-          "virtualbox": "dmz-jump · db",
-          "vmware_desktop": "dmz-jump · db",
+          "virtualbox": "dmz-jump - db",
+          "vmware_desktop": "dmz-jump - db",
           "hyperv": "dmz-jump-db",
-          "parallels": "dmz-jump · db",
+          "parallels": "dmz-jump - db",
           "libvirt": "dmz-jump_db",
-          "utm": "dmz-jump · db",
+          "utm": "dmz-jump - db",
           "vmware_esxi": "dmz-jump-db"
         },
-        "boot_digest": "sha256:8586f7aba0920809bc5ef61eb1a0a327234436c34dae488bed359c14a155059d"
+        "boot_digest": "sha256:7139df8ced6dd350e50bcb9d9382f039af0da682c9a6a61defd8e0a486243261"
       },
       "ports": [
         {
@@ -2527,15 +2527,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "user",
         "vm_names": {
-          "virtualbox": "dmz-jump · user",
-          "vmware_desktop": "dmz-jump · user",
+          "virtualbox": "dmz-jump - user",
+          "vmware_desktop": "dmz-jump - user",
           "hyperv": "dmz-jump-user",
-          "parallels": "dmz-jump · user",
+          "parallels": "dmz-jump - user",
           "libvirt": "dmz-jump_user",
-          "utm": "dmz-jump · user",
+          "utm": "dmz-jump - user",
           "vmware_esxi": "dmz-jump-user"
         },
-        "boot_digest": "sha256:c5503073b9d207abae3f4e5762bce3952ca98212756a45e9a1412e9ca8066799"
+        "boot_digest": "sha256:42a83f9193b197e77d0ebe22c8f74bed6c5f3efd22c518f417ab28392f09cfd6"
       }
     }
   ],

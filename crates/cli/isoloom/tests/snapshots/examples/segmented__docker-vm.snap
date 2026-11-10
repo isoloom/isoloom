@@ -531,23 +531,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "segmented · isoloom-docker-host"
+    v.name = "segmented - isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "segmented · isoloom-docker-host"
+    v.vmx["displayName"] = "segmented - isoloom-docker-host"
     v.vmx["numvcpus"] = "3"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "segmented · isoloom-docker-host"
+    v.name = "segmented - isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "segmented · isoloom-docker-host"
+    v.name = "segmented - isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2032,14 +2032,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "segmented · isoloom-docker-host",
-          "vmware_desktop": "segmented · isoloom-docker-host",
-          "parallels": "segmented · isoloom-docker-host",
+          "virtualbox": "segmented - isoloom-docker-host",
+          "vmware_desktop": "segmented - isoloom-docker-host",
+          "parallels": "segmented - isoloom-docker-host",
           "libvirt": "segmented_default",
-          "utm": "segmented · isoloom-docker-host",
+          "utm": "segmented - isoloom-docker-host",
           "vmware_esxi": "segmented-isoloom-docker-host"
         },
-        "boot_digest": "sha256:ea98965d98b3673afcb956981c54926b19808323c3b430caca9b9233b5e3ec54"
+        "boot_digest": "sha256:7bda3c3a7e8a0e94a243420e1e9e6d28ef900e5a72f9e13333a825f0fef61b50"
       }
     },
     {

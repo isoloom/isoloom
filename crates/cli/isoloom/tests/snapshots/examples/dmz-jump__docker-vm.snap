@@ -533,23 +533,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "dmz-jump · isoloom-docker-host"
+    v.name = "dmz-jump - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "dmz-jump · isoloom-docker-host"
+    v.vmx["displayName"] = "dmz-jump - isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "dmz-jump · isoloom-docker-host"
+    v.name = "dmz-jump - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "dmz-jump · isoloom-docker-host"
+    v.name = "dmz-jump - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2148,14 +2148,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "dmz-jump · isoloom-docker-host",
-          "vmware_desktop": "dmz-jump · isoloom-docker-host",
-          "parallels": "dmz-jump · isoloom-docker-host",
+          "virtualbox": "dmz-jump - isoloom-docker-host",
+          "vmware_desktop": "dmz-jump - isoloom-docker-host",
+          "parallels": "dmz-jump - isoloom-docker-host",
           "libvirt": "dmz-jump_default",
-          "utm": "dmz-jump · isoloom-docker-host",
+          "utm": "dmz-jump - isoloom-docker-host",
           "vmware_esxi": "dmz-jump-isoloom-docker-host"
         },
-        "boot_digest": "sha256:4ddb07cf57882760c2808f675e5afcb0bff36ebe5f89b6b06cc0e224d27a455d"
+        "boot_digest": "sha256:797db136ddca54de7877b1f796c6c5d02c4ede2d7537125546fc74473d8ae158"
       }
     },
     {

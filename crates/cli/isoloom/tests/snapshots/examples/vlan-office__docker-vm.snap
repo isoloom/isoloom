@@ -533,23 +533,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "vlan-office · isoloom-docker-host"
+    v.name = "vlan-office - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "vlan-office · isoloom-docker-host"
+    v.vmx["displayName"] = "vlan-office - isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "vlan-office · isoloom-docker-host"
+    v.name = "vlan-office - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "vlan-office · isoloom-docker-host"
+    v.name = "vlan-office - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2086,14 +2086,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "vlan-office · isoloom-docker-host",
-          "vmware_desktop": "vlan-office · isoloom-docker-host",
-          "parallels": "vlan-office · isoloom-docker-host",
+          "virtualbox": "vlan-office - isoloom-docker-host",
+          "vmware_desktop": "vlan-office - isoloom-docker-host",
+          "parallels": "vlan-office - isoloom-docker-host",
           "libvirt": "vlan-office_default",
-          "utm": "vlan-office · isoloom-docker-host",
+          "utm": "vlan-office - isoloom-docker-host",
           "vmware_esxi": "vlan-office-isoloom-docker-host"
         },
-        "boot_digest": "sha256:376af81c8a7f93ad7c407d464cc4800c9445fd8c69e440acdee07fa621b75158"
+        "boot_digest": "sha256:c72146d3d342e016b2ebc6c72b8267f3d9ab2b81b5181485ffc13b40437857d8"
       }
     },
     {

@@ -266,13 +266,15 @@ fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
     env.controller.is_some() || !checks.controller.is_empty()
 }
 
-/// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> · <define>`,
-/// after its define name (a lab machine's, or one of Isoloom's own under `isoloom-`).
+/// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> - <define>`,
+/// after its define name (a lab machine's, or one of Isoloom's own under `isoloom-`). ASCII only:
+/// Vagrant interpolates it into its own messages, and a reload fails on a non-ASCII name
+/// (`incompatible character encodings: UTF-8 and ASCII-8BIT`).
 pub(crate) fn label(env: &Environment, define: &str) -> String {
-    format!("{} · {define}", env.name)
+    format!("{} - {define}", env.name)
 }
 
-/// A VM's name on ESXi and Hyper-V, which allow no `·`: `<env>-<define>`.
+/// A VM's name on ESXi and Hyper-V, with no space: `<env>-<define>`.
 pub(crate) fn vm_name(env: &Environment, define: &str) -> String {
     format!("{}-{define}", env.name)
 }

@@ -958,24 +958,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.86.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-several-addresses-office", libvirt__network_name: "isoloom-several-addresses-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "several-addresses · web"
+      v.name = "several-addresses - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "several-addresses · web"
+      v.vmx["displayName"] = "several-addresses - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "several-addresses · web"
+      v.name = "several-addresses - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "several-addresses · web"
+      v.name = "several-addresses - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1145,24 +1145,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.86.0.40", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-several-addresses-office", libvirt__network_name: "isoloom-several-addresses-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "several-addresses · block"
+      v.name = "several-addresses - block"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "several-addresses · block"
+      v.vmx["displayName"] = "several-addresses - block"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "several-addresses · block"
+      v.name = "several-addresses - block"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "several-addresses · block"
+      v.name = "several-addresses - block"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1347,24 +1347,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.86.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-several-addresses-office", libvirt__network_name: "isoloom-several-addresses-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "several-addresses · client"
+      v.name = "several-addresses - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "several-addresses · client"
+      v.vmx["displayName"] = "several-addresses - client"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "several-addresses · client"
+      v.name = "several-addresses - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "several-addresses · client"
+      v.name = "several-addresses - client"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2067,15 +2067,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "several-addresses · web",
-          "vmware_desktop": "several-addresses · web",
+          "virtualbox": "several-addresses - web",
+          "vmware_desktop": "several-addresses - web",
           "hyperv": "several-addresses-web",
-          "parallels": "several-addresses · web",
+          "parallels": "several-addresses - web",
           "libvirt": "several-addresses_web",
-          "utm": "several-addresses · web",
+          "utm": "several-addresses - web",
           "vmware_esxi": "several-addresses-web"
         },
-        "boot_digest": "sha256:413d8d81b6ce268e874a63b2f3b7b6cff4b9090c8ed0edf8e6f7b7fe34de3832"
+        "boot_digest": "sha256:75553c3d32305951a6f1c0ff1d04c6aec5b79bcf37e946b900e6f03477c6bcf1"
       },
       "ports": [
         {
@@ -2101,15 +2101,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "block",
         "vm_names": {
-          "virtualbox": "several-addresses · block",
-          "vmware_desktop": "several-addresses · block",
+          "virtualbox": "several-addresses - block",
+          "vmware_desktop": "several-addresses - block",
           "hyperv": "several-addresses-block",
-          "parallels": "several-addresses · block",
+          "parallels": "several-addresses - block",
           "libvirt": "several-addresses_block",
-          "utm": "several-addresses · block",
+          "utm": "several-addresses - block",
           "vmware_esxi": "several-addresses-block"
         },
-        "boot_digest": "sha256:9e67a82b53f83fe716a6ef78e78c716a61dfbcbe666e28439bf4f85add13488a"
+        "boot_digest": "sha256:35c4dc7d90e60abd313c17c1e774635b9c84e14218f17207c4c3fbaf98be9f1c"
       }
     },
     {
@@ -2127,15 +2127,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "client",
         "vm_names": {
-          "virtualbox": "several-addresses · client",
-          "vmware_desktop": "several-addresses · client",
+          "virtualbox": "several-addresses - client",
+          "vmware_desktop": "several-addresses - client",
           "hyperv": "several-addresses-client",
-          "parallels": "several-addresses · client",
+          "parallels": "several-addresses - client",
           "libvirt": "several-addresses_client",
-          "utm": "several-addresses · client",
+          "utm": "several-addresses - client",
           "vmware_esxi": "several-addresses-client"
         },
-        "boot_digest": "sha256:8f00632faa7e732bed752ecb4956ebcebe98e89d7acc7f1ba22202d0d3b81766"
+        "boot_digest": "sha256:0c6ea8efe55347e1de711ef489a868a74776a69edebc0bd8be1b185d221fa901"
       }
     }
   ],

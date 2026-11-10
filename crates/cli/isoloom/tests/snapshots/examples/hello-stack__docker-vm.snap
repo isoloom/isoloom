@@ -534,23 +534,23 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 8080, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "hello-stack · isoloom-docker-host"
+    v.name = "hello-stack - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "hello-stack · isoloom-docker-host"
+    v.vmx["displayName"] = "hello-stack - isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "hello-stack · isoloom-docker-host"
+    v.name = "hello-stack - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "hello-stack · isoloom-docker-host"
+    v.name = "hello-stack - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1984,14 +1984,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "hello-stack · isoloom-docker-host",
-          "vmware_desktop": "hello-stack · isoloom-docker-host",
-          "parallels": "hello-stack · isoloom-docker-host",
+          "virtualbox": "hello-stack - isoloom-docker-host",
+          "vmware_desktop": "hello-stack - isoloom-docker-host",
+          "parallels": "hello-stack - isoloom-docker-host",
           "libvirt": "hello-stack_default",
-          "utm": "hello-stack · isoloom-docker-host",
+          "utm": "hello-stack - isoloom-docker-host",
           "vmware_esxi": "hello-stack-isoloom-docker-host"
         },
-        "boot_digest": "sha256:665e3b958db9cf76f7336d0791dcc5bc2af6fee39e9a10b58b22f1f85382ad90"
+        "boot_digest": "sha256:0a677412798435107ff77ce652a00b69734b707621bb3d9ea9e67e32a18e9651"
       }
     },
     {

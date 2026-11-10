@@ -639,25 +639,25 @@ Vagrant.configure("2") do |config|
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "192.168.58.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · files01"
+      v.name = "mixed-office - files01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
       v.customize ["modifyvm", :id, "--tpm-type", "2.0"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "mixed-office · files01"
+      v.vmx["displayName"] = "mixed-office - files01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "3072"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "mixed-office · files01"
+      v.name = "mixed-office - files01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
     end
     m.vm.provider "utm" do |v|
-      v.name = "mixed-office · files01"
+      v.name = "mixed-office - files01"
       v.cpus = 2
       v.memory = 3072
     end
@@ -758,24 +758,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("intranet/web", 8083), host_ip: "127.0.0.1"
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · intranet"
+      v.name = "mixed-office - intranet"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "mixed-office · intranet"
+      v.vmx["displayName"] = "mixed-office - intranet"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "mixed-office · intranet"
+      v.name = "mixed-office - intranet"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "mixed-office · intranet"
+      v.name = "mixed-office - intranet"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -909,24 +909,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.58.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · isoloom-controller"
+      v.name = "mixed-office - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "mixed-office · isoloom-controller"
+      v.vmx["displayName"] = "mixed-office - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "mixed-office · isoloom-controller"
+      v.name = "mixed-office - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "mixed-office · isoloom-controller"
+      v.name = "mixed-office - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1632,15 +1632,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "files01",
         "vm_names": {
-          "virtualbox": "mixed-office · files01",
-          "vmware_desktop": "mixed-office · files01",
+          "virtualbox": "mixed-office - files01",
+          "vmware_desktop": "mixed-office - files01",
           "hyperv": "mixed-office-files01",
-          "parallels": "mixed-office · files01",
+          "parallels": "mixed-office - files01",
           "libvirt": "mixed-office_files01",
-          "utm": "mixed-office · files01",
+          "utm": "mixed-office - files01",
           "vmware_esxi": "mixed-office-files01"
         },
-        "boot_digest": "sha256:76f4bc2c6a46c9c7eca57f02c2c52a5317e26d8f83e939e5518081571fea9adf"
+        "boot_digest": "sha256:933eb9541f56775c2f2305d16299d324714446336c225e703664393d0561ecf2"
       },
       "ports": [
         {
@@ -1666,15 +1666,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "intranet",
         "vm_names": {
-          "virtualbox": "mixed-office · intranet",
-          "vmware_desktop": "mixed-office · intranet",
+          "virtualbox": "mixed-office - intranet",
+          "vmware_desktop": "mixed-office - intranet",
           "hyperv": "mixed-office-intranet",
-          "parallels": "mixed-office · intranet",
+          "parallels": "mixed-office - intranet",
           "libvirt": "mixed-office_intranet",
-          "utm": "mixed-office · intranet",
+          "utm": "mixed-office - intranet",
           "vmware_esxi": "mixed-office-intranet"
         },
-        "boot_digest": "sha256:0aa19a03233f57e5ab28fab13f2323758c0cd07252446d9bb85594869eb88b90"
+        "boot_digest": "sha256:1f99c8956cb52faa97f5db7445090d6deb54489ebbb2568e95e58499b17d9051"
       },
       "ports": [
         {
@@ -1703,15 +1703,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "mixed-office · isoloom-controller",
-          "vmware_desktop": "mixed-office · isoloom-controller",
+          "virtualbox": "mixed-office - isoloom-controller",
+          "vmware_desktop": "mixed-office - isoloom-controller",
           "hyperv": "mixed-office-isoloom-controller",
-          "parallels": "mixed-office · isoloom-controller",
+          "parallels": "mixed-office - isoloom-controller",
           "libvirt": "mixed-office_isoloom-controller",
-          "utm": "mixed-office · isoloom-controller",
+          "utm": "mixed-office - isoloom-controller",
           "vmware_esxi": "mixed-office-isoloom-controller"
         },
-        "boot_digest": "sha256:0dc16798c1a77cc3f4118dd00fc24afb7649b7a11934e0131feb85f29038bb8a"
+        "boot_digest": "sha256:9653fec2ba9a1ffc1d8e9d29036f0ed23820ac0c44802e1764dab8c868832a79"
       }
     }
   ],

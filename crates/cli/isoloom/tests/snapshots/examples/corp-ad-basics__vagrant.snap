@@ -630,24 +630,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · isoloom-router"
+      v.name = "corp-ad-basics - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · isoloom-router"
+      v.vmx["displayName"] = "corp-ad-basics - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · isoloom-router"
+      v.name = "corp-ad-basics - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics · isoloom-router"
+      v.name = "corp-ad-basics - isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -791,24 +791,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.20.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · dc01"
+      v.name = "corp-ad-basics - dc01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · dc01"
+      v.vmx["displayName"] = "corp-ad-basics - dc01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · dc01"
+      v.name = "corp-ad-basics - dc01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
     end
     m.vm.provider "utm" do |v|
-      v.name = "corp-ad-basics · dc01"
+      v.name = "corp-ad-basics - dc01"
       v.cpus = 2
       v.memory = 4096
     end
@@ -911,25 +911,25 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.20.21", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · ws-01"
+      v.name = "corp-ad-basics - ws-01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
       v.customize ["modifyvm", :id, "--tpm-type", "2.0"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · ws-01"
+      v.vmx["displayName"] = "corp-ad-basics - ws-01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · ws-01"
+      v.name = "corp-ad-basics - ws-01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
     end
     m.vm.provider "utm" do |v|
-      v.name = "corp-ad-basics · ws-01"
+      v.name = "corp-ad-basics - ws-01"
       v.cpus = 2
       v.memory = 4096
     end
@@ -1036,25 +1036,25 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.20.22", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · ws-02"
+      v.name = "corp-ad-basics - ws-02"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
       v.customize ["modifyvm", :id, "--tpm-type", "2.0"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · ws-02"
+      v.vmx["displayName"] = "corp-ad-basics - ws-02"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · ws-02"
+      v.name = "corp-ad-basics - ws-02"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
     end
     m.vm.provider "utm" do |v|
-      v.name = "corp-ad-basics · ws-02"
+      v.name = "corp-ad-basics - ws-02"
       v.cpus = 2
       v.memory = 4096
     end
@@ -1153,24 +1153,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · web01"
+      v.name = "corp-ad-basics - web01"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · web01"
+      v.vmx["displayName"] = "corp-ad-basics - web01"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · web01"
+      v.name = "corp-ad-basics - web01"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics · web01"
+      v.name = "corp-ad-basics - web01"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1337,24 +1337,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · isoloom-controller"
+      v.name = "corp-ad-basics - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · isoloom-controller"
+      v.vmx["displayName"] = "corp-ad-basics - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · isoloom-controller"
+      v.name = "corp-ad-basics - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics · isoloom-controller"
+      v.name = "corp-ad-basics - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2196,15 +2196,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · isoloom-router",
-          "vmware_desktop": "corp-ad-basics · isoloom-router",
+          "virtualbox": "corp-ad-basics - isoloom-router",
+          "vmware_desktop": "corp-ad-basics - isoloom-router",
           "hyperv": "corp-ad-basics-isoloom-router",
-          "parallels": "corp-ad-basics · isoloom-router",
+          "parallels": "corp-ad-basics - isoloom-router",
           "libvirt": "corp-ad-basics_isoloom-router",
-          "utm": "corp-ad-basics · isoloom-router",
+          "utm": "corp-ad-basics - isoloom-router",
           "vmware_esxi": "corp-ad-basics-isoloom-router"
         },
-        "boot_digest": "sha256:0c4ac100ec11b40cbd22abf5685c75e43a510be1d62216fbaa639b911dab1109"
+        "boot_digest": "sha256:d03456c95a44e9245988ddf5e19c7ba8afc6599c1ce783689f7633cbfe4046ee"
       }
     },
     {
@@ -2223,15 +2223,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "dc01",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · dc01",
-          "vmware_desktop": "corp-ad-basics · dc01",
+          "virtualbox": "corp-ad-basics - dc01",
+          "vmware_desktop": "corp-ad-basics - dc01",
           "hyperv": "corp-ad-basics-dc01",
-          "parallels": "corp-ad-basics · dc01",
+          "parallels": "corp-ad-basics - dc01",
           "libvirt": "corp-ad-basics_dc01",
-          "utm": "corp-ad-basics · dc01",
+          "utm": "corp-ad-basics - dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:86294ff2a6941135b0f0fad9dc2ddc7b27e220dc3489450c3605f5d0032f0372"
+        "boot_digest": "sha256:d42cc69afc59b00ff1bea6b0f134ed67b1be90ad4c826ec74d864faec61c9887"
       },
       "ports": [
         {
@@ -2276,15 +2276,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "ws-01",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · ws-01",
-          "vmware_desktop": "corp-ad-basics · ws-01",
+          "virtualbox": "corp-ad-basics - ws-01",
+          "vmware_desktop": "corp-ad-basics - ws-01",
           "hyperv": "corp-ad-basics-ws-01",
-          "parallels": "corp-ad-basics · ws-01",
+          "parallels": "corp-ad-basics - ws-01",
           "libvirt": "corp-ad-basics_ws-01",
-          "utm": "corp-ad-basics · ws-01",
+          "utm": "corp-ad-basics - ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:2d726beb91cc3d6eddbfee3f3e76323008bb9a5396cbf84a865046fbcec30c5b"
+        "boot_digest": "sha256:68f80318af3d26876bfa1bb83c1fc0484d8f6481a2db236a1579d9a88d31eb8d"
       }
     },
     {
@@ -2303,15 +2303,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "ws-02",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · ws-02",
-          "vmware_desktop": "corp-ad-basics · ws-02",
+          "virtualbox": "corp-ad-basics - ws-02",
+          "vmware_desktop": "corp-ad-basics - ws-02",
           "hyperv": "corp-ad-basics-ws-02",
-          "parallels": "corp-ad-basics · ws-02",
+          "parallels": "corp-ad-basics - ws-02",
           "libvirt": "corp-ad-basics_ws-02",
-          "utm": "corp-ad-basics · ws-02",
+          "utm": "corp-ad-basics - ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:0445f5b45fe6d8cbee7b8f2e9c509766c52eefe4db01b61f397b52c1a87c5644"
+        "boot_digest": "sha256:ff9b0bbf07af24407405e078fc41406d55743605f8ce4d329c477216aa54f274"
       }
     },
     {
@@ -2330,15 +2330,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web01",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · web01",
-          "vmware_desktop": "corp-ad-basics · web01",
+          "virtualbox": "corp-ad-basics - web01",
+          "vmware_desktop": "corp-ad-basics - web01",
           "hyperv": "corp-ad-basics-web01",
-          "parallels": "corp-ad-basics · web01",
+          "parallels": "corp-ad-basics - web01",
           "libvirt": "corp-ad-basics_web01",
-          "utm": "corp-ad-basics · web01",
+          "utm": "corp-ad-basics - web01",
           "vmware_esxi": "corp-ad-basics-web01"
         },
-        "boot_digest": "sha256:a8a4729a0a403871d4b0b79be415103a4ec46cfc46db70d55b0f7caa515ef250"
+        "boot_digest": "sha256:8c118d24560c417b7a44b6645224f3d1136cb25a7d6406466c8c222f652607ff"
       },
       "ports": [
         {
@@ -2364,15 +2364,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · isoloom-controller",
-          "vmware_desktop": "corp-ad-basics · isoloom-controller",
+          "virtualbox": "corp-ad-basics - isoloom-controller",
+          "vmware_desktop": "corp-ad-basics - isoloom-controller",
           "hyperv": "corp-ad-basics-isoloom-controller",
-          "parallels": "corp-ad-basics · isoloom-controller",
+          "parallels": "corp-ad-basics - isoloom-controller",
           "libvirt": "corp-ad-basics_isoloom-controller",
-          "utm": "corp-ad-basics · isoloom-controller",
+          "utm": "corp-ad-basics - isoloom-controller",
           "vmware_esxi": "corp-ad-basics-isoloom-controller"
         },
-        "boot_digest": "sha256:7151811b79f5cdb9ebf692b43d3da429724f49876dec7e7bab02c50f5398a317"
+        "boot_digest": "sha256:68a4461d2cfe102ab75fdf89a1b64298bbad515507cbd63a3bc62cddb726a303"
       }
     }
   ],

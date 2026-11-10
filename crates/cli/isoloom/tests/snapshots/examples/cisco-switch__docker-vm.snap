@@ -537,23 +537,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "cisco-switch · isoloom-docker-host"
+    v.name = "cisco-switch - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "cisco-switch · isoloom-docker-host"
+    v.vmx["displayName"] = "cisco-switch - isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "cisco-switch · isoloom-docker-host"
+    v.name = "cisco-switch - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "cisco-switch · isoloom-docker-host"
+    v.name = "cisco-switch - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1941,14 +1941,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "cisco-switch · isoloom-docker-host",
-          "vmware_desktop": "cisco-switch · isoloom-docker-host",
-          "parallels": "cisco-switch · isoloom-docker-host",
+          "virtualbox": "cisco-switch - isoloom-docker-host",
+          "vmware_desktop": "cisco-switch - isoloom-docker-host",
+          "parallels": "cisco-switch - isoloom-docker-host",
           "libvirt": "cisco-switch_default",
-          "utm": "cisco-switch · isoloom-docker-host",
+          "utm": "cisco-switch - isoloom-docker-host",
           "vmware_esxi": "cisco-switch-isoloom-docker-host"
         },
-        "boot_digest": "sha256:6e7a7e776a676209ec1ec298998e468015b3bd6b08846f93c04bff9cd456b17c"
+        "boot_digest": "sha256:3e571930e6940fb6cc42046bbc0ecd38dd39a87f732c3462398942157cd8f71d"
       }
     },
     {

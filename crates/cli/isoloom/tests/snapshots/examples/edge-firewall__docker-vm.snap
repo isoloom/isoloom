@@ -533,23 +533,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "edge-firewall · isoloom-docker-host"
+    v.name = "edge-firewall - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "edge-firewall · isoloom-docker-host"
+    v.vmx["displayName"] = "edge-firewall - isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "edge-firewall · isoloom-docker-host"
+    v.name = "edge-firewall - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "edge-firewall · isoloom-docker-host"
+    v.name = "edge-firewall - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2107,14 +2107,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "edge-firewall · isoloom-docker-host",
-          "vmware_desktop": "edge-firewall · isoloom-docker-host",
-          "parallels": "edge-firewall · isoloom-docker-host",
+          "virtualbox": "edge-firewall - isoloom-docker-host",
+          "vmware_desktop": "edge-firewall - isoloom-docker-host",
+          "parallels": "edge-firewall - isoloom-docker-host",
           "libvirt": "edge-firewall_default",
-          "utm": "edge-firewall · isoloom-docker-host",
+          "utm": "edge-firewall - isoloom-docker-host",
           "vmware_esxi": "edge-firewall-isoloom-docker-host"
         },
-        "boot_digest": "sha256:d2c48fa534b21e1ab2e1a952d85a209f41c8fd0359b187d5caff140efefd5829"
+        "boot_digest": "sha256:ad8ef59883f14609cbf32655d3f28a94827f0755116c9b4edb657a6a5d2dd54a"
       }
     },
     {

@@ -535,23 +535,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "cisco-dynamips · isoloom-docker-host"
+    v.name = "cisco-dynamips - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "cisco-dynamips · isoloom-docker-host"
+    v.vmx["displayName"] = "cisco-dynamips - isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "cisco-dynamips · isoloom-docker-host"
+    v.name = "cisco-dynamips - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "cisco-dynamips · isoloom-docker-host"
+    v.name = "cisco-dynamips - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1862,14 +1862,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "cisco-dynamips · isoloom-docker-host",
-          "vmware_desktop": "cisco-dynamips · isoloom-docker-host",
-          "parallels": "cisco-dynamips · isoloom-docker-host",
+          "virtualbox": "cisco-dynamips - isoloom-docker-host",
+          "vmware_desktop": "cisco-dynamips - isoloom-docker-host",
+          "parallels": "cisco-dynamips - isoloom-docker-host",
           "libvirt": "cisco-dynamips_default",
-          "utm": "cisco-dynamips · isoloom-docker-host",
+          "utm": "cisco-dynamips - isoloom-docker-host",
           "vmware_esxi": "cisco-dynamips-isoloom-docker-host"
         },
-        "boot_digest": "sha256:c17cb3672ee9eee05ff5bc3a0b7e042b2f944f1a44193d282335b8c99f2d553c"
+        "boot_digest": "sha256:dd379d9077b249744dd1d93f29f620c0ee70815bae778e3b0983928c9acdcee2"
       }
     },
     {

@@ -607,24 +607,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.60.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "hello-stack · cache"
+      v.name = "hello-stack - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "hello-stack · cache"
+      v.vmx["displayName"] = "hello-stack - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "hello-stack · cache"
+      v.name = "hello-stack - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "hello-stack · cache"
+      v.name = "hello-stack - cache"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -803,24 +803,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "hello-stack · web"
+      v.name = "hello-stack - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "hello-stack · web"
+      v.vmx["displayName"] = "hello-stack - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "hello-stack · web"
+      v.name = "hello-stack - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "hello-stack · web"
+      v.name = "hello-stack - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -991,24 +991,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.60.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "hello-stack · isoloom-controller"
+      v.name = "hello-stack - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "hello-stack · isoloom-controller"
+      v.vmx["displayName"] = "hello-stack - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "hello-stack · isoloom-controller"
+      v.name = "hello-stack - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "hello-stack · isoloom-controller"
+      v.name = "hello-stack - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE

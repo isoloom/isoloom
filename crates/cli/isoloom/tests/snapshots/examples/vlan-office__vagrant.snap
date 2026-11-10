@@ -636,24 +636,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-servers", libvirt__network_name: "isoloom-vlan-office-servers", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office · isoloom-router"
+      v.name = "vlan-office - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office · isoloom-router"
+      v.vmx["displayName"] = "vlan-office - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office · isoloom-router"
+      v.name = "vlan-office - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office · isoloom-router"
+      v.name = "vlan-office - isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -788,24 +788,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-servers", libvirt__network_name: "isoloom-vlan-office-servers", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office · intranet"
+      v.name = "vlan-office - intranet"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office · intranet"
+      v.vmx["displayName"] = "vlan-office - intranet"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office · intranet"
+      v.name = "vlan-office - intranet"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office · intranet"
+      v.name = "vlan-office - intranet"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1011,24 +1011,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan10", libvirt__network_name: "isoloom-vlan-office-office-vlan10", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office · staff"
+      v.name = "vlan-office - staff"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office · staff"
+      v.vmx["displayName"] = "vlan-office - staff"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office · staff"
+      v.name = "vlan-office - staff"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office · staff"
+      v.name = "vlan-office - staff"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1233,24 +1233,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office · guest"
+      v.name = "vlan-office - guest"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office · guest"
+      v.vmx["displayName"] = "vlan-office - guest"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office · guest"
+      v.name = "vlan-office - guest"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office · guest"
+      v.name = "vlan-office - guest"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1420,24 +1420,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.20.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office · admin"
+      v.name = "vlan-office - admin"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office · admin"
+      v.vmx["displayName"] = "vlan-office - admin"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office · admin"
+      v.name = "vlan-office - admin"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "vlan-office · admin"
+      v.name = "vlan-office - admin"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2377,15 +2377,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "vlan-office · isoloom-router",
-          "vmware_desktop": "vlan-office · isoloom-router",
+          "virtualbox": "vlan-office - isoloom-router",
+          "vmware_desktop": "vlan-office - isoloom-router",
           "hyperv": "vlan-office-isoloom-router",
-          "parallels": "vlan-office · isoloom-router",
+          "parallels": "vlan-office - isoloom-router",
           "libvirt": "vlan-office_isoloom-router",
-          "utm": "vlan-office · isoloom-router",
+          "utm": "vlan-office - isoloom-router",
           "vmware_esxi": "vlan-office-isoloom-router"
         },
-        "boot_digest": "sha256:6e95fa3ca383cdc298335c4080d47a6e13a717d95033c96815454548d831611c"
+        "boot_digest": "sha256:c524cda541c5ef97ad6bb59e8df1bb3006ab9a22ae9bee40e270af9674084e92"
       }
     },
     {
@@ -2403,15 +2403,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "intranet",
         "vm_names": {
-          "virtualbox": "vlan-office · intranet",
-          "vmware_desktop": "vlan-office · intranet",
+          "virtualbox": "vlan-office - intranet",
+          "vmware_desktop": "vlan-office - intranet",
           "hyperv": "vlan-office-intranet",
-          "parallels": "vlan-office · intranet",
+          "parallels": "vlan-office - intranet",
           "libvirt": "vlan-office_intranet",
-          "utm": "vlan-office · intranet",
+          "utm": "vlan-office - intranet",
           "vmware_esxi": "vlan-office-intranet"
         },
-        "boot_digest": "sha256:5cc56fb60ef7d3b753b1ab3e32a2df6ef95eb88bc7c9ce77d8dba0dbe4cc17e9"
+        "boot_digest": "sha256:a61368cb20898d0d722401630bc797a056ee3243028c511370e4a43782524057"
       },
       "ports": [
         {
@@ -2438,15 +2438,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "staff",
         "vm_names": {
-          "virtualbox": "vlan-office · staff",
-          "vmware_desktop": "vlan-office · staff",
+          "virtualbox": "vlan-office - staff",
+          "vmware_desktop": "vlan-office - staff",
           "hyperv": "vlan-office-staff",
-          "parallels": "vlan-office · staff",
+          "parallels": "vlan-office - staff",
           "libvirt": "vlan-office_staff",
-          "utm": "vlan-office · staff",
+          "utm": "vlan-office - staff",
           "vmware_esxi": "vlan-office-staff"
         },
-        "boot_digest": "sha256:d4f5e1f830b3301c3239256e0a94c2828da99a87c01f49be7a8d42be6d523e23"
+        "boot_digest": "sha256:523acef43872a895db88992a957ddb9ff482d432e2f45e5e776a89f635242ab5"
       }
     },
     {
@@ -2464,15 +2464,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "guest",
         "vm_names": {
-          "virtualbox": "vlan-office · guest",
-          "vmware_desktop": "vlan-office · guest",
+          "virtualbox": "vlan-office - guest",
+          "vmware_desktop": "vlan-office - guest",
           "hyperv": "vlan-office-guest",
-          "parallels": "vlan-office · guest",
+          "parallels": "vlan-office - guest",
           "libvirt": "vlan-office_guest",
-          "utm": "vlan-office · guest",
+          "utm": "vlan-office - guest",
           "vmware_esxi": "vlan-office-guest"
         },
-        "boot_digest": "sha256:e9dea7b261aeddf474d112cf89b24ca1e8afb54b3d0fb58062c6334da442ba5d"
+        "boot_digest": "sha256:e6a478af9c344c54453aa0140508c1d9f8544da7adf414fddaf2d7e0bdb1747e"
       }
     },
     {
@@ -2491,15 +2491,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "admin",
         "vm_names": {
-          "virtualbox": "vlan-office · admin",
-          "vmware_desktop": "vlan-office · admin",
+          "virtualbox": "vlan-office - admin",
+          "vmware_desktop": "vlan-office - admin",
           "hyperv": "vlan-office-admin",
-          "parallels": "vlan-office · admin",
+          "parallels": "vlan-office - admin",
           "libvirt": "vlan-office_admin",
-          "utm": "vlan-office · admin",
+          "utm": "vlan-office - admin",
           "vmware_esxi": "vlan-office-admin"
         },
-        "boot_digest": "sha256:a5cca0a4956046666f00fbbd80b3152642d8bc929b5916b115c5b2d55e646729"
+        "boot_digest": "sha256:052dbcae607f2d07b9f2acfe200f7ef072230604880dd4eaba35839df7c578aa"
       }
     }
   ],

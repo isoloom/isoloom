@@ -350,14 +350,14 @@
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "web-portal · isoloom-docker-host",
-          "vmware_desktop": "web-portal · isoloom-docker-host",
-          "parallels": "web-portal · isoloom-docker-host",
+          "virtualbox": "web-portal - isoloom-docker-host",
+          "vmware_desktop": "web-portal - isoloom-docker-host",
+          "parallels": "web-portal - isoloom-docker-host",
           "libvirt": "web-portal_default",
-          "utm": "web-portal · isoloom-docker-host",
+          "utm": "web-portal - isoloom-docker-host",
           "vmware_esxi": "web-portal-isoloom-docker-host"
         },
-        "boot_digest": "sha256:56df8a22a8dca8e7f29a1d10a1ecc62f84a9ff63eb3b0fe770cd126706079ead"
+        "boot_digest": "sha256:874bf11f6519e0d85efdd4682b591067b457f3fb34c02f4fa771f71a64dc753d"
       }
     },
     {

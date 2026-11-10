@@ -533,23 +533,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "shared-files · isoloom-docker-host"
+    v.name = "shared-files - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "shared-files · isoloom-docker-host"
+    v.vmx["displayName"] = "shared-files - isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "shared-files · isoloom-docker-host"
+    v.name = "shared-files - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "shared-files · isoloom-docker-host"
+    v.name = "shared-files - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1895,14 +1895,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "shared-files · isoloom-docker-host",
-          "vmware_desktop": "shared-files · isoloom-docker-host",
-          "parallels": "shared-files · isoloom-docker-host",
+          "virtualbox": "shared-files - isoloom-docker-host",
+          "vmware_desktop": "shared-files - isoloom-docker-host",
+          "parallels": "shared-files - isoloom-docker-host",
           "libvirt": "shared-files_default",
-          "utm": "shared-files · isoloom-docker-host",
+          "utm": "shared-files - isoloom-docker-host",
           "vmware_esxi": "shared-files-isoloom-docker-host"
         },
-        "boot_digest": "sha256:44bbb6b34fe328bf76f21a7faf585b708d7e6ba157097df6459665f8c1e8a764"
+        "boot_digest": "sha256:a97f9a6eac316c8d51945470c13ca71db22b5e451e986fd9125cf2a1c9e8d390"
       }
     },
     {

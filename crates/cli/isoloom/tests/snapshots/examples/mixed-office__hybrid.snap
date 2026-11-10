@@ -650,25 +650,25 @@ Vagrant.configure("2") do |config|
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "192.168.58.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · files01"
+      v.name = "mixed-office - files01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
       v.customize ["modifyvm", :id, "--tpm-type", "2.0"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "mixed-office · files01"
+      v.vmx["displayName"] = "mixed-office - files01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "3072"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "mixed-office · files01"
+      v.name = "mixed-office - files01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
     end
     m.vm.provider "utm" do |v|
-      v.name = "mixed-office · files01"
+      v.name = "mixed-office - files01"
       v.cpus = 2
       v.memory = 3072
     end
@@ -768,24 +768,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.58.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · isoloom-controller"
+      v.name = "mixed-office - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "mixed-office · isoloom-controller"
+      v.vmx["displayName"] = "mixed-office - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "mixed-office · isoloom-controller"
+      v.name = "mixed-office - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "mixed-office · isoloom-controller"
+      v.name = "mixed-office - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -943,7 +943,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 8083, host: 8083, host_ip: "127.0.0.1"
     m.vm.network "private_network", ip: "192.168.58.253", auto_config: false, mac: "0A15574BB300", virtualbox__intnet: "isoloom-mixed-office-office"
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · isoloom-docker-host"
+      v.name = "mixed-office - isoloom-docker-host"
       v.cpus = 2
       v.memory = 2048
       v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]

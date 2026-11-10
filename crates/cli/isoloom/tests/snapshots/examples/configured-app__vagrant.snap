@@ -638,24 +638,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/http", 8086), host_ip: "127.0.0.1"
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-app · web"
+      v.name = "configured-app - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-app · web"
+      v.vmx["displayName"] = "configured-app - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-app · web"
+      v.name = "configured-app - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "configured-app · web"
+      v.name = "configured-app - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1186,24 +1186,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.66.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-app · api"
+      v.name = "configured-app - api"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-app · api"
+      v.vmx["displayName"] = "configured-app - api"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-app · api"
+      v.name = "configured-app - api"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "configured-app · api"
+      v.name = "configured-app - api"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1587,24 +1587,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.66.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-app · isoloom-controller"
+      v.name = "configured-app - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-app · isoloom-controller"
+      v.vmx["displayName"] = "configured-app - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-app · isoloom-controller"
+      v.name = "configured-app - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "configured-app · isoloom-controller"
+      v.name = "configured-app - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -2395,15 +2395,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "configured-app · web",
-          "vmware_desktop": "configured-app · web",
+          "virtualbox": "configured-app - web",
+          "vmware_desktop": "configured-app - web",
           "hyperv": "configured-app-web",
-          "parallels": "configured-app · web",
+          "parallels": "configured-app - web",
           "libvirt": "configured-app_web",
-          "utm": "configured-app · web",
+          "utm": "configured-app - web",
           "vmware_esxi": "configured-app-web"
         },
-        "boot_digest": "sha256:a24a019321e90789b5f13849979fc7d110b068f9379708a9175cdd559eae67f5"
+        "boot_digest": "sha256:06a877812da21988b861e81f87c1b445af8bc99ed02422e718715d1935b0c8b7"
       },
       "ports": [
         {
@@ -2434,15 +2434,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "api",
         "vm_names": {
-          "virtualbox": "configured-app · api",
-          "vmware_desktop": "configured-app · api",
+          "virtualbox": "configured-app - api",
+          "vmware_desktop": "configured-app - api",
           "hyperv": "configured-app-api",
-          "parallels": "configured-app · api",
+          "parallels": "configured-app - api",
           "libvirt": "configured-app_api",
-          "utm": "configured-app · api",
+          "utm": "configured-app - api",
           "vmware_esxi": "configured-app-api"
         },
-        "boot_digest": "sha256:ea3217776330e8dfdb676381bfb21e8b8c6b80f25fb9141503eea8ea8dcfe759"
+        "boot_digest": "sha256:56ffdfc947901d2034437301fc03372aab472eae4bd579c0ba2a11f2d584efaf"
       },
       "ports": [
         {
@@ -2472,15 +2472,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "configured-app · isoloom-controller",
-          "vmware_desktop": "configured-app · isoloom-controller",
+          "virtualbox": "configured-app - isoloom-controller",
+          "vmware_desktop": "configured-app - isoloom-controller",
           "hyperv": "configured-app-isoloom-controller",
-          "parallels": "configured-app · isoloom-controller",
+          "parallels": "configured-app - isoloom-controller",
           "libvirt": "configured-app_isoloom-controller",
-          "utm": "configured-app · isoloom-controller",
+          "utm": "configured-app - isoloom-controller",
           "vmware_esxi": "configured-app-isoloom-controller"
         },
-        "boot_digest": "sha256:371ff3f2051bddc9ee992927a71bee5e3e428bfa59c639362f63a4cc279bf4fd"
+        "boot_digest": "sha256:88f755a5d8da0b91a04cb6bbf3858cc0d2644ce346ee6d0b2f093848b86f0180"
       }
     }
   ],

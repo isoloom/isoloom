@@ -642,24 +642,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.20.0.32", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-lab", libvirt__network_name: "isoloom-supplier-portal-api-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "supplier-portal-api · database"
+      v.name = "supplier-portal-api - database"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "supplier-portal-api · database"
+      v.vmx["displayName"] = "supplier-portal-api - database"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "supplier-portal-api · database"
+      v.name = "supplier-portal-api - database"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "supplier-portal-api · database"
+      v.name = "supplier-portal-api - database"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -861,24 +861,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 3206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 3206), host_ip: "127.0.0.1"
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "supplier-portal-api · web"
+      v.name = "supplier-portal-api - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "supplier-portal-api · web"
+      v.vmx["displayName"] = "supplier-portal-api - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "supplier-portal-api · web"
+      v.name = "supplier-portal-api - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "supplier-portal-api · web"
+      v.name = "supplier-portal-api - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1013,24 +1013,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.20.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-lab", libvirt__network_name: "isoloom-supplier-portal-api-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "supplier-portal-api · isoloom-controller"
+      v.name = "supplier-portal-api - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "supplier-portal-api · isoloom-controller"
+      v.vmx["displayName"] = "supplier-portal-api - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "supplier-portal-api · isoloom-controller"
+      v.name = "supplier-portal-api - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "supplier-portal-api · isoloom-controller"
+      v.name = "supplier-portal-api - isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1856,15 +1856,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "database",
         "vm_names": {
-          "virtualbox": "supplier-portal-api · database",
-          "vmware_desktop": "supplier-portal-api · database",
+          "virtualbox": "supplier-portal-api - database",
+          "vmware_desktop": "supplier-portal-api - database",
           "hyperv": "supplier-portal-api-database",
-          "parallels": "supplier-portal-api · database",
+          "parallels": "supplier-portal-api - database",
           "libvirt": "supplier-portal-api_database",
-          "utm": "supplier-portal-api · database",
+          "utm": "supplier-portal-api - database",
           "vmware_esxi": "supplier-portal-api-database"
         },
-        "boot_digest": "sha256:5042392ba300da838eb48c783a3e5895091d6ac868e3982d9fa9a9e1d23bcc68"
+        "boot_digest": "sha256:bed99d382afa127f4b7d6244894072852a2fc33666e402fb43a788e05a1ba908"
       },
       "ports": [
         {
@@ -1890,15 +1890,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "supplier-portal-api · web",
-          "vmware_desktop": "supplier-portal-api · web",
+          "virtualbox": "supplier-portal-api - web",
+          "vmware_desktop": "supplier-portal-api - web",
           "hyperv": "supplier-portal-api-web",
-          "parallels": "supplier-portal-api · web",
+          "parallels": "supplier-portal-api - web",
           "libvirt": "supplier-portal-api_web",
-          "utm": "supplier-portal-api · web",
+          "utm": "supplier-portal-api - web",
           "vmware_esxi": "supplier-portal-api-web"
         },
-        "boot_digest": "sha256:c71cced9889b0fb92056b519e4a2ed964e1e3be57dbb38cfd7dde5158bc37e21"
+        "boot_digest": "sha256:939f543d68bee7ae84cfaf6a6170f238da9df96c214edb664db5ffef80b5793a"
       },
       "ports": [
         {
@@ -1927,15 +1927,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "supplier-portal-api · isoloom-controller",
-          "vmware_desktop": "supplier-portal-api · isoloom-controller",
+          "virtualbox": "supplier-portal-api - isoloom-controller",
+          "vmware_desktop": "supplier-portal-api - isoloom-controller",
           "hyperv": "supplier-portal-api-isoloom-controller",
-          "parallels": "supplier-portal-api · isoloom-controller",
+          "parallels": "supplier-portal-api - isoloom-controller",
           "libvirt": "supplier-portal-api_isoloom-controller",
-          "utm": "supplier-portal-api · isoloom-controller",
+          "utm": "supplier-portal-api - isoloom-controller",
           "vmware_esxi": "supplier-portal-api-isoloom-controller"
         },
-        "boot_digest": "sha256:0af7920536b853b6e64ef7ba897a9886b767cfe98041842e8c3ce14004d6c47c"
+        "boot_digest": "sha256:78aa165f96512d7f47e55c121d6e24f7644ea98fa0609d1e014782a660c770af"
       }
     }
   ],

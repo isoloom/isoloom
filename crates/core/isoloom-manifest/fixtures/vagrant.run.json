@@ -399,15 +399,15 @@
       "native": {
         "vagrant": "dc01",
         "vm_names": {
-          "virtualbox": "mini-ad · dc01",
-          "vmware_desktop": "mini-ad · dc01",
+          "virtualbox": "mini-ad - dc01",
+          "vmware_desktop": "mini-ad - dc01",
           "hyperv": "mini-ad-dc01",
-          "parallels": "mini-ad · dc01",
+          "parallels": "mini-ad - dc01",
           "libvirt": "mini-ad_dc01",
-          "utm": "mini-ad · dc01",
+          "utm": "mini-ad - dc01",
           "vmware_esxi": "mini-ad-dc01"
         },
-        "boot_digest": "sha256:2ecc39573d289b0d32b781c743631988cab7e2fda1d56c614b5a1a9e7d5f5834"
+        "boot_digest": "sha256:59b21f803ce290bcfd4ab8cf33f77d34f65ca7db8c5dcf3a9c0e0590a0e5ab52"
       },
       "ports": [
         {
@@ -440,15 +440,15 @@
       "native": {
         "vagrant": "ws01",
         "vm_names": {
-          "virtualbox": "mini-ad · ws01",
-          "vmware_desktop": "mini-ad · ws01",
+          "virtualbox": "mini-ad - ws01",
+          "vmware_desktop": "mini-ad - ws01",
           "hyperv": "mini-ad-ws01",
-          "parallels": "mini-ad · ws01",
+          "parallels": "mini-ad - ws01",
           "libvirt": "mini-ad_ws01",
-          "utm": "mini-ad · ws01",
+          "utm": "mini-ad - ws01",
           "vmware_esxi": "mini-ad-ws01"
         },
-        "boot_digest": "sha256:d7d7212adcacfdf8b6dc62c0ef3928e0fd8f3fce4d6fab41c8f730653999dd93"
+        "boot_digest": "sha256:e34ae910b43faf805049976e5a01c4e068a50bba7e46308726d4bdf8118c794d"
       }
     },
     {
@@ -464,15 +464,15 @@
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "mini-ad · isoloom-controller",
-          "vmware_desktop": "mini-ad · isoloom-controller",
+          "virtualbox": "mini-ad - isoloom-controller",
+          "vmware_desktop": "mini-ad - isoloom-controller",
           "hyperv": "mini-ad-isoloom-controller",
-          "parallels": "mini-ad · isoloom-controller",
+          "parallels": "mini-ad - isoloom-controller",
           "libvirt": "mini-ad_isoloom-controller",
-          "utm": "mini-ad · isoloom-controller",
+          "utm": "mini-ad - isoloom-controller",
           "vmware_esxi": "mini-ad-isoloom-controller"
         },
-        "boot_digest": "sha256:4f4040d977cb2d2128d738a91415855ed791e7fdf869b5dfdb7ca4c0a12456f9"
+        "boot_digest": "sha256:d477c1c9ac022575ba4660ed44a22aae878920ba3a6915037eccdde4dc218a3c"
       }
     }
   ],

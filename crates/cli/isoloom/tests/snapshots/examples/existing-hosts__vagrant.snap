@@ -841,24 +841,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.1.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-existing-hosts-lab", libvirt__network_name: "isoloom-existing-hosts-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "existing-hosts · web"
+      v.name = "existing-hosts - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "existing-hosts · web"
+      v.vmx["displayName"] = "existing-hosts - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "existing-hosts · web"
+      v.name = "existing-hosts - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "existing-hosts · web"
+      v.name = "existing-hosts - web"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -991,24 +991,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.1.21", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-existing-hosts-lab", libvirt__network_name: "isoloom-existing-hosts-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "existing-hosts · cache"
+      v.name = "existing-hosts - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "existing-hosts · cache"
+      v.vmx["displayName"] = "existing-hosts - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "existing-hosts · cache"
+      v.name = "existing-hosts - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "existing-hosts · cache"
+      v.name = "existing-hosts - cache"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1695,15 +1695,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "web",
         "vm_names": {
-          "virtualbox": "existing-hosts · web",
-          "vmware_desktop": "existing-hosts · web",
+          "virtualbox": "existing-hosts - web",
+          "vmware_desktop": "existing-hosts - web",
           "hyperv": "existing-hosts-web",
-          "parallels": "existing-hosts · web",
+          "parallels": "existing-hosts - web",
           "libvirt": "existing-hosts_web",
-          "utm": "existing-hosts · web",
+          "utm": "existing-hosts - web",
           "vmware_esxi": "existing-hosts-web"
         },
-        "boot_digest": "sha256:007598ca625a16762fcc74189e8dad5cbe22ac307751de489917ca9ed6e8f257"
+        "boot_digest": "sha256:15207d605545ad94e3a560531cbcd872dc3bbd27a266c4b120b8732ddd59b672"
       },
       "ports": [
         {
@@ -1729,15 +1729,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "cache",
         "vm_names": {
-          "virtualbox": "existing-hosts · cache",
-          "vmware_desktop": "existing-hosts · cache",
+          "virtualbox": "existing-hosts - cache",
+          "vmware_desktop": "existing-hosts - cache",
           "hyperv": "existing-hosts-cache",
-          "parallels": "existing-hosts · cache",
+          "parallels": "existing-hosts - cache",
           "libvirt": "existing-hosts_cache",
-          "utm": "existing-hosts · cache",
+          "utm": "existing-hosts - cache",
           "vmware_esxi": "existing-hosts-cache"
         },
-        "boot_digest": "sha256:a5e8f8169f260f2e6f4fb0dd2daf84cf0a0665505424dc7bf74bd872f342afbb"
+        "boot_digest": "sha256:cff1485f23cb98f953c21c2716b0d058a85b1695f77a5b04f1d4ccf38a0b8123"
       },
       "ports": [
         {

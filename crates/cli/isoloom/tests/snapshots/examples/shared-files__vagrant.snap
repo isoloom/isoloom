@@ -629,24 +629,24 @@ Vagrant.configure("2") do |config|
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.disk :disk, name: "data", size: "50GB"
     m.vm.provider "virtualbox" do |v|
-      v.name = "shared-files · writer"
+      v.name = "shared-files - writer"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "shared-files · writer"
+      v.vmx["displayName"] = "shared-files - writer"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "shared-files · writer"
+      v.name = "shared-files - writer"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "shared-files · writer"
+      v.name = "shared-files - writer"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -822,24 +822,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.84.0.11", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-shared-files-app", libvirt__network_name: "isoloom-shared-files-app", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "shared-files · reader"
+      v.name = "shared-files - reader"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "shared-files · reader"
+      v.vmx["displayName"] = "shared-files - reader"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "shared-files · reader"
+      v.name = "shared-files - reader"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "shared-files · reader"
+      v.name = "shared-files - reader"
       v.cpus = 1
       v.memory = 1024
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1530,15 +1530,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "writer",
         "vm_names": {
-          "virtualbox": "shared-files · writer",
-          "vmware_desktop": "shared-files · writer",
+          "virtualbox": "shared-files - writer",
+          "vmware_desktop": "shared-files - writer",
           "hyperv": "shared-files-writer",
-          "parallels": "shared-files · writer",
+          "parallels": "shared-files - writer",
           "libvirt": "shared-files_writer",
-          "utm": "shared-files · writer",
+          "utm": "shared-files - writer",
           "vmware_esxi": "shared-files-writer"
         },
-        "boot_digest": "sha256:dcca0f68b3ae0a906e8a6443894cb93ce97252fd13752ff4e871dfedbd40ad54"
+        "boot_digest": "sha256:6c5e7c3a23bdd4c64775df8fd7ad60ff2c2f1b0779d02c99a872856d3dfd5ff1"
       }
     },
     {
@@ -1556,15 +1556,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "reader",
         "vm_names": {
-          "virtualbox": "shared-files · reader",
-          "vmware_desktop": "shared-files · reader",
+          "virtualbox": "shared-files - reader",
+          "vmware_desktop": "shared-files - reader",
           "hyperv": "shared-files-reader",
-          "parallels": "shared-files · reader",
+          "parallels": "shared-files - reader",
           "libvirt": "shared-files_reader",
-          "utm": "shared-files · reader",
+          "utm": "shared-files - reader",
           "vmware_esxi": "shared-files-reader"
         },
-        "boot_digest": "sha256:9a94ecbb8c1d0a2c1669d30cc79b317001b937107420f9d5d78465414591fd49"
+        "boot_digest": "sha256:a50472d4bb1b2358bf44690b365f217bb41eb7434942165b0d48348ed7cfce3f"
       }
     }
   ],

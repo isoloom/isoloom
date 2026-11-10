@@ -86,7 +86,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   design examples under `crates/core/isoloom-plan/tests/spec-examples/`, the spelling list is
   `.typos.toml`.
 - **Breaking: Isoloom's own Vagrant VMs are named after their define names**, under the
-  `isoloom-` prefix a lab machine can't take: their display names (`<lab> · isoloom-controller`,
+  `isoloom-` prefix a lab machine can't take: their display names (`<lab> - isoloom-controller`,
   `isoloom-router`, `isoloom-tool-shell`, `isoloom-docker-host` for the docker-vm and hybrid
   hosts; were `controller`, `router`, `tool shell`, `docker`, `containers`), the controller's
   check step (`check-isoloom-controller`, was `check-controller`) and its runner
@@ -534,6 +534,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **`isoloom import vagrant`'s help says the Vagrantfile's code runs**: it said nothing is
   created, but Ruby runs the whole file on this computer (only `Vagrant` is a stand-in), so
   import only a Vagrantfile you trust.
+
+- **A Vagrant VM's display name is ASCII**: `<lab> - <machine>` (was `<lab> · <machine>`) on
+  VirtualBox, VMware, Parallels and UTM, and the docker-vm and hybrid hosts. Vagrant interpolates
+  the name into its own messages, and `vagrant reload` failed on the `·` (`incompatible character
+  encodings: UTF-8 and ASCII-8BIT`, seen on UTM) after a first `up` had passed.
 
 ### Removed
 

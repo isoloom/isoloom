@@ -80,7 +80,7 @@ fn a_lab_machine_named_as_one_of_isoloom_s_own_vms_stands_beside_it_on_vagrant()
     let distinct: BTreeSet<_> = names.iter().collect();
     assert_eq!(distinct.len(), names.len(), "a provider shows each VM under its own name: {names:?}");
     for own in ["isoloom-router", "isoloom-tool-shell", "isoloom-controller"] {
-        assert!(named(&names, &format!("names · {own}")), "{own}: {names:?}");
+        assert!(named(&names, &format!("names - {own}")), "{own}: {names:?}");
         assert!(named(&names, &format!("names-{own}")), "{own}: {names:?}");
     }
     let manifest = isoloom_manifest::parse(file(&files, "vagrant/run.json")?)?;
@@ -101,7 +101,7 @@ fn a_lab_machine_named_as_one_of_isoloom_s_own_vms_stands_beside_it_on_hybrid() 
     let lab = valid(HYBRID)?;
     let files = generate(&lab, Target::Hybrid)?;
     let vagrantfile = file(&files, "hybrid/Vagrantfile")?;
-    assert!(vagrantfile.contains("v.name = \"names · isoloom-docker-host\""), "{vagrantfile}");
+    assert!(vagrantfile.contains("v.name = \"names - isoloom-docker-host\""), "{vagrantfile}");
     let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
     assert!(paths.iter().any(|p| p.ends_with("hybrid/checks/controller.sh")), "{paths:?}");
     assert!(paths.iter().any(|p| p.ends_with("hybrid/checks/isoloom-controller.sh")), "{paths:?}");
@@ -120,7 +120,7 @@ machines:
     )?;
     let files = generate(&lab, Target::DockerVm)?;
     let names = vm_names(&files, "docker-vm")?;
-    assert!(named(&names, "names · isoloom-docker-host"), "{names:?}");
+    assert!(named(&names, "names - isoloom-docker-host"), "{names:?}");
     assert!(named(&names, "names-isoloom-docker-host"), "{names:?}");
     Ok(())
 }
