@@ -351,6 +351,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A tag from the environment or a `-s` is its text as written**: `ISOLOOM_TAGS__ACCOUNT=0x1F`
+  was read as YAML, the tag `31` (`1e3` was `1000`).
 - **Docker: a network appliance joins the existing networks it is on** (`overrides.docker.networks.<n>.external`),
   at its fixed address and after its own interfaces (the next `ethN`); its interfaces replaced
   every network, so it was left off them silently.

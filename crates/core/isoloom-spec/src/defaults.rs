@@ -170,7 +170,7 @@ pub fn load(from: &Sources) -> Result<Resolved> {
     for (k, v) in from_env(from.host.text_vars().into_iter()) {
         layers.push(Layer {
             source: format!("environment ISOLOOM_{}", k.replace('.', "__").to_uppercase()),
-            value: at_path(&k, scalar(&v)),
+            value: at_path(&k, typed(&k, &v)),
         });
     }
     for s in from.sets {
@@ -178,7 +178,7 @@ pub fn load(from: &Sources) -> Result<Resolved> {
         let Some(k) = k.strip_prefix("defaults.") else { continue };
         layers.push(Layer {
             source: format!("-s {s}"),
-            value: at_path(k, scalar(v)),
+            value: at_path(k, typed(k, v)),
         });
     }
     resolve(&layers)
@@ -250,9 +250,14 @@ pub fn parse_set(s: &str) -> Result<(&str, &str)> {
     Ok((k, v))
 }
 
-/// A value as YAML would read it (`3` a number, `true` a boolean, else text).
+/// The value `text` gives the key `key` from the environment or a `-s`: a tag's as written (a
+/// tag is text, so `ISOLOOM_TAGS__ACCOUNT=0x1F` is `0x1F`, not 31), any other as YAML reads it
+/// (`3` a number, `true` a boolean, else text).
 #[must_use]
-pub(crate) fn scalar(text: &str) -> Value {
+pub(crate) fn typed(key: &str, text: &str) -> Value {
+    if key.split('.').next() == Some("tags") {
+        return Value::String(text.to_owned());
+    }
     serde_yaml_ng::from_str(text).unwrap_or_else(|_| Value::String(text.to_owned()))
 }
 
@@ -326,7 +331,7 @@ pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> 
         if k.starts_with("defaults.") {
             continue;
         }
-        merge(&mut doc, &at_path(k, scalar(v)));
+        merge(&mut doc, &at_path(k, typed(k, v)));
         any = true;
     }
     if !any {
@@ -431,10 +436,33 @@ mod tests {
     }
 
     #[test]
+    fn a_tag_from_the_environment_or_a_set_keeps_its_text() {
+        let env = from_env(
+            [
+                ("ISOLOOM_TAGS__ACCOUNT".to_owned(), "0x1F".to_owned()),
+                ("ISOLOOM_TAGS__RUN".to_owned(), "1e3".to_owned()),
+            ]
+            .into_iter(),
+        );
+        let layers: Vec<Layer> = env
+            .iter()
+            .map(|(k, v)| Layer {
+                source: "environment".into(),
+                value: at_path(k, typed(k, v)),
+            })
+            .collect();
+        let tags = resolve(&layers).unwrap().defaults.tags;
+        assert_eq!((tags["account"].as_str(), tags["run"].as_str()), ("0x1F", "1e3"));
+        let spec = override_spec_with("version: 1\n", None, &["tags.account=0x1F".to_owned(), "x.port=8080".to_owned()]).unwrap();
+        assert!(spec.contains("account: '0x1F'"), "a tag stays text: {spec}");
+        assert!(spec.contains("port: 8080"), "another value is as YAML reads it: {spec}");
+    }
+
+    #[test]
     fn a_tag_set_as_a_number_or_a_flag_is_its_text() {
         let layer = |key: &str, value: &str| Layer {
             source: format!("-s defaults.{key}"),
-            value: at_path(key, scalar(value)),
+            value: at_path(key, typed(key, value)),
         };
         let resolved = resolve(&[layer("tags.cost", "12"), layer("tags.billable", "true"), layer("tags.team", "ops")]).unwrap();
         let tags: Vec<(&str, &str)> = resolved.defaults.tags.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();

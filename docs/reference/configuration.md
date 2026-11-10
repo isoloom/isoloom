@@ -31,9 +31,9 @@ The keys:
 
 An unknown key is an error. Only the `images`, `vagrant`, `cloud` and `tags` sections are read
 from the environment (`ISOLOOM_TAGS__TEAM=platform`; a variable's name is read lowercased, so a
-tag key with capitals or a dot is set in a file). A tag's value is text; a number or
-`true`/`false` is read as its text (`-s defaults.tags.cost-center=1234`), so quote one whose form
-matters in a file (`"007"`).
+tag key with capitals or a dot is set in a file). A tag's value is text: from the environment or
+a `-s` it is taken as written (`ISOLOOM_TAGS__ACCOUNT=0x1F` is `0x1F`); in a file a number or
+`true`/`false` is read as its text, so quote one whose form matters (`"0x1F"`, `"1e3"`).
 
 ```sh
 $ isoloom defaults
