@@ -159,6 +159,10 @@ among others (the CHANGELOG's **Removed** section lists every item):
 - `isoloom_spec::model::Spec::inputs` is a list of `Input` (`name`, `sensitive`), and
   `Spec::plain_inputs` is removed: read `input.sensitive` (or `Spec::declares_input`).
   `isoloom_spec::validate::kebab` is `isoloom_manifest::is_kebab`.
+- `isoloom_spec::targets` (`derive`, `effective`, `missing`, `mixed`) is removed: ask the lab,
+  `isoloom_targets::Lab::possible` for the targets that can run a spec and
+  `Lab::not_possible(target)` for why one can't, which count the access machine and the image
+  table as the generator does.
 - `isoloom_spec::profile::list` returns `Result<Listed>`: the profiles' `names`, and the
   `skipped` files a listing warns about.
 - `isoloom_targets::GenerateError::NoGenerator` is removed (every target has a backend), and an

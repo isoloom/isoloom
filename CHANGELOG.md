@@ -66,7 +66,6 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   private; `isoloom_compose::guest` takes how the VM's way in gets root (`AsRoot`), and
   `isoloom_terraform::cloud_docker_manifests` a guest per `AsRoot`.
 - **Breaking: the `external` target writes no `machines.json`**: no runner read it.
-
 - **Breaking: Isoloom's own router and controller take Isoloom's names on Proxmox, ESXi and the
   clouds.** A lab machine named `router` or `controller` wrote a second
   `proxmox_virtual_environment_file` of the same name (invalid Terraform), and on ESXi and the
@@ -176,28 +175,37 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `cost_center`: one label on Google Cloud and Kubernetes, the second silently lost) are
   refused, and so are Isoloom's own keys in any case (`Managed-By`). Library: the tags' forms
   are `isoloom_spec::tags` (was `isoloom_render::tags`).
-
 - **Breaking: `external` refuses a check its hosts can't run**: a project script or an Ansible
   playbook (an existing host has no copy of the project), and a check with no host to run from (no
   `from:` and no access machine). It wrote the runners without them, so they never ran, while the
   matrix showed ✓; the matrix now shows them refused there.
 - **Breaking: `isoloom report services` is gone**: it was a hidden name of `isoloom report ports`.
-- **Breaking (library): one place decides a target's refusals.** `isoloom_targets::backend` is
-  total (every target has one) and `GenerateError::NoGenerator` is removed;
-  `isoloom_vagrant::disk_refusal` is part of `provider_refusal`; `refusal_on` also takes a cloud on
-  `cloud-vm` (`aws`); `GenerateError::Instance` reports an instance that can't be made, not a
-  refusal. `isoloom_spec::profile::list` returns a `Result<Listed>` (`names`, and the `skipped`
-  files whose name isn't kebab-case). `isoloom_render::steps::Archive::File` is
-  `Archive::Uploaded` (the fixed `PROJECT_ARCHIVE`), beside `windows_project_unpack`.
-  `isoloom_import::NoteKind::NotYet` is `NotInSpec`, `isoloom_catalogue::OsFamily` is
-  `DistroName`, and render's `constraints::{trust_linux, trust_windows}`,
-  `container::CHECK_RUNNER_PREFIX`, `HostSize::MIN_MEMORY_MB` and `windows::COMPUTER_NAME_MAX` are
-  crate-internal. `isoloom_spec::model::Spec::inputs` is a list of `Input` (its `name` and whether
-  it is `sensitive`), and `Spec::plain_inputs` is removed; the plan carries the inputs, the
-  secrets, each machine's role, the tools with their addresses and the constraints
-  (`Environment::{inputs, secrets, tools, constraints}`, `MachinePlan::role`), and
-  `isoloom_render::constraints::build_args` is removed. `isoloom_spec::validate::kebab` is
+- **Breaking (library): one rule says which targets can run a spec.** `Lab::not_possible(target)`
+  gives the reason a target can't run it (`NotPossible`), and `Lab::possible` keeps the targets
+  it gives none for; `isoloom_spec::targets` (`derive`, `effective`, `missing`, `mixed`) is
+  removed, as it answered from the spec's forms alone, skipping the access machine and the image
+  table, and offered targets the generator then refused.
+- **Breaking (library): every target has a backend.** `isoloom_targets::backend` is total and
+  `GenerateError::NoGenerator` is removed; `GenerateError::Instance` reports an instance that
+  can't be made, not a refusal.
+- **Breaking (library): `refusal_on` takes a cloud on `cloud-vm`** (`Some("aws")`), and
+  `isoloom_vagrant::disk_refusal` is part of `provider_refusal`.
+- **Breaking (library): `isoloom_spec::profile::list` returns a `Result<Listed>`**: the
+  profiles' `names`, and the `skipped` files whose name isn't kebab-case.
+- **Breaking (library): `isoloom_render::steps::Archive::File` is `Archive::Uploaded`** (the fixed
+  `PROJECT_ARCHIVE`), beside `windows_project_unpack`.
+- **Breaking (library): renamed items.** `isoloom_import::NoteKind::NotYet` is `NotInSpec`,
+  `isoloom_catalogue::OsFamily` is `DistroName`, and `isoloom_spec::validate::kebab` is
   `isoloom_manifest::is_kebab` (at most `KEBAB_MAX`, 63, characters).
+- **Breaking (library): render items no other crate uses are crate-internal**:
+  `constraints::{trust_linux, trust_windows}`, `container::CHECK_RUNNER_PREFIX`,
+  `HostSize::MIN_MEMORY_MB` and `windows::COMPUTER_NAME_MAX`.
+- **Breaking (library): `isoloom_spec::model::Spec::inputs` is a list of `Input`** (its `name`
+  and whether it is `sensitive`), and `Spec::plain_inputs` is removed.
+- **Breaking (library): the plan carries what the backends read of the spec**: the inputs, the
+  secrets, each machine's role, the tools with their addresses and the constraints
+  (`Environment::{inputs, secrets, tools, constraints}`, `MachinePlan::role`);
+  `isoloom_render::constraints::build_args` is removed.
 
 ### Added
 
