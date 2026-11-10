@@ -163,7 +163,10 @@ pub(crate) fn label(step: &Step) -> String {
         Step::Tc => "link impairment".into(),
         Step::Ready => "health check".into(),
         Step::Prelude => "system constraints".into(),
-        _ => "set-up".into(),
+        Step::Forwarding { .. } => "forwarding".into(),
+        Step::Project => "the project".into(),
+        Step::CaCertificates { .. } => "certificate authorities".into(),
+        Step::Reboot => "restarting".into(),
     }
 }
 

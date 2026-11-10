@@ -176,3 +176,12 @@ fn a_tracked_step_marks_its_progress_best_effort_and_its_failure_always() {
     assert!(ok && ran.exists(), "a progress mark that can't be written doesn't skip the step");
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn each_step_says_what_it_is_in_the_ready_file() {
+    let labels: Vec<String> = [Step::Project, Step::CaCertificates { files: vec!["ca.pem".into()] }, Step::Reboot]
+        .iter()
+        .map(cloud_init::label)
+        .collect();
+    assert_eq!(labels, ["the project", "certificate authorities", "restarting"]);
+}

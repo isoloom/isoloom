@@ -440,6 +440,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `generate` removed every file it had written before and exited 0, and `check` then passed with
   nothing to compare. A generation with no file is now a no (exit 1) that writes and removes
   nothing, and `check` is a no too.
+- **A VM's ready file names each step of its set-up.** Trusting the certificate authorities,
+  copying the project, forwarding and restarting all read `running: set-up`; each says what it is
+  now (`running: certificate authorities`, as the controller's does).
 - **A template filled in for two places generates.** Two `template:` steps of one machine
   reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
   file is written once per source.
