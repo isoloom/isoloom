@@ -59,7 +59,7 @@ impl CheckLine {
         if let Some(r) = rest.strip_prefix("FAIL ") {
             let (name, reason) = r.split_once(": ").unwrap_or((r, ""));
             return Some(CheckLine::Fail {
-                name: name.to_owned(),
+                name: name.trim_end().to_owned(),
                 reason: reason.trim_end().to_owned(),
             });
         }

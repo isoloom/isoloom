@@ -68,6 +68,8 @@ fn a_line_is_read_after_the_prefix_a_tool_prints() {
 #[test]
 fn a_fail_line_without_a_reason_has_an_empty_one() {
     assert_eq!(CheckLine::parse("isoloom-check: FAIL web"), Some(fail("web", "")));
+    assert_eq!(CheckLine::parse("isoloom-check: FAIL web  "), Some(fail("web", "")));
+    assert_eq!(CheckLine::parse("isoloom-check: FAIL web  : down"), Some(fail("web", "down")));
 }
 
 #[test]

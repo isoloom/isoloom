@@ -415,6 +415,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   run, took the host port the runner chose (`ISOLOOM_HOSTPORTS`): the run's URL didn't answer.
   The relay, and its removal with the VM, now take the forward's own host number, written once
   for both, the `publish` number still the fallback when the runner chose none.
+- **`CheckLine::parse` drops the spaces after a FAIL line's name, as after a PASS line's.**
+  `isoloom-check: FAIL web  ` read the name `web  `.
 - **Every command that reads the environment reads it as `generate` does.** `targets`,
   `validate`, `resources` and `profiles` took neither `--images` nor `-s`, and `graph`, `report`,
   `message` and `inspect` took `-s` but not `--images`: with an image table, `isoloom targets`
