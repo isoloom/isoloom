@@ -548,7 +548,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider "libvirt" do |v|
     v.default_prefix = "supplier-portal-api_"
   end
-  config.vm.network "forwarded_port", guest: 3206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 3206), host_ip: "127.0.0.1"
+  config.vm.network "forwarded_port", guest: 8206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 8206), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
     v.name = "supplier-portal-api - isoloom-docker-host"
@@ -1212,7 +1212,7 @@ output "ssh_user" {
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -1244,12 +1244,12 @@ output "ssh_user" {
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${outputs.ip}"
           }
         }
@@ -1468,7 +1468,7 @@ output "ssh_user" {
     },
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -1522,7 +1522,7 @@ output "ssh_user" {
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -1556,7 +1556,7 @@ output "ssh_user" {
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true
@@ -2056,7 +2056,7 @@ systemctl enable --now isoloom-published.service
           "utm": "supplier-portal-api - isoloom-docker-host",
           "vmware_esxi": "supplier-portal-api-isoloom-docker-host"
         },
-        "boot_digest": "sha256:699c39c6beff374b9c24bf8bb0510f421da5720a833d8c0c8ed05fddae4258b7"
+        "boot_digest": "sha256:2e16407e3dbc8a45325610fec14f59e076963ae6b6258ee3e51b2e84990b7817"
       }
     },
     {
@@ -2076,7 +2076,7 @@ systemctl enable --now isoloom-published.service
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -2108,12 +2108,12 @@ systemctl enable --now isoloom-published.service
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "127.0.0.1"
           }
         }
@@ -2315,7 +2315,7 @@ systemctl enable --now isoloom-published.service
   "outputs": [
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -2373,7 +2373,7 @@ systemctl enable --now isoloom-published.service
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -2411,7 +2411,7 @@ systemctl enable --now isoloom-published.service
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true

@@ -29,11 +29,11 @@ fn a_vm_block_gets_its_os_and_steps() {
 
 #[test]
 fn a_list_of_ports_becomes_a_map() {
-    let p = scanned("machines:\n  web:\n    ports: [{ port: 80, http: true, publish: 8080 }, { port: 3206, name: portal, publish: 3206, fixed: true }]\n");
+    let p = scanned("machines:\n  web:\n    ports: [{ port: 80, http: true, publish: 8080 }, { port: 8206, name: portal, publish: 8206, fixed: true }]\n");
     assert_eq!(p[0].code, Code::InvalidValue);
     let fix = p[0].fix.as_deref().unwrap();
     assert!(fix.contains("p80: { port: 80, protocol: http, publish: 8080 }"), "{fix}");
-    assert!(fix.contains("portal: { port: 3206, publish: { host: 3206, fixed: true } }"), "{fix}");
+    assert!(fix.contains("portal: { port: 8206, publish: { host: 8206, fixed: true } }"), "{fix}");
 }
 
 #[test]

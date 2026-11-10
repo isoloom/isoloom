@@ -146,7 +146,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _http_any 'http://web:3206/'; then pass 'web:3206 from database'; else fail 'web:3206 from database' "nothing answers at http://web:3206/"; fi
+if _retry 30 _http_any 'http://web:8206/'; then pass 'web:8206 from database'; else fail 'web:8206 from database' "nothing answers at http://web:8206/"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -317,7 +317,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _tcp 'database' 3207; then pass 'database:3207 from web'; else fail 'database:3207 from web' "nothing listens at database:3207"; fi
+if _retry 30 _tcp 'database' 8207; then pass 'database:8207 from web'; else fail 'database:8207 from web' "nothing listens at database:8207"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -327,7 +327,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 #!/bin/sh
 # The portal answers on its port with its page.
 set -eu
-curl -fsS --max-time 10 http://web:3206/ | grep -q "Supplier portal"
+curl -fsS --max-time 10 http://web:8206/ | grep -q "Supplier portal"
 echo "the portal answers"
 
 ## .isoloom/kubernetes/chart/files/project/build/database/seed.sh
@@ -336,7 +336,7 @@ echo "the portal answers"
 # variable, and goes in as a hex literal, so no character of it can break the statement.
 set -eu
 token=$(od -An -v -tx1 /run/lab/launch-token | tr -d ' \n')
-mysql -h 127.0.0.1 -P 3207 -u root <<SQL
+mysql -h 127.0.0.1 -P 8207 -u root <<SQL
 CREATE DATABASE IF NOT EXISTS portal;
 CREATE TABLE IF NOT EXISTS portal.launch (token VARBINARY(255) NOT NULL);
 INSERT INTO portal.launch VALUES (0x$token);
@@ -344,7 +344,7 @@ SQL
 
 ## .isoloom/kubernetes/chart/templates/NOTES.txt
 Published ports, on this computer:
-  kubectl -n {{ .Release.Namespace }} port-forward svc/isoloom-web 3206:3206
+  kubectl -n {{ .Release.Namespace }} port-forward svc/isoloom-web 8206:8206
 Checks: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
 
 ## .isoloom/kubernetes/chart/templates/environment.yaml
@@ -415,21 +415,21 @@ spec:
             - SETUID
             - SYS_CHROOT
         ports:
-        - containerPort: 3207
+        - containerPort: 8207
         readinessProbe:
           exec:
             command:
             - /.isoloom-probe/busybox
             - sh
             - -c
-            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8207
           periodSeconds: 5
           failureThreshold: 60
         env:
         - name: MYSQL_ALLOW_EMPTY_PASSWORD
           value: '1'
         - name: MYSQL_TCP_PORT
-          value: '3207'
+          value: '8207'
         - name: API_URL
           valueFrom:
             secretKeyRef:
@@ -457,7 +457,7 @@ spec:
         command:
         - sh
         - -c
-        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207; do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8207; do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -481,7 +481,7 @@ spec:
         - name: MYSQL_ALLOW_EMPTY_PASSWORD
           value: '1'
         - name: MYSQL_TCP_PORT
-          value: '3207'
+          value: '8207'
         - name: API_URL
           valueFrom:
             secretKeyRef:
@@ -525,9 +525,9 @@ spec:
   selector:
     isoloom.com/machine: database
   ports:
-  - name: p3207
-    port: 3207
-    targetPort: 3207
+  - name: p8207
+    port: 8207
+    targetPort: 8207
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -575,7 +575,7 @@ spec:
         command:
         - sh
         - -c
-        - until nc -z database 3207; do sleep 2; done
+        - until nc -z database 8207; do sleep 2; done
         securityContext:
           runAsUser: 65534
           runAsGroup: 65534
@@ -608,14 +608,14 @@ spec:
             - SETUID
             - SYS_CHROOT
         ports:
-        - containerPort: 3206
+        - containerPort: 8206
         readinessProbe:
           exec:
             command:
             - /.isoloom-probe/busybox
             - sh
             - -c
-            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3206
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8206
           periodSeconds: 5
           failureThreshold: 60
         resources:
@@ -645,9 +645,9 @@ spec:
   selector:
     isoloom.com/machine: web
   ports:
-  - name: p3206
-    port: 3206
-    targetPort: 3206
+  - name: p8206
+    port: 8206
+    targetPort: 8206
 ---
 apiVersion: v1
 kind: Service
@@ -659,9 +659,9 @@ spec:
   selector:
     isoloom.com/machine: web
   ports:
-  - name: p3206
-    port: 3206
-    targetPort: 3206
+  - name: p8206
+    port: 8206
+    targetPort: 8206
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -678,7 +678,7 @@ spec:
     - ipBlock:
         cidr: 0.0.0.0/0
     ports:
-    - port: 3206
+    - port: 8206
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1053,7 +1053,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _http_any 'http://web:3206/'; then pass 'web:3206 from database'; else fail 'web:3206 from database' "nothing answers at http://web:3206/"; fi
+if _retry 30 _http_any 'http://web:8206/'; then pass 'web:8206 from database'; else fail 'web:8206 from database' "nothing answers at http://web:8206/"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -1412,7 +1412,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _tcp 'database' 3207; then pass 'database:3207 from web'; else fail 'database:3207 from web' "nothing listens at database:3207"; fi
+if _retry 30 _tcp 'database' 8207; then pass 'database:8207 from web'; else fail 'database:8207 from web' "nothing listens at database:8207"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -1431,7 +1431,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 # Secrets: create isoloom-secrets from their stores once the namespace exists (the pods wait for it):
 #   kubectl -n isoloom-supplier-portal-api create secret generic isoloom-secrets --from-file=input-launch-token=<file>
 # Published ports, on this computer (each command runs until stopped):
-#   kubectl -n isoloom-supplier-portal-api port-forward svc/isoloom-web 3206:3206
+#   kubectl -n isoloom-supplier-portal-api port-forward svc/isoloom-web 8206:8206
 
 apiVersion: v1
 kind: Namespace
@@ -1506,21 +1506,21 @@ spec:
             - SETUID
             - SYS_CHROOT
         ports:
-        - containerPort: 3207
+        - containerPort: 8207
         readinessProbe:
           exec:
             command:
             - /.isoloom-probe/busybox
             - sh
             - -c
-            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8207
           periodSeconds: 5
           failureThreshold: 60
         env:
         - name: MYSQL_ALLOW_EMPTY_PASSWORD
           value: '1'
         - name: MYSQL_TCP_PORT
-          value: '3207'
+          value: '8207'
         - name: API_URL
           valueFrom:
             secretKeyRef:
@@ -1548,7 +1548,7 @@ spec:
         command:
         - sh
         - -c
-        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207; do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8207; do sleep 2; done && sh /isoloom/scripts/build__database__seed.sh && exec sleep infinity
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -1572,7 +1572,7 @@ spec:
         - name: MYSQL_ALLOW_EMPTY_PASSWORD
           value: '1'
         - name: MYSQL_TCP_PORT
-          value: '3207'
+          value: '8207'
         - name: API_URL
           valueFrom:
             secretKeyRef:
@@ -1616,9 +1616,9 @@ spec:
   selector:
     isoloom.com/machine: database
   ports:
-  - name: p3207
-    port: 3207
-    targetPort: 3207
+  - name: p8207
+    port: 8207
+    targetPort: 8207
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1666,7 +1666,7 @@ spec:
         command:
         - sh
         - -c
-        - until nc -z database 3207; do sleep 2; done
+        - until nc -z database 8207; do sleep 2; done
         securityContext:
           runAsUser: 65534
           runAsGroup: 65534
@@ -1699,14 +1699,14 @@ spec:
             - SETUID
             - SYS_CHROOT
         ports:
-        - containerPort: 3206
+        - containerPort: 8206
         readinessProbe:
           exec:
             command:
             - /.isoloom-probe/busybox
             - sh
             - -c
-            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3206
+            - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8206
           periodSeconds: 5
           failureThreshold: 60
         resources:
@@ -1736,9 +1736,9 @@ spec:
   selector:
     isoloom.com/machine: web
   ports:
-  - name: p3206
-    port: 3206
-    targetPort: 3206
+  - name: p8206
+    port: 8206
+    targetPort: 8206
 ---
 apiVersion: v1
 kind: Service
@@ -1750,9 +1750,9 @@ spec:
   selector:
     isoloom.com/machine: web
   ports:
-  - name: p3206
-    port: 3206
-    targetPort: 3206
+  - name: p8206
+    port: 8206
+    targetPort: 8206
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1769,7 +1769,7 @@ spec:
     - ipBlock:
         cidr: 0.0.0.0/0
     ports:
-    - port: 3206
+    - port: 8206
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

@@ -276,9 +276,9 @@ mod tests {
 
     #[test]
     fn publish_is_true_a_number_or_fixed() {
-        let p = ports("{ a: { port: 1, publish: true }, b: { port: 2, publish: { host: 3206, fixed: true } }, c: { port: 3, publish: false } }").unwrap();
+        let p = ports("{ a: { port: 1, publish: true }, b: { port: 2, publish: { host: 8206, fixed: true } }, c: { port: 3, publish: false } }").unwrap();
         let publish: Vec<_> = p.values().map(|p| p.publish).collect();
-        assert_eq!(publish, [Some(Publish::Free), Some(Publish::Fixed(NonZeroU16::new(3206).unwrap())), None]);
+        assert_eq!(publish, [Some(Publish::Free), Some(Publish::Fixed(NonZeroU16::new(8206).unwrap())), None]);
     }
 
     #[test]

@@ -798,9 +798,9 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       mkdir -p /etc/systemd/system.conf.d
       grep -v -E '^(MYSQL_ALLOW_EMPTY_PASSWORD|MYSQL_TCP_PORT)=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true
       printf %s 'MYSQL_ALLOW_EMPTY_PASSWORD=1
-      MYSQL_TCP_PORT=3207
+      MYSQL_TCP_PORT=8207
       ' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment
-      printf '[Manager]\nDefaultEnvironment=%s\n' '"MYSQL_ALLOW_EMPTY_PASSWORD=1" "MYSQL_TCP_PORT=3207"' > /etc/systemd/system.conf.d/90-isoloom-environment.conf
+      printf '[Manager]\nDefaultEnvironment=%s\n' '"MYSQL_ALLOW_EMPTY_PASSWORD=1" "MYSQL_TCP_PORT=8207"' > /etc/systemd/system.conf.d/90-isoloom-environment.conf
       systemctl daemon-reexec 2>/dev/null || true
     SH
     m.vm.provision "shell", name: "secrets", env: { "ISOLOOM_SECRET_INPUT_LAUNCH_TOKEN" => isoloom_b64(INPUTS["LAUNCH_TOKEN"]) }, inline: <<~'SH'
@@ -856,7 +856,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       . /tmp/isoloom-inputs.env
       set +a
       export MYSQL_ALLOW_EMPTY_PASSWORD='1'
-      export MYSQL_TCP_PORT='3207'
+      export MYSQL_TCP_PORT='8207'
       mkdir -p '/opt/isoloom' && cd '/opt/isoloom'
       sh '/opt/isoloom/build/database/seed.sh'
       mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done
@@ -870,7 +870,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.20.0.31", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-lab", libvirt__network_name: "isoloom-supplier-portal-api-lab", libvirt__dhcp_enabled: false
-    m.vm.network "forwarded_port", guest: 3206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 3206), host_ip: "127.0.0.1"
+    m.vm.network "forwarded_port", guest: 8206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 8206), host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
       v.name = "supplier-portal-api - web"
       v.linked_clone = true
@@ -1010,11 +1010,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           fi
           /etc/isoloom/env-net.sh
         SH
-        IsoloomHyperV.ports(machine, [[3206, ISOLOOM_HOSTPORTS.fetch("web/portal", 3206)]])
+        IsoloomHyperV.ports(machine, [[8206, ISOLOOM_HOSTPORTS.fetch("web/portal", 8206)]])
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[3206, ISOLOOM_HOSTPORTS.fetch("web/portal", 3206)]]); IsoloomHyperV.prune(["isoloom-supplier-portal-api-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[8206, ISOLOOM_HOSTPORTS.fetch("web/portal", 8206)]]); IsoloomHyperV.prune(["isoloom-supplier-portal-api-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1039,7 +1039,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
 ", args: ["10.20.0.31/24"]
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
-    m.vm.provision "shell", name: "wait for database", inline: "i=0; until (bash -c '</dev/tcp/database/3207' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\""
+    m.vm.provision "shell", name: "wait for database", inline: "i=0; until (bash -c '</dev/tcp/database/8207' 2>/dev/null || nc -z -w 2 database 8207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\""
     m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/web.sh'\\'''"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
@@ -1286,7 +1286,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _http_any 'http://10.20.0.31:3206/'; then pass 'web:3206 from database'; else fail 'web:3206 from database' "nothing answers at http://10.20.0.31:3206/"; fi
+if _retry 30 _http_any 'http://10.20.0.31:8206/'; then pass 'web:8206 from database'; else fail 'web:8206 from database' "nothing answers at http://10.20.0.31:8206/"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -1457,7 +1457,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _tcp '10.20.0.32' 3207; then pass 'database:3207 from web'; else fail 'database:3207 from web' "nothing listens at 10.20.0.32:3207"; fi
+if _retry 30 _tcp '10.20.0.32' 8207; then pass 'database:8207 from web'; else fail 'database:8207 from web' "nothing listens at 10.20.0.32:8207"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -1912,7 +1912,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -2001,17 +2001,17 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api - web",
           "vmware_esxi": "supplier-portal-api-web"
         },
-        "boot_digest": "sha256:01e765139ead478af1f72fa04a54bfa92211a3bcefa8e10cf265e161b10da18d"
+        "boot_digest": "sha256:756d3cb49428b81758b2d3301a2bcb6fd1f58ec3ff8beb55f5cfaee8a145f8c8"
       },
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "127.0.0.1"
           }
         }
@@ -2296,7 +2296,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
   "outputs": [
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -2323,7 +2323,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -2346,7 +2346,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true

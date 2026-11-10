@@ -120,7 +120,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _http_any 'http://10.20.0.31:3206/'; then pass 'web:3206 from database'; else fail 'web:3206 from database' "nothing answers at http://10.20.0.31:3206/"; fi
+if _retry 30 _http_any 'http://10.20.0.31:8206/'; then pass 'web:8206 from database'; else fail 'web:8206 from database' "nothing answers at http://10.20.0.31:8206/"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -291,7 +291,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
-if _retry 30 _tcp '10.20.0.32' 3207; then pass 'database:3207 from web'; else fail 'database:3207 from web' "nothing listens at 10.20.0.32:3207"; fi
+if _retry 30 _tcp '10.20.0.32' 8207; then pass 'database:8207 from web'; else fail 'database:8207 from web' "nothing listens at 10.20.0.32:8207"; fi
 fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
@@ -316,7 +316,7 @@ services:
         ipv4_address: 10.20.0.32
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: '1'
-      MYSQL_TCP_PORT: '3207'
+      MYSQL_TCP_PORT: '8207'
       API_URL: ${API_URL:-}
     volumes:
     - isoloom-probe-amd64:/.isoloom-probe:ro
@@ -330,7 +330,7 @@ services:
       - /.isoloom-probe/busybox
       - sh
       - -c
-      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3207
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8207
       interval: 5s
       timeout: 3s
       retries: 60
@@ -344,7 +344,7 @@ services:
           cpus: '1'
           memory: 1024M
     labels:
-      isoloom.port.mysql: tcp:3207
+      isoloom.port.mysql: tcp:8207
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
     restart: unless-stopped
@@ -357,7 +357,7 @@ services:
     network_mode: service:database
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: '1'
-      MYSQL_TCP_PORT: '3207'
+      MYSQL_TCP_PORT: '8207'
       API_URL: ${API_URL:-}
     volumes:
     - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro
@@ -386,7 +386,7 @@ services:
       lab:
         ipv4_address: 10.20.0.31
     ports:
-    - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:3206:3206
+    - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:8206:8206
     volumes:
     - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
@@ -395,7 +395,7 @@ services:
       - /.isoloom-probe/busybox
       - sh
       - -c
-      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 3206
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8206
       interval: 5s
       timeout: 3s
       retries: 60
@@ -413,7 +413,7 @@ services:
           cpus: '1'
           memory: 1024M
     labels:
-      isoloom.port.portal: http:3206
+      isoloom.port.portal: http:8206
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
     restart: unless-stopped
@@ -687,7 +687,7 @@ secrets:
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -719,12 +719,12 @@ secrets:
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${params.ISOLOOM_PUBLISH_ADDRESS}"
           }
         }
@@ -922,7 +922,7 @@ secrets:
   "outputs": [
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://127.0.0.1:${value}/",
@@ -987,7 +987,7 @@ secrets:
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -1032,7 +1032,7 @@ secrets:
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true
@@ -1141,7 +1141,7 @@ secrets:
       },
       "ports": {
         "mysql": {
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp"
         }
       },
@@ -1188,11 +1188,11 @@ secrets:
       },
       "ports": {
         "portal": {
-          "port": 3206,
+          "port": 8206,
           "protocol": "http",
-          "publish": 3206,
-          "published": 3206,
-          "url": "http://127.0.0.1:3206/",
+          "publish": 8206,
+          "published": 8206,
+          "url": "http://127.0.0.1:8206/",
           "fixed": true
         }
       },
@@ -1240,9 +1240,9 @@ secrets:
     {
       "machine": "web",
       "name": "portal",
-      "port": 3206,
+      "port": 8206,
       "protocol": "http",
-      "host_port": 3206
+      "host_port": 8206
     }
   ],
   "targets": {
@@ -1325,10 +1325,10 @@ secrets:
         "runner": "isoloom-check-database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "derived": true,
             "kind": "http",
-            "target": "http://10.20.0.31:3206/",
+            "target": "http://10.20.0.31:8206/",
             "expect": "any",
             "wait": 30
           }
@@ -1340,10 +1340,10 @@ secrets:
         "runner": "isoloom-check-web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "derived": true,
             "kind": "tcp",
-            "target": "10.20.0.32:3207",
+            "target": "10.20.0.32:8207",
             "expect": "open",
             "wait": 30
           }

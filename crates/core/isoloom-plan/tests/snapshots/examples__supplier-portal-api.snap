@@ -32,9 +32,9 @@ machines:
     dns: ~
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: "1"
-      MYSQL_TCP_PORT: "3207"
+      MYSQL_TCP_PORT: "8207"
     ports:
-      - port: 3207
+      - port: 8207
         name: mysql
         http: false
         publish: ~
@@ -73,10 +73,10 @@ machines:
     shm_size: ~
     dns: ~
     ports:
-      - port: 3206
+      - port: 8206
         name: portal
         http: true
-        publish: 3206
+        publish: 8206
         fixed: true
     inputs: []
     resources:

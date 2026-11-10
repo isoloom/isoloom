@@ -190,9 +190,9 @@ resource "aws_security_group" "env" {
     cidr_blocks = [var.allowed_cidr]
   }
   ingress {
-    description = "published 3206"
-    from_port   = 3206
-    to_port     = 3206
+    description = "published 8206"
+    from_port   = 8206
+    to_port     = 8206
     protocol    = "tcp"
     cidr_blocks = [var.allowed_cidr]
   }
@@ -494,7 +494,7 @@ output "ssh_user" {
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -526,12 +526,12 @@ output "ssh_user" {
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${outputs.ip}"
           }
         }
@@ -753,7 +753,7 @@ output "ssh_user" {
     },
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -807,7 +807,7 @@ output "ssh_user" {
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -841,7 +841,7 @@ output "ssh_user" {
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true
@@ -1063,7 +1063,7 @@ resource "azurerm_network_security_group" "env" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = ["22", "3206"]
+    destination_port_ranges    = ["22", "8206"]
     source_address_prefix      = var.allowed_cidr
     destination_address_prefix = "*"
   }
@@ -1380,7 +1380,7 @@ output "ssh_user" {
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -1412,12 +1412,12 @@ output "ssh_user" {
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${outputs.ip}"
           }
         }
@@ -1639,7 +1639,7 @@ output "ssh_user" {
     },
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -1693,7 +1693,7 @@ output "ssh_user" {
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -1727,7 +1727,7 @@ output "ssh_user" {
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true
@@ -1928,7 +1928,7 @@ resource "digitalocean_firewall" "env" {
   }
   inbound_rule {
     protocol         = "tcp"
-    port_range       = "3206"
+    port_range       = "8206"
     source_addresses = [var.allowed_cidr]
   }
   outbound_rule {
@@ -2156,7 +2156,7 @@ output "ssh_user" {
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -2188,12 +2188,12 @@ output "ssh_user" {
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${outputs.ip}"
           }
         }
@@ -2415,7 +2415,7 @@ output "ssh_user" {
     },
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -2469,7 +2469,7 @@ output "ssh_user" {
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -2503,7 +2503,7 @@ output "ssh_user" {
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true
@@ -2734,7 +2734,7 @@ resource "google_compute_firewall" "env" {
   source_ranges = [var.allowed_cidr]
   allow {
     protocol = "tcp"
-    ports    = ["22", "3206"]
+    ports    = ["22", "8206"]
   }
 }
 
@@ -3037,7 +3037,7 @@ output "ssh_user" {
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -3069,12 +3069,12 @@ output "ssh_user" {
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${outputs.ip}"
           }
         }
@@ -3296,7 +3296,7 @@ output "ssh_user" {
     },
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -3350,7 +3350,7 @@ output "ssh_user" {
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -3384,7 +3384,7 @@ output "ssh_user" {
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true
@@ -3574,7 +3574,7 @@ resource "linode_firewall" "env" {
     label    = "ssh-and-published"
     action   = "ACCEPT"
     protocol = "TCP"
-    ports    = "22,3206"
+    ports    = "22,8206"
     ipv4     = [var.allowed_cidr]
   }
   linodes = [linode_instance.env.id]
@@ -3789,7 +3789,7 @@ output "ssh_user" {
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -3821,12 +3821,12 @@ output "ssh_user" {
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${outputs.ip}"
           }
         }
@@ -4048,7 +4048,7 @@ output "ssh_user" {
     },
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -4102,7 +4102,7 @@ output "ssh_user" {
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -4136,7 +4136,7 @@ output "ssh_user" {
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true
@@ -4372,8 +4372,8 @@ resource "oci_core_security_list" "env" {
     source   = var.allowed_cidr
     protocol = "6"
     tcp_options {
-      min = 3206
-      max = 3206
+      min = 8206
+      max = 8206
     }
   }
 }
@@ -4616,7 +4616,7 @@ output "ssh_user" {
       "ports": [
         {
           "name": "mysql",
-          "port": 3207,
+          "port": 8207,
           "protocol": "tcp",
           "http": false
         }
@@ -4648,12 +4648,12 @@ output "ssh_user" {
       "ports": [
         {
           "name": "portal",
-          "port": 3206,
+          "port": 8206,
           "protocol": "tcp",
           "http": true,
           "publish": {
             "mode": "fixed",
-            "preferred": 3206,
+            "preferred": 8206,
             "address": "${outputs.ip}"
           }
         }
@@ -4875,7 +4875,7 @@ output "ssh_user" {
     },
     {
       "name": "web__portal",
-      "description": "web's portal (port 3206).",
+      "description": "web's portal (port 8206).",
       "role": "entry",
       "sensitive": false,
       "format": "http://${host.web}:${value}/",
@@ -4929,7 +4929,7 @@ output "ssh_user" {
         "from": "from database",
         "checks": [
           {
-            "name": "web:3206 from database",
+            "name": "web:8206 from database",
             "kind": "http",
             "wait_s": 30,
             "derived": true
@@ -4963,7 +4963,7 @@ output "ssh_user" {
         "from": "from web",
         "checks": [
           {
-            "name": "database:3207 from web",
+            "name": "database:8207 from web",
             "kind": "tcp",
             "wait_s": 30,
             "derived": true

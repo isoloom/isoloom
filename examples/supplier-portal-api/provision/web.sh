@@ -1,5 +1,5 @@
 #!/bin/sh
-# The portal as a native VM: nginx serving the same page as the container, on port 3206.
+# The portal as a native VM: nginx serving the same page as the container, on port 8206.
 set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
