@@ -2,6 +2,7 @@
 //! `copy`'s source, each `template` and its placeholders, each folder or file a catalogue
 //! service's settings name), present in the project folder.
 
+use std::io::ErrorKind;
 use std::path::Path;
 
 use isoloom_spec::syntax::placeholder::Place;
@@ -54,18 +55,22 @@ fn missing(at: FieldPath, path: &str) -> Problem {
     Problem::new(Code::InvalidValue, at, format!("`{path}` doesn't exist in the project folder"))
 }
 
-/// Template `file` (`from`, as written) of machine `machine`: present, text, and each of its
+/// Template `file` (`from`, as written) of machine `machine`: present, readable, text, and each of its
 /// placeholders one a template may name and the spec has.
 fn template(source: &syntax::Spec, machine: &str, at: &FieldPath, file: &Path, from: &str) -> Vec<Problem> {
     if !file.exists() {
         return vec![missing(at.clone(), from)];
     }
-    let Ok(text) = std::fs::read_to_string(file) else {
-        return vec![Problem::new(
-            Code::InvalidValue,
-            at.clone(),
-            format!("`{from}` isn't a text file: a template is filled in as text"),
-        )];
+    let text = match std::fs::read_to_string(file) {
+        Ok(text) => text,
+        Err(e) if e.kind() == ErrorKind::InvalidData => {
+            return vec![Problem::new(
+                Code::InvalidValue,
+                at.clone(),
+                format!("`{from}` isn't a text file: a template is filled in as text"),
+            )];
+        }
+        Err(e) => return vec![Problem::new(Code::InvalidValue, at.clone(), format!("`{from}` can't be read: {e}"))],
     };
     // One problem per template, every placeholder in it: a field holds one problem.
     let found = syntax::placeholder_problems(source, Some(machine), &text, Place::Template);

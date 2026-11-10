@@ -72,3 +72,24 @@ fn a_templates_placeholders_resolve_against_the_spec() {
         "{reason}"
     );
 }
+
+#[test]
+fn a_template_that_cant_be_read_says_why_and_only_bytes_that_arent_text_say_so() {
+    let dir = project("unreadable", &[("binary.conf", "")]).unwrap();
+    std::fs::write(dir.join("binary.conf"), [0xff, 0xfe, 0x00]).unwrap();
+    std::fs::create_dir_all(dir.join("folder.conf")).unwrap();
+    let lab = testing::lab(&lab(
+        "[{ template: { from: binary.conf, to: /b } }, { template: { from: folder.conf, to: /f } }]",
+    ));
+    let found: Vec<String> = lab.problems_with_files(&dir).iter().map(isoloom_spec::syntax::Problem::line).collect();
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert_eq!(
+        found[0],
+        "machines.web.app.steps[0].template.from: `binary.conf` isn't a text file: a template is filled in as text"
+    );
+    assert!(
+        found[1].starts_with("machines.web.app.steps[1].template.from: `folder.conf` can't be read: "),
+        "{}",
+        found[1]
+    );
+}
