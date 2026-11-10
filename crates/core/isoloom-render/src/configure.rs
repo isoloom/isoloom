@@ -72,7 +72,7 @@ impl<'a> Configured<'a> {
     ///
     /// # Errors
     ///
-    /// Why it can't be: its text wasn't read when the files were generated, or a placeholder
+    /// Why it can't be: its text wasn't in the project when the files were generated, or a placeholder
     /// names nothing the lab has (`isoloom validate` reports that first), as the line a recipe
     /// fails with.
     pub fn template(&self, from: &ProjectPath) -> Result<String, String> {
@@ -80,7 +80,7 @@ impl<'a> Configured<'a> {
             .recipe
             .files
             .get(from)
-            .ok_or_else(|| format!("the template {from} wasn't read when the files were generated: run `isoloom generate` in the project folder"))?;
+            .ok_or_else(|| format!("the template {from} wasn't in the project when the files were generated: add it, then generate again"))?;
         fill(text, &Context::new(self.env, self.machine)).map_err(|e| format!("the template {from}: {e}"))
     }
 

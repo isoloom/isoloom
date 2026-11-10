@@ -28,7 +28,8 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     isoloom_spec::find(&a.dir)?;
     let file = spec::file_name(&a.dir);
     // The lab as `generate` reads it, the defaults applied: a tag they add is validated too.
-    let (name, problems, warnings) = match spec::with_settings(profile, &a.dir, &a.settings) {
+    // A template it can't read is left out: the file checks report it.
+    let (name, problems, warnings) = match spec::settled(profile.load(&a.dir)?.as_ref(), &a.dir, &a.settings, spec::Unread::Skipped) {
         Ok((lab, _)) => {
             let problems = if a.skip_files { lab.problems() } else { lab.problems_with_files(&a.dir) };
             (lab.spec().name.clone(), problems, lab.warnings())

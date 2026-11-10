@@ -15,7 +15,7 @@ fn a_template_is_filled_in_for_its_machine_on_its_target() {
     let c = Configured::of(&env, "m").expect("a recipe");
     assert_eq!(c.template(&"conf/a.conf".parse().unwrap()).as_deref(), Ok("name=m at=10.9.0.10\n"));
     let unread = c.template(&"conf/b.conf".parse().unwrap()).unwrap_err();
-    assert!(unread.contains("wasn't read when the files were generated"), "{unread}");
+    assert!(unread.contains("wasn't in the project when the files were generated: add it"), "{unread}");
 }
 
 #[test]

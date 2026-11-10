@@ -78,29 +78,53 @@ pub(crate) fn defaults_of<'a>(
     }
 }
 
+/// What a command does with a template the lab fills in that can't be read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Unread {
+    /// It is an error, with the read error: the files would be generated without it.
+    Fails,
+    /// It is left out, for `isoloom validate`, whose file checks report it as a problem.
+    Skipped,
+}
+
 /// The lab with `-s` overrides, the image table, the clouds' regions and the defaults' tags
-/// applied, and the defaults in effect: the lab every command reads, as `generate` writes it.
+/// applied, and the defaults in effect: the lab every command reads, as `generate` writes it. A
+/// template that can't be read is an error.
 pub(crate) fn with_settings(profile: &Profile, dir: &Path, given: &Settings) -> Result<(Lab, Resolved)> {
     let profile = profile.load(dir)?;
+    settled(profile.as_ref(), dir, given, Unread::Fails)
+}
+
+/// [`with_settings`] with `profile` already loaded (or none), and a template that can't be read
+/// handled as `unread` says: the one pipeline every command reads the lab through, `isoloom
+/// profiles` included.
+pub(crate) fn settled(profile: Option<&isoloom_spec::profile::Profile>, dir: &Path, given: &Settings, unread: Unread) -> Result<(Lab, Resolved)> {
     let sets = &given.sets;
-    let mut spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
-    let settings = isoloom_spec::defaults::load(&defaults_of(dir, given.images.as_deref(), profile.as_ref(), sets)).map_err(CliError::Defaults)?;
+    let mut spec = isoloom_spec::load_profiled(dir, profile, sets)?;
+    let settings = isoloom_spec::defaults::load(&defaults_of(dir, given.images.as_deref(), profile, sets)).map_err(CliError::Defaults)?;
     spec.tags = settings.tags_under(&spec.tags).map_err(CliError::Defaults)?;
     let lab = Lab::new(spec)
         .with_images(settings.defaults.images.clone())
         .with_regions(settings.defaults.regions());
-    let templates = templates(&lab, dir);
+    let templates = templates(&lab, dir, unread)?;
     Ok((lab.with_templates(templates), settings))
 }
 
 /// The texts of the project files `lab`'s steps fill in as templates, read from `dir`. One that
-/// can't be read is left out: validation reports it, and its machine's configuration fails
-/// saying so.
-fn templates(lab: &Lab, dir: &Path) -> std::collections::BTreeMap<isoloom_spec::syntax::ProjectPath, String> {
-    lab.template_paths()
-        .into_iter()
-        .filter_map(|p| Some((p.clone(), std::fs::read_to_string(dir.join(p.as_str())).ok()?)))
-        .collect()
+/// can't be read fails with the read error, or is left out when `unread` says so.
+fn templates(lab: &Lab, dir: &Path, unread: Unread) -> Result<std::collections::BTreeMap<isoloom_spec::syntax::ProjectPath, String>> {
+    let mut out = std::collections::BTreeMap::new();
+    for p in lab.template_paths() {
+        let path = dir.join(p.as_str());
+        match std::fs::read_to_string(&path) {
+            Ok(text) => {
+                out.insert(p, text);
+            }
+            Err(_) if unread == Unread::Skipped => {}
+            Err(source) => return Err(CliError::Read { path, source }),
+        }
+    }
+    Ok(out)
 }
 
 /// The lab, when it has no problem: generators assume a checked spec, so a spec that parses but

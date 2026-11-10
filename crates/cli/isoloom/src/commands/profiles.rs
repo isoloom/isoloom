@@ -1,6 +1,7 @@
 //! `isoloom profiles`: each of the project's profiles, checked against the spec.
 
 use super::{Console, Listing, Result, Verdict};
+use crate::error::CliError;
 use crate::spec::Settings;
 use std::path::Path;
 
@@ -67,18 +68,13 @@ fn check(dir: &Path, name: &str, settings: &Settings) -> Checked {
     }
 }
 
-/// What is wrong with the spec a profile makes, and with the target it pins.
+/// What is wrong with the spec a profile makes, read as `generate --profile` reads it (the
+/// defaults' tags, image table and regions, its templates), and with the target it pins.
 fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile, settings: &Settings) -> Vec<String> {
-    let spec = match isoloom_spec::load_profiled(dir, Some(p), &settings.sets) {
-        Err(isoloom_spec::Error::Invalid { problems, .. }) => return problems.iter().map(|e| format!("the spec it makes: {}", e.line())).collect(),
-        Err(e) => return e.to_string().lines().map(str::to_owned).collect(),
-        Ok(spec) => spec,
-    };
-    let lab = match isoloom_spec::defaults::load(&crate::spec::defaults_of(dir, settings.images.as_deref(), Some(p), &settings.sets)) {
-        Err(e) => return vec![e.to_string()],
-        Ok(r) => isoloom_targets::Lab::new(spec)
-            .with_regions(r.defaults.regions())
-            .with_images(r.defaults.images),
+    let lab = match crate::spec::settled(Some(p), dir, settings, crate::spec::Unread::Fails) {
+        Err(CliError::InvalidSpec { problems, .. }) => return problems.iter().map(|e| format!("the spec it makes: {}", e.line())).collect(),
+        Err(e) => return with_causes(&e).lines().map(str::to_owned).collect(),
+        Ok((lab, _)) => lab,
     };
     let mut problems: Vec<String> = lab.problems().iter().map(|e| format!("the spec it makes: {}", e.line())).collect();
     if let Some(t) = p.target
@@ -89,4 +85,18 @@ fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile, settings: &Settin
         problems.push(format!("can't run on `{}`: {why}", t.id()));
     }
     problems
+}
+
+/// `e` and its causes on one line (`can't read conf/site.conf: No such file or directory`).
+fn with_causes(e: &dyn std::error::Error) -> String {
+    let mut out = e.to_string();
+    let mut next = e.source();
+    while let Some(cause) = next {
+        let text = cause.to_string();
+        if !out.contains(&text) {
+            out = format!("{out}: {text}");
+        }
+        next = cause.source();
+    }
+    out
 }

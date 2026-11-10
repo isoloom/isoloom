@@ -106,7 +106,7 @@ fn a_template_goes_in_filled_and_encoded() {
     assert!(
         unread[0]
             .as_deref()
-            .is_some_and(|l| l.starts_with("isoloom_fail 'the template conf/app.toml wasn'\\''t read")),
+            .is_some_and(|l| l.starts_with("isoloom_fail 'the template conf/app.toml wasn'\\''t in the project")),
         "{unread:?}"
     );
 }

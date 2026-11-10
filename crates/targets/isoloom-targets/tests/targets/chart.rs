@@ -64,11 +64,19 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
 }
 
 #[test]
-fn a_missing_script_is_left_to_validate() -> Outcome {
+fn a_missing_script_fails_with_the_read_error() -> Outcome {
     let (dir, lab, files) = kubernetes("dmz-jump")?;
     assert_eq!(project_copies(&lab, &files, &dir).unwrap().len(), 2, "its two check scripts");
     let elsewhere = dir.join("a folder without the scripts");
-    assert_eq!(project_copies(&lab, &files, &elsewhere).unwrap().len(), 0, "the scripts it lacks are left out");
+    let e = project_copies(&lab, &files, &elsewhere).unwrap_err();
+    let mut chain = Vec::new();
+    let mut next: Option<&dyn std::error::Error> = Some(&e);
+    while let Some(cause) = next {
+        chain.push(cause.to_string());
+        next = cause.source();
+    }
+    let chain = chain.join(": ");
+    assert!(chain.contains("checks/") && chain.contains("No such file"), "{chain}");
     Ok(())
 }
 

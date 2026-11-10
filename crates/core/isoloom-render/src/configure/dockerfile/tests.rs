@@ -87,7 +87,9 @@ fn a_template_is_copied_filled_in_with_its_owner_and_mode() {
     assert_eq!(rendered.contents, "host = 'm'\n");
     let unread = built("os: debian@12, app: { steps: [{ template: { from: conf/app.toml, to: /etc/app.toml } }] }", &[]);
     assert!(
-        unread[0].contents.contains("&& isoloom_fail 'the template conf/app.toml wasn'\\''t read"),
+        unread[0]
+            .contents
+            .contains("&& isoloom_fail 'the template conf/app.toml wasn'\\''t in the project"),
         "{}",
         unread[0].contents
     );
