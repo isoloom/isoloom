@@ -80,14 +80,21 @@ pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
     (files, skipped)
 }
 
-/// The project's own files the generated ones copy (the scripts a Helm chart's pods run), read
-/// from the project folder `dir`.
+/// The project's own files the generated ones copy, read from the project folder `dir`: when
+/// `files` hold the Kubernetes target's (its folder under `.isoloom/`), the scripts its plan of
+/// `lab` runs, which its Helm chart and kustomization read.
 ///
 /// # Errors
 ///
 /// [`Error::ProjectCopies`] when one can't be read.
-pub fn project_copies(files: &[GeneratedFile], dir: &Path) -> Result<Vec<GeneratedFile>> {
-    isoloom_kubernetes::project_copies(files, dir).map_err(Error::ProjectCopies)
+pub fn project_copies(lab: &Lab, files: &[GeneratedFile], dir: &Path) -> Result<Vec<GeneratedFile>> {
+    let target = Target::Kubernetes;
+    let folder = format!("{OUTPUT_DIR}/{}/", target.id());
+    if !files.iter().any(|f| f.path.starts_with(&folder)) {
+        return Ok(Vec::new());
+    }
+    let env = lab.plan(&lowered(lab, target, None)?, target, None);
+    isoloom_kubernetes::project_copies(&env, dir).map_err(Error::ProjectCopies)
 }
 
 /// The lab as `target` runs it: lowered for it, as instance `n` when one is asked.

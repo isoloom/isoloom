@@ -8,14 +8,16 @@ use isoloom_targets::{GeneratedFile, Lab, generate, project_copies};
 
 use crate::testing::{Outcome, example, examples, file};
 
-/// The example `name`'s folder and its Kubernetes files.
-fn kubernetes(name: &str) -> Outcome<(PathBuf, Vec<GeneratedFile>)> {
-    Ok((examples().join(name), generate(&example(name)?, Target::Kubernetes)?))
+/// The example `name`'s folder, its lab and its Kubernetes files.
+fn kubernetes(name: &str) -> Outcome<(PathBuf, Lab, Vec<GeneratedFile>)> {
+    let lab = example(name)?;
+    let files = generate(&lab, Target::Kubernetes)?;
+    Ok((examples().join(name), lab, files))
 }
 
 #[test]
 fn the_chart_is_the_same_environment_with_images_as_values() -> Outcome {
-    let (_, files) = kubernetes("hello-stack")?;
+    let (_, _, files) = kubernetes("hello-stack")?;
     let chart = file(&files, "chart/Chart.yaml")?;
     assert!(
         chart.contains("apiVersion: v2\nname: hello-stack\n") && chart.contains("version: 0.1.0"),
@@ -39,7 +41,7 @@ fn the_chart_is_the_same_environment_with_images_as_values() -> Outcome {
 
 #[test]
 fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
-    let (dir, files) = kubernetes("hello-stack")?;
+    let (dir, lab, files) = kubernetes("hello-stack")?;
     let tests = file(&files, "chart/templates/tests/checks.yaml")?;
     assert_eq!(tests.matches("helm.sh/hook: test").count(), 3);
     assert_eq!(tests.matches("kind: Pod").count(), 3, "pods, so `helm test --logs` finds them");
@@ -50,7 +52,7 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
 
     let scripts = file(&files, "chart/templates/scripts.yaml")?;
     assert!(scripts.contains("build__cache__seed.sh: '{{ required"), "{scripts}");
-    let copies = project_copies(&files, &dir).unwrap();
+    let copies = project_copies(&lab, &files, &dir).unwrap();
     // At its path in the project, where the kustomization reads it too.
     let seed = copies.iter().find(|f| f.path.ends_with("chart/files/project/build/cache/seed.sh")).unwrap();
     assert_eq!(seed.contents, std::fs::read_to_string(dir.join("build/cache/seed.sh")).unwrap());
@@ -63,10 +65,18 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
 
 #[test]
 fn a_missing_script_is_left_to_validate() -> Outcome {
-    let (dir, files) = kubernetes("dmz-jump")?;
-    assert_eq!(project_copies(&files, &dir).unwrap().len(), 2, "its two check scripts");
+    let (dir, lab, files) = kubernetes("dmz-jump")?;
+    assert_eq!(project_copies(&lab, &files, &dir).unwrap().len(), 2, "its two check scripts");
     let elsewhere = dir.join("a folder without the scripts");
-    assert_eq!(project_copies(&files, &elsewhere).unwrap().len(), 0, "the scripts it lacks are left out");
+    assert_eq!(project_copies(&lab, &files, &elsewhere).unwrap().len(), 0, "the scripts it lacks are left out");
+    Ok(())
+}
+
+#[test]
+fn only_the_kubernetes_files_copy_the_scripts() -> Outcome {
+    let (dir, lab, _) = kubernetes("hello-stack")?;
+    let compose = generate(&lab, Target::Docker)?;
+    assert!(project_copies(&lab, &compose, &dir).unwrap().is_empty(), "no Kubernetes files, nothing to copy");
     Ok(())
 }
 

@@ -22,7 +22,7 @@ use std::fs::Metadata;
 use std::io::Write as _;
 use std::path::{Component, Path, PathBuf};
 
-use isoloom_targets::{GeneratedFile, OUTPUT_DIR};
+use isoloom_targets::{GeneratedFile, Lab, OUTPUT_DIR};
 
 use crate::error::{CliError, Result};
 
@@ -33,8 +33,8 @@ pub(crate) const LIST: &str = ".isoloom/.generated";
 const LIST_HEADER: &str = "# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.";
 
 /// The generator's files plus the project's own files they copy into the output.
-pub(crate) fn finish(mut files: Vec<GeneratedFile>, dir: &Path) -> Result<Vec<GeneratedFile>> {
-    let copies = isoloom_targets::project_copies(&files, dir)?;
+pub(crate) fn finish(lab: &Lab, mut files: Vec<GeneratedFile>, dir: &Path) -> Result<Vec<GeneratedFile>> {
+    let copies = isoloom_targets::project_copies(lab, &files, dir)?;
     files.extend(copies);
     Ok(files)
 }

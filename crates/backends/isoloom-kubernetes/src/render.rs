@@ -81,11 +81,7 @@ fn objects(env: &Environment) -> Rendered {
     objects.extend(network::policies(env));
     let checks = checks::plan(env);
     objects.extend(checks.policies.iter().cloned());
-    let mut scripts: Vec<String> = machines.iter().flat_map(|m| m.init().iter().cloned()).collect();
-    scripts.extend(machines.iter().flat_map(crate::files::sources));
-    scripts.extend(checks.scripts.iter().cloned());
-    scripts.sort();
-    scripts.dedup();
+    let scripts = project_scripts(&machines, &checks);
     Rendered {
         namespace,
         objects,
@@ -93,6 +89,17 @@ fn objects(env: &Environment) -> Rendered {
         scripts,
         labels: crate::objects::common_labels(env.spec()),
     }
+}
+
+/// The project's scripts the pods run (the machines' init jobs and files, the checks), sorted,
+/// each once: the kustomization's `ConfigMap`, and the chart's copies ([`crate::project_copies`]).
+pub(crate) fn project_scripts(machines: &[Machine], checks: &Checks) -> Vec<String> {
+    let mut scripts: Vec<String> = machines.iter().flat_map(|m| m.init().iter().cloned()).collect();
+    scripts.extend(machines.iter().flat_map(crate::files::sources));
+    scripts.extend(checks.scripts.iter().cloned());
+    scripts.sort();
+    scripts.dedup();
+    scripts
 }
 
 /// The plain manifests, with how to start and stop them, the images to build first and the

@@ -45,15 +45,6 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
-    /// A generated kustomization isn't one (it was edited by hand).
-    #[error("{path}: {NOT_A_KUSTOMIZATION}: {source}")]
-    Kustomization {
-        /// The kustomization, from the project folder.
-        path: String,
-        /// Why it couldn't be read.
-        #[source]
-        source: serde_yaml_ng::Error,
-    },
 }
 
 /// A result whose error is this crate's [`Error`].
@@ -70,7 +61,6 @@ impl From<Error> for RenderError {
             Error::Unwritable { source } => RenderError::internal(target, UNWRITABLE, source),
             Error::Schema { source } => RenderError::internal(target, SCHEMA, source),
             Error::Read { path, source } => RenderError::internal(target, format!("{path} (copied into the Helm chart) can't be read"), source),
-            Error::Kustomization { path, source } => RenderError::internal(target, format!("{path}: {NOT_A_KUSTOMIZATION}"), source),
         }
     }
 }
@@ -79,8 +69,6 @@ impl From<Error> for RenderError {
 const UNWRITABLE: &str = "a manifest couldn't be written as YAML";
 /// What an [`Error::Schema`] is, after its target.
 const SCHEMA: &str = "the values' schema couldn't be written as JSON";
-/// What an [`Error::Kustomization`] is, after its path.
-const NOT_A_KUSTOMIZATION: &str = "not a kustomization Isoloom reads";
 
 #[cfg(test)]
 mod tests {

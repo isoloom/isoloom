@@ -59,7 +59,7 @@ pub(super) fn planned(generation: &Generation, profile: &spec::Profile, dir: &Pa
             skipped,
         });
     }
-    let files = generated::finish(files, dir)?;
+    let files = generated::finish(&lab, files, dir)?;
     let stale = generated::stale(dir, &files, &generated::scope(target.as_deref()))?;
     let list = generated::list(dir, &files, &stale)?;
     generated::writable(dir, files.iter().chain(&list))?;

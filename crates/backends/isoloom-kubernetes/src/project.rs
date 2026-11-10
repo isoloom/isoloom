@@ -7,36 +7,35 @@
 
 use std::path::Path;
 
+use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
 
+use crate::checks;
 use crate::error::{Error, Result};
-use crate::kustomize;
-use crate::layout::{DIR, PROJECT_COPIES};
+use crate::layout::{PROJECT_COPIES, output};
+use crate::machine::Machine;
+use crate::render::project_scripts;
 
-/// The chart's copies of the project's scripts, read from the project folder `dir`, for the
-/// kustomizations among `files`. A script the project doesn't have yet is left out: it is
-/// `validate`'s to report (and the chart's `required` names it at install).
+/// The chart's copies of the project's scripts `env`'s pods run, read from the project folder
+/// `dir`, where the target writes them (`.isoloom/kubernetes/chart/files/project/`). A script the
+/// project doesn't have yet is left out: it is `validate`'s to report (and the chart's `required`
+/// names it at install).
 ///
 /// # Errors
 ///
-/// [`Error::Kustomization`] when a generated kustomization isn't one (it was edited by hand),
 /// [`Error::Read`] when a script exists but can't be read.
-pub fn project_copies(files: &[GeneratedFile], dir: &Path) -> Result<Vec<GeneratedFile>> {
+pub fn project_copies(env: &Environment, dir: &Path) -> Result<Vec<GeneratedFile>> {
     let mut out = Vec::new();
-    for f in files.iter().filter(|f| f.path.ends_with(&format!("/{DIR}/kustomization.yaml"))) {
-        let base = f.path.trim_end_matches("kustomization.yaml");
-        let scripts = kustomize::project_scripts(&f.contents).map_err(|source| Error::Kustomization { path: f.path.clone(), source })?;
-        for path in scripts {
-            let contents = match std::fs::read_to_string(dir.join(&path)) {
-                Ok(c) => c,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(source) => return Err(Error::Read { path, source }),
-            };
-            out.push(GeneratedFile {
-                path: format!("{base}{PROJECT_COPIES}/{path}"),
-                contents,
-            });
-        }
+    for path in project_scripts(&Machine::all(env), &checks::plan(env)) {
+        let contents = match std::fs::read_to_string(dir.join(&path)) {
+            Ok(c) => c,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(source) => return Err(Error::Read { path, source }),
+        };
+        out.push(GeneratedFile {
+            path: output(&format!("{PROJECT_COPIES}/{path}")),
+            contents,
+        });
     }
     Ok(out)
 }
