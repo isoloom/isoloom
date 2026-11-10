@@ -129,6 +129,27 @@ fn the_message_uses_named_paths() {
 }
 
 #[test]
+fn an_unpublished_port_has_no_published_port_and_the_fix_resolves() {
+    let spec = |message: &str| {
+        let mut spec = parse(
+            "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, ports: { web: { port: 80, protocol: http } } }\n",
+        )
+        .unwrap();
+        spec.message = Some(message.to_owned());
+        spec
+    };
+    let found = check(&spec("{{ machines.web.ports.web.published }} {{ machines.web.ports.web.url }}"));
+    let reasons: Vec<&str> = found.iter().map(|p| p.reason.as_str()).collect();
+    assert_eq!(reasons.len(), 2, "{reasons:?}");
+    assert!(reasons.iter().all(|r| r.contains("`web` isn't published (`publish:`)")), "{reasons:?}");
+    let fix = found[0].fix.clone().unwrap_or_default();
+    assert_eq!(fix, "`{{ machines.web.ports.web.port }}`");
+    let fixed = fix.trim_matches('`');
+    assert!(check(&spec(fixed)).is_empty(), "the fix resolves: {fixed}");
+    assert_eq!(check(&spec("{{ machines.web.ports.web.port }}")).len(), 0);
+}
+
+#[test]
 fn each_unresolved_placeholder_says_why() {
     let why = |spec: &crate::syntax::Spec| check(spec).into_iter().map(|p| p.reason).collect::<Vec<_>>();
     assert_eq!(why(&with_message("site", "{{ machines.web.addresses.lab }}")), Vec::<String>::new());

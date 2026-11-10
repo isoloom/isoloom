@@ -1,7 +1,8 @@
 //! The placeholders of the message and of an app's templates, read with the spec's one grammar
 //! ([`placeholder`]) and resolved against the spec at validation: a
 //! typo or an index (`ports.0`) fails here, not at run time. The message may use
-//! `machines.<m>.ports.<name>.port`, `.published` and `.url` (an `http` or `https` port's),
+//! `machines.<m>.ports.<name>.port`, and a published port's `.published` and `.url` (an `http`
+//! or `https` one's),
 //! `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`; a template the machine's own
 //! `machine.name` and `machine.addresses.<network>`, and no run-time value.
 
@@ -69,6 +70,11 @@ fn resolve(spec: &Spec, template_of: Option<&str>, r: &Reference) -> Result<(), 
                 .ports
                 .get(port)
                 .ok_or_else(|| format!("`{machine}` has no port named `{port}` (ports are named, never numbered)"))?;
+            if *field != PortField::Port && p.publish.is_none() {
+                return Err(format!(
+                    "`{port}` isn't published (`publish:`), so it has no published port or URL; `.port` is its number in the machine"
+                ));
+            }
             if *field == PortField::Url && !p.protocol.is_http() {
                 return Err(format!("`{port}` isn't an `http` or `https` port, so it has no URL"));
             }
@@ -83,11 +89,18 @@ fn resolve(spec: &Spec, template_of: Option<&str>, r: &Reference) -> Result<(), 
     }
 }
 
-/// A placeholder the spec could write, as the fix.
+/// A placeholder the spec could write, as the fix: a published port's published port, else a
+/// port's number, else a machine's address, each of the spec's own; one that resolves.
 fn example(spec: &Spec) -> String {
-    let named = spec
-        .machines
-        .iter()
-        .find_map(|(m, machine)| machine.ports.keys().next().map(|p| format!("`{{{{ machines.{m}.ports.{p}.published }}}}`")));
-    named.unwrap_or_else(|| "`{{ machines.<machine>.ports.<name>.published }}` or `{{ machines.<machine>.addresses.<network> }}`".into())
+    let machines = || spec.machines.iter();
+    let published = machines().find_map(|(m, machine)| {
+        let (p, _) = machine.ports.iter().find(|(_, p)| p.publish.is_some())?;
+        Some(format!("machines.{m}.ports.{p}.published"))
+    });
+    let port = || machines().find_map(|(m, machine)| Some(format!("machines.{m}.ports.{}.port", machine.ports.keys().next()?)));
+    let address = || machines().find_map(|(m, machine)| Some(format!("machines.{m}.addresses.{}", machine.networks.keys().next()?)));
+    published.or_else(port).or_else(address).map_or_else(
+        || "`{{ machines.<machine>.ports.<name>.published }}` or `{{ machines.<machine>.addresses.<network> }}`".into(),
+        |path| format!("`{{{{ {path} }}}}`"),
+    )
 }

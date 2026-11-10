@@ -352,6 +352,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **The message's `.published` and `.url` name a published port**: validation took them on a
+  port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
+  fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,
+  else an address).
 - **The Ansible project fails when a firewall step's collection has no pin** (library:
   `isoloom_ansible::Error::Collection`) instead of leaving `requirements.yml` out silently.
 - **A check or `provision:` file is a playbook by its extension in any case**, as a step's file

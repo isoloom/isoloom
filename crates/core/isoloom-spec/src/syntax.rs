@@ -107,8 +107,9 @@ pub struct Spec {
     #[schemars(default)]
     pub checks: Vec<Check>,
     /// Shown once the environment is up, in Markdown, with `{{ path }}` placeholders:
-    /// `machines.<m>.ports.<name>.port`, `.published`, `.url`, `machines.<m>.addresses.<network>`
-    /// and `cloud.outputs.<name>`, each checked at validation.
+    /// `machines.<m>.ports.<name>.port`, a published port's `.published` and `.url` (an `http` or
+    /// `https` one's), `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`, each checked
+    /// at validation.
     pub message: Option<String>,
     /// Tags every cloud resource and Kubernetes object carries, beside Isoloom's own
     /// (`cost-center: 1234`, `team: platform`): AWS's default tags, Azure's tags, Oracle

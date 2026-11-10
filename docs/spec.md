@@ -61,7 +61,7 @@ Named sets of machines sharing fields, also Ansible inventory groups and `overri
 
 ### `message`
 
-Shown once the environment is up, in Markdown, with `{{ path }}` placeholders: `machines.<m>.ports.<name>.port`, `.published`, `.url`, `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`, each checked at validation.
+Shown once the environment is up, in Markdown, with `{{ path }}` placeholders: `machines.<m>.ports.<name>.port`, a published port's `.published` and `.url` (an `http` or `https` one's), `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`, each checked at validation.
 
 - **Type:** string
 

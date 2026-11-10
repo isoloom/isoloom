@@ -97,7 +97,7 @@
     },
     "message": {
       "type": "string",
-      "description": "Shown once the environment is up, in Markdown, with `{{ path }}` placeholders:\n`machines.<m>.ports.<name>.port`, `.published`, `.url`, `machines.<m>.addresses.<network>`\nand `cloud.outputs.<name>`, each checked at validation."
+      "description": "Shown once the environment is up, in Markdown, with `{{ path }}` placeholders:\n`machines.<m>.ports.<name>.port`, a published port's `.published` and `.url` (an `http` or\n`https` one's), `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`, each checked\nat validation."
     },
     "tags": {
       "type": "object",
