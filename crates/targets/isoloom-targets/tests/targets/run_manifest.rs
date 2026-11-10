@@ -314,7 +314,7 @@ networks:
   lab: { cidr: 10.9.0.0/24 }
 machines:
   web: { networks: { lab: 10 }, ports: { web: { port: 80, protocol: http } }, app: { image: nginx } }
-  user: { access: true, networks: { lab: 20 } }
+  user: { os: debian@12, access: true, networks: { lab: 20 } }
 checks:
   - { name: the page answers from the seat, from: user, http: \"http://web/\" }
 ";
@@ -352,7 +352,7 @@ fn the_check_stand_in_is_taken_down_after_the_checks_on_every_container_target()
 #[test]
 fn a_lab_without_an_access_machine_has_no_stand_in_to_start_or_take_down() -> Outcome {
     let no_seat = ACCESS_SEAT
-        .replace("  user: { access: true, networks: { lab: 20 } }\n", "")
+        .replace("  user: { os: debian@12, access: true, networks: { lab: 20 } }\n", "")
         .replace(", from: user", "");
     for (target, path) in CONTAINER_MANIFESTS {
         let m = run_json(&generate(&lab(&no_seat)?, target)?, path)?;

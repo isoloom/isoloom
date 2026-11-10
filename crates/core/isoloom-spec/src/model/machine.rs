@@ -225,7 +225,8 @@ pub struct Machine {
     /// folders. The targets whose machines run elsewhere refuse it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub host_folders: Vec<HostFolder>,
-    /// The machine the user lands on. It may have no implementation: the runner supplies it.
+    /// The machine the user lands on. It may have no implementation of its own: the runner's
+    /// image table supplies it (`supplied`), and a target it gives none of its form refuses it.
     #[serde(default)]
     pub access: bool,
     /// How a container produces this machine: an image or a build, and what only a container

@@ -111,7 +111,8 @@ pub enum MachineShape {
     Container,
     /// A virtual machine.
     Vm,
-    /// An access machine the runner supplies (nothing to build).
+    /// An access machine the spec leaves to the runner with none of the target's forms from the
+    /// image table: the target refuses the lab, so nothing renders it.
     Supplied,
     /// An existing machine, reached as it is (every machine on the `external` target).
     External,
@@ -425,7 +426,8 @@ fn network(spec: &Spec, name: &str, n: &Network, declared: &str) -> NetworkPlan 
 
 /// How the target produces machine `m`. Lowering keeps only the forms the target runs and
 /// refuses a machine without one, so a machine with neither form here is the access machine the
-/// runner supplies.
+/// spec leaves to the runner, which the target refuses unless the image table gave it its form
+/// (`Lab::missing_form`).
 fn shape(target: Target, m: &Machine) -> MachineShape {
     if target == Target::External {
         return MachineShape::External;

@@ -1,9 +1,10 @@
 ---
-source: crates/isoloom-render/tests/inventory.rs
-expression: "inventory::render(&env(\"corp-ad-basics\", Target::CloudVm), &aws())"
+source: crates/core/isoloom-render/tests/inventory.rs
+expression: "inventory::render(&env(\"corp-ad-basics\", Target::CloudVm)?, &aws())"
 ---
 [linux]
 web01 ansible_host=10.40.10.10 ansible_user=admin
+user ansible_host=10.40.99.10 ansible_user=admin
 
 [windows]
 dc01 ansible_host=10.40.20.5

@@ -13,8 +13,9 @@ use crate::configure::{DaemonTable, unstarted};
 
 impl Lab {
     /// What the spec says that is likely not what its author means, in file order: a daemon a
-    /// recipe installs with no `service` step for it (it would start on Debian VMs only). Never
-    /// a problem: validation passes with warnings.
+    /// recipe installs with no `service` step for it (it would start on Debian VMs only), a
+    /// best-effort seal, an access machine left to the runner that the image table gives no
+    /// form. Never a problem: validation passes with warnings.
     #[must_use]
     pub fn warnings(&self) -> Vec<Warning> {
         let daemons = DaemonTable::common();
@@ -51,6 +52,7 @@ impl Lab {
             w.span = self.source.spans.find(&w.path);
             out.push(w);
         }
+        out.extend(self.unsupplied_warning());
         out.sort_by_key(|w| w.span.map(|s| (s.line, s.column)));
         out
     }

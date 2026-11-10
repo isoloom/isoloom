@@ -40,6 +40,18 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   run-manifest machines already were, and the `checks` output names the controller
   `isoloom-controller`. A lab applied with 1.x has them under the old names: the next `terraform
   apply` destroys and re-creates them.
+- **Breaking: an access machine left to the runner needs the runner's image table.** An
+  `access: true` machine with no `os` and nothing to run takes its forms from the image table's
+  `access:` (`isoloom generate --images`, the defaults' `images:`). Without one, the VM targets
+  (Vagrant, Proxmox, ESXi, the clouds) wrote no VM for it, and on Proxmox and the clouds no run
+  manifest entry either, while every other machine's hosts file still listed it; Docker wrote its
+  service with no image, which `docker compose --profile access` refuses. A target the table gives
+  none of the form it runs now refuses the lab at `machines.<m>.os` (`isoloom targets` says why),
+  and `isoloom validate` warns when the table gives none at all. Give the machine `os: debian@12`,
+  or pass a table with `access: { docker: <image>, vm: <os> }`. The `corp-ad-basics` example's
+  access machine is `os: debian@12` now: an on-demand VM on Vagrant, a VM on Proxmox and ESXi, a
+  container on hybrid. `isoloom_targets::Lab::missing_form` says why a target can't run a lab at
+  all, the image table included.
 - **Breaking: what Isoloom names beside a machine is under `isoloom-`, which no machine takes.**
   The check runner of the networks' position is `isoloom-networks` (its script
   `checks/isoloom-networks.sh`, its run-manifest step `check-isoloom-networks`, its Compose

@@ -72,7 +72,7 @@ fn windows_machines_are_not_vantage_points() -> Outcome {
     let derived = checks::derived(&example("corp-ad-basics")?.spec());
     assert!(derived.iter().all(|c| c.position != Position::Machine("dc01".into())));
     assert!(derived.iter().all(|c| c.position != Position::Machine("ws-01".into())));
-    // The access machine (no implementation) still is: the runner supplies it.
+    // The access machine (Linux) still is.
     assert_ne!(names(&derived, "user"), Vec::<String>::new());
     // A machine can run them, so nothing stands on the networks instead.
     assert!(derived.iter().all(|c| c.position != Position::Networks));
@@ -169,7 +169,7 @@ fn hybrid_checks_from_the_controller_when_only_containers_could() -> Outcome {
     Ok(())
 }
 
-const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, ports: { web: { port: 80, protocol: http } }, app: { image: nginx } }\n  user: { access: true, networks: { lab: 20 } }\n";
+const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, ports: { web: { port: 80, protocol: http } }, app: { image: nginx } }\n  user: { os: debian@12, access: true, networks: { lab: 20 } }\n";
 
 /// The runner script of `checks` at `position`: hosts as written, scripts run with `sh`.
 fn runner(position: &Position, checks: &[&checks::Resolved]) -> String {

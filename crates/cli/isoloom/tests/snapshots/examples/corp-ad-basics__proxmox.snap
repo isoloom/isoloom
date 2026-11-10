@@ -1003,6 +1003,91 @@ resource "proxmox_virtual_environment_firewall_rules" "web01" {
   }
 }
 
+# Machine `user`.
+resource "proxmox_virtual_environment_file" "user" {
+  node_name    = var.node
+  datastore_id = var.snippets_datastore
+  content_type = "snippets"
+  source_raw {
+    file_name = "iso${var.slot}-user.yaml"
+    data = format("#cloud-config\n%s", yamlencode({
+      hostname    = "user"
+      users       = local.users
+      packages    = ["nftables", "curl", "netcat-openbsd"]
+      write_files = local.project_files
+      runcmd = [
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.40.10.10 web01'\\'' '\\''10.40.99.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: routes' > /var/lib/isoloom/ready; sh -c 'ip route replace 10.40.10.0/24 via 10.40.99.254\nip route replace 10.40.20.0/24 via 10.40.99.254' || { echo 'failed: routes' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
+      ]
+    }))
+  }
+}
+
+resource "proxmox_virtual_environment_vm" "user" {
+  name      = "iso${var.slot}-user"
+  node_name = var.node
+  tags      = ["isoloom", "corp-ad-basics"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
+  on_boot   = false
+  cpu {
+    cores = 1
+    type  = "host"
+  }
+  memory {
+    dedicated = 1024
+  }
+  disk {
+    datastore_id = var.datastore
+    file_id      = proxmox_download_file.debian_12.id
+    interface    = "virtio0"
+    size         = 20
+  }
+  network_device {
+    bridge   = proxmox_sdn_vnet.access.id
+    firewall = true
+  }
+  initialization {
+    datastore_id      = var.datastore
+    user_data_file_id = proxmox_virtual_environment_file.user.id
+    dns {
+      servers = ["1.1.1.1"]
+    }
+    ip_config {
+      ipv4 {
+        address = "10.40.99.10/24"
+        gateway = "10.40.99.254"
+      }
+    }
+  }
+  operating_system {
+    type = "l26"
+  }
+  serial_device {}
+  depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `user`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "user" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.user.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "user" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.user.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network access"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.access.name}"
+  }
+}
+
 # The controller: runs the environment's playbooks once every machine is up.
 resource "proxmox_virtual_environment_file" "isoloom_controller" {
   node_name    = var.node
@@ -1023,7 +1108,7 @@ resource "proxmox_virtual_environment_file" "isoloom_controller" {
         {
           path        = "/etc/isoloom/inventory.ini"
           permissions = "0600"
-          content     = "[linux]\nweb01 ansible_host=10.40.10.10 ansible_user=isoloom\n\n[windows]\ndc01 ansible_host=10.40.20.5\nws-01 ansible_host=10.40.20.21\nws-02 ansible_host=10.40.20.22\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n\n[domain]\ndc01\nws-01\nws-02\n"
+          content     = "[linux]\nweb01 ansible_host=10.40.10.10 ansible_user=isoloom\nuser ansible_host=10.40.99.10 ansible_user=isoloom\n\n[windows]\ndc01 ansible_host=10.40.20.5\nws-01 ansible_host=10.40.20.21\nws-02 ansible_host=10.40.20.22\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n\n[domain]\ndc01\nws-01\nws-02\n"
         }
       ])
       runcmd = [
@@ -1031,6 +1116,7 @@ resource "proxmox_virtual_environment_file" "isoloom_controller" {
         "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.40.20.5 dc01'\\'' '\\''10.40.20.21 ws-01'\\'' '\\''10.40.20.22 ws-02'\\'' '\\''10.40.10.10 web01'\\'' '\\''10.40.99.10 user'\\'' >> /etc/hosts' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: installing Ansible' > /var/lib/isoloom/ready; sh -c '[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q '\\''ansible-core>=2.15,<2.17'\\'' pywinrm; }' || { echo 'failed: installing Ansible' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for web01' > /var/lib/isoloom/ready; sh -c 'i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.40.10.10 head -n 1 /var/lib/isoloom/ready 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"web01: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && { echo '\\''web01 not ready'\\''; exit 1; }; sleep 5; done' || { echo 'failed: waiting for web01' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for user' > /var/lib/isoloom/ready; sh -c 'i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 isoloom@10.40.99.10 head -n 1 /var/lib/isoloom/ready 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"user: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && { echo '\\''user not ready'\\''; exit 1; }; sleep 5; done' || { echo 'failed: waiting for user' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for the Windows machines' > /var/lib/isoloom/ready; sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini dc01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''dc01 not ready'\\''; exit 1; }; sleep 10; done' || { echo 'failed: waiting for the Windows machines' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for the Windows machines' > /var/lib/isoloom/ready; sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-01 not ready'\\''; exit 1; }; sleep 10; done' || { echo 'failed: waiting for the Windows machines' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for the Windows machines' > /var/lib/isoloom/ready; sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini ws-02 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''ws-02 not ready'\\''; exit 1; }; sleep 10; done' || { echo 'failed: waiting for the Windows machines' > /var/lib/isoloom/ready; exit 1; }",
@@ -1108,7 +1194,8 @@ resource "proxmox_virtual_environment_vm" "isoloom_controller" {
     proxmox_virtual_environment_vm.dc01,
     proxmox_virtual_environment_vm.ws_01,
     proxmox_virtual_environment_vm.ws_02,
-    proxmox_virtual_environment_vm.web01
+    proxmox_virtual_environment_vm.web01,
+    proxmox_virtual_environment_vm.user
   ]
 }
 
@@ -1128,7 +1215,13 @@ output "ready_file" {
 
 # The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
-  value = { dc01 = "10.40.20.5", ws-01 = "10.40.20.21", ws-02 = "10.40.20.22", web01 = "10.40.10.10" }
+  value = {
+    dc01  = "10.40.20.5"
+    ws-01 = "10.40.20.21"
+    ws-02 = "10.40.20.22"
+    web01 = "10.40.10.10"
+    user  = "10.40.99.10"
+  }
 }
 
 output "ssh_user" {
@@ -1140,8 +1233,8 @@ output "checks" {
   value = [
     {
       position = "user"
-      machine  = "isoloom-controller"
-      host     = "10.40.10.253"
+      machine  = "user"
+      host     = "10.40.99.10"
       user     = "isoloom"
       script   = ".isoloom/proxmox/checks/user.sh"
     },
@@ -1533,6 +1626,7 @@ locals {
     {
       "name": "user",
       "role": "access",
+      "os": "debian-12",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1680,6 +1774,18 @@ locals {
     },
     {
       "kind": "ready_file",
+      "host": "10.40.99.10",
+      "user": "isoloom",
+      "path": "${outputs.ready_file}",
+      "log": "/var/log/cloud-init-output.log",
+      "grammar": "isoloom-ready/1",
+      "via": "isoloom@${outputs.ip}",
+      "timeout_s": 2400,
+      "unreachable_timeout_s": 600,
+      "interval_s": 10
+    },
+    {
+      "kind": "ready_file",
       "host": "10.40.10.253",
       "user": "isoloom",
       "path": "${outputs.ready_file}",
@@ -1729,7 +1835,7 @@ locals {
     "runners": [
       {
         "id": "user",
-        "from": "from isoloom-controller",
+        "from": "from user",
         "checks": [
           {
             "name": "checks/domain-up.sh",
@@ -1773,7 +1879,7 @@ locals {
           "action": "ssh.run",
           "with": {
             "command": "ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} sh -s",
-            "host": "10.40.10.253",
+            "host": "10.40.99.10",
             "user": "isoloom",
             "via": "isoloom@${outputs.ip}"
           },

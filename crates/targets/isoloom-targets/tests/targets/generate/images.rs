@@ -44,6 +44,41 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
 }
 
 #[test]
+fn a_target_the_image_table_gives_no_form_for_the_access_machine_refuses_it() -> Outcome {
+    // Left out, the machine would still be in every other machine's hosts file (and Docker's
+    // service would have no image): refused instead, at its `os`.
+    let mut supplied = source("segmented")?;
+    supplied.machines["user"].os = None;
+    let refused = |lab: &Lab, t: Target| match generate(lab, t) {
+        Err(isoloom_targets::Error::Generate(isoloom_targets::GenerateError::Unsupported { what, .. })) => what,
+        other => format!("not refused: {:?}", other.map(|f| f.len())),
+    };
+    let bare = Lab::new(supplied.clone());
+    for t in [
+        Target::Docker,
+        Target::DockerVm,
+        Target::Kubernetes,
+        Target::Vagrant,
+        Target::Proxmox,
+        Target::Esxi,
+        Target::CloudVm,
+    ] {
+        assert!(
+            refused(&bare, t).starts_with("machines.user.os: without `os`, the access machine"),
+            "{t:?}: {}",
+            refused(&bare, t)
+        );
+        assert!(!bare.possible().contains(&t), "{t:?}");
+    }
+    // A table with the container only: the container targets generate it, the VM targets don't.
+    let container = isoloom_spec::images::Table::parse("access: { docker: registry.example.com/workstation:1 }\n").unwrap();
+    let half = Lab::new(supplied).with_images(container);
+    assert!(generate(&half, Target::Docker).is_ok());
+    assert!(refused(&half, Target::Vagrant).contains("`access.vm`"), "{}", refused(&half, Target::Vagrant));
+    Ok(())
+}
+
+#[test]
 fn the_image_table_sits_between_built_in_images_and_the_spec() -> Outcome {
     let table = isoloom_spec::images::Table::parse("os:\n  debian@12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
     let vagrant = generated(&example("hello-stack")?.with_images(table), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;

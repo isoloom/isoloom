@@ -489,7 +489,7 @@
       "properties": {
         "os": {
           "$ref": "#/$defs/Os",
-          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form."
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner's image table supplies.\nWindows has no container form."
         },
         "service": {
           "$ref": "#/$defs/ServicesInput",
@@ -529,7 +529,7 @@
         },
         "access": {
           "type": "boolean",
-          "description": "The machine the user lands on (at most one). Without `os`, the runner supplies it. On\ndemand: the initial start skips it and the runner hot-adds it with the image or box the user\npicked (`ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX`).",
+          "description": "The machine the user lands on (at most one). Without `os` (and nothing to run), the\nrunner supplies it through its image table's `access:` (`isoloom generate --images`, the\ndefaults' `images:`); a target the table gives none of the form it runs refuses it. On\ndemand: the initial start skips it and the runner hot-adds it with the image or box the user\npicked (`ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX`).",
           "default": false
         },
         "ports": {
@@ -2767,7 +2767,7 @@
       "properties": {
         "os": {
           "$ref": "#/$defs/Os",
-          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form."
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner's image table supplies.\nWindows has no container form."
         },
         "service": {
           "$ref": "#/$defs/ServicesInput",
@@ -2908,7 +2908,7 @@
       "properties": {
         "os": {
           "$ref": "#/$defs/Os",
-          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form."
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner's image table supplies.\nWindows has no container form."
         },
         "service": {
           "$ref": "#/$defs/ServicesInput",

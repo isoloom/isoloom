@@ -335,7 +335,7 @@ The environment's machines, by name, started in the order written (after their `
 
 ### `machines.*.os`
 
-The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default. Required, except for a machine whose only recipe is `app.image`, `app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has no container form.
+The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default. Required, except for a machine whose only recipe is `app.image`, `app.build` or `app.appliance`, and an `access` machine the runner's image table supplies. Windows has no container form.
 
 - **Type:** string
 - **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `alpine@3.24`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
@@ -835,7 +835,7 @@ How many of this machine (2 to 99): clones `<name>-01`, `<name>-02`, ..., each o
 
 ### `machines.*.access`
 
-The machine the user lands on (at most one). Without `os`, the runner supplies it. On demand: the initial start skips it and the runner hot-adds it with the image or box the user picked (`ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX`).
+The machine the user lands on (at most one). Without `os` (and nothing to run), the runner supplies it through its image table's `access:` (`isoloom generate --images`, the defaults' `images:`); a target the table gives none of the form it runs refuses it. On demand: the initial start skips it and the runner hot-adds it with the image or box the user picked (`ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX`).
 
 - **Type:** boolean
 - **Default:** `false`

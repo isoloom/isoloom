@@ -27,6 +27,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 | A machine using the `openssh` entry and signing in as `ctf` without saying so | the login account defaults to `user` | `with: { username: ctf }` to keep the old account |
 | A tag key starting with a digit, two keys equal but for case or lowercasing to one label (`Cost.Center`, `cost_center`), or `Managed-By`/`Isoloom…` in any case | refused at `tags.<key>` | one key per tag, starting with a letter |
 | A tag whose `key:value` is over 50 characters, or under 3 (an empty value of a one-letter key) | refused at `tags.<key>` (Linode's limit, the strictest cloud's) | a shorter value |
+| An `access: true` machine with no `os` and nothing to run, generated with no image table (`--images`, the defaults' `images:`) giving its `access:` | refused by every target but `external` at `machines.<m>.os` (`validate` warns): Docker wrote a service with no image, which the runner couldn't start, and the VM targets left the machine out while every other machine's hosts file listed it | `os: debian@12` (or the image table's `access: { docker: <image>, vm: <os> }`) |
 | The same tag rules broken by a tag of the defaults (a defaults file, `ISOLOOM_TAGS__*`, `-s defaults.tags.*`), or a tag of the defaults clashing with the spec's | every command stops, naming the layer (`defaults (environment ISOLOOM_TAGS__TEAM): tag …`) | fix the defaults' tag |
 
 ## Behavior that changed

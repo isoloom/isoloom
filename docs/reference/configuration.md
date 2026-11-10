@@ -138,7 +138,9 @@ access:
 Keys under each OS: `vagrant`, `vagrant_version`, `box_url`, `box_server_url`, `qemu`,
 `hyperv`, `winrm`, `winssh`, `proxmox`, `aws`, `azure`, `gcp`, `digitalocean`, `linode`, `oci`.
 `access` names the image (`docker`) or OS (`vm`) of the access machine when the spec leaves it to
-the runner. The fields and their formats: `isoloom schema` and the
+the runner (`access: true`, no `os`, nothing to run). A target the table gives none of the form it
+runs refuses that machine, so a spec that leaves it to the runner generates only with a table that
+names it (`isoloom validate` warns when none does). The fields and their formats: `isoloom schema` and the
 [spec reference](../spec.md).
 
 ## Overriding a value once

@@ -114,8 +114,8 @@ pub struct Machine {
 pub(crate) struct MachineInput {
     /// The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone
     /// for its pinned default. Required, except for a machine whose only recipe is `app.image`,
-    /// `app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has
-    /// no container form.
+    /// `app.build` or `app.appliance`, and an `access` machine the runner's image table supplies.
+    /// Windows has no container form.
     #[serde(default)]
     os: Option<OsRef>,
     /// A catalogue service, `name[@version]` (`postgres@16`), or a list of them. Not with `app`.
@@ -141,7 +141,9 @@ pub(crate) struct MachineInput {
     /// further along on every network. Where the spec names this machine, it means every clone.
     #[serde(default, rename = "count")]
     _count: Option<u8>,
-    /// The machine the user lands on (at most one). Without `os`, the runner supplies it. On
+    /// The machine the user lands on (at most one). Without `os` (and nothing to run), the
+    /// runner supplies it through its image table's `access:` (`isoloom generate --images`, the
+    /// defaults' `images:`); a target the table gives none of the form it runs refuses it. On
     /// demand: the initial start skips it and the runner hot-adds it with the image or box the user
     /// picked (`ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX`).
     #[serde(default)]

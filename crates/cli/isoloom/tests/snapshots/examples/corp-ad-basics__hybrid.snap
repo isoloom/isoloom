@@ -1455,12 +1455,14 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "isoloom-docker-host"
     m.vm.network "private_network", ip: "10.40.10.253", auto_config: false, mac: "0A15F2C61700", virtualbox__intnet: "isoloom-corp-ad-basics-dmz"
     m.vm.network "private_network", ip: "10.40.20.253", auto_config: false, mac: "0A15F2C61701", virtualbox__intnet: "isoloom-corp-ad-basics-corp"
+    m.vm.network "private_network", ip: "10.40.99.253", auto_config: false, mac: "0A15F2C61702", virtualbox__intnet: "isoloom-corp-ad-basics-access"
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics - isoloom-docker-host"
       v.cpus = 2
       v.memory = 2048
       v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
       v.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
+      v.customize ["modifyvm", :id, "--nicpromisc4", "allow-all"]
     end
     m.vm.provision "isoloom_project", name: "project", rules: "/.isoloom*
 !/.isoloom/hybrid/compose.yml
@@ -1510,6 +1512,9 @@ fi"
       IF=$(ip -o link | grep -i '0a:15:f2:c6:17:01' | awk -F': ' '{print $2}')
       ip link set "$IF" up promisc on
       docker network inspect isoloom-corp-ad-basics-corp >/dev/null 2>&1 || docker network create -d macvlan --subnet 10.40.20.0/24 --gateway 10.40.20.254 -o parent="$IF" isoloom-corp-ad-basics-corp
+      IF=$(ip -o link | grep -i '0a:15:f2:c6:17:02' | awk -F': ' '{print $2}')
+      ip link set "$IF" up promisc on
+      docker network inspect isoloom-corp-ad-basics-access >/dev/null 2>&1 || docker network create -d macvlan --subnet 10.40.99.0/24 --gateway 10.40.99.254 -o parent="$IF" isoloom-corp-ad-basics-access
     SH
     m.vm.provision "shell", name: "containers", inline: "cd /opt/isoloom && docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900"
   end
@@ -1650,10 +1655,10 @@ services:
       corp:
         ipv4_address: 10.40.20.10
     extra_hosts:
+    - user:10.40.99.10
     - dc01:10.40.20.5
     - ws-01:10.40.20.21
     - ws-02:10.40.20.22
-    - user:10.40.99.10
     volumes:
     - isoloom-probe-amd64:/.isoloom-probe:ro
     healthcheck:
@@ -1699,6 +1704,122 @@ services:
       isoloom.managed: 'true'
       isoloom.environment: corp-ad-basics
     restart: unless-stopped
+  user:
+    image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858}
+    platform: linux/amd64
+    profiles:
+    - access
+    init: true
+    entrypoint:
+    - sleep
+    - infinity
+    hostname: user
+    networks:
+      access:
+        ipv4_address: 10.40.99.10
+    extra_hosts:
+    - web01:10.40.10.10
+    - dc01:10.40.20.5
+    - ws-01:10.40.20.21
+    - ws-02:10.40.20.22
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: corp-ad-basics
+    restart: unless-stopped
+  isoloom-routes-user:
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+    profiles:
+    - access
+    init: true
+    entrypoint:
+    - /bin/sh
+    - -c
+    - ip route replace 10.40.10.0/24 via 10.40.99.254 && ip route replace 10.40.20.0/24 via 10.40.99.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:user
+    cap_add:
+    - NET_ADMIN
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip route show 10.40.10.0/24 | grep -q via
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      user:
+        condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: corp-ad-basics
+    restart: unless-stopped
+  isoloom-access:
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - sleep
+    - infinity
+    hostname: user
+    networks:
+      access:
+        ipv4_address: 10.40.99.10
+    extra_hosts:
+    - web01:10.40.10.10
+    - dc01:10.40.20.5
+    - ws-01:10.40.20.21
+    - ws-02:10.40.20.22
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: corp-ad-basics
+  isoloom-routes-isoloom-access:
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+    profiles:
+    - check
+    init: true
+    entrypoint:
+    - /bin/sh
+    - -c
+    - ip route replace 10.40.10.0/24 via 10.40.99.254 && ip route replace 10.40.20.0/24 via 10.40.99.254 && while ip -o -4 addr show | grep -qv ' lo '; do sleep 2; done; exit 1
+    network_mode: service:isoloom-access
+    cap_add:
+    - NET_ADMIN
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - ip route show 10.40.10.0/24 | grep -q via
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      isoloom-access:
+        condition: service_started
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: corp-ad-basics
+    restart: unless-stopped
+  isoloom-check:
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    profiles:
+    - check
+    entrypoint:
+    - /bin/sh
+    - /isoloom/run.sh
+    network_mode: service:isoloom-access
+    volumes:
+    - ./checks/user.sh:/isoloom/run.sh:ro
+    depends_on:
+      web01:
+        condition: service_healthy
+      isoloom-routes-web01:
+        condition: service_healthy
+      isoloom-access:
+        condition: service_started
+      isoloom-routes-isoloom-access:
+        condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: corp-ad-basics
   isoloom-probe-amd64:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
     platform: linux/amd64
@@ -1720,6 +1841,9 @@ networks:
   corp:
     external: true
     name: isoloom-corp-ad-basics-corp
+  access:
+    external: true
+    name: isoloom-corp-ad-basics-access
 volumes:
   isoloom-probe-amd64:
     labels:
@@ -1980,10 +2104,13 @@ volumes:
     "user": {
       "access": true,
       "supplied": false,
-      "shapes": [],
+      "shapes": [
+        "docker",
+        "vm"
+      ],
       "role": "member",
       "arch": "amd64",
-      "os": null,
+      "os": "debian-12",
       "windows": false,
       "addresses": {
         "access": "10.40.99.10"
@@ -1995,7 +2122,18 @@ volumes:
       "depends_on": [],
       "inputs": [],
       "volumes": {},
-      "resources": {},
+      "resources": {
+        "docker": {
+          "cpus": 1,
+          "memory_mb": 512,
+          "disk_gb": 5
+        },
+        "vm": {
+          "cpus": 1,
+          "memory_mb": 1024,
+          "disk_gb": 20
+        }
+      },
       "gateway_of": [],
       "routes": [
         {
@@ -2008,7 +2146,9 @@ volumes:
         }
       ],
       "default_gateway": null,
-      "offline": false
+      "offline": false,
+      "os_family": "debian",
+      "os_version": "12"
     }
   },
   "start_order": [

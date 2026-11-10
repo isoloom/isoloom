@@ -37,6 +37,7 @@ machines:
       build: build/web01                         # the container form: its own Dockerfile
       steps: [{ playbook: provision/web01.yml }] # the VM form: its playbook
   user:
+    os: debian@12
     access: true
     networks: { access: 10 }
 

@@ -2,7 +2,8 @@
 //! cell what the target decides about a lab using the field.
 //!
 //! Nothing in it is written by hand. Each row is a change to a small lab that uses one field (its
-//! value, or fields together): `probes.yml`, and one row per OS of the spec's own table. Each
+//! value, or fields together): `probes.yml`, and one row per OS of the spec's own table, read
+//! with a runner's image table that supplies the access machine a spec leaves to it. Each
 //! column (`Column`) decides on the changed lab exactly as it decides on any spec (`decide`):
 //! lowering, the backend's declared capabilities, its own limits, a Vagrant provider's, a
 //! cloud's. A cell is generated, refused with the step that refused it and why, or not
@@ -142,8 +143,14 @@ fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, St
         with_hosts(&mut v);
     }
     let text = serde_yaml_ng::to_string(&v).map_err(|e| e.to_string())?;
-    isoloom_spec::parse(&text).map(Lab::new).map_err(|e| e.to_string())
+    let images = isoloom_spec::images::Table::parse(RUNNER_IMAGES).map_err(|e| e.to_string())?;
+    isoloom_spec::parse(&text).map(|s| Lab::new(s).with_images(images)).map_err(|e| e.to_string())
 }
+
+/// The image table every row's lab is read with, as a runner gives one: it supplies the access
+/// machine a spec leaves to the runner (no `os`), in both forms. Without it, every target but
+/// `external` refuses that machine.
+const RUNNER_IMAGES: &str = "access: { docker: registry.example.com/workstation:1, vm: debian@12 }\n";
 
 /// A row: its labs, then each column's decision about the one it reads.
 fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Row {

@@ -134,7 +134,7 @@ rows:
     about: clones of one machine
     patch: { machines: { m: { count: 2 } } }
   - field: machines.*.access
-    about: the machine the user lands on, supplied by the runner (no OS)
+    about: the machine the user lands on, supplied by the runner's image table (no OS)
     also: [access]
     without: [os]
     patch: { machines: { user: { access: true, networks: { lan: 99 } } } }
@@ -372,7 +372,7 @@ rows:
     about: a command run inside a machine
     patch: { checks: [{ from: m, exec: "redis-cli ping", expect: PONG }] }
   - field: checks[].exec
-    about: a command run inside an access machine the runner supplies
+    about: a command run inside an access machine the runner's image table supplies
     features: [exec-without-container]
     uses: features
     patch:

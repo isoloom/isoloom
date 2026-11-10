@@ -15,6 +15,7 @@ use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems, ProjectPath
 
 use crate::lower::{Lowered, Scope, lower};
 
+mod access;
 mod steps;
 mod templates;
 
@@ -195,17 +196,28 @@ impl Lab {
         Target::ALL
             .into_iter()
             .filter(|t| *t != Target::CloudServices)
-            .filter(|t| crate::lower::missing_form(&self.source, self.catalogue, *t).is_none())
+            .filter(|t| self.missing_form(*t).is_none())
             .filter(|t| *t != Target::Hybrid || isoloom_spec::targets::mixed(&self.spec()))
             .filter(|t| self.source.targets.as_ref().is_none_or(|wanted| wanted.contains(t)))
             .collect()
     }
 
-    /// Why `target` can't run the lab, found while lowering: the first machine it has no form
-    /// for, or a VM step it doesn't render yet, as a `refused` problem at the field.
+    /// The first machine `target` has no form for, as a `refused` problem at the field that rules
+    /// it out, placed: the target can't run the lab at all. The access machine the spec leaves to
+    /// the runner has the forms the image table gives it.
+    #[must_use]
+    pub fn missing_form(&self, target: Target) -> Option<Problem> {
+        let missing = crate::lower::missing_form(&self.source, self.catalogue, target).or_else(|| self.unsupplied(target));
+        missing.map(|p| self.place(p))
+    }
+
+    /// Why `target` can't run the lab, as a `refused` problem at the field: found while
+    /// lowering (the first machine it has no form for, or a VM step it doesn't render yet), else
+    /// the access machine the spec leaves to the runner, when the image table gives it none of
+    /// the form the target runs.
     #[must_use]
     pub fn refusal(&self, target: Target) -> Option<Problem> {
-        let first = self.raw(Scope::Target(target)).refusals.first().cloned();
+        let first = self.raw(Scope::Target(target)).refusals.first().cloned().or_else(|| self.unsupplied(target));
         first.map(|p| self.place(p))
     }
 

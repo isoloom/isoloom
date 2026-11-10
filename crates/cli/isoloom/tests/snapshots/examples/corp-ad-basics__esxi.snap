@@ -667,6 +667,78 @@ resource "terraform_data" "web01" {
   }
 }
 
+# Machine `user`.
+resource "esxi_guest" "user" {
+  guest_name     = "iso${var.slot}-user"
+  notes          = "isoloom: corp-ad-basics"
+  disk_store     = var.disk_store
+  ovf_source     = var.images["debian-12"]
+  numvcpus       = "1"
+  memsize        = "1024"
+  boot_disk_size = "20"
+  power          = "on"
+  network_interfaces {
+    virtual_network = esxi_portgroup.access.name
+    mac_address     = format("00:50:56:%02x:%02x:%02x", var.slot, 6, 0)
+    nic_type        = "vmxnet3"
+  }
+  guestinfo = {
+    metadata = base64encode(yamlencode({
+      instance-id    = "iso${var.slot}-user"
+      local-hostname = "user"
+      network = {
+        version = 2
+        ethernets = {
+          nic0 = {
+            match       = { macaddress = format("00:50:56:%02x:%02x:%02x", var.slot, 6, 0) }
+            addresses   = ["10.40.99.10/24"]
+            routes      = [{ to = "0.0.0.0/0", via = "10.40.99.254" }]
+            nameservers = { addresses = ["1.1.1.1"] }
+          }
+        }
+      }
+    }))
+    "metadata.encoding" = "base64"
+    userdata            = base64encode(format("#cloud-config\n%s", yamlencode({ hostname = "user", users = local.users })))
+    "userdata.encoding" = "base64"
+  }
+  depends_on = [esxi_guest.isoloom_router]
+}
+
+# Its set-up: its steps from the plan, over SSH through the router.
+resource "terraform_data" "user" {
+  triggers_replace = [esxi_guest.user.id]
+  connection {
+    type                = "ssh"
+    host                = "10.40.99.10"
+    user                = "isoloom"
+    private_key         = file(pathexpand(var.ssh_private_key_file))
+    bastion_host        = local.router_address
+    bastion_user        = "isoloom"
+    bastion_private_key = file(pathexpand(var.ssh_private_key_file))
+    timeout             = "10m"
+  }
+  provisioner "local-exec" {
+    command = "tar -czf \"${path.module}/.isoloom-project-user.tgz\" --exclude=\"${basename(local.root)}/.isoloom*\" --exclude=\".git\" --exclude=\".terraform\" --exclude=\"*.tfstate\" --exclude=\"*.tfstate.*\" --exclude=\".terraform.tfstate.lock.info\" --exclude=\"crash.log\" --exclude=\"crash.*.log\" --exclude=\".vagrant\" --exclude=\".isoloom-reach\" -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
+  }
+  provisioner "file" {
+    source      = "${path.module}/.isoloom-project-user.tgz"
+    destination = "/tmp/isoloom-project.tgz"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      "sudo sh -c 'mkdir -p /var/lib/isoloom'",
+      "mkdir -p ~/.ssh && echo '${trimspace(tls_private_key.controller.public_key_openssh)}' >> ~/.ssh/authorized_keys",
+      "sudo sh -c 'echo '\\''running: the project'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz' || { sudo sh -c 'echo '\\''failed: the project'\\'' > /var/lib/isoloom/ready'; exit 1; }",
+      "sudo sh -c 'echo '\\''running: hosts file'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.40.10.10 web01'\\'' '\\''10.40.99.10 user'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { sudo sh -c 'echo '\\''failed: hosts file'\\'' > /var/lib/isoloom/ready'; exit 1; }",
+      "sudo sh -c 'echo '\\''running: routes'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'ip route replace 10.40.10.0/24 via 10.40.99.254\nip route replace 10.40.20.0/24 via 10.40.99.254' || { sudo sh -c 'echo '\\''failed: routes'\\'' > /var/lib/isoloom/ready'; exit 1; }",
+      "sudo sh -c 'echo '\\''running: health check'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { sudo sh -c 'echo '\\''failed: health check'\\'' > /var/lib/isoloom/ready'; exit 1; }"
+    ]
+  }
+}
+
 # The controller: runs the environment's playbooks once every machine is set up.
 resource "esxi_guest" "isoloom_controller" {
   guest_name     = "iso${var.slot}-isoloom-controller"
@@ -747,7 +819,7 @@ resource "terraform_data" "isoloom_controller" {
     destination = "/tmp/isoloom-controller-key"
   }
   provisioner "file" {
-    content     = "[linux]\nweb01 ansible_host=10.40.10.10 ansible_user=isoloom\n\n[windows]\ndc01 ansible_host=10.40.20.5\nws-01 ansible_host=10.40.20.21\nws-02 ansible_host=10.40.20.22\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n\n[domain]\ndc01\nws-01\nws-02\n"
+    content     = "[linux]\nweb01 ansible_host=10.40.10.10 ansible_user=isoloom\nuser ansible_host=10.40.99.10 ansible_user=isoloom\n\n[windows]\ndc01 ansible_host=10.40.20.5\nws-01 ansible_host=10.40.20.21\nws-02 ansible_host=10.40.20.22\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n\n[domain]\ndc01\nws-01\nws-02\n"
     destination = "/tmp/isoloom-inventory.ini"
   }
   provisioner "remote-exec" {
@@ -766,7 +838,7 @@ resource "terraform_data" "isoloom_controller" {
       "sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready'"
     ]
   }
-  depends_on = [esxi_guest.dc01, esxi_guest.ws_01, esxi_guest.ws_02, terraform_data.web01]
+  depends_on = [esxi_guest.dc01, esxi_guest.ws_01, esxi_guest.ws_02, terraform_data.web01, terraform_data.user]
 }
 
 locals {
@@ -785,7 +857,13 @@ output "ready_file" {
 
 # The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
-  value = { dc01 = "10.40.20.5", ws-01 = "10.40.20.21", ws-02 = "10.40.20.22", web01 = "10.40.10.10" }
+  value = {
+    dc01  = "10.40.20.5"
+    ws-01 = "10.40.20.21"
+    ws-02 = "10.40.20.22"
+    web01 = "10.40.10.10"
+    user  = "10.40.99.10"
+  }
 }
 
 output "ssh_user" {
@@ -797,8 +875,8 @@ output "checks" {
   value = [
     {
       position = "user"
-      machine  = "isoloom-controller"
-      host     = "10.40.10.253"
+      machine  = "user"
+      host     = "10.40.99.10"
       user     = "isoloom"
       script   = ".isoloom/esxi/checks/user.sh"
     },
