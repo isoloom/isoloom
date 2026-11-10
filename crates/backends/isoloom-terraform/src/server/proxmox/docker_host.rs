@@ -44,7 +44,7 @@ pub fn module(env: &Environment, guest: &GuestCompose) -> Result<Vec<GeneratedFi
     let mut m = module::start(&Usage {
         apply: " -var proxmox_endpoint=https://<server>:8006/ -var proxmox_api_token=<user@realm!name=secret> -var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\"",
         key: None,
-        after: "# Then:   setup.sh piped into `sudo sh -s` over SSH, the project in /opt/isoloom, and Compose (run.json)\n",
+        after: "# Then:   the project in /opt/isoloom, setup.sh piped into `sudo sh -s` over SSH, and Compose (run.json)\n",
         ..Usage::with_key(&folder, "")
     });
     m.block(terraform(&[providers::PROXMOX]));

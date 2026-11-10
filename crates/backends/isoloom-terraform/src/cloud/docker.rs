@@ -219,7 +219,8 @@ pub(crate) fn module(cloud: Cloud, env: &Environment) -> Result<GeneratedFile> {
 }
 
 /// The host's set-up script `.isoloom/cloud-docker/<cloud>/setup.sh` (the same on every cloud):
-/// the runner pipes it into `sudo sh -s` to install Docker in the VM.
+/// the runner pipes it into `sh -s` as root (with `sudo` where the cloud's login isn't root) to
+/// install Docker in the VM.
 fn setup_files(env: &Environment) -> Vec<GeneratedFile> {
     hosting(env)
         .map(|cloud| GeneratedFile {

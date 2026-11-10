@@ -5,7 +5,7 @@
 //! Terraform lifecycle, the cloud's credentials and the VM.
 //!
 //! Terraform keeps only the infrastructure: no SSH from it, no project in the module. Once the
-//! apply is done, the runner installs Docker and copies the project into the VM over SSH
+//! apply is done, the runner copies the project into the VM and installs Docker over SSH
 //! (`into_vm`), then starts the Compose file there, the launch's values and the containers'
 //! secrets carried in over SSH (`SendEnv`). The published ports answer at the VM's address, and
 //! the runner reads the containers inside it (`Manifest.guest`).
