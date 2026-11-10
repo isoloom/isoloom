@@ -175,12 +175,12 @@ const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }
 fn runner(position: &Position, checks: &[&checks::Resolved]) -> String {
     let host = |h: &checks::Host, _: &Position| h.to_string();
     let run = |p: &str| format!("sh {p}");
-    let render = checks::Render {
+    let render = isoloom_render::checks::Render {
         host: &host,
         script: &run,
         playbook: None,
     };
-    checks::script(position, checks, &render)
+    isoloom_render::checks::script(position, checks, &render)
 }
 
 fn problems(yaml: &str) -> Outcome<Vec<String>> {

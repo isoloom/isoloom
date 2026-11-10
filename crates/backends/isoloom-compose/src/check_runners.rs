@@ -5,7 +5,8 @@
 
 use indexmap::IndexMap;
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{self, Host, Position, Probe, Render, Resolved};
+use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
+use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, UTILITY_IMAGE, exec_runner, init_names};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 
@@ -38,12 +39,12 @@ pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Servic
         if !execs.is_empty() {
             files.push(GeneratedFile {
                 path: format!("{OUTPUT_DIR}/{DIR}/checks/{}", exec_runner(&id)),
-                contents: checks::script(&pos, &execs, &render),
+                contents: script(&pos, &execs, &render),
             });
         }
         files.push(GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/checks/{id}.sh"),
-            contents: checks::script(&pos, &group, &render),
+            contents: script(&pos, &group, &render),
         });
         let scripts = group.iter().any(|c| matches!(c.probe, Probe::Script { .. }));
         let runner = runner(env, &pos, scripts, services);

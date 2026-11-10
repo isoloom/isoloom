@@ -89,14 +89,14 @@ pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Positi
             quote(playbook)
         )
     };
-    let render = checks::Render {
+    let render = isoloom_render::checks::Render {
         host: &host,
         script: &isoloom_render::checks::script_command,
         playbook: Some(&run_playbook),
     };
     GeneratedFile {
         path: format!("{OUTPUT_DIR}/{dir}/checks/{file}.sh"),
-        contents: checks::script(position, group, &render),
+        contents: isoloom_render::checks::script(position, group, &render),
     }
 }
 

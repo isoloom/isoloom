@@ -18,8 +18,8 @@
 //!   [`project`] copied in.
 //! - **The network pieces:** [`router`], VLAN [`trunks`], [`ipv6`] and a VM's more
 //!   addresses.
-//! - **The containers' shared parts:** [`container`]; where a check reaches its host:
-//!   [`checks`].
+//! - **The containers' shared parts:** [`container`]; the check runners (the sh runner a
+//!   position's checks become, where a check reaches its host): [`checks`].
 //! - **The run manifest's pieces** every target's `run.json` is built from: [`run_manifest`].
 //! - **What an ESXi host is told about a VM** (its guest OS type), which the `esxi` target and
 //!   Vagrant's ESXi provider share: [`esxi`].

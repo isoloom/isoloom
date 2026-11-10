@@ -3,7 +3,8 @@
 //! the runners, not refused.
 
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{self, Host, Position, Probe, Render, Resolved};
+use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
+use isoloom_render::checks::{Render, script};
 
 /// What a script check runs instead, should one reach a runner: why it can't run, and failure.
 const NO_SCRIPT: &str = "echo 'scripts need the project on the machine; the external target runs probes only' >&2; exit 1";
@@ -26,7 +27,7 @@ pub(crate) fn runners(env: &Environment) -> Vec<(String, String)> {
                 .into_iter()
                 .filter(|c| !matches!(c.probe, Probe::Script { .. } | Probe::Playbook { .. }))
                 .collect();
-            (!probes.is_empty()).then(|| (format!("checks/{m}.sh"), checks::script(&pos, &probes, &render)))
+            (!probes.is_empty()).then(|| (format!("checks/{m}.sh"), script(&pos, &probes, &render)))
         })
         .collect()
 }

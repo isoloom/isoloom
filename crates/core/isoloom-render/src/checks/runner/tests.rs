@@ -1,7 +1,8 @@
 use isoloom_spec::probe::Url;
 use proptest::prelude::*;
 
-use super::super::{HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
+use isoloom_plan::checks::{HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
+
 use super::{Host, Render, looks_expanded, script, single_quoted, with_directives};
 
 proptest! {
@@ -124,6 +125,41 @@ fn a_runner_reports_each_check_and_fails_when_one_failed() {
     assert_eq!(sh.matches("ISOLOOM_DERIVED").count(), 1, "only the derived check: {sh}");
     assert!(
         sh.ends_with("\necho \"isoloom-check: END $passed passed, $failed failed\"\n[ \"$failed\" -eq 0 ]\n"),
+        "{sh}"
+    );
+}
+
+/// An `exec` check named `n` running `command`.
+fn exec(n: &str, command: &str) -> Resolved {
+    check(
+        n,
+        0,
+        Probe::Exec {
+            command: command.into(),
+            expect: None,
+        },
+    )
+}
+
+#[cfg(unix)]
+#[test]
+fn what_a_runner_prints_reads_back_as_its_checks_lines() {
+    use isoloom_manifest::CheckLine;
+
+    let sh = runner(&[exec("it's up", "true"), exec("db ready", "echo refused; false")], false);
+    let out = std::process::Command::new("sh").arg("-c").arg(&sh).output().expect("sh runs");
+    assert_eq!(out.status.code(), Some(1), "one failed");
+    let read: Vec<CheckLine> = String::from_utf8_lossy(&out.stdout).lines().filter_map(CheckLine::parse).collect();
+    assert_eq!(
+        read,
+        [
+            CheckLine::Pass { name: "it's up".into() },
+            CheckLine::Fail {
+                name: "db ready".into(),
+                reason: "refused".into()
+            },
+            CheckLine::End { passed: 1, failed: 1 },
+        ],
         "{sh}"
     );
 }

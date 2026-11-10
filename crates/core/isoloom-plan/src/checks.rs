@@ -8,20 +8,18 @@
 //! networks are offline must not reach the internet.
 //!
 //! The planner here is target-independent: [`plan`] resolves every check to a position and a
-//! probe with symbolic hosts, and [`script`] turns one position's checks into a POSIX sh
-//! runner. Each generator decides how a position is realized (a container in a machine's
-//! network namespace, a provisioner on a VM, a Job with a machine's labels) and how a symbolic
-//! host is written (an address, or a name on Kubernetes). The runners print one line per
-//! check, `isoloom-check: PASS <name>` or `isoloom-check: FAIL <name>: <why>`, which
-//! the runner's `check` reads back (`isoloom_manifest::CheckLine`, the protocol's reader).
+//! probe with symbolic hosts, and `isoloom_render::checks::script` turns one position's checks
+//! into a POSIX sh runner. Each generator decides how a position is realized (a container in a
+//! machine's network namespace, a provisioner on a VM, a Job with a machine's labels) and how a
+//! symbolic host is written (an address, or a name on Kubernetes). The runners print one line
+//! per check, which the runner's `check` reads back (`isoloom_manifest::CheckLine`, the
+//! `isoloom-check/1` protocol).
 
 pub use isoloom_spec::probe::{Host, Url, can_run_checks};
 
 mod derived;
-mod runner;
 
 pub use derived::{allowed, derived, from_networks};
-pub use runner::{Render, script};
 
 /// The switch of the checks derived from the spec (`0` skips them): the check runner reads it,
 /// and every target passes it through from the host. Named once, here.
@@ -90,20 +88,17 @@ pub struct HttpRequest {
     pub body: Option<String>,
     /// Text the response body must contain.
     pub contains: Option<String>,
-    /// Follow redirects (up to `HTTP_MAX_REDIRECTS`) and compare the final status.
+    /// Follow redirects (as many as the runner goes through) and compare the final status.
     pub follow: bool,
 }
 
 impl HttpRequest {
     /// Nothing beyond a GET and its status (following redirects or not).
-    fn is_plain(&self) -> bool {
+    #[must_use]
+    pub fn is_plain(&self) -> bool {
         self.method.is_none() && self.headers.is_empty() && self.body.is_none() && self.contains.is_none()
     }
 }
-
-/// How many redirects an `http` check with `follow` goes through before giving up (the status
-/// compared is then that of the last answer, a redirect).
-pub(crate) const HTTP_MAX_REDIRECTS: u32 = 5;
 
 /// What a `tcp` check writes and reads beyond connecting (both optional; `send` needs `contains`).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

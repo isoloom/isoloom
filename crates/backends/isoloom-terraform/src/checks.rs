@@ -5,7 +5,7 @@
 use crate::hcl_builder::{Block, Expression, list, object, string};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position};
-use isoloom_render::checks::{address_of, script_command};
+use isoloom_render::checks::{Render, address_of, script, script_command};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 
 use crate::module::output;
@@ -14,7 +14,7 @@ use crate::module::output;
 /// at `/opt/isoloom`.
 pub(crate) fn runners(env: &Environment, dir: &str) -> Vec<GeneratedFile> {
     let host = |h: &Host, _: &Position| address_of(env, h);
-    let render = checks::Render {
+    let render = Render {
         host: &host,
         script: &script_command,
         playbook: None,
@@ -23,7 +23,7 @@ pub(crate) fn runners(env: &Environment, dir: &str) -> Vec<GeneratedFile> {
         .into_iter()
         .map(|(pos, group)| GeneratedFile {
             path: format!("{OUTPUT_DIR}/{dir}/checks/{}.sh", pos.id()),
-            contents: checks::script(&pos, &group, &render),
+            contents: script(&pos, &group, &render),
         })
         .collect()
 }

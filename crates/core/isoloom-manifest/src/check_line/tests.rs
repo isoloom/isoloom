@@ -41,6 +41,13 @@ proptest! {
     }
 
     #[test]
+    fn a_written_line_reads_back_as_itself(n in name(), why in "([!-~]([ -~]{0,20}[!-~])?)?", passed in any::<u32>(), failed in any::<u32>()) {
+        for line in [pass(&n), fail(&n, &why), CheckLine::End { passed, failed }] {
+            prop_assert_eq!(CheckLine::parse(&line.to_string()), Some(line));
+        }
+    }
+
+    #[test]
     fn a_line_without_the_marker_is_none(line in prefix()) {
         prop_assert_eq!(CheckLine::parse(&line), None);
     }

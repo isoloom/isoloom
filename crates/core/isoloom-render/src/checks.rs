@@ -1,10 +1,14 @@
-//! What the backends' check runners share: where a probe reaches its host, and how a VM target
-//! runs a project check script.
+//! The backends' check runners: the POSIX sh runner a position's checks become ([`script`]),
+//! where a probe reaches its host, and how a VM target runs a project check script.
 
 use isoloom_plan::Environment;
 use isoloom_plan::checks::Host;
 
 use crate::steps::PROJECT_DIR;
+
+mod runner;
+
+pub use runner::{Render, script};
 
 /// A probe's host at its address: a machine where a probe reaches it on the network
 /// ([`Environment::probe_address`]), a literal as written. For the targets that keep the
@@ -18,7 +22,7 @@ pub fn address_of(env: &Environment, host: &Host) -> String {
 }
 
 /// The shell command a VM target runs a project check script with: from the project copy at
-/// [`PROJECT_DIR`], then `sh <path>` (what a backend hands [`isoloom_plan::checks::Render::script`]).
+/// [`PROJECT_DIR`], then `sh <path>` (what a backend hands [`Render::script`]).
 #[must_use]
 pub fn script_command(path: &str) -> String {
     script_command_in(PROJECT_DIR, path)

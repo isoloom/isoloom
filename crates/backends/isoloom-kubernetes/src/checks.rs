@@ -6,6 +6,7 @@
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
+use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, check_runner, exec_runner};
 
 use crate::error::Result;
@@ -58,7 +59,7 @@ fn run_script(path: &str) -> String {
 /// One position's runners, its Job and, standing on offline networks only, its egress policy
 /// (offline as a machine there would be).
 fn position(env: &Environment, pos: &Position, job: &str, group: Vec<&Resolved>, out: &mut Checks) {
-    let render = checks::Render {
+    let render = Render {
         host: &host,
         script: &run_script,
         playbook: None,
@@ -73,9 +74,9 @@ fn position(env: &Environment, pos: &Position, job: &str, group: Vec<&Resolved>,
     }));
     let (execs, group): (Vec<&Resolved>, Vec<&Resolved>) = group.into_iter().partition(|c| matches!(c.probe, Probe::Exec { .. }));
     if !execs.is_empty() {
-        out.files.push((exec_runner(pos.id()), checks::script(pos, &execs, &render)));
+        out.files.push((exec_runner(pos.id()), script(pos, &execs, &render)));
     }
-    let runner = (format!("{}.sh", pos.id()), checks::script(pos, &group, &render));
+    let runner = (format!("{}.sh", pos.id()), script(pos, &group, &render));
     out.files.push(runner.clone());
     if !nets.is_empty() && nets.iter().all(|n| env.networks.get(n.as_str()).is_some_and(|n| !n.internet)) {
         out.policies.push(network::offline(&format!("offline-{job}"), Selector::of(CHECK_LABEL, job)));
