@@ -6,7 +6,7 @@
 //! files Compose reads from its environment read from the VM's copy, and root's Docker (through
 //! `sudo` keeping the values the way in forwarded, unless the way in is root: [`AsRoot`]).
 
-use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_FIXED};
+use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_ADDRESS, PUBLISH_FIXED};
 use isoloom_manifest::{EnvName, Failure, Machine, Name, Part, Placeholder, PublishMode, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_render::container::{exec_runner, host_environment, host_folders};
@@ -24,6 +24,7 @@ use super::slots::{Starts, slots};
 use super::stand_ins::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
 use crate::error::Result;
 use crate::file::ComposeFile;
+use crate::layout::DIR;
 use crate::start::StartPlan;
 
 /// The commands of a project in the VM: `docker compose` as root under its name, with its file,
@@ -42,7 +43,7 @@ impl InVm {
     /// in forwarded and `before` exported (no `sudo` for root).
     fn compose(&self, before: &str, rest: &[Part]) -> Template {
         let head = format!(
-            "cd {} && {before}{}env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 {PUBLISH_FIXED}=1 {}docker compose --project-name {} --file {OUTPUT_DIR}/docker/compose.yml ",
+            "cd {} && {before}{}env {PUBLISH_ADDRESS}=0.0.0.0 {PUBLISH_FIXED}=1 {}docker compose --project-name {} --file {OUTPUT_DIR}/{DIR}/compose.yml ",
             steps::PROJECT_DIR,
             self.as_root.keeping_env(),
             self.folders,
@@ -142,7 +143,7 @@ fn runners(env: &Environment, vm: &InVm) -> Result<(Vec<GuestRunner>, Vec<StepId
         derived.push(runner.command.id.clone());
         out.push(runner);
         if let Some((machine, execs)) = &p.execs {
-            let piped = format!("exec -T {machine} sh -s < {OUTPUT_DIR}/docker/checks/{}", exec_runner(machine));
+            let piped = format!("exec -T {machine} sh -s < {OUTPUT_DIR}/{DIR}/checks/{}", exec_runner(machine));
             out.push(GuestRunner {
                 id: Name::parse(&p.exec_id())?,
                 from: inside(machine),

@@ -6,6 +6,7 @@
 //! supervisor (`super::supervisor`) is the image's entrypoint, and starts it. The project folder is the
 //! build context.
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::configure::{ContainerProcess, Resource, RunPlan, TemplatePlan};
 use isoloom_plan::{Build, Environment, Image, MachineShape};
 use isoloom_spec::shell::quote;
@@ -21,7 +22,15 @@ const LIBRARY: &str = "/usr/local/lib/isoloom/configure.sh";
 /// Where the supervisor is in the image.
 const SUPERVISOR: &str = "/usr/local/bin/isoloom-run";
 
-/// The generated Dockerfiles of `env`'s containers, each at its path (its base image pulled
+/// Where machine `machine`'s generated Dockerfile is written, from the project folder:
+/// `.isoloom/docker/build/<machine>/Dockerfile`, beside the Compose file that builds from it
+/// (Kubernetes' build command names the same file).
+#[must_use]
+pub fn path(machine: &str) -> String {
+    format!("{OUTPUT_DIR}/docker/build/{machine}/Dockerfile")
+}
+
+/// The generated Dockerfiles of `env`'s containers, each at its [`path`] (its base image pulled
 /// through the registry mirrors), with what each builds from: the shell library, the supervisor
 /// and the templates filled in.
 #[must_use]
@@ -30,7 +39,7 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
     for (name, mp) in &env.machines {
         let (
             Some(Image::Container {
-                build: Some(Build::Generated { dockerfile, base, process }),
+                build: Some(Build::Generated { base, process }),
                 ..
             }),
             Some(c),
@@ -40,7 +49,7 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
             continue;
         };
         out.push(GeneratedFile {
-            path: dockerfile.clone(),
+            path: path(name),
             contents: render(&c, &env.images.pull(base), process),
         });
         if super::uses_library(c.recipe()) && !out.iter().any(|f| f.path == shell::LIBRARY_PATH) {

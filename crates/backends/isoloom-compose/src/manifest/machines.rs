@@ -168,7 +168,7 @@ fn volumes(mp: &MachinePlan, project: &Project) -> Result<Vec<Volume>> {
 
 /// Where a published port listens: `ISOLOOM_PUBLISH_ADDRESS`.
 fn publish_address() -> Result<Template> {
-    let name = isoloom_manifest::EnvName::parse(super::slots::PUBLISH_ADDRESS)?;
+    let name = isoloom_manifest::EnvName::parse(isoloom_manifest::contract::PUBLISH_ADDRESS)?;
     Ok(Template::from(Placeholder::Param(name)))
 }
 

@@ -1,5 +1,6 @@
 //! A module's first lines: the generated-file header, then how to start and stop it.
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_render::header;
 use isoloom_render::run_manifest::RUNNER;
 
@@ -57,7 +58,7 @@ impl<'a> Usage<'a> {
 
     /// The header, then the lines.
     pub(crate) fn text(&self) -> String {
-        let chdir = format!("terraform -chdir=.isoloom/{}", self.folder);
+        let chdir = format!("terraform -chdir={OUTPUT_DIR}/{}", self.folder);
         let ssh = if self.runner { PUBLIC_KEY } else { SSH_KEY };
         let key = self.key.map(|settings| format!(" \\\n#           {settings}{ssh}")).unwrap_or_default();
         let then = if self.runner { then_runner() } else { String::new() };

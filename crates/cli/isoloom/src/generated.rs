@@ -89,7 +89,7 @@ fn listed(dir: &Path) -> Result<BTreeSet<String>> {
             if under_output(l) {
                 Ok(l.to_owned())
             } else {
-                Err(refused(l, "isn't a path under .isoloom/"))
+                Err(refused(l, format!("isn't a path under {OUTPUT_DIR}/")))
             }
         })
         .collect()
@@ -136,14 +136,14 @@ fn reach(dir: &Path, entry: &str) -> Result<Reach> {
 /// link on its way is an error.
 fn still_there(dir: &Path, entry: &str) -> Result<bool> {
     match reach(dir, entry)? {
-        Reach::Linked(_) => Err(refused(entry, "is reached through a symbolic link")),
+        Reach::Linked(_) => Err(refused(entry, "is reached through a symbolic link".to_owned())),
         Reach::Missing => Ok(false),
         Reach::Found(m) => Ok(m.is_file()),
     }
 }
 
 /// The error for a list entry Isoloom won't remove, and `why`.
-fn refused(entry: &str, why: &'static str) -> CliError {
+fn refused(entry: &str, why: String) -> CliError {
     CliError::GeneratedList { entry: entry.to_owned(), why }
 }
 
@@ -203,4 +203,14 @@ pub(crate) fn list(dir: &Path, files: &[GeneratedFile], removed: &[String]) -> R
         path: LIST.to_owned(),
         contents: text,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_list_is_under_the_output_folder() {
+        assert_eq!(LIST, format!("{OUTPUT_DIR}/.generated"));
+    }
 }

@@ -90,12 +90,12 @@ fn shift_ipv6(copy: &mut Spec, n: u8) -> Result<()> {
 /// A generated file's path and contents, moved from `.isoloom/` to the instance's folder.
 #[must_use]
 pub fn relocate(path: &str, contents: &str, n: u8) -> (String, String) {
-    let dir = output_dir(Some(n));
-    let path = match path.strip_prefix(".isoloom/") {
-        Some(rest) => format!("{dir}/{rest}"),
+    let (from, to) = (format!("{OUTPUT_DIR}/"), format!("{}/", output_dir(Some(n))));
+    let path = match path.strip_prefix(&from) {
+        Some(rest) => format!("{to}{rest}"),
         None => path.to_owned(),
     };
-    (path, contents.replace(".isoloom/", &format!("{dir}/")))
+    (path, contents.replace(&from, &to))
 }
 
 #[cfg(test)]

@@ -224,6 +224,7 @@ name = "isoloom-catalogue"
 version = "1.0.9"
 dependencies = [
  "indexmap",
+ "isoloom-manifest",
  "isoloom-spec",
  "regex",
  "schemars",

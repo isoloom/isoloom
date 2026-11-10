@@ -3,8 +3,9 @@
 
 use indexmap::IndexMap;
 use isoloom_manifest as manifest;
-use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_FIXED};
+use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_ADDRESS, PUBLISH_FIXED};
 use isoloom_plan::{Environment, Image, PublishedPort};
+use isoloom_render::configure::dockerfile;
 use isoloom_render::container::{PROBE_DIR, init_names};
 use isoloom_render::{GeneratedFile, constraints, steps::PROJECT_DIR};
 use isoloom_spec::model;
@@ -76,7 +77,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
     };
     if let Some(Image::Container { reference, build, .. }) = &plan.image {
         svc.image = Some(reference.clone());
-        svc.build = build.as_ref().map(|b| build_of(env, b));
+        svc.build = build.as_ref().map(|b| build_of(env, m.name, b));
     }
     dns(spec, &mut svc);
     // A stock image the runner supplies for the user to work from, or one the spec marks
@@ -146,9 +147,9 @@ fn port(p: &PublishedPort) -> String {
     let proto = if p.protocol.is_tcp() { "" } else { "/udp" };
     let (publish, port) = (p.publish, p.port);
     if p.fixed {
-        format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{publish}:{port}{proto}")
+        format!("${{{PUBLISH_ADDRESS}:-127.0.0.1}}:{publish}:{port}{proto}")
     } else {
-        format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:${{{PUBLISH_FIXED}:+{publish}}}:{port}{proto}")
+        format!("${{{PUBLISH_ADDRESS}:-127.0.0.1}}:${{{PUBLISH_FIXED}:+{publish}}}:{port}{proto}")
     }
 }
 
@@ -156,7 +157,7 @@ fn port(p: &PublishedPort) -> String {
 /// the context) and build arguments when the spec gives them; the spec's own arguments win over
 /// the constraints'. `$$`: a literal value, not Compose's interpolation. A generated Dockerfile
 /// builds with the project folder as its context.
-fn build_of(env: &Environment, b: &isoloom_plan::Build) -> Build {
+fn build_of(env: &Environment, machine: &str, b: &isoloom_plan::Build) -> Build {
     let constraints = constraints::build_args(env.spec());
     let (context, dockerfile, target, own) = match b {
         isoloom_plan::Build::Own {
@@ -170,7 +171,7 @@ fn build_of(env: &Environment, b: &isoloom_plan::Build) -> Build {
             target.clone(),
             args.clone(),
         ),
-        isoloom_plan::Build::Generated { dockerfile, .. } => (ROOT.to_owned(), Some(dockerfile.clone()), None, IndexMap::new()),
+        isoloom_plan::Build::Generated { .. } => (ROOT.to_owned(), Some(dockerfile::path(machine)), None, IndexMap::new()),
     };
     Build {
         context,

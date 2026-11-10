@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_spec::syntax::{OsRef, ProjectPath, Step};
 use serde_json::{Map, Value};
 
@@ -141,7 +142,7 @@ impl Context<'_> {
             .ok_or_else(|| format!("the template `{file}` isn't a file of the entry (under `files/`)"))?;
         let text = values.text(text, Text::Template).map_err(|e| format!("{file}: {e}"))?;
         let item = label.map(|n| format!("item-{n}/")).unwrap_or_default();
-        let key: ProjectPath = format!(".isoloom/catalogue/{}/{item}{file}", self.entry.name())
+        let key: ProjectPath = format!("{OUTPUT_DIR}/catalogue/{}/{item}{file}", self.entry.name())
             .parse()
             .map_err(|e| format!("{file}: {e}"))?;
         *from = Value::String(key.to_string());

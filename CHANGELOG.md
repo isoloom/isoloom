@@ -91,7 +91,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   version control and the tools' state at any depth. A runner that took every output in copied
   other targets' Terraform state and logins into the guest. The tools' state patterns are
   `isoloom_manifest::ignore::{TERRAFORM_STATE, VAGRANT_STATE, RUNNER_STATE}`, and the reach folder
-  is `isoloom_manifest::ignore::REACH_DIR` (was `isoloom_render::secrets::REACH_DIR`).
+  is `isoloom_manifest::contract::REACH_DIR` (was `isoloom_render::secrets::REACH_DIR`).
 - **Breaking (library): `Manifest::validate` refuses a name twice in any of the manifest's lists**
   (machines, networks, tools, params, secret slots, outputs) with one error,
   `isoloom_manifest::Error::Duplicate { list, name }` (code `duplicate`), which replaces

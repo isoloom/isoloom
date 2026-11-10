@@ -100,7 +100,7 @@ impl<'a> Machine<'a> {
                 Some(format!("{cmd}{} {context}", options.concat()))
             }
             // Isoloom's own Dockerfile, with the project folder as its context.
-            Build::Generated { dockerfile, .. } => Some(format!("{cmd} -f {dockerfile} .")),
+            Build::Generated { .. } => Some(format!("{cmd} -f {} .", isoloom_render::configure::dockerfile::path(self.name))),
         }
     }
 }

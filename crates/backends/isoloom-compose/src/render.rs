@@ -13,8 +13,9 @@ pub(crate) use service::readiness;
 use std::fmt;
 
 use indexmap::IndexMap;
-use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_ADDRESS};
 use isoloom_plan::Environment;
+use isoloom_plan::checks::Position;
 use isoloom_render::backend::Files;
 use isoloom_render::container::PROBE_IMAGE;
 use isoloom_render::{GeneratedFile, header};
@@ -30,7 +31,7 @@ use isoloom_render::run_manifest::RUNNER;
 use crate::images::TOOLBOX_IMAGE;
 use crate::layout::DIR;
 use crate::machine::Machine;
-use crate::names::{probe_service, tool_service};
+use crate::names::{check_runner_service, probe_service, tool_service};
 use crate::start::StartPlan;
 use crate::{check_runners, ipv6, labels, networks, outside, router, storage};
 
@@ -39,9 +40,13 @@ use crate::{check_runners, ipv6, labels, networks, outside, router, storage};
 fn usage(file: &ComposeFile) -> String {
     let compose = format!("docker compose -f {OUTPUT_DIR}/{DIR}/compose.yml");
     let start = StartPlan::of(file).command(&compose, None);
-    format!(
-        "# Start:  {start}\n# Checks: {RUNNER}, or by hand: {compose} --profile check run --rm isoloom-check, and isoloom-check-<machine>\n# Stop:   {compose} down -v\n"
-    )
+    // The runner where a user stands, and another position's.
+    let user = Position::Networks;
+    let (own, other) = (
+        check_runner_service(&user, &user),
+        check_runner_service(&Position::Machine("<machine>".into()), &user),
+    );
+    format!("# Start:  {start}\n# Checks: {RUNNER}, or by hand: {compose} --profile check run --rm {own}, and {other}\n# Stop:   {compose} down -v\n")
 }
 
 /// The Compose file of `env` and the files it mounts (check runners, appliance configurations),
@@ -186,7 +191,7 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
             }
         }
         if let (Some(port), Some(host)) = (tool.port, tool.publish) {
-            t.ports = vec![format!("${{ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}}:{host}:{port}")];
+            t.ports = vec![format!("${{{PUBLISH_ADDRESS}:-127.0.0.1}}:{host}:{port}")];
         }
         services.insert(tool_service(name), t);
     }

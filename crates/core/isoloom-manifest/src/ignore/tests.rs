@@ -1,6 +1,7 @@
 use proptest::prelude::*;
 
-use super::{FILE, Rules, Token, copy_rules, tokens};
+use super::{FILE, OUTPUTS, RUNNER_STATE, Rules, Token, copy_rules, tokens};
+use crate::contract::{OUTPUT_DIR, REACH_DIR};
 
 fn kept<'a>(rules: &str, paths: &[&'a str]) -> Vec<&'a str> {
     let r = Rules::parse(rules);
@@ -171,4 +172,10 @@ fn the_copy_rules_are_lines_of_the_files_syntax() {
         copy_rules(&[".isoloom/hybrid/compose.yml"]),
         "/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n.terraform/\n*.tfstate\n*.tfstate.*\n.terraform.tfstate.lock.info\ncrash.log\ncrash.*.log\n.vagrant/\n.isoloom-reach/\n"
     );
+}
+
+#[test]
+fn the_outputs_and_the_runner_s_state_are_the_contract_s_folders() {
+    assert_eq!(OUTPUTS, format!("/{OUTPUT_DIR}*"));
+    assert_eq!(RUNNER_STATE, [format!("{REACH_DIR}/")]);
 }

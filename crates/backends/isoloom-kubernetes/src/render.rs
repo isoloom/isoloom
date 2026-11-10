@@ -4,6 +4,7 @@
 
 use std::fmt;
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header};
@@ -12,7 +13,7 @@ use serde::Serialize;
 use crate::backend::capabilities;
 use crate::checks::{self, Checks};
 use crate::error::{Error, Result};
-use crate::layout::output;
+use crate::layout::{DIR, output};
 use crate::machine::{self, Machine};
 use crate::objects::{Labels, Manifest};
 use crate::pod::INPUTS;
@@ -112,7 +113,7 @@ impl fmt::Display for Usage<'_> {
         let (env, ns) = (self.env, self.namespace);
         writeln!(
             f,
-            "# Start:  kubectl apply -k .isoloom/kubernetes\n#         kubectl -n {ns} wait --for=condition=Available deployment --all --timeout=600s\n# Stop:   kubectl delete namespace {ns}"
+            "# Start:  kubectl apply -k {OUTPUT_DIR}/{DIR}\n#         kubectl -n {ns} wait --for=condition=Available deployment --all --timeout=600s\n# Stop:   kubectl delete namespace {ns}"
         )?;
         let builds: Vec<String> = Machine::all(env).iter().filter_map(Machine::build_command).collect();
         if !builds.is_empty() {

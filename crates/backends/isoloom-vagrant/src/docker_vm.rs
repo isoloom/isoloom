@@ -115,7 +115,7 @@ fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
     let mut r = Ruby::new();
     r.text(&header("#"));
     r.comment(&format!(
-        "Start:  cd .isoloom/{DIR} && vagrant up\nChecks: cd .isoloom/{DIR} && vagrant provision --provision-with checks\nStop:   cd .isoloom/{DIR} && vagrant destroy -f"
+        "Start:  cd {OUTPUT_DIR}/{DIR} && vagrant up\nChecks: cd {OUTPUT_DIR}/{DIR} && vagrant provision --provision-with checks\nStop:   cd {OUTPUT_DIR}/{DIR} && vagrant destroy -f"
     ));
     r.blank();
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));

@@ -145,8 +145,9 @@ pub(crate) fn files(c: &Checks, namespace: &str, labels: &Labels) -> Result<Vec<
     let mut out: Vec<GeneratedFile> = c.files.iter().map(|(n, text)| file(n, text.clone())).collect();
     let names: Vec<&str> = c.jobs.iter().map(|j| j.metadata.name.as_str()).collect();
     let usage = format!(
-        "# The environment's checks, one Job per position. Run after the environment:\n#   kubectl -n {namespace} delete job {names} --ignore-not-found\n#   kubectl apply -k .isoloom/kubernetes/checks\n#   kubectl -n {namespace} wait --for=condition=complete job --all --timeout=300s; kubectl -n {namespace} logs -l {CHECK_LABEL}\n",
-        names = names.join(" ")
+        "# The environment's checks, one Job per position. Run after the environment:\n#   kubectl -n {namespace} delete job {names} --ignore-not-found\n#   kubectl apply -k {checks}\n#   kubectl -n {namespace} wait --for=condition=complete job --all --timeout=300s; kubectl -n {namespace} logs -l {CHECK_LABEL}\n",
+        names = names.join(" "),
+        checks = output("checks")
     );
     out.push(file("job.yaml", format!("{}{usage}{}", generated(), documents(&c.jobs, labels)?)));
     let runners = c.runners.iter().map(|(n, _)| n.clone()).collect();

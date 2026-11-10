@@ -44,7 +44,15 @@ pub(crate) fn file() -> GeneratedFile {
 
 #[cfg(test)]
 mod tests {
+    use isoloom_manifest::contract::OUTPUT_DIR;
+
     use super::*;
+
+    #[test]
+    fn it_and_the_snapshot_are_under_the_output_folder() {
+        assert_eq!(PATH, format!("{OUTPUT_DIR}/.gitignore"));
+        assert_eq!(crate::resolved::PATH, format!("{OUTPUT_DIR}/resolved.json"));
+    }
 
     /// Whether `name` matches `glob`, whose only wildcard is `*`.
     fn matches(glob: &str, name: &str) -> bool {

@@ -18,10 +18,9 @@ use super::machines::Member;
 use crate::error::Result;
 use crate::start::StartPlan;
 
-/// The host address published ports listen on.
-pub(super) const PUBLISH_ADDRESS: &str = "ISOLOOM_PUBLISH_ADDRESS";
-/// Set: each published port takes its `publish` number.
-use isoloom_manifest::contract::PUBLISH_FIXED;
+/// The host address published ports listen on; set: each published port takes its `publish`
+/// number.
+use isoloom_manifest::contract::{PUBLISH_ADDRESS, PUBLISH_FIXED};
 /// `0`: the checks derived from the spec are skipped.
 use isoloom_render::run_manifest::DERIVED;
 

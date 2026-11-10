@@ -640,6 +640,7 @@ version = "1.0.9"
 dependencies = [
  "indexmap",
  "insta",
+ "isoloom-manifest",
  "isoloom-spec",
  "jsonschema",
  "proptest",

@@ -78,12 +78,12 @@ pub(crate) enum CliError {
     },
     /// A line of `.isoloom/.generated` names a file Isoloom won't remove: one outside
     /// `.isoloom/`, or one reached through a symbolic link.
-    #[error("`.isoloom/.generated` lists `{entry}`, which {why}, so Isoloom won't remove it; delete that line")]
+    #[error("`{list}` lists `{entry}`, which {why}, so Isoloom won't remove it; delete that line", list = crate::generated::LIST)]
     GeneratedList {
         /// The line.
         entry: String,
         /// Why it is refused.
-        why: &'static str,
+        why: String,
     },
     /// A generated file's path goes through a symbolic link under the project folder, or is one:
     /// writing it would follow the link out of the project.

@@ -53,9 +53,18 @@ pub const SSH_PROXY_COMMAND: &str = "ISOLOOM_SSH_PROXY_COMMAND";
 /// its `publish` number.
 pub const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
 
+/// The param naming the host address a Compose file's published ports listen on (`127.0.0.1`
+/// when unset; `0.0.0.0` inside a VM that forwards them).
+pub const PUBLISH_ADDRESS: &str = "ISOLOOM_PUBLISH_ADDRESS";
+
 /// The param (`1`) asking each published port for its own `publish` number rather than a free
 /// one: a Compose file's and a Vagrantfile's.
 pub const PUBLISH_FIXED: &str = "ISOLOOM_PUBLISH_FIXED";
+
+/// Where a Terraform set-up that waits for its secrets says how to reach its machine, under its
+/// module: one file per machine, `<user>@<address>`. The runner reads it while Terraform runs (the
+/// module's outputs come only once every set-up is done) and delivers there.
+pub const REACH_DIR: &str = ".isoloom-reach";
 
 /// The folder on a Linux machine its guest-delivered secrets are kept in, one root-only file per
 /// slot.
@@ -77,5 +86,6 @@ mod tests {
         assert!(EXPIRES_TAG.starts_with(EXPIRES_WORD));
         assert_eq!(DELIVERED, format!("{SECRETS_DIR}/.delivered"));
         assert!(OUTPUT_DIR.starts_with('.') && RESERVED_PREFIX.starts_with(OUTPUT_DIR.trim_start_matches('.')));
+        assert!(REACH_DIR.starts_with(OUTPUT_DIR), "the outputs' pattern leaves it out of every copy");
     }
 }

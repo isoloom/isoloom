@@ -46,23 +46,15 @@ pub enum Build {
         args: IndexMap<String, String>,
     },
     /// A Dockerfile Isoloom generates from the machine's recipe ([`super::MachinePlan::recipe`]),
-    /// built with the project folder as its context.
+    /// built with the project folder as its context. Where it is written is the renderer's
+    /// (`isoloom_render::configure::dockerfile::path`).
     Generated {
-        /// Where the generated Dockerfile is written, from the project folder
-        /// (`.isoloom/docker/build/<machine>/Dockerfile`).
-        dockerfile: String,
         /// The image it starts `FROM`: the OS's official image, pinned by digest.
         base: String,
         /// What the container runs: Isoloom's supervisor as its entrypoint for its services, its own
         /// command, or nothing (idle).
         process: ContainerProcess,
     },
-}
-
-/// Where a machine's generated Dockerfile is written, from the project folder.
-#[must_use]
-pub(crate) fn generated_dockerfile(machine: &str) -> String {
-    format!(".isoloom/docker/build/{machine}/Dockerfile")
 }
 
 /// What machine `name` runs from on the target, in `shape`, its configuration resolved as
@@ -79,7 +71,6 @@ pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, reci
                 args: d.args.clone(),
             });
             let generated = d.generated.as_ref().map(|g| Build::Generated {
-                dockerfile: generated_dockerfile(name),
                 base: g.base.clone(),
                 process: match (g.from, &g.after_start) {
                     // An entry's official image keeps its own entrypoint and command, after the
@@ -155,20 +146,13 @@ mod tests {
         assert_eq!(args.get("A").map(String::as_str), Some("1"));
         let Some(Image::Container {
             reference: generated,
-            build: Some(Build::Generated {
-                dockerfile: written,
-                base,
-                process,
-            }),
+            build: Some(Build::Generated { base, process }),
             published: false,
         }) = image("gen")
         else {
             panic!("a generated build, with no published image")
         };
-        assert_eq!(
-            (generated.as_str(), written.as_str()),
-            ("localhost/isoloom/lab-gen", ".isoloom/docker/build/gen/Dockerfile")
-        );
+        assert_eq!(generated, "localhost/isoloom/lab-gen");
         assert!(base.starts_with("debian:12@sha256:"));
         assert_eq!(process, ContainerProcess::Idle, "nothing to run: kept idle");
         assert_eq!(image("user"), None, "a supplied machine runs from nothing of ours");

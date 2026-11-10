@@ -36,8 +36,8 @@ use std::collections::BTreeSet;
 /// The file's name, at the project's root.
 pub const FILE: &str = ".isoloomignore";
 
-/// Isoloom's outputs, at the project's top: `.isoloom/`, an instance's `.isoloom-<n>/`, and every
-/// other `.isoloom*` entry there. It takes `.isoloomignore` itself too, on purpose: the copy has
+/// Isoloom's outputs, at the project's top: `.isoloom/` ([`OUTPUT_DIR`](crate::contract::OUTPUT_DIR)),
+/// an instance's `.isoloom-<n>/`, and every other `.isoloom*` entry there. It takes `.isoloomignore` itself too, on purpose: the copy has
 /// applied it already, and a machine has no use for it.
 pub const OUTPUTS: &str = "/.isoloom*";
 
@@ -58,12 +58,8 @@ pub const TERRAFORM_STATE: &[&str] = &[
 /// What Vagrant writes beside a Vagrantfile: each machine's folder (its id, its private key).
 pub const VAGRANT_STATE: &[&str] = &[".vagrant/"];
 
-/// Where a Terraform set-up that waits for its secrets says how to reach its machine, under its
-/// module: one file per machine, `<user>@<address>`. The runner reads it while Terraform runs (the
-/// module's outputs come only once every set-up is done) and delivers there.
-pub const REACH_DIR: &str = ".isoloom-reach";
-
-/// What the runner reads beside a module: each cloud machine's SSH login ([`REACH_DIR`]).
+/// What the runner reads beside a module: each cloud machine's SSH login
+/// ([`REACH_DIR`](crate::contract::REACH_DIR)).
 pub const RUNNER_STATE: &[&str] = &[".isoloom-reach/"];
 
 /// What a copy of the project into a machine leaves out beyond the project's `.isoloomignore`, as

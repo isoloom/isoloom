@@ -12,12 +12,13 @@ use indexmap::IndexMap;
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
+use isoloom_render::container::exec_runner;
 use serde::Serialize;
 use serde_yaml_ng::Value;
 
 use crate::error::{Error, Result};
 use crate::kustomize::{CHECK_SCRIPTS, SCRIPTS, key};
-use crate::layout::{CHART, CHART_PROJECT_FILES, DIR};
+use crate::layout::{CHART, CHART_PROJECT_FILES, DIR, output};
 use crate::machine::Machine;
 use crate::objects::{HELM_TAG, Image, Labels, Manifest, Metadata, Spec, Text, go_string};
 use crate::pod::INPUTS;
@@ -80,7 +81,7 @@ fn chart_file(env: &Environment) -> Result<String> {
         version: "0.1.0",
         app_version: "0.1.0",
     };
-    let usage = "# `helm package .isoloom/kubernetes/chart --version <v>` packages it with that version.\n";
+    let usage = format!("# `helm package {} --version <v>` packages it with that version.\n", output(CHART));
     Ok(format!("{}{usage}{}", generated(), document(&chart)?))
 }
 
@@ -167,7 +168,10 @@ fn tests(r: &Rendered) -> Result<String> {
             objects.push(Manifest::pod(metadata, j.template.spec.clone()));
         }
     }
-    let about = "# The checks: `helm test <release>` runs a Job per position; an `exec` check runs inside its\n# machine: kubectl -n <namespace> exec -i deploy/<machine> -- sh -s < .isoloom/kubernetes/checks/isoloom-exec-<machine>.sh\n";
+    let about = format!(
+        "# The checks: `helm test <release>` runs a Job per position; an `exec` check runs inside its\n# machine: kubectl -n <namespace> exec -i deploy/<machine> -- sh -s < {}\n",
+        output(&format!("checks/{}", exec_runner("<machine>")))
+    );
     Ok(format!("{}{about}{}", generated(), helm_documents(&objects, &r.labels)?))
 }
 

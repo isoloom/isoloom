@@ -196,7 +196,7 @@ fn render_in(env: &Environment, layout: &Layout) -> Result<(Files, BootStatement
 fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(&header("#"));
     r.comment(&format!(
-        "Start:  cd .isoloom/{dir} && vagrant up\nStop:   cd .isoloom/{dir} && vagrant destroy -f"
+        "Start:  cd {OUTPUT_DIR}/{dir} && vagrant up\nStop:   cd {OUTPUT_DIR}/{dir} && vagrant destroy -f"
     ));
     r.blank();
     // Machines start one after the other, in dependency order: a machine's services are up

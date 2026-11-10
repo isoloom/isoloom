@@ -3,7 +3,7 @@
 //! restarting between two of them.
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Template, boolean, call, list, reference, string};
-use isoloom_manifest::ignore::REACH_DIR;
+use isoloom_manifest::contract::REACH_DIR;
 use isoloom_render::project::{self, TarExclusion};
 
 /// How Terraform reaches the machine.
@@ -72,7 +72,7 @@ pub(crate) struct Provisioner {
     /// The resources it waits for.
     pub(crate) depends_on: Vec<Expression>,
     /// The name it tells the runner how to reach the machine under, before anything else
-    /// (`isoloom_manifest::ignore::REACH_DIR`): a machine whose set-up waits for its secrets.
+    /// (`isoloom_manifest::contract::REACH_DIR`): a machine whose set-up waits for its secrets.
     pub(crate) announce: Option<String>,
 }
 
