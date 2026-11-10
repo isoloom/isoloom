@@ -194,9 +194,12 @@ pub enum Error {
         /// The step it names.
         step: String,
     },
-    /// A machine named twice.
-    #[error("machines: `{name}` appears twice")]
-    DuplicateMachine {
+    /// A name used twice in one list: two machines, networks, tools, params, secret slots or
+    /// outputs of one name.
+    #[error("{list}: `{name}` appears twice; a name is unique in its list")]
+    Duplicate {
+        /// The list (`machines`, `networks`, `tools`, `params`, `secrets`, `outputs`).
+        list: &'static str,
         /// The name.
         name: String,
     },
@@ -207,12 +210,6 @@ pub enum Error {
         machine: String,
         /// The port's name.
         port: String,
-    },
-    /// An output name used twice.
-    #[error("outputs: `{name}` appears twice; an output's name is unique")]
-    DuplicateOutput {
-        /// The name.
-        name: String,
     },
     /// A reference to a machine that doesn't exist.
     #[error("{at}: no machine `{machine}` in this manifest")]
@@ -295,9 +292,8 @@ impl Error {
             Error::DuplicateStep { .. } => "duplicate_step",
             Error::UnknownStep { .. } => "unknown_step",
             Error::ReadyNotUp { .. } => "ready_not_up",
-            Error::DuplicateMachine { .. } => "duplicate_machine",
+            Error::Duplicate { .. } => "duplicate",
             Error::DuplicatePort { .. } => "duplicate_port",
-            Error::DuplicateOutput { .. } => "duplicate_output",
             Error::UnknownMachine { .. } => "unknown_machine",
             Error::UnknownPublished { .. } => "unknown_published",
             Error::UnknownParam { .. } => "unknown_param",

@@ -80,32 +80,44 @@ fn a_ready_condition_names_an_up_step_and_known_machines() {
     assert_eq!(refused(ready(json!({ "kind": "step_ok", "step": "down" }))), "ready_not_up");
 }
 
+/// The fixture with the first entry of `list` written twice (`entry`, when given, the list's only
+/// one first).
+fn twice(list: &str, entry: Option<Value>) -> Result<(), Error> {
+    read(|d| {
+        if let Some(e) = entry {
+            d[list] = json!([e]);
+        }
+        let first = d[list][0].clone();
+        d[list].as_array_mut().unwrap().push(first);
+    })
+}
+
 #[test]
-fn machines_and_their_ports_are_named_once() {
-    assert_eq!(
-        refused(|d| {
-            let web = d["machines"][0].clone();
-            d["machines"].as_array_mut().unwrap().push(web);
-        }),
-        "duplicate_machine"
-    );
+fn each_lists_names_are_unique() {
+    let secret = slot(&json!({ "via": "env", "var": "DEMO_SECRET", "steps": ["up"] }))[0].clone();
+    let param = param(&json!({ "via": "env", "var": "REGION", "steps": ["up"] }))[0].clone();
+    for (list, entry) in [
+        ("machines", None),
+        ("networks", None),
+        ("tools", None),
+        ("outputs", None),
+        ("secrets", Some(secret)),
+        ("params", Some(param)),
+    ] {
+        let err = twice(list, entry).unwrap_err();
+        assert!(matches!(&err, Error::Duplicate { list: l, .. } if *l == list), "{list}: {err}");
+        assert_eq!(err.code(), "duplicate");
+    }
+}
+
+#[test]
+fn a_machines_ports_are_named_once() {
     assert_eq!(
         refused(|d| {
             let site = d["machines"][0]["ports"][0].clone();
             d["machines"][0]["ports"].as_array_mut().unwrap().push(site);
         }),
         "duplicate_port"
-    );
-}
-
-#[test]
-fn outputs_are_named_once() {
-    assert_eq!(
-        refused(|d| {
-            let output = d["outputs"][0].clone();
-            d["outputs"].as_array_mut().unwrap().push(output);
-        }),
-        "duplicate_output"
     );
 }
 

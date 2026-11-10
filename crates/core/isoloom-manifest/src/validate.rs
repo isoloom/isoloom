@@ -17,8 +17,8 @@ impl Manifest {
     ///
     /// The first of: [`Error::NoHosts`], [`Error::DriverIdentity`] (an identity
     /// for another driver), [`Error::DuplicateStep`], [`Error::UnknownStep`] (a
-    /// delivery's step), [`Error::ReadyNotUp`], [`Error::DuplicateMachine`],
-    /// [`Error::DuplicatePort`], [`Error::DuplicateOutput`], [`Error::UnknownMachine`] (the
+    /// delivery's step), [`Error::ReadyNotUp`], [`Error::Duplicate`] (a name twice in a list),
+    /// [`Error::DuplicatePort`], [`Error::UnknownMachine`] (the
     /// guest's VM among them),
     /// [`Error::UnknownPublished`], [`Error::UnknownParam`] (the seal's param among them),
     /// [`Error::UnknownOutput`] and [`Error::PlaceholderOutOfPlace`].
@@ -35,8 +35,8 @@ impl Manifest {
         self.unique_steps()?;
         self.deliveries()?;
         self.ready_conditions()?;
+        self.unique_names()?;
         self.machine_references()?;
-        self.unique_outputs()?;
         if let Some(g) = &self.guest {
             self.machine_exists("guest.machine", g.machine.as_str())?;
         }
@@ -111,11 +111,17 @@ impl Manifest {
         Ok(())
     }
 
+    /// Each list's names, each once.
+    fn unique_names(&self) -> Result<()> {
+        unique("machines", self.machines.iter().map(|m| m.name.as_str()))?;
+        unique("networks", self.networks.iter().map(|n| n.name.as_str()))?;
+        unique("tools", self.tools.iter().map(|t| t.name.as_str()))?;
+        unique("params", self.params.iter().map(|p| p.name.as_str()))?;
+        unique("secrets", self.secrets.iter().map(|s| s.name.as_str()))?;
+        unique("outputs", self.outputs.iter().map(|o| o.name.as_str()))
+    }
+
     fn machine_references(&self) -> Result<()> {
-        let mut seen = BTreeSet::new();
-        if let Some(dup) = self.machines.iter().find(|m| !seen.insert(&m.name)) {
-            return Err(Error::DuplicateMachine { name: dup.name.to_string() });
-        }
         for m in &self.machines {
             let mut names = BTreeSet::new();
             if let Some(dup) = m.ports.iter().find(|p| !names.insert(&p.name)) {
@@ -141,14 +147,6 @@ impl Manifest {
             }
         }
         Ok(())
-    }
-
-    fn unique_outputs(&self) -> Result<()> {
-        let mut seen = BTreeSet::new();
-        match self.outputs.iter().find(|o| !seen.insert(&o.name)) {
-            Some(dup) => Err(Error::DuplicateOutput { name: dup.name.to_string() }),
-            None => Ok(()),
-        }
     }
 
     fn placeholders(&self) -> Result<()> {
@@ -203,6 +201,15 @@ impl Manifest {
             at: at.to_owned(),
             port: format!("{machine}.{port}"),
         })
+    }
+}
+
+/// [`Error::Duplicate`] for the first name of `list` that `names` gives twice.
+fn unique<'a>(list: &'static str, names: impl IntoIterator<Item = &'a str>) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    match names.into_iter().find(|n| !seen.insert(*n)) {
+        Some(name) => Err(Error::Duplicate { list, name: name.to_owned() }),
+        None => Ok(()),
     }
 }
 

@@ -71,7 +71,10 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 - New, optional: each Vagrant VM's `machines[].native.boot_digest` (reload a running VM whose
   digest changed), each lab machine's `machines[].resources`.
 - A published port's output is named `<machine>__<port>` (`web__portal`, was `web_portal`),
-  and a manifest naming an output twice is refused (`duplicate_output`).
+  and a manifest naming an output twice is refused.
+- A manifest giving one name twice in any list (machines, networks, tools, params, secret slots,
+  outputs) is refused with one error, `Error::Duplicate { list, name }` (code `duplicate`), which
+  replaces `Error::DuplicateMachine` (`duplicate_machine`).
 - Isoloom's own Compose services start with `isoloom-`: a route sidecar is
   `isoloom-routes-<machine>` (was `<machine>-routes`), an `init` job `isoloom-init-<machine>-<n>`
   (was `<machine>-init-<n>`) and its step `job-isoloom-init-<machine>-<n>`.

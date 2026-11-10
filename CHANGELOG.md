@@ -32,6 +32,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+- **Breaking (library): `Manifest::validate` refuses a name twice in any of the manifest's lists**
+  (machines, networks, tools, params, secret slots, outputs) with one error,
+  `isoloom_manifest::Error::Duplicate { list, name }` (code `duplicate`), which replaces
+  `Error::DuplicateMachine` (`duplicate_machine`). Two networks, tools, params or secret slots of
+  one name were taken.
 - **Breaking: a lab machine's role in the run manifest is `member`** (was `target`, which the
   manifest's top-level `target` names a target with): `machines[].role: member`,
   `isoloom_manifest::Role::Member` (was `Role::Target`). `resolved.json` says `member` too, and
@@ -46,7 +51,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `ui` and `web`'s `admin-ui` were both `web_admin_ui`) or a Terraform output's (machine `ssh`'s
   port `user` was `ssh_user`), and the run manifest listed both. A machine's name has no `--`, so
   the names can't meet now, and `Manifest::validate` refuses an output named twice
-  (`Error::DuplicateOutput`, `duplicate_output`).
+  (`Error::Duplicate`, `duplicate`).
 - **Breaking: the run manifest is version 1, and stable.** `manifest_version` is `1`; a reader
   refuses `0`. The schema is `schemas/run-manifest-v1.schema.json`, its `$id` (and each
   manifest's `$schema`) the committed file on `main`
