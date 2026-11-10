@@ -129,7 +129,7 @@ resource "esxi_portgroup" "lab" {
 
 # The router: forwards between networks with the reach rules, and to the internet. VMware Tools reports its uplink address.
 resource "esxi_guest" "isoloom_router" {
-  guest_name            = "iso${var.slot}-router"
+  guest_name            = "iso${var.slot}-isoloom-router"
   notes                 = "isoloom: ansible-pair"
   disk_store            = var.disk_store
   ovf_source            = var.images["ubuntu-24.04"]
@@ -150,8 +150,8 @@ resource "esxi_guest" "isoloom_router" {
   }
   guestinfo = {
     metadata = base64encode(yamlencode({
-      instance-id    = "iso${var.slot}-router"
-      local-hostname = "router"
+      instance-id    = "iso${var.slot}-isoloom-router"
+      local-hostname = "isoloom-router"
       network = {
         version = 2
         ethernets = {
@@ -336,7 +336,7 @@ resource "terraform_data" "cache" {
 
 # The controller: runs the environment's playbooks once every machine is set up.
 resource "esxi_guest" "isoloom_controller" {
-  guest_name     = "iso${var.slot}-controller"
+  guest_name     = "iso${var.slot}-isoloom-controller"
   notes          = "isoloom: ansible-pair"
   disk_store     = var.disk_store
   ovf_source     = var.images["ubuntu-24.04"]
@@ -351,8 +351,8 @@ resource "esxi_guest" "isoloom_controller" {
   }
   guestinfo = {
     metadata = base64encode(yamlencode({
-      instance-id    = "iso${var.slot}-controller"
-      local-hostname = "controller"
+      instance-id    = "iso${var.slot}-isoloom-controller"
+      local-hostname = "isoloom-controller"
       network = {
         version = 2
         ethernets = {
@@ -385,10 +385,10 @@ resource "terraform_data" "isoloom_controller" {
     timeout             = "10m"
   }
   provisioner "local-exec" {
-    command = "tar -czf \"${path.module}/.isoloom-project-controller.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
+    command = "tar -czf \"${path.module}/.isoloom-project-isoloom_controller.tgz\" --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X \"${abspath(local_file.isoloom_project.filename)}\" -C \"${dirname(local.root)}\" \"${basename(local.root)}\""
   }
   provisioner "file" {
-    source      = "${path.module}/.isoloom-project-controller.tgz"
+    source      = "${path.module}/.isoloom-project-isoloom_controller.tgz"
     destination = "/tmp/isoloom-project.tgz"
   }
   provisioner "file" {

@@ -14,7 +14,7 @@ use super::guest::{Guest, Nic};
 use super::machines;
 use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::module::ident;
-use crate::server::router::{forwarding, outputs as lab_outputs, ruleset_content};
+use crate::server::router::{NAME, forwarding, outputs as lab_outputs, ruleset_content};
 
 /// The router's place among the VMs (the controller is next, then the machines).
 pub(super) const INDEX: u64 = 0;
@@ -24,7 +24,7 @@ const ADDRESS_WAIT_SECS: u64 = 600;
 
 /// The router's VM.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let mut config = CloudConfig::new("isoloom-router", reference("local.users"));
+    let mut config = CloudConfig::new(NAME, reference("local.users"));
     config.packages = vec!["nftables".to_owned()];
     config.ca_certs = cloud_init::site_authorities(env);
     config.bootcmd.extend(cloud_init::prelude(env));
@@ -53,7 +53,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     }));
     let guest = Guest {
         id: "isoloom_router".to_owned(),
-        name: "router".to_owned(),
+        name: NAME.to_owned(),
         index: INDEX,
         os: SERVICE_OS.to_owned(),
         size: (1, 512, 10),

@@ -122,7 +122,7 @@ fn runner(env: &Environment, reach: &Reach, p: &Position) -> Option<Runner> {
             user: string(reach.user_of(mp)),
         }),
         None => reach.controller.clone().filter(|_| controller::needed(env)).map(|host| Runner {
-            machine: "controller".to_owned(),
+            machine: controller::NAME.to_owned(),
             host,
             user: string((reach.user)(controller::OS)),
         }),

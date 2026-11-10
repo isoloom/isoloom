@@ -73,7 +73,7 @@ fn azure_runs_windows_over_winrm_and_a_controller_runs_the_checks() -> Outcome {
     // A Windows-only environment: a Debian controller runs the checks from its public IP.
     assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"isoloom_controller\""));
     assert!(
-        tf.contains("machine  = \"controller\"\n      host     = azurerm_public_ip.isoloom_controller.ip_address"),
+        tf.contains("machine  = \"isoloom-controller\"\n      host     = azurerm_public_ip.isoloom_controller.ip_address"),
         "{tf}"
     );
     Ok(())

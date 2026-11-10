@@ -492,12 +492,12 @@ resource "proxmox_virtual_environment_firewall_ipset" "lab" {
 }
 
 # The router: forwards between networks with the reach rules, and to the internet.
-resource "proxmox_virtual_environment_file" "router" {
+resource "proxmox_virtual_environment_file" "isoloom_router" {
   node_name    = var.node
   datastore_id = var.snippets_datastore
   content_type = "snippets"
   source_raw {
-    file_name = "iso${var.slot}-router.yaml"
+    file_name = "iso${var.slot}-isoloom-router.yaml"
     data = format("#cloud-config\n%s", yamlencode({
       hostname = "isoloom-router"
       users    = local.users
@@ -538,7 +538,7 @@ resource "proxmox_virtual_environment_file" "router" {
 
 # The guest agent reports its uplink address (DHCP), for the published ports.
 resource "proxmox_virtual_environment_vm" "isoloom_router" {
-  name      = "iso${var.slot}-router"
+  name      = "iso${var.slot}-isoloom-router"
   node_name = var.node
   tags      = ["isoloom", "configured-app"]
   pool_id   = proxmox_virtual_environment_pool.env.pool_id
@@ -554,7 +554,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   lifecycle {
     postcondition {
       condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.66.0.254"], a)]) > 0
-      error_message = "VM `router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address (an IPv6 address alone isn't enough: the uplink needs IPv4 from DHCP). Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
+      error_message = "VM `isoloom-router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address (an IPv6 address alone isn't enough: the uplink needs IPv4 from DHCP). Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
     }
   }
   cpu {
@@ -580,7 +580,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   }
   initialization {
     datastore_id      = var.datastore
-    user_data_file_id = proxmox_virtual_environment_file.router.id
+    user_data_file_id = proxmox_virtual_environment_file.isoloom_router.id
     ip_config {
       ipv4 {
         address = "dhcp"

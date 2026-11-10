@@ -222,7 +222,7 @@ resource "aws_instance" "cache" {
 
 # The controller (Ansible): every network may reach it, and SSH from allowed_cidr.
 resource "aws_security_group" "isoloom_controller" {
-  name   = "${local.name}-controller"
+  name   = "${local.name}-isoloom-controller"
   vpc_id = aws_vpc.env.id
   ingress {
     description = "lab"
@@ -273,7 +273,7 @@ resource "aws_instance" "isoloom_controller" {
     volume_type = "gp3"
     encrypted   = true
   }
-  tags = { Name = "${local.name}-controller" }
+  tags = { Name = "${local.name}-isoloom-controller" }
 }
 
 resource "aws_eip" "isoloom_controller" {
@@ -326,7 +326,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = aws_eip.isoloom_controller.public_ip
       user     = "admin"
       command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"

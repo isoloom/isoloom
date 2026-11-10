@@ -282,7 +282,11 @@ fn the_server_routers_trust_the_certificate_authority_before_they_install_their_
     const AUTHORITY: &str = "ca_certs = { trusted = [file(\"${local.root}/certs/corp-ca.pem\")] }";
     let lab = example_with_ca("segmented")?;
     for (target, module, router) in [
-        (Target::Proxmox, "proxmox/main.tf", "resource \"proxmox_virtual_environment_file\" \"router\""),
+        (
+            Target::Proxmox,
+            "proxmox/main.tf",
+            "resource \"proxmox_virtual_environment_file\" \"isoloom_router\"",
+        ),
         (Target::Esxi, "esxi/main.tf", "resource \"esxi_guest\" \"isoloom_router\""),
     ] {
         let tf = file(&lab, target, module)?;

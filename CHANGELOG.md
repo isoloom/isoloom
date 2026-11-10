@@ -565,6 +565,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **The Proxmox and ESXi routers trust the site's certificate authorities** before they install
   their packages (cloud-init's `ca_certs`, each file read from the project), as the CHANGELOG's
   entry on Isoloom's own VMs said: only Vagrant's router did.
+- **Isoloom's own router and controller take Isoloom's names on Proxmox, ESXi and the clouds.**
+  A lab machine named `router` or `controller` wrote a second `proxmox_virtual_environment_file`
+  of the same name (invalid Terraform), and on ESXi and the clouds a second VM, snippet or cloud
+  resource of the same name. Their snippets, VMs and cloud resources are named
+  `isoloom-router`/`isoloom-controller` now (`iso<slot>-isoloom-router`,
+  `<env>-isoloom-controller`; Terraform labels `isoloom_router`, `isoloom_controller`), as their
+  run-manifest machines already were, and the `checks` output names the controller
+  `isoloom-controller`.
 
 - **QEMU's hub ports are one block per environment.** Each network had its own hashed base
   port, its VMs the ports after it, so two networks could hand one port to two hubs (`n9` and

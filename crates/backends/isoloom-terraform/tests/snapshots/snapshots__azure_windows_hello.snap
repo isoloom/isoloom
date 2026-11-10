@@ -257,7 +257,7 @@ resource "terraform_data" "web01" {
 
 # The controller (Ansible): every network may reach it, and SSH from allowed_cidr.
 resource "azurerm_network_security_group" "isoloom_controller" {
-  name                = "${local.name}-controller"
+  name                = "${local.name}-isoloom-controller"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
   tags                = local.tags
@@ -308,7 +308,7 @@ resource "azurerm_network_security_group" "isoloom_controller" {
 }
 
 resource "azurerm_public_ip" "isoloom_controller" {
-  name                = "${local.name}-controller"
+  name                = "${local.name}-isoloom-controller"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
   tags                = local.tags
@@ -317,7 +317,7 @@ resource "azurerm_public_ip" "isoloom_controller" {
 }
 
 resource "azurerm_network_interface" "isoloom_controller_lab" {
-  name                = "${local.name}-controller-lab"
+  name                = "${local.name}-isoloom-controller-lab"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
   tags                = local.tags
@@ -336,7 +336,7 @@ resource "azurerm_network_interface_security_group_association" "isoloom_control
 }
 
 resource "azurerm_linux_virtual_machine" "isoloom_controller" {
-  name                  = "${local.name}-controller"
+  name                  = "${local.name}-isoloom-controller"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
@@ -401,7 +401,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = azurerm_public_ip.isoloom_controller.ip_address
       user     = "isoloom"
       command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"

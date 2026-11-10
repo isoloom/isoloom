@@ -193,7 +193,7 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
         connection: Connection::Ssh { host: c.host, user: c.user },
         uploads: vec![
             Upload::Project {
-                id: "controller".to_owned(),
+                id: "isoloom_controller".to_owned(),
                 destination: steps::PROJECT_ARCHIVE,
             },
             Upload::Content {

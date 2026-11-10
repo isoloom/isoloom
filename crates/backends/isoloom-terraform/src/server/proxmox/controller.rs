@@ -20,7 +20,7 @@ use crate::module::ident;
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
     m.commented(
         "The controller: runs the environment's playbooks once every machine is up.",
-        snippet("controller", "controller", cloud_config(env).document()),
+        snippet(&ident(controller::NAME), controller::NAME, cloud_config(env).document()),
     );
     // The uplink (DHCP, its route out) first, then every network at the controller address.
     let mut nics = vec![nic("var.uplink_bridge", None)];
@@ -35,8 +35,8 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     depends_on.extend(vms(env).map(|(n, _)| reference(&format!("proxmox_virtual_environment_vm.{}", ident(n)))));
     let vm = Vm {
         id: "isoloom_controller".to_owned(),
-        snippet: "controller".to_owned(),
-        name: "controller".to_owned(),
+        snippet: ident(controller::NAME),
+        name: controller::NAME.to_owned(),
         size: (cpus, memory, disk),
         boot: Boot::Image(ident(controller::OS)),
         tpm: false,

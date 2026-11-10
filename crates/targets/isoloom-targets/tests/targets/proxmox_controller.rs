@@ -17,7 +17,7 @@ fn proxmox_runs_environment_playbooks_from_a_controller() -> Outcome {
     // The controller VM: on the uplink (its route out, to install Ansible) and on every network.
     assert!(tf.contains("resource \"proxmox_virtual_environment_vm\" \"isoloom_controller\""));
     assert!(tf.contains("bridge = var.uplink_bridge"));
-    assert!(tf.contains("user_data_file_id = proxmox_virtual_environment_file.controller.id"));
+    assert!(tf.contains("user_data_file_id = proxmox_virtual_environment_file.isoloom_controller.id"));
     // The inventory names each machine as the isoloom user with the controller's key.
     assert!(tf.contains("ansible_user=isoloom"));
     assert!(tf.contains("ansible_ssh_private_key_file=/etc/isoloom/id_ed25519"));

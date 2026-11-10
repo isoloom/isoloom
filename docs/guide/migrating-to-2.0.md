@@ -54,6 +54,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 - **`resolved.json`** is `resolved_version: 5`: a machine's size in each form (`resources.docker`,
   `resources.vm`), and a lab machine's `role` is `member` (was `target`).
 - The example `pivot-dmz` is now `dmz-jump`.
+- **Isoloom's own router and controller are renamed on Proxmox, ESXi and the clouds** (`isoloom-router`, `isoloom-controller`: their snippets, VM names and cloud resource names). A lab applied with 1.x has them under the old names: `terraform apply` replaces them (destroy and re-create), or run `isothrum down` and `up` again.
 
 ## Runner authors
 

@@ -16,6 +16,10 @@ use crate::cloud::vm::seal;
 use crate::machine::controller;
 use crate::module::output;
 
+/// The router's name: its host name, its VM's and snippet's, and its machine in a run manifest.
+/// A lab machine can't take it (`isoloom-` names are Isoloom's own).
+pub(crate) const NAME: &str = "isoloom-router";
+
 /// Forwarding on, as a sysctl file: IPv4, and IPv6 when the lab routes IPv6
 /// (`isoloom_plan::routing::forwarding`).
 pub(crate) fn forwarding(env: &Environment) -> String {

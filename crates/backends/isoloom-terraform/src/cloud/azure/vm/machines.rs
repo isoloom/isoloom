@@ -266,7 +266,7 @@ fn reach_rules(mut g: Nsg, rule: &str, ports: &[u16], block: &str) -> Nsg {
 /// its custom data (it waits for every machine's own set-up before the playbooks).
 pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let id = "isoloom_controller";
-    let mut g = Nsg::new(id, "controller");
+    let mut g = Nsg::new(id, controller::NAME);
     for (n, p) in &env.networks {
         g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
     }
@@ -274,9 +274,9 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
         "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
         g.allow("ssh", "Tcp", "22", reference("var.allowed_cidr")).build(),
     );
-    m.block(public_ip(id, "controller"));
+    m.block(public_ip(id, controller::NAME));
     let addresses = controller::addresses(env);
-    m.blocks(controller_nics(id, "controller", (&addresses, &IndexMap::new(), &IndexMap::new()), false));
+    m.blocks(controller_nics(id, controller::NAME, (&addresses, &IndexMap::new(), &IndexMap::new()), false));
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, _, disk) = controller::size(env);
     // Azure's Debian image is a 30 GB disk: the least it takes.
@@ -286,7 +286,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let setup = controller_setup::set_up(env, &|_| USER.to_owned(), inventory, &at_boot);
     m.block(linux_vm(
         id,
-        "controller",
+        controller::NAME,
         (controller::OS, None),
         (RULES.controller_size(env), disk, false),
         (list(ids), user_data::capped(&setup, "the controller", CAP)?),

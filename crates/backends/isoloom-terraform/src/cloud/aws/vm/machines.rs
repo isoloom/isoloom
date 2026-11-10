@@ -278,7 +278,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
             .add_block(lifecycle("user_data_base64", None))
             .add_block(primary(&first))
             .add_block(root_disk(disk))
-            .add_attribute(("tags", object([("Name", name_with("-controller"))])))
+            .add_attribute(("tags", object([("Name", name_with(&format!("-{}", controller::NAME)))])))
             .build(),
     );
     m.block(eip("isoloom_controller", &first));

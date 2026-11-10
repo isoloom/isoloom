@@ -144,7 +144,7 @@ fn controller(env: &Environment, m: &mut Module) {
     let (cpus, memory, disk) = controller::size(env);
     let guest = Guest {
         id: "isoloom_controller".to_owned(),
-        name: "controller".to_owned(),
+        name: controller::NAME.to_owned(),
         index: CONTROLLER_INDEX,
         os: SERVICE_OS.to_owned(),
         size: (cpus, memory, disk),

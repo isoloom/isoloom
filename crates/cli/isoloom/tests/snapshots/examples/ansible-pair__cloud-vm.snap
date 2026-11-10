@@ -257,7 +257,7 @@ resource "aws_instance" "cache" {
 
 # The controller (Ansible): every network may reach it, and SSH from allowed_cidr.
 resource "aws_security_group" "isoloom_controller" {
-  name   = "${local.name}-controller"
+  name   = "${local.name}-isoloom-controller"
   vpc_id = aws_vpc.env.id
   ingress {
     description = "lab"
@@ -308,7 +308,7 @@ resource "aws_instance" "isoloom_controller" {
     volume_type = "gp3"
     encrypted   = true
   }
-  tags = { Name = "${local.name}-controller" }
+  tags = { Name = "${local.name}-isoloom-controller" }
 }
 
 resource "aws_eip" "isoloom_controller" {
@@ -361,7 +361,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = aws_eip.isoloom_controller.public_ip
       user     = "admin"
       command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
@@ -1272,7 +1272,7 @@ resource "azurerm_linux_virtual_machine" "cache" {
 
 # The controller (Ansible): every network may reach it, and SSH from allowed_cidr.
 resource "azurerm_network_security_group" "isoloom_controller" {
-  name                = "${local.name}-controller"
+  name                = "${local.name}-isoloom-controller"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
   tags                = local.tags
@@ -1323,7 +1323,7 @@ resource "azurerm_network_security_group" "isoloom_controller" {
 }
 
 resource "azurerm_public_ip" "isoloom_controller" {
-  name                = "${local.name}-controller"
+  name                = "${local.name}-isoloom-controller"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
   tags                = local.tags
@@ -1332,7 +1332,7 @@ resource "azurerm_public_ip" "isoloom_controller" {
 }
 
 resource "azurerm_network_interface" "isoloom_controller_lab" {
-  name                = "${local.name}-controller-lab"
+  name                = "${local.name}-isoloom-controller-lab"
   resource_group_name = azurerm_resource_group.env.name
   location            = var.region
   tags                = local.tags
@@ -1351,7 +1351,7 @@ resource "azurerm_network_interface_security_group_association" "isoloom_control
 }
 
 resource "azurerm_linux_virtual_machine" "isoloom_controller" {
-  name                  = "${local.name}-controller"
+  name                  = "${local.name}-isoloom-controller"
   resource_group_name   = azurerm_resource_group.env.name
   location              = var.region
   tags                  = local.tags
@@ -1424,7 +1424,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = azurerm_public_ip.isoloom_controller.ip_address
       user     = "isoloom"
       command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
@@ -2518,11 +2518,11 @@ resource "google_compute_instance" "cache" {
 # The controller (Ansible): every network may reach it, and SSH from allowed_cidr.
 resource "google_compute_firewall" "isoloom_controller_net_lab" {
   project       = local.project
-  name          = "${local.name}-controller-net-lab"
+  name          = "${local.name}-isoloom-controller-net-lab"
   network       = google_compute_network.lab.id
   direction     = "INGRESS"
   source_ranges = ["10.63.0.0/24"]
-  target_tags   = ["${local.name}-controller"]
+  target_tags   = ["${local.name}-isoloom-controller"]
   allow {
     protocol = "all"
   }
@@ -2530,11 +2530,11 @@ resource "google_compute_firewall" "isoloom_controller_net_lab" {
 
 resource "google_compute_firewall" "isoloom_controller_ssh" {
   project       = local.project
-  name          = "${local.name}-controller-ssh"
+  name          = "${local.name}-isoloom-controller-ssh"
   network       = google_compute_network.lab.id
   direction     = "INGRESS"
   source_ranges = [var.allowed_cidr]
-  target_tags   = ["${local.name}-controller"]
+  target_tags   = ["${local.name}-isoloom-controller"]
   allow {
     protocol = "tcp"
     ports    = ["22"]
@@ -2543,10 +2543,10 @@ resource "google_compute_firewall" "isoloom_controller_ssh" {
 
 resource "google_compute_instance" "isoloom_controller" {
   project      = local.project
-  name         = "${local.name}-controller"
+  name         = "${local.name}-isoloom-controller"
   machine_type = "e2-small"
   zone         = local.zone
-  tags         = ["${local.name}-controller"]
+  tags         = ["${local.name}-isoloom-controller"]
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
@@ -2625,7 +2625,7 @@ output "checks" {
   value = [
     {
       position = "networks"
-      machine  = "controller"
+      machine  = "isoloom-controller"
       host     = google_compute_instance.isoloom_controller.network_interface[0].access_config[0].nat_ip
       user     = "admin"
       command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"

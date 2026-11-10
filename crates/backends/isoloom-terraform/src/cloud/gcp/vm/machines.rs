@@ -270,7 +270,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let id = "isoloom_controller";
     let Some(first) = env.networks.keys().next() else { return Ok(()) };
     let addresses = controller::addresses(env);
-    let who = (id, "controller");
+    let who = (id, controller::NAME);
     let mut rules = env
         .networks
         .iter()
@@ -287,7 +287,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     m.block(instance(&Instance {
         env,
         id,
-        who: "controller",
+        who: controller::NAME,
         os: controller::OS,
         own: None,
         machine_type: RULES.controller_size(env),

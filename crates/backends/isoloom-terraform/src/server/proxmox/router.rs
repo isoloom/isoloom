@@ -13,11 +13,11 @@ use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::machine::controller;
 use crate::module::ident;
-use crate::server::router::{forwarding, ruleset_content};
+use crate::server::router::{NAME, forwarding, ruleset_content};
 
 /// The router's snippet and VM.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let mut config = CloudConfig::new("isoloom-router", reference("local.users"));
+    let mut config = CloudConfig::new(NAME, reference("local.users"));
     config.packages = vec!["nftables".to_owned(), "qemu-guest-agent".to_owned()];
     config.ca_certs = cloud_init::site_authorities(env);
     config.bootcmd.extend(cloud_init::prelude(env));
@@ -40,7 +40,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     }
     m.commented(
         "The router: forwards between networks with the reach rules, and to the internet.",
-        snippet("router", "router", config.document()),
+        snippet(&ident(NAME), NAME, config.document()),
     );
     let mut nics = vec![nic("var.uplink_bridge", Some(call("upper", [mac(None)])))];
     nics.extend(
@@ -50,8 +50,8 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     );
     let vm = Vm {
         id: "isoloom_router".to_owned(),
-        snippet: "router".to_owned(),
-        name: "router".to_owned(),
+        snippet: ident(NAME),
+        name: NAME.to_owned(),
         size: (1, 512, 8),
         boot: Boot::Image(ident(controller::OS)),
         tpm: false,

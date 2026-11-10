@@ -140,7 +140,7 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() -> Out
         let tf = file(&files, &format!(".isoloom/cloud-vm/{cloud}/main.tf")).unwrap();
         assert!(tf.contains("isoloom_controller"), "{cloud}");
         // Each entry one item a line (the HCL builder).
-        let entry = format!("position = \"networks\"\n      machine  = \"controller\"\n      host     = {host}");
+        let entry = format!("position = \"networks\"\n      machine  = \"isoloom-controller\"\n      host     = {host}");
         assert!(tf.contains(&entry), "{cloud}: {tf}");
     }
     Ok(())

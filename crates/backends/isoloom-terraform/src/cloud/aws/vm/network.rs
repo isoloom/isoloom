@@ -140,7 +140,7 @@ pub(super) fn security_group(env: &Environment, (name, mp): (&str, &MachinePlan)
 /// The controller's: every network may reach it, and SSH from `allowed_cidr`.
 pub(super) fn controller_group(env: &Environment) -> Block {
     let mut b = resource("aws_security_group", "isoloom_controller")
-        .add_attribute(("name", name_with("-controller")))
+        .add_attribute(("name", name_with(&format!("-{}", crate::machine::controller::NAME))))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")));
     for (n, p) in &env.networks {
         b = b.add_block(ingress(n, (0, 0), "-1", list([string(p.cidr.as_str())])));
