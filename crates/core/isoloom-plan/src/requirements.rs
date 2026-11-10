@@ -5,12 +5,10 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use indexmap::IndexMap;
 use isoloom_spec::model::Spec;
-use isoloom_spec::windows::Tpm;
 
 use crate::checks::{self, Position, Probe};
-use crate::environment::{MachinePlan, MachineShape};
+use crate::environment::MachineShape;
 use crate::hardware::Need;
 
 /// A capability a backend may have: the kind of a [`Requirement`].
@@ -375,7 +373,7 @@ impl fmt::Display for Requirement {
             Requirement::ExistingHostFiles { machine } => crate::machine_files::no_existing_host_files(f, machine),
             Requirement::ExistingHostScriptCheck { check } => crate::existing_hosts::no_script_check(f, check),
             Requirement::ExistingHostCheckFromNoHost { check } => crate::existing_hosts::no_host_to_run_from(f, check),
-            Requirement::Tpm { machine } => no_tpm(f, machine),
+            Requirement::Tpm { machine } => crate::hardware::no_tpm(f, machine),
             Requirement::MachineProcess { machine } => write!(f, "machine `{machine}` {OWN_PROCESS}"),
             Requirement::OwnBoot { machine } => crate::boot::no_own_boot(f, machine),
             Requirement::Hardware { machine, need } => need.reason(machine, f),
@@ -396,14 +394,6 @@ impl fmt::Display for Requirement {
             Requirement::HostFolders { machine } => crate::storage::no_host_folders(f, machine),
         }
     }
-}
-
-/// Why a target without a virtual TPM refuses a machine that requires one.
-fn no_tpm(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
-    write!(
-        f,
-        "machine `{machine}` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)"
-    )
 }
 
 /// What a backend can render.
@@ -546,16 +536,6 @@ pub(crate) fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineSh
         }
     }
     out
-}
-
-/// The first VM that requires a TPM (`vm.tpm: true`); one Windows 11 merely expects is given
-/// where the target can, so it requires nothing.
-#[must_use]
-pub(crate) fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
-    machines
-        .iter()
-        .find(|(_, m)| m.shape == MachineShape::Vm && m.tpm == Some(Tpm::Required))
-        .map(|(name, _)| Requirement::Tpm { machine: name.clone() })
 }
 
 /// The checks' requirements beyond probing from a container: playbooks, and `exec` checks that

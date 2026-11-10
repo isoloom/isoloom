@@ -1,14 +1,35 @@
-//! What a machine asks of the hardware under it (`gpus`, `devices`, `nested_virtualization`),
-//! and what that requires of the backend, by the machine's shape on the target: a container
-//! gets the host's GPUs and devices from its runtime, a VM gets GPUs passed through or sized in
-//! and runs VMs of its own through its hypervisor. An existing host is used as it is.
+//! What a machine asks of the hardware under it (`gpus`, `devices`, `nested_virtualization`, a
+//! VM's `tpm`), and what that requires of the backend, by the machine's shape on the target: a
+//! container gets the host's GPUs and devices from its runtime, a VM gets GPUs passed through or
+//! sized in, runs VMs of its own through its hypervisor and gets a virtual TPM from it. An
+//! existing host is used as it is.
 
 use std::fmt;
 
+use indexmap::IndexMap;
 use isoloom_spec::model::{Device, Gpus, Machine, Spec};
+use isoloom_spec::windows::Tpm;
 
-use crate::environment::MachineShape;
+use crate::environment::{MachinePlan, MachineShape};
 use crate::requirements::{Feature, Requirement};
+
+/// The first VM that requires a TPM (`vm.tpm: true`); one Windows 11 merely expects is given
+/// where the target can, so it requires nothing.
+#[must_use]
+pub(crate) fn tpm(machines: &IndexMap<String, MachinePlan>) -> Option<Requirement> {
+    machines
+        .iter()
+        .find(|(_, m)| m.shape == MachineShape::Vm && m.tpm == Some(Tpm::Required))
+        .map(|(name, _)| Requirement::Tpm { machine: name.clone() })
+}
+
+/// Why a target without a virtual TPM refuses a machine that requires one.
+pub(crate) fn no_tpm(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
+    write!(
+        f,
+        "machine `{machine}` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)"
+    )
+}
 
 /// A machine's hardware, as the spec asks for it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
