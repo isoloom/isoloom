@@ -27,7 +27,7 @@ pub fn rewrite_image(c: &Constraints, image: &str) -> String {
 /// Where an image the project builds is tagged when the spec names none: `localhost/`, a
 /// registry no one pushes to or pulls from, so the tag never resolves to someone's Docker Hub
 /// repository.
-pub const BUILT_IMAGE_PREFIX: &str = "localhost/isoloom";
+const BUILT_IMAGE_PREFIX: &str = "localhost/isoloom";
 
 /// The tag a machine's container image goes by: the published one, or the name its build is
 /// tagged with (so its `init:` jobs can reuse it), `localhost/isoloom/<environment>-<machine>`.

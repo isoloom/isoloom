@@ -143,8 +143,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   within a version only optional fields are added; removing or renaming a field, changing its
   meaning, or adding a value a runner must act on bumps the version.
 - **Breaking: images the project builds are tagged `localhost/isoloom/<environment>-<machine>`**
-  (was `isoloom/<environment>-<machine>`, a name in someone else's Docker Hub namespace)
-  (`isoloom_plan::images::BUILT_IMAGE_PREFIX`).
+  (was `isoloom/<environment>-<machine>`, a name in someone else's Docker Hub namespace).
 - **Breaking: a Kubernetes published port is a cluster-internal Service** (`isoloom-<machine>`),
   reached with the `kubectl port-forward` the manifests' header and the chart's notes give; no
   public `LoadBalancer` is opened. Pods run under the Pod Security Standards' `baseline` level,
@@ -209,6 +208,17 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Breaking (library): render items no other crate uses are crate-internal**:
   `constraints::{trust_linux, trust_windows}`, `container::CHECK_RUNNER_PREFIX`,
   `HostSize::MIN_MEMORY_MB` and `windows::COMPUTER_NAME_MAX`.
+- **Breaking (library): items nothing outside their crate used are crate-internal or gone.**
+  `isoloom_spec`: `Spec::declares_input` (read `Input::sensitive` of `Spec::inputs`),
+  `model::PUBLIC_RESOLVER`, `tags::{key_refusal, value_refusal}`,
+  `defaults::{parse_set, override_spec}` (`load_profiled(dir, None, sets)` applies the sets;
+  `override_spec_with` stays) and the root's `DEFAULT_MEMORY_MB`, `DEFAULT_DISK_GB` and
+  `CONTAINER_DISK_GB`; `isoloom_targets::{CloudDockerBackend, DockerVmBackend, HybridBackend}`
+  (`isoloom_targets::generate` renders a target); `isoloom_plan::routing::routes_ipv6`,
+  `isoloom_plan::images::BUILT_IMAGE_PREFIX`, `isoloom_render::run_manifest::secret_source`,
+  `isoloom_render::steps::ACCEPT_ENV_DIR` and `isoloom_render::powershell::UNTAR`;
+  `isoloom_render::steps::WINDOWS_PROJECT_DIR` is removed (`isoloom_spec::windows::ISOLOOM_DIR`
+  is the folder).
 - **Breaking (library): `isoloom_spec::model::Spec::inputs` is a list of `Input`** (its `name`
   and whether it is `sensitive`), and `Spec::plain_inputs` is removed.
 - **Breaking (library): the plan's routes and IPv6 blocks are typed, worked out once.**
@@ -326,9 +336,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **The library takes the person's regions like the image table** (`Lab::with_regions`, from
   `Defaults::regions`; `Environment::regions`), and says each cloud's built-in one
   (`isoloom_targets::default_regions`). Also: `isoloom_spec::MachineSize` (a machine's size in a
-  form), `isoloom_render::run_manifest::{machine, resources, secret_source}`,
-  `MachinePlan::{reads_input, reads_input_file}`, `isoloom_plan::routing::{forwarding,
-  routes_ipv6}`, `isoloom_render::esxi::guest_os`, `isoloom_terraform::hcl_quote` and
+  form), `isoloom_render::run_manifest::{machine, resources}`,
+  `MachinePlan::{reads_input, reads_input_file}`, `isoloom_plan::routing::forwarding`,
+  `isoloom_render::esxi::guest_os`, `isoloom_terraform::hcl_quote` and
   `isoloom_targets::Error::Instance`.
 - **`isoloom validate` shows the spec's warnings**: a daemon a recipe installs with no `service`
   step for it, a `seal: best-effort` machine. Each reads `! warning: <field>` with its reason and
@@ -765,8 +775,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **A tag's rules are the strictest cloud's, as documented.** A value was allowed 255 bytes, but
   Linode takes a `key:value` tag of 3 to 50 characters (`x:` was too short, a long one too long),
   and the length was counted in bytes against a message saying characters. A tag is now refused
-  unless `key:value` is 3 to 50 characters, its value on one line; the rules are
-  `isoloom_spec::tags::{key_refusal, value_refusal}`, which the defaults' tags follow too.
+  unless `key:value` is 3 to 50 characters, its value on one line; the spec's tags and the
+  defaults' follow the same rules.
 - **A project path with a space works on every target.** A spec takes `provision/my setup.sh`,
   but the Dockerfiles wrote `COPY provision/my setup.sh provision/my setup.sh` and the set-up and
   check commands `sh provision/my setup.sh`, two words. Every `COPY` is now in its JSON form
@@ -1028,7 +1038,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   (`vagrant`, `proxmox`, `cloud`, `external`) and `WinrmAuth` are gone: a backend builds its own
   with `Access::new`, from `inventory::{vars, winrm_vars, WINRM_PATIENCE, WINDOWS_OVER_SSH}`.
   New: `controller::{NAME, INSTALL_ANSIBLE, PLAYBOOK_ENVIRONMENT}`, `steps::{accept_env,
-  accept_env_line, ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, RELOAD_SSHD, WINDOWS_PROJECT_ARCHIVE}`,
+  accept_env_line, ACCEPT_ENV_FILE, RELOAD_SSHD, WINDOWS_PROJECT_ARCHIVE}`,
   `isoloom_manifest::SnakeName::from_label`, `isoloom_spec::validate::dns_name`,
   `isoloom_ansible::configure::role_name`. `isoloom_spec::model::TmpfsMount::mode` (and
   `Tmpfs::mode`) is a `TmpfsMode`, read once, rather than text.
@@ -1043,9 +1053,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   Vagrant backend's own; `isoloom_spec::windows::esxi_guest_os` is
   `isoloom_render::esxi::guest_os`, which the Vagrant and ESXi backends share. Items of the
   supported crates that hand out a building-block crate's types are `#[doc(hidden)]`, so not a
-  promise: `Lab::plan` and `Lab::catalogue`, and `isoloom_targets::{backend,
-  CloudDockerBackend, DockerVmBackend, HybridBackend}` (`isoloom_targets::generate` renders a
-  target).
+  promise: `Lab::plan`, `Lab::catalogue` and `isoloom_targets::backend`
+  (`isoloom_targets::generate` renders a target); the docker-vm, hybrid and cloud-docker
+  backends themselves are crate-internal.
 - **Library items replaced or nothing outside their crate used**:
   `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}` (the lab takes
   the regions: `Lab::with_regions`) and `isoloom_spec::files` (`GeneratedFile` is

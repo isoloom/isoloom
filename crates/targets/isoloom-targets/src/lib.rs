@@ -44,10 +44,6 @@ pub mod report;
 pub mod resolved;
 pub mod tiers;
 
-// The backends themselves are the building-block crates' port (`isoloom_render::backend`), so
-// they are this crate's tests' and benches', not the supported API.
-#[doc(hidden)]
-pub use composite::{CloudDockerBackend, DockerVmBackend, HybridBackend};
 pub use error::{Error, GenerateError, Result};
 pub use generation::{default_regions, generate, generate_all, generate_instance, project_copies};
 pub use isoloom_plan::{Lab, NotPossible};

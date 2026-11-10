@@ -4,7 +4,7 @@
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
-use crate::testing::{Outcome, example, file, plan};
+use crate::testing::{Outcome, example, file};
 
 /// A gateway between two networks (IPv4 only: a gateway's network carries no IPv6), and the
 /// lab's router routing IPv6 between two others (`v6`) or not.
@@ -37,7 +37,6 @@ fn a_gateway_forwards_by_the_plans_step_on_every_vm_target() -> Outcome {
             })
             .ok_or("no forwarding step")?;
         assert_eq!(sysctls.len(), if v6 { 2 } else { 1 }, "{sysctls:?}");
-        assert_eq!(isoloom_plan::routing::routes_ipv6(env.spec()), v6);
         let line = if v6 { "'net.ipv6.conf.all.forwarding=1'" } else { "'net.ipv4.ip_forward=1'" };
         let vagrant = file(&generate(&lab, Target::Vagrant)?, "vagrant/Vagrantfile")?.to_owned();
         let fw = vagrant.split("config.vm.define \"fw\"").nth(1).ok_or("no fw")?;
@@ -50,8 +49,6 @@ fn a_gateway_forwards_by_the_plans_step_on_every_vm_target() -> Outcome {
 
 #[test]
 fn routers_forward_ipv6_when_the_lab_routes_it() -> Outcome {
-    let routed = plan("dual-stack", Target::Docker)?;
-    assert!(isoloom_plan::routing::routes_ipv6(routed.spec()));
     let compose = file(&generate(&example("dual-stack")?, Target::Docker)?, "docker/compose.yml")?.to_owned();
     let service = compose.split("\n  isoloom-router:\n").nth(1).ok_or("no router")?;
     assert!(service.contains("net.ipv6.conf.all.forwarding: '1'"), "{service}");

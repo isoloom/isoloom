@@ -5,10 +5,10 @@
 use isoloom_plan::configure::{CommandPlan, FilePlan, Resource, ServicePlan, ServiceSource, UserPlan};
 use isoloom_spec::shell::base64;
 use isoloom_spec::syntax::{FileState, Guard, Invocation};
+use isoloom_spec::windows::ISOLOOM_DIR;
 
 use super::Configured;
 use crate::powershell::quote;
-use crate::steps::WINDOWS_PROJECT_DIR;
 use crate::{GeneratedFile, header};
 
 /// The library, as Isoloom ships it.
@@ -40,7 +40,7 @@ pub(crate) fn script(c: &Configured<'_>, resources: &[Resource], fresh: bool) ->
         "Set-Content -LiteralPath $env:ISOLOOM_CHANGED -Value 'changed'"
     };
     let library = super::compact(LIBRARY);
-    format!("$ErrorActionPreference = 'Stop'\n{library}$env:ISOLOOM_CHANGED = '{CHANGED}'\n{mark}\nSet-Location -LiteralPath '{WINDOWS_PROJECT_DIR}'\n{calls}")
+    format!("$ErrorActionPreference = 'Stop'\n{library}$env:ISOLOOM_CHANGED = '{CHANGED}'\n{mark}\nSet-Location -LiteralPath '{ISOLOOM_DIR}'\n{calls}")
 }
 
 /// Step `r`'s call(s), one per line; `None` for a step the library doesn't run (a script, a

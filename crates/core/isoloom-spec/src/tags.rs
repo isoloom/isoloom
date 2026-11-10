@@ -18,7 +18,7 @@ const WORD: std::ops::RangeInclusive<usize> = 3..=50;
 /// `_ . : -`, starting with a letter (Google Cloud's labels), and not one Isoloom writes itself in
 /// any case (Azure's tag names ignore case).
 #[must_use]
-pub fn key_refusal(key: &str) -> Option<String> {
+pub(crate) fn key_refusal(key: &str) -> Option<String> {
     let allowed = |c: char| c.is_ascii_alphanumeric() || "_.:-".contains(c);
     let lower = key.to_ascii_lowercase();
     if key.len() > LABEL_MAX || !key.starts_with(|c: char| c.is_ascii_alphabetic()) || !key.chars().all(allowed) {
@@ -33,7 +33,7 @@ pub fn key_refusal(key: &str) -> Option<String> {
 /// Why `value` can't be tag `key`'s value everywhere, if it can't: on one line, and with the key
 /// a `key:value` word of 3 to 50 characters (Linode's tags).
 #[must_use]
-pub fn value_refusal(key: &str, value: &str) -> Option<String> {
+pub(crate) fn value_refusal(key: &str, value: &str) -> Option<String> {
     let word = key.chars().count() + 1 + value.chars().count();
     if value.chars().any(char::is_control) {
         Some("a value on one line".to_owned())

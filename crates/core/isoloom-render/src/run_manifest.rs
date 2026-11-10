@@ -23,7 +23,7 @@ use isoloom_spec::model;
 /// the store is asked for, as the spec writes it. An input's file has none: the input's own slot
 /// carries its value.
 #[must_use]
-pub fn secret_source(source: &model::SecretSource) -> Option<isoloom_manifest::SecretSource> {
+fn secret_source(source: &model::SecretSource) -> Option<isoloom_manifest::SecretSource> {
     let store = match source {
         model::SecretSource::Env { .. } => isoloom_manifest::Store::Env,
         model::SecretSource::File { .. } => isoloom_manifest::Store::File,
@@ -58,9 +58,9 @@ pub struct HeldSecret<'a> {
     pub holders: Vec<&'a str>,
 }
 
-/// Each secret of `env` the runner reads from a store ([`secret_source`]: an input's file is the
-/// input's own slot) that machines of `shape` get, with those machines: what a run manifest's
-/// secret slots are made of. A secret no such machine gets is left out.
+/// Each secret of `env` the runner reads from a store (`env`, `file`, `vault`, `sops`: an
+/// input's file is the input's own slot) that machines of `shape` get, with those machines: what
+/// a run manifest's secret slots are made of. A secret no such machine gets is left out.
 #[must_use]
 pub fn held_secrets(env: &Environment, shape: MachineShape) -> Vec<HeldSecret<'_>> {
     env.secrets

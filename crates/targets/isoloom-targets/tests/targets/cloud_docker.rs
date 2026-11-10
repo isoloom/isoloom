@@ -2,9 +2,8 @@
 //! cloud, and its refusals, Compose's capabilities first, then the clouds' own.
 
 use isoloom_plan::Environment;
-use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_targets::{CloudDockerBackend, Lab};
+use isoloom_targets::{Lab, backend};
 
 use crate::testing::{Outcome, plan};
 
@@ -15,7 +14,7 @@ fn env(name: &str) -> Outcome<Environment> {
 
 #[test]
 fn the_compose_file_comes_first_then_a_module_per_cloud() -> Outcome {
-    let files = CloudDockerBackend.render(&env("hello-stack")?).unwrap();
+    let files = backend(Target::CloudDocker).render(&env("hello-stack")?).unwrap();
     let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
     let compose = paths.iter().position(|p| *p == ".isoloom/docker/compose.yml").expect("the Compose file");
     let first_module = paths.iter().position(|p| p.starts_with(".isoloom/cloud-docker/")).expect("a module");
@@ -29,9 +28,9 @@ fn the_compose_file_comes_first_then_a_module_per_cloud() -> Outcome {
 #[test]
 fn a_machine_needing_a_controller_is_refused_by_capabilities() -> Outcome {
     let e = env("ansible-pair")?;
-    let why = CloudDockerBackend.refusal(&e).expect("refused");
+    let why = backend(Target::CloudDocker).refusal(&e).expect("refused");
     assert!(why.contains("provision"), "{why}");
-    assert!(CloudDockerBackend.render(&e).is_err());
+    assert!(backend(Target::CloudDocker).render(&e).is_err());
     Ok(())
 }
 
@@ -44,12 +43,12 @@ fn arm64_is_refused_by_the_clouds() {
         .unwrap(),
     );
     let e = Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None);
-    let why = CloudDockerBackend.refusal(&e).unwrap();
+    let why = backend(Target::CloudDocker).refusal(&e).unwrap();
     assert_eq!(
         why,
         "machine `w`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)"
     );
-    assert!(CloudDockerBackend.render(&e).unwrap_err().to_string().ends_with(&why));
+    assert!(backend(Target::CloudDocker).render(&e).unwrap_err().to_string().ends_with(&why));
 }
 
 #[test]
@@ -64,16 +63,16 @@ fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
         Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None)
     };
     // 512 MB + 14 GB + Docker's 1 GB: 15.5 GB fits the 16 GB host.
-    assert_eq!(CloudDockerBackend.refusal(&env(14336)), None);
+    assert_eq!(backend(Target::CloudDocker).refusal(&env(14336)), None);
     // 512 MB + 16 GB + 1 GB was given the 16 GB host all the same.
-    let why = CloudDockerBackend.refusal(&env(16384)).unwrap();
+    let why = backend(Target::CloudDocker).refusal(&env(16384)).unwrap();
     assert!(
         why.starts_with(
             "no cloud can run it (aws, azure, gcp, oci: the containers' host needs 17920 MB of memory (Docker's 1024 MB and the containers', machine `db` asking for the most, 16384 MB): the largest Docker host here has 16384 MB; digitalocean: "
         ),
         "{why}"
     );
-    assert!(CloudDockerBackend.render(&env(16384)).unwrap_err().to_string().ends_with(&why));
+    assert!(backend(Target::CloudDocker).render(&env(16384)).unwrap_err().to_string().ends_with(&why));
 }
 
 /// Every command a manifest runs over SSH, with the user it logs in as.
@@ -99,7 +98,7 @@ fn ssh_commands(json: &serde_json::Value) -> Vec<(String, String)> {
 
 #[test]
 fn linodes_root_host_runs_every_command_without_sudo_the_others_through_it() -> Outcome {
-    let manifests = CloudDockerBackend.run_manifests(&env("configured-app")?).unwrap();
+    let manifests = backend(Target::CloudDocker).run_manifests(&env("configured-app")?).unwrap();
     let of = |cloud: &str| {
         let placed = manifests.iter().find(|p| p.sub == Some(cloud)).expect(cloud);
         ssh_commands(&serde_json::to_value(&placed.manifest).unwrap())

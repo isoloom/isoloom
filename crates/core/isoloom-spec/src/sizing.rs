@@ -8,14 +8,14 @@ use crate::model::{self, Resources};
 /// core; they differ only in the memory and disk they reserve.
 pub const DEFAULT_CPUS: u32 = 1;
 /// A VM's memory when its `resources` don't say, in MB.
-pub const DEFAULT_MEMORY_MB: u32 = 1024;
+pub(crate) const DEFAULT_MEMORY_MB: u32 = 1024;
 /// A VM's disk when its `resources` don't say, in GB.
-pub const DEFAULT_DISK_GB: u32 = 20;
+pub(crate) const DEFAULT_DISK_GB: u32 = 20;
 /// A container's memory when its `resources` don't say, in MB: it shares the host kernel, so it
 /// asks for less than a VM.
 pub const CONTAINER_MEMORY_MB: u32 = 512;
 /// A container's disk when its `resources` don't say, in GB.
-pub const CONTAINER_DISK_GB: u32 = 5;
+pub(crate) const CONTAINER_DISK_GB: u32 = 5;
 
 /// What a spec's machines add up to: how many, and their CPUs, memory and disk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

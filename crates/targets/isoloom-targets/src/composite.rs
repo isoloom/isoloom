@@ -45,7 +45,7 @@ const DOCKER_VM_ROOT: AsRoot = AsRoot::Sudo;
 
 /// The `cloud-docker` backend: Compose on one cloud VM per cloud, built by Terraform.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct CloudDockerBackend;
+pub(crate) struct CloudDockerBackend;
 
 impl Backend for CloudDockerBackend {
     fn target(&self) -> Target {
@@ -85,7 +85,7 @@ impl Backend for CloudDockerBackend {
 /// The `docker-vm` backend: Compose on one local VM (Vagrant), or on a Proxmox server
 /// (Terraform).
 #[derive(Debug, Clone, Copy, Default)]
-pub struct DockerVmBackend;
+pub(crate) struct DockerVmBackend;
 
 impl Backend for DockerVmBackend {
     fn target(&self) -> Target {
@@ -145,7 +145,7 @@ pub(crate) const PROXMOX: &str = "proxmox";
 
 /// The `hybrid` backend: Vagrant VMs, and the containers on one more VM beside them.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct HybridBackend;
+pub(crate) struct HybridBackend;
 
 impl Backend for HybridBackend {
     fn target(&self) -> Target {

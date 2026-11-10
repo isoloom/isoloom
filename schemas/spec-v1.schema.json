@@ -3809,7 +3809,7 @@
           "items": {
             "type": "string"
           },
-          "description": "The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask\nnames of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's\ncontroller, and the router's resolver forwarding the lab's queries. Without it, the\npublic [`PUBLIC_RESOLVER`]."
+          "description": "The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask\nnames of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's\ncontroller, and the router's resolver forwarding the lab's queries. Without it, the\npublic `1.1.1.1`."
         },
         "ca_certificates": {
           "type": "array",

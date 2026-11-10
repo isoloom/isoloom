@@ -4,8 +4,9 @@
 
 use isoloom_spec::model::MachineFile;
 use isoloom_spec::shell::quote;
+use isoloom_spec::windows::ISOLOOM_DIR;
 
-use super::{PROJECT_DIR, WINDOWS_PROJECT_DIR};
+use super::PROJECT_DIR;
 use crate::powershell;
 
 /// The files as a root shell script: each written (or copied from the project), then given its
@@ -47,7 +48,7 @@ pub(super) fn windows(files: &[MachineFile]) -> String {
             let dir = format!("New-Item -ItemType Directory -Force -Path (Split-Path -Parent {path}) | Out-Null");
             let write = match (&f.source, &f.content) {
                 (Some(source), _) => {
-                    let from = format!("{WINDOWS_PROJECT_DIR}\\{}", source.replace('/', "\\"));
+                    let from = format!("{ISOLOOM_DIR}\\{}", source.replace('/', "\\"));
                     format!("Copy-Item -Force -Path {} -Destination {path}", powershell::quote(&from))
                 }
                 (None, content) => format!("[IO.File]::WriteAllText({path}, {})", powershell::quote(content.as_deref().unwrap_or_default())),

@@ -50,7 +50,7 @@ pub struct Constraints {
     /// The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask
     /// names of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's
     /// controller, and the router's resolver forwarding the lab's queries. Without it, the
-    /// public [`PUBLIC_RESOLVER`].
+    /// public `1.1.1.1`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dns: Vec<String>,
     /// Certificate authorities every machine trusts beside the public ones (PEM files in the
@@ -66,9 +66,9 @@ pub struct Constraints {
 
 /// The resolver a machine asks when neither the spec nor its constraints name one: public, so it
 /// still installs software.
-pub const PUBLIC_RESOLVER: &str = "1.1.1.1";
+const PUBLIC_RESOLVER: &str = "1.1.1.1";
 
-/// The resolvers of `constraints` ([`Constraints::dns`]), else [`PUBLIC_RESOLVER`].
+/// The resolvers of `constraints` ([`Constraints::dns`]), else the public `1.1.1.1`.
 #[must_use]
 pub fn resolvers(constraints: Option<&Constraints>) -> Vec<&str> {
     match constraints.filter(|c| !c.dns.is_empty()) {

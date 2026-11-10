@@ -3,7 +3,7 @@
 
 /// Unpacks the project's tar.gz on Windows (`$archive`, `$dest`, `$strip` set before it): no
 /// `tar.exe` before Windows Server 2019.
-pub const UNTAR: &str = include_str!("powershell/untar.ps1");
+pub(crate) const UNTAR: &str = include_str!("powershell/untar.ps1");
 
 /// A PowerShell single-quoted string literal reading as `s`: nothing inside is expanded.
 /// PowerShell takes the typographic single quotes (U+2018 to U+201B) as quotes too, so each of

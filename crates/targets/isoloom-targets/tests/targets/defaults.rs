@@ -1,8 +1,11 @@
 //! Defaults: layers merge leaf by leaf, the last one winning; `-s` overrides the spec or the
 //! defaults; the clouds' built-in regions are what the generators write.
 
-use isoloom_spec::defaults::{self, Layer, from_env, override_spec, resolve};
-use isoloom_spec::{Target, load, parse};
+use std::ffi::OsString;
+
+use isoloom_spec::defaults::{self, Layer, Sources, from_env, resolve};
+use isoloom_spec::host::Host;
+use isoloom_spec::{Target, load, load_profiled};
 use isoloom_targets::{Lab, generate};
 
 use crate::testing::Outcome;
@@ -40,7 +43,7 @@ fn later_layers_win_leaf_by_leaf() -> Outcome {
 }
 
 #[test]
-fn environment_and_sets_reach_the_defaults() {
+fn environment_and_sets_reach_the_defaults() -> Outcome {
     let env = from_env(
         vec![
             ("ISOLOOM_CLOUD__AWS__REGION".to_owned(), "eu-west-1".to_owned()),
@@ -57,28 +60,34 @@ fn environment_and_sets_reach_the_defaults() {
             ("vagrant.provider".to_owned(), "qemu".to_owned())
         ]
     );
-    assert_eq!(defaults::parse_set("defaults.cloud.aws.region=x").unwrap(), ("defaults.cloud.aws.region", "x"));
-    assert!(defaults::parse_set("nonsense").is_err());
-    assert!(defaults::parse_set("a..b=1").is_err());
+    let project = crate::testing::examples().join("hello-stack");
+    let with_sets = |sets: &[String]| {
+        defaults::load(&Sources {
+            project: &project,
+            images_file: None,
+            profile: None,
+            sets,
+            host: Host::new([(OsString::from("ISOLOOM_HOME"), OsString::from("/nonexistent/isoloom-home"))]),
+        })
+    };
+    let set = with_sets(&["defaults.cloud.aws.region=x".into()])?;
+    assert_eq!(set.defaults.cloud["aws"].region.as_deref(), Some("x"));
+    assert!(with_sets(&["nonsense".into()]).is_err(), "a set without `=`");
+    assert!(with_sets(&["a..b=1".into()]).is_err(), "a key with an empty part");
+    Ok(())
 }
 
 #[test]
-fn sets_override_the_spec_before_it_is_parsed() {
-    let text = std::fs::read_to_string(crate::testing::examples().join("hello-stack/isoloom.yml")).unwrap();
-    let out = override_spec(
-        &text,
-        &[
-            "machines.web.os=ubuntu@24.04".into(),
-            "networks.app.internet=true".into(),
-            "defaults.cloud.aws.region=eu-west-1".into(),
-        ],
-    )
-    .unwrap();
-    let spec = parse(&out).unwrap();
+fn sets_override_the_spec_before_it_is_parsed() -> Outcome {
+    let sets = [
+        "machines.web.os=ubuntu@24.04".into(),
+        "networks.app.internet=true".into(),
+        "defaults.cloud.aws.region=eu-west-1".into(),
+    ];
+    let spec = load_profiled(&crate::testing::examples().join("hello-stack"), None, &sets)?;
     assert_eq!(spec.machines["web"].os.map(isoloom_spec::syntax::OsRef::name), Some("ubuntu-24.04"));
     assert!(spec.networks["app"].internet);
-    // Without spec overrides the text is untouched (comments and all).
-    assert_eq!(override_spec(&text, &["defaults.cloud.aws.region=eu-west-1".into()]).unwrap(), text);
+    Ok(())
 }
 
 /// The default of `cloud-vm/<cloud>/main.tf`'s `region` variable, and of its run manifest's

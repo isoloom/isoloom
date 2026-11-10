@@ -287,7 +287,7 @@ pub fn from_env(vars: impl Iterator<Item = (String, String)>) -> Vec<(String, St
 /// # Errors
 ///
 /// [`Error::SetShape`] without an `=`, [`Error::SetKey`] when the key isn't a dotted path.
-pub fn parse_set(s: &str) -> Result<(&str, &str)> {
+pub(crate) fn parse_set(s: &str) -> Result<(&str, &str)> {
     let (k, v) = s.split_once('=').ok_or_else(|| Error::SetShape { set: s.to_owned() })?;
     if k.is_empty() || k.split('.').any(str::is_empty) {
         return Err(Error::SetKey { set: s.to_owned() });
@@ -354,16 +354,19 @@ pub fn leaves(v: &Value, prefix: &str) -> Vec<String> {
 /// # Errors
 ///
 /// As [`override_spec_with`].
-pub fn override_spec(yaml: &str, sets: &[String]) -> Result<String> {
+pub(crate) fn override_spec(yaml: &str, sets: &[String]) -> Result<String> {
     override_spec_with(yaml, None, sets)
 }
 
-/// [`override_spec`] with `base` (a profile's `spec`) deep-merged first.
+/// The spec's YAML with `base` (a profile's `spec`) deep-merged in, then `-s key=value`
+/// overrides applied (keys without the `defaults.` prefix), before it is parsed:
+/// `machines.web.os=ubuntu@24.04`, `networks.lan.internet=false`. With nothing to apply, the text
+/// is returned as it is, comments and all.
 ///
 /// # Errors
 ///
-/// [`Error::Yaml`] when the spec isn't YAML (or can't be written back), and the errors of
-/// [`parse_set`].
+/// [`Error::Yaml`] when the spec isn't YAML (or can't be written back), [`Error::SetShape`] for
+/// a set without an `=`, [`Error::SetKey`] when its key isn't a dotted path.
 pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> Result<String> {
     let mut doc: Value = serde_yaml_ng::from_str(yaml)?;
     let mut any = false;
@@ -566,6 +569,14 @@ mod tests {
         for s in ["=1", "a..b=1", ".a=1"] {
             assert!(matches!(parse_set(s), Err(Error::SetKey { .. })), "{s}");
         }
+    }
+
+    #[test]
+    fn no_spec_set_leaves_the_text_untouched() -> Outcome {
+        let text = "# The lab.\nname: lab # its name\nmachines:\n  web: { os: debian@12 }\n";
+        assert_eq!(override_spec(text, &["defaults.cloud.aws.region=eu-west-1".into()])?, text, "comments and all");
+        assert_ne!(override_spec(text, &["machines.web.os=ubuntu@24.04".into()])?, text);
+        Ok(())
     }
 
     #[test]

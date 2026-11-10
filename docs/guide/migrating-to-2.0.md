@@ -149,8 +149,9 @@ among others (the CHANGELOG's **Removed** section lists every item):
   `isoloom_targets::decision`, the matrix's `columns`, `rows`, `Row` and `Cell`.
 - `isoloom_spec::images::{VagrantBox, HyperVBox, vagrant, HYPERV_DEBIAN_12, QEMU_DEBIAN_12}` and
   `isoloom_spec::windows::esxi_guest_os` (the backends' own now). `Lab::plan`, `Lab::catalogue`
-  and `isoloom_targets::{backend, CloudDockerBackend, DockerVmBackend, HybridBackend}` are
-  hidden, outside the supported API: generate with `isoloom_targets::generate`.
+  and `isoloom_targets::backend` are hidden, outside the supported API, and
+  `isoloom_targets::{CloudDockerBackend, DockerVmBackend, HybridBackend}` are crate-internal:
+  generate with `isoloom_targets::generate`.
 - `isoloom_spec::defaults::Defaults::tags_under` is `Resolved::tags_under`, which returns a
   `Result` (`Error::DefaultTag` for a tag of the defaults clashing with the spec's); `resolve`
   and `load` refuse a tag of the defaults no cloud takes with `Error::DefaultTag`.
@@ -160,12 +161,18 @@ among others (the CHANGELOG's **Removed** section lists every item):
 - `isoloom_manifest::access::{DEFAULT_BOX, DEFAULT_ARM64_BOX, DEFAULT_IMAGE}` and
   `isoloom_manifest::SUPPORTED_VERSION` (now crate-internal).
 - `isoloom_spec::model::Spec::inputs` is a list of `Input` (`name`, `sensitive`), and
-  `Spec::plain_inputs` is removed: read `input.sensitive` (or `Spec::declares_input`).
+  `Spec::plain_inputs` is removed: read `input.sensitive`.
   `isoloom_spec::validate::kebab` is `isoloom_manifest::is_kebab`.
 - `isoloom_spec::targets` (`derive`, `effective`, `missing`, `mixed`) is removed: ask the lab,
   `isoloom_targets::Lab::possible` for the targets that can run a spec and
   `Lab::not_possible(target)` for why one can't, which count the access machine and the image
   table as the generator does.
+- `Spec::declares_input` (look the name up in `Spec::inputs`),
+  `isoloom_spec::model::PUBLIC_RESOLVER` (`model::resolvers(None)` gives it),
+  `isoloom_spec::tags::{key_refusal, value_refusal}`, `isoloom_spec::defaults::{parse_set,
+  override_spec}` (`load_profiled(dir, None, sets)` applies the sets,
+  `override_spec_with(yaml, None, sets)` to text) and the root's `DEFAULT_MEMORY_MB`,
+  `DEFAULT_DISK_GB` and `CONTAINER_DISK_GB` are crate-internal.
 - `isoloom_spec::profile::list` returns `Result<Listed>`: the profiles' `names`, and the
   `skipped` files a listing warns about.
 - `isoloom_targets::GenerateError::NoGenerator` is removed (every target has a backend), and an

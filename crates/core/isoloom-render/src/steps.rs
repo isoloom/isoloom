@@ -7,6 +7,7 @@ use isoloom_manifest::ReadyLine;
 use isoloom_plan::Environment;
 use isoloom_plan::lifecycle::{RunKind, Step};
 use isoloom_spec::shell::quote;
+use isoloom_spec::windows::ISOLOOM_DIR;
 
 use crate::configure::{self, Configured, shell};
 use crate::network::{ipv6, more_addresses};
@@ -33,7 +34,7 @@ pub const WINDOWS_PROJECT_ARCHIVE: &str = "C:\\Windows\\Temp\\isoloom-project.tg
 /// The sshd drop-in directory where a VM readied over SSH learns which variables it accepts from a
 /// session (the launch's values): the runner forwards them with `SendEnv`, and sshd drops any not
 /// listed in [`ACCEPT_ENV_FILE`]. A bare VM may ship without it: it is created first.
-pub const ACCEPT_ENV_DIR: &str = "/etc/ssh/sshd_config.d";
+const ACCEPT_ENV_DIR: &str = "/etc/ssh/sshd_config.d";
 /// The drop-in naming the variables sshd accepts ([`accept_env_line`]).
 pub const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
 /// sshd reloaded, whichever of its two unit names the OS gives it; one not running yet (it reads
@@ -103,12 +104,12 @@ pub fn project_unpack(from: Archive, strip: bool) -> String {
 }
 
 /// [`project_unpack`] on Windows, in PowerShell: [`WINDOWS_PROJECT_ARCHIVE`] (uploaded before)
-/// unpacked into [`WINDOWS_PROJECT_DIR`], replacing what an earlier copy left, its top folder left
+/// unpacked into [`ISOLOOM_DIR`], replacing what an earlier copy left, its top folder left
 /// out when `strip`. Every way of getting the project into a Windows VM unpacks it with this.
 #[must_use]
 pub fn windows_project_unpack(strip: bool) -> String {
     format!(
-        "$archive = '{WINDOWS_PROJECT_ARCHIVE}'; $dest = '{WINDOWS_PROJECT_DIR}'; $strip = {}\n{}",
+        "$archive = '{WINDOWS_PROJECT_ARCHIVE}'; $dest = '{ISOLOOM_DIR}'; $strip = {}\n{}",
         u8::from(strip),
         powershell::UNTAR
     )
@@ -269,10 +270,6 @@ pub fn wait_for_mark(mark: &str, timeout_s: u32, waiting: &str, missing: &str) -
     )
 }
 
-/// Where the project is unpacked on a Windows VM, and the machine's own scripts with it; where
-/// a Windows recipe runs from too (`configure::powershell`).
-pub const WINDOWS_PROJECT_DIR: &str = isoloom_spec::windows::ISOLOOM_DIR;
-
 /// Installs packages with the machine's own package manager (Debian and Ubuntu, or the RHEL
 /// family: Rocky, AlmaLinux, CentOS, Fedora).
 const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }";
@@ -349,10 +346,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::MoreAddresses { addresses } => Some(more_addresses::windows(addresses)),
         Step::Project => Some(windows_project_unpack(true)),
         Step::CaCertificates { files } => Some(constraints::trust_windows(
-            &files
-                .iter()
-                .map(|f| format!("{WINDOWS_PROJECT_DIR}\\{}", f.replace('/', "\\")))
-                .collect::<Vec<_>>(),
+            &files.iter().map(|f| format!("{ISOLOOM_DIR}\\{}", f.replace('/', "\\"))).collect::<Vec<_>>(),
         )),
         Step::Files { files } => Some(files::windows(files)),
         Step::Secrets => env.machines.get(machine).map(|mp| secrets::windows::step(machine, &mp.secrets)),
@@ -363,7 +357,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             creates,
         } => {
             let run = format!(
-                "Set-Location {WINDOWS_PROJECT_DIR}; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
+                "Set-Location {ISOLOOM_DIR}; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
                 powershell::quote(path)
             );
             Some(match creates {
@@ -375,7 +369,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Command => process::windows_command(env, machine),
         Step::Setup { paths } => Some(process::windows_setup(paths)),
         Step::Ready => Some(format!(
-            "{}New-Item -ItemType Directory -Force {WINDOWS_PROJECT_DIR} | Out-Null; Set-Content {} {}",
+            "{}New-Item -ItemType Directory -Force {ISOLOOM_DIR} | Out-Null; Set-Content {} {}",
             process::windows_healthy(env, machine).unwrap_or_default(),
             isoloom_spec::windows::READY_FILE,
             ReadyLine::Ready

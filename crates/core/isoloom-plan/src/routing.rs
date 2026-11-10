@@ -53,7 +53,7 @@ pub fn is_gateway(spec: &Spec, name: &str) -> bool {
 /// Whether the lab routes IPv6: its router has an IPv6 address on a network it routes. The one
 /// test of every router's and gateway's IPv6 forwarding.
 #[must_use]
-pub fn routes_ipv6(spec: &Spec) -> bool {
+pub(crate) fn routes_ipv6(spec: &Spec) -> bool {
     !crate::ipv6::router(spec).is_empty()
 }
 

@@ -6,8 +6,9 @@
 use isoloom_plan::{Environment, Health, HealthTest, MachinePlan};
 use isoloom_spec::model::CommandLine;
 use isoloom_spec::shell::quote;
+use isoloom_spec::windows::ISOLOOM_DIR;
 
-use super::{MAKE_STATE_DIR, PROJECT_DIR, WINDOWS_PROJECT_DIR, inputs_file};
+use super::{MAKE_STATE_DIR, PROJECT_DIR, inputs_file};
 use crate::boot;
 use crate::powershell;
 use crate::secrets;
@@ -73,7 +74,7 @@ pub(super) fn windows_setup(paths: &[String]) -> String {
         })
         .collect();
     format!(
-        "if (-not (Test-Path '{WINDOWS_PROJECT_DIR}\\setup.done')) {{ Set-Location {WINDOWS_PROJECT_DIR}; {}; Set-Content '{WINDOWS_PROJECT_DIR}\\setup.done' done }}",
+        "if (-not (Test-Path '{ISOLOOM_DIR}\\setup.done')) {{ Set-Location {ISOLOOM_DIR}; {}; Set-Content '{ISOLOOM_DIR}\\setup.done' done }}",
         runs.join("; ")
     )
 }
@@ -128,19 +129,19 @@ fn powershell(c: &CommandLine) -> String {
 /// A script under the project folder, written from `lines`.
 fn windows_script(name: &str, lines: &[String]) -> String {
     let body = lines.join("\n");
-    format!("Set-Content -Path '{WINDOWS_PROJECT_DIR}\\{name}.ps1' -Value {}", powershell::quote(&body))
+    format!("Set-Content -Path '{ISOLOOM_DIR}\\{name}.ps1' -Value {}", powershell::quote(&body))
 }
 
 /// A startup task running `name.ps1` as SYSTEM, started now.
 fn startup_task(name: &str) -> String {
     format!(
-        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {WINDOWS_PROJECT_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
+        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {ISOLOOM_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
     )
 }
 
 /// The working directory, on Windows.
 fn windows_dir(mp: &MachinePlan) -> String {
-    powershell::quote(mp.process.working_dir.as_deref().unwrap_or(WINDOWS_PROJECT_DIR))
+    powershell::quote(mp.process.working_dir.as_deref().unwrap_or(ISOLOOM_DIR))
 }
 
 /// The command on Windows: a startup task (as SYSTEM) running `command.ps1`, its secrets placed

@@ -5,7 +5,7 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_targets::GeneratedFile;
-use isoloom_targets::{DockerVmBackend, HybridBackend, Lab};
+use isoloom_targets::{Lab, backend};
 
 /// A test's outcome: a failure is the report.
 type Outcome<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -39,7 +39,7 @@ fn file(files: &[GeneratedFile], path: &str) -> Outcome<String> {
 
 #[test]
 fn docker_vm_hello_stack() -> Outcome {
-    let files = render(&DockerVmBackend, "hello-stack")?;
+    let files = render(backend(Target::DockerVm), "hello-stack")?;
     let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
     assert!(paths.contains(&".isoloom/docker/compose.yml"), "the Compose file it runs: {paths:?}");
     assert!(paths.contains(&".isoloom/docker-vm/proxmox/main.tf"), "{paths:?}");
@@ -49,7 +49,7 @@ fn docker_vm_hello_stack() -> Outcome {
 
 #[test]
 fn docker_vm_segmented() -> Outcome {
-    insta::assert_snapshot!(file(&render(&DockerVmBackend, "segmented")?, "docker-vm/Vagrantfile")?);
+    insta::assert_snapshot!(file(&render(backend(Target::DockerVm), "segmented")?, "docker-vm/Vagrantfile")?);
     Ok(())
 }
 
@@ -59,7 +59,7 @@ fn docker_vm_shares_the_containers_host_folders_into_its_vm() -> Outcome {
         "version: 1\nname: shared-desk\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  desk: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared }, { from: '~/notes', path: /home/notes, read_only: true }] }\n",
         Target::DockerVm,
     )?;
-    let vagrantfile = file(&DockerVmBackend.render(&env)?, "docker-vm/Vagrantfile")?;
+    let vagrantfile = file(&backend(Target::DockerVm).render(&env)?, "docker-vm/Vagrantfile")?;
     let start = vagrantfile.find("  # This computer's folders").ok_or("no host folders")?;
     let end = vagrantfile.find("  config.vm.provision \"docker\"").ok_or("no Docker")?;
     insta::assert_snapshot!(vagrantfile.get(start..end).ok_or("out of order")?);
@@ -68,19 +68,19 @@ fn docker_vm_shares_the_containers_host_folders_into_its_vm() -> Outcome {
 
 #[test]
 fn hybrid_mixed_office_vagrantfile() -> Outcome {
-    insta::assert_snapshot!(file(&render(&HybridBackend, "mixed-office")?, "hybrid/Vagrantfile")?);
+    insta::assert_snapshot!(file(&render(backend(Target::Hybrid), "mixed-office")?, "hybrid/Vagrantfile")?);
     Ok(())
 }
 
 #[test]
 fn hybrid_mixed_office_compose() -> Outcome {
-    insta::assert_snapshot!(file(&render(&HybridBackend, "mixed-office")?, "hybrid/compose.yml")?);
+    insta::assert_snapshot!(file(&render(backend(Target::Hybrid), "mixed-office")?, "hybrid/compose.yml")?);
     Ok(())
 }
 
 #[test]
 fn hybrid_files_are_the_vagrantfile_the_compose_file_then_the_checks() -> Outcome {
-    let files = render(&HybridBackend, "mixed-office")?;
+    let files = render(backend(Target::Hybrid), "mixed-office")?;
     let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
     assert_eq!(
         paths,
@@ -96,9 +96,16 @@ fn hybrid_files_are_the_vagrantfile_the_compose_file_then_the_checks() -> Outcom
 #[test]
 fn rendering_twice_gives_the_same_files() -> Outcome {
     for example in ["hello-stack", "segmented", "udp-dns"] {
-        assert_eq!(render(&DockerVmBackend, example)?, render(&DockerVmBackend, example)?, "{example}");
+        assert_eq!(
+            render(backend(Target::DockerVm), example)?,
+            render(backend(Target::DockerVm), example)?,
+            "{example}"
+        );
     }
-    assert_eq!(render(&HybridBackend, "mixed-office")?, render(&HybridBackend, "mixed-office")?);
+    assert_eq!(
+        render(backend(Target::Hybrid), "mixed-office")?,
+        render(backend(Target::Hybrid), "mixed-office")?
+    );
     Ok(())
 }
 
@@ -114,10 +121,10 @@ fn mixed(extra: &str) -> Outcome<Environment> {
 #[test]
 fn hybrid_refuses_a_vm_waiting_for_a_container_from_the_plan() -> Outcome {
     let env = mixed("    depends_on: [web]\n")?;
-    let why = HybridBackend.refusal(&env).expect("refused");
+    let why = backend(Target::Hybrid).refusal(&env).expect("refused");
     assert_eq!(why, "VM `db` depends on container `web`: VMs start first in a hybrid environment");
     assert_eq!(
-        HybridBackend.render(&env).unwrap_err().to_string(),
+        backend(Target::Hybrid).render(&env).unwrap_err().to_string(),
         format!("hybrid: {why}"),
         "render refuses the same way, before writing anything"
     );
@@ -134,7 +141,12 @@ fn hybrid_refuses_a_volume_shared_by_containers_and_vms() -> Outcome {
         s
     };
     env = Environment::build(&spec, Target::Hybrid, None);
-    assert!(HybridBackend.refusal(&env).expect("refused").contains("`data` is shared by containers and VMs"));
+    assert!(
+        backend(Target::Hybrid)
+            .refusal(&env)
+            .expect("refused")
+            .contains("`data` is shared by containers and VMs")
+    );
     Ok(())
 }
 
@@ -142,12 +154,12 @@ fn hybrid_refuses_a_volume_shared_by_containers_and_vms() -> Outcome {
 fn hybrid_refuses_gateways_and_docker_vm_takes_them() -> Outcome {
     // `fw` has both forms (Debian's image, a Debian VM); a TPM makes `pc` a VM.
     let gateway = "version: 1\nname: g\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    os: debian@12\n    networks: { wan: 2, lan: 1 }\n  pc:\n    os: debian@12\n    networks: { lan: 10 }\n    hardware: { tpm: required }\n";
-    let why = HybridBackend.refusal(&build(gateway, Target::Hybrid)?);
+    let why = backend(Target::Hybrid).refusal(&build(gateway, Target::Hybrid)?);
     assert_eq!(
         why.as_deref(),
         Some("network `lan` is routed by a `gateway` machine, which this target doesn't route through (`isoloom matrix` lists the targets that do)")
     );
-    assert!(DockerVmBackend.refusal(&build(gateway, Target::DockerVm)?).is_none());
+    assert!(backend(Target::DockerVm).refusal(&build(gateway, Target::DockerVm)?).is_none());
     Ok(())
 }
 
@@ -158,7 +170,7 @@ fn docker_vm_refuses_what_compose_cannot_run() -> Outcome {
         Target::DockerVm,
     )?;
     assert_eq!(
-        DockerVmBackend.render(&env).unwrap_err().to_string(),
+        backend(Target::DockerVm).render(&env).unwrap_err().to_string(),
         "docker-vm: environment-level provisioning (`provision:`) runs on the VM targets only"
     );
     Ok(())
@@ -170,7 +182,9 @@ fn hybrid_forwards_a_fixed_published_port() -> Outcome {
     let web = &mut spec.machines["web"].ports[0];
     web.publish = Some(8080);
     web.fixed = true;
-    let files = HybridBackend.render(&Environment::build(&spec, Target::Hybrid, None)).expect("renders");
+    let files = backend(Target::Hybrid)
+        .render(&Environment::build(&spec, Target::Hybrid, None))
+        .expect("renders");
     assert!(file(&files, "hybrid/compose.yml")?.contains("    - 8080:80\n"));
     let forward = "m.vm.network \"forwarded_port\", guest: 8080, host: 8080, host_ip: \"127.0.0.1\"\n";
     assert!(file(&files, "hybrid/Vagrantfile")?.contains(forward));
@@ -193,7 +207,9 @@ fn hybrid_forwards_a_published_tool() -> Outcome {
     let mut spec = mixed("")?.spec().clone();
     let tools = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    app: { image: alpine }\ntools:\n  web-ui: { image: \"nginx:1\", port: 80, publish: 9090 }\n";
     spec.tools = isoloom_spec::parse(tools).expect("parses").tools;
-    let files = HybridBackend.render(&Environment::build(&spec, Target::Hybrid, None)).expect("renders");
+    let files = backend(Target::Hybrid)
+        .render(&Environment::build(&spec, Target::Hybrid, None))
+        .expect("renders");
     let compose = file(&files, "hybrid/compose.yml")?;
     assert!(compose.contains("    - 9090:80\n"), "{compose}");
     assert!(compose.contains("      isoloom-publish: null\n"), "{compose}");

@@ -27,7 +27,7 @@ pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub use checks::{Check, Declared, Expect};
 pub use cloud::{CloudProvider, CloudServices};
 pub use configuration::Configuration;
-pub use constraints::{Constraints, Mirrors, PUBLIC_RESOLVER, Proxy, resolvers};
+pub use constraints::{Constraints, Mirrors, Proxy, resolvers};
 pub use hardware::{DEFAULT_GPU_DRIVER, Device, DeviceFull, DeviceInput, GpuCount, Gpus, GpusFull, GpusInput};
 pub use host_folder::{HostFolder, HostPath};
 pub use implementation::{
@@ -198,7 +198,7 @@ impl Input {
 impl Spec {
     /// Whether the spec declares the input `name`.
     #[must_use]
-    pub fn declares_input(&self, name: &str) -> bool {
+    pub(crate) fn declares_input(&self, name: &str) -> bool {
         self.inputs.iter().any(|i| i.name == name)
     }
 

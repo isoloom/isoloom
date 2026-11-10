@@ -54,8 +54,8 @@ pub fn load(dir: &Path) -> Result<syntax::Spec> {
 }
 
 /// Reads the spec in `dir` with a profile's `spec` merged in (checked against the spec first:
-/// see [`profile::Profile::check`]), then `-s key=value` overrides (see
-/// [`defaults::override_spec`]; keys prefixed `defaults.` are left to the defaults).
+/// see [`profile::Profile::check`]), then `-s key=value` overrides before it is parsed
+/// (`machines.web.os=ubuntu@24.04`; keys prefixed `defaults.` are left to the defaults).
 ///
 /// # Errors
 ///
