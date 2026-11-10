@@ -5,14 +5,19 @@
 //! VM's internet traffic goes through QEMU's slow user-mode stack (measured: about 12 times
 //! slower than the shared network, an image pull of a gigabyte taking over half an hour).
 //!
-//! On UTM, a Linux VM's first provisioner, at every `vagrant up`, gives the emulated card's
-//! default route a higher metric (200), so the shared network's wins: its route now, and its
-//! network configuration (NetworkManager, systemd-networkd or ifupdown) for every later boot and
-//! DHCP renewal. Only the default route changes: SSH and the forwarded ports still reach the VM
-//! through the emulated card. The card is the one whose default route is through `10.0.2.2`, not
-//! a name; a VM with no other default route (no shared network) is left alone. The other
-//! providers have no such pair (QEMU's own provider gives a VM the user-mode network only): there
-//! the provisioner, defined on every provider so UTM's keeps its place first, does nothing.
+//! Which of the two is faster depends on the Mac's network (measured: the emulated one at 0.17
+//! MB/s one day, 34 MB/s the next, when the shared one reached nothing at all), so on UTM a Linux
+//! VM's first provisioner, at every `vagrant up`, prefers the shared network only when it reaches
+//! the internet: its default route then gets a lower metric (50) than the emulated one's (DHCP's
+//! 100), otherwise a higher one (200), so the emulated network keeps the traffic. The choice holds
+//! for its route now and for its card's network configuration (NetworkManager, systemd-networkd
+//! or ifupdown) at every later boot and DHCP renewal, until the next `vagrant up` makes it again. Only the shared card is touched: the emulated
+//! card carries Vagrant's SSH session, the one running the provisioner, and applying a new
+//! configuration to a card renews its lease, which cut that session. The emulated card is the
+//! one whose default route is through `10.0.2.2`, the shared one the other card with a default
+//! route; a VM with no such pair (no shared network) is left alone. The other providers have no
+//! such pair (QEMU's own provider gives a VM the user-mode network only): there the provisioner,
+//! defined on every provider so UTM's keeps its place first, does nothing.
 
 use crate::ruby::{Provision, Ruby, Value};
 
@@ -22,24 +27,36 @@ pub(crate) const NAT_ROUTE: &str = "nat-route";
 /// The Ruby constant holding [`NAT_ROUTE_SH`], defined once before `Vagrant.configure`.
 const CONSTANT: &str = "ISOLOOM_NAT_ROUTE";
 
-/// The script: the emulated card's default route at metric 200, now and in its configuration.
+/// The script: the shared card's default route at metric 50 when that network reaches the
+/// internet (a ping to a public resolver through it answers), 200 otherwise, now and in its
+/// configuration.
 ///
 /// The configuration is the card's own: a box may configure every card from one shared file
-/// (Debian's cloud images: netplan's `10-netplan-all.network`), and a setting there would raise
-/// the shared network's route too, a tie again. So systemd-networkd gets a file of its own that
-/// matches the emulated card only and sorts before the shared one. Applying it renews the card's
-/// lease, so its gateway is unreachable for a moment: the script waits for the route to come back
-/// before it touches it. `ISOLOOM_NETWORKD_DIR` (default `/etc/systemd/network`) is for tests.
+/// (Debian's cloud images: netplan's `10-netplan-all.network`), and a setting there would change
+/// the emulated card too, renewing the lease of the card SSH runs over. So systemd-networkd gets a
+/// file of its own that matches the shared card only and sorts before the shared one. Applying it
+/// renews that card's lease, the emulated route carrying the traffic meanwhile: the script waits
+/// for the card's route to come back before it touches it. `ISOLOOM_NETWORKD_DIR` (default
+/// `/etc/systemd/network`) is for tests.
 pub(crate) const NAT_ROUTE_SH: &str = r#"set -eu
 gw=10.0.2.2
-nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
-# No default route through the emulated network, or no other one to prefer: nothing to do.
+dev_of() { awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}'; }
+via_of() { awk '{for (i = 1; i < NF; i++) if ($i == "via") { print $(i + 1); exit }}'; }
+nat=$(ip -4 route show default via "$gw" | dev_of)
+# No default route through the emulated network, or no shared one to prefer: nothing to do.
 [ -n "$nat" ] || exit 0
-ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
-# Waits (up to 30 s) for the card's default route after its configuration was applied again.
+up=$(ip -4 route show default | grep -v "via $gw dev $nat " | dev_of)
+[ -n "$up" ] || exit 0
+# The shared network leads only when it reaches the internet; otherwise the emulated one does.
+metric=200
+for probe in 1.1.1.1 8.8.8.8 9.9.9.9; do
+  if ping -c 1 -W 2 -I "$up" "$probe" >/dev/null 2>&1; then metric=50; break; fi
+done
+[ "$metric" = 50 ] || echo "nat-route: the shared network ($up) reaches no public resolver; the emulated network keeps the traffic"
+# Waits (up to 30 s) for the shared card's default route after its configuration was applied.
 route_back() {
   i=0
-  until ip -4 route show default via "$gw" dev "$nat" | grep -q .; do
+  until ip -4 route show default dev "$up" | grep -q .; do
     i=$((i + 1))
     [ "$i" -lt 30 ] || return 1
     sleep 1
@@ -47,35 +64,37 @@ route_back() {
 }
 netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
 if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
-  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
-  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
-    nmcli connection modify "$con" ipv4.route-metric 200
-    nmcli device reapply "$nat"
+  con=$(nmcli -g GENERAL.CONNECTION device show "$up")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != "$metric" ]; then
+    nmcli connection modify "$con" ipv4.route-metric "$metric"
+    nmcli device reapply "$up"
   fi
-elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
-  own="$netd/05-isoloom-nat-route.network"
-  if [ "$file" != "$own" ]; then
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$up" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  own="$netd/05-isoloom-uplink.network"
+  want=$(printf '[Match]\nName=%s\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=%s\n' "$up" "$metric")
+  if [ "$file" != "$own" ] || [ "$(cat "$own")" != "$want" ]; then
     mkdir -p "$netd"
-    printf '[Match]\nName=%s\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nRouteMetric=200\n' "$nat" > "$own"
+    printf '%s\n' "$want" > "$own"
     networkctl reload
-    networkctl reconfigure "$nat"
+    networkctl reconfigure "$up"
   fi
 elif [ -f /etc/network/interfaces ]; then
   for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
-    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
-    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
-      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+    [ -f "$f" ] && grep -q "^iface $up inet dhcp" "$f" || continue
+    sed -i "/^iface $up inet dhcp/,/^[^ \t]/{/^[ \t]*metric /d}" "$f"
+    sed -i "/^iface $up inet dhcp/a\\    metric $metric" "$f"
   done
 fi
 if ! route_back; then
-  echo "nat-route: the emulated card has no default route any more; the shared network carries the traffic"
+  echo "nat-route: the shared card has no default route any more; the emulated network carries the traffic"
   exit 0
 fi
 # The route as it is now, whatever the configuration does at its next renewal.
-ip -4 route show default via "$gw" dev "$nat" | grep -q ' metric 200' ||
-  ip -4 route replace default via "$gw" dev "$nat" metric 200
-for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
-  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+upgw=$(ip -4 route show default dev "$up" | via_of)
+ip -4 route show default dev "$up" | grep -q " metric $metric " ||
+  ip -4 route replace default via "$upgw" dev "$up" metric "$metric"
+for m in $(ip -4 route show default dev "$up" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = "$metric" ] || ip -4 route del default via "$upgw" dev "$up" metric "$m"
 done
 "#;
 
@@ -120,6 +139,11 @@ mod tests {
         /// [dev D]` prints the lines of `routes` holding each filter given, and logs every other
         /// call.
         fn new(name: &str, routes: &str) -> Result<Run, Box<dyn std::error::Error>> {
+            Run::reaching(name, routes, true)
+        }
+
+        /// As [`Run::new`], with a stand-in `ping` that answers when `reaches`.
+        fn reaching(name: &str, routes: &str, reaches: bool) -> Result<Run, Box<dyn std::error::Error>> {
             let dir = std::env::temp_dir().join(format!("isoloom-nat-route-{}-{name}", std::process::id()));
             if dir.exists() {
                 std::fs::remove_dir_all(&dir)?;
@@ -135,7 +159,8 @@ mod tests {
                     run.log().display(),
                 ),
             )?;
-            for tool in ["awk", "grep", "sed", "mkdir"] {
+            run.stand_in("ping", if reaches { "exit 0\n" } else { "exit 1\n" })?;
+            for tool in ["awk", "grep", "sed", "mkdir", "cat"] {
                 let found = Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
                 std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), run.dir.join("bin").join(tool))?;
             }
@@ -156,6 +181,18 @@ mod tests {
             std::fs::write(&path, format!("#!/bin/sh\n{body}"))?;
             Command::new("chmod").arg("+x").arg(&path).status()?;
             Ok(())
+        }
+
+        /// A stand-in `networkctl` that reports the card's network file as `file` and logs every
+        /// other call.
+        fn networkd_on(&self, file: &str) -> Result<(), Box<dyn std::error::Error>> {
+            self.stand_in(
+                "networkctl",
+                &format!(
+                    "if [ \"$1\" = status ]; then echo '  Network File: {file}'; else echo \"networkctl $*\" >> {}; fi\n",
+                    self.log().display()
+                ),
+            )
         }
 
         /// The script run to its end (it must succeed): the calls it made, one a line.
@@ -184,51 +221,73 @@ mod tests {
     const TWO_DEFAULTS: &str =
         "default via 192.168.64.1 dev enp0s1 proto dhcp src 192.168.64.5 metric 100\ndefault via 10.0.2.2 dev enp0s2 proto dhcp src 10.0.2.15 metric 100\n";
 
+    /// The calls that move the shared card's default route (DHCP's metric 100) to `metric`.
+    fn shared_route_at(metric: u32) -> String {
+        format!("ip -4 route replace default via 192.168.64.1 dev enp0s1 metric {metric}\nip -4 route del default via 192.168.64.1 dev enp0s1 metric 100\n")
+    }
+
     #[test]
-    fn with_two_default_routes_the_emulated_cards_loses() -> Result<(), Box<dyn std::error::Error>> {
-        assert_eq!(
-            changes("two", TWO_DEFAULTS)?,
-            "ip -4 route replace default via 10.0.2.2 dev enp0s2 metric 200\nip -4 route del default via 10.0.2.2 dev enp0s2 metric 100\n"
-        );
+    fn with_two_default_routes_the_shared_cards_wins() -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(changes("two", TWO_DEFAULTS)?, shared_route_at(50));
+        Ok(())
+    }
+
+    /// The emulated card carries Vagrant's SSH session, the one running the script: applying a
+    /// configuration to it renews its lease, which cut that session. Nothing touches it.
+    #[test]
+    fn the_emulated_card_ssh_runs_over_is_never_changed() -> Result<(), Box<dyn std::error::Error>> {
+        let run = Run::new("ssh-card", TWO_DEFAULTS)?;
+        run.networkd_on("/run/systemd/network/10-netplan-all.network")?;
+        let calls = run.calls()?;
+        assert!(!calls.contains("enp0s2"), "{calls}");
         Ok(())
     }
 
     /// Debian's cloud images configure every card from netplan's one `10-netplan-all.network`: a
-    /// setting there would raise the shared network's route too (a tie again). The emulated card
-    /// gets a file of its own, sorting first, matching it alone.
+    /// setting there would change the emulated card too. The shared card gets a file of its own,
+    /// sorting first, matching it alone.
     #[test]
-    fn under_networkd_the_emulated_card_gets_a_file_of_its_own() -> Result<(), Box<dyn std::error::Error>> {
+    fn under_networkd_the_shared_card_gets_a_file_of_its_own() -> Result<(), Box<dyn std::error::Error>> {
         let run = Run::new("networkd", TWO_DEFAULTS)?;
-        let log = run.log();
-        run.stand_in(
-            "networkctl",
-            &format!(
-                "if [ \"$1\" = status ]; then echo '  Network File: /run/systemd/network/10-netplan-all.network'; else echo \"networkctl $*\" >> {}; fi\n",
-                log.display()
-            ),
-        )?;
+        run.networkd_on("/run/systemd/network/10-netplan-all.network")?;
         let calls = run.calls()?;
-        assert!(calls.starts_with("networkctl reload\nnetworkctl reconfigure enp0s2\n"), "{calls}");
-        let own = std::fs::read_to_string(run.networkd().join("05-isoloom-nat-route.network"))?;
-        assert_eq!(own, "[Match]\nName=enp0s2\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nRouteMetric=200\n");
+        assert!(calls.starts_with("networkctl reload\nnetworkctl reconfigure enp0s1\n"), "{calls}");
+        let own = std::fs::read_to_string(run.networkd().join("05-isoloom-uplink.network"))?;
+        assert_eq!(own, "[Match]\nName=enp0s1\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=50\n");
         assert_eq!(std::fs::read_dir(run.networkd())?.count(), 1, "nothing is added to the shared file");
         Ok(())
     }
 
-    /// Once its own file applies, a later run changes nothing in the configuration.
+    /// The shared card on its own file, which says `metric` (written as the script writes it).
+    fn on_own_file(name: &str, metric: u32, reaches: bool) -> Result<String, Box<dyn std::error::Error>> {
+        let run = Run::reaching(name, TWO_DEFAULTS, reaches)?;
+        let own = run.networkd().join("05-isoloom-uplink.network");
+        std::fs::create_dir_all(run.networkd())?;
+        std::fs::write(&own, format!("[Match]\nName=enp0s1\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric={metric}\n"))?;
+        run.networkd_on(&own.display().to_string())?;
+        run.calls()
+    }
+
+    /// Once its own file says the current choice, a later run changes nothing in the configuration.
     #[test]
     fn a_card_already_on_its_own_file_is_not_reconfigured() -> Result<(), Box<dyn std::error::Error>> {
-        let run = Run::new("own", TWO_DEFAULTS)?;
-        let own = run.networkd().join("05-isoloom-nat-route.network");
-        run.stand_in(
-            "networkctl",
-            &format!(
-                "if [ \"$1\" = status ]; then echo '  Network File: {}'; else echo \"networkctl $*\" >> {}; fi\n",
-                own.display(),
-                run.log().display()
-            ),
-        )?;
-        assert!(!run.calls()?.contains("networkctl"));
+        assert!(!on_own_file("own", 50, true)?.contains("networkctl"));
+        Ok(())
+    }
+
+    /// The choice is made again at every `vagrant up`: a file from a day the shared network
+    /// reached nothing is rewritten when it does.
+    #[test]
+    fn a_choice_that_changed_rewrites_the_cards_file() -> Result<(), Box<dyn std::error::Error>> {
+        assert!(on_own_file("changed", 200, true)?.starts_with("networkctl reload\nnetworkctl reconfigure enp0s1\n"));
+        Ok(())
+    }
+
+    /// A shared network that reaches nothing (seen: the Mac's own NAT down while the emulated one
+    /// ran at 34 MB/s) must not take the traffic: its route goes behind the emulated one.
+    #[test]
+    fn a_shared_network_without_internet_stays_behind_the_emulated_one() -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(Run::reaching("unreached", TWO_DEFAULTS, false)?.calls()?, shared_route_at(200));
         Ok(())
     }
 

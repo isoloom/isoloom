@@ -459,14 +459,23 @@ end
 ISOLOOM_NAT_ROUTE = <<~'SH'
 set -eu
 gw=10.0.2.2
-nat=$(ip -4 route show default via "$gw" | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
-# No default route through the emulated network, or no other one to prefer: nothing to do.
+dev_of() { awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}'; }
+via_of() { awk '{for (i = 1; i < NF; i++) if ($i == "via") { print $(i + 1); exit }}'; }
+nat=$(ip -4 route show default via "$gw" | dev_of)
+# No default route through the emulated network, or no shared one to prefer: nothing to do.
 [ -n "$nat" ] || exit 0
-ip -4 route show default | grep -v "via $gw dev $nat " | grep -q . || exit 0
-# Waits (up to 30 s) for the card's default route after its configuration was applied again.
+up=$(ip -4 route show default | grep -v "via $gw dev $nat " | dev_of)
+[ -n "$up" ] || exit 0
+# The shared network leads only when it reaches the internet; otherwise the emulated one does.
+metric=200
+for probe in 1.1.1.1 8.8.8.8 9.9.9.9; do
+  if ping -c 1 -W 2 -I "$up" "$probe" >/dev/null 2>&1; then metric=50; break; fi
+done
+[ "$metric" = 50 ] || echo "nat-route: the shared network ($up) reaches no public resolver; the emulated network keeps the traffic"
+# Waits (up to 30 s) for the shared card's default route after its configuration was applied.
 route_back() {
   i=0
-  until ip -4 route show default via "$gw" dev "$nat" | grep -q .; do
+  until ip -4 route show default dev "$up" | grep -q .; do
     i=$((i + 1))
     [ "$i" -lt 30 ] || return 1
     sleep 1
@@ -474,35 +483,37 @@ route_back() {
 }
 netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
 if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
-  con=$(nmcli -g GENERAL.CONNECTION device show "$nat")
-  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != 200 ]; then
-    nmcli connection modify "$con" ipv4.route-metric 200
-    nmcli device reapply "$nat"
+  con=$(nmcli -g GENERAL.CONNECTION device show "$up")
+  if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != "$metric" ]; then
+    nmcli connection modify "$con" ipv4.route-metric "$metric"
+    nmcli device reapply "$up"
   fi
-elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$nat" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
-  own="$netd/05-isoloom-nat-route.network"
-  if [ "$file" != "$own" ]; then
+elif command -v networkctl >/dev/null 2>&1 && file=$(networkctl status "$up" 2>/dev/null | sed -n 's/^ *Network File: //p') && [ -n "$file" ] && [ "$file" != n/a ]; then
+  own="$netd/05-isoloom-uplink.network"
+  want=$(printf '[Match]\nName=%s\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=%s\n' "$up" "$metric")
+  if [ "$file" != "$own" ] || [ "$(cat "$own")" != "$want" ]; then
     mkdir -p "$netd"
-    printf '[Match]\nName=%s\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nRouteMetric=200\n' "$nat" > "$own"
+    printf '%s\n' "$want" > "$own"
     networkctl reload
-    networkctl reconfigure "$nat"
+    networkctl reconfigure "$up"
   fi
 elif [ -f /etc/network/interfaces ]; then
   for f in /etc/network/interfaces /etc/network/interfaces.d/*; do
-    [ -f "$f" ] && grep -q "^iface $nat inet dhcp" "$f" || continue
-    sed -n "/^iface $nat inet dhcp/,/^[^ \t]/p" "$f" | grep -q '^[ \t]*metric ' ||
-      sed -i "/^iface $nat inet dhcp/a\\    metric 200" "$f"
+    [ -f "$f" ] && grep -q "^iface $up inet dhcp" "$f" || continue
+    sed -i "/^iface $up inet dhcp/,/^[^ \t]/{/^[ \t]*metric /d}" "$f"
+    sed -i "/^iface $up inet dhcp/a\\    metric $metric" "$f"
   done
 fi
 if ! route_back; then
-  echo "nat-route: the emulated card has no default route any more; the shared network carries the traffic"
+  echo "nat-route: the shared card has no default route any more; the emulated network carries the traffic"
   exit 0
 fi
 # The route as it is now, whatever the configuration does at its next renewal.
-ip -4 route show default via "$gw" dev "$nat" | grep -q ' metric 200' ||
-  ip -4 route replace default via "$gw" dev "$nat" metric 200
-for m in $(ip -4 route show default via "$gw" dev "$nat" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
-  [ "$m" = 200 ] || ip -4 route del default via "$gw" dev "$nat" metric "$m"
+upgw=$(ip -4 route show default dev "$up" | via_of)
+ip -4 route show default dev "$up" | grep -q " metric $metric " ||
+  ip -4 route replace default via "$upgw" dev "$up" metric "$metric"
+for m in $(ip -4 route show default dev "$up" | awk '{m = 0; for (i = 1; i < NF; i++) if ($i == "metric") m = $(i + 1); print m}'); do
+  [ "$m" = "$metric" ] || ip -4 route del default via "$upgw" dev "$up" metric "$m"
 done
 SH
 

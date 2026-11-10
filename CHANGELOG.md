@@ -385,13 +385,16 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   droplet), and refuse a disk larger than their largest size's, naming the machine and the size.
 - **`cloud-docker` refuses containers that need more memory than the largest Docker host**
   (16 GB), naming the container that asks for the most; they got that host all the same.
-- **On UTM, a Linux VM's internet goes through UTM's shared network**: vagrant_utm gives a VM
+- **On UTM, a Linux VM's internet takes the network that reaches it**: vagrant_utm gives a VM
   UTM's shared network and the plugin's emulated one (QEMU user mode, `10.0.2.0/24`), both with a
-  DHCP default route at the same metric, and Linux picked the emulated one, about 12 times slower
-  (an image pull of a gigabyte took over half an hour in `docker-vm`'s VM). A `nat-route`
-  provisioner, first and at every `up`, gives the emulated card's default route metric 200, now
-  and in the guest's network configuration (NetworkManager, systemd-networkd or ifupdown); SSH
-  and forwarded ports still use it. It does nothing on the other providers or without a second
+  DHCP default route at the same metric, and Linux picked the emulated one, which was about 12
+  times slower one day (an image pull of a gigabyte took over half an hour in `docker-vm`'s VM)
+  and fast the next, when the shared network reached nothing. A `nat-route` provisioner, first and
+  at every `up`, gives the shared card's default route metric 50 when that network reaches a
+  public resolver, 200 otherwise, now and in that card's own network configuration
+  (NetworkManager, systemd-networkd or ifupdown). It never changes the emulated card, which
+  carries Vagrant's SSH session and the forwarded ports: applying a configuration to it renewed
+  its lease and cut that session. It does nothing on the other providers or without a second
   default route.
 - **A gateway forwards IPv6 when the lab routes it**, on every VM target (it forwarded IPv4 only
   outside Compose); its forwarding is a plan step every VM backend renders, and routers and
