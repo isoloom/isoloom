@@ -46,7 +46,15 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Breaking (library): the address blocks are `isoloom_spec::net`'s** (`Cidr`, `Cidr6`,
   `PRIVATE`, `IPV6_PREFIX`, `docker_cidrs`), no longer under `validate`, and `Cidr` and `Cidr6`
   keep their fields private: build one with `Cidr::new`, `parse`, `enclosing` or `ALL` (read it
-  with `base`, `address`, `prefix`, split it with `halves`), a `Cidr6` with `Cidr6::new`.
+  with `base`, `address`, `prefix`, split it with `halves`), a `Cidr6` with `Cidr6::new`. The
+  addresses Isoloom reserves in a network's block (`host`, `gateway`, `gateway_octet`, `tool`,
+  `controller`, `router`) are `isoloom_spec::net::NetworkBlock`'s, a /24 to /29 block
+  (`NetworkBlock::new`, `parse`, `enclosing`), not `Cidr`'s, and `tool` is `None` past the
+  block's host addresses.
+- **Breaking (library): the plan carries each network's `NetworkBlock`** (`NetworkPlan::cidr`
+  and `declared_cidr`, `OutsideNetwork::cidr`, `Environment::block`), parsed once, not its text;
+  `isoloom_plan::addressing::netmask` is removed. `MachinePlan::os` is private: a VM's OS is
+  `isoloom_plan::Vm::os` (`Environment::vms`, `vm`).
 - **Breaking (library): `ComposeBackend` is `ComposeBackend::DOCKER` or `HOSTED`**, its target
   private; `isoloom_compose::guest` takes how the VM's way in gets root (`AsRoot`), and
   `isoloom_terraform::cloud_docker_manifests` a guest per `AsRoot`.

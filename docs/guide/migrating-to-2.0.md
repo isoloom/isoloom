@@ -129,7 +129,9 @@ among others (the CHANGELOG's **Removed** section lists every item):
 
 - `isoloom_spec::validate::{Cidr, Cidr6, PRIVATE, IPV6_PREFIX, docker_cidrs}` are
   `isoloom_spec::net`'s, and `Cidr`'s `base` and `len` are private: `Cidr::new(base, len)`,
-  `base()`, `prefix()`. `isoloom_spec::validate::RESERVED_PREFIX`,
+  `base()`, `prefix()`. A network's reserved addresses (`host`, `gateway`, `tool`,
+  `controller`, `router`) are `isoloom_spec::net::NetworkBlock`'s, a /24 to /29:
+  `NetworkBlock::parse(text)?.host(octet)`. `isoloom_spec::validate::RESERVED_PREFIX`,
   `isoloom_targets::OUTPUT_DIR` are `isoloom_manifest::contract`'s.
 - `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}`: the lab takes
   the regions (`Lab::with_regions`, from `Defaults::regions`); `isoloom_targets::default_regions`
