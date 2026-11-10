@@ -79,24 +79,38 @@ impl AsRoot {
 
 /// Where the project's archive is read from when it is unpacked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Archive<'a> {
-    /// A file on the VM (`/tmp/isoloom-project.tgz`, uploaded before).
-    File(&'a str),
+pub enum Archive {
+    /// [`PROJECT_ARCHIVE`] on the VM, uploaded before, and removed once unpacked.
+    Uploaded,
     /// The command's standard input (piped over SSH).
     Stdin,
 }
 
 /// The project unpacked into [`PROJECT_DIR`] as root, replacing what an earlier copy left, so a
 /// file deleted from the project goes from the VM too: the archive read `from`, its top folder
-/// left out when `strip`. One line, with no single quote, so a caller can wrap it in `sh -c '…'`.
+/// left out when `strip`. The files are root's (an archive Isoloom or a runner writes holds uid
+/// 0). One line, with no single quote, so a caller can wrap it in `sh -c '…'`. Every way of
+/// getting the project into a Linux VM unpacks it with this line.
 #[must_use]
-pub fn project_unpack(from: Archive<'_>, strip: bool) -> String {
-    let source = match from {
-        Archive::File(path) => path,
-        Archive::Stdin => "-",
-    };
+pub fn project_unpack(from: Archive, strip: bool) -> String {
     let strip = if strip { " --strip-components=1" } else { "" };
-    format!("rm -rf {PROJECT_DIR} && mkdir -p {PROJECT_DIR} && tar -xzf {source} -C {PROJECT_DIR}{strip}")
+    let fresh = format!("rm -rf {PROJECT_DIR} && mkdir -p {PROJECT_DIR}");
+    match from {
+        Archive::Uploaded => format!("{fresh} && tar -xzf {PROJECT_ARCHIVE} -C {PROJECT_DIR}{strip} && rm -f {PROJECT_ARCHIVE}"),
+        Archive::Stdin => format!("{fresh} && tar -xzf - -C {PROJECT_DIR}{strip}"),
+    }
+}
+
+/// [`project_unpack`] on Windows, in PowerShell: [`WINDOWS_PROJECT_ARCHIVE`] (uploaded before)
+/// unpacked into [`WINDOWS_PROJECT_DIR`], replacing what an earlier copy left, its top folder left
+/// out when `strip`. Every way of getting the project into a Windows VM unpacks it with this.
+#[must_use]
+pub fn windows_project_unpack(strip: bool) -> String {
+    format!(
+        "$archive = '{WINDOWS_PROJECT_ARCHIVE}'; $dest = '{WINDOWS_PROJECT_DIR}'; $strip = {}\n{}",
+        u8::from(strip),
+        powershell::UNTAR
+    )
 }
 
 /// The line of [`ACCEPT_ENV_FILE`] letting sshd accept `forwarded`, environment variables' names
@@ -271,7 +285,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Trunks => network::trunks(env, machine),
         Step::Volumes { paths } => (!paths.is_empty()).then(|| format!("mkdir -p {}\n", paths.iter().map(|p| quote(p)).collect::<Vec<_>>().join(" "))),
         Step::SharedVolume { volume, path, role } => Some(shared_volume::linux(volume, path, role)),
-        Step::Project => Some(format!("{} && rm -f {PROJECT_ARCHIVE}\n", project_unpack(Archive::File(PROJECT_ARCHIVE), true))),
+        Step::Project => Some(format!("{}\n", project_unpack(Archive::Uploaded, true))),
         Step::CaCertificates { files } => Some(constraints::trust_linux(
             &files.iter().map(|f| format!("{PROJECT_DIR}/{f}")).collect::<Vec<_>>(),
         )),
@@ -305,10 +319,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Routes { routes, .. } => network::windows_routes(routes),
         Step::Ipv6 { addresses, routes } => Some(ipv6::windows(addresses, routes)),
         Step::MoreAddresses { addresses } => Some(more_addresses::windows(addresses)),
-        Step::Project => Some(format!(
-            "$archive = '{WINDOWS_PROJECT_ARCHIVE}'; $dest = '{WINDOWS_PROJECT_DIR}'; $strip = 1\n{}",
-            powershell::UNTAR
-        )),
+        Step::Project => Some(windows_project_unpack(true)),
         Step::CaCertificates { files } => Some(constraints::trust_windows(
             &files
                 .iter()

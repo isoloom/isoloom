@@ -56,7 +56,7 @@ use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::checks::{Position, Resolved};
 use isoloom_plan::{Controller, Environment, MachineShape};
 use isoloom_render::backend::Files;
-use isoloom_render::{GeneratedFile, header, powershell, router, steps};
+use isoloom_render::{GeneratedFile, header, router, steps};
 use isoloom_spec::model::{Spec, Target};
 
 use crate::backend::capabilities;
@@ -78,18 +78,18 @@ const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
 /// The Ruby that copies the project into a VM (`vagrant_project.rb`): a tar.gz built when the
 /// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`, leaving out
 /// what a copy leaves out (`IsoloomProject::COPY_RULES`, [`copy_rules`] for a machine that reads
-/// none of Isoloom's outputs); on Windows unpacked by PowerShell (`untar.ps1`, as
-/// `IsoloomProject::UNTAR_PS1`). Every Vagrantfile Isoloom writes carries it, after `ROOT`.
+/// none of Isoloom's outputs), uploaded and unpacked as every target unpacks the project
+/// ([`steps::project_unpack`] as root on Linux, [`steps::windows_project_unpack`] on Windows).
+/// Every Vagrantfile Isoloom writes carries it, after `ROOT`.
 pub(crate) fn project_rb() -> String {
     format!(
-        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project goes, and its archive on the way.\nIsoloomProject::LINUX_DIR = {}\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::WINDOWS_DIR = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n{}PS1\n",
+        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,\n# with no tar.exe before Windows Server 2019).\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::LINUX_UNPACK = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\nIsoloomProject::WINDOWS_UNPACK = <<'PS1'\n{}PS1\n",
         include_str!("vagrant_project.rb"),
         copy_rules(&[]),
-        Value::str(steps::PROJECT_DIR),
         Value::str(steps::PROJECT_ARCHIVE),
-        Value::str(steps::WINDOWS_PROJECT_DIR),
+        Value::str(&steps::project_unpack(steps::Archive::Uploaded, false)),
         Value::str(steps::WINDOWS_PROJECT_ARCHIVE),
-        powershell::UNTAR
+        steps::windows_project_unpack(false)
     )
 }
 

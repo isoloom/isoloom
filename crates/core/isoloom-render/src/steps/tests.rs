@@ -451,5 +451,20 @@ fn every_project_unpack_replaces_the_old_copy() {
         project_unpack(Archive::Stdin, false),
         "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom"
     );
-    assert!(!project_unpack(Archive::File("/tmp/a b.tgz"), true).contains('\''));
+    assert_eq!(
+        project_unpack(Archive::Uploaded, true),
+        "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz"
+    );
+    assert!(!project_unpack(Archive::Uploaded, false).contains('\''), "it goes in sh -c '…'");
+}
+
+#[test]
+fn the_windows_project_unpack_reads_the_uploaded_archive_into_the_project_folder() {
+    let unpack = super::windows_project_unpack(false);
+    assert!(
+        unpack.starts_with("$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 0\n"),
+        "{unpack}"
+    );
+    assert!(unpack.ends_with(crate::powershell::UNTAR), "{unpack}");
+    assert!(super::windows_project_unpack(true).contains("; $strip = 1\n"));
 }

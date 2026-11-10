@@ -143,9 +143,9 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
       end
     end
 
-    # Builds the archive, uploads it, unpacks it in LINUX_DIR (WINDOWS_DIR on Windows, over
-    # WinRM or OpenSSH, with UNTAR_PS1), replacing an older copy. The folders and the archives'
-    # paths are the generator's, set after this file.
+    # Builds the archive, uploads it to LINUX_ARCHIVE (WINDOWS_ARCHIVE on Windows, over WinRM or
+    # OpenSSH) and unpacks it as root with LINUX_UNPACK (WINDOWS_UNPACK), replacing an older copy.
+    # The archives' paths and the unpacking are the generator's, set after this file.
     class Provisioner < Vagrant.plugin("2", :provisioner)
       def provision
         windows = %w[winrm winssh].include?(@machine.config.vm.communicator.to_s)
@@ -153,21 +153,16 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
           f.binmode
           IsoloomProject.write(ROOT, f, rules: config.rules)
           f.close
-          dest = windows ? WINDOWS_DIR : LINUX_DIR
-          @machine.ui.info("The project, #{(File.size(f.path) / 1024.0).ceil} KB compressed, to #{dest}")
+          @machine.ui.info("The project, #{(File.size(f.path) / 1024.0).ceil} KB compressed, into the VM")
           comm = @machine.communicate
           if windows
-            archive = WINDOWS_ARCHIVE
-            comm.upload(f.path, archive)
-            script = "$archive = '#{archive}'; $dest = '#{dest}'; $strip = 0\n#{UNTAR_PS1}"
-            comm.execute(script, elevated: true) do |type, data|
+            comm.upload(f.path, WINDOWS_ARCHIVE)
+            comm.execute(WINDOWS_UNPACK, elevated: true) do |type, data|
               @machine.ui.info(data.chomp) if type == :stdout && !data.strip.empty?
             end
           else
-            unpacked = LINUX_ARCHIVE.delete_suffix(".tgz")
             comm.upload(f.path, LINUX_ARCHIVE)
-            comm.execute("rm -rf #{unpacked} && mkdir #{unpacked} && tar -xzf #{LINUX_ARCHIVE} -C #{unpacked} && rm -f #{LINUX_ARCHIVE}")
-            comm.sudo("rm -rf #{dest} && mv #{unpacked} #{dest}")
+            comm.sudo(LINUX_UNPACK)
           end
         end
       end
