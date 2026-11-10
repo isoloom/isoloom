@@ -8,7 +8,7 @@
 
 use isoloom_manifest::{Error as ManifestError, Failure, Machine, Output, OutputRole, PathTemplate, RelPath, Step, StepId, Template};
 use isoloom_render::run_manifest::{self, guest::COMPOSE_OUTPUTS, guest::GuestCommand, guest::GuestCompose};
-use isoloom_render::steps::{self, ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, AsRoot, CLOUD_INIT_WAIT, PUBLISHED_FROM_OUTSIDE, RELOAD_SSHD, install_docker};
+use isoloom_render::steps::{self, AsRoot, CLOUD_INIT_WAIT, PUBLISHED_FROM_OUTSIDE, install_docker};
 
 use crate::hcl_builder::{Expression, list, string};
 use crate::ssh::Login;
@@ -53,20 +53,16 @@ pub(crate) fn port_strings(ports: &[u16]) -> Expression {
 /// # Errors
 ///
 /// A step id the manifest refuses (a bug: it is fixed). The forwarded names are environment
-/// variables (upper snake case), so the command needs no quoting.
+/// variables (upper snake case), so the command holds no single quote to escape.
 pub(crate) fn accept_env(guest: &GuestCompose, as_root: AsRoot) -> Result<Option<GuestCommand>, ManifestError> {
     let forwarded = guest.forwarded();
     if forwarded.is_empty() {
         return Ok(None);
     }
-    let line = steps::accept_env_line(&forwarded);
-    let sudo = as_root.prefix();
     Ok(Some(GuestCommand {
         id: StepId::parse("accept-env")?,
         note: Some("Letting the VM accept the launch's values…".into()),
-        command: Template::text(&format!(
-            "{sudo}mkdir -p {ACCEPT_ENV_DIR} && echo {line} | {sudo}tee {ACCEPT_ENV_FILE} >/dev/null && {sudo}sh -c \"{RELOAD_SSHD}\""
-        )),
+        command: Template::text(&format!("{}sh -c '{}'", as_root.prefix(), steps::accept_env(&forwarded))),
         timeout_s: 60,
         failure: Failure::Fail,
     }))
@@ -285,11 +281,9 @@ mod tests {
         let line = cmd.command.to_string();
         assert!(line.contains("AcceptEnv DEMO_SECRET LAUNCH_TOKEN"), "{line}");
         assert!(line.contains("/etc/ssh/sshd_config.d/isoloom-env.conf"), "{line}");
-        // The drop-in directory is created first: a bare Terraform-made VM may lack it, and `tee`
-        // cannot create it, so without this the forwarded launch values would arrive unset.
-        assert!(line.contains("sudo mkdir -p /etc/ssh/sshd_config.d &&"), "{line}");
+        // Render's one command, as root: the drop-in directory is created first, since a bare
+        // Terraform-made VM may lack it and the forwarded launch values would arrive unset.
+        assert!(line.starts_with("sudo sh -c 'mkdir -p /etc/ssh/sshd_config.d &&"), "{line}");
         assert!(line.contains("systemctl reload ssh || systemctl reload sshd"), "{line}");
-        // The way in wraps the command in single quotes, so it must contain none.
-        assert!(!line.contains('\''), "{line}");
     }
 }
