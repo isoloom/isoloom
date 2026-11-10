@@ -58,3 +58,40 @@ fn every_vm_name_a_vagrantfile_gives_is_ascii() -> Outcome {
     assert!(named > 0, "the examples name VMs");
     Ok(())
 }
+
+/// The examples' reference (`docs/reference/examples.md`): each example's row and the targets its
+/// last column lists.
+fn documented_targets() -> Outcome<Vec<(String, Vec<String>)>> {
+    let page = std::fs::read_to_string(examples().join("../docs/reference/examples.md"))?;
+    Ok(page
+        .lines()
+        .filter_map(|line| {
+            let cells: Vec<&str> = line.strip_prefix("| ")?.trim_end_matches('|').split(" | ").map(str::trim).collect();
+            let name = cells.first()?.strip_prefix('`')?.strip_suffix('`')?;
+            let targets = cells.last()?.split(", ").map(str::to_owned).collect();
+            Some((name.to_owned(), targets))
+        })
+        .collect())
+}
+
+#[test]
+fn the_examples_reference_lists_every_example_with_the_targets_it_allows() -> Outcome {
+    let documented = documented_targets()?;
+    let mut names = Vec::new();
+    for dir in example_dirs()? {
+        let lab = isoloom_targets::Lab::new(isoloom_spec::load(&dir)?);
+        let name = dir.file_name().and_then(|n| n.to_str()).ok_or("an example's folder")?.to_owned();
+        let allowed: Vec<String> = lab
+            .possible()
+            .into_iter()
+            .filter(|t| refusal(&lab, *t).is_none())
+            .map(|t| t.id().to_owned())
+            .collect();
+        let row = documented.iter().find(|(n, _)| *n == name).map(|(_, t)| t);
+        assert_eq!(row, Some(&allowed), "docs/reference/examples.md's row for `{name}` against `isoloom targets`");
+        names.push(name);
+    }
+    let extra: Vec<&String> = documented.iter().map(|(n, _)| n).filter(|n| !names.contains(n)).collect();
+    assert!(extra.is_empty(), "docs/reference/examples.md lists examples that don't exist: {extra:?}");
+    Ok(())
+}

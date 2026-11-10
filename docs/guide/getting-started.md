@@ -64,6 +64,7 @@ isoloom generate --target docker
 ...
 ✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
 ```
 
 Everything is written under `.isoloom/`. `compose.yml` is a plain Compose file: read it, run it

@@ -56,9 +56,9 @@ published URL. Two variables change that when you run the file by hand:
 Each spec network is a Docker network; `internet: false` networks have no route out, which the
 derived checks prove ("no internet from web"). Traffic between networks goes through a router
 container Isoloom adds when `reach` rules need one, which forwards only what the rules allow; the
-derived checks prove that too. A container that needs `privileged`, `NET_ADMIN` or `NET_RAW` on
-an offline network is refused unless the spec accepts a best-effort seal
-(`machines.<name>.seal: best-effort`).
+derived checks prove that too. A `privileged` container on an offline network is refused unless
+the spec accepts a best-effort seal (`machines.<name>.seal: best-effort`): from inside it could
+lift the seal.
 
 ## Teardown
 

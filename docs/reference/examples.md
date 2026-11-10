@@ -28,7 +28,7 @@ may still refuse some clouds).
 |---|---|---|
 | `air-gapped` | A network with no internet and nothing published | docker, hosted, docker-vm, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 | `segmented` | Three networks and a router; `reach` rules allow some paths and block the rest | docker, hosted, docker-vm, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
-| `dmz-jump` | A gateway in a DMZ, an app and a database behind it, a client that only sees the DMZ | docker, hosted, docker-vm, cloud-docker, kubernetes, vagrant, cloud-vm |
+| `dmz-jump` | A gateway in a DMZ, an app and a database behind it, a client that only sees the DMZ | docker, hosted, docker-vm, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 | `edge-firewall` | A firewall machine of the environment's own routes the DMZ and the LAN with its own rules | docker, hosted, docker-vm, cloud-docker, vagrant, cloud-vm |
 | `dual-stack` | Two dual-stack networks and a router, IPv4 and IPv6 alike | docker, hosted, docker-vm, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 | `vlan-office` | One LAN split into two VLANs, each with its own reach | docker, hosted, docker-vm, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |

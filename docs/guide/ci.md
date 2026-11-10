@@ -44,8 +44,9 @@ when the files no longer match the spec:
 ```
 
 `isoloom check --target docker` checks one target's files, `--profile` a profile's.
-`isoloom check --quiet` prints only the problems, and `isoloom check --json` prints them for a
-tool. Exit codes: 0 up to date, 1 out of date (or the spec is invalid), 2 could not run.
+`isoloom check --quiet` prints only the problems, and `isoloom check --json` prints, for a tool,
+each file's status (`current`, `out_of_date`, `missing`, `unreadable`, `no_longer_generated`), the
+reasons a target asked for has no files, and a summary. Exit codes: 0 up to date, 1 out of date (or the spec is invalid), 2 could not run.
 
 Validate every spec of a repository without writing anything:
 
