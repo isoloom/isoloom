@@ -87,3 +87,21 @@ fn the_snapshot_of_an_instance_that_cant_be_made_is_an_error_not_the_lab_as_writ
     assert_eq!(resolve_with(&lab, None)?["instance"], serde_json::Value::Null);
     Ok(())
 }
+
+#[test]
+fn an_instance_that_cant_be_made_is_its_own_error_not_the_target_refusing_the_lab() -> Outcome {
+    use isoloom_targets::{Error, GenerateError};
+    let lab = example("hello-stack")?;
+    for n in [0, 100] {
+        let Err(Error::Generate(e)) = generate_instance(&lab, Target::Docker, n) else {
+            panic!("instance {n} generated");
+        };
+        assert!(
+            matches!(e, GenerateError::Instance { target: Target::Docker, number, .. } if number == n),
+            "{e:?}"
+        );
+        assert!(!e.is_refusal(), "{e}");
+        assert!(e.to_string().starts_with(&format!("docker: instance {n}: ")), "{e}");
+    }
+    Ok(())
+}

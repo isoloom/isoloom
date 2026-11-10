@@ -36,7 +36,8 @@ fn with_snapshot(lab: &Lab, target: Target) -> std::result::Result<Vec<Generated
 ///
 /// # Errors
 ///
-/// As [`generate`], and [`Error::Generate`] when the instance can't be made.
+/// As [`generate`], and [`Error::Generate`] with [`GenerateError::Instance`] when the instance
+/// can't be made.
 pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<GeneratedFile>> {
     let mut files = target_files(lab, target, Some(n))?;
     files.push(resolved::file_with(lab, n)?);
@@ -116,7 +117,11 @@ pub fn project_copies(lab: &Lab, files: &[GeneratedFile], dir: &Path) -> Result<
 fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Spec, GenerateError> {
     let spec = lab.for_target(target);
     match instance {
-        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|e| GenerateError::Unsupported { target, what: e.to_string() }),
+        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|e| GenerateError::Instance {
+            target,
+            number: n,
+            source: std::sync::Arc::new(e),
+        }),
         None => Ok(spec),
     }
 }

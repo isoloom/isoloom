@@ -87,6 +87,19 @@ pub enum GenerateError {
         /// What it doesn't support, as the refusal reads.
         what: String,
     },
+    /// The lab can't be made the instance asked for on the target (`isoloom_spec::instance::apply`:
+    /// a number out of range, a name too long, a published port or an IPv6 block moved past its
+    /// end). Not a refusal: the target takes the lab, not that instance of it.
+    #[error("{}: instance {number}: {source}", target.id())]
+    Instance {
+        /// The target being generated.
+        target: Target,
+        /// The instance number asked for.
+        number: u8,
+        /// Why it can't be made.
+        #[source]
+        source: Arc<isoloom_spec::Error>,
+    },
     /// The backend failed, not the lab (a bug: a value the run manifest's types refused, a file
     /// its writer couldn't write), with the error it failed with.
     #[error("{}: {what}", target.id())]
