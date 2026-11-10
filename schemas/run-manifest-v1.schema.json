@@ -1286,9 +1286,9 @@
       "description": "One of the environment's networks."
     },
     "Cidr": {
-      "description": "A network block: an IPv4 or IPv6 address and a prefix length (`10.30.0.0/24`).",
+      "description": "A network block: its first IPv4 or IPv6 address, with no bit set past the prefix (which the pattern can't check), and a prefix length that fits the address (`10.30.0.0/24`).",
       "type": "string",
-      "pattern": "^[0-9A-Fa-f.:]+/[0-9]{1,3}$"
+      "pattern": "^(?:[0-9]{1,3}(?:\\.[0-9]{1,3}){3}/(?:3[0-2]|[12][0-9]|[0-9])|[0-9A-Fa-f.:]*:[0-9A-Fa-f.:]*/(?:12[0-8]|1[01][0-9]|[1-9][0-9]|[0-9]))$"
     },
     "Machine": {
       "type": "object",

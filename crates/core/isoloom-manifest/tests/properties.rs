@@ -25,7 +25,17 @@ fn accepts(def: &'static str, text: &str) -> bool {
 }
 
 /// The definitions the properties compare the types with.
-const DEFINITIONS: [&str; 4] = ["Template", "PathTemplate", "RelPath", "Program"];
+const DEFINITIONS: [&str; 5] = ["Template", "PathTemplate", "RelPath", "Program", "Cidr"];
+
+#[test]
+fn the_schema_takes_the_blocks_the_type_takes_and_refuses_a_prefix_past_the_address() {
+    for good in ["10.30.0.0/24", "0.0.0.0/0", "10.30.0.1/32", "fd00:30::/64", "::/0", "fd00::1/128"] {
+        assert!(isoloom_manifest::Cidr::parse(good).is_ok() && accepts("Cidr", good), "{good}");
+    }
+    for bad in ["10.30.0.0/999", "10.30.0.0/33", "fd00::/129", "10.30.0.0", "lab/24", "10.30.0.0/x"] {
+        assert!(isoloom_manifest::Cidr::parse(bad).is_err() && !accepts("Cidr", bad), "{bad}");
+    }
+}
 
 #[test]
 fn the_schema_defines_what_the_properties_compare() {

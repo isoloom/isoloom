@@ -45,7 +45,8 @@ pub enum Role {
     Check,
 }
 
-/// A network block, IPv4 or IPv6 (`10.30.0.0/24`).
+/// A network block, IPv4 or IPv6 (`10.30.0.0/24`): its first address, with no bit set past the
+/// prefix, and a prefix length that fits the address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Cidr {
     address: IpAddr,
@@ -58,14 +59,20 @@ impl Cidr {
     /// # Errors
     ///
     /// [`Error::Cidr`] when it isn't an address, a `/` and a prefix length that fits the
-    /// address (at most 32 for IPv4, 128 for IPv6).
+    /// address (at most 32 for IPv4, 128 for IPv6), or the address has a bit set past the prefix
+    /// (`10.30.0.1/24`: an address in the block, not the block).
     pub fn parse(text: &str) -> Result<Cidr> {
         let err = || Error::Cidr { value: text.to_owned() };
         let (address, prefix) = text.split_once('/').ok_or_else(err)?;
         let address: IpAddr = address.parse().map_err(|_| err())?;
         let prefix: u8 = prefix.parse().map_err(|_| err())?;
-        let max = if address.is_ipv4() { 32 } else { 128 };
-        if prefix > max {
+        let width = if address.is_ipv4() { 32 } else { 128 };
+        // The address's bits past the prefix (a shift by the whole width leaves none: `/32`).
+        let host_bits = match address {
+            IpAddr::V4(a) => u32::from(a).checked_shl(u32::from(prefix)).is_some_and(|rest| rest != 0),
+            IpAddr::V6(a) => u128::from(a).checked_shl(u32::from(prefix)).is_some_and(|rest| rest != 0),
+        };
+        if prefix > width || host_bits {
             return Err(err());
         }
         Ok(Cidr { address, prefix })
@@ -98,6 +105,11 @@ impl<'de> Deserialize<'de> for Cidr {
     }
 }
 
+/// What a [`Cidr`] looks like: an IPv4 address and a prefix length up to 32, or an IPv6 address
+/// and one up to 128.
+const CIDR_PATTERN: &str =
+    r"^(?:[0-9]{1,3}(?:\.[0-9]{1,3}){3}/(?:3[0-2]|[12][0-9]|[0-9])|[0-9A-Fa-f.:]*:[0-9A-Fa-f.:]*/(?:12[0-8]|1[01][0-9]|[1-9][0-9]|[0-9]))$";
+
 impl JsonSchema for Cidr {
     fn schema_name() -> Cow<'static, str> {
         "Cidr".into()
@@ -105,9 +117,9 @@ impl JsonSchema for Cidr {
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
-            "description": "A network block: an IPv4 or IPv6 address and a prefix length (`10.30.0.0/24`).",
+            "description": "A network block: its first IPv4 or IPv6 address, with no bit set past the prefix (which the pattern can't check), and a prefix length that fits the address (`10.30.0.0/24`).",
             "type": "string",
-            "pattern": "^[0-9A-Fa-f.:]+/[0-9]{1,3}$",
+            "pattern": CIDR_PATTERN,
         })
     }
 }
@@ -314,7 +326,17 @@ mod tests {
         assert_eq!(Cidr::parse("fd00:30::/64").unwrap().to_string(), "fd00:30::/64");
         assert_eq!(Cidr::parse("10.30.0.1/32").unwrap().to_string(), "10.30.0.1/32");
         assert_eq!("fd00::1/128".parse::<Cidr>().unwrap().to_string(), "fd00::1/128");
-        for bad in ["10.30.0.0", "10.30.0.0/33", "fd00::/129", "lab/24", "10.30.0.0/x"] {
+        assert_eq!(Cidr::parse("0.0.0.0/0").unwrap().to_string(), "0.0.0.0/0");
+        for bad in [
+            "10.30.0.0",
+            "10.30.0.0/33",
+            "fd00::/129",
+            "lab/24",
+            "10.30.0.0/x",
+            "10.30.0.0/999",
+            "10.30.0.1/24",
+            "fd00::1/64",
+        ] {
             assert_eq!(Cidr::parse(bad).unwrap_err().code(), "cidr", "{bad}");
         }
     }

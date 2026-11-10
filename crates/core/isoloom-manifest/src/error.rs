@@ -130,8 +130,8 @@ pub enum Error {
         /// The path as written.
         path: String,
     },
-    /// A network block that doesn't parse.
-    #[error("`{value}` isn't a network block: write an address and a prefix length (`10.30.0.0/24`)")]
+    /// A network block that doesn't parse, or names an address in the block, not the block.
+    #[error("`{value}` isn't a network block: write its first address and a prefix length (`10.30.0.0/24`)")]
     Cidr {
         /// The block as written.
         value: String,
