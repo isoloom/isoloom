@@ -53,7 +53,7 @@
 //! ",
 //! )?);
 //! let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None);
-//! let files = ComposeBackend(Target::Docker).render(&env)?;
+//! let files = ComposeBackend::DOCKER.render(&env)?;
 //! let compose = files.iter().find(|f| f.path == ".isoloom/docker/compose.yml").ok_or("no Compose file")?;
 //! assert!(compose.contents.contains("ipv4_address: 10.9.0.10"));
 //! # Ok::<(), Box<dyn std::error::Error>>(())

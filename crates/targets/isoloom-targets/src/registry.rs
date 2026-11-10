@@ -12,8 +12,8 @@ use isoloom_vagrant::VagrantBackend;
 
 use crate::composite::{CloudDockerBackend, DockerVmBackend, HybridBackend};
 
-static DOCKER: ComposeBackend = ComposeBackend(Target::Docker);
-static HOSTED: ComposeBackend = ComposeBackend(Target::Hosted);
+static DOCKER: ComposeBackend = ComposeBackend::DOCKER;
+static HOSTED: ComposeBackend = ComposeBackend::HOSTED;
 static DOCKER_VM: DockerVmBackend = DockerVmBackend;
 static CLOUD_DOCKER: CloudDockerBackend = CloudDockerBackend;
 static KUBERNETES: KubernetesBackend = KubernetesBackend;

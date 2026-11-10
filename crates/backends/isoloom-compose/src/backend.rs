@@ -11,30 +11,55 @@ use isoloom_spec::model::Target;
 
 use crate::render;
 
-/// The Compose backend of the `docker` and `hosted` targets (a hosting service runs the same
-/// Compose file): the target it renders for.
+/// The targets a Compose file is rendered for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ComposeBackend(pub Target);
+enum ComposeTarget {
+    /// `docker`: the user's own Docker host.
+    Docker,
+    /// `hosted`: a hosting service runs the same Compose file.
+    Hosted,
+}
+
+impl ComposeTarget {
+    fn target(self) -> Target {
+        match self {
+            ComposeTarget::Docker => Target::Docker,
+            ComposeTarget::Hosted => Target::Hosted,
+        }
+    }
+}
+
+/// The Compose backend of the `docker` and `hosted` targets (a hosting service runs the same
+/// Compose file): [`ComposeBackend::DOCKER`] or [`ComposeBackend::HOSTED`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ComposeBackend(ComposeTarget);
+
+impl ComposeBackend {
+    /// The `docker` target's.
+    pub const DOCKER: ComposeBackend = ComposeBackend(ComposeTarget::Docker);
+    /// The `hosted` target's.
+    pub const HOSTED: ComposeBackend = ComposeBackend(ComposeTarget::Hosted);
+}
 
 impl Backend for ComposeBackend {
     fn target(&self) -> Target {
-        self.0
+        self.0.target()
     }
 
     fn capabilities(&self) -> Capabilities {
-        capabilities(self.0)
+        capabilities(self.0.target())
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        Ok(render::render(self.0, env)?)
+        Ok(render::render(self.0.target(), env)?)
     }
 
     /// The `docker` target's manifest; a hosting service runs the file its own way.
     fn run_manifest(&self, env: &Environment) -> Result<Option<Manifest>, RenderError> {
-        if self.0 != Target::Docker {
+        if self.0 != ComposeTarget::Docker {
             return Ok(None);
         }
-        let file = render::compose_file(self.0, env)?.file;
+        let file = render::compose_file(Target::Docker, env)?.file;
         Ok(Some(crate::manifest::docker(env, &file)?))
     }
 }
@@ -98,24 +123,18 @@ pub(crate) fn capabilities(target: Target) -> Capabilities {
 /// connection (the runner), and Compose takes them from there.
 #[must_use]
 pub fn capabilities_on_a_vm() -> Capabilities {
-    Capabilities::of([
-        Feature::NetworkAppliances,
-        Feature::Gateways,
-        Feature::MachineAliases,
-        Feature::Ulimits,
-        Feature::TrafficControl,
-        Feature::DataDisks,
-        Feature::TmpfsModes,
-        Feature::Ipv6,
-        Feature::Ipv6Only,
-        Feature::Ipv6Auto,
-        Feature::Secrets,
-        Feature::SecretOwners,
-        Feature::OwnedProjectFiles,
-        Feature::MachineProcess,
-        Feature::PrivateDns,
-    ])
+    capabilities(Target::Hosted).without(&OWN_HOST_ONLY)
 }
+
+/// What only Compose on the user's own Docker host renders: the host's existing networks,
+/// GPUs, devices and volumes, and volumes kept past `down`.
+const OWN_HOST_ONLY: [Feature; 5] = [
+    Feature::ExternalNetworks,
+    Feature::ContainerGpus,
+    Feature::ContainerDevices,
+    Feature::PersistentVolumes,
+    Feature::ExternalVolumes,
+];
 
 #[cfg(test)]
 mod tests {
@@ -123,14 +142,7 @@ mod tests {
 
     #[test]
     fn a_vm_runs_what_compose_does_but_what_only_the_users_own_host_has() {
-        let own_host_only = [
-            Feature::ExternalNetworks,
-            Feature::ContainerGpus,
-            Feature::ContainerDevices,
-            Feature::PersistentVolumes,
-            Feature::ExternalVolumes,
-        ];
-        for f in own_host_only {
+        for f in OWN_HOST_ONLY {
             assert!(capabilities(Target::Docker).has(f) && !capabilities_on_a_vm().has(f), "{f:?}");
         }
         assert!(capabilities_on_a_vm().has(Feature::Secrets));

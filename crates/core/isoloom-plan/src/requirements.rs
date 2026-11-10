@@ -408,6 +408,13 @@ impl Capabilities {
         self
     }
 
+    /// These capabilities but `features`.
+    #[must_use]
+    pub fn without(mut self, features: &[Feature]) -> Capabilities {
+        self.features.retain(|f| !features.contains(f));
+        self
+    }
+
     /// Whether the backend has `feature`.
     #[must_use]
     pub fn has(&self, feature: Feature) -> bool {

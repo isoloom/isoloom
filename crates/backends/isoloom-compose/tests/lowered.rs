@@ -40,7 +40,7 @@ fn plan_of(source: &str) -> Outcome<Environment> {
 /// appears only in the `up` step and `--ignore-pull-failures` only in the pull step, so a run's
 /// pull-or-build behaviour is readable from this text.
 fn up_lifecycle_text(env: &Environment) -> Outcome<String> {
-    let backend = isoloom_compose::ComposeBackend(Target::Docker);
+    let backend = isoloom_compose::ComposeBackend::DOCKER;
     let manifest = isoloom_render::backend::Backend::run_manifest(&backend, env)?.ok_or("no run manifest")?;
     Ok(format!("{:?}", manifest.lifecycle.up))
 }
@@ -69,7 +69,7 @@ fn an_input_file_is_a_secret_read_from_its_input_never_the_environment() -> Outc
 /// start it without the variable: the value goes to `start` (resume) as well as `up`.
 #[test]
 fn an_input_file_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
-    let backend = isoloom_compose::ComposeBackend(Target::Docker);
+    let backend = isoloom_compose::ComposeBackend::DOCKER;
     let manifest = isoloom_render::backend::Backend::run_manifest(&backend, &plan("help-desk")?)?.ok_or("no run manifest")?;
     let slot = manifest
         .secrets
