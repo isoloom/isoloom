@@ -57,7 +57,7 @@ fn route(cidr: &str, target: (&str, Expression)) -> Block {
 /// gateway routes it to (all of them, on a routed network) through that gateway, and each
 /// routed network through its own.
 fn table(env: &Environment, net: &str) -> Block {
-    let closed = crate::cloud::vm::seal::any(env) && crate::cloud::vm::seal::closed(env, net);
+    let closed = crate::seal::any(env) && crate::seal::closed(env, net);
     let b = resource("aws_route_table", &ident(net))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
         .add_block(if closed { sealed_route_out() } else { route_out() });

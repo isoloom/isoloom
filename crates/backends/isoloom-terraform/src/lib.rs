@@ -38,6 +38,7 @@ mod hcl_builder;
 mod limits;
 mod machine;
 mod module;
+mod seal;
 mod server;
 mod target;
 #[cfg(test)]

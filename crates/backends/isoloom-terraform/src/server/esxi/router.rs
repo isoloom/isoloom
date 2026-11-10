@@ -67,7 +67,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         windows: false,
         lifecycle: Some(uplink_checked(env)),
     };
-    let unsealed = if crate::cloud::vm::seal::any(env) {
+    let unsealed = if crate::seal::any(env) {
         " Every network keeps the internet, the internet: false ones included: nothing seals them on ESXi."
     } else {
         ""

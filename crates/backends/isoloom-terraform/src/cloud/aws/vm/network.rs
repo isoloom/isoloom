@@ -41,7 +41,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .build(),
     );
     let own_tables = routing::blocks(env, m);
-    let closed = |net: &str| seal::any(env) && seal::closed(env, net);
+    let closed = |net: &str| crate::seal::any(env) && crate::seal::closed(env, net);
     if !own_tables {
         m.block(
             resource("aws_route_table", "env")

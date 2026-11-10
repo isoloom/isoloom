@@ -159,7 +159,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) -> c
     m.block(droplet.build());
     m.commented(
         "What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.",
-        firewall(mp, &id, crate::cloud::vm::seal::sealed(env, mp)),
+        firewall(mp, &id, crate::seal::sealed(env, mp)),
     );
     Ok(())
 }

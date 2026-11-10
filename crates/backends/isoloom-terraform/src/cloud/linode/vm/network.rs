@@ -78,7 +78,7 @@ fn reach_rules(way: Way, rules: &[Rule<'_>]) -> Vec<Block> {
 /// machine with no internet (its own network and its `reach` rules still allowed). The
 /// firewall is stateful: replies to what came in still leave.
 fn outbound_policy(env: &Environment, mp: &MachinePlan) -> Expression {
-    if seal::sealed(env, mp) {
+    if crate::seal::sealed(env, mp) {
         seal::when_sealed(string("DROP"), string("ACCEPT"))
     } else {
         string("ACCEPT")
@@ -105,7 +105,7 @@ fn firewall(env: &Environment, (name, mp): (&str, &MachinePlan), (net, cidr): (&
         .add_blocks(everything((Way::In, Action::Accept), "vpc", cidr))
         .add_blocks(reach_rules(Way::In, &reach::into(env, net)))
         .add_blocks(reach_rules(Way::Out, &reach::out_of(env, net)));
-    if seal::sealed(env, mp) {
+    if crate::seal::sealed(env, mp) {
         b = b.add_blocks(everything((Way::Out, Action::Accept), "vpc-out", cidr));
     }
     for (other, p) in env.networks.iter().filter(|(n, _)| n.as_str() != net) {

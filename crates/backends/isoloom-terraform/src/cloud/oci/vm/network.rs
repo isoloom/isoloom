@@ -168,7 +168,7 @@ fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
         .add_block(fragmentation(inbound, false))
         .add_block(rule(outbound, "its own network", string(cidr), "all", None))
         .add_blocks(reach_rules(outbound, &reach::out_of(env, net), "to"));
-    if seal::any(env) && seal::closed(env, net) {
+    if crate::seal::any(env) && crate::seal::closed(env, net) {
         b = b.add_block(internet_until_sealed());
     } else {
         for block in reach::public_blocks() {

@@ -12,9 +12,9 @@ use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::checks::{Invocation, Runner, output_block};
-use crate::cloud::vm::seal;
 use crate::machine::controller;
 use crate::module::output;
+use crate::seal;
 
 /// The router's name: its host name, its VM's and snippet's, and its machine in a run manifest.
 /// A lab machine can't take it (`isoloom-` names are Isoloom's own).

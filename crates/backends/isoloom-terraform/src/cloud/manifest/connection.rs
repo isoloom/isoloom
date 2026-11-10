@@ -25,7 +25,7 @@ pub(crate) const RUNNER_SET: [&str; 3] = ["ssh_public_key", "expires_at", SEALED
 
 /// The variable that seals the run (`crate::cloud::vm::seal`), set by the runner once the
 /// machines are set up.
-pub(crate) const SEALED: &str = crate::cloud::vm::seal::SEALED;
+pub(crate) const SEALED: &str = crate::seal::SEALED;
 
 /// The module's variable the launch's values go in, one entry each.
 pub(crate) const INPUTS: &str = "inputs";

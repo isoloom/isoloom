@@ -104,7 +104,7 @@ fn firewalls(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Vec<Block> 
     if !allows.is_empty() {
         out.push(firewall((&id, name), ("published", first), allowed(), allows));
     }
-    if seal::sealed(env, mp) {
+    if crate::seal::sealed(env, mp) {
         for net in mp.addresses.keys() {
             out.extend(sealed((&id, name), env, net));
         }

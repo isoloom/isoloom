@@ -16,7 +16,7 @@ use crate::module::variable::Variable;
 /// The run's seal switch, the runner's recorded `sealed` flag (`crate::server::router`). The
 /// module has no `isoloom_sealed` Terraform variable (the router's snippet never changes), so
 /// Terraform ignores it; the seal is the seal-reload step.
-pub(super) const SEALED: &str = crate::cloud::vm::seal::SEALED;
+pub(super) const SEALED: &str = crate::seal::SEALED;
 
 /// The module's variables the runner sets itself (`steps`): never params an embedder gives.
 pub(super) const RUNNER_SET: [&str; 3] = ["slot", "ssh_public_key", "proxmox_ssh_private_key_file"];

@@ -155,7 +155,7 @@ pub(in crate::cloud::azure) fn source_image(os: &str, tpm: bool) -> Block {
 /// ports from `allowed_cidr`.
 fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Block {
     let allowed = || reference("var.allowed_cidr");
-    let mut g = Nsg::new(&ident(name), name).sealed(crate::cloud::vm::seal::sealed(env, mp));
+    let mut g = Nsg::new(&ident(name), name).sealed(crate::seal::sealed(env, mp));
     let Some(m) = env.spec().machines.get(name) else { return g.build() };
     for (n, p) in reach::own(env, m) {
         g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
