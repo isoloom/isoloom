@@ -14,9 +14,11 @@ use isoloom_plan::{Environment, MachinePlan};
 
 use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
+use crate::cloud::user_data_limit::Limit;
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
 use crate::limits::Limits;
+use crate::machine::user_data::Capped;
 use crate::module::{self, ident, providers, resource};
 
 /// What Linode takes.
@@ -92,25 +94,28 @@ const PLANS: Sizes = Sizes::ordered(&[
     Size::new("g6-standard-6", 6, 16384, 1).with_disk(320),
 ]);
 
+/// How Linode takes an instance's user data: its metadata, base64, 65535 bytes of it decoded.
+const CAP: Capped = Capped {
+    limit: Limit::Linode,
+    gzipped: false,
+};
+
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
 pub(crate) const DRIVER: Driver = Driver {
     base: super::BASE,
     requires: (&[providers::LINODE, providers::RANDOM], &[]),
     refusal,
-    // No cap on its user data that the module checks: its machines are written as they are.
-    write: |env, m| {
-        write(env, m);
-        Ok(())
-    },
+    write,
 };
 
 /// The module after its providers: the VPC and its subnets, the firewalls, each machine, the outputs.
-fn write(env: &Environment, m: &mut Module) {
+fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     network::blocks(env, m);
     for (vm, at) in vm::at_first_address(env) {
-        machine(env, vm, at, m);
+        machine(env, vm, at, m)?;
     }
     outputs::write_as(env, super::BASE.user, &public_ip, m);
+    Ok(())
 }
 
 /// A Linode's public address.
@@ -120,11 +125,15 @@ fn public_ip(name: &str) -> Expression {
 
 /// Machine `name`'s root password (for the console: SSH logs in with the key), its instance (a
 /// public interface, and a VPC interface pinned to its address), set up from its user data.
-fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) {
+///
+/// # Errors
+///
+/// [`crate::Error::Refused`] when its user data is over [`CAP`].
+fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
     let id = ident(name);
     m.block(module::password(&id));
     let at_boot = std::iter::once(Template::text(SUDO)).chain(network::routes(env, net)).collect();
-    let setup = hooks::user_data(env, (name, mp), USER, at_boot);
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
     let mut vpc = Block::builder("interface")
         .add_attribute(("purpose", string("vpc")))
         .add_attribute(("subnet_id", reference(&format!("linode_vpc_subnet.{}.id", ident(net)))))
@@ -155,4 +164,5 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
             .build(),
     );
     m.blocks(disks::linode(env, name, &mp.disks));
+    Ok(())
 }

@@ -201,12 +201,6 @@ pub(crate) fn script(s: &SetUp) -> Template {
     t
 }
 
-/// [`script`] as an expression.
-#[must_use]
-pub(crate) fn expression(s: &SetUp) -> Expression {
-    script(s).into_expression()
-}
-
 /// How a cloud receives a machine's user data: its cap, and whether the module gzips the script
 /// (AWS's `base64gzip`: AWS counts the gzip's bytes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

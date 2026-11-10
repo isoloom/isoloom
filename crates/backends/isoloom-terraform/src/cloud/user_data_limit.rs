@@ -14,7 +14,21 @@ pub(crate) enum Limit {
     /// Google Cloud: 256 KiB for one metadata value (the startup script).
     /// <https://cloud.google.com/compute/docs/metadata/setting-custom-metadata#limitations>
     Gcp,
+    /// DigitalOcean: 64 KiB of user data, plain text.
+    /// <https://docs.digitalocean.com/products/droplets/how-to/provide-user-data/>
+    DigitalOcean,
+    /// Linode: 65535 bytes of user data, once decoded from its base64.
+    /// <https://techdocs.akamai.com/linode-api/reference/post-linode-instance>
+    Linode,
+    /// Oracle Cloud: 32000 bytes for all of an instance's metadata, the user data counted in the
+    /// base64 it travels in, less [`OCI_KEY_ROOM`] for the SSH key beside it.
+    /// <https://docs.oracle.com/iaas/Content/Compute/Tasks/updatinginstancemetada.htm>
+    Oci,
 }
+
+/// What Oracle Cloud's cap leaves for the instance's other metadata value, its SSH public key
+/// (`ssh_authorized_keys`): an OpenSSH key, RSA 4096 included, is under 1 KiB.
+const OCI_KEY_ROOM: usize = 1024;
 
 impl Limit {
     /// The cap in bytes.
@@ -22,8 +36,18 @@ impl Limit {
     pub(crate) fn bytes(self) -> usize {
         match self {
             Limit::Aws => 16 * 1024,
-            Limit::Azure => 65_535,
+            Limit::Azure | Limit::Linode => 65_535,
             Limit::Gcp => 256 * 1024,
+            Limit::DigitalOcean => 64 * 1024,
+            Limit::Oci => 32_000 - OCI_KEY_ROOM,
+        }
+    }
+
+    /// The size of `document` as the cloud counts it: its bytes, or (Oracle Cloud) its base64's.
+    fn counted(self, document: &[u8]) -> usize {
+        match self {
+            Limit::Oci => document.len().div_ceil(3) * 4,
+            _ => document.len(),
         }
     }
 
@@ -34,18 +58,21 @@ impl Limit {
             Limit::Aws => "AWS",
             Limit::Azure => "Azure",
             Limit::Gcp => "Google Cloud",
+            Limit::DigitalOcean => "DigitalOcean",
+            Limit::Linode => "Linode",
+            Limit::Oci => "Oracle Cloud",
         }
     }
 
-    /// `Ok` when `document` (the user data as the cloud counts it: gzipped when it is sent
-    /// gzipped, never base64) fits; otherwise [`TooBig`], which a caller turns into a refusal
-    /// naming the machine.
+    /// `Ok` when `document` (the user data as the module sends it: gzipped when it is sent
+    /// gzipped, never base64) fits, as the cloud counts it ([`Limit::counted`]); otherwise
+    /// [`TooBig`], which a caller turns into a refusal naming the machine.
     ///
     /// # Errors
     ///
     /// [`TooBig`] when the document is over the cap, with its size and the cap.
     pub(crate) fn fits(self, document: &[u8]) -> Result<(), TooBig> {
-        let size = document.len();
+        let size = self.counted(document);
         let cap = self.bytes();
         if size <= cap {
             Ok(())
@@ -90,5 +117,17 @@ mod tests {
         assert_eq!(Limit::Aws.fits(&gzip(&big)), Ok(()), "gzip shrinks what AWS counts");
         assert_eq!((Limit::Azure.bytes(), Limit::Gcp.bytes()), (65_535, 256 * 1024));
         assert_eq!((Limit::Azure.provider(), Limit::Gcp.provider()), ("Azure", "Google Cloud"));
+    }
+
+    #[test]
+    fn oracle_cloud_counts_the_base64_beside_the_ssh_key() {
+        assert_eq!(Limit::Oci.bytes(), 30_976);
+        // 23232 bytes are 30976 in base64: the cap's own size.
+        assert_eq!(Limit::Oci.fits(&vec![b'x'; 23_232]), Ok(()));
+        let err = Limit::Oci.fits(&vec![b'x'; 23_233]).unwrap_err();
+        assert_eq!((err.provider, err.size, err.cap), ("Oracle Cloud", 30_980, 30_976));
+        assert_eq!(Limit::DigitalOcean.fits(&vec![b'x'; 64 * 1024]), Ok(()));
+        assert!(Limit::DigitalOcean.fits(&vec![b'x'; 64 * 1024 + 1]).is_err());
+        assert!(Limit::Linode.fits(&vec![b'x'; 65_536]).is_err());
     }
 }

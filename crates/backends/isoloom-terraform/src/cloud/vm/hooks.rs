@@ -24,19 +24,13 @@ pub(crate) fn of(mp: &MachinePlan, at_boot: Vec<Template>) -> Hooks {
 }
 
 /// A Linux machine's user data on a cloud: its whole set-up, logging in as `user`, `at_boot`
-/// run first at every boot.
-pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>) -> Expression {
-    let hooks = of(machine.1, at_boot);
-    user_data::expression(&linux::set_up(env, machine, user, &hooks))
-}
-
-/// [`user_data()`] on a cloud that caps it: refused, naming the machine, when it is over the cap
+/// run first at every boot; refused, naming the machine, when it is over the cloud's cap
 /// ([`user_data::capped`]).
 ///
 /// # Errors
 ///
 /// [`crate::Error::Refused`] when the machine's user data is over the cap.
-pub(crate) fn capped_user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>, cap: Capped) -> Result<Expression> {
+pub(crate) fn user_data(env: &Environment, machine: (&str, &MachinePlan), user: &str, at_boot: Vec<Template>, cap: Capped) -> Result<Expression> {
     let hooks = of(machine.1, at_boot);
     user_data::capped(&linux::set_up(env, machine, user, &hooks), &format!("machine `{}`", machine.0), cap)
 }

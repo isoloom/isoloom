@@ -50,7 +50,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     }
     let os = mp.os.as_deref().unwrap_or_default();
     m.blocks(disks::gcp(env, name, &mp.disks));
-    let setup = hooks::capped_user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses), CAP)?;
+    let setup = hooks::user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses), CAP)?;
     let mut vm = instance(&Instance {
         env,
         id: &id,

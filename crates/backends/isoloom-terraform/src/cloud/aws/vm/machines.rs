@@ -61,7 +61,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
     let user = image_user(mp.os.as_deref().unwrap_or_default());
     let instance = nesting(instance, mp)
-        .add_attribute(user_data(hooks::capped_user_data(env, (name, mp), user, at_boot, CAP)?))
+        .add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot, CAP)?))
         .add_block(lifecycle("user_data_base64", tpm_ami.as_deref()));
     if addresses::needs_interfaces(mp) {
         m.blocks(several_networks((name, mp), instance));

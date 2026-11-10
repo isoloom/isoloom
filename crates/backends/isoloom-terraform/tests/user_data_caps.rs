@@ -1,6 +1,5 @@
-//! A cloud that caps a machine's user data (AWS, Azure, Google Cloud) refuses a machine whose
-//! user data is over its cap as the cloud counts it, naming the machine; the other clouds keep
-//! their modules.
+//! Every cloud caps a machine's user data and refuses a machine whose user data is over its cap
+//! as the cloud counts it, naming the machine; the other clouds keep their modules.
 
 pub mod testing;
 
@@ -89,6 +88,23 @@ fn azure_refuses_over_its_custom_data_cap_and_gcp_takes_up_to_256_kb() -> Outcom
     let gcp = refusal(Cloud::Gcp, &lab(270_000))?.ok_or("GCP takes it")?;
     assert!(gcp.starts_with("machine `web`: "), "{gcp}");
     assert!(gcp.contains("as Google Cloud counts it, over its 262144-byte limit"), "{gcp}");
+    Ok(())
+}
+
+#[test]
+fn digitalocean_linode_and_oracle_cloud_refuse_over_their_caps() -> Outcome {
+    // Oracle Cloud counts the base64 within its 32000 bytes of metadata: 25 KB is over.
+    let oci = refusal(Cloud::Oci, &lab(25_000))?.ok_or("Oracle Cloud takes it")?;
+    assert!(oci.starts_with("machine `web`: "), "{oci}");
+    assert!(oci.contains("as Oracle Cloud counts it, over its 30976-byte limit"), "{oci}");
+    for cloud in [Cloud::DigitalOcean, Cloud::Linode] {
+        assert_eq!(refusal(cloud, &lab(25_000))?, None, "{}", cloud.id());
+    }
+    let yaml = lab(70_000);
+    let digitalocean = refusal(Cloud::DigitalOcean, &yaml)?.ok_or("DigitalOcean takes it")?;
+    assert!(digitalocean.contains("as DigitalOcean counts it, over its 65536-byte limit"), "{digitalocean}");
+    let linode = refusal(Cloud::Linode, &yaml)?.ok_or("Linode takes it")?;
+    assert!(linode.contains("as Linode counts it, over its 65535-byte limit"), "{linode}");
     Ok(())
 }
 

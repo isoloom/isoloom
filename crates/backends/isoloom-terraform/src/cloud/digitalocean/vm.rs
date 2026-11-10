@@ -10,9 +10,11 @@ use isoloom_plan::{Environment, MachinePlan};
 use super::{Way, rule, ssh_key, vpc};
 use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with, tag_list};
+use crate::cloud::user_data_limit::Limit;
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Volumes};
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
 use crate::limits::Limits;
+use crate::machine::user_data::Capped;
 use crate::machine::vms;
 use crate::module::{ident, providers, resource};
 
@@ -92,25 +94,28 @@ const SIZES: Sizes = Sizes::ordered(&[
     Size::new("s-4vcpu-8gb", 4, 8192, 1).with_disk(160),
 ]);
 
+/// How DigitalOcean takes a droplet's user data: plain text, 64 KiB of it.
+const CAP: Capped = Capped {
+    limit: Limit::DigitalOcean,
+    gzipped: false,
+};
+
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
 pub(crate) const DRIVER: Driver = Driver {
     base: super::BASE,
     requires: (&[providers::DIGITALOCEAN], &[]),
     refusal,
-    // No cap on its user data that the module checks: its machines are written as they are.
-    write: |env, m| {
-        write(env, m);
-        Ok(())
-    },
+    write,
 };
 
 /// The module after its providers: the VPC, the droplet, its firewall and set-up, the outputs.
-fn write(env: &Environment, m: &mut Module) {
+fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     network(env, m);
     for (name, mp) in vms(env) {
-        droplet(env, name, mp, m);
+        droplet(env, name, mp, m)?;
     }
     outputs::write_as(env, super::BASE.user, &public_ip, m);
+    Ok(())
 }
 
 /// A droplet's public address.
@@ -129,7 +134,11 @@ fn network(env: &Environment, m: &mut Module) {
 }
 
 /// Machine `name`'s droplet, set up from its user data, and its firewall.
-fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
+///
+/// # Errors
+///
+/// [`crate::Error::Refused`] when its user data is over [`CAP`].
+fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) -> crate::Result<()> {
     let id = ident(name);
     let os = mp.os.as_deref().unwrap_or_default();
     let slug = own_image::of(mp, own_image::digitalocean).unwrap_or_else(|| image(os).unwrap_or_default());
@@ -141,7 +150,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         .add_attribute(("image", string(slug)))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))
-        .add_attribute(("user_data", hooks::user_data(env, (name, mp), USER, Vec::new())))
+        .add_attribute(("user_data", hooks::user_data(env, (name, mp), USER, Vec::new(), CAP)?))
         .add_attribute(("tags", tag_list(env)))
         .add_block(instance::set_up_once(reference("user_data")).build());
     if !mp.disks.is_empty() {
@@ -152,6 +161,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
         "What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.",
         firewall(mp, &id, crate::cloud::vm::seal::sealed(env, mp)),
     );
+    Ok(())
 }
 
 /// SSH and the droplet's own published ports from `allowed_cidr`, everything from the VPC,

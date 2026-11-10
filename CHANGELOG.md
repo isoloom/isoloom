@@ -259,9 +259,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   (Ansible) does the same, AWS's included.
 - **`cloud-vm` refuses a machine whose user data is over its cloud's cap**, naming the machine
   (the controller included), instead of letting the apply fail: AWS's 16 KB counted after gzip,
-  Azure's 65535 bytes of custom data, Google Cloud's 256 KB startup script. The other clouds keep
-  their modules (`isoloom targets` says which). What is measured is the text Isoloom writes; the
-  values Terraform fills in at apply are left out.
+  Azure's 65535 bytes of custom data, Google Cloud's 256 KB startup script, DigitalOcean's 64 KB,
+  Linode's 65535 bytes, and Oracle Cloud's 32000 bytes of metadata (the user data's base64 and
+  1 KB for the SSH key). The other clouds keep their modules (`isoloom targets` says which).
+  What is measured is the text Isoloom writes; the values Terraform fills in at apply are left
+  out.
 - **A `cloud-docker` host keeps its first boot's expiry** the same way: a later apply with another
   `expires_at` no longer stops and starts the AWS host or replaces the Azure, DigitalOcean, Linode
   or Oracle Cloud one. GCP's startup script is a `metadata` entry, which the provider updates in

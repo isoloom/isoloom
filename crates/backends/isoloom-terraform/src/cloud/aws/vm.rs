@@ -7,7 +7,7 @@
 //!   reach each other, `reach` rules open one network to another (on their ports), the rest is
 //!   closed.
 //! - Each machine is an instance at its address that sets itself up from its user data (the
-//!   core's, `crate::cloud::vm::hooks::capped_user_data`), once the runner delivered the project
+//!   core's, `crate::cloud::vm::hooks::user_data`), once the runner delivered the project
 //!   over SSH. A machine on several networks gets a network interface on each
 //!   (source/destination check off, so replies leave from the right one), brought up by MAC at
 //!   every boot, and an Elastic IP on the first.

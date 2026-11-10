@@ -38,7 +38,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
     let own = own_image::of(mp, own_image::azure);
     let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
-    let setup = hooks::capped_user_data(env, (name, mp), USER, at_boot, CAP)?;
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
     m.block(linux_vm(
         &id,
         name,

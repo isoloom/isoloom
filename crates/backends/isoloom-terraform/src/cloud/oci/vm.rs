@@ -30,9 +30,11 @@ use isoloom_plan::{Environment, MachinePlan};
 use super::{SHAPE, availability_domain, availability_domains, owned, ubuntu_images};
 use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with};
+use crate::cloud::user_data_limit::Limit;
 use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
+use crate::machine::user_data::Capped;
 use crate::machine::vms;
 use crate::module::{ident, providers, resource};
 
@@ -161,21 +163,24 @@ fn size_refusal(env: &Environment) -> Option<String> {
     })
 }
 
+/// How Oracle Cloud takes an instance's user data: a metadata value, base64, within the
+/// 32000 bytes of all its metadata.
+const CAP: Capped = Capped {
+    limit: Limit::Oci,
+    gzipped: false,
+};
+
 /// Its `cloud-vm` driver: its module takes the compartment it goes in, and authenticates with
 /// the OCI CLI's configuration.
 pub(crate) const DRIVER: Driver = Driver {
     base: super::BASE,
     requires: (&[providers::OCI], &[]),
     refusal,
-    // No cap on its user data that the module checks: its machines are written as they are.
-    write: |env, m| {
-        write(env, m);
-        Ok(())
-    },
+    write,
 };
 
 /// The module after its providers: the images, the VCN, its security list and subnet, each machine, the outputs.
-fn write(env: &Environment, m: &mut Module) {
+fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
     m.commented(
         "The compartment's availability domains; the instances land in the first.",
@@ -185,10 +190,11 @@ fn write(env: &Environment, m: &mut Module) {
     network::blocks(env, m);
     private_dns::write(env, m);
     for (vm, at) in vm::at_first_address(env) {
-        machine(env, vm, at, m);
+        machine(env, vm, at, m)?;
     }
     network::gateway_routes(env, m);
     outputs::write_as(env, super::BASE.user, &public_ip, m);
+    Ok(())
 }
 
 /// An instance's public address.
@@ -214,17 +220,22 @@ fn images(env: &Environment, m: &mut Module) {
 
 /// Machine `name`'s instance at its fixed address, set up from its user data (its other VNICs
 /// found at boot through the metadata service), its VNICs and further addresses.
-fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) {
+///
+/// # Errors
+///
+/// [`crate::Error::Refused`] when its user data is over [`CAP`].
+fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
     let group = published::group(name, mp, m);
     let mut at_boot = interfaces::up_found(env, &mp.addresses, &|_, a| metadata::mac(a));
     at_boot.extend(ipv6::at_boot(env, mp));
-    let setup = hooks::user_data(env, (name, mp), USER, at_boot);
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
     m.commented(
         &format!("Machine `{name}`, at its fixed address {address}."),
         instance(env, (name, mp), (net, &address.to_string()), (group, setup)),
     );
     vnics(env, (name, mp), m);
     addresses::blocks((name, mp), m);
+    Ok(())
 }
 
 /// Machine `name`'s instance, its first VNIC on network `net` at `address` (with its published
