@@ -115,7 +115,7 @@ fn forwarded(env: &Environment, sealed: bool) -> Option<String> {
 /// sealed, traffic to an `internet: false` network from elsewhere is dropped (so it keeps only
 /// its `reach` rules), and that network is dropped from the internet forward and masquerade.
 fn rules(env: &Environment, sealed: bool) -> String {
-    let lab = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", "));
+    let blocks = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", "));
     let mut forward: Vec<String> = router::forward_rules(env.spec());
     let mut dnat = Vec::new();
     for (name, m) in &env.spec().machines {
@@ -125,7 +125,7 @@ fn rules(env: &Environment, sealed: bool) -> String {
         for (sv, host) in m.ports.iter().filter_map(|s| Some((s, s.publish?))) {
             let (proto, port) = (sv.protocol.id(), sv.port);
             forward.push(format!("ip daddr {addr} {proto} dport {port} ct status dnat accept"));
-            dnat.push(format!("    ip saddr != {lab} {proto} dport {host} dnat ip to {addr}:{port}\n"));
+            dnat.push(format!("    ip saddr != {blocks} {proto} dport {host} dnat ip to {addr}:{port}\n"));
         }
     }
     if sealed {

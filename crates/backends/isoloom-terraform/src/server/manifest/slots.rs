@@ -26,7 +26,7 @@ fn tf_var(name: &str, shape: TfVarShape) -> Result<NonEmpty<Delivery>, ManifestE
 }
 
 /// The module's variables an embedder sets (of `variables`, those the runner sets itself aside,
-/// `private_key` among them: `super::steps::runner_set`), the checks' switch when the lab has
+/// `private_key` among them: `super::steps::runner_set`), the checks' switch when the environment has
 /// checks, and the seal switch when the run has an `internet: false` network to seal (`sealed`).
 pub(crate) fn params(variables: &[Variable], private_key: &str, runners: &[CheckRunner], sealed: bool) -> Result<Vec<Param>, ManifestError> {
     let runner_set = super::steps::runner_set(private_key);

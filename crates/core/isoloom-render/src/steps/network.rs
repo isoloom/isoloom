@@ -86,8 +86,8 @@ pub(super) fn tc(env: &Environment, machine: &str) -> Option<String> {
 /// ([`boot::at_boot`] loads the rules). Run again, it replaces its table: nftables comes from the
 /// machine's package manager (Alpine's too: the controller's default box).
 pub(super) fn egress(env: &Environment) -> String {
-    let lab = env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", ");
-    let lab6 = ipv6::egress_rule(env);
+    let blocks = env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", ");
+    let blocks6 = ipv6::egress_rule(env);
     let load = boot::at_boot(
         "egress",
         "No new connection leaves the isoloom networks",
@@ -96,7 +96,7 @@ pub(super) fn egress(env: &Environment) -> String {
         &[],
     );
     format!(
-        "{}printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {lab} }} ct state new drop'{lab6} '  }}' '}}' > /etc/isoloom-egress.nft\n{load}",
+        "{}printf '%s\\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {{' '  chain output {{' '    type filter hook output priority 0; policy accept;' '    oifname \"lo\" accept' '    ip daddr != {{ {blocks} }} ct state new drop'{blocks6} '  }}' '}}' > /etc/isoloom-egress.nft\n{load}",
         super::nftables()
     )
 }

@@ -151,7 +151,11 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
 fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, image: &'a VagrantBox, link: &'a Link) -> Guest<'a> {
     let os = Os::of(mp);
     // No cloud-init on Windows: its address is set from PowerShell.
-    let windows_address = mp.addresses.first().filter(|_| os == Os::Windows).map(|(net, ip)| (*ip, env.block(net).netmask()));
+    let windows_address = mp
+        .addresses
+        .first()
+        .filter(|_| os == Os::Windows)
+        .map(|(net, ip)| (*ip, env.block(net).netmask()));
     let hyperv = HyperV {
         env: &env.name,
         boxed: image.hyperv.clone(),

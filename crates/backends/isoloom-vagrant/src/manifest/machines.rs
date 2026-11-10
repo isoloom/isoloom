@@ -41,7 +41,7 @@ fn machine(env: &Environment, d: &Define, boot_digest: &str) -> Result<Machine> 
     let mut out = isoloom_render::run_manifest::machine(&d.name, Role::Infra)?;
     out.native = Some(native(env, d, boot_digest)?);
     match d.kind {
-        Kind::Lab => lab_machine(env, &d.name, &mut out)?,
+        Kind::Machine => environment_machine(env, &d.name, &mut out)?,
         Kind::Router => {
             let routed = env.router.iter().flatten().map(|(n, a)| Ok((Name::parse(n)?, IpAddr::V4(*a))));
             out.addresses = routed.collect::<Result<_>>()?;
@@ -62,10 +62,11 @@ fn machine(env: &Environment, d: &Define, boot_digest: &str) -> Result<Machine> 
     Ok(out)
 }
 
-/// A lab machine: its OS, size and addresses, and its ports. A published port is forwarded from
-/// the host's loopback to a port the runner picks free at the first start (reflected in the lab's
-/// URL), unless the spec fixed it (`publish: { fixed: true }`), when it forwards that number.
-fn lab_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
+/// A machine of the environment: its OS, size and addresses, and its ports. A published port is
+/// forwarded from the host's loopback to a port the runner picks free at the first start
+/// (reflected in the environment's URL), unless the spec fixed it (`publish: { fixed: true }`),
+/// when it forwards that number.
+fn environment_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
     let (Some(mp), Some(m)) = (env.machines.get(name), env.spec().machines.get(name)) else {
         return Ok(());
     };

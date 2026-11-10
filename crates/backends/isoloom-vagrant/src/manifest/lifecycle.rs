@@ -227,7 +227,7 @@ pub(super) fn ready(shape: &Shape) -> Result<Vec<Condition>> {
     let lab: Vec<Name> = shape
         .defines
         .iter()
-        .filter(|d| d.kind == Kind::Lab)
+        .filter(|d| d.kind == Kind::Machine)
         .map(|d| Name::parse(&d.name))
         .collect::<Result<_, _>>()?;
     Ok(vec![up, Condition::MachinesRunning { machines: lab }])

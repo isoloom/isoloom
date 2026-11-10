@@ -303,8 +303,8 @@ pub(crate) fn vm_name(env: &Environment, define: &str) -> String {
 pub(crate) enum Kind {
     /// The router Isoloom adds for `reach` rules.
     Router,
-    /// A machine of the lab.
-    Lab,
+    /// A machine of the environment.
+    Machine,
     /// The `shell` tool's VM.
     ToolShell,
     /// The controller.
@@ -353,7 +353,7 @@ impl Shape {
             defines.push(define(router::NAME, Kind::Router));
         }
         for name in env.start_order.iter().filter(|n| machine::has_vm(env, n)) {
-            defines.push(define(name, Kind::Lab));
+            defines.push(define(name, Kind::Machine));
             let linux = env.machines.get(name).is_some_and(|mp| transport::Os::of(mp) == transport::Os::Linux);
             if let Some(group) = checks.of_machine(name).filter(|_| linux) {
                 runners.push(Runner {
