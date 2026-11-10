@@ -103,9 +103,18 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   separated by spaces; `.isoloom/docker .isoloom/configure` for a Compose VM); the archive follows
   `isoloom_manifest::ignore::Rules::for_copy(<.isoloomignore>, <outputs>)`, which also leaves out
   version control and the tools' state at any depth. A runner that took every output in copied
-  other targets' Terraform state and logins into the guest. The tools' state patterns are
-  `isoloom_manifest::ignore::{TERRAFORM_STATE, VAGRANT_STATE, RUNNER_STATE}`, and the reach folder
-  is `isoloom_manifest::contract::REACH_DIR` (was `isoloom_render::secrets::REACH_DIR`).
+  other targets' Terraform state into the guest. The tools' state patterns are
+  `isoloom_manifest::ignore::{TERRAFORM_STATE, VAGRANT_STATE}`.
+- **Breaking: no Terraform set-up writes a machine's login into `.isoloom-reach/`**, which no
+  runner read: a runner delivers a machine's secrets once its guest delivery's `during_step` has
+  succeeded, else once `up`'s steps all have, from the module's outputs. 1.x's
+  `isoloom_render::secrets::REACH_DIR` is removed, not moved, so is the tools' state pattern for
+  it, and `.isoloom/.gitignore` and the project's copies no longer name `.isoloom-reach/`. The run manifest's `during_step` says
+  so (it said the runner delivered while the step ran).
+- **Breaking: `cloud-vm` refuses secrets on a Windows machine** on AWS and Azure: its set-up runs
+  over WinRM during Terraform's apply and waits for its secrets, which the runner delivers only
+  once `up`'s steps are done, so the set-up timed out. Give such a machine its secret another way,
+  or run it on `vagrant`.
 - **Breaking (library): `Manifest::validate` refuses a name twice in any of the manifest's lists**
   (machines, networks, tools, params, secret slots, outputs) with one error,
   `isoloom_manifest::Error::Duplicate { list, name }` (code `duplicate`), which replaces

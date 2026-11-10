@@ -7,7 +7,7 @@
 //! `terraform init` chose, so a project that commits its generated files commits it too, and
 //! every machine then installs the same providers.
 
-use isoloom_manifest::ignore::{RUNNER_STATE, TERRAFORM_STATE, VAGRANT_STATE};
+use isoloom_manifest::ignore::{TERRAFORM_STATE, VAGRANT_STATE};
 use isoloom_render::GeneratedFile;
 
 /// Where it is written, relative to the project folder.
@@ -15,13 +15,12 @@ pub const PATH: &str = ".isoloom/.gitignore";
 
 /// The patterns, each group under the comment that says whose files they are: the tools' state
 /// no copy of the project takes either ([`isoloom_manifest::ignore::never_copied`]).
-const SECTIONS: [(&str, &[&str]); 3] = [
+const SECTIONS: [(&str, &[&str]); 2] = [
     (
         "Terraform: the provider cache, the state and its backups (secrets in plain text), the state's lock, crash logs.",
         TERRAFORM_STATE,
     ),
     ("Vagrant: each machine's folder (its id, its private key).", VAGRANT_STATE),
-    ("The runner: each cloud machine's SSH login, written as Terraform reaches it.", RUNNER_STATE),
 ];
 
 /// The file.
@@ -94,7 +93,6 @@ mod tests {
             "proxmox/.terraform.tfstate.lock.info",
             "esxi/crash.log",
             "vagrant/.vagrant/",
-            "cloud-vm/aws/.isoloom-reach/",
         ] {
             assert!(ignores(&text, path), "{path}:\n{text}");
         }

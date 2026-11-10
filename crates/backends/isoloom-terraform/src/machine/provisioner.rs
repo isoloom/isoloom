@@ -3,7 +3,6 @@
 //! restarting between two of them.
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Template, boolean, call, list, reference, string};
-use isoloom_manifest::contract::REACH_DIR;
 use isoloom_render::project::{self, TarExclusion};
 
 /// How Terraform reaches the machine.
@@ -71,9 +70,6 @@ pub(crate) struct Provisioner {
     pub(crate) parts: Vec<Vec<Expression>>,
     /// The resources it waits for.
     pub(crate) depends_on: Vec<Expression>,
-    /// The name it tells the runner how to reach the machine under, before anything else
-    /// (`isoloom_manifest::contract::REACH_DIR`): a machine whose set-up waits for its secrets.
-    pub(crate) announce: Option<String>,
 }
 
 impl Provisioner {
@@ -93,9 +89,6 @@ impl Provisioner {
             .add_label(self.name.as_str())
             .add_attribute(("triggers_replace", list([self.replace_on])))
             .add_block(connection(&self.connection));
-        if let Some(name) = &self.announce {
-            b = b.add_block(announce(name, &self.connection));
-        }
         for u in self.uploads {
             b = b.add_blocks(upload(u));
         }
@@ -110,31 +103,6 @@ impl Provisioner {
         }
         b.build()
     }
-}
-
-/// A `local-exec` writing `<user>@<address>` to `<module>/.isoloom-reach/<name>`, followed on
-/// Windows by how WinRM authenticates (`winrm`, or `winrm-ntlm`), or by `via <user>@<address>`
-/// through a jump host: an address, never a secret (the password stays in Terraform's state,
-/// where the runner reads it).
-fn announce(name: &str, c: &Connection) -> Block {
-    let (host, user, suffix) = match c {
-        Connection::Ssh { host, user } | Connection::SshVia { host, user, .. } => (host.clone(), user.as_str(), ""),
-        Connection::WinRm { host, ntlm, .. } => (host.clone(), super::USER, if *ntlm { " winrm-ntlm" } else { " winrm" }),
-    };
-    let mut command = Template::text("mkdir -p \"");
-    command.push_expr(reference("path.module"));
-    command.push_text(format!("/{REACH_DIR}\" && echo \"{user}@"));
-    command.push_expr(host);
-    command.push_text(suffix);
-    // Through a jump host: ` via <user>@<jump host>`.
-    if let Connection::SshVia { bastion, .. } = c {
-        command.push_text(format!(" via {user}@"));
-        command.push_expr(bastion.clone());
-    }
-    command.push_text("\" > \"");
-    command.push_expr(reference("path.module"));
-    command.push_text(format!("/{REACH_DIR}/{name}\""));
-    provisioner("local-exec").add_attribute(("command", command.into_expression())).build()
 }
 
 /// An SSH connection as `user` to `host`, through `bastion` when there is one (as the same

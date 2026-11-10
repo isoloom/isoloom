@@ -1031,7 +1031,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Delivered while this step runs (the guest waits for it), retried until it lands."
+              "description": "Delivered once this step has succeeded, before the steps after it; when absent, once `up`'s steps all have. The machine's set-up waits for the delivery, so a step that waits for that set-up can't be this one."
             },
             "via": {
               "type": "string",

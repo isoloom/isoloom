@@ -33,9 +33,6 @@ crash.*.log
 # Vagrant: each machine's folder (its id, its private key).
 .vagrant/
 
-# The runner: each cloud machine's SSH login, written as Terraform reaches it.
-.isoloom-reach/
-
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
@@ -390,7 +387,6 @@ IsoloomProject::COPY_RULES = "/.isoloom*
 crash.log
 crash.*.log
 .vagrant/
-.isoloom-reach/
 "
 # Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,
 # with no tar.exe before Windows Server 2019).

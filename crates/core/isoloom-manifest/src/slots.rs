@@ -84,7 +84,9 @@ pub enum Delivery {
         machine: Name,
         /// How it gets there.
         transport: Transport,
-        /// Delivered while this step runs (the guest waits for it), retried until it lands.
+        /// Delivered once this step has succeeded, before the steps after it; when absent, once
+        /// `up`'s steps all have. The machine's set-up waits for the delivery, so a step that
+        /// waits for that set-up can't be this one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         during_step: Option<StepId>,
     },

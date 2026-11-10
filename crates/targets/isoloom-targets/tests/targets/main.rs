@@ -15,6 +15,7 @@ mod cloud_vm_digitalocean;
 mod cloud_vm_gcp;
 mod cloud_vm_linode;
 mod cloud_vm_oci;
+mod cloud_windows_secrets;
 mod constraints;
 mod defaults;
 mod determinism;

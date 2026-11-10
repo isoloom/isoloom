@@ -224,7 +224,6 @@ IsoloomProject::COPY_RULES = "/.isoloom*
 crash.log
 crash.*.log
 .vagrant/
-.isoloom-reach/
 "
 # Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,
 # with no tar.exe before Windows Server 2019).

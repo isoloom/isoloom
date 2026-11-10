@@ -4,7 +4,7 @@
 //! exactly what the generated files do. Every copy also leaves out what [`copy_rules`] says,
 //! whatever the file says: Isoloom's outputs (but those a machine reads, as each copy names
 //! them) and the file itself ([`OUTPUTS`]), version control and what the tools write in a
-//! project ([`TERRAFORM_STATE`], [`VAGRANT_STATE`], [`RUNNER_STATE`]). Gitignore-style, at the
+//! project ([`TERRAFORM_STATE`], [`VAGRANT_STATE`]). Gitignore-style, at the
 //! project's root:
 //!
 //! - one pattern per line; blank lines and `#` comments are skipped, spaces around a pattern
@@ -58,15 +58,11 @@ pub const TERRAFORM_STATE: &[&str] = &[
 /// What Vagrant writes beside a Vagrantfile: each machine's folder (its id, its private key).
 pub const VAGRANT_STATE: &[&str] = &[".vagrant/"];
 
-/// What the runner reads beside a module: each cloud machine's SSH login
-/// ([`REACH_DIR`](crate::contract::REACH_DIR)).
-pub const RUNNER_STATE: &[&str] = &[".isoloom-reach/"];
-
 /// What a copy of the project into a machine leaves out beyond the project's `.isoloomignore`, as
 /// lines of its syntax, read after the project's own so none of them is brought back: Isoloom's
 /// outputs but `outputs` (paths of them a machine reads, relative to the project, with `/`: a
 /// folder with all it holds), then, at any depth, version control and what the tools write
-/// ([`TERRAFORM_STATE`], [`VAGRANT_STATE`], [`RUNNER_STATE`]), in the outputs a machine reads too.
+/// ([`TERRAFORM_STATE`], [`VAGRANT_STATE`]), in the outputs a machine reads too.
 ///
 /// ```
 /// use isoloom_manifest::ignore::{Rules, copy_rules};
@@ -83,13 +79,12 @@ pub fn copy_rules(outputs: &[&str]) -> String {
 }
 
 /// What no copy of the project takes, at any depth, as patterns of this file's syntax: version
-/// control and what the tools write ([`TERRAFORM_STATE`], [`VAGRANT_STATE`], [`RUNNER_STATE`]).
+/// control and what the tools write ([`TERRAFORM_STATE`], [`VAGRANT_STATE`]).
 pub fn never_copied() -> impl Iterator<Item = &'static str> {
     [VERSION_CONTROL]
         .into_iter()
         .chain(TERRAFORM_STATE.iter().copied())
         .chain(VAGRANT_STATE.iter().copied())
-        .chain(RUNNER_STATE.iter().copied())
 }
 
 /// One piece of a pattern, as matched.

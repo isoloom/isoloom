@@ -100,8 +100,6 @@ pub(crate) fn blocks(w: Machine) -> Vec<Block> {
         uploads,
         parts: vec![commands],
         depends_on,
-        // The runner delivers its secrets over WinRM while the set-up waits for them.
-        announce: (!plan.secrets.is_empty()).then(|| name.to_owned()),
     };
     out.push(setup.block());
     out
@@ -122,7 +120,6 @@ fn rename(w: &Machine, connection: &Connection) -> [Block; 2] {
             up = host.to_uppercase()
         ))]],
         depends_on: Vec::new(),
-        announce: None,
     };
     let pause = resource("time_sleep", &format!("{id}_restart"))
         .add_attribute(("create_duration", string("90s")))

@@ -1,7 +1,7 @@
 use proptest::prelude::*;
 
-use super::{FILE, OUTPUTS, RUNNER_STATE, Rules, Token, copy_rules, tokens};
-use crate::contract::{OUTPUT_DIR, REACH_DIR};
+use super::{FILE, OUTPUTS, Rules, Token, copy_rules, tokens};
+use crate::contract::OUTPUT_DIR;
 
 fn kept<'a>(rules: &str, paths: &[&'a str]) -> Vec<&'a str> {
     let r = Rules::parse(rules);
@@ -139,7 +139,6 @@ fn a_copy_leaves_out_the_outputs_but_those_it_keeps_and_the_tools_state_everywhe
         ".isoloom/configure/lib/configure.sh",
         ".isoloom/cloud-vm/aws/main.tf",
         ".isoloom/cloud-vm/aws/terraform.tfstate",
-        ".isoloom/cloud-vm/aws/.isoloom-reach/web",
         ".isoloom/docker/terraform.tfstate.backup",
         ".git/HEAD",
         "infra/.terraform/providers/x",
@@ -147,7 +146,6 @@ fn a_copy_leaves_out_the_outputs_but_those_it_keeps_and_the_tools_state_everywhe
         "infra/.terraform.tfstate.lock.info",
         "infra/crash.1.log",
         "vm/.vagrant/machines/default/id",
-        "deep/.isoloom-reach/web",
     ];
     // The project's own `!` can't bring any of them back.
     let rules = Rules::for_copy("*.bak\n!**\n", &[".isoloom/docker", ".isoloom/configure"]);
@@ -170,12 +168,11 @@ fn a_copy_leaves_out_the_outputs_but_those_it_keeps_and_the_tools_state_everywhe
 fn the_copy_rules_are_lines_of_the_files_syntax() {
     assert_eq!(
         copy_rules(&[".isoloom/hybrid/compose.yml"]),
-        "/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n.terraform/\n*.tfstate\n*.tfstate.*\n.terraform.tfstate.lock.info\ncrash.log\ncrash.*.log\n.vagrant/\n.isoloom-reach/\n"
+        "/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n.terraform/\n*.tfstate\n*.tfstate.*\n.terraform.tfstate.lock.info\ncrash.log\ncrash.*.log\n.vagrant/\n"
     );
 }
 
 #[test]
-fn the_outputs_and_the_runner_s_state_are_the_contract_s_folders() {
+fn the_outputs_are_the_contract_s_folder() {
     assert_eq!(OUTPUTS, format!("/{OUTPUT_DIR}*"));
-    assert_eq!(RUNNER_STATE, [format!("{REACH_DIR}/")]);
 }

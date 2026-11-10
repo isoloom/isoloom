@@ -31,9 +31,6 @@ crash.*.log
 # Vagrant: each machine's folder (its id, its private key).
 .vagrant/
 
-# The runner: each cloud machine's SSH login, written as Terraform reaches it.
-.isoloom-reach/
-
 ## .isoloom/cloud-services/run.json
 {
   "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",

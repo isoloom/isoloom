@@ -71,6 +71,9 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   `ESXI_DEFAULT_SSH_PORT`, `SSH_PROXY_COMMAND`, `HOSTPORTS`, `PUBLISH_FIXED`, `SECRETS_DIR` and
   `DELIVERED`. Read them from there instead of copying their values.
 - **The `external` target writes no `machines.json`**: read the hosts from `inventory.ini`.
+- **No Terraform set-up writes `.isoloom-reach/<machine>`**: deliver a guest secret once its
+  `during_step` has succeeded, else once `up`'s steps all have, as the run manifest reference
+  says.
 
 - **A lab machine's role is `member`** (was `target`, a word the manifest's top-level `target`
   uses for something else): `machines[].role` is `member`, `job`, `infra`, `access`, `tool` or
@@ -104,7 +107,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   project, separated by spaces, each a file or a folder with all it holds). Build the archive's
   rules with `isoloom_manifest::ignore::Rules::for_copy(<the project's .isoloomignore>, <outputs>)`
   and drop any list of your own: it also leaves out version control and the tools' state
-  (`.terraform/`, `*.tfstate*`, `.vagrant/`, `.isoloom-reach/`) at any depth, and an earlier
+  (`.terraform/`, `*.tfstate*`, `.vagrant/`) at any depth, and an earlier
   archive at the top. `docker-vm/proxmox/run.json` and `cloud-docker`'s manifests name
   `.isoloom/docker .isoloom/configure`; `cloud-vm`'s name none.
 - The networks' check runner is `isoloom-networks` (step `check-isoloom-networks`, script

@@ -129,26 +129,23 @@ fn a_cloud_config_leaves_its_empty_lists_out() {
     );
 }
 
+/// A set-up over SSH that waits for its secrets writes nothing for a runner to read beside the
+/// module: a runner delivers them once `up`'s steps are done, from the module's outputs. It
+/// once wrote each machine's login into `.isoloom-reach/`, which no runner read.
 #[test]
-fn a_machine_waiting_for_secrets_announces_its_address_first() {
+fn a_machine_waiting_for_secrets_writes_no_login_for_the_runner() {
     let spec = format!("{SPEC}secrets:\n  db: {{ env: DB }}\n").replace(
         "    environment: { TOKEN: { input: TOKEN } }\n",
         "    environment: { TOKEN: { input: TOKEN } }\n    files: [{ path: /run/secrets/db, secret: db }]\n",
     );
     let env = environment(&spec, Target::CloudVm);
-    let machine = |name| provisioner(&env, name, reference("aws_instance.a.public_ip"));
-    let a = machine("a");
-    assert_eq!(a.announce.as_deref(), Some("a"));
-    assert!(machine("b").announce.is_none());
+    let a = provisioner(&env, "a", reference("aws_instance.a.public_ip"));
     let first: Vec<String> = a.parts[0].iter().map(text).collect();
     assert!(first.iter().any(|c| c.contains("/var/lib/isoloom/secrets/.delivered")), "{first:?}");
     let mut m = Module::new("");
     m.block(a.block());
     let hcl = m.render().unwrap();
-    let announce =
-        hcl.find("mkdir -p \\\"${path.module}/.isoloom-reach\\\" && echo \\\"admin@${aws_instance.a.public_ip}\\\" > \\\"${path.module}/.isoloom-reach/a\\\"");
-    let upload = hcl.find("provisioner \"file\"");
-    assert!(announce.is_some() && announce < upload, "{hcl}");
+    assert!(!hcl.contains(".isoloom-reach"), "{hcl}");
 }
 
 /// A tracked step run by a real `sh`, its ready file at `ready`: its exit status and what the

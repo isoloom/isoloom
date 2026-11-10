@@ -229,7 +229,6 @@ IsoloomProject::COPY_RULES = "/.isoloom*
 crash.log
 crash.*.log
 .vagrant/
-.isoloom-reach/
 "
 # Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,
 # with no tar.exe before Windows Server 2019).
@@ -598,7 +597,6 @@ Vagrant.configure("2") do |config|
 crash.log
 crash.*.log
 .vagrant/
-.isoloom-reach/
 "
   config.vm.provision "docker", type: "shell", inline: "command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   set -e

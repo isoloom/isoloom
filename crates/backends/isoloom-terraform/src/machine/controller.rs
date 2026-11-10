@@ -264,7 +264,6 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
         ],
         parts: vec![cmds.into_iter().map(Template::into_expression).collect()],
         depends_on: env.vms().map(|Vm { name: n, .. }| reference(&format!("terraform_data.{}", ident(n)))).collect(),
-        announce: None,
     }
 }
 

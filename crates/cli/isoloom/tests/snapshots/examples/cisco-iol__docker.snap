@@ -45,9 +45,6 @@ crash.*.log
 # Vagrant: each machine's folder (its id, its private key).
 .vagrant/
 
-# The runner: each cloud machine's SSH login, written as Terraform reaches it.
-.isoloom-reach/
-
 ## .isoloom/docker/appliances/r1/NETMAP
 1:0/0 513:0/0
 1:0/1 513:0/1

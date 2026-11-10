@@ -62,7 +62,6 @@ pub(crate) fn provisioner(m: Machine) -> Provisioner {
             host: m.remote.host,
             user: m.user,
         },
-        announce: (!mp.secrets.is_empty()).then(|| name.to_owned()),
     }
 }
 

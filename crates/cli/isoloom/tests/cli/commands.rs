@@ -471,7 +471,7 @@ fn generate_writes_a_gitignore_for_the_tools_state_and_lists_it() -> Outcome {
     let run = isoloom(&home, &[&"generate", &dir])?;
     assert_eq!(run.code, Some(0), "{run:?}");
     let ignore = std::fs::read_to_string(dir.join(".isoloom/.gitignore"))?;
-    for pattern in [".terraform/", "*.tfstate", "*.tfstate.*", ".vagrant/", ".isoloom-reach/"] {
+    for pattern in [".terraform/", "*.tfstate", "*.tfstate.*", ".vagrant/"] {
         assert!(ignore.lines().any(|l| l == pattern), "{pattern}: {ignore}");
     }
     assert!(!ignore.contains(".terraform.lock.hcl"), "the lock file is committed: {ignore}");

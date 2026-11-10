@@ -200,21 +200,21 @@ fn no_secret_value_reaches_a_vm_target_file() -> Outcome {
 #[test]
 fn no_secret_value_reaches_a_windows_machines_file() -> Outcome {
     let generated = generated(WINDOWS, "windows")?;
-    // Each VM target's Windows set-up waits for the delivery, then registers the startup task
-    // that puts the files back at every boot.
-    for target in ["vagrant", "cloud-vm/aws", "cloud-vm/azure"] {
-        let set_up = generated
-            .iter()
-            .filter(|(p, _)| p.starts_with(target))
-            .any(|(_, text)| text.contains("secrets\\\\.delivered") || text.contains("secrets\\.delivered"));
-        assert!(set_up, "{target} doesn't wait for the secrets");
-        let task = generated
-            .iter()
-            .any(|(p, text)| p.starts_with(target) && text.contains("isoloom-apply-secrets"));
-        assert!(task, "{target} doesn't put them back at boot");
+    // Vagrant's Windows set-up waits for the delivery, then registers the startup task that puts
+    // the files back at every boot. The clouds refuse a Windows machine's secrets: its set-up runs
+    // during Terraform's apply, before the runner delivers them.
+    for cloud in ["aws", "azure"] {
+        assert!(find(&generated, &format!("cloud-vm/{cloud}/main.tf")).is_err(), "{cloud} refuses them");
     }
-    // A cloud's set-up says how to reach its Windows machine over WinRM, never its password.
-    assert!(find(&generated, "cloud-vm/aws/main.tf")?.contains(" winrm-ntlm\\\" > \\\""));
+    let set_up = generated
+        .iter()
+        .filter(|(p, _)| p.starts_with("vagrant"))
+        .any(|(_, text)| text.contains("secrets\\\\.delivered") || text.contains("secrets\\.delivered"));
+    assert!(set_up, "vagrant doesn't wait for the secrets");
+    let task = generated
+        .iter()
+        .any(|(p, text)| p.starts_with("vagrant") && text.contains("isoloom-apply-secrets"));
+    assert!(task, "vagrant doesn't put them back at boot");
     Ok(())
 }
 

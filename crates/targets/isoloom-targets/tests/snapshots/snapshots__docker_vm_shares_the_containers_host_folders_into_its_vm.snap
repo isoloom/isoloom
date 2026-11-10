@@ -46,5 +46,4 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
 crash.log
 crash.*.log
 .vagrant/
-.isoloom-reach/
 "

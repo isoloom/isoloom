@@ -104,7 +104,7 @@ fn tricky_project(dir: &Path) -> Outcome<(PathBuf, String)> {
         "sub/.vagrant",
         ".isoloom/docker/checks",
         ".isoloom/configure/lib",
-        ".isoloom/cloud-vm/aws/.isoloom-reach",
+        ".isoloom/cloud-vm/aws",
     ] {
         std::fs::create_dir_all(root.join(d))?;
     }
@@ -116,7 +116,6 @@ fn tricky_project(dir: &Path) -> Outcome<(PathBuf, String)> {
     std::fs::write(root.join(".isoloom/docker/checks/web.sh"), "true\n")?;
     std::fs::write(root.join(".isoloom/configure/lib/configure.sh"), "true\n")?;
     std::fs::write(root.join(".isoloom/cloud-vm/aws/terraform.tfstate"), "{}")?;
-    std::fs::write(root.join(".isoloom/cloud-vm/aws/.isoloom-reach/web"), "admin@203.0.113.7")?;
     // The tools' state outside the outputs too: a module of the project's own, applied in place.
     std::fs::write(root.join("sub/terraform.tfstate"), "{}")?;
     std::fs::write(root.join("sub/.vagrant/private_key"), "secret")?;
@@ -150,29 +149,14 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
     assert!(has(&list, &long), "{list}");
     assert!(list.lines().any(|x| x.starts_with("-rwx") && x.ends_with(" run.sh")), "{list}");
     assert!(has(&list, ".isoloom/hybrid/compose.yml"), "{list}");
-    for gone in [
-        ".git/",
-        "HEAD",
-        "private_key",
-        ".isoloom/vagrant/",
-        ".isoloom/docker/",
-        "tfstate",
-        ".isoloom-reach",
-    ] {
+    for gone in [".git/", "HEAD", "private_key", ".isoloom/vagrant/", ".isoloom/docker/", "tfstate"] {
         assert!(!list.contains(gone), "{gone} went in: {list}");
     }
     // docker-vm's: the `docker` target's folder and the configuration files, all they hold.
     let compose = run(&[".isoloom/docker", ".isoloom/configure"], "compose.tgz")?;
     assert!(has(&compose, ".isoloom/docker/checks/web.sh"), "{compose}");
     assert!(has(&compose, ".isoloom/configure/lib/configure.sh"), "{compose}");
-    for gone in [
-        ".isoloom/vagrant/",
-        ".isoloom/hybrid/",
-        ".isoloom/cloud-vm/",
-        "tfstate",
-        ".isoloom-reach",
-        "private_key",
-    ] {
+    for gone in [".isoloom/vagrant/", ".isoloom/hybrid/", ".isoloom/cloud-vm/", "tfstate", "private_key"] {
         assert!(!compose.contains(gone), "{gone} went in: {compose}");
     }
     unpacks_as_packed(&dir, &long)?;
