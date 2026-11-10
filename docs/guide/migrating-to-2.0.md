@@ -28,6 +28,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 | A tag key starting with a digit, two keys equal but for case or lowercasing to one label (`Cost.Center`, `cost_center`), or `Managed-By`/`Isoloom…` in any case | refused at `tags.<key>` | one key per tag, starting with a letter |
 | A tag whose `key:value` is over 50 characters, or under 3 (an empty value of a one-letter key) | refused at `tags.<key>` (Linode's limit, the strictest cloud's) | a shorter value |
 | An `access: true` machine with no `os` and nothing to run, generated with no image table (`--images`, the defaults' `images:`) giving its `access:` | refused by every target but `external` and `cloud-services` at `machines.<m>.os` (`validate` warns): Docker wrote a service with no image, which the runner couldn't start, and the VM targets left the machine out while every other machine's hosts file listed it | `os: debian@12` (or the image table's `access: { docker: <image>, vm: <os> }`) |
+| A Windows machine whose name is over 15 characters, for `cloud-vm` | refused by every VM target (`cloud-vm` cut it to 15 characters, so two machines could get one computer name) | a name of 15 characters at most |
 | The same tag rules broken by a tag of the defaults (a defaults file, `ISOLOOM_TAGS__*`, `-s defaults.tags.*`), or a tag of the defaults clashing with the spec's | every command stops, naming the layer (`defaults (environment ISOLOOM_TAGS__TEAM): tag …`) | fix the defaults' tag |
 
 ## Behavior that changed
@@ -62,6 +63,13 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 - **Isoloom's own router and controller are renamed on Proxmox, ESXi and the clouds** (`isoloom-router`, `isoloom-controller`: their snippets, VM names and cloud resource names). A lab applied with 1.x has them under the old names: `terraform apply` replaces them (destroy and re-create), or run `isothrum down` and `up` again.
 
 ## Runner authors
+
+- **The names a runner shares with the generated files outside `run.json` are
+  `isoloom_manifest::contract`'s**: `OUTPUT_DIR`, `RESERVED_PREFIX`, `CONTROLLER`, `HALTING`,
+  `EXPIRES_TAG`, `INSTANCE_TAG`, `EXPIRES_WORD`, `ESXI_HOSTNAME`, `ESXI_HOSTPORT`,
+  `ESXI_DEFAULT_SSH_PORT`, `SSH_PROXY_COMMAND`, `HOSTPORTS`, `PUBLISH_FIXED`, `SECRETS_DIR` and
+  `DELIVERED`. Read them from there instead of copying their values.
+- **The `external` target writes no `machines.json`**: read the hosts from `inventory.ini`.
 
 - **A lab machine's role is `member`** (was `target`, a word the manifest's top-level `target`
   uses for something else): `machines[].role` is `member`, `job`, `infra`, `access`, `tool` or
@@ -119,6 +127,10 @@ The supported crates are `isoloom-spec`, `isoloom-targets` and `isoloom-manifest
 ([policies](../reference/policies.md#what-is-stable)). Removed or made crate-internal in 2.0,
 among others (the CHANGELOG's **Removed** section lists every item):
 
+- `isoloom_spec::validate::{Cidr, Cidr6, PRIVATE, IPV6_PREFIX, docker_cidrs}` are
+  `isoloom_spec::net`'s, and `Cidr`'s `base` and `len` are private: `Cidr::new(base, len)`,
+  `base()`, `prefix()`. `isoloom_spec::validate::RESERVED_PREFIX`,
+  `isoloom_targets::OUTPUT_DIR` are `isoloom_manifest::contract`'s.
 - `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}`: the lab takes
   the regions (`Lab::with_regions`, from `Defaults::regions`); `isoloom_targets::default_regions`
   gives each cloud's built-in one.
