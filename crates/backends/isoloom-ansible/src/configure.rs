@@ -48,7 +48,7 @@ pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<Genera
     for (name, c) in &configured {
         out.extend(role_files(c, &format!("{base}/roles/{}", role_name(name)))?);
     }
-    if let Some(reqs) = requirements(&configured) {
+    if let Some(reqs) = requirements(&configured)? {
         out.push(GeneratedFile {
             path: format!("{base}/requirements.yml"),
             contents: reqs,
@@ -79,22 +79,31 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
 }
 
 /// `requirements.yml` naming the pinned collections the roles use (today only `ansible.posix`,
-/// for a `firewall` step), from the embedded catalogue; `None` when no role names one. A catalogue
-/// that doesn't load never gets here (validation refuses the lab, `Lab::problems`), and the
-/// embedded one's `ansible.posix` pin is held by `a_firewall_recipe_pins_ansible_posix_in_requirements`.
+/// for a `firewall` step), from the embedded catalogue; `None` when no role names one.
+///
+/// # Errors
+///
+/// [`crate::Error::Collection`] when the embedded catalogue doesn't load or pins no
+/// `ansible.posix`: a bug its tests and `a_firewall_recipe_pins_ansible_posix_in_requirements`
+/// catch first.
 ///
 /// Each entry carries the exact version, its archive `source`, and the `sha256` that
 /// `catalogue/collections.yml` pins (never dropped): a run checks the archive against it before
 /// installing, so it can't fetch a mutated collection (the design's vendored/pinned rule).
-fn requirements(configured: &[(String, Configured<'_>)]) -> Option<String> {
+fn requirements(configured: &[(String, Configured<'_>)]) -> crate::Result<Option<String>> {
+    const POSIX: &str = "ansible.posix";
     let firewall = configured
         .iter()
         .any(|(_, c)| c.recipe().resources().any(|r| matches!(r, Resource::Firewall(ports) if !ports.is_empty())));
     if !firewall {
-        return None;
+        return Ok(None);
     }
-    let catalogue = Catalogue::embedded().ok()?;
-    let posix = catalogue.collections().get("ansible.posix")?;
+    let missing = |why: String| crate::Error::Collection { name: POSIX, why };
+    let catalogue = Catalogue::embedded().map_err(|e| missing(e.to_string()))?;
+    let posix = catalogue
+        .collections()
+        .get(POSIX)
+        .ok_or_else(|| missing("the embedded catalogue's collections.yml has none".to_owned()))?;
     let collections = json!([{
         "name": posix.name,
         "version": posix.version,
@@ -102,7 +111,7 @@ fn requirements(configured: &[(String, Configured<'_>)]) -> Option<String> {
         "sha256": posix.sha256.to_string(),
     }]);
     let body = task::document(&json!({ "collections": collections }));
-    Some(format!("{}{body}", header("#")))
+    Ok(Some(format!("{}{body}", header("#"))))
 }
 
 #[cfg(test)]

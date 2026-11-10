@@ -351,6 +351,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **The Ansible project fails when a firewall step's collection has no pin** (library:
+  `isoloom_ansible::Error::Collection`) instead of leaving `requirements.yml` out silently.
 - **A check or `provision:` file is a playbook by its extension in any case**, as a step's file
   is (`checks/site.YML` ran as a shell script): one rule, `isoloom_spec::syntax::is_yaml_file`.
 - **A tag from the environment or a `-s` is its text as written**: `ISOLOOM_TAGS__ACCOUNT=0x1F`

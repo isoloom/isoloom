@@ -23,6 +23,15 @@ pub enum Error {
         /// The machine.
         machine: String,
     },
+    /// A firewall step needs a collection (`ansible.posix`) the embedded catalogue doesn't pin,
+    /// or the catalogue doesn't load: its own tests fail first, so this is a bug.
+    #[error("{}: the collection `{name}` a firewall step needs has no pin: {why}", Target::External.id())]
+    Collection {
+        /// The collection.
+        name: &'static str,
+        /// Why it has no pin.
+        why: String,
+    },
 }
 
 /// A result whose error is this crate's [`Error`].
@@ -36,7 +45,9 @@ impl From<Error> for RenderError {
                 target: Target::External,
                 refusal,
             },
-            e @ Error::WindowsPackages { .. } => RenderError::internal(Target::External, "the Ansible project can't be rendered", e),
+            e @ (Error::WindowsPackages { .. } | Error::Collection { .. }) => {
+                RenderError::internal(Target::External, "the Ansible project can't be rendered", e)
+            }
         }
     }
 }
@@ -56,5 +67,18 @@ mod tests {
         };
         assert_eq!(e.to_string(), RenderError::from(e.clone()).to_string());
         assert!(e.to_string().starts_with("external: "), "{e}");
+    }
+
+    #[test]
+    fn a_collection_without_a_pin_is_the_backends_failure_not_a_refusal() {
+        let e = Error::Collection {
+            name: "ansible.posix",
+            why: "the embedded catalogue's collections.yml has none".into(),
+        };
+        assert_eq!(
+            e.to_string(),
+            "external: the collection `ansible.posix` a firewall step needs has no pin: the embedded catalogue's collections.yml has none"
+        );
+        assert!(matches!(RenderError::from(e), RenderError::Internal { .. }));
     }
 }
