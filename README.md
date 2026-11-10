@@ -214,7 +214,7 @@ Isoloom follows Semantic Versioning ([policies](docs/reference/policies.md)):
 |---|---|
 | The spec format (`version: 1`) | Strict: a spec valid on a release stays valid, with the same meaning, for the whole major version |
 | The command line | Strict: commands, flags, exit codes and `--json` output |
-| The run manifest | Versioned: `manifest_version: 1`, which a release only extends with what a version-1 reader may ignore |
+| The run manifest | Versioned: `manifest_version: 1`; a minor release may add an optional field, which a runner reads once it upgrades the `isoloom-manifest` it pins |
 | Catalogue entries | Removable with notice: deprecated in a minor release, removed no earlier than three months later |
 | The library API | `isoloom-spec`, `isoloom-targets` and `isoloom-manifest` are supported; the other crates are building blocks whose API may change |
 | The generated files | Their behavior, proven by the checks; their text may change in any release |

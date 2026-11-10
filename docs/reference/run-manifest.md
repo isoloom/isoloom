@@ -42,10 +42,16 @@ and `isoloom-manifest` holds the types and fixtures runners can test against.
 
 ## Versions and compatibility
 
-`manifest_version` is the contract's version: **1** from Isoloom 2.0. Within version 1, a release
-only adds what a version-1 reader may ignore: an optional field, a new kind of step that a runner
-can skip. Anything a version-1 reader would misread (a field removed, renamed or given another
-meaning, a new required field) raises `manifest_version`, in a major release of Isoloom.
+`manifest_version` is the contract's version: **1** from Isoloom 2.0. Within version 1, a minor
+release of Isoloom may add an optional field. Removing or renaming a field, changing what a field
+holds or means, making a field required, or adding a value a runner must act on (a step action, a
+delivery, a condition) raises `manifest_version`, in a major release of Isoloom.
+
+The reader (`isoloom-manifest`) is strict: it refuses a field or value it doesn't know, as the
+schema does (`additionalProperties: false`). A manifest that uses a field added in a minor release
+needs a runner built with that release's `isoloom-manifest`, so a runner pins the
+`isoloom-manifest` it reads and upgrades it with the Isoloom it runs. The policy is
+`isoloom_manifest::COMPATIBILITY`, which the schema's description repeats.
 
 A runner reads the versions it was built for and refuses any other before running anything.
 Isothrum's release notes say which `manifest_version` each of its releases reads. Isoloom 1.x
