@@ -38,6 +38,7 @@ mod own_image_boot;
 mod possible;
 mod project_copy;
 mod proxmox_controller;
+mod readme;
 mod reboot;
 mod report;
 mod reserved_names;

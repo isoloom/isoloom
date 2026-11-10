@@ -147,7 +147,7 @@ real runs: **Tier 1**, a full real run (up, checks, down) from every host OS it 
 | `docker-vm` | The containers on one VM (Vagrant, UTM included, or Proxmox) | 2 | yes | [Vagrant](docs/guide/targets/vagrant.md), [Proxmox](docs/guide/targets/proxmox.md) |
 | `hybrid` | Containers and VMs together on the same networks | 2 | no | [Vagrant](docs/guide/targets/vagrant.md) |
 | `proxmox` | A Terraform module: one VM per machine on Proxmox VE, with its SDN, router and firewall | 2 | yes | [Proxmox](docs/guide/targets/proxmox.md) |
-| `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | 2 | no | [ESXi](docs/guide/targets/esxi.md) |
+| `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | 2 | yes | [ESXi](docs/guide/targets/esxi.md) |
 | `cloud-vm` | A Terraform module per cloud: one VM per machine on AWS, Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud | 2 | yes, per cloud | [Clouds](docs/guide/targets/cloud.md) |
 | `cloud-docker` | A Terraform module per cloud: the containers on one cloud VM | 2 | yes, per cloud | [Clouds](docs/guide/targets/cloud.md) |
 | `cloud-services` | Your own Terraform module, applied into your AWS, Azure or Google Cloud account | 2 | yes | [Clouds](docs/guide/targets/cloud.md) |
