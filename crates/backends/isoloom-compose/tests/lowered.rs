@@ -5,9 +5,11 @@
 use std::error::Error;
 use std::path::Path;
 
+use isoloom_compose::ComposeBackend;
 use isoloom_plan::Environment;
 use isoloom_plan::lower::{Scope, lower};
 use isoloom_render::GeneratedFile;
+use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 
 /// A test's outcome: a failed step is its report.
@@ -26,7 +28,7 @@ fn plan(name: &str) -> Outcome<Environment> {
 
 /// The files Compose renders for a design example.
 fn render(name: &str) -> Outcome<Vec<GeneratedFile>> {
-    Ok(isoloom_compose::render(Target::Docker, &plan(name)?)?)
+    Ok(ComposeBackend::DOCKER.render(&plan(name)?)?)
 }
 
 /// The Docker plan of an inline spec.

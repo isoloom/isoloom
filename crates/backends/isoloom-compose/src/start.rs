@@ -83,7 +83,6 @@ fn plan_of(started: &[Started]) -> StartPlan {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::model::Target;
 
     use super::*;
     use crate::file::{Condition, Restart, Service};
@@ -145,7 +144,7 @@ mod tests {
         let env = crate::testing::environment(
             "version: 1\nname: leaves\nnetworks: { net: { cidr: 10.71.0.0/24 } }\nmachines:\n  store: { networks: { net: 5 }, app: { image: redis }, setup: [fill.sh] }\n  app: { networks: { net: 6 }, depends_on: [store], app: { image: nginx }, setup: [prime.sh] }\n",
         );
-        let rendered = crate::render::compose_file(Target::Docker, &env).expect("renders");
+        let rendered = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).expect("renders");
         let plan = StartPlan::of(&rendered.file);
         assert_eq!(plan.jobs, ["isoloom-init-app-1"]);
         assert!(

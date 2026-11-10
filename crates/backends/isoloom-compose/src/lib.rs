@@ -85,4 +85,3 @@ mod testing;
 
 pub use backend::{ComposeBackend, capabilities_on_a_vm, guest};
 pub use error::{Error, Result};
-pub use render::render;

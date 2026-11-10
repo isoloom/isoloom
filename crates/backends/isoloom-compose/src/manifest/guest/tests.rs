@@ -33,7 +33,7 @@ fn guest_of(yaml: &str) -> GuestCompose {
 
 fn guest_as(yaml: &str, as_root: AsRoot) -> GuestCompose {
     let env = environment(yaml);
-    let file = compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+    let file = compose_file(crate::backend::ComposeTarget::Docker, &env).unwrap().file;
     guest(&env, &file, as_root).unwrap()
 }
 

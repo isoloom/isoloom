@@ -11,6 +11,7 @@
 //!   the Compose file run inside it as the Compose backend says.
 //! - `hybrid`: the Vagrant VMs and the containers' host, with the containers' Compose file.
 
+use isoloom_compose::ComposeBackend;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{self, Backend, Files, Placed};
@@ -28,7 +29,7 @@ fn on_docker(env: &Environment) -> Environment {
 /// The `docker` target's files for `env`: what a Docker host runs. A refusal or failure is
 /// `env`'s target's.
 fn docker_files(env: &Environment) -> Result<Files, RenderError> {
-    isoloom_compose::render(Target::Docker, &on_docker(env)).map_err(|e| RenderError::from(e).on(env.target))
+    ComposeBackend::DOCKER.render(&on_docker(env)).map_err(|e| e.on(env.target))
 }
 
 /// What runs inside the VM for `env`: the `docker` target's Compose file, and the commands that

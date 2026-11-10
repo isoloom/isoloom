@@ -3,8 +3,10 @@
 use std::error::Error;
 use std::path::Path;
 
+use isoloom_compose::ComposeBackend;
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
+use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 
 /// A test's outcome: a failed step is its report.
@@ -18,7 +20,7 @@ fn render(spec: isoloom_spec::Spec) -> Outcome<Vec<GeneratedFile>> {
         return Err(format!("the spec isn't valid: {problems:?}").into());
     }
     let docker = lab.for_target(Target::Docker);
-    Ok(isoloom_compose::render(Target::Docker, &Environment::build(&docker, Target::Docker, None))?)
+    Ok(ComposeBackend::DOCKER.render(&Environment::build(&docker, Target::Docker, None))?)
 }
 
 /// An example of the project, as written.
@@ -113,8 +115,8 @@ fn provisioning_is_refused_without_rendering() -> Outcome {
     )
     .map_err(|problems| format!("{problems:?}"))?;
     let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None);
-    let refused = isoloom_compose::render(Target::Docker, &env).err().ok_or("rendered")?;
-    assert!(matches!(refused, isoloom_compose::Error::Refused { .. }), "{refused:?}");
+    let refused = ComposeBackend::DOCKER.render(&env).err().ok_or("rendered")?;
+    assert!(matches!(refused, isoloom_render::Error::Refused { .. }), "{refused:?}");
     assert_eq!(
         refused.to_string(),
         "docker: environment-level provisioning (`provision:`) runs on the VM targets only"

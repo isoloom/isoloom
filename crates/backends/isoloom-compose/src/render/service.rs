@@ -377,7 +377,7 @@ mod tests {
         let env = crate::testing::environment(
             "version: 1\nname: t\nnetworks:\n  dmz: { cidr: 10.9.0.0/24, gateway: fw }\n  out: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    networks: { out: 5, dmz: 1 }\n    sysctls: { net.ipv4.tcp_syncookies: \"1\" }\n    app: { image: alpine }\n",
         );
-        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        let file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).unwrap().file;
         let fw = &file.services["fw"];
         assert_eq!(fw.sysctls.get("net.ipv4.tcp_syncookies").map(String::as_str), Some("1"), "{:?}", fw.sysctls);
         assert_eq!(fw.sysctls.get("net.ipv4.ip_forward").map(String::as_str), Some("1"), "{:?}", fw.sysctls);
@@ -397,7 +397,7 @@ mod tests {
         let env = crate::testing::environment(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 } }\nvolumes: { data: {} }\nmachines:\n  r:\n    networks: { a: 1 }\n    volumes: { data: /data }\n    host_folders: [{ from: shared, path: /shared }]\n    environment: { SITE: lab }\n    app: { image: iol, appliance: cisco-iol }\n",
         );
-        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        let file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).unwrap().file;
         let r = &file.services["r"];
         let mounts = serde_yaml_ng::to_string(&r.volumes).unwrap();
         for wanted in ["data:/data", "target: /shared", "./appliances/r/"] {
@@ -413,7 +413,7 @@ mod tests {
         let env = crate::testing::environment(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24, gateway: fw }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  fw: { networks: { b: 5, a: 1 }, app: { image: alpine } }\n  web: { networks: { a: 10 }, setup: [seed.sh], app: { image: nginx } }\n  web-routes: { networks: { b: 10 }, app: { image: nginx } }\n  web-init-1: { networks: { b: 11 }, app: { image: nginx } }\n",
         );
-        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        let file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).unwrap().file;
         for service in ["web", "web-routes", "web-init-1", "isoloom-routes-web", "isoloom-init-web-1"] {
             assert!(file.services.contains_key(service), "{service}: {:?}", file.services.keys());
         }
@@ -426,7 +426,7 @@ mod tests {
         let env = crate::testing::environment(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, corp: { cidr: 192.168.50.0/24 } }\nmachines:\n  r: { networks: { a: 1, corp: 7 }, app: { image: iol, appliance: cisco-iol } }\noverrides:\n  docker: { networks: { corp: { external: corp-net } } }\n",
         );
-        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        let file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).unwrap().file;
         let nets = &file.services["r"].networks;
         assert_eq!(nets.keys().collect::<Vec<_>>(), ["isoloom-mgmt", "a", "corp"], "{nets:?}");
         let corp = nets["corp"].as_ref().unwrap();

@@ -18,9 +18,10 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_render::container::PROBE_IMAGE;
 use isoloom_render::{GeneratedFile, header, trunks};
-use isoloom_spec::model::{Arch, Target};
+use isoloom_spec::model::Arch;
 use isoloom_spec::net::Cidr;
 
+use crate::backend::ComposeTarget;
 use crate::error::{Error, Result};
 use crate::file::{Attachment, ComposeFile, NetworkMode, Restart, Service, Volume};
 use isoloom_render::run_manifest::RUNNER;
@@ -49,7 +50,7 @@ fn usage(file: &ComposeFile) -> String {
 ///
 /// [`Error::Refused`] when `env` needs what Compose can't do, [`Error::Unwritable`] when the
 /// file can't be written as YAML.
-pub fn render(target: Target, env: &Environment) -> Result<Files> {
+pub(crate) fn render(target: ComposeTarget, env: &Environment) -> Result<Files> {
     let Rendered { file, files: mounted } = compose_file(target, env)?;
     let yaml = to_yaml(target, &file)?;
     let mut files = vec![GeneratedFile {
@@ -79,9 +80,12 @@ pub(crate) struct Rendered {
 /// The typed Compose file of `env` and the files it mounts, for a target that adapts it before
 /// writing it (`hybrid` plugs it into its Docker host's networks). Refused as `target` when
 /// `env` needs what Compose can't do.
-pub(crate) fn compose_file(target: Target, env: &Environment) -> Result<Rendered> {
+pub(crate) fn compose_file(target: ComposeTarget, env: &Environment) -> Result<Rendered> {
     if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &crate::backend::capabilities(target)) {
-        return Err(Error::Refused { target, refusal });
+        return Err(Error::Refused {
+            target: target.target(),
+            refusal,
+        });
     }
     let mut out = Out::default();
     let ts = trunks::containers(env.spec());
@@ -118,8 +122,11 @@ pub(crate) fn compose_file(target: Target, env: &Environment) -> Result<Rendered
 }
 
 /// `file` as YAML, a failure reported as `target`'s.
-pub(crate) fn to_yaml(target: Target, file: &ComposeFile) -> Result<String> {
-    serde_yaml_ng::to_string(file).map_err(|source| Error::Unwritable { target, source })
+pub(crate) fn to_yaml(target: ComposeTarget, file: &ComposeFile) -> Result<String> {
+    serde_yaml_ng::to_string(file).map_err(|source| Error::Unwritable {
+        target: target.target(),
+        source,
+    })
 }
 
 /// What rendering the machines collects besides their services.

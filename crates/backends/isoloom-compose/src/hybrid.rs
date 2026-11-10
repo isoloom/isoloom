@@ -11,6 +11,7 @@ use isoloom_render::container::{DOCKER_HOST, HybridContainers, docker_net};
 use isoloom_render::{GeneratedFile, header, router};
 use isoloom_spec::model::{Protocol, Spec, Target};
 
+use crate::backend::ComposeTarget;
 use crate::error::Result;
 use crate::file::{ComposeFile, Network, Service};
 use crate::names::tool_of;
@@ -32,7 +33,7 @@ const START_TIMEOUT: u32 = 900;
 /// both as the `hybrid` target's.
 pub fn render(env: &Environment) -> Result<HybridContainers> {
     let alone = Environment::build(&containers_only(env.spec()), Target::Hybrid, env.instance);
-    let mut compose = compose_file(Target::Hybrid, &alone)?.file;
+    let mut compose = compose_file(ComposeTarget::Hybrid, &alone)?.file;
     compose.services.shift_remove(router::NAME);
     let names: Vec<String> = compose.services.keys().cloned().collect();
     let vm_hosts = vm_hosts(env);
@@ -150,7 +151,7 @@ fn external_networks(env: &Environment, nets: &[String], publishing: bool) -> In
 
 /// The file's text: what it is, then the file.
 fn contents(compose: &ComposeFile) -> Result<String> {
-    let yaml = to_yaml(Target::Hybrid, compose)?;
+    let yaml = to_yaml(ComposeTarget::Hybrid, compose)?;
     Ok(format!(
         "{}# The containers of a hybrid environment: run on the {DOCKER_HOST} VM, on the networks\n# it creates there (macvlan, shared with the VMs). Started by the Vagrantfile next to it.\n\n{yaml}",
         header("#")

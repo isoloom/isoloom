@@ -11,20 +11,24 @@ use isoloom_spec::model::Target;
 
 use crate::render;
 
-/// The targets a Compose file is rendered for.
+/// The targets a Compose file is rendered for, and no other.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum ComposeTarget {
+pub(crate) enum ComposeTarget {
     /// `docker`: the user's own Docker host.
     Docker,
     /// `hosted`: a hosting service runs the same Compose file.
     Hosted,
+    /// `hybrid`: the containers' file, run on the Docker host VM beside the environment's VMs.
+    Hybrid,
 }
 
 impl ComposeTarget {
-    fn target(self) -> Target {
+    /// The target it is.
+    pub(crate) fn target(self) -> Target {
         match self {
             ComposeTarget::Docker => Target::Docker,
             ComposeTarget::Hosted => Target::Hosted,
+            ComposeTarget::Hybrid => Target::Hybrid,
         }
     }
 }
@@ -47,11 +51,11 @@ impl Backend for ComposeBackend {
     }
 
     fn capabilities(&self) -> Capabilities {
-        capabilities(self.0.target())
+        capabilities(self.0)
     }
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
-        Ok(render::render(self.0.target(), env)?)
+        Ok(render::render(self.0, env)?)
     }
 
     /// The `docker` target's manifest; a hosting service runs the file its own way.
@@ -59,7 +63,7 @@ impl Backend for ComposeBackend {
         if self.0 != ComposeTarget::Docker {
             return Ok(None);
         }
-        let file = render::compose_file(Target::Docker, env)?.file;
+        let file = render::compose_file(ComposeTarget::Docker, env)?.file;
         Ok(Some(crate::manifest::docker(env, &file)?))
     }
 }
@@ -74,7 +78,7 @@ impl Backend for ComposeBackend {
 /// [`crate::Error::Refused`] when `env` needs what Compose can't do; a manifest error for a name
 /// the run manifest refuses (a bug: the spec checks them).
 pub fn guest(env: &Environment, as_root: AsRoot) -> crate::Result<GuestCompose> {
-    let file = render::compose_file(Target::Docker, env)?.file;
+    let file = render::compose_file(ComposeTarget::Docker, env)?.file;
     crate::manifest::guest(env, &file, as_root)
 }
 
@@ -89,7 +93,7 @@ pub fn guest(env: &Environment, as_root: AsRoot) -> crate::Result<GuestCompose> 
 /// past `down` or exist already; no raw disk (a container gets no block device). Only on the
 /// `docker` target, folders of the computer that runs the lab: its containers run there (a
 /// hosting service's and the hybrid VM's don't).
-pub(crate) fn capabilities(target: Target) -> Capabilities {
+pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
     let caps = Capabilities::of([
         Feature::NetworkAppliances,
         Feature::Gateways,
@@ -113,7 +117,11 @@ pub(crate) fn capabilities(target: Target) -> Capabilities {
         Feature::PersistentVolumes,
         Feature::ExternalVolumes,
     ]);
-    if target == Target::Docker { caps.with(Feature::HostFolders) } else { caps }
+    if target == ComposeTarget::Docker {
+        caps.with(Feature::HostFolders)
+    } else {
+        caps
+    }
 }
 
 /// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
@@ -123,7 +131,7 @@ pub(crate) fn capabilities(target: Target) -> Capabilities {
 /// connection (the runner), and Compose takes them from there.
 #[must_use]
 pub fn capabilities_on_a_vm() -> Capabilities {
-    capabilities(Target::Hosted).without(&OWN_HOST_ONLY)
+    capabilities(ComposeTarget::Hosted).without(&OWN_HOST_ONLY)
 }
 
 /// What only Compose on the user's own Docker host renders: the host's existing networks,
@@ -143,18 +151,18 @@ mod tests {
     #[test]
     fn a_vm_runs_what_compose_does_but_what_only_the_users_own_host_has() {
         for f in OWN_HOST_ONLY {
-            assert!(capabilities(Target::Docker).has(f) && !capabilities_on_a_vm().has(f), "{f:?}");
+            assert!(capabilities(ComposeTarget::Docker).has(f) && !capabilities_on_a_vm().has(f), "{f:?}");
         }
         assert!(capabilities_on_a_vm().has(Feature::Secrets));
     }
 
     #[test]
     fn only_the_docker_targets_containers_run_on_the_computer_whose_folders_they_mount() {
-        let with: Vec<Target> = [Target::Docker, Target::Hosted, Target::Hybrid]
+        let with: Vec<ComposeTarget> = [ComposeTarget::Docker, ComposeTarget::Hosted, ComposeTarget::Hybrid]
             .into_iter()
             .filter(|t| capabilities(*t).has(Feature::HostFolders))
             .collect();
-        assert_eq!(with, [Target::Docker]);
+        assert_eq!(with, [ComposeTarget::Docker]);
         assert!(!capabilities_on_a_vm().has(Feature::HostFolders), "the VM's backend shares them, when it can");
     }
 }

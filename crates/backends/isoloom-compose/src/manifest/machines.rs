@@ -194,7 +194,6 @@ fn tool_port(tool: &model::Tool) -> Result<Option<Port>> {
 #[cfg(test)]
 mod tests {
     use isoloom_manifest::Error as ManifestError;
-    use isoloom_spec::model::Target;
 
     use crate::error::Error;
     use crate::file::Service;
@@ -210,7 +209,7 @@ machines:
   web: { networks: { lan: 10 }, app: { image: nginx } }
 ",
         );
-        let mut file = crate::render::compose_file(Target::Docker, &env).expect("renders").file;
+        let mut file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).expect("renders").file;
         assert!(super::classify(&env, &file).is_ok());
         file.services.insert("mystery".into(), Service::default());
         let err = super::classify(&env, &file).err();
