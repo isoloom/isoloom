@@ -67,6 +67,13 @@ pub(crate) const ESXI_USERNAME: Setting = Setting {
     default: Default::Text("root"),
 };
 
+/// The ESXi user's password: a secret slot of the run manifest, read by the ESXi plugin itself
+/// (`env:ESXI_PASSWORD`), never by the Vagrantfile.
+pub(crate) const ESXI_PASSWORD: Setting = Setting {
+    name: "ESXI_PASSWORD",
+    default: Default::None,
+};
+
 /// The datastore the VMs' disks go on (unset: ESXi's first).
 pub(crate) const ESXI_DATASTORE: Setting = Setting {
     name: "ESXI_DATASTORE",

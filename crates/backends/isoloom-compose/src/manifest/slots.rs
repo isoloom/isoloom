@@ -5,25 +5,20 @@
 
 use std::collections::BTreeSet;
 
+use isoloom_manifest::contract::PUBLISH_ADDRESS;
 use isoloom_manifest::{
-    Delivery, EnvName, Identifier, Machine, Name, NonEmpty, Param, PublishMode, Role, SecretSlot, SecretSource, SetBy, SlotKind, StepId, StepSelection, Store,
+    Delivery, EnvName, Identifier, Machine, Name, NonEmpty, Param, Role, SecretSlot, SecretSource, SetBy, SlotKind, StepId, StepSelection, Store,
 };
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::secret_variable;
 
 use isoloom_render::container::project_variables;
-use isoloom_render::run_manifest::held_secrets;
+use isoloom_render::run_manifest::{derived_switch, held_secrets, publish_fixed};
 
 use super::lifecycle::{job_step, owner};
 use super::machines::Member;
 use crate::error::Result;
 use crate::start::StartPlan;
-
-/// The host address published ports listen on; set: each published port takes its `publish`
-/// number.
-use isoloom_manifest::contract::{PUBLISH_ADDRESS, PUBLISH_FIXED};
-/// `0`: the checks derived from the spec are skipped.
-use isoloom_render::run_manifest::DERIVED;
 
 fn env_name(name: &str) -> Result<EnvName> {
     Ok(EnvName::parse(name)?)
@@ -51,13 +46,8 @@ fn param(name: &str, description: &str, default: Option<&str>, values: &[&str], 
 /// The params the Compose file reads: the publish address and the fixed host ports when a port
 /// is published, the derived checks' switch when a runner reads it.
 pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Param>> {
-    let published: Vec<PublishMode> = machines
-        .iter()
-        .flat_map(|m| &m.ports)
-        .filter_map(|p| p.publish.as_ref().map(|p| p.mode))
-        .collect();
     let mut out = Vec::new();
-    if !published.is_empty() {
+    if let Some(fixed) = publish_fixed(machines)? {
         out.push(param(
             PUBLISH_ADDRESS,
             "The host address published ports listen on.",
@@ -65,17 +55,9 @@ pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Par
             &[],
             StepSelection::Every,
         )?);
-        // Declared whenever a port is published, even if every one is already `fixed:` (no
-        // ephemeral one to pin): the program running the lab (to keep the lab's own ports) may
-        // pass it for any lab that publishes a port, and it is a no-op where the compose file
-        // already pins the port to its `publish:` number.
-        let what = "Set: each published port takes its `publish:` number instead of an ephemeral one.";
-        out.push(param(PUBLISH_FIXED, what, None, &["1"], StepSelection::Every)?);
+        out.push(fixed);
     }
-    if let Ok(steps) = NonEmpty::new(derived.to_vec(), "the check steps") {
-        let what = "0: the checks derived from the spec (reachability, no internet) are skipped.";
-        out.push(param(DERIVED, what, Some("1"), &["0", "1"], StepSelection::Only(steps))?);
-    }
+    out.extend(derived_switch(derived.to_vec())?);
     Ok(out)
 }
 

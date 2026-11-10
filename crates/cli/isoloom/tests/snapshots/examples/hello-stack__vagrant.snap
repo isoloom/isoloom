@@ -1698,7 +1698,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "ISOLOOM_PUBLISH_FIXED",
-      "description": "Forward each published port from its own `publish` number on the host, instead of a free port the runner picks.",
+      "description": "Set: each published port takes its own `publish` number on the host, instead of a free one.",
       "values": [
         "1"
       ],

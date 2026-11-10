@@ -206,6 +206,36 @@ pub fn derived_switch(steps: Vec<StepId>) -> Result<Option<Param>, ManifestError
     }))
 }
 
+/// `ISOLOOM_PUBLISH_FIXED` ([`isoloom_manifest::contract::PUBLISH_FIXED`]), delivered to every
+/// step, when one of `machines` publishes a port: set, each published port takes its own
+/// `publish` number on the host instead of a free one. A program running the environment (to
+/// keep its own ports) may pass it whenever a port is published; it changes nothing for a port
+/// already `fixed`. `None` when no port is published.
+///
+/// # Errors
+///
+/// Fails on a name the manifest refuses (a bug: it is fixed).
+pub fn publish_fixed(machines: &[Machine]) -> Result<Option<Param>, ManifestError> {
+    if !machines.iter().flat_map(|m| &m.ports).any(|p| p.publish.is_some()) {
+        return Ok(None);
+    }
+    let name = isoloom_manifest::contract::PUBLISH_FIXED;
+    Ok(Some(Param {
+        name: EnvName::parse(name)?,
+        description: "Set: each published port takes its own `publish` number on the host, instead of a free one.".into(),
+        default: None,
+        values: vec!["1".into()],
+        required: false,
+        hosts: BTreeSet::new(),
+        providers: BTreeSet::new(),
+        set_by: SetBy::Embedder,
+        deliver: NonEmpty::one(Delivery::Env {
+            var: EnvName::parse(name)?,
+            steps: StepSelection::Every,
+        }),
+    }))
+}
+
 /// The derived checks' switch, as a runner reads it.
 pub const DERIVED: &str = isoloom_plan::checks::DERIVED;
 

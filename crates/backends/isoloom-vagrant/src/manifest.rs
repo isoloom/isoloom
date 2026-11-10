@@ -39,7 +39,7 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
         manifest_version: ManifestVersion,
         generator: run_manifest::generator()?,
         environment: run_manifest::environment(env)?,
-        params: slots::params(&runners)?,
+        params: slots::params(&machines, &runners)?,
         secrets: slots::slots(env, &lifecycle)?,
         networks: run_manifest::networks(env, |n| Template::text(&format!("isoloom-{}-{n}", env.name)))?,
         outputs: run_manifest::outputs_on_their_hosts(&machines)?,

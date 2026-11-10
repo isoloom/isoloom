@@ -66,7 +66,7 @@
     },
     {
       "name": "ISOLOOM_PUBLISH_FIXED",
-      "description": "Set: each published port takes its `publish:` number instead of an ephemeral one.",
+      "description": "Set: each published port takes its own `publish` number on the host, instead of a free one.",
       "values": [
         "1"
       ],

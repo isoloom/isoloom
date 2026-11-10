@@ -200,6 +200,28 @@ fn every_env_delivered_slot_has_a_value_or_a_default() -> Outcome {
     Ok(())
 }
 
+/// `ISOLOOM_PUBLISH_FIXED` is one param, declared alike by Compose and Vagrant when a port is
+/// published, and by neither when none is.
+#[test]
+fn compose_and_vagrant_declare_the_fixed_ports_switch_alike_and_only_when_a_port_is_published() -> Outcome {
+    let fixed = |yaml: &str, target: Target, path: &str| -> Outcome<Option<String>> {
+        let m = run_json(&generate(&lab(yaml)?, target).unwrap(), path)?;
+        let p = m.params.iter().find(|p| p.name.as_str() == isoloom_manifest::contract::PUBLISH_FIXED);
+        Ok(p.map(|p| serde_json::to_string(p).unwrap()))
+    };
+    let spec = |ports: &str| {
+        format!("version: 1\nname: p\nnetworks: {{ lan: {{ cidr: 10.30.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12{ports} }}\n")
+    };
+    let published = spec(", ports: { web: { port: 80, publish: 8080 } }");
+    let compose = fixed(&published, Target::Docker, ".isoloom/docker/run.json")?;
+    assert!(compose.is_some());
+    assert_eq!(compose, fixed(&published, Target::Vagrant, ".isoloom/vagrant/run.json")?);
+    let unpublished = spec(", ports: { web: 80 }");
+    assert_eq!(fixed(&unpublished, Target::Docker, ".isoloom/docker/run.json")?, None);
+    assert_eq!(fixed(&unpublished, Target::Vagrant, ".isoloom/vagrant/run.json")?, None);
+    Ok(())
+}
+
 /// An input's own `sensitive` reaches its slot: one the spec marks `false` is shown, one it says
 /// nothing of is masked.
 #[test]

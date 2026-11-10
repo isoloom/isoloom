@@ -119,7 +119,7 @@ pub(crate) fn esxi_host(r: &mut Ruby) {
     r.assign("v.esxi_hostname", Value::raw(settings::ESXI_HOSTNAME.fetch()));
     r.assign("v.esxi_hostport", Value::raw(format!("{}.to_i", settings::ESXI_HOSTPORT.fetch())));
     r.assign("v.esxi_username", Value::raw(settings::ESXI_USERNAME.fetch()));
-    r.assign("v.esxi_password", Value::str("env:ESXI_PASSWORD"));
+    r.assign("v.esxi_password", Value::str(&format!("env:{}", settings::ESXI_PASSWORD.name)));
     let store = settings::ESXI_DATASTORE.raw();
     r.assign_if("v.esxi_disk_store", Value::raw(&store), &store);
 }

@@ -7,17 +7,16 @@
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    CheckRunner, Delivery, EnvName, HostOs, Identifier, Lifecycle, Name, NonEmpty, Param, Provider, SecretSlot, SetBy, SlotKind, StepId, StepSelection,
+    CheckRunner, Delivery, EnvName, HostOs, Identifier, Lifecycle, Machine, Name, NonEmpty, Param, Provider, SecretSlot, SetBy, SlotKind, StepId, StepSelection,
 };
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::secret_variable;
 
-use isoloom_render::run_manifest::{derived_switch, held_secrets};
+use isoloom_render::run_manifest::{derived_switch, held_secrets, publish_fixed};
 
 use super::lifecycle::{PROVISION, PROVISION_MACHINE, UP};
 use crate::error::Result;
 use crate::settings::{self, Setting};
-use isoloom_manifest::contract;
 
 /// A param: what it is, its default, the values it takes, and whom it concerns.
 struct Wanted<'a> {
@@ -66,32 +65,16 @@ const ESXI: [(Setting, &str, bool); 5] = [
     ),
 ];
 
-/// The params the Vagrantfile reads, every step getting them; `ISOLOOM_DERIVED` only the check
-/// runners'.
-pub(super) fn params(runners: &[CheckRunner]) -> Result<Vec<Param>> {
-    let mut out = vec![hyperv_switch()?, publish_fixed()?];
+/// The params the Vagrantfile reads, every step getting them: whether the published ports of
+/// `machines` keep their own numbers when one is published (unset, the runner picks free host
+/// ports at the first start, so two environments forwarding one number never collide), and
+/// `ISOLOOM_DERIVED` only the check runners'.
+pub(super) fn params(machines: &[Machine], runners: &[CheckRunner]) -> Result<Vec<Param>> {
+    let mut out = vec![hyperv_switch()?];
+    out.extend(publish_fixed(machines)?);
     out.extend(remote_params()?);
     out.extend(derived_switch(runners.iter().map(|r| r.step.id.clone()).collect())?);
     Ok(out)
-}
-
-/// Whether each published port takes its own `publish:` number on the host instead of a free one
-/// the runner picks at the first start (an embedder's "use the lab's own ports" choice). Unset, the
-/// runner picks free ports, so two VM labs forwarding one number never collide.
-fn publish_fixed() -> Result<Param> {
-    param(
-        &Wanted {
-            name: contract::PUBLISH_FIXED,
-            description: "Forward each published port from its own `publish` number on the host, instead of a free port the runner picks.",
-            default: None,
-            values: &["1"],
-            required: false,
-            hosts: &[],
-            providers: &[],
-            set_by: SetBy::Embedder,
-        },
-        StepSelection::Every,
-    )
 }
 
 /// The Hyper-V switch the VMs' first adapter goes on.
@@ -209,7 +192,8 @@ pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<Secr
 
 /// The ESXi host's password, given to every step on `vmware_esxi`.
 pub(super) fn esxi_password() -> Result<SecretSlot> {
-    let mut password = slot("ESXI_PASSWORD", SlotKind::Connection, &[], env_var("ESXI_PASSWORD", StepSelection::Every)?)?;
+    let name = settings::ESXI_PASSWORD.name;
+    let mut password = slot(name, SlotKind::Connection, &[], env_var(name, StepSelection::Every)?)?;
     password.providers = BTreeSet::from([Provider::VmwareEsxi]);
     Ok(password)
 }
