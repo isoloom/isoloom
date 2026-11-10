@@ -54,7 +54,7 @@ jobs:
       - run: cargo test --workspace --locked
 
   # The engineering-standard ratchet (clean-code counts per crate against xtask/baselines/quality-baseline.json),
-  # the API docs, and every example validating.
+  # the fuzz targets' build, the API docs, and every example validating.
   quality:
     name: Quality ratchet, API docs and examples
     runs-on: ubuntu-24.04
@@ -71,6 +71,9 @@ jobs:
         with:
           tool: cargo-machete@0.9.2
       - run: cargo run -p xtask --locked -- quality
+      # The fuzz targets (a workspace of their own, outside the others' builds) still build
+      # against the crates' public items, formatted and lint-clean.
+      - run: cargo run -p xtask --locked -- fuzz --check
       # The API docs build without a warning (broken intra-doc links, bare URLs).
       - run: cargo doc --workspace --no-deps --locked
         env:
