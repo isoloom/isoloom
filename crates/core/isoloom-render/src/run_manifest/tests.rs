@@ -310,3 +310,17 @@ fn a_check_reports_its_kind_its_wait_and_whether_isoloom_derived_it() {
     assert_eq!((c.name.as_str(), c.wait_s, c.derived), ("c", 7, true));
     assert_eq!(NonZeroU32::new(timeout_s(&[])), NonZeroU32::new(60));
 }
+
+#[test]
+fn a_secret_slot_names_the_machines_of_its_shape_that_get_it_and_no_input_s_file() {
+    let env = testing::env(
+        "version: 1\nname: s\ninputs: [TOKEN]\nsecrets:\n  db: { env: DB }\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n    files: [{ path: /run/db, secret: db }, { path: /run/token, input: TOKEN }]\n  vm:\n    networks: { lan: 11 }\n    os: windows-server@2022\n    files: [{ path: 'C:\\db', secret: db }]\n",
+        Target::Hybrid,
+    );
+    let held = super::held_secrets(&env, isoloom_plan::MachineShape::Container);
+    let found: Vec<(&str, Vec<&str>)> = held.iter().map(|h| (h.name, h.holders.clone())).collect();
+    assert_eq!(found, [("db", vec!["web"])], "the input's file is left out");
+    assert_eq!(held.first().map(|h| h.source.reference.as_str()), Some("DB"));
+    let vms = super::held_secrets(&env, isoloom_plan::MachineShape::Vm);
+    assert_eq!(vms.iter().map(|h| h.holders.clone()).collect::<Vec<_>>(), [vec!["vm"]]);
+}

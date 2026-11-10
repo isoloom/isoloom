@@ -31,7 +31,7 @@ pub(super) fn of_file(env: &Environment) -> IndexMap<String, Secret> {
         .keys()
         .filter(|name| containers.iter().any(|m| m.secrets.iter().any(|s| &s.name == *name)))
         .map(|name| {
-            let environment = isoloom_render::secrets::compose_variable(env.spec(), name);
+            let environment = isoloom_render::secrets::compose_variable(env, name);
             (name.clone(), Secret { environment })
         })
         .collect()

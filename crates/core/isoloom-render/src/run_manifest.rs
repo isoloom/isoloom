@@ -16,7 +16,7 @@ use isoloom_manifest::{
     PublishMode, Role, Run, SetBy, SnakeName, Step, StepId, StepSelection, Template, Tool, ToolName, Version, When,
 };
 use isoloom_plan::checks::{Probe, Resolved};
-use isoloom_plan::{Environment, MachinePlan, PublishedPort};
+use isoloom_plan::{Environment, MachinePlan, MachineShape, PublishedPort};
 use isoloom_spec::model;
 
 /// Where the runner reads secret `source` when the embedder gives no value: its store and what
@@ -35,6 +35,37 @@ pub fn secret_source(source: &model::SecretSource) -> Option<isoloom_manifest::S
         store,
         reference: source.reference().to_owned(),
     })
+}
+
+/// A secret the runner reads from its store, and the machines of one shape that get it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeldSecret<'a> {
+    /// The secret's name.
+    pub name: &'a str,
+    /// Where the runner reads its value.
+    pub source: isoloom_manifest::SecretSource,
+    /// The machines of the shape that get it, in spec order.
+    pub holders: Vec<&'a str>,
+}
+
+/// Each secret of `env` the runner reads from a store ([`secret_source`]: an input's file is the
+/// input's own slot) that machines of `shape` get, with those machines: what a run manifest's
+/// secret slots are made of. A secret no such machine gets is left out.
+#[must_use]
+pub fn held_secrets(env: &Environment, shape: MachineShape) -> Vec<HeldSecret<'_>> {
+    env.secrets
+        .iter()
+        .filter_map(|(name, source)| {
+            let source = secret_source(source)?;
+            let holders: Vec<&str> = env
+                .machines
+                .iter()
+                .filter(|(_, m)| m.shape == shape && m.secrets.iter().any(|s| &s.name == name))
+                .map(|(n, _)| n.as_str())
+                .collect();
+            (!holders.is_empty()).then_some(HeldSecret { name, source, holders })
+        })
+        .collect()
 }
 
 /// What generated files and messages call the program that executes a run manifest: no

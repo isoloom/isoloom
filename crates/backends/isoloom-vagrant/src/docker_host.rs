@@ -36,7 +36,7 @@ pub(crate) fn set_up(r: &mut Ruby, env: &Environment, var: &str, outputs: &[&str
 /// decoded (they come in base64), the containers' secrets read once delivered, then `start`.
 pub(crate) fn start(r: &mut Ruby, env: &Environment, var: &str, name: &str, start: &str) {
     let inputs = &env.input_names();
-    let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
+    let secrets = isoloom_render::secrets::host_environment(env, &isoloom_render::secrets::of_containers(env));
     let script = format!("{}{secrets}{start}", values::linux_decode(inputs));
     let encoded = (!inputs.is_empty()).then(|| values::encoded(inputs));
     r.provision(shell(var, name).kw("inline", Value::str(&script)).kw_opt("env", encoded));

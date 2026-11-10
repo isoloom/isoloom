@@ -14,7 +14,8 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use indexmap::IndexMap;
 use isoloom_spec::images;
 use isoloom_spec::model::{
-    Arch, Boot, Constraints, External, HostFolder, Input, Machine, MachineFile, Network, Protocol, Resources, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
+    Arch, Boot, Constraints, External, HostFolder, Input, Machine, MachineFile, Network, Protocol, Resources, Seal, SecretSource, Spec, Target, Tc, Ulimit,
+    VmImage, Winrm,
 };
 use isoloom_spec::net::{NetworkBlock, docker_cidrs};
 use isoloom_spec::windows::{self, Tpm};
@@ -72,6 +73,9 @@ pub struct Environment {
     /// The launch values it reads (`inputs`), in spec order, each with whether it is sensitive:
     /// names only, never values.
     pub inputs: Vec<Input>,
+    /// The secrets, by name, each with where the runner reads its value (an input's file: the
+    /// input), in spec order: never their values.
+    pub secrets: IndexMap<String, SecretSource>,
     /// What the environment asks of the backend rendering it.
     pub requirements: Vec<Requirement>,
     /// The image references to pull, through the registry mirrors.
@@ -360,6 +364,7 @@ impl Environment {
             controller: Controller::needed(&laid_out).then(|| Controller::of(&laid_out)),
             constraints: laid_out.constraints.clone(),
             inputs: laid_out.inputs.clone(),
+            secrets: laid_out.secrets.clone(),
             requirements,
             images: Images::of(&laid_out),
             inventory_groups: ansible::groups(&laid_out),

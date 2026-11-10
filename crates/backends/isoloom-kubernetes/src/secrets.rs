@@ -118,7 +118,7 @@ pub(crate) fn mounts(m: &Machine) -> Vec<VolumeMount> {
 
 /// The usage line saying how the Secret comes to be, when a machine gets secrets.
 pub(crate) fn usage(env: &Environment, namespace: &str) -> Option<String> {
-    let names: Vec<&String> = env.spec().secrets.keys().collect();
+    let names: Vec<&String> = env.secrets.keys().collect();
     if env.machines.values().all(|m| m.secrets.is_empty()) || names.is_empty() {
         return None;
     }

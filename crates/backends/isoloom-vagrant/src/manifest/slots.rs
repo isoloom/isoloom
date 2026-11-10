@@ -9,10 +9,10 @@ use std::collections::BTreeSet;
 use isoloom_manifest::{
     CheckRunner, Delivery, EnvName, HostOs, Identifier, Lifecycle, Name, NonEmpty, Param, Provider, SecretSlot, SetBy, SlotKind, StepId, StepSelection,
 };
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::secret_variable;
 
-use isoloom_render::run_manifest::derived_switch;
+use isoloom_render::run_manifest::{derived_switch, held_secrets};
 
 use super::lifecycle::{PROVISION, PROVISION_MACHINE, UP};
 use crate::error::Result;
@@ -183,8 +183,7 @@ fn provisioning(lifecycle: &Lifecycle) -> Result<StepSelection> {
 /// The slots: each input a VM reads (as its environment or a file; delivered empty when left
 /// out), each secret a VM gets (from its store), and ESXi's password.
 pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<SecretSlot>> {
-    let spec = env.spec();
-    let vms: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == isoloom_plan::MachineShape::Vm).collect();
+    let vms: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Vm).collect();
     let mut out = Vec::new();
     for input in &env.inputs {
         let readers: Vec<&str> = vms.iter().filter(|(_, m)| m.reads_input(&input.name)).map(|(n, _)| n.as_str()).collect();
@@ -198,20 +197,10 @@ pub(super) fn slots(env: &Environment, lifecycle: &Lifecycle) -> Result<Vec<Secr
         s.default = Some(String::new());
         out.push(s);
     }
-    for (name, source) in &spec.secrets {
-        let Some(source) = isoloom_render::run_manifest::secret_source(source) else {
-            continue;
-        };
-        let holders: Vec<&str> = vms
-            .iter()
-            .filter(|(_, m)| m.secrets.iter().any(|s| &s.name == name))
-            .map(|(n, _)| n.as_str())
-            .collect();
-        if holders.is_empty() {
-            continue;
-        }
-        let mut s = slot(name, SlotKind::Secret, &holders, env_var(&secret_variable(name), provisioning(lifecycle)?)?)?;
-        s.source = Some(source);
+    for held in held_secrets(env, MachineShape::Vm) {
+        let deliver = env_var(&secret_variable(held.name), provisioning(lifecycle)?)?;
+        let mut s = slot(held.name, SlotKind::Secret, &held.holders, deliver)?;
+        s.source = Some(held.source);
         out.push(s);
     }
     out.push(esxi_password()?);

@@ -139,12 +139,12 @@ fn the_wait_passes_once_delivered() {
 #[cfg(unix)]
 #[test]
 fn a_docker_host_reads_each_kept_value_into_its_variable() {
-    let spec = testing::spec(LAB);
-    assert_eq!(host_environment(&spec, &[]), "");
+    let env = testing::env(LAB, Target::Hybrid);
+    assert_eq!(host_environment(&env, &[]), "");
     let names = vec!["db-password".to_owned()];
     let script = format!(
         "mkdir -p {KEPT_DIR} && printf 'v\\n\\n' > {KEPT_DIR}/db-password && touch {DELIVERED}\n{}printf '%s|' \"$ISOLOOM_SECRET_DB_PASSWORD\"",
-        host_environment(&spec, &names)
+        host_environment(&env, &names)
     );
     let (out, dir) = run(&script, "", "host");
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
@@ -165,9 +165,9 @@ fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
 fn a_docker_host_gets_the_secrets_of_its_containers_in_the_spec_s_order() {
     let env = testing::env(LAB, Target::Hybrid);
     assert_eq!(of_containers(&env), ["db-password", "input-demo-secret"]);
-    assert_eq!(compose_variable(env.spec(), "db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
+    assert_eq!(compose_variable(&env, "db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
     assert_eq!(
-        compose_variable(env.spec(), "input-demo-secret"),
+        compose_variable(&env, "input-demo-secret"),
         "DEMO_SECRET",
         "an input's file reads the input itself"
     );

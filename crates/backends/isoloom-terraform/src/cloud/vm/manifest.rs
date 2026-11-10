@@ -10,8 +10,8 @@ use std::net::IpAddr;
 
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SecretSlot, SnakeName, Template};
-use isoloom_plan::{Environment, Vm};
-use isoloom_render::run_manifest::{outputs_with, timeout_s};
+use isoloom_plan::{Environment, MachineShape, Vm};
+use isoloom_render::run_manifest::{held_secrets, outputs_with, timeout_s};
 
 use crate::module::manifest::terraform_output as state;
 use isoloom_spec::model::Target;
@@ -168,21 +168,10 @@ fn inputs(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
 /// stays out of the state. Owners are the machine's set-up's business (its `Secrets` step places
 /// the file). An input's file is the input's own slot.
 fn machine_secrets(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
-    let spec = env.spec();
     let mut out = Vec::new();
-    for (name, source) in &spec.secrets {
-        let Some(source) = isoloom_render::run_manifest::secret_source(source) else {
-            continue;
-        };
-        let readers: Vec<Name> = env
-            .vms()
-            .filter(|Vm { plan: mp, .. }| mp.secrets.iter().any(|s| &s.name == name))
-            .map(|Vm { name: n, .. }| Name::parse(n))
-            .collect::<Result<_, _>>()?;
-        if readers.is_empty() {
-            continue;
-        }
-        out.push(connection::guest_secret(name, source, &readers)?);
+    for held in held_secrets(env, MachineShape::Vm) {
+        let readers: Vec<Name> = held.holders.iter().map(|n| Name::parse(n)).collect::<Result<_, _>>()?;
+        out.push(connection::guest_secret(held.name, held.source, &readers)?);
     }
     Ok(out)
 }

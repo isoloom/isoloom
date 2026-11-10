@@ -12,6 +12,7 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::secret_variable;
 
 use isoloom_render::container::project_variables;
+use isoloom_render::run_manifest::held_secrets;
 
 use super::lifecycle::{job_step, owner};
 use super::machines::Member;
@@ -117,19 +118,15 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, sta
             out.push(s);
         }
     }
-    for (name, source) in &env.spec().secrets {
-        let Some(source) = isoloom_render::run_manifest::secret_source(source) else {
-            continue;
-        };
-        let holders: Vec<&str> = containers
-            .iter()
-            .filter(|(_, m)| m.secrets.iter().any(|s| &s.name == name))
-            .map(|(n, _)| n.as_str())
-            .collect();
-        if !holders.is_empty() {
-            let var = secret_variable(name);
-            out.push(slot(name, SlotKind::Secret, Some(source), &var, reach(&holders, members, plan, starts)?)?);
-        }
+    for held in held_secrets(env, MachineShape::Container) {
+        let var = secret_variable(held.name);
+        out.push(slot(
+            held.name,
+            SlotKind::Secret,
+            Some(held.source),
+            &var,
+            reach(&held.holders, members, plan, starts)?,
+        )?);
     }
     if starts == Starts::Guest {
         return Ok(out);

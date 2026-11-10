@@ -11,7 +11,7 @@
 
 use isoloom_plan::secrets::VM_DEFAULT_MODE;
 use isoloom_plan::{Environment, MachineShape, SecretFile};
-use isoloom_spec::model::{SecretSource, Spec, secret_variable};
+use isoloom_spec::model::{SecretSource, secret_variable};
 use isoloom_spec::shell::quote;
 
 use crate::boot;
@@ -124,8 +124,8 @@ pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> St
 /// The variable the Compose file reads secret `name` from: an input's file, the input's own
 /// variable; a secret, `ISOLOOM_SECRET_<NAME>`.
 #[must_use]
-pub fn compose_variable(spec: &Spec, name: &str) -> String {
-    match spec.secrets.get(name) {
+pub fn compose_variable(env: &Environment, name: &str) -> String {
+    match env.secrets.get(name) {
         Some(SecretSource::Input { input }) => input.clone(),
         _ => secret_variable(name),
     }
@@ -133,8 +133,8 @@ pub fn compose_variable(spec: &Spec, name: &str) -> String {
 
 /// The name secret `name`'s value is kept under on a machine: an input's file, the input's own
 /// name; a secret, its name (as [`SecretFile::kept`]).
-fn kept_name<'a>(spec: &'a Spec, name: &'a str) -> &'a str {
-    match spec.secrets.get(name) {
+fn kept_name<'a>(env: &'a Environment, name: &'a str) -> &'a str {
+    match env.secrets.get(name) {
         Some(SecretSource::Input { input }) => input,
         _ => name,
     }
@@ -144,15 +144,15 @@ fn kept_name<'a>(spec: &'a Spec, name: &'a str) -> &'a str {
 /// variable the Compose file reads it from ([`compose_variable`]), its last line breaks kept.
 /// Nothing when there are none.
 #[must_use]
-pub fn host_environment(spec: &Spec, names: &[String]) -> String {
+pub fn host_environment(env: &Environment, names: &[String]) -> String {
     if names.is_empty() {
         return String::new();
     }
     let read: String = names
         .iter()
         .map(|name| {
-            let var = compose_variable(spec, name);
-            let kept = kept_name(spec, name);
+            let var = compose_variable(env, name);
+            let kept = kept_name(env, name);
             format!("{var}=\"$(cat {KEPT_DIR}/{kept}; printf x)\"; {var}=\"${{{var}%x}}\"; export {var}\n")
         })
         .collect::<Vec<_>>()
