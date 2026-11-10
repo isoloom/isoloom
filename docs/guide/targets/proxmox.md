@@ -1,7 +1,7 @@
 # Proxmox VE: `proxmox` and `docker-vm` on Proxmox
 
 The `proxmox` target writes a Terraform module (`.isoloom/proxmox/main.tf`, provider
-`bpg/proxmox ~> 0.115.0`) that makes one VM per machine on a Proxmox VE server, with an SDN zone
+`bpg/proxmox ~> 0.116.1`) that makes one VM per machine on a Proxmox VE server, with an SDN zone
 and VNet per network, a resource pool, a router VM (between the networks, by the `reach` rules,
 and out to the internet), and Proxmox firewall rules. `docker-vm` can also put its single Docker VM on Proxmox
 (`.isoloom/docker-vm/proxmox/`). Both write a run manifest.

@@ -53,9 +53,12 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
 ///
 /// - **An IP set** (`proxmox_virtual_environment_firewall_ipset`, the cluster's, by name): its
 ///   delete reads its entries first, and Proxmox answers `no such IPSet '<name>'`.
-/// - **A container** (`proxmox_virtual_environment_container`): its delete looks for it on every
-///   node of the cluster, then reads its status on the node it is on, else on the state's, where
-///   Proxmox answers that its configuration file doesn't exist only when no node has it.
+/// - **A VM** (`proxmox_virtual_environment_vm`) and **a container**
+///   (`proxmox_virtual_environment_container`): the delete looks for it on every node of the
+///   cluster, then reads its status on the node it is on, else on the state's, where Proxmox
+///   answers that its configuration file doesn't exist only when no node has it. (A VM's delete
+///   looks across the cluster from bpg/proxmox 0.116.1: before, a VM moved to another node gave
+///   the same answer.)
 pub(super) fn gone() -> Result<Vec<GoneError>, ManifestError> {
     let gone = |resource: &str, error: &str| {
         Ok(GoneError {
@@ -65,6 +68,10 @@ pub(super) fn gone() -> Result<Vec<GoneError>, ManifestError> {
     };
     vec![
         gone("proxmox_virtual_environment_firewall_ipset", "no such IPSet '{id}'"),
+        gone(
+            "proxmox_virtual_environment_vm",
+            "Configuration file 'nodes/{node_name}/qemu-server/{id}.conf' does not exist",
+        ),
         gone(
             "proxmox_virtual_environment_container",
             "Configuration file 'nodes/{node_name}/lxc/{id}.conf' does not exist",

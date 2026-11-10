@@ -166,7 +166,7 @@ needs each target's tools ([tool versions](docs/reference/tool-versions.md)):
 - **Terraform 1.6** or later for the clouds, Proxmox and ESXi, with the
   providers the modules pin (`hashicorp/aws ~> 6.67.0`, `hashicorp/azurerm ~> 5.8.0`,
   `hashicorp/google ~> 8.5.0`, `digitalocean/digitalocean ~> 2.103.0`, `linode/linode ~> 4.7.0`,
-  `oracle/oci ~> 9.8.0`, `bpg/proxmox ~> 0.115.0`, `josenk/esxi ~> 1.10.3`);
+  `oracle/oci ~> 9.8.0`, `bpg/proxmox ~> 0.116.1`, `josenk/esxi ~> 1.10.3`);
 - `kubectl` or Helm, and a network plugin that enforces NetworkPolicies: `kubernetes`;
 - Ansible: `external`.
 

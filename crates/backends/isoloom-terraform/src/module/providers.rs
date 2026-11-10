@@ -55,7 +55,7 @@ pub(crate) const OCI: Provider = Provider {
 pub(crate) const PROXMOX: Provider = Provider {
     name: "proxmox",
     source: "bpg/proxmox",
-    version: "~> 0.115.0",
+    version: "~> 0.116.1",
 };
 /// Standalone ESXi hosts.
 pub(crate) const ESXI: Provider = Provider {

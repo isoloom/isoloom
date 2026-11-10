@@ -108,7 +108,7 @@ type in the state. An instance whose text one of the destroy's lines holds is go
 drops it from the state (`terraform state rm`), says which, and destroys again; any other
 failure stays the `down`'s. The text names one instance, by its own attributes, in its
 provider's words, so a resource that might still exist is never forgotten. The Proxmox
-manifests name bpg/proxmox's IP set and container.
+manifests name bpg/proxmox's IP set, VM and container.
 
 ## The checks
 

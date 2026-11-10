@@ -48,6 +48,10 @@
           "error": "no such IPSet '{id}'"
         },
         {
+          "resource": "proxmox_virtual_environment_vm",
+          "error": "Configuration file 'nodes/{node_name}/qemu-server/{id}.conf' does not exist"
+        },
+        {
           "resource": "proxmox_virtual_environment_container",
           "error": "Configuration file 'nodes/{node_name}/lxc/{id}.conf' does not exist"
         }

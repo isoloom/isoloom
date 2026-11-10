@@ -42,7 +42,7 @@ reaches you only through a new Isoloom release, after the modules are validated 
 | DigitalOcean | `digitalocean/digitalocean` | `~> 2.103.0` | on DigitalOcean |
 | Linode | `linode/linode` | `~> 4.7.0` | on Linode |
 | Oracle Cloud | `oracle/oci` | `~> 9.8.0` | on Oracle Cloud |
-| Proxmox VE | `bpg/proxmox` | `~> 0.115.0` | `proxmox`, `docker-vm` on Proxmox |
+| Proxmox VE | `bpg/proxmox` | `~> 0.116.1` | `proxmox`, `docker-vm` on Proxmox |
 | ESXi | `josenk/esxi` | `~> 1.10.3` | `esxi` |
 | TLS | `hashicorp/tls` | `~> 4.4.1` | the controller's SSH key |
 | Random | `hashicorp/random` | `~> 3.9.1` | Windows machines' and Linode's root passwords |

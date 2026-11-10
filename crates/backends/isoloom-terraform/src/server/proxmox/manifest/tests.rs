@@ -64,6 +64,10 @@ fn the_manifest_names_the_providers_errors_for_a_resource_already_gone() {
         [
             ("proxmox_virtual_environment_firewall_ipset", "no such IPSet '{id}'"),
             (
+                "proxmox_virtual_environment_vm",
+                "Configuration file 'nodes/{node_name}/qemu-server/{id}.conf' does not exist"
+            ),
+            (
                 "proxmox_virtual_environment_container",
                 "Configuration file 'nodes/{node_name}/lxc/{id}.conf' does not exist"
             ),
