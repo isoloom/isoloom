@@ -170,6 +170,28 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   refused, and so are Isoloom's own keys in any case (`Managed-By`). Library: the tags' forms
   are `isoloom_spec::tags` (was `isoloom_render::tags`).
 
+- **Breaking: `external` refuses a check its hosts can't run**: a project script or an Ansible
+  playbook (an existing host has no copy of the project), and a check with no host to run from (no
+  `from:` and no access machine). It wrote the runners without them, so they never ran, while the
+  matrix showed ✓; the matrix now shows them refused there.
+- **Breaking: `isoloom report services` is gone**: it was a hidden name of `isoloom report ports`.
+- **Breaking (library): one place decides a target's refusals.** `isoloom_targets::backend` is
+  total (every target has one) and `GenerateError::NoGenerator` is removed;
+  `isoloom_vagrant::disk_refusal` is part of `provider_refusal`; `refusal_on` also takes a cloud on
+  `cloud-vm` (`aws`); `GenerateError::Instance` reports an instance that can't be made, not a
+  refusal. `isoloom_spec::profile::list` returns a `Result<Listed>` (`names`, and the `skipped`
+  files whose name isn't kebab-case). `isoloom_render::steps::Archive::File` is
+  `Archive::Uploaded` (the fixed `PROJECT_ARCHIVE`), beside `windows_project_unpack`.
+  `isoloom_import::NoteKind::NotYet` is `NotInSpec`, `isoloom_catalogue::OsFamily` is
+  `DistroName`, and render's `constraints::{trust_linux, trust_windows}`,
+  `container::CHECK_RUNNER_PREFIX`, `HostSize::MIN_MEMORY_MB` and `windows::COMPUTER_NAME_MAX` are
+  crate-internal. `isoloom_spec::model::Spec::inputs` is a list of `Input` (its `name` and whether
+  it is `sensitive`), and `Spec::plain_inputs` is removed; the plan carries the inputs, the
+  secrets, each machine's role, the tools with their addresses and the constraints
+  (`Environment::{inputs, secrets, tools, constraints}`, `MachinePlan::role`), and
+  `isoloom_render::constraints::build_args` is removed. `isoloom_spec::validate::kebab` is
+  `isoloom_manifest::is_kebab` (at most `KEBAB_MAX`, 63, characters).
+
 ### Added
 
 - **The run manifest's `identity.terraform.gone`**: the errors a Terraform module's providers
@@ -477,6 +499,39 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`external`'s `requirements.yml` installs**: it names a collection by its archive's URL with
+  `type: url`, the form `ansible-galaxy collection install -r` takes (a `source:` was read as a
+  Galaxy server, and the install failed). Galaxy checks no hash of such an archive, so the file
+  gives the catalogue's pinned SHA-256 in a comment, and the external guide says how to check the
+  archive before installing it.
+- **`resolved.json` and `isoloom targets` give one reason a target isn't possible**: a spec with
+  `cloud:` says cloud services run on `cloud-services` only, one without says `cloud-services`
+  needs `cloud:`, and "left out by `targets:`" only when the spec has `targets:`.
+- **ESXi's run manifest names no set-up log**: on ESXi Terraform sets the machines up over SSH,
+  and the ready files named cloud-init's log, which holds only the router's.
+- **`import compose` notes a GPU device after the first** (a machine has one GPU request) and a
+  `count` that is neither a number nor `all`, instead of keeping the last device and every GPU.
+- **`isoloom profiles` warns about a file it skips** (a name that isn't kebab-case), and a profiles
+  folder it can't read is an error, not no profile; an `ISOLOOM_PROFILE` that isn't text is an
+  error instead of running without the profile.
+- **The Docker host's `setup.sh` says it is piped into `sh -s` as root**, as on Linode's root
+  login, and the docs give the order the runner follows: the project, then Docker.
+- **The external docs say Windows hosts are reached over SSH** (OpenSSH on Windows, PowerShell), as
+  the inventory reaches them, not over WinRM.
+- **A Windows VM's administrator is put in the Administrators group by its SID on AWS too**, which
+  works on a Windows image of any language, and only once the user is there; AWS's WinRM set-up is
+  the servers' (one `isoloom winrm` firewall rule, each rule made once).
+- **Vagrant unpacks the project as every target does**: as root, the old copy removed first, the
+  files root's, the archive removed after.
+- **The run manifest's `Cidr` is a block**: an address with bits past the prefix (`10.30.0.1/24`)
+  is refused, and the schema's pattern refuses a prefix past the address's width (`/999`).
+- **"environment", not "lab", in the generated files left**: Hyper-V's Linux VMs set their
+  addresses with `/etc/isoloom/env-net.sh` (`isoloom-env-net.service`), and a Cisco appliance's
+  IOS domain is the environment's private DNS domain, `<name>.internal` unless `dns.private` sets
+  one.
+- **What the code says states facts, not a roadmap**: no "(yet)" in the `cloud:` validation
+  message or a Compose draft's header; a test holds every string literal of the sources to it.
+  ESXi's `images` variable gives its default OVAs' SHA-256, which its provider checks none of.
 - **A Proxmox lab whose server lost one of its resources can be destroyed.** The `down` runs
   `terraform destroy` without a refresh (a refresh waits on a router whose guest agent never ran),
   so a resource the server no longer has (a host reset after an apply cut short) reaches
