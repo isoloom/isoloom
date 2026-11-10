@@ -426,6 +426,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   too.
 - **`CheckLine::parse` drops the spaces after a FAIL line's name, as after a PASS line's.**
   `isoloom-check: FAIL web  ` read the name `web  `.
+- **Generating every target fails when two targets write one path with other contents.**
+  `generate_all` (and so `isoloom generate` and `check` without `--target`) kept the first
+  target's file and dropped the later one without a word; it now leaves that target out with an
+  internal error, which fails the command. A file two targets write the same (the `docker`
+  target's Compose file, which `docker-vm` runs) is still written once.
 - **Every command that reads the environment reads it as `generate` does.** `targets`,
   `validate`, `resources` and `profiles` took neither `--images` nor `-s`, and `graph`, `report`,
   `message` and `inspect` took `-s` but not `--images`: with an image table, `isoloom targets`

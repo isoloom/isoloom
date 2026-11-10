@@ -58,26 +58,40 @@ pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
     let mut files: Vec<GeneratedFile> = Vec::new();
     let mut skipped = Vec::new();
     for target in lab.possible() {
-        match target_files(lab, target, None) {
-            Ok(own) => {
-                let first = files.is_empty();
-                for file in own {
-                    if !files.iter().any(|x| x.path == file.path) {
-                        files.push(file);
-                    }
-                }
-                // The resolved snapshot (it asks each target whether it refuses the lab) and the
-                // .gitignore are the same for every target: written once, after the first
-                // target's files.
-                if first {
-                    files.push(resolved::file(lab));
-                    files.push(gitignore::file());
-                }
+        match target_files(lab, target, None).and_then(|own| added(&mut files, target, own)) {
+            // The resolved snapshot (it asks each target whether it refuses the lab) and the
+            // .gitignore are the same for every target: written once, after the first target's
+            // files.
+            Ok(true) => {
+                files.push(resolved::file(lab));
+                files.push(gitignore::file());
             }
+            Ok(false) => {}
             Err(e) => skipped.push(e),
         }
     }
     (files, skipped)
+}
+
+/// Adds `target`'s files (`own`) to the earlier targets' (`files`), each path once (a file an
+/// earlier target wrote the same is theirs), and says whether they are the first target's. A
+/// file at an earlier target's path with other contents would replace it, a bug of one of the two
+/// backends: an error, and none of `own` is added.
+fn added(files: &mut Vec<GeneratedFile>, target: Target, own: Vec<GeneratedFile>) -> std::result::Result<bool, GenerateError> {
+    if let Some(clash) = own.iter().find(|f| files.iter().any(|x| x.path == f.path && x.contents != f.contents)) {
+        return Err(GenerateError::Internal {
+            target,
+            what: format!("`{}` is an earlier target's file, with other contents", clash.path),
+            source: std::sync::Arc::new(WrittenTwice),
+        });
+    }
+    let first = files.is_empty();
+    for file in own {
+        if !files.iter().any(|x| x.path == file.path) {
+            files.push(file);
+        }
+    }
+    Ok(first)
 }
 
 /// The project's own files the generated ones copy, read from the project folder `dir`: when
@@ -151,7 +165,8 @@ fn assembled(
     }
 }
 
-/// Two of a target's files at one path, the second of which would replace the first.
+/// Two generated files at one path, the second of which would replace the first: two of a
+/// target's, or two targets' with other contents.
 #[derive(Debug, thiserror::Error)]
 #[error("two generated files at one path")]
 struct WrittenTwice;
@@ -217,6 +232,30 @@ mod tests {
                 .unwrap_or_default();
             assert!(e.contains("twice"), "{e}");
         }
+    }
+
+    #[test]
+    fn a_path_two_targets_write_is_theirs_once_or_an_error() {
+        let mut files = Vec::new();
+        assert!(matches!(
+            added(&mut files, Target::Docker, vec![GeneratedFile::new(".isoloom/docker/compose.yml", "a")]),
+            Ok(true)
+        ));
+        // The same file again (docker-vm runs the docker target's Compose file): kept once.
+        let same = vec![
+            GeneratedFile::new(".isoloom/docker/compose.yml", "a"),
+            GeneratedFile::new(".isoloom/docker-vm/Vagrantfile", "v"),
+        ];
+        assert!(matches!(added(&mut files, Target::DockerVm, same), Ok(false)));
+        assert_eq!(files.len(), 2);
+        // Other contents at that path would replace it: an error, and nothing of the target added.
+        let other = vec![
+            GeneratedFile::new(".isoloom/hybrid/Vagrantfile", "h"),
+            GeneratedFile::new(".isoloom/docker/compose.yml", "b"),
+        ];
+        let e = added(&mut files, Target::Hybrid, other).err().map(|e| e.to_string()).unwrap_or_default();
+        assert!(e.contains("`.isoloom/docker/compose.yml` is an earlier target's file"), "{e}");
+        assert_eq!(files.len(), 2);
     }
 
     fn at(path: &str) -> GeneratedFile {
