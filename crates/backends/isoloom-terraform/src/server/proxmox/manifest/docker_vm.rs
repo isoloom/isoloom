@@ -6,13 +6,12 @@
 //! and the containers' states are read inside it. A server lab isn't parked: it is made or
 //! destroyed.
 
-use isoloom_manifest::{Driver, Error as ManifestError, Lifecycle, Manifest, ManifestVersion, Placeholder, RelPath, SCHEMA_URL, SnakeName, Template};
+use isoloom_manifest::{Error as ManifestError, Lifecycle, Manifest, Placeholder, RelPath, SnakeName, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 
 use crate::docker_host::{docker_host_outputs, into_vm};
 use crate::ssh::Login;
-use isoloom_render::run_manifest::{self, environment, generator};
 use isoloom_spec::model::Target;
 
 use super::super::docker_host::{SETUP, USER, variables};
@@ -51,15 +50,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
     let mut secrets = slots::connection(&vars)?;
     secrets.extend(guest.slots.iter().cloned());
     let lifecycle = lifecycle(guest, &login)?;
-    Ok(Manifest {
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: generator()?,
-        environment: environment(env)?,
-        target: isoloom_manifest::Target::DockerVm,
-        cloud: None,
-        driver: Driver::Terraform,
-        hosts: run_manifest::every_host(),
+    crate::module::manifest::Body {
         tools: tools()?,
         identity: runner_identity(super::gone()?)?,
         params,
@@ -73,7 +64,8 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
         recovery: None,
         expiry: None,
         guest: Some(host.guest),
-    })
+    }
+    .manifest(env, isoloom_manifest::Target::DockerVm, None)
 }
 
 /// Terraform makes the VM (`init`, `apply`), then it is readied over SSH ([`into_vm`]) and Compose

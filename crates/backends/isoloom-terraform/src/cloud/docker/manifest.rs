@@ -10,13 +10,12 @@
 //! secrets carried in over SSH (`SendEnv`). The published ports answer at the VM's address, and
 //! the runner reads the containers inside it (`Manifest.guest`).
 
-use isoloom_manifest::{Driver, Error as ManifestError, Manifest, ManifestVersion, Placeholder, RelPath, SCHEMA_URL, SnakeName, Step, Template};
+use isoloom_manifest::{Error as ManifestError, Manifest, Placeholder, RelPath, SnakeName, Step, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::guest::GuestCompose;
 
 use crate::docker_host::{accept_env, docker_host_outputs, into_vm};
 use crate::ssh::Login;
-use isoloom_render::run_manifest::{environment, generator};
 
 use super::super::Cloud;
 use super::super::manifest::{self, connection, steps};
@@ -48,15 +47,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
     let mut secrets = connection::slots(cloud, connection::terraform_steps(false))?;
     secrets.extend(guest.slots.iter().cloned());
     let outputs = docker_host_outputs(&guest_machines)?;
-    Ok(Manifest {
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: generator()?,
-        environment: environment(env)?,
-        target: isoloom_manifest::Target::CloudDocker,
-        cloud: Some(manifest::cloud_of(cloud)),
-        driver: Driver::Terraform,
-        hosts: isoloom_render::run_manifest::every_host(),
+    crate::module::manifest::Body {
         tools: manifest::tools()?,
         identity: crate::module::manifest::runner_identity(Vec::new())?,
         params,
@@ -72,7 +63,8 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         recovery: manifest::recovery()?,
         expiry: manifest::expiry()?,
         guest: Some(host.guest),
-    })
+    }
+    .manifest(env, isoloom_manifest::Target::CloudDocker, Some(manifest::cloud_of(cloud)))
 }
 
 /// The `up` steps: Terraform's lock, init and apply, then the runner installs Docker and copies

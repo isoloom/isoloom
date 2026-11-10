@@ -17,11 +17,10 @@ pub(crate) mod connection;
 pub(crate) mod steps;
 
 use isoloom_manifest::{
-    CheckRunner, Checks, Driver, Error as ManifestError, Expiry, ExpiryUnit, Machine, Manifest, ManifestVersion, Output, Recovery, Retries, SCHEMA_URL,
-    SecretSlot, SnakeName, Tool, Version,
+    CheckRunner, Error as ManifestError, Expiry, ExpiryUnit, Machine, Manifest, Output, Recovery, Retries, SecretSlot, SnakeName, Tool, Version,
 };
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::{argv, environment, generator, networks, tool};
+use isoloom_render::run_manifest::{argv, networks, tool};
 
 use super::Cloud;
 use crate::module::manifest::DEFAULT_LIFE_MIN;
@@ -57,15 +56,7 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
     params.extend(steps::derived(&frame.runners)?);
     let mut secrets = connection::slots(frame.cloud, connection::terraform_steps(sealed))?;
     secrets.extend(frame.slots);
-    Ok(Manifest {
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: generator()?,
-        environment: environment(env)?,
-        target: frame.target,
-        cloud: Some(cloud_of(frame.cloud)),
-        driver: Driver::Terraform,
-        hosts: isoloom_render::run_manifest::every_host(),
+    crate::module::manifest::Body {
         tools: tools()?, // Terraform and ssh.
         identity: crate::module::manifest::runner_identity(Vec::new())?,
         params,
@@ -75,16 +66,12 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
         outputs: frame.outputs,
         lifecycle: steps::lifecycle(&frame.guests, sealed)?,
         ready: steps::ready(&frame.guests)?,
-        checks: Checks {
-            protocol: isoloom_manifest::CheckProtocol::V1,
-            setup: Vec::new(),
-            runners: frame.runners,
-            teardown: Vec::new(),
-        },
+        checks: crate::module::manifest::checks(frame.runners),
         recovery: recovery()?,
         expiry: expiry()?,
         guest: None,
-    })
+    }
+    .manifest(env, frame.target, Some(cloud_of(frame.cloud)))
 }
 
 /// A cloud's recovery: one more apply after a failed one, for a cloud's eventual consistency (an

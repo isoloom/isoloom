@@ -20,9 +20,9 @@ mod machines;
 pub(super) mod slots;
 pub(super) mod steps;
 
-use isoloom_manifest::{Checks, Driver, Error as ManifestError, GoneError, Manifest, ManifestVersion, SCHEMA_URL, Template, Tool, Version};
+use isoloom_manifest::{Error as ManifestError, GoneError, Manifest, Template, Tool, Version};
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::{self, environment, generator};
+use isoloom_render::run_manifest::{self};
 use isoloom_spec::model::Target;
 
 use crate::Error;
@@ -61,15 +61,7 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
     let runners = steps::runners(env)?;
     let machines = machines::machines(env)?;
     let sealed = crate::seal::any(env);
-    Ok(Manifest {
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: generator()?,
-        environment: environment(env)?,
-        target: server.names,
-        cloud: None,
-        driver: Driver::Terraform,
-        hosts: run_manifest::every_host(),
+    crate::module::manifest::Body {
         tools: (server.tools)()?,
         identity: crate::module::manifest::runner_identity((server.gone)()?)?,
         params: slots::params(&server.variables, server.private_key, &runners, sealed)?,
@@ -79,16 +71,12 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
         machines,
         lifecycle: steps::lifecycle(server.private_key, sealed)?,
         ready: steps::ready(env, server.applied, server.setup_log)?,
-        checks: Checks {
-            protocol: isoloom_manifest::CheckProtocol::V1,
-            setup: Vec::new(),
-            runners,
-            teardown: Vec::new(),
-        },
+        checks: crate::module::manifest::checks(runners),
         recovery: None,
         expiry: None,
         guest: None,
-    })
+    }
+    .manifest(env, server.names, None)
 }
 
 /// Terraform, at the oldest release every module Isoloom writes takes.

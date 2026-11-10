@@ -20,12 +20,12 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    Action, Argv, Checks, Condition, Delivery, Driver, EnvName, Error as ManifestError, Expiry, ExpiryUnit, HostArgv, Identifier, Identity, Lifecycle,
-    Manifest, ManifestVersion, NonEmpty, Output, OutputRole, OutputSource, Part, Placeholder, Program, Recovery, RelPath, Retries, Run, RunVar, SCHEMA_URL,
-    SecretSlot, SlotKind, SnakeName, StateFileFormat, StateOwner, Step, StepId, Template, TerraformIdentity, Tool, ToolName,
+    Action, Argv, Condition, Delivery, EnvName, Error as ManifestError, Expiry, ExpiryUnit, HostArgv, Identifier, Identity, Lifecycle, Manifest, NonEmpty,
+    Output, OutputRole, OutputSource, Part, Placeholder, Program, Recovery, RelPath, Retries, Run, RunVar, SecretSlot, SlotKind, SnakeName, StateFileFormat,
+    StateOwner, Step, StepId, Template, TerraformIdentity, Tool, ToolName,
 };
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::{argv, environment, generator, noted, tool};
+use isoloom_render::run_manifest::{argv, noted, tool};
 use isoloom_spec::model::{CloudProvider, CloudServices};
 
 use crate::cloud::Cloud;
@@ -73,15 +73,7 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
     let on = cloud_of(cloud.provider);
     let mut secrets = connection::slots(on, &STEPS)?;
     secrets.extend(inputs(cloud)?);
-    Ok(Manifest {
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: generator()?,
-        environment: environment(env)?,
-        target: isoloom_manifest::Target::CloudServices,
-        cloud: Some(crate::cloud::manifest::cloud_of(on)),
-        driver: Driver::Terraform,
-        hosts: isoloom_render::run_manifest::every_host(),
+    crate::module::manifest::Body {
         tools: tools(cloud)?,
         identity: Identity::Terraform(TerraformIdentity {
             module: RelPath::parse(".")?,
@@ -99,12 +91,7 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
             step: StepId::parse("apply")?,
             means: Some("the module's services exist".into()),
         }],
-        checks: Checks {
-            protocol: isoloom_manifest::CheckProtocol::V1,
-            setup: Vec::new(),
-            runners: Vec::new(),
-            teardown: Vec::new(),
-        },
+        checks: crate::module::manifest::checks(Vec::new()),
         recovery: Some(Recovery {
             stale_markers: Vec::new(),
             steps: Vec::new(),
@@ -117,7 +104,8 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
             default_minutes: Some(DEFAULT_LIFE_MIN),
         }),
         guest: None,
-    })
+    }
+    .manifest(env, isoloom_manifest::Target::CloudServices, Some(crate::cloud::manifest::cloud_of(on)))
 }
 
 /// The profile, then where the module runs (`connection::placement`): a name the spec's `env`
