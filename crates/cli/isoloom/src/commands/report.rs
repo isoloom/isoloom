@@ -31,7 +31,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     let (lab, resolved) = spec::valid(profile, &a.project.dir, a.instance, &a.settings)?;
     let snapshot = spec::snapshot(&lab, a.instance)?;
     console.print(isoloom_targets::report::report(&a.name, &snapshot, a.md)?)?;
-    // Published ports on Hyper-V (the provider the defaults or Vagrant pick): not forwarded.
+    // Published UDP ports on Hyper-V (the provider the defaults or Vagrant pick): not relayed.
     if matches!(a.name.as_str(), "ports" | "services")
         && vagrant_provider(&resolved).as_deref() == Some("hyperv")
         && let Some(note) = isoloom_targets::report::hyperv_ports_note(&snapshot)

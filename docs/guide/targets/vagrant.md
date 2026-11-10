@@ -58,7 +58,9 @@ isothrum down . --target vagrant
 
 Each spec network is a private network of the provider, with the spec's addresses. Forwarded
 ports bind to `127.0.0.1` on the host. On Hyper-V, machines join the switch named by
-`ISOLOOM_HYPERV_SWITCH` (default `Default Switch`). A Windows box's RDP forward is disabled.
+`ISOLOOM_HYPERV_SWITCH` (default `Default Switch`); Hyper-V forwards no port, so the Vagrantfile
+relays each published TCP port from `127.0.0.1` with Windows' port proxy, and a UDP one is reached
+at the machine's address. A Windows box's RDP forward is disabled.
 
 Windows machines are reached over WinRM, by default plain HTTP on port 5985 with basic
 authentication and the box's `vagrant` account, as Vagrant's Windows boxes are built. That traffic

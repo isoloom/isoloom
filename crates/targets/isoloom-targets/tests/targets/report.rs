@@ -58,11 +58,15 @@ fn reports_cover_addresses_services_wiring_and_resources() -> Outcome {
     Ok(())
 }
 
+/// Hyper-V relays a published TCP port on the host port the run reports: only a UDP one isn't
+/// there.
 #[test]
-fn on_hyperv_published_ports_are_said_not_to_be_forwarded() -> Outcome {
-    let note = hyperv_ports_note(&snapshot("windows-hello")?).expect("windows-hello publishes a port");
-    assert!(note.contains("127.0.0.1:8082 (web01:80) is not there"), "{note}");
-    // Nothing published, nothing to say.
+fn on_hyperv_only_published_udp_ports_are_said_not_to_be_relayed() -> Outcome {
+    let note = hyperv_ports_note(&snapshot("udp-dns")?).expect("udp-dns publishes a UDP port");
+    assert!(note.contains("127.0.0.1:10053/udp (dns:53) is not there"), "{note}");
+    assert!(note.contains("relays TCP only"), "{note}");
+    // A TCP port answers: nothing to say; nor with nothing published.
+    assert_eq!(hyperv_ports_note(&snapshot("windows-hello")?), None);
     assert_eq!(hyperv_ports_note(&snapshot("existing-hosts")?), None);
     Ok(())
 }

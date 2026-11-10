@@ -42,22 +42,25 @@ pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String> {
     Ok(if markdown { markdown_table(&head, &rows) } else { text_table(&head, &rows) })
 }
 
-/// Under Vagrant's Hyper-V provider the published ports (`127.0.0.1:<port>` in the ports
-/// report) aren't there: Hyper-V forwards none. A note saying so and where they are instead,
-/// when the environment publishes any.
+/// Under Vagrant's Hyper-V provider a published UDP port (`127.0.0.1:<port>/udp` in the ports
+/// report) isn't there: Hyper-V forwards no port, and the Vagrantfile's relay (Windows' port
+/// proxy) relays TCP only. A note saying so and where they are instead, when the environment
+/// publishes any; its TCP ports answer on this host as the report says.
 #[must_use]
 pub fn hyperv_ports_note(r: &Value) -> Option<String> {
     let published: Vec<String> = entries(r, "machines")
         .flat_map(|(m, v)| {
             entries(v, "ports").filter_map(move |(_, s)| {
                 let port = s.get("port").and_then(Value::as_u64).unwrap_or(0);
-                s.get("publish").and_then(Value::as_u64).map(|p| format!("127.0.0.1:{p} ({m}:{port})"))
+                let udp = s.get("protocol").and_then(Value::as_str) == Some("udp");
+                let publish = s.get("published").or_else(|| s.get("publish")).and_then(Value::as_u64);
+                publish.filter(|_| udp).map(|p| format!("127.0.0.1:{p}/udp ({m}:{port})"))
             })
         })
         .collect();
     (!published.is_empty()).then(|| {
         format!(
-            "Note: on Vagrant's Hyper-V provider no port is forwarded to this host, so {} {} not there: reach each service at its VM's address on the first switch (`vagrant ssh-config <machine>` shows it).\n",
+            "Note: on Vagrant's Hyper-V provider a UDP port isn't relayed to this host (Windows' port proxy relays TCP only), so {} {} not there: reach it at its VM's address on the first switch (`vagrant ssh-config <machine>` shows it).\n",
             published.join(", "),
             if published.len() == 1 { "is" } else { "are" }
         )
