@@ -70,7 +70,10 @@ pub(crate) const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
 pub(crate) fn chosen_ports(r: &mut Ruby) {
     r.text("require \"json\"\n");
     r.comment("The host ports the runner chose for this run; each forward defaults to its own number.");
-    r.assign(HOSTPORTS, Value::raw(format!("(JSON.parse(ENV.fetch({}, {})) rescue {{}})", Value::str(HOSTPORTS), Value::str("{}"))));
+    r.assign(
+        HOSTPORTS,
+        Value::raw(format!("(JSON.parse(ENV.fetch({}, {})) rescue {{}})", Value::str(HOSTPORTS), Value::str("{}"))),
+    );
 }
 
 /// A published port's host number as the Vagrantfile reads it: the runner's choice for this run,

@@ -204,7 +204,10 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.assign("ENV[\"VAGRANT_NO_PARALLEL\"]", Value::str("1"));
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.comment("This host's CPU as QEMU names it: a machine built for another one runs emulated there.");
-    r.assign("HOST_ARCH", Value::raw(format!("{ARM_HOST} ? {} : {}", Value::str("aarch64"), Value::str("x86_64"))));
+    r.assign(
+        "HOST_ARCH",
+        Value::raw(format!("{ARM_HOST} ? {} : {}", Value::str("aarch64"), Value::str("x86_64"))),
+    );
     r.text(&project_rb());
     r.text(hyperv::HYPERV_RB);
     r.text(vagrantfile::PORT_CHECK_RB);
