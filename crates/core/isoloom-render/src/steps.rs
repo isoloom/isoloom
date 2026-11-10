@@ -169,7 +169,7 @@ pub fn wait_for_mark(mark: &str, timeout_s: u32, waiting: &str, missing: &str) -
 }
 
 /// Where the project is unpacked on a Windows VM, and the machine's own scripts with it; where
-/// a Windows recipe runs from too (see [`crate::configure::powershell`]).
+/// a Windows recipe runs from too (`configure::powershell`).
 pub const WINDOWS_PROJECT_DIR: &str = isoloom_spec::windows::ISOLOOM_DIR;
 
 /// Installs packages with the machine's own package manager (Debian and Ubuntu, or the RHEL

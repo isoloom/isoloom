@@ -32,8 +32,8 @@ pub const INSTALL_ANSIBLE: &str =
     "[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }";
 
 /// What any playbook the controller runs needs in its environment: the Ansible
-/// [`INSTALL_ANSIBLE`] installs, first on the `PATH`, and no host-key checking (see
-/// [`ENVIRONMENT`]), as one `export`.
+/// [`INSTALL_ANSIBLE`] installs, first on the `PATH`, and no host-key checking (the environment's
+/// hosts are freshly created, with no stable `known_hosts`), as one `export`.
 pub const PLAYBOOK_ENVIRONMENT: &str = "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False";
 
 /// Runs of a playbook in all: the first and up to three again.
