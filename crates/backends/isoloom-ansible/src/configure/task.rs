@@ -165,19 +165,35 @@ fn seq_item(out: &mut String, value: &Value, indent: usize) {
     }
 }
 
-/// A multi-line string as a literal block scalar, its content at `child`; `|` keeps the trailing
-/// newline the string ends with, `|-` writes none, and `!unsafe` leads one holding Jinja.
+/// A multi-line string as a literal block scalar, its content at `child`, or double-quoted when
+/// it is only newlines, a line ends in a space or a tab, or the text holds another control
+/// character (which a block scalar can't carry exactly, or a file mustn't hold). The indentation indicator (`2`: `child`
+/// is two past the key) keeps a first line that starts with spaces from setting the indentation;
+/// the chomping keeps every final newline: none `-`, one (clip), more `+`. `!unsafe` leads one
+/// holding Jinja.
 fn block(out: &mut String, prefix: &str, key: &str, s: &str, child: usize) {
-    let (chomp, body) = match s.strip_suffix('\n') {
-        Some(body) => ("|", body),
-        None => ("|-", s),
+    let body = s.trim_end_matches('\n');
+    let blockable = !body.is_empty()
+        && body.split('\n').all(|line| !line.ends_with([' ', '\t']))
+        && !s.chars().any(|c| c.is_control() && c != '\n' && c != '\t');
+    if !blockable {
+        push(out, &format!("{prefix}{key}: {}{}", unsafe_tag(s), quoted(s)));
+        return;
+    }
+    let chomp = match s.len() - body.len() {
+        0 => "-",
+        1 => "",
+        _ => "+",
     };
-    push(out, &format!("{prefix}{key}: {}{chomp}", unsafe_tag(s)));
-    for line in body.split('\n') {
+    push(out, &format!("{prefix}{key}: {}|2{chomp}", unsafe_tag(s)));
+    let lines = body.split('\n').chain(std::iter::repeat_n("", (s.len() - body.len()).saturating_sub(1)));
+    for line in lines {
         if line.is_empty() {
             out.push('\n');
         } else {
-            push(out, &format!("{}{line}", pad(child)));
+            out.push_str(&pad(child));
+            out.push_str(line);
+            out.push('\n');
         }
     }
 }
@@ -207,9 +223,23 @@ fn scalar(s: &str) -> String {
     if plain(s) { s.to_owned() } else { quoted(s) }
 }
 
-/// `s` double-quoted, with the few escapes a double-quoted scalar needs.
+/// `s` double-quoted: a backslash, a quote and every control character escaped.
 fn quoted(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\t', "\\t"))
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            // Every control character is below U+00A0, so two hex digits name it.
+            c if c.is_control() => out.push_str(&format!("\\x{:02x}", u32::from(c))),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 /// Whether `s` is safe as a plain scalar: a path, a name, a package spec or an FQCN, never empty,
@@ -225,7 +255,8 @@ fn plain(s: &str) -> bool {
     first && s.chars().all(safe)
 }
 
-/// Appends `line` and a newline (no trailing space: `yamllint`'s `trailing-spaces`).
+/// Appends a structural `line` (a key, a `- `, a scalar on its line) and a newline, with no
+/// trailing space (`yamllint`'s `trailing-spaces`); a block scalar's content is written as it is.
 fn push(out: &mut String, line: &str) {
     out.push_str(line.trim_end());
     out.push('\n');
@@ -285,7 +316,7 @@ mod tests {
         assert!(text.contains("- !unsafe \"{% if 1 %}\"\n"), "{text}");
         assert!(text.contains("- !unsafe \"{# c #}\"\n"), "{text}");
         assert!(text.contains("- \"a}b{\"\n"), "a lone brace is no Jinja: {text}");
-        assert!(text.contains("content: !unsafe |\n"), "a block scalar is tagged too: {text}");
+        assert!(text.contains("content: !unsafe |2\n"), "a block scalar is tagged too: {text}");
         assert!(text.contains("own: \"{{ isoloom_project }}\"\n"), "Isoloom's own Jinja stays a template: {text}");
     }
 
@@ -295,7 +326,60 @@ mod tests {
             .module("ansible.builtin.copy", json!({ "content": "a\nb\n", "dest": "/f" }))
             .into_value();
         let text = yaml(vec![task]);
-        assert!(text.contains("content: |\n      a\n      b\n"), "{text}");
+        assert!(text.contains("content: |2\n      a\n      b\n"), "{text}");
+    }
+
+    /// `text` read back by a YAML parser, its `!unsafe` tags dropped, as JSON.
+    fn read_back(text: &str) -> Value {
+        fn untag(v: serde_yaml_ng::Value) -> serde_yaml_ng::Value {
+            match v {
+                serde_yaml_ng::Value::Tagged(t) => untag(t.value),
+                serde_yaml_ng::Value::Sequence(items) => serde_yaml_ng::Value::Sequence(items.into_iter().map(untag).collect()),
+                serde_yaml_ng::Value::Mapping(m) => {
+                    serde_yaml_ng::Value::Mapping(m.into_iter().map(|(k, v)| (k, untag(v))).collect())
+                }
+                other => other,
+            }
+        }
+        let yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(text).unwrap_or_else(|e| panic!("{e}: {text}"));
+        serde_json::to_value(untag(yaml)).unwrap()
+    }
+
+    /// A task whose `content` is `s`, as YAML.
+    fn content(s: &str) -> (Value, String) {
+        let task = Task::new("x").module("ansible.builtin.copy", json!({ "content": s, "dest": "/f" })).into_value();
+        let text = yaml(vec![task.clone()]);
+        (Value::Array(vec![task]), text)
+    }
+
+    #[test]
+    fn a_block_scalar_reads_back_as_the_text_it_holds() {
+        for s in [
+            "  indented first\nthen not\n",
+            "a  \nb\n",
+            "a\n\n",
+            "a\nb",
+            "a\n\n\nb\n\n\n",
+            "\n",
+            "\n\n",
+            "\tx\ny\n",
+            "a\r\nb\n",
+            "# not a comment\n- not a list\n",
+            "{{ x }}\n  y\n",
+        ] {
+            let (value, text) = content(s);
+            assert_eq!(read_back(&text), value, "{s:?} as {text}");
+            assert!(!text.lines().any(|l| l.ends_with(' ')), "no trailing space in the file: {text}");
+        }
+        assert!(content("  a\nb\n").1.contains("content: |2\n        a\n      b\n"), "{}", content("  a\nb\n").1);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn any_text_reads_back_as_itself(s in "[ a-z{}#:\\-\"'\t\n\r\u{1b}é]{0,40}") {
+            let (value, text) = content(&s);
+            proptest::prop_assert_eq!(read_back(&text), value, "{}", text);
+        }
     }
 
     #[test]

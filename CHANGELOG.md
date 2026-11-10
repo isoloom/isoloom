@@ -332,6 +332,12 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **The Ansible renderer's multi-line strings read back as written.** A block scalar had no
+  indentation indicator and its lines were trimmed: a command or file whose first line starts
+  with spaces made unparseable YAML, and trailing spaces and extra final newlines were lost (the
+  shell renderer kept them). A block scalar now carries its indentation (`|2`) and keeps every
+  final newline (`|2+`); text a block can't hold exactly (a line ending in a space, a control
+  character) is double-quoted with escapes.
 - **Security: the controller's inventory is owner-only.** On the clouds, Proxmox and ESXi the
   controller wrote `/etc/isoloom/inventory.ini`, which holds the Windows machines' generated
   password, world-readable (`0644`); it is `0600` like the controller's key, and only root (the
