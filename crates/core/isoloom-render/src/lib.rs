@@ -21,6 +21,8 @@
 //! - **The containers' shared parts:** [`container`]; where a check reaches its host:
 //!   [`checks`].
 //! - **The run manifest's pieces** every target's `run.json` is built from: [`run_manifest`].
+//! - **What an ESXi host is told about a VM** (its guest OS type), which the `esxi` target and
+//!   Vagrant's ESXi provider share: [`esxi`].
 //! - **Numbers from names** that are the same on every build: [`stable_hash`].
 //!
 //! Everything here is a pure function of the plan: no I/O, no clock, no environment.

@@ -73,9 +73,11 @@ edge.
 ## Parse, don't validate; typed errors
 
 Raw input is converted once into types that can't hold invalid states (newtypes for names, ports,
-CIDRs, versions and IDs; enums instead of booleans and strings). Each library crate has one
+CIDRs, versions and IDs; enums instead of booleans and strings). Each library crate has its
 `thiserror` error enum with a `Result` alias, variants carrying a `#[source]` cause and the field
-path. No `unwrap`, `expect` or `panic` outside tests; no `anyhow` in libraries.
+path; an operation that fails its own way has an enum of its own beside it (`isoloom-targets`'
+`GenerateError`, why one target's files weren't generated, which its `Error` wraps). No `unwrap`,
+`expect` or `panic` outside tests; no `anyhow` in libraries.
 
 ## Honest proof
 
