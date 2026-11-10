@@ -190,20 +190,31 @@ pub fn derived_switch(steps: Vec<StepId>) -> Result<Option<Param>, ManifestError
     let Ok(steps) = NonEmpty::new(steps, "the check steps") else {
         return Ok(None);
     };
-    Ok(Some(Param {
-        name: EnvName::parse(DERIVED)?,
-        description: "0: the checks derived from the spec (reachability, no internet) are skipped.".into(),
-        default: Some("1".into()),
-        values: vec!["0".into(), "1".into()],
+    let what = "0: the checks derived from the spec (reachability, no internet) are skipped.";
+    embedder_param(DERIVED, what, Some("1"), &["0", "1"], StepSelection::Only(steps)).map(Some)
+}
+
+/// An optional param `name` the embedder sets (its `default` and the `values` it takes, if any
+/// are listed), delivered as its own variable to `steps`.
+///
+/// # Errors
+///
+/// Fails on a name the manifest refuses (a bug: it is fixed).
+pub fn embedder_param(name: &str, description: &str, default: Option<&str>, values: &[&str], steps: StepSelection) -> Result<Param, ManifestError> {
+    Ok(Param {
+        name: EnvName::parse(name)?,
+        description: description.into(),
+        default: default.map(String::from),
+        values: values.iter().map(|v| (*v).to_owned()).collect(),
         required: false,
         hosts: BTreeSet::new(),
         providers: BTreeSet::new(),
         set_by: SetBy::Embedder,
         deliver: NonEmpty::one(Delivery::Env {
-            var: EnvName::parse(DERIVED)?,
-            steps: StepSelection::Only(steps),
+            var: EnvName::parse(name)?,
+            steps,
         }),
-    }))
+    })
 }
 
 /// `ISOLOOM_PUBLISH_FIXED` ([`isoloom_manifest::contract::PUBLISH_FIXED`]), delivered to every
@@ -219,21 +230,8 @@ pub fn publish_fixed(machines: &[Machine]) -> Result<Option<Param>, ManifestErro
     if !machines.iter().flat_map(|m| &m.ports).any(|p| p.publish.is_some()) {
         return Ok(None);
     }
-    let name = isoloom_manifest::contract::PUBLISH_FIXED;
-    Ok(Some(Param {
-        name: EnvName::parse(name)?,
-        description: "Set: each published port takes its own `publish` number on the host, instead of a free one.".into(),
-        default: None,
-        values: vec!["1".into()],
-        required: false,
-        hosts: BTreeSet::new(),
-        providers: BTreeSet::new(),
-        set_by: SetBy::Embedder,
-        deliver: NonEmpty::one(Delivery::Env {
-            var: EnvName::parse(name)?,
-            steps: StepSelection::Every,
-        }),
-    }))
+    let what = "Set: each published port takes its own `publish` number on the host, instead of a free one.";
+    embedder_param(isoloom_manifest::contract::PUBLISH_FIXED, what, None, &["1"], StepSelection::Every).map(Some)
 }
 
 /// The derived checks' switch, as a runner reads it.

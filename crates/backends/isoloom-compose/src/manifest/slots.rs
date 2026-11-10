@@ -6,14 +6,12 @@
 use std::collections::BTreeSet;
 
 use isoloom_manifest::contract::PUBLISH_ADDRESS;
-use isoloom_manifest::{
-    Delivery, EnvName, Identifier, Machine, Name, NonEmpty, Param, Role, SecretSlot, SecretSource, SetBy, SlotKind, StepId, StepSelection, Store,
-};
+use isoloom_manifest::{Delivery, EnvName, Identifier, Machine, Name, NonEmpty, Param, Role, SecretSlot, SecretSource, SlotKind, StepId, StepSelection, Store};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::secret_variable;
 
 use isoloom_render::container::project_variables;
-use isoloom_render::run_manifest::{derived_switch, held_secrets, publish_fixed};
+use isoloom_render::run_manifest::{derived_switch, embedder_param, held_secrets, publish_fixed};
 
 use super::lifecycle::{job_step, owner};
 use super::machines::Member;
@@ -29,26 +27,12 @@ fn env(var: &str, steps: StepSelection) -> Result<NonEmpty<Delivery>> {
     Ok(NonEmpty::one(Delivery::Env { var: env_name(var)?, steps }))
 }
 
-fn param(name: &str, description: &str, default: Option<&str>, values: &[&str], steps: StepSelection) -> Result<Param> {
-    Ok(Param {
-        name: env_name(name)?,
-        description: description.into(),
-        default: default.map(String::from),
-        values: values.iter().map(|v| (*v).to_owned()).collect(),
-        required: false,
-        hosts: BTreeSet::new(),
-        providers: BTreeSet::new(),
-        set_by: SetBy::Embedder,
-        deliver: env(name, steps)?,
-    })
-}
-
 /// The params the Compose file reads: the publish address and the fixed host ports when a port
 /// is published, the derived checks' switch when a runner reads it.
 pub(super) fn params(machines: &[Machine], derived: &[StepId]) -> Result<Vec<Param>> {
     let mut out = Vec::new();
     if let Some(fixed) = publish_fixed(machines)? {
-        out.push(param(
+        out.push(embedder_param(
             PUBLISH_ADDRESS,
             "The host address published ports listen on.",
             Some("127.0.0.1"),
