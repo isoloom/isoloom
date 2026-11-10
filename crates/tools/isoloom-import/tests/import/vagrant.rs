@@ -103,3 +103,78 @@ fn a_vagrantfile_that_defines_nothing_of_its_own_is_an_error() -> Outcome {
     assert!(matches!(draft(&only_isoloom, "x", "Vagrantfile"), Err(isoloom_import::Error::NoVagrantMachine)));
     Ok(())
 }
+
+/// One machine whose `vm` makes `calls` (JSON), on a private network besides.
+fn one_machine(os_box: &str, calls: &str) -> Outcome<Recording> {
+    Ok(format!(
+        r#"{{"children":{{"vm":{{"calls":[{{"name":"define","args":["web"],"block":{{"children":{{"vm":{{"settings":{{"box":"{os_box}"}},"calls":[
+            {{"name":"network","args":["private_network",{{"ip":"192.168.40.10"}}]}},{calls}]}}}}}}}}]}}}}}}"#
+    )
+    .parse()?)
+}
+
+#[test]
+fn a_public_network_is_a_bridged_network() -> Outcome {
+    let fixed = one_machine(
+        "bento/debian-12",
+        r#"{"name":"network","args":["public_network",{"ip":"192.168.1.50","bridge":"en0: Wi-Fi"}]}"#,
+    )?;
+    let d = draft(&fixed, "lab", "Vagrantfile")?;
+    assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
+    let drafted = spec(&d)?;
+    let lan = &drafted.networks["lan"];
+    assert_eq!(lan.cidr, "192.168.1.0/24");
+    let bridged = lan.bridged.as_ref().ok_or("not bridged")?;
+    assert_eq!((bridged.interface.as_deref(), bridged.dhcp), (Some("en0: Wi-Fi"), false));
+    assert_eq!(drafted.machines["web"].networks["lan"], Octets::One(50));
+    // By DHCP, with the LAN's own default route: the block is a placeholder, said.
+    let dhcp = one_machine(
+        "bento/debian-12",
+        r#"{"name":"network","args":["public_network",{"use_dhcp_assigned_default_route":true}]}"#,
+    )?;
+    let d = draft(&dhcp, "lab", "Vagrantfile")?;
+    assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
+    let drafted = spec(&d)?;
+    let bridged = drafted.networks["lan"].bridged.as_ref().ok_or("not bridged")?;
+    assert!(bridged.dhcp && bridged.default_route && bridged.interface.is_none(), "{}", d.yaml);
+    assert_eq!(drafted.machines["web"].networks["lan"], Octets::One(0));
+    assert!(has(&d, NoteKind::Changed, "define web.vm.network", "set it to the LAN's"), "{:?}", d.notes);
+    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", d.notes);
+    Ok(())
+}
+
+#[test]
+fn a_synced_folder_is_a_host_folder() -> Outcome {
+    let shared = one_machine(
+        "bento/debian-12",
+        r#"{"name":"synced_folder","args":["data","/srv/data",{"mount_options":["ro"]}]},
+           {"name":"synced_folder","args":["notes","/srv/notes",{"type":"rsync"}]},
+           {"name":"synced_folder","args":[".","/vagrant"]},
+           {"name":"synced_folder","args":["off","/srv/off",{"disabled":true}]}"#,
+    )?;
+    let d = draft(&shared, "lab", "Vagrantfile")?;
+    assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
+    let folders: Vec<(String, String, bool)> = spec(&d)?.machines["web"]
+        .host_folders
+        .iter()
+        .map(|f| (f.from.clone(), f.path.clone(), f.read_only))
+        .collect();
+    assert_eq!(
+        folders,
+        [
+            ("data".to_owned(), "/srv/data".to_owned(), true),
+            ("notes".to_owned(), "/srv/notes".to_owned(), false)
+        ],
+        "{}",
+        d.yaml
+    );
+    let at = "define web.vm.synced_folder";
+    assert!(has(&d, NoteKind::Changed, at, "`notes`: each target shares a host folder its own way; not kept: type: rsync"));
+    assert!(has(&d, NoteKind::Equivalent, at, "the project: Isoloom copies it"), "{:?}", d.notes);
+    // A Windows machine has none: left out, and said.
+    let windows = one_machine("gusztavvargadr/windows-server", r#"{"name":"synced_folder","args":["data","C:/data"]}"#)?;
+    let d = draft(&windows, "lab", "Vagrantfile")?;
+    assert!(spec(&d)?.machines["web"].host_folders.is_empty(), "{}", d.yaml);
+    assert!(has(&d, NoteKind::Changed, at, "a Windows machine has no host folders"), "{:?}", d.notes);
+    Ok(())
+}

@@ -30,6 +30,8 @@ struct Machine {
     networks: Vec<(String, u8)>,
     /// (guest port, host port, UDP).
     publish: Vec<(u16, u16, bool)>,
+    /// Folders of the computer shared into it: (from, path, read only).
+    host_folders: Vec<(String, String, bool)>,
     cpus: Option<u32>,
     memory_mb: Option<u32>,
     /// Its provisioning steps: scripts, playbooks and reboots, in order.
@@ -39,15 +41,43 @@ struct Machine {
 /// The step a shell provisioner's `reboot: true` becomes.
 const REBOOT: &str = isoloom_spec::model::REBOOT_STEP;
 
+/// A network the machines are on: a private network, or one bridged to the host's LAN.
+#[derive(Debug)]
+struct Net {
+    /// Its block.
+    cidr: Cidr,
+    /// The name the Vagrantfile gave it (the VirtualBox internal network's), if any.
+    name: String,
+    /// How it is bridged, for a public network.
+    bridged: Option<Bridge>,
+}
+
+/// A public network: bridged to an interface of the host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Bridge {
+    /// The host interface Vagrant bridges to, when the Vagrantfile names it.
+    interface: Option<String>,
+    /// The machines take their address from the LAN's DHCP server.
+    dhcp: bool,
+    /// With `dhcp`, the default route is the LAN's.
+    default_route: bool,
+}
+
+/// The block a DHCP public network is given: the Vagrantfile doesn't say the LAN's.
+const LAN_PLACEHOLDER: Cidr = Cidr {
+    base: u32::from_be_bytes([192, 168, 1, 0]),
+    len: 24,
+};
+
 /// What the import collects across the machines.
 #[derive(Debug)]
 struct Import<'a> {
     /// The top configuration's `vm`: what every machine inherits.
     global: Option<&'a Recording>,
     notes: Notes,
-    /// Private networks by block (`192.168.33.0/24`), with the name the Vagrantfile gave them
-    /// (the VirtualBox internal network's), if any.
-    nets: IndexMap<String, (Cidr, String)>,
+    /// The networks by key: a private network by its block (`192.168.33.0/24`), a public one by
+    /// `bridged ` and its block or interface.
+    nets: IndexMap<String, Net>,
     /// Host-side Ansible playbooks: run once for the environment.
     env_playbooks: Vec<String>,
 }
@@ -122,6 +152,7 @@ impl<'a> Import<'a> {
             image,
             networks: Vec::new(),
             publish: Vec::new(),
+            host_folders: Vec::new(),
             cpus: None,
             memory_mb: None,
             steps: Vec::new(),
@@ -139,7 +170,7 @@ impl<'a> Import<'a> {
             );
         }
         if m.networks.is_empty() {
-            self.notes.add(at, NoteKind::Changed, "no private network: put the machine on a network");
+            self.notes.add(at, NoteKind::Changed, "no network: put the machine on one");
         }
         Some(m)
     }
@@ -186,22 +217,97 @@ impl<'a> Import<'a> {
         match (c.name(), c.first().as_str()) {
             ("network", "private_network") => self.private_network(at, m, c),
             ("network", "forwarded_port") => self.forwarded_port(at, m, c),
-            ("network", "public_network") => self.notes.add(
-                format!("{at}.vm.network"),
-                NoteKind::NotYet,
-                "a network bridged to the outside (planned in the format)",
-            ),
+            ("network", "public_network") => self.public_network(at, m, c),
             ("provider", p) => self.provider(&format!("{at}.vm.provider {p}"), m, c.block()),
             ("provision", _) => self.provision(at, m, c),
-            ("synced_folder", _) if c.opt("disabled").and_then(Value::as_bool) != Some(true) => {
-                self.notes.add(
-                    format!("{at}.vm.synced_folder"),
-                    NoteKind::Equivalent,
-                    "no shared folders: Isoloom copies the project into each Linux VM",
-                );
-            }
+            ("synced_folder", _) if c.opt("disabled").and_then(Value::as_bool) != Some(true) => self.synced_folder(at, m, c),
             _ => {}
         }
+    }
+
+    /// A public network: a `bridged` network, at the machine's fixed address in its block, else
+    /// by DHCP from the LAN (the block a placeholder then, said).
+    fn public_network(&mut self, at: &str, m: &mut Machine, c: &Call) {
+        let at = format!("{at}.vm.network");
+        let interface = match c.opt("bridge") {
+            Some(Value::Array(list)) => {
+                let first = text(list.first());
+                if list.len() > 1 {
+                    self.notes.add(
+                        &at,
+                        NoteKind::Changed,
+                        format!("several interfaces to bridge to: the first, `{}`, is kept", first.as_deref().unwrap_or_default()),
+                    );
+                }
+                first
+            }
+            other => text(other),
+        };
+        let fixed = text(c.opt("ip")).and_then(|ip| ip.parse::<Ipv4Addr>().ok());
+        let dhcp = fixed.is_none();
+        let bridge = Bridge {
+            interface: interface.clone(),
+            dhcp,
+            default_route: dhcp && c.opt("use_dhcp_assigned_default_route").and_then(Value::as_bool) == Some(true),
+        };
+        let (cidr, octet) = match fixed {
+            Some(ip) => (block(ip, text(c.opt("netmask")).as_deref()).0, ip.octets()[3]),
+            None => {
+                self.notes.add(
+                    &at,
+                    NoteKind::Changed,
+                    format!("by DHCP from the LAN, whose block the Vagrantfile doesn't say: `cidr` is {LAN_PLACEHOLDER}, set it to the LAN's"),
+                );
+                (LAN_PLACEHOLDER, 0)
+            }
+        };
+        let key = format!("bridged {}", if dhcp { interface.unwrap_or_default() } else { cidr.to_string() });
+        self.nets.entry(key.clone()).or_insert_with(|| Net {
+            cidr,
+            name: "lan".to_owned(),
+            bridged: Some(bridge),
+        });
+        m.networks.push((key, octet));
+    }
+
+    /// A synced folder: a host folder of a Linux machine, read only when mounted `ro`. Vagrant's
+    /// own share of the project at `/vagrant` is Isoloom's copy of it. How Vagrant shares it
+    /// (`type`, owners) isn't kept, and said.
+    fn synced_folder(&mut self, at: &str, m: &mut Machine, c: &Call) {
+        let at = format!("{at}.vm.synced_folder");
+        let (from, path) = (c.first(), c.arg(1).unwrap_or_default());
+        if from.trim_end_matches('/') == "." && path.trim_end_matches('/') == "/vagrant" {
+            self.notes.add(
+                at,
+                NoteKind::Equivalent,
+                "the project: Isoloom copies it into each Linux VM (/opt/isoloom); to share it both ways instead, give the machine `host_folders: [{ from: ., path: /vagrant }]`",
+            );
+            return;
+        }
+        if isoloom_spec::images::is_windows(m.os) {
+            self.notes
+                .add(at, NoteKind::Changed, format!("`{from}` left out: a Windows machine has no host folders"));
+            return;
+        }
+        let read_only = c
+            .opt("mount_options")
+            .and_then(Value::as_array)
+            .is_some_and(|o| o.iter().any(|v| text(Some(v)).is_some_and(|t| t.split(',').any(|w| w == "ro"))));
+        let ignored: Vec<String> = c
+            .options()
+            .into_iter()
+            .flatten()
+            .filter(|(k, _)| !matches!(k.as_str(), "disabled" | "mount_options" | "create" | "id"))
+            .map(|(k, v)| format!("{k}: {}", text(Some(v)).unwrap_or_else(|| v.to_string())))
+            .collect();
+        if !ignored.is_empty() {
+            self.notes.add(
+                &at,
+                NoteKind::Changed,
+                format!("`{from}`: each target shares a host folder its own way; not kept: {}", ignored.join(", ")),
+            );
+        }
+        m.host_folders.push((from, path, read_only));
     }
 
     /// A private network with a fixed address: the machine joins its block (said when it isn't
@@ -234,9 +340,11 @@ impl<'a> Import<'a> {
             );
         }
         let key = cidr.to_string();
-        self.nets
-            .entry(key.clone())
-            .or_insert_with(|| (cidr, text(c.opt("virtualbox__intnet")).map(|n| label(&n)).unwrap_or_default()));
+        self.nets.entry(key.clone()).or_insert_with(|| Net {
+            cidr,
+            name: text(c.opt("virtualbox__intnet")).map(|n| label(&n)).unwrap_or_default(),
+            bridged: None,
+        });
         m.networks.push((key, ip.octets()[3]));
     }
 

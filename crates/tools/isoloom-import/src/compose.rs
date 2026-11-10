@@ -41,6 +41,8 @@ struct Machine {
     memory_mb: Option<u32>,
     depends_on: Vec<String>,
     volumes: Vec<(String, String)>,
+    /// More names it answers to, on every network.
+    aliases: Vec<String>,
     image: Option<String>,
     build: Option<String>,
     dockerfile: Option<String>,
@@ -66,6 +68,9 @@ struct Import<'a> {
     one_shot: BTreeSet<String>,
     /// Named volume -> how many services mount it.
     volume_users: IndexMap<String, usize>,
+    /// The volumes shared between machines, by their name in the draft, each with the first
+    /// machine that mounts it: the spec's top-level `volumes`, and their `owner`.
+    shared: IndexMap<String, String>,
     /// Every input a machine reads, for the spec's own `inputs`.
     spec_inputs: BTreeSet<String>,
 }
@@ -109,6 +114,7 @@ pub fn draft(compose_yaml: &str, fallback_name: &str, source: &str) -> Result<Dr
         source,
         nets: &import.nets,
         inputs: &import.spec_inputs,
+        shared: &import.shared,
     };
     let yaml = write::draft_yaml(&env, &machines);
     Ok(import.notes.draft(yaml))
@@ -152,7 +158,7 @@ fn one_shot_services(services: &Mapping) -> BTreeSet<String> {
     one_shot
 }
 
-/// Named volumes used by more than one service: shared data, not expressible yet.
+/// How many services mount each named volume: one used by several is shared between machines.
 fn volume_users(services: &Mapping) -> IndexMap<String, usize> {
     let mut users: IndexMap<String, usize> = IndexMap::new();
     for svc in services.values() {
@@ -209,6 +215,7 @@ impl<'a> Import<'a> {
             names: machine_names(services),
             one_shot: one_shot_services(services),
             volume_users: volume_users(services),
+            shared: IndexMap::new(),
             spec_inputs: BTreeSet::new(),
         }
     }
@@ -230,9 +237,11 @@ impl<'a> Import<'a> {
         if m.name != name {
             self.note_rename(&svc, &m.name);
         }
-        for (n, ip) in self.wanted_networks(&svc) {
-            self.join(&svc, &mut m, &n, ip.as_deref())?;
+        let wanted = self.wanted_networks(&svc);
+        for (n, ip, _) in &wanted {
+            self.join(&svc, &mut m, n, ip.as_deref())?;
         }
+        self.aliases(&svc, &mut m, &wanted);
         for (k, v) in &svc.keys {
             self.key(&svc, k.as_str().unwrap_or_default(), v, &mut m);
         }
@@ -284,23 +293,21 @@ impl<'a> Import<'a> {
             .add(&svc.at, NoteKind::Changed, format!("renamed `{renamed}` (machine names are DNS names){refs}"));
     }
 
-    /// The networks a service joins, each with the address it asks for, if any.
-    fn wanted_networks(&mut self, svc: &Service) -> Vec<(String, Option<String>)> {
-        let mut wanted: Vec<(String, Option<String>)> = Vec::new();
+    /// The networks a service joins, each with the address it asks for, if any, and the aliases
+    /// it has there.
+    fn wanted_networks(&mut self, svc: &Service) -> Vec<(String, Option<String>, Vec<String>)> {
+        let mut wanted: Vec<(String, Option<String>, Vec<String>)> = Vec::new();
         match svc.keys.get("networks") {
-            Some(Value::Sequence(list)) => wanted.extend(list.iter().filter_map(str_of).map(|n| (n, None))),
+            Some(Value::Sequence(list)) => wanted.extend(list.iter().filter_map(str_of).map(|n| (n, None, Vec::new()))),
             Some(Value::Mapping(map)) => {
                 for (key, opts) in map {
                     let n = str_of(key).unwrap_or_default();
                     let ip = opts.get("ipv4_address").and_then(str_of);
-                    if opts.get("aliases").is_some() {
-                        self.notes
-                            .add(format!("{}.networks.{n}.aliases", svc.at), NoteKind::NotYet, "aliases: a machine has one name");
-                    }
-                    wanted.push((n, ip));
+                    let aliases = opts.get("aliases").and_then(Value::as_sequence).into_iter().flatten().filter_map(str_of).collect();
+                    wanted.push((n, ip, aliases));
                 }
             }
-            _ => wanted.push((DEFAULT_NETWORK.to_owned(), None)),
+            _ => wanted.push((DEFAULT_NETWORK.to_owned(), None, Vec::new())),
         }
         if matches!(svc.keys.get("network_mode").and_then(str_of).as_deref(), Some(mode) if mode != "bridge") {
             self.notes.add(
@@ -308,9 +315,40 @@ impl<'a> Import<'a> {
                 NoteKind::ByDesign,
                 "a machine has its own addresses; attached to the default network instead",
             );
-            wanted = vec![(DEFAULT_NETWORK.to_owned(), None)];
+            wanted = vec![(DEFAULT_NETWORK.to_owned(), None, Vec::new())];
         }
         wanted
+    }
+
+    /// The aliases a service has on its networks, as the machine's `aliases`: a machine answers
+    /// to them on every network it is on, which is said when the service had them on some of its
+    /// networks only. One that isn't a DNS name the spec takes, or names a machine, is left out
+    /// and said; the service's own name is its machine's already.
+    fn aliases(&mut self, svc: &Service, m: &mut Machine, wanted: &[(String, Option<String>, Vec<String>)]) {
+        for (n, _, aliases) in wanted.iter().filter(|(_, _, a)| !a.is_empty()) {
+            let at = format!("{}.networks.{n}.aliases", svc.at);
+            for alias in aliases {
+                let name = alias.to_ascii_lowercase();
+                if name == svc.name || name == m.name || m.aliases.contains(&name) {
+                    continue;
+                }
+                if !isoloom_spec::validate::dns_name(&name) || name.starts_with(isoloom_spec::validate::RESERVED_PREFIX) {
+                    self.notes
+                        .add(&at, NoteKind::Changed, format!("`{alias}` left out: not a name a machine can answer to"));
+                } else if self.names.values().any(|other| *other == name) {
+                    self.notes.add(&at, NoteKind::Changed, format!("`{alias}` left out: it names a machine"));
+                } else {
+                    m.aliases.push(name);
+                }
+            }
+            if wanted.len() > 1 {
+                self.notes.add(
+                    at,
+                    NoteKind::Changed,
+                    format!("the machine's `aliases` answer on every network it is on, not only on `{n}`"),
+                );
+            }
+        }
     }
 
     /// Puts the machine on network `n`, at the address it asked for when that's usable.

@@ -426,6 +426,13 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   everything else, then runs each such job attached, as the `docker` and `docker-vm` run manifests
   do. The `# Start:` line atop the generated `compose.yml` does the same (and builds), so the
   hand-run start works for such a spec.
+- **`isoloom import` carries over what the format has, instead of saying it can't.** A Compose
+  volume shared between services becomes a top-level `volumes:` entry held by the first machine
+  that mounts it, and a service's network `aliases` its machine's `aliases` (said when the
+  service had them on some of its networks only); a Vagrant `public_network` becomes a `bridged`
+  network (by DHCP, with a placeholder block to set, when it has no `ip`), and a
+  `synced_folder` a `host_folders` entry. A `synced_folder`'s options after its paths
+  (`disabled: true` among them) were not read either.
 - **Proxmox's seal is one SSH step.** Its `terraform apply` with `isoloom_sealed` changed
   nothing (the module has no such variable) and is gone; the router is sealed by the SSH step,
   which also keeps the sealed ruleset for later boots.

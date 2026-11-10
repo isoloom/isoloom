@@ -99,7 +99,7 @@ fn not_a_compose_file_is_an_error() {
 }
 
 #[test]
-fn volumes_shared_between_services_are_noted() -> Outcome {
+fn a_volume_shared_between_services_is_shared_between_machines() -> Outcome {
     let compose = "services:\n  a:\n    image: x\n    volumes: [\"shared:/data\", \"./conf:/etc/x:ro\", \"/cache\"]\n  b:\n    image: x\n    volumes: [{ type: volume, source: shared, target: /in }]\nvolumes: { shared: {} }\n";
     let d = draft(compose, "x", "compose.yaml")?;
     let spec = spec(&d)?;
@@ -109,9 +109,30 @@ fn volumes_shared_between_services_are_noted() -> Outcome {
         Some("/cache"),
         "anonymous volume kept"
     );
-    assert!(!spec.machines["a"].volumes.contains_key("shared"));
-    assert!(has(&d, NoteKind::NotYet, "services.a.volumes", "shared:/data"));
+    // One volume for both, held by the first that mounts it, each at its own path.
+    assert_eq!(spec.volumes["shared"].owner.as_deref(), Some("a"), "{}", d.yaml);
+    let at = |m: &str| spec.machines[m].volumes.get("shared").map(isoloom_spec::model::Mount::path);
+    assert_eq!((at("a"), at("b")), (Some("/data"), Some("/in")));
+    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", d.notes);
     assert!(has(&d, NoteKind::InImage, "services.a.volumes", "./conf:/etc/x:ro"));
+    Ok(())
+}
+
+#[test]
+fn a_services_network_aliases_are_its_machines_aliases() -> Outcome {
+    let compose = "services:\n  api:\n    image: x\n    networks:\n      front: { aliases: [api, API.example.com, web, bad_name] }\n      back: {}\n  web:\n    image: y\n    networks: [front]\nnetworks: { front: {}, back: {} }\n";
+    let d = draft(compose, "x", "compose.yaml")?;
+    assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
+    let spec = spec(&d)?;
+    // Its own name is its machine's; another machine's name and a name no machine can take are
+    // left out, and said.
+    assert_eq!(spec.machines["api"].aliases, ["api.example.com"], "{}", d.yaml);
+    let at = "services.api.networks.front.aliases";
+    assert!(has(&d, NoteKind::Changed, at, "`web` left out: it names a machine"), "{:?}", d.notes);
+    assert!(has(&d, NoteKind::Changed, at, "`bad_name` left out"), "{:?}", d.notes);
+    // On one of its two networks in Compose, on both in the spec: said.
+    assert!(has(&d, NoteKind::Changed, at, "on every network it is on, not only on `front`"), "{:?}", d.notes);
+    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", d.notes);
     Ok(())
 }
 

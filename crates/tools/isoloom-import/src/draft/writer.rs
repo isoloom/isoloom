@@ -120,6 +120,11 @@ impl Writer {
         self.line(format!("  {name}:{pad} {{ cidr: {block}{internet} }}"));
     }
 
+    /// One network bridged to an interface of the host (`bridged`, a flow mapping).
+    pub(crate) fn bridged(&mut self, name: &str, block: Cidr, bridged: &str) {
+        self.line(format!("  {name}: {{ cidr: {block}, bridged: {bridged} }}"));
+    }
+
     /// The `machines:` key, after a blank line.
     pub(crate) fn machines(&mut self) {
         self.out.push_str("\nmachines:\n");

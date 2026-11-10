@@ -200,8 +200,10 @@ fn resources(s: &Subject, p: &mut Problems) {
     }
 }
 
-/// Whether `a` is a DNS name (lowercase labels, each at most 63 characters).
-pub(super) fn dns_name(a: &str) -> bool {
+/// Whether `a` is a DNS name a machine's `aliases` take (lowercase labels, each at most 63
+/// characters).
+#[must_use]
+pub fn dns_name(a: &str) -> bool {
     a.len() <= 253
         && a.split('.').all(|l| {
             !l.is_empty()

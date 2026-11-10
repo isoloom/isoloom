@@ -1,7 +1,7 @@
 //! Writing the Vagrant draft: the shared parts through [`Writer`]; the steps, the boxes kept as
 //! overrides and the environment's playbooks here.
 
-use super::{Import, Machine, REBOOT};
+use super::{Bridge, Import, Machine, REBOOT};
 use crate::draft::quoting::{quoted, scalar};
 use crate::draft::writer::{Header, Port, Writer};
 use crate::naming::network_names;
@@ -14,7 +14,7 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
         import
             .nets
             .iter()
-            .map(|(key, (_, named))| (key.clone(), (!named.is_empty()).then(|| named.trim_start_matches("isoloom-").to_owned()))),
+            .map(|(key, net)| (key.clone(), (!net.name.is_empty()).then(|| net.name.trim_start_matches("isoloom-").to_owned()))),
     );
     let mut y = Writer::new(&Header {
         tool: "vagrant",
@@ -23,8 +23,12 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
         next: "add `app.image` or `app.build` to machines that should be a container rather than their steps' build, and `checks` that prove the behavior.",
         name,
     });
-    for (key, (block, _)) in &import.nets {
-        y.network(names.get(key).map_or("lab", String::as_str), 0, *block, true);
+    for (key, net) in &import.nets {
+        let name = names.get(key).map_or("lab", String::as_str);
+        match &net.bridged {
+            Some(b) => y.bridged(name, net.cidr, &bridged(b)),
+            None => y.network(name, 0, net.cidr, true),
+        }
     }
     y.machines();
     for m in machines {
@@ -37,6 +41,17 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
         }));
         y.resources(m.cpus, m.memory_mb);
         y.os(m.os);
+        if !m.host_folders.is_empty() {
+            let each: Vec<String> = m
+                .host_folders
+                .iter()
+                .map(|(from, path, read_only)| {
+                    let ro = if *read_only { ", read_only: true" } else { "" };
+                    format!("{{ from: {}, path: {}{ro} }}", scalar(from), scalar(path))
+                })
+                .collect();
+            y.line(format!("    host_folders: [{}]", each.join(", ")));
+        }
         if !m.steps.is_empty() {
             let steps: Vec<String> = m.steps.iter().map(|s| step(s)).collect();
             y.line(format!("    app:\n      steps: [{}]", steps.join(", ")));
@@ -50,6 +65,21 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
         }
     }
     y.finish()
+}
+
+/// A public network's `bridged` mapping.
+fn bridged(b: &Bridge) -> String {
+    let mut keys = Vec::new();
+    if let Some(i) = &b.interface {
+        keys.push(format!("interface: {}", quoted(i)));
+    }
+    if b.dhcp {
+        keys.push("dhcp: true".to_owned());
+    }
+    if b.default_route {
+        keys.push("default_route: true".to_owned());
+    }
+    format!("{{ {} }}", keys.join(", "))
 }
 
 /// A provisioning step as an `app.steps` item: a playbook, a script, or a reboot.

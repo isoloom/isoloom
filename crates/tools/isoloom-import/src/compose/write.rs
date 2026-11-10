@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use indexmap::IndexMap;
+
 use super::Machine;
 use super::networks::Networks;
 use crate::draft::quoting::{quoted, scalar};
@@ -15,9 +17,11 @@ pub(super) struct Environment<'a> {
     pub(super) nets: &'a Networks,
     /// Every input a machine reads, for the spec's own `inputs`.
     pub(super) inputs: &'a BTreeSet<String>,
+    /// The volumes shared between machines, each with its owner.
+    pub(super) shared: &'a IndexMap<String, String>,
 }
 
-/// The draft: the header, the networks, the inputs, then the machines.
+/// The draft: the header, the networks, the shared volumes, the inputs, then the machines.
 pub(super) fn draft_yaml(env: &Environment, machines: &[Machine]) -> String {
     let mut y = Writer::new(&Header {
         tool: "compose",
@@ -30,6 +34,12 @@ pub(super) fn draft_yaml(env: &Environment, machines: &[Machine]) -> String {
     let width = nets.clone().map(|n| n.name.len()).max().unwrap_or(0);
     for n in nets {
         y.network(&n.name, width, n.cidr, n.internet);
+    }
+    if !env.shared.is_empty() {
+        y.line("\nvolumes:");
+        for (name, owner) in env.shared {
+            y.line(format!("  {name}: {{ owner: {owner} }}"));
+        }
     }
     if !env.inputs.is_empty() {
         // Compose gave them to the containers as environment variables: not sensitive, so they
@@ -57,6 +67,10 @@ fn machine(y: &mut Writer, m: &Machine) {
         y.line(format!("    environment: {{ {} }}", each.join(", ")));
     }
     y.resources(m.cpus, m.memory_mb);
+    if !m.aliases.is_empty() {
+        let names: Vec<String> = m.aliases.iter().map(|a| scalar(a)).collect();
+        y.line(format!("    aliases: [{}]", names.join(", ")));
+    }
     if !m.depends_on.is_empty() {
         y.line(format!("    depends_on: [{}]", m.depends_on.join(", ")));
     }

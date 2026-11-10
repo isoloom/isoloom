@@ -201,33 +201,30 @@ impl Import<'_> {
         }
     }
 
-    /// A volume of one machine carries over; host paths and volumes shared between machines don't.
+    /// A named or anonymous volume carries over, one shared between machines as the spec's
+    /// top-level `volumes` held by the first machine that mounts it; host paths don't.
     fn volumes(&mut self, kat: String, v: &Value, m: &mut Machine) {
         let mut binds = Vec::new();
-        let mut shared = Vec::new();
         for item in v.as_sequence().into_iter().flatten() {
             match volume_mount(item) {
                 Some((VolumeMount::Bind, _)) | None => binds.push(flat(item)),
-                Some((VolumeMount::Named(n), path)) if self.volume_users.get(&n).copied().unwrap_or(0) > 1 => shared.push(format!("{n}:{path}")),
-                Some((VolumeMount::Named(n), path)) => m.volumes.push((label(&n), path)),
+                Some((VolumeMount::Named(n), path)) => {
+                    if self.volume_users.get(&n).copied().unwrap_or(0) > 1 {
+                        self.shared.entry(label(&n)).or_insert_with(|| m.name.clone());
+                    }
+                    m.volumes.push((label(&n), path));
+                }
                 Some((VolumeMount::Anonymous, path)) => m.volumes.push((label(path.trim_start_matches('/')), path)),
             }
         }
         if !binds.is_empty() {
             self.notes.add(
-                kat.clone(),
+                kat,
                 NoteKind::InImage,
                 format!(
                     "project files mounted in: copy them into the image, or run scripts as `setup` scripts: {}",
                     binds.join(", ")
                 ),
-            );
-        }
-        if !shared.is_empty() {
-            self.notes.add(
-                kat,
-                NoteKind::NotYet,
-                format!("data shared between machines (not in the format yet): {}", shared.join(", ")),
             );
         }
     }

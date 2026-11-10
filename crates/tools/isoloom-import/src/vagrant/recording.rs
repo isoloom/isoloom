@@ -92,10 +92,19 @@ impl Call {
         self.block.as_ref()
     }
 
+    /// The argument at `index` (from 0), as text (`synced_folder`'s guest path is the second).
+    pub(super) fn arg(&self, index: usize) -> Option<String> {
+        text(self.args.get(index))
+    }
+
+    /// The options given as arguments (Ruby's trailing hash: `ip: ...`), when there are any.
+    pub(super) fn options(&self) -> Option<&serde_json::Map<String, Value>> {
+        self.args.last().and_then(Value::as_object)
+    }
+
     /// The option `key`, given as an argument (`ip: ...`) or set in the block.
     pub(super) fn opt(&self, key: &str) -> Option<&Value> {
-        self.args
-            .get(1)
+        self.options()
             .and_then(|opts| opts.get(key))
             .filter(|v| !v.is_null())
             .or_else(|| self.block()?.setting(key))

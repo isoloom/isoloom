@@ -23,7 +23,7 @@ mod ipv6;
 mod links;
 mod machine_files;
 mod machines;
-pub use machines::{MACHINE_NAME_MAX, RESERVED_PREFIX};
+pub use machines::{MACHINE_NAME_MAX, RESERVED_PREFIX, dns_name};
 mod networks;
 mod os;
 mod outside;
