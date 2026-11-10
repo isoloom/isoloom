@@ -75,3 +75,44 @@ fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
     );
     assert!(CloudDockerBackend.render(&env(16384)).unwrap_err().to_string().ends_with(&why));
 }
+
+/// Every command a manifest runs over SSH, with the user it logs in as.
+fn ssh_commands(json: &serde_json::Value) -> Vec<(String, String)> {
+    let text = |v: &serde_json::Value| v.as_str().unwrap_or_default().to_owned();
+    let mut out = Vec::new();
+    let mut stack = vec![json];
+    while let Some(v) = stack.pop() {
+        match v {
+            serde_json::Value::Object(o) => {
+                if o.get("action").and_then(|a| a.as_str()) == Some("ssh.run") {
+                    let with = &o["with"];
+                    out.push((text(&with["user"]), text(&with["command"])));
+                }
+                stack.extend(o.values());
+            }
+            serde_json::Value::Array(a) => stack.extend(a),
+            _ => {}
+        }
+    }
+    out
+}
+
+#[test]
+fn linodes_root_host_runs_every_command_without_sudo_the_others_through_it() -> Outcome {
+    let manifests = CloudDockerBackend.run_manifests(&env("configured-app")?).unwrap();
+    let of = |cloud: &str| {
+        let placed = manifests.iter().find(|p| p.sub == Some(cloud)).expect(cloud);
+        ssh_commands(&serde_json::to_value(&placed.manifest).unwrap())
+    };
+    let linode = of("linode");
+    assert!(linode.len() > 4, "{linode:?}");
+    for (user, command) in &linode {
+        assert_eq!(user, "root");
+        // Linode's Debian has no `sudo`: root runs each command as it is.
+        assert!(!command.contains("sudo"), "{command}");
+    }
+    let aws = of("aws");
+    assert!(aws.iter().all(|(user, _)| user != "root"), "{aws:?}");
+    assert!(aws.iter().any(|(_, c)| c.starts_with("sudo rm -rf /opt/isoloom")), "{aws:?}");
+    Ok(())
+}

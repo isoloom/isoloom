@@ -40,6 +40,7 @@ mod machine;
 mod module;
 mod seal;
 mod server;
+mod ssh;
 mod target;
 #[cfg(test)]
 mod testing;

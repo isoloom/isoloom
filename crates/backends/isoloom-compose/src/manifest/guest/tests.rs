@@ -28,9 +28,38 @@ checks:
 ";
 
 fn guest_of(yaml: &str) -> GuestCompose {
+    guest_as(yaml, AsRoot::Sudo)
+}
+
+fn guest_as(yaml: &str, as_root: AsRoot) -> GuestCompose {
     let env = environment(yaml);
     let file = compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
-    guest(&env, &file).unwrap()
+    guest(&env, &file, as_root).unwrap()
+}
+
+#[test]
+fn a_root_way_in_runs_every_command_without_sudo() {
+    let g = guest_as(WITH_SECRET, AsRoot::Root);
+    let commands = g
+        .start
+        .iter()
+        .chain([&g.status])
+        .chain(g.check_setup.iter())
+        .chain(g.check_teardown.iter())
+        .chain(g.runners.iter().flat_map(|r| std::iter::once(&r.command).chain(&r.on_timeout)))
+        .map(|c| c.command.to_string());
+    let mut seen = 0;
+    for c in commands {
+        assert!(!c.contains("sudo"), "{c}");
+        seen += 1;
+    }
+    assert!(seen > 3, "{seen}");
+    assert!(
+        g.start[0]
+            .command
+            .to_string()
+            .starts_with("cd /opt/isoloom && env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0")
+    );
 }
 
 #[test]

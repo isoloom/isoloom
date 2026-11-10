@@ -4,8 +4,8 @@
 //! and the param saying whether the derived checks run.
 
 use isoloom_manifest::{
-    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RelPath, Run, RunVar, Seal,
-    SnakeName, Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RelPath, RunVar, Seal, Step,
+    Template,
 };
 use isoloom_render::run_manifest::noted;
 use isoloom_render::steps::PROJECT_DIR;
@@ -14,6 +14,7 @@ use isoloom_spec::linux::STATE_DIR;
 use super::connection::SEALED;
 use crate::machine::user_data::{DELIVERED, SETUP_LOG};
 use crate::module::manifest::{self, id, secs, terraform, words};
+use crate::ssh::Login;
 
 /// The values the runner gives a cloud module: its key, which the machines let in.
 const VARS: &[(&str, RunVar)] = &[("TF_VAR_ssh_public_key", RunVar::SshPublicKey)];
@@ -31,39 +32,17 @@ use isoloom_render::run_manifest::DERIVED;
 pub(crate) struct Guest {
     /// Its name in the manifest.
     pub(crate) machine: String,
-    /// Its address (`${outputs.address_<machine>}`).
-    pub(crate) address: Template,
-    /// The user the runner's key logs in as.
-    pub(crate) user: String,
+    /// Its address (`${outputs.address_<machine>}`) and the user the runner's key logs in as.
+    pub(crate) login: Login,
     /// How long its set-up may take after the delivery, in seconds.
     pub(crate) setup_s: u32,
 }
 
 impl Guest {
-    /// `sudo ` unless the user is root (Linode's Debian has no `sudo`).
-    fn sudo(&self) -> &'static str {
-        if self.user == "root" { "" } else { "sudo " }
-    }
-
     /// Its step id's suffix: its name, as a step id takes it.
     fn id(&self) -> String {
         self.machine.to_ascii_lowercase().replace(['_', '.'], "-")
     }
-}
-
-/// An `ssh.run` step to `guest`, running `command`, its `with` extended by `more`.
-fn ssh_run(step: &str, guest: &Guest, command: Template, more: &[(&str, Template)]) -> Result<Step, ManifestError> {
-    let mut with = vec![("host", guest.address.clone()), ("user", Template::text(&guest.user)), ("command", command)];
-    with.extend(more.iter().cloned());
-    let mut s = Step::action(id(step)?, Action::SshRun);
-    s.run = Run::Action {
-        action: Action::SshRun,
-        with: with
-            .into_iter()
-            .map(|(k, v)| Ok((SnakeName::parse(k)?, v)))
-            .collect::<Result<_, ManifestError>>()?,
-    };
-    Ok(s)
 }
 
 /// The project archived in the run's state folder (from the project's folder, three levels up
@@ -77,10 +56,10 @@ fn archive() -> Result<Step, ManifestError> {
 fn deliver(guest: &Guest) -> Result<Step, ManifestError> {
     let command = format!(
         "{}sh -c 'mkdir -p {PROJECT_DIR} {STATE_DIR} && tar -xzf - -C {PROJECT_DIR} && touch {DELIVERED}'",
-        guest.sudo()
+        guest.login.as_root().prefix()
     );
     let wait = [("wait_s", Template::text(&BOOT_WAIT_S.to_string()))];
-    let mut s = ssh_run(&format!("deliver-{}", guest.id()), guest, Template::text(&command), &wait)?;
+    let mut s = guest.login.step(&format!("deliver-{}", guest.id()), &Template::text(&command), &wait)?;
     s.stdin = Some(PathTemplate::in_state_dir(&RelPath::parse("project.tgz")?));
     s.timeout_s = secs(BOOT_WAIT_S + 600);
     Ok(noted(s, &format!("Copying the project into {}…", guest.machine)))
@@ -164,7 +143,13 @@ pub(crate) fn ready(guests: &[Guest]) -> Result<Vec<Condition>, ManifestError> {
         means: Some("the machines exist and booted; each sets itself up from its user data once the project is in".into()),
     }];
     for g in guests {
-        out.push(crate::module::manifest::ready_file(g.address.clone(), &g.user, SETUP_LOG, None, g.setup_s)?);
+        out.push(crate::module::manifest::ready_file(
+            g.login.host.clone(),
+            &g.login.user,
+            SETUP_LOG,
+            None,
+            g.setup_s,
+        )?);
     }
     Ok(out)
 }
@@ -177,7 +162,7 @@ pub(crate) fn check_step(position: &str, guest: &Guest, script: &str, timeout_s:
         Part::Placeholder(Placeholder::Param(EnvName::parse(DERIVED)?)),
         Part::Text(format!(" sh {script}")),
     ]);
-    let mut s = ssh_run(&format!("check-{position}"), guest, command, &[])?;
+    let mut s = guest.login.step(&format!("check-{position}"), &command, &[])?;
     s.timeout_s = secs(timeout_s);
     Ok(s)
 }
@@ -191,12 +176,12 @@ pub(crate) fn derived(runners: &[CheckRunner]) -> Result<Vec<Param>, ManifestErr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use isoloom_manifest::Run;
 
     fn guest(user: &str) -> Guest {
         Guest {
             machine: "web".into(),
-            address: Template::text("203.0.113.10"),
-            user: user.into(),
+            login: Login::new(Template::text("203.0.113.10"), user),
             setup_s: 2400,
         }
     }

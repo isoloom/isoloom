@@ -6,6 +6,7 @@ use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_render::run_manifest::guest::GuestCompose;
+use isoloom_render::steps::AsRoot;
 use isoloom_spec::model::Target;
 
 use crate::render;
@@ -38,17 +39,18 @@ impl Backend for ComposeBackend {
     }
 }
 
-/// What runs inside `docker-vm`'s VM for `env` (planned for the `docker` target): the `docker`
-/// target's Compose file, its containers, and the commands that start, check and read them there
-/// (the backend that makes the VM runs them through its own way in).
+/// What runs inside a Docker host VM (`docker-vm`, `cloud-docker`) for `env` (planned for the
+/// `docker` target): the `docker` target's Compose file, its containers, and the commands that
+/// start, check and read them there, as root as the way in gets it (`as_root`: the backend that
+/// makes the VM runs them through its own way in).
 ///
 /// # Errors
 ///
 /// [`crate::Error::Refused`] when `env` needs what Compose can't do; a manifest error for a name
 /// the run manifest refuses (a bug: the spec checks them).
-pub fn guest(env: &Environment) -> crate::Result<GuestCompose> {
+pub fn guest(env: &Environment, as_root: AsRoot) -> crate::Result<GuestCompose> {
     let file = render::compose_file(Target::Docker, env)?.file;
-    crate::manifest::guest(env, &file)
+    crate::manifest::guest(env, &file, as_root)
 }
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,

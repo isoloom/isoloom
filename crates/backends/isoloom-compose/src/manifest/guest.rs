@@ -3,14 +3,15 @@
 //! roles, slots, start plan and check runners as on this computer's Docker ([`super::docker`]),
 //! with what differs in a VM: the file's own project name (one lab per VM), every published port
 //! fixed at its `publish` number (the VM forwards it, or answers at its own address), the project
-//! files Compose reads from its environment read from the VM's copy, and root's Docker (`sudo`,
-//! keeping the values the way in forwarded).
+//! files Compose reads from its environment read from the VM's copy, and root's Docker (through
+//! `sudo` keeping the values the way in forwarded, unless the way in is root: [`AsRoot`]).
 
 use isoloom_manifest::{EnvName, Failure, Machine, Name, Part, Placeholder, PublishMode, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_render::container::{exec_runner, host_environment, host_folders};
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, GuestRunner};
 use isoloom_render::run_manifest::{DERIVED, check, derived_switch, networks, timeout_s};
+use isoloom_render::steps::AsRoot;
 use isoloom_render::{OUTPUT_DIR, steps};
 
 use super::Project;
@@ -29,17 +30,20 @@ use crate::start::StartPlan;
 /// folders where the VM shares them.
 struct InVm {
     project: String,
+    /// How the way in gets root.
+    as_root: AsRoot,
     /// `<variable>=<where the VM shares it> ` for each container's host folder.
     folders: String,
 }
 
 impl InVm {
     /// `cd <project copy> && <before>sudo -E … docker compose … <rest>`, `-E` keeping what the way
-    /// in forwarded and `before` exported.
+    /// in forwarded and `before` exported (no `sudo` for root).
     fn compose(&self, before: &str, rest: &[Part]) -> Template {
         let head = format!(
-            "cd {} && {before}sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 {}docker compose --project-name {} --file {OUTPUT_DIR}/docker/compose.yml ",
+            "cd {} && {before}{}env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 {}docker compose --project-name {} --file {OUTPUT_DIR}/docker/compose.yml ",
             steps::PROJECT_DIR,
+            self.as_root.keeping_env(),
             self.folders,
             self.project
         );
@@ -49,7 +53,8 @@ impl InVm {
     /// The containers, as `ps` lists them: nothing before Docker is in the VM.
     fn status(&self) -> Template {
         Template::text(&format!(
-            "if command -v docker >/dev/null; then sudo docker compose --project-name {} ps --all --format json; fi",
+            "if command -v docker >/dev/null; then {}docker compose --project-name {} ps --all --format json; fi",
+            self.as_root.prefix(),
             self.project
         ))
     }
@@ -69,8 +74,9 @@ fn command(id: &str, note: Option<String>, command: Template, timeout_s: u32) ->
     })
 }
 
-/// What runs inside `docker-vm`'s VM: the Compose file `file` of `env` (the `docker` target's).
-pub(crate) fn guest(env: &Environment, file: &ComposeFile) -> Result<GuestCompose> {
+/// What runs inside a Docker host VM: the Compose file `file` of `env` (the `docker` target's),
+/// run as root as `as_root` says.
+pub(crate) fn guest(env: &Environment, file: &ComposeFile, as_root: AsRoot) -> Result<GuestCompose> {
     let members = classify(env, file)?;
     let plan = StartPlan::of(file);
     let project = Project::Named(file.name.clone());
@@ -80,6 +86,7 @@ pub(crate) fn guest(env: &Environment, file: &ComposeFile) -> Result<GuestCompos
         .collect();
     let vm = InVm {
         project: file.name.clone(),
+        as_root,
         folders: folders.concat(),
     };
     let (runners, derived) = runners(env, &vm)?;
@@ -154,8 +161,9 @@ fn compose_runner(vm: &InVm, p: &Planned<'_>) -> Result<GuestRunner> {
         Part::Text(format!(" {}", p.service)),
     ];
     // A runner cut off by its time limit leaves its one-off container behind.
+    let sudo = vm.as_root.prefix();
     let leftover = format!(
-        "sudo docker ps -aq --filter label=com.docker.compose.project={} --filter label=com.docker.compose.service={} --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+        "{sudo}docker ps -aq --filter label=com.docker.compose.project={} --filter label=com.docker.compose.service={} --filter label=com.docker.compose.oneoff=True | xargs -r {sudo}docker rm -f",
         vm.project, p.service
     );
     Ok(GuestRunner {

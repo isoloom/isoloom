@@ -432,3 +432,12 @@ fn a_project_script_with_a_space_in_its_path_runs() {
     std::fs::remove_dir_all(&dir).ok();
     assert!(status.success() && ran, "{script}");
 }
+
+#[test]
+fn root_runs_a_command_as_it_is_and_another_user_through_sudo() {
+    use super::AsRoot;
+    assert_eq!(AsRoot::of("root"), AsRoot::Root);
+    assert_eq!((AsRoot::Root.prefix(), AsRoot::Root.keeping_env()), ("", ""));
+    assert_eq!(AsRoot::of("isoloom"), AsRoot::Sudo);
+    assert_eq!((AsRoot::Sudo.prefix(), AsRoot::Sudo.keeping_env()), ("sudo ", "sudo -E "));
+}

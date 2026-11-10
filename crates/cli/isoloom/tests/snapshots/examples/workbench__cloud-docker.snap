@@ -1850,7 +1850,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom",
+          "command": "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -1862,7 +1862,7 @@ output "ssh_user" {
         "note": "Installing Docker in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -s",
+          "command": "sh -s",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -1874,7 +1874,7 @@ output "ssh_user" {
         "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -1981,7 +1981,7 @@ output "ssh_user" {
           "id": "check-bench",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-bench",
+            "command": "cd /opt/isoloom && env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-bench",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -1992,7 +1992,7 @@ output "ssh_user" {
             "id": "rm-check-bench",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=workbench --filter label=com.docker.compose.service=isoloom-check-bench --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "docker ps -aq --filter label=com.docker.compose.project=workbench --filter label=com.docker.compose.service=isoloom-check-bench --filter label=com.docker.compose.oneoff=True | xargs -r docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -2019,7 +2019,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name workbench ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then docker compose --project-name workbench ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "root"
       },
@@ -3139,7 +3139,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom",
+          "command": "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3151,7 +3151,7 @@ output "ssh_user" {
         "note": "Installing Docker in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -s",
+          "command": "sh -s",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3163,7 +3163,7 @@ output "ssh_user" {
         "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
+          "command": "cd /opt/isoloom && env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3270,7 +3270,7 @@ output "ssh_user" {
           "id": "check-bench",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-bench",
+            "command": "cd /opt/isoloom && env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name workbench --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check-bench",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -3281,7 +3281,7 @@ output "ssh_user" {
             "id": "rm-check-bench",
             "action": "ssh.run",
             "with": {
-              "command": "sudo docker ps -aq --filter label=com.docker.compose.project=workbench --filter label=com.docker.compose.service=isoloom-check-bench --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
+              "command": "docker ps -aq --filter label=com.docker.compose.project=workbench --filter label=com.docker.compose.service=isoloom-check-bench --filter label=com.docker.compose.oneoff=True | xargs -r docker rm -f",
               "host": "${outputs.ip}",
               "user": "root"
             },
@@ -3308,7 +3308,7 @@ output "ssh_user" {
       "id": "ps",
       "action": "ssh.run",
       "with": {
-        "command": "if command -v docker >/dev/null; then sudo docker compose --project-name workbench ps --all --format json; fi",
+        "command": "if command -v docker >/dev/null; then docker compose --project-name workbench ps --all --format json; fi",
         "host": "${outputs.ip}",
         "user": "root"
       },

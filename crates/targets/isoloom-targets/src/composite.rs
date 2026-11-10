@@ -16,6 +16,7 @@ use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{self, Backend, Files, Placed};
 use isoloom_render::container::host_folders;
 use isoloom_render::run_manifest::guest::GuestCompose;
+use isoloom_render::steps::AsRoot;
 use isoloom_spec::model::Target;
 use isoloom_vagrant::{docker_vm, hybrid};
 
@@ -31,10 +32,15 @@ fn docker_files(env: &Environment) -> Result<Files, RenderError> {
 }
 
 /// What runs inside the VM for `env`: the `docker` target's Compose file, and the commands that
-/// start, check and read it there. A refusal or failure is `env`'s target's.
-fn guest(env: &Environment) -> Result<GuestCompose, RenderError> {
-    isoloom_compose::guest(&on_docker(env)).map_err(|e| RenderError::from(e).on(env.target))
+/// start, check and read it there, as root as `as_root` says. A refusal or failure is `env`'s
+/// target's.
+fn guest(env: &Environment, as_root: AsRoot) -> Result<GuestCompose, RenderError> {
+    isoloom_compose::guest(&on_docker(env), as_root).map_err(|e| RenderError::from(e).on(env.target))
 }
+
+/// How `docker-vm`'s VM is entered: as a user with `sudo` (Vagrant's `vagrant`, the Proxmox
+/// VM's `isoloom`).
+const DOCKER_VM_ROOT: AsRoot = AsRoot::Sudo;
 
 /// The `cloud-docker` backend: Compose on one cloud VM per cloud, built by Terraform.
 #[derive(Debug, Clone, Copy, Default)]
@@ -63,9 +69,9 @@ impl Backend for CloudDockerBackend {
     }
 
     /// A run manifest per cloud that can host the containers, built on the Compose-in-a-VM plan
-    /// (`guest`, from the `docker` target's environment).
+    /// (`guest`, from the `docker` target's environment) as the cloud's host user gets root.
     fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
-        Ok(isoloom_terraform::cloud_docker_manifests(env, &guest(env)?)?)
+        isoloom_terraform::cloud_docker_manifests(env, &|as_root| guest(env, as_root))
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
@@ -97,7 +103,7 @@ impl Backend for DockerVmBackend {
     /// computer that runs the lab (the server's VM runs elsewhere).
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::DockerVm, env, &self.capabilities())?;
-        let guest = guest(env)?;
+        let guest = guest(env, DOCKER_VM_ROOT)?;
         let mut files = docker_files(env)?;
         files.push(docker_vm::vagrantfile(env, &guest)?);
         if on_proxmox(env) {
@@ -109,7 +115,7 @@ impl Backend for DockerVmBackend {
     /// One manifest per way the VM is made: Vagrant's (`docker-vm/run.json`), Proxmox's
     /// (`docker-vm/proxmox/run.json`) when the lab can run there.
     fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
-        let guest = guest(env)?;
+        let guest = guest(env, DOCKER_VM_ROOT)?;
         let mut out = vec![Placed::here(docker_vm::manifest(env, &guest)?)];
         if on_proxmox(env) {
             out.push(Placed::under("proxmox", isoloom_terraform::docker_vm_manifest(env, &guest)?));

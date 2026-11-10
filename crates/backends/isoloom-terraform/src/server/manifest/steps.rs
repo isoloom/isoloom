@@ -13,6 +13,7 @@ use isoloom_render::run_manifest::{action_with, timeout_s};
 use crate::machine::{controller, vms};
 use crate::module::manifest::{self, PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, secs, terraform, words};
 use crate::server::router::check_host;
+use crate::ssh::Login;
 
 use crate::machine::USER;
 
@@ -26,13 +27,8 @@ const SETUP_LOG: &str = "/var/log/cloud-init-output.log";
 /// environment's way in, as `isoloom`: where the runner reaches every machine through, and, on
 /// ESXi, where Terraform does too.
 fn seal_reload() -> Result<Step, ManifestError> {
-    let with = [
-        ("host", output("ip")?),
-        ("user", Template::text(USER)),
-        ("command", Template::text(&crate::server::router::sealed_reload())),
-    ];
-    let mut step = Step::action(id("seal-reload")?, Action::SshRun);
-    step.run = action_with(Action::SshRun, with)?;
+    let login = Login::new(output("ip")?, USER);
+    let mut step = login.step("seal-reload", &Template::text(&crate::server::router::sealed_reload()), &[])?;
     step.timeout_s = secs(UNREACHABLE_S);
     Ok(step)
 }

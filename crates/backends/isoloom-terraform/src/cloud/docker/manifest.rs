@@ -10,11 +10,12 @@
 //! secrets carried in over SSH (`SendEnv`). The published ports answer at the VM's address, and
 //! the runner reads the containers inside it (`Manifest.guest`).
 
-use isoloom_manifest::{Driver, Error as ManifestError, Manifest, ManifestVersion, Placeholder, RelPath, Run, SCHEMA_URL, SnakeName, Step, Template};
+use isoloom_manifest::{Driver, Error as ManifestError, Manifest, ManifestVersion, Placeholder, RelPath, SCHEMA_URL, SnakeName, Step, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::guest::GuestCompose;
 
-use crate::docker_host::{accept_env, docker_host_outputs, into_vm, ssh_run};
+use crate::docker_host::{accept_env, docker_host_outputs, into_vm};
+use crate::ssh::Login;
 use isoloom_render::run_manifest::{environment, generator};
 
 use super::super::Cloud;
@@ -23,16 +24,21 @@ use super::super::manifest::{self, connection, steps};
 /// The host's address (`${outputs.ip}`): where SSH reaches it and its containers' ports answer.
 const IP: &str = "ip";
 
+/// The way into `driver`'s host: its address output ([`IP`]), as the user its image signs in as.
+pub(crate) fn login(driver: &super::Driver) -> Result<Login, ManifestError> {
+    Ok(Login::new(Template::from(Placeholder::Output(SnakeName::parse(IP)?)), driver.user()))
+}
+
 /// How long the runner retries the first SSH while the fresh VM is still booting, in seconds.
 const SSH_BOOT_WAIT_S: u32 = 300;
 
-/// The run manifest of `env`'s containers on `cloud`, run in one VM whose module `driver` writes;
-/// `guest` is the Compose-in-a-VM plan (`isoloom_compose::guest`). Its message is left to the
-/// caller.
-pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, guest: &GuestCompose) -> Result<Manifest, ManifestError> {
-    let ip = Template::from(Placeholder::Output(SnakeName::parse(IP)?));
-    let way_in = ssh_run(ip.clone(), driver.user());
-    let up = up_steps(&way_in, guest)?;
+/// The run manifest of `env`'s containers on `cloud`, run in one VM whose module `driver` writes,
+/// entered as `login` (the host's address and user); `guest` is the Compose-in-a-VM plan
+/// (`isoloom_compose::guest`) as that user gets root. Its message is left to the caller.
+pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, login: &Login, guest: &GuestCompose) -> Result<Manifest, ManifestError> {
+    let ip = login.host.clone();
+    let way_in = login.way_in();
+    let up = up_steps(login, guest)?;
     let guest_machines = guest.machines_at(&ip);
     let host = guest.docker_host(env, ("apply", "the Docker host exists and booted"), Some(ip.clone()), &way_in)?;
     let mut machines = vec![host.machine];
@@ -71,23 +77,24 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
 
 /// The `up` steps: Terraform's lock, init and apply, then the runner installs Docker and copies
 /// the project into the VM over SSH (`into_vm`) and starts the Compose file there.
-fn up_steps(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, guest: &GuestCompose) -> Result<Vec<Step>, ManifestError> {
+fn up_steps(login: &Login, guest: &GuestCompose) -> Result<Vec<Step>, ManifestError> {
+    let way_in = login.way_in();
     let mut up = vec![
         steps::clear_lock()?,
         steps::init_step()?,
         steps::apply_step("apply", "Creating the Docker host in the cloud…")?,
     ];
-    let mut into = into_vm(way_in, &RelPath::parse("setup.sh")?, "../../..")?;
+    let mut into = into_vm(login, &RelPath::parse("setup.sh")?, "../../..")?;
     boot_wait(&mut into)?;
     up.extend(into);
     // The VM is readied bare over SSH (no cloud-init `AcceptEnv`, unlike docker-vm on Proxmox), so
     // its sshd must be told to accept the launch's values the runner forwards (`SendEnv`) before
     // the start steps run; otherwise the containers' env vars arrive unset.
-    if let Some(accept) = accept_env(guest)? {
-        up.push(accept.step(way_in)?);
+    if let Some(accept) = accept_env(guest, login.as_root())? {
+        up.push(accept.step(&way_in)?);
     }
     for command in &guest.start {
-        up.push(command.step(way_in)?);
+        up.push(command.step(&way_in)?);
     }
     Ok(up)
 }

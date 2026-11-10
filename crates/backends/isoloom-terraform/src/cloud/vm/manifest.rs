@@ -5,6 +5,7 @@
 //! project's copy there. A Windows machine is still set up by Terraform over WinRM (its module
 //! uploads the project itself), so the runner neither delivers to it nor reads its ready file.
 
+use crate::ssh::Login;
 use std::net::IpAddr;
 
 use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SecretSlot, SnakeName, Template};
@@ -41,14 +42,13 @@ fn at(machine: &str) -> Result<Template, ManifestError> {
 
 /// The run manifest of `env` on `cloud`, whose module `driver` writes.
 pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Result<isoloom_manifest::Manifest, ManifestError> {
-    let user = |mp: &MachinePlan| (driver.base.user)(mp.os.as_deref().unwrap_or_default()).to_owned();
+    let user = |mp: &MachinePlan| (driver.base.user)(mp.os.as_deref().unwrap_or_default());
     let mut guests: Vec<Guest> = vms(env)
         .filter(|(_, mp)| !mp.is_windows())
         .map(|(name, mp)| {
             Ok(Guest {
                 machine: name.to_owned(),
-                address: at(name)?,
-                user: user(mp),
+                login: Login::new(at(name)?, user(mp)),
                 setup_s: manifest::SETUP_S,
             })
         })
@@ -56,8 +56,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Resu
     if controller::needed(env) {
         guests.push(Guest {
             machine: CONTROLLER.to_owned(),
-            address: at(CONTROLLER)?,
-            user: (driver.base.user)(controller::OS).to_owned(),
+            login: Login::new(at(CONTROLLER)?, (driver.base.user)(controller::OS)),
             setup_s: manifest::PLAYBOOKS_S,
         });
     }

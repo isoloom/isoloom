@@ -39,6 +39,44 @@ pub const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
 /// the drop-in when it starts) doesn't fail the set-up.
 pub const RELOAD_SSHD: &str = "systemctl reload ssh || systemctl reload sshd || true";
 
+/// How a command run over SSH as a VM's login user gets root: the one rule every way into a VM
+/// shares. A user other than root goes through `sudo`; root runs the command as it is, since its
+/// image may have no `sudo` (Linode's Debian).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AsRoot {
+    /// The login user is root: no prefix.
+    Root,
+    /// Another user, through `sudo`.
+    Sudo,
+}
+
+impl AsRoot {
+    /// The rule for login user `user`.
+    #[must_use]
+    pub fn of(user: &str) -> AsRoot {
+        if user == "root" { AsRoot::Root } else { AsRoot::Sudo }
+    }
+
+    /// What goes before a command run as root: `sudo `, or nothing.
+    #[must_use]
+    pub fn prefix(self) -> &'static str {
+        match self {
+            AsRoot::Root => "",
+            AsRoot::Sudo => "sudo ",
+        }
+    }
+
+    /// [`AsRoot::prefix`], keeping the session's environment (the values the way in forwarded):
+    /// `sudo -E `, or nothing.
+    #[must_use]
+    pub fn keeping_env(self) -> &'static str {
+        match self {
+            AsRoot::Root => "",
+            AsRoot::Sudo => "sudo -E ",
+        }
+    }
+}
+
 /// The line of [`ACCEPT_ENV_FILE`] letting sshd accept `forwarded`, environment variables' names
 /// (upper snake case, so no quoting is needed).
 #[must_use]

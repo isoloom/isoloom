@@ -4,13 +4,14 @@
 //! host sets itself up from its user data (`crate::cloud::docker::setup`), and the Proxmox one
 //! through the docker-vm run manifest. Either is readied the same way over SSH ([`into_vm`]):
 //! [`setup_script`] (Docker) piped in, then the project's archive; then the Compose backend's
-//! commands run through [`ssh_run`].
+//! commands run through the same way in ([`Login`]).
 
-use isoloom_manifest::{Action, Error as ManifestError, Failure, Machine, Output, OutputRole, PathTemplate, RelPath, Run, Step, StepId, Template};
+use isoloom_manifest::{Error as ManifestError, Failure, Machine, Output, OutputRole, PathTemplate, RelPath, Step, StepId, Template};
 use isoloom_render::run_manifest::{self, guest::COMPOSE_OUTPUTS, guest::GuestCommand, guest::GuestCompose};
-use isoloom_render::steps::{self, ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, CLOUD_INIT_WAIT, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE, RELOAD_SSHD, install_docker};
+use isoloom_render::steps::{self, ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, AsRoot, CLOUD_INIT_WAIT, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE, RELOAD_SSHD, install_docker};
 
 use crate::hcl_builder::{Expression, list, string};
+use crate::ssh::Login;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::Protocol;
 
@@ -46,23 +47,25 @@ pub(crate) fn port_strings(ports: &[u16]) -> Expression {
 /// variables (`AcceptEnv`) and reloads sshd, run before the start steps so the sessions that
 /// create the containers carry the launch's values. `None` when nothing is forwarded. A VM
 /// whose image sets `AcceptEnv` from cloud-init (docker-vm on Proxmox) does not need it; a VM
-/// Terraform makes bare (cloud-docker) does, since nothing else tells its sshd.
+/// Terraform makes bare (cloud-docker) does, since nothing else tells its sshd. Run as root as
+/// `as_root` says.
 ///
 /// # Errors
 ///
 /// A step id the manifest refuses (a bug: it is fixed). The forwarded names are environment
 /// variables (upper snake case), so the command needs no quoting.
-pub(crate) fn accept_env(guest: &GuestCompose) -> Result<Option<GuestCommand>, ManifestError> {
+pub(crate) fn accept_env(guest: &GuestCompose, as_root: AsRoot) -> Result<Option<GuestCommand>, ManifestError> {
     let forwarded = guest.forwarded();
     if forwarded.is_empty() {
         return Ok(None);
     }
     let line = steps::accept_env_line(&forwarded);
+    let sudo = as_root.prefix();
     Ok(Some(GuestCommand {
         id: StepId::parse("accept-env")?,
         note: Some("Letting the VM accept the launch's values…".into()),
         command: Template::text(&format!(
-            "sudo mkdir -p {ACCEPT_ENV_DIR} && echo {line} | sudo tee {ACCEPT_ENV_FILE} >/dev/null && sudo sh -c \"{RELOAD_SSHD}\""
+            "{sudo}mkdir -p {ACCEPT_ENV_DIR} && echo {line} | {sudo}tee {ACCEPT_ENV_FILE} >/dev/null && {sudo}sh -c \"{RELOAD_SSHD}\""
         )),
         timeout_s: 60,
         failure: Failure::Fail,
@@ -89,46 +92,42 @@ pub(crate) fn docker_host_outputs(machines: &[Machine]) -> Result<Vec<Output>, M
     Ok(out)
 }
 
-/// The way into a VM Terraform made: `ssh.run` to `host` (`${outputs.ip}`) as `user`, with the
-/// runner's key.
-pub(crate) fn ssh_run(host: Template, user: &str) -> impl Fn(&Template) -> Result<Run, ManifestError> {
-    let user = Template::text(user);
-    move |command: &Template| run_manifest::action_with(Action::SshRun, [("host", host.clone()), ("user", user.clone()), ("command", command.clone())])
-}
-
 /// How long the set-up script may take: cloud-init's end, then Docker's install.
 const SETUP_S: u32 = 1800;
 
-/// A VM Terraform made, readied for Compose through `way_in`: the project archived
-/// (`project.archive`, `root` its folder from the manifest's, with [`COMPOSE_OUTPUTS`]) and piped into `tar` in the VM's
-/// project folder, replacing what an earlier copy left, then `setup` (the generated
-/// [`setup_script`], beside the manifest) piped into `sudo sh -s`, which trusts the project's
-/// certificate authorities before it downloads Docker.
+/// A VM Terraform made, readied for Compose through `login`: the project archived
+/// (`project.archive`, `root` its folder from the manifest's, with [`COMPOSE_OUTPUTS`]) and piped
+/// into `tar` in the VM's project folder, replacing what an earlier copy left, then `setup` (the
+/// generated [`setup_script`], beside the manifest) piped into `sh -s` as root, which trusts the
+/// project's certificate authorities before it downloads Docker. Each command gets root as the
+/// login's user does ([`AsRoot`]).
 ///
 /// # Errors
 ///
-/// What `way_in` refuses, or a path or id the manifest refuses (a bug: they are fixed).
-pub(crate) fn into_vm(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, setup: &RelPath, root: &str) -> Result<Vec<Step>, ManifestError> {
+/// A path, key or id the manifest refuses (a bug: they are fixed).
+pub(crate) fn into_vm(login: &Login, setup: &RelPath, root: &str) -> Result<Vec<Step>, ManifestError> {
+    let sudo = login.as_root().prefix();
+    let way_in = login.way_in();
     let docker = GuestCommand {
         id: StepId::parse("docker")?,
         note: Some("Installing Docker in the VM…".into()),
-        command: Template::text("sudo sh -s"),
+        command: Template::text(&format!("{sudo}sh -s")),
         timeout_s: SETUP_S,
         failure: Failure::Fail,
     };
-    let mut docker = docker.step(way_in)?;
+    let mut docker = docker.step(&way_in)?;
     docker.stdin = Some(PathTemplate::relative(setup));
     let archive = run_manifest::project_archive(root, &COMPOSE_OUTPUTS)?;
     let copy = GuestCommand {
         id: StepId::parse("project")?,
         note: Some("Copying the project into the VM…".into()),
         command: Template::text(&format!(
-            "sudo rm -rf {PROJECT_DIR} && sudo mkdir -p {PROJECT_DIR} && sudo tar -xzf - -C {PROJECT_DIR}"
+            "{sudo}rm -rf {PROJECT_DIR} && {sudo}mkdir -p {PROJECT_DIR} && {sudo}tar -xzf - -C {PROJECT_DIR}"
         )),
         timeout_s: 600,
         failure: Failure::Fail,
     };
-    let mut copy = copy.step(way_in)?;
+    let mut copy = copy.step(&way_in)?;
     copy.stdin = Some(PathTemplate::in_state_dir(&RelPath::parse("project.tgz")?));
     Ok(vec![archive, copy, docker])
 }
@@ -152,7 +151,7 @@ pub(crate) fn setup_script(env: &Environment) -> String {
 #[cfg(test)]
 mod tests {
 
-    use isoloom_manifest::SecretSlot;
+    use isoloom_manifest::{Action, Run, SecretSlot};
     use isoloom_spec::model::Protocol;
 
     use super::*;
@@ -184,8 +183,8 @@ mod tests {
 
     #[test]
     fn a_vm_terraform_made_gets_the_project_then_docker_over_ssh() {
-        let way_in = ssh_run(Template::text("10.0.0.9"), "isoloom");
-        let steps = into_vm(&way_in, &RelPath::parse("setup.sh").unwrap(), "../../..").unwrap();
+        let login = Login::new(Template::text("10.0.0.9"), "isoloom");
+        let steps = into_vm(&login, &RelPath::parse("setup.sh").unwrap(), "../../..").unwrap();
         let ids: Vec<&str> = steps.iter().map(|s| s.id.as_str()).collect();
         assert_eq!(ids, ["archive", "project", "docker"]);
         assert_eq!(steps[2].stdin.as_ref().map(ToString::to_string).as_deref(), Some("setup.sh"));
@@ -227,9 +226,28 @@ mod tests {
     }
 
     #[test]
+    fn a_root_login_readies_the_vm_without_sudo() {
+        let login = Login::new(Template::text("10.0.0.9"), "root");
+        let steps = into_vm(&login, &RelPath::parse("setup.sh").unwrap(), "../../..").unwrap();
+        let commands: Vec<String> = steps[1..]
+            .iter()
+            .map(|s| {
+                let Run::Action { with, .. } = &s.run else { panic!() };
+                with.iter().find(|(k, _)| k.as_str() == "command").map(|(_, v)| v.to_string()).unwrap()
+            })
+            .collect();
+        assert_eq!(
+            commands,
+            ["rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom", "sh -s"]
+        );
+        let accept = accept_env(&guest(vec![slot("TOKEN", "LAUNCH_TOKEN").unwrap()]), AsRoot::Root).unwrap().unwrap();
+        assert!(!accept.command.to_string().contains("sudo"), "{}", accept.command);
+    }
+
+    #[test]
     fn the_old_copy_cleared_is_always_the_fixed_project_folder() {
-        let way_in = ssh_run(Template::text("10.0.0.9"), "isoloom");
-        let steps = into_vm(&way_in, &RelPath::parse("setup.sh").unwrap(), "../../..").unwrap();
+        let login = Login::new(Template::text("10.0.0.9"), "isoloom");
+        let steps = into_vm(&login, &RelPath::parse("setup.sh").unwrap(), "../../..").unwrap();
         let Run::Action { with, .. } = &steps[1].run else { panic!() };
         let command = with.iter().find(|(k, _)| k.as_str() == "command").map(|(_, v)| v.to_string()).unwrap();
         // A literal path, nothing a shell expands: no variable can turn it into `rm -rf /`.
@@ -257,11 +275,11 @@ mod tests {
 
     #[test]
     fn accept_env_is_none_without_forwarded_vars_and_lists_them_otherwise() {
-        assert_eq!(accept_env(&guest(Vec::new())).unwrap(), None);
-        let cmd = accept_env(&guest(vec![
-            slot("TOKEN", "LAUNCH_TOKEN").unwrap(),
-            slot("DEMO_SECRET", "DEMO_SECRET").unwrap(),
-        ]))
+        assert_eq!(accept_env(&guest(Vec::new()), AsRoot::Sudo).unwrap(), None);
+        let cmd = accept_env(
+            &guest(vec![slot("TOKEN", "LAUNCH_TOKEN").unwrap(), slot("DEMO_SECRET", "DEMO_SECRET").unwrap()]),
+            AsRoot::Sudo,
+        )
         .unwrap()
         .expect("a command when a value is forwarded");
         let line = cmd.command.to_string();

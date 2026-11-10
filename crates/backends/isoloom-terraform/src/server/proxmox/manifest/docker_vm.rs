@@ -6,11 +6,12 @@
 //! and the containers' states are read inside it. A server lab isn't parked: it is made or
 //! destroyed.
 
-use isoloom_manifest::{Driver, Error as ManifestError, Lifecycle, Manifest, ManifestVersion, Placeholder, RelPath, Run, SCHEMA_URL, SnakeName, Template};
+use isoloom_manifest::{Driver, Error as ManifestError, Lifecycle, Manifest, ManifestVersion, Placeholder, RelPath, SCHEMA_URL, SnakeName, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 
-use crate::docker_host::{docker_host_outputs, into_vm, ssh_run};
+use crate::docker_host::{docker_host_outputs, into_vm};
+use crate::ssh::Login;
 use isoloom_render::run_manifest::{self, environment, generator};
 use isoloom_spec::model::Target;
 
@@ -37,8 +38,9 @@ pub fn docker_vm(env: &Environment, guest: &GuestCompose) -> crate::Result<Manif
 }
 
 fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestError> {
-    let ip = Template::from(Placeholder::Output(SnakeName::parse(IP)?));
-    let way_in = ssh_run(ip.clone(), USER);
+    let login = Login::new(Template::from(Placeholder::Output(SnakeName::parse(IP)?)), USER);
+    let ip = login.host.clone();
+    let way_in = login.way_in();
     let host = guest.docker_host(env, ("apply", "the Docker host VM exists and booted"), Some(ip.clone()), &way_in)?;
     let mut machines = vec![host.machine];
     machines.extend(guest.machines_at(&ip));
@@ -48,7 +50,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
     params.extend(guest.params.iter().cloned());
     let mut secrets = slots::connection(&vars)?;
     secrets.extend(guest.slots.iter().cloned());
-    let lifecycle = lifecycle(guest, &way_in)?;
+    let lifecycle = lifecycle(guest, &login)?;
     Ok(Manifest {
         schema: Some(SCHEMA_URL.to_owned()),
         manifest_version: ManifestVersion,
@@ -76,13 +78,13 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
 
 /// Terraform makes the VM (`init`, `apply`), then it is readied over SSH ([`into_vm`]) and Compose
 /// starts in it (`guest.start`).
-fn lifecycle(guest: &GuestCompose, way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Lifecycle, ManifestError> {
+fn lifecycle(guest: &GuestCompose, login: &Login) -> Result<Lifecycle, ManifestError> {
     // docker-vm is a single Docker host VM with no router to seal; the internet seal is the
     // Compose layer's (the guest), not a second apply here.
     let mut lifecycle = steps::lifecycle(PRIVATE_KEY, false)?;
     let mut up = lifecycle.up.as_slice().to_vec();
-    up.extend(into_vm(way_in, &RelPath::parse(SETUP)?, "../../..")?);
-    up.extend(GuestCommand::steps(&guest.start, way_in)?);
+    up.extend(into_vm(login, &RelPath::parse(SETUP)?, "../../..")?);
+    up.extend(GuestCommand::steps(&guest.start, &login.way_in())?);
     lifecycle.up = isoloom_manifest::NonEmpty::new(up, "lifecycle.up")?;
     Ok(lifecycle)
 }
