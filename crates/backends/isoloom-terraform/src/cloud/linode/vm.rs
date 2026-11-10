@@ -128,7 +128,7 @@ fn public_ip(name: &str) -> Expression {
 ///
 /// # Errors
 ///
-/// [`crate::Error::Refused`] when its user data is over [`CAP`].
+/// [`crate::Error::Refused`] when the Linode's user data is over Linode's cap ([`CAP`]).
 fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
     let id = ident(name);
     m.block(module::password(&id));

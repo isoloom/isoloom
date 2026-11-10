@@ -6,21 +6,11 @@ pub mod testing;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule, EsxiBackend, ProxmoxBackend};
-use testing::{Outcome, file, plan};
-
-/// A Windows machine the controller provisions.
-const LAB: &str = "version: 1
-name: t
-networks: { lan: { cidr: 10.9.0.0/24 } }
-machines:
-  dc: { networks: { lan: 10 }, os: windows-server@2022 }
-provision:
-  - ansible: provision/site.yml
-";
+use testing::{Outcome, WINDOWS_PROVISIONED, file, plan};
 
 #[test]
 fn a_clouds_controller_writes_its_inventory_owner_only() -> Outcome {
-    let env = plan(LAB, Target::CloudVm)?;
+    let env = plan(WINDOWS_PROVISIONED, Target::CloudVm)?;
     let tf = CloudVmModule::new(Cloud::Aws).render(&env)?.contents;
     assert!(
         tf.contains("base64 -d > /etc/isoloom/inventory.ini) && chmod 0600 /etc/isoloom/inventory.ini"),
@@ -31,7 +21,7 @@ fn a_clouds_controller_writes_its_inventory_owner_only() -> Outcome {
 
 #[test]
 fn proxmoxs_controller_writes_its_inventory_owner_only() -> Outcome {
-    let env = plan(LAB, Target::Proxmox)?;
+    let env = plan(WINDOWS_PROVISIONED, Target::Proxmox)?;
     let tf = file(&ProxmoxBackend.render(&env)?, "proxmox/main.tf")?.to_owned();
     let at = tf.find("/etc/isoloom/inventory.ini").ok_or("no inventory in the module")?;
     let entry = tf.get(at.saturating_sub(200)..(at + 200).min(tf.len())).unwrap_or_default();
@@ -42,7 +32,7 @@ fn proxmoxs_controller_writes_its_inventory_owner_only() -> Outcome {
 
 #[test]
 fn esxis_controller_installs_its_inventory_owner_only() -> Outcome {
-    let env = plan(LAB, Target::Esxi)?;
+    let env = plan(WINDOWS_PROVISIONED, Target::Esxi)?;
     let tf = file(&EsxiBackend.render(&env)?, "esxi/main.tf")?.to_owned();
     assert!(
         tf.contains("install -m 0600 /tmp/isoloom-inventory.ini /etc/isoloom/inventory.ini"),

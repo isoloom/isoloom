@@ -10,6 +10,16 @@ use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
 
+/// A Windows Server the controller provisions: a lab with a controller and a Windows password.
+pub const WINDOWS_PROVISIONED: &str = "version: 1
+name: t
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  dc: { networks: { lan: 10 }, os: windows-server@2022 }
+provision:
+  - ansible: provision/site.yml
+";
+
 /// A test's outcome: a failure is the report.
 pub type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
