@@ -57,7 +57,7 @@ pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
         "destroy",
         words(&["destroy", "-auto-approve", "-input=false", "-no-color", "-refresh=false"]),
         1800,
-        "Removing the lab from the server…",
+        "Removing the environment from the server…",
         VARS,
     )?;
     let seal = sealed
@@ -72,7 +72,10 @@ pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
         })
         .transpose()?;
     Ok(Lifecycle {
-        up: NonEmpty::new(vec![lock()?, init()?, apply("apply", "Creating the lab's VMs on the server…")?], "lifecycle.up")?,
+        up: NonEmpty::new(
+            vec![lock()?, init()?, apply("apply", "Creating the environment's VMs on the server…")?],
+            "lifecycle.up",
+        )?,
         down: NonEmpty::new(vec![lock()?, init()?, destroy], "lifecycle.down")?,
         park: None,
         resume: Vec::new(),

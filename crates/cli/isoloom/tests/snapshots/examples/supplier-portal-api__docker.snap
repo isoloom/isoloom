@@ -769,7 +769,7 @@ secrets:
     "up": [
       {
         "id": "pin-ports",
-        "note": "Picking the lab's host ports…",
+        "note": "Picking the environment's host ports…",
         "action": "compose.pin_ports"
       },
       {
@@ -783,7 +783,7 @@ secrets:
       },
       {
         "id": "up",
-        "note": "Starting the lab's containers…",
+        "note": "Starting the environment's containers…",
         "argv": [
           "docker",
           "compose",

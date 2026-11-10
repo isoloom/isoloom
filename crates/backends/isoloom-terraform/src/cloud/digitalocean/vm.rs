@@ -127,7 +127,7 @@ fn public_ip(name: &str) -> Expression {
 fn network(env: &Environment, m: &mut Module) {
     let cidr = env.networks.values().next().map(|n| n.cidr.as_str()).unwrap_or_default();
     m.commented(
-        "The environment's network: a VPC with the lab network's range. DigitalOcean assigns the\ndroplet a private address in it (it can't be pinned), so this is best-effort addressing.",
+        "The environment's network: a VPC with its network's range. DigitalOcean assigns the\ndroplet a private address in it (it can't be pinned), so this is best-effort addressing.",
         vpc(cidr),
     );
     m.block(ssh_key());

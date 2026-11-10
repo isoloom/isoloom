@@ -136,7 +136,7 @@ pub(crate) fn is_default_gateway(env: &Environment, mp: &MachinePlan) -> bool {
 pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
     let dir = target.id();
     m.commented(
-        "The router's uplink address: the lab's way in.",
+        "The router's uplink address: the environment's way in.",
         output("ip", reference("local.router_address")),
     );
     m.commented(

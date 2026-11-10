@@ -43,7 +43,7 @@ fn only_the_targets_whose_machines_run_on_that_computer_take_it() -> Outcome {
     ] {
         let why = refusal(&lab, t).ok_or_else(|| format!("{} takes it", t.id()))?;
         assert!(
-            why.contains("machine `desk` mounts a folder of the computer that runs the lab (`host_folders`)"),
+            why.contains("machine `desk` mounts a folder of the computer that runs the environment (`host_folders`)"),
             "{}: {why}",
             t.id()
         );
@@ -120,7 +120,7 @@ fn docker_vm_refuses_it_on_esxi_and_proxmox_and_writes_no_proxmox_module() -> Ou
     for p in ["vmware_esxi", "proxmox"] {
         let why = refusal_on(&lab, Target::DockerVm, Some(p)).ok_or_else(|| format!("{p} takes it"))?;
         assert!(
-            why.contains("machine `desk` mounts a folder of the computer that runs the lab (`host_folders`)"),
+            why.contains("machine `desk` mounts a folder of the computer that runs the environment (`host_folders`)"),
             "{why}"
         );
     }

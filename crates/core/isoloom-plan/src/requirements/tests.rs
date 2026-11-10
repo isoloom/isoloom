@@ -114,7 +114,7 @@ fn about_storage() -> Vec<(Requirement, &'static str)> {
         (Requirement::TmpfsModes { machine: web() }, "machine `web` sets a tmpfs `mode`"),
         (
             Requirement::HostFolders { machine: web() },
-            "machine `web` mounts a folder of the computer that runs the lab (`host_folders`)",
+            "machine `web` mounts a folder of the computer that runs the environment (`host_folders`)",
         ),
     ]
 }

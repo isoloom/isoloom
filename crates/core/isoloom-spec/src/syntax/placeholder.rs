@@ -140,7 +140,7 @@ impl Reference {
         match self {
             Reference::MachineName | Reference::OwnAddress { .. } if place == Place::Message => Err("the message names machines by `machines.<m>`"),
             Reference::Port { .. } if self.is_run_time() && place != Place::Message => {
-                Err("a published port and a URL are known only once the lab runs; a file gets `port`")
+                Err("a published port and a URL are known only once the environment runs; a file gets `port`")
             }
             Reference::CloudOutput(_) if place != Place::Message => Err("a cloud output is the message's only"),
             Reference::Version | Reference::Os(_) | Reference::Var(_) | Reference::Setting { .. } if !entry => Err("only a catalogue entry has it"),

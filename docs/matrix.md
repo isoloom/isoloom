@@ -482,18 +482,18 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.host_folders`
 
-- `hosted`, `cloud-docker`, `kubernetes`, `hybrid`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the lab (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them yet
-- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the lab (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
+- `hosted`, `cloud-docker`, `kubernetes`, `hybrid`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them yet
+- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the lab (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
+- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
 
 ### `machines.*.host_folders[].read_only = true`
 
-- `hosted`, `cloud-docker`, `kubernetes`, `hybrid`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the lab (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them yet
-- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the lab (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
-- `vagrant/qemu`: provider: machine `m` mounts a folder of the computer that runs the lab (`host_folders`): one is read-only (`read_only`), and the `qemu` provider (vagrant-qemu) mounts its VirtioFS shares read-write
+- `hosted`, `cloud-docker`, `kubernetes`, `hybrid`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them yet
+- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
+- `vagrant/qemu`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): one is read-only (`read_only`), and the `qemu` provider (vagrant-qemu) mounts its VirtioFS shares read-write
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the lab (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
+- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
 
 ### `networks.*.internet = false`
 

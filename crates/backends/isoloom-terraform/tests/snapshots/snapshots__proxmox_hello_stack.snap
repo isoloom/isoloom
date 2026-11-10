@@ -67,7 +67,7 @@ variable "node" {
   description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
   validation {
     condition     = var.node != ""
-    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+    error_message = "Set `node` to the Proxmox node the environment's VMs go on (`pvesh get /nodes` lists them)."
   }
 }
 
@@ -480,7 +480,7 @@ locals {
   router_address = try([for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.60.0.254"], a)][0], "")
 }
 
-# The router's uplink address: the lab's way in.
+# The router's uplink address: the environment's way in.
 output "ip" {
   value = local.router_address
 }

@@ -129,7 +129,7 @@ fn on_proxmox(env: &Environment) -> bool {
 pub(crate) fn docker_vm_proxmox_refusal(env: &Environment) -> Option<String> {
     let name = host_folders::needing_a_local_vm(env)?;
     Some(format!(
-        "machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): the Proxmox server's VM runs on the server, not on this computer"
+        "machine `{name}` mounts a folder of the computer that runs the environment (`host_folders`): the Proxmox server's VM runs on the server, not on this computer"
     ))
 }
 

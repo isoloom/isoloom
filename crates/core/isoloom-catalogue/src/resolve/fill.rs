@@ -78,7 +78,7 @@ impl Values<'_> {
         if at == Text::Field && out.contains("{{") {
             return Err(Unfilled::Misplaced {
                 reference: text.to_owned(),
-                why: "the lab's machines are named in a template's file only: a step runs before the machine reaches the others",
+                why: "the environment's machines are named in a template's file only: a step runs before the machine reaches the others",
             });
         }
         Ok(out)
@@ -167,7 +167,7 @@ impl Values<'_> {
             lab if at == Text::Template => Ok(format!("{{{{ {lab} }}}}")),
             lab => Err(Unfilled::Misplaced {
                 reference: lab.to_string(),
-                why: "the lab's machines are named in a template's file only: a step runs before the machine reaches the others",
+                why: "the environment's machines are named in a template's file only: a step runs before the machine reaches the others",
             }),
         }
     }

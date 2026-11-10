@@ -4,6 +4,18 @@ Isoloom is a converter: it reads one `isoloom.yml` and writes the native files o
 infrastructure and configuration tool, plus a run manifest. It runs nothing. This document is the
 map of how the pieces fit; the per-crate docs (`cargo doc`) are the detail.
 
+## Terms
+
+- **Environment**: what a spec describes and a target runs, its machines, networks and checks.
+  Every user-facing text (the docs, messages, a run manifest's notes) says environment.
+  `isoloom_plan::Environment` is one target's plan of it.
+- **Lab** (`isoloom_targets::Lab`): an `isoloom.yml` project ready to generate, its authored spec
+  with what it reads besides (the catalogue, the image table, the clouds' regions, the template
+  files). Each target's `Environment` is planned from it. The type keeps its name: `Environment`
+  already names the plan, and the runners embedding Isoloom build on `Lab`.
+- **Target**: a way to run the environment (`docker`, `vagrant`, `cloud-vm`…), each with its
+  generated files under `.isoloom/<target>/` and a run manifest (`run.json`).
+
 ## The pipeline
 
 ```

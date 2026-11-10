@@ -8,7 +8,7 @@ expression: "cloud(\"linode\")?"
 # Start:  terraform -chdir=.isoloom/cloud-docker/linode init && terraform -chdir=.isoloom/cloud-docker/linode apply \
 #           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/linode destroy (same variables)
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {

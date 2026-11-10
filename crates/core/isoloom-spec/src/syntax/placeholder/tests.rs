@@ -47,7 +47,7 @@ fn each_place_names_only_its_own_paths() {
     let template = |text: &str| read(text, Place::Template);
     assert!(template("listen {{ machine.addresses.lab }}:{{ machines.db.ports.pg.port }}").is_ok());
     let run_time = template("{{ machines.web.ports.site.published }}").unwrap_err();
-    assert!(matches!(&run_time[0], Error::NotHere { why, .. } if why.contains("only once the lab runs")));
+    assert!(matches!(&run_time[0], Error::NotHere { why, .. } if why.contains("only once the environment runs")));
     assert!(template("{{ with.port }}").is_err() && read("{{ with.port }}", Place::Entry).is_ok());
     assert!(read("{{ item.name }}", Place::Entry).is_err() && read("{{ item.name }}", Place::EntryItem).is_ok());
     assert!(read("{{ machine.name }}", Place::Message).is_err() && read("{{ cloud.outputs.x }}", Place::Template).is_err());

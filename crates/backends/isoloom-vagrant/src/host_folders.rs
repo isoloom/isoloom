@@ -156,7 +156,7 @@ pub fn docker_vm_refusal(env: &Environment, provider: &str) -> Option<String> {
 
 /// Machine `name`'s host folders refused, `why`.
 fn refused(name: &str, why: &str) -> String {
-    format!("machine `{name}` mounts a folder of the computer that runs the lab (`host_folders`): {why}")
+    format!("machine `{name}` mounts a folder of the computer that runs the environment (`host_folders`): {why}")
 }
 
 #[cfg(test)]

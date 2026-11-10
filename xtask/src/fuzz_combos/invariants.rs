@@ -45,7 +45,7 @@ pub(crate) fn check(generated: &GeneratedSpec) -> Result<Outcome, String> {
         return Err("generation is not deterministic: a target was left out only on one run".to_owned());
     }
     if let Some(failed) = skipped.iter().find(|e| !e.is_refusal()) {
-        return Err(format!("a target's backend failed rather than refusing the lab: `{failed}`"));
+        return Err(format!("a target's backend failed rather than refusing the environment: `{failed}`"));
     }
     if let Some(silent) = reasonless(&skipped) {
         return Err(silent);

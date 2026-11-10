@@ -66,7 +66,7 @@ fn the_seal_applies_the_sealed_ruleset_live_on_the_router() {
     assert_eq!(
         arg("host").as_deref(),
         Some("${outputs.ip}"),
-        "reached at the router's uplink, the lab's way in"
+        "reached at the router's uplink, the environment's way in"
     );
     assert_eq!(arg("user").as_deref(), Some("isoloom"));
     assert!(arg("via").is_none(), "the router is reached directly, not through itself");

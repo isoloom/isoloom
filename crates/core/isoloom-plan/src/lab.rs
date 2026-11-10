@@ -18,7 +18,10 @@ use crate::lower::{Lowered, Scope, lower};
 mod steps;
 mod templates;
 
-/// An authored spec, ready to plan.
+/// A lab: an `isoloom.yml` project ready to generate, its authored spec with what it reads
+/// besides (the catalogue, the image table, the clouds' regions, the template files). Each
+/// target's [`Environment`](crate::Environment), the environment the spec describes as that
+/// target runs it, is planned from it (`ARCHITECTURE.md`'s terms).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lab {
     source: syntax::Spec,

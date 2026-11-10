@@ -205,7 +205,7 @@ fn copy(cloud: &CloudServices, when: Option<&str>) -> Result<Step, ManifestError
         action: Action::TerraformCopyModule,
         with,
     };
-    Ok(noted(s, "Copying the lab's Terraform module…"))
+    Ok(noted(s, "Copying the environment's Terraform module…"))
 }
 
 /// The lock cleared, the module copied, `init`, then `apply` (or `destroy`).
@@ -230,7 +230,7 @@ fn lifecycle(cloud: &CloudServices) -> Result<Lifecycle, ManifestError> {
                 lock()?,
                 copy(cloud, None)?,
                 init()?,
-                terraform(cloud, "apply", apply, "Creating the lab's services…")?,
+                terraform(cloud, "apply", apply, "Creating the environment's services…")?,
             ],
             "lifecycle.up",
         )?,
@@ -239,7 +239,7 @@ fn lifecycle(cloud: &CloudServices) -> Result<Lifecycle, ManifestError> {
                 lock()?,
                 copy(cloud, Some("missing"))?,
                 init()?,
-                terraform(cloud, "destroy", destroy, "Removing the lab's services…")?,
+                terraform(cloud, "destroy", destroy, "Removing the environment's services…")?,
             ],
             "lifecycle.down",
         )?,

@@ -155,7 +155,7 @@ fn lifecycle(env: &Environment, guest: &GuestCompose, way_in: &dyn Fn(&Template)
 fn up_step(env: &Environment, guest: &GuestCompose) -> Result<Step> {
     let with = prepares(env, guest).join(",");
     let mut s = run(UP, on_provider(&["up"], &["--provision-with", &with])?, UP_TIMEOUT_S)?;
-    s.note = Some("Building the lab's VM with Docker in it…".into());
+    s.note = Some("Building the environment's VM with Docker in it…".into());
     Ok(s)
 }
 

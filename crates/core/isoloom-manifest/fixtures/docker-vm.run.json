@@ -509,7 +509,7 @@
       },
       {
         "id": "up",
-        "note": "Building the lab's VM with Docker in it…",
+        "note": "Building the environment's VM with Docker in it…",
         "argv": [
           "vagrant",
           "up",
@@ -522,7 +522,7 @@
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "argv": [
           "vagrant",
           "ssh",

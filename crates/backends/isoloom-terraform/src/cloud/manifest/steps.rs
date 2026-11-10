@@ -104,7 +104,7 @@ pub(crate) fn destroy_step() -> Result<Step, ManifestError> {
         "destroy",
         words(&["destroy", "-auto-approve", "-input=false", "-no-color"]),
         3600,
-        "Removing the lab from the cloud…",
+        "Removing the environment from the cloud…",
         VARS,
     )
 }
@@ -137,7 +137,11 @@ pub(crate) fn terraform_lifecycle(up: Vec<Step>) -> Result<Lifecycle, ManifestEr
 /// each machine (or `destroy`); when the run has anything to seal (`sealed`), the seal: a second
 /// apply once the machines are set up.
 pub(crate) fn lifecycle(guests: &[Guest], sealed: bool) -> Result<Lifecycle, ManifestError> {
-    let mut up = vec![clear_lock()?, init_step()?, apply_step("apply", "Creating the lab's machines in the cloud…")?];
+    let mut up = vec![
+        clear_lock()?,
+        init_step()?,
+        apply_step("apply", "Creating the environment's machines in the cloud…")?,
+    ];
     if !guests.is_empty() {
         up.push(archive()?);
         up.extend(guests.iter().map(deliver).collect::<Result<Vec<_>, _>>()?);

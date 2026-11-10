@@ -121,7 +121,7 @@ pub(super) fn back_up(vms: &[&str]) -> Result<Vec<Step>> {
 /// provisioners, the controller's playbooks included.
 fn up_step(shape: &Shape) -> Result<Step> {
     let mut s = run(UP, on_provider(&["up"], &[])?, UP_TIMEOUT_S)?;
-    s.note = Some("Building the lab's VMs (Windows machines take a while)…".into());
+    s.note = Some("Building the environment's VMs (Windows machines take a while)…".into());
     if shape.controller().is_some() {
         s.verdict = Some(ANSIBLE_VERDICT.into());
     }
@@ -209,7 +209,7 @@ fn provision(env: &Environment, shape: &Shape) -> Result<Provision> {
     let play = || -> Result<Step> {
         let mut s = run("play", vagrant_argv(&["provision", CONTROLLER, "--provision-with", "ansible"])?, 14_400)?;
         s.verdict = Some(ANSIBLE_VERDICT.into());
-        Ok(noted(s, "Running the lab's setup play…"))
+        Ok(noted(s, "Running the environment's setup play…"))
     };
     let park = || park_controller(env, shape, true);
     Ok(Provision {

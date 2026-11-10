@@ -123,7 +123,7 @@ pub(crate) fn project_wait() -> Tracked {
             DELIVERED,
             DELIVERY_WAIT_S,
             &format!("waiting for the project, which {RUNNER} delivers over SSH"),
-            &format!("the project never came: start the lab through {RUNNER}, which delivers it over SSH"),
+            &format!("the project never came: start the environment through {RUNNER}, which delivers it over SSH"),
         ),
     )
 }

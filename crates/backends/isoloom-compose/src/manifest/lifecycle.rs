@@ -55,7 +55,7 @@ pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member])
 /// ([`start`]).
 fn up(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>> {
     let mut steps = vec![
-        noted(act("pin-ports", Action::ComposePinPorts)?, "Picking the lab's host ports…"),
+        noted(act("pin-ports", Action::ComposePinPorts)?, "Picking the environment's host ports…"),
         act("ports-free", Action::ComposeCheckPortsFree)?,
         tolerated(act("stale-networks", Action::ComposeRemoveStaleNetworks)?),
     ];
@@ -104,7 +104,7 @@ pub(super) fn start(env: &Environment, plan: &StartPlan, members: &[Member], up_
         // back to building rather than failing the run.
         out.push(StartStep {
             id: "pull".to_owned(),
-            note: format!("Pulling the lab's published images{place}…"),
+            note: format!("Pulling the environment's published images{place}…"),
             args: words(&["pull", "--ignore-pull-failures"]),
             timeout_s: 1800,
             tolerated: true,
@@ -112,7 +112,7 @@ pub(super) fn start(env: &Environment, plan: &StartPlan, members: &[Member], up_
     }
     out.push(StartStep {
         id: up_id.to_owned(),
-        note: format!("Starting the lab's containers{place}…"),
+        note: format!("Starting the environment's containers{place}…"),
         args: words(&up),
         timeout_s: 1800,
         tolerated: false,

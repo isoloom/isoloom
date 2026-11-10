@@ -2399,7 +2399,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       {
         "id": "up",
-        "note": "Building the lab's VMs (Windows machines take a while)…",
+        "note": "Building the environment's VMs (Windows machines take a while)…",
         "argv": [
           "vagrant",
           "up",
@@ -2553,7 +2553,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "id": "play",
-          "note": "Running the lab's setup play…",
+          "note": "Running the environment's setup play…",
           "argv": [
             "vagrant",
             "provision",
@@ -2600,7 +2600,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "id": "play",
-          "note": "Running the lab's setup play…",
+          "note": "Running the environment's setup play…",
           "argv": [
             "vagrant",
             "provision",

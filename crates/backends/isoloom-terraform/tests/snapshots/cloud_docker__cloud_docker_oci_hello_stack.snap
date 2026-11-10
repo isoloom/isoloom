@@ -9,7 +9,7 @@ expression: "cloud(\"oci\")?"
 #           -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/oci destroy (same variables)
 # Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {

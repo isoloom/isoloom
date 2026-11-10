@@ -68,7 +68,7 @@ fn a_templates_placeholders_resolve_against_the_spec() {
         "{reason}"
     );
     assert!(
-        reason.contains("known only once the lab runs") && reason.contains("only a catalogue entry has it"),
+        reason.contains("known only once the environment runs") && reason.contains("only a catalogue entry has it"),
         "{reason}"
     );
 }

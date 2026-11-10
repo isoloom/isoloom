@@ -78,7 +78,7 @@ fn from(at: &str, f: &HostFolder, p: &mut Problems) {
     } else if matches!(f.host(), HostPath::Project(_)) && from.starts_with('~') {
         p.add(
             at,
-            format!("`{from}`: `~` or `~/...` is the home folder of the user running the lab; another user's (`~name`) isn't one"),
+            format!("`{from}`: `~` or `~/...` is the home folder of the user running the environment; another user's (`~name`) isn't one"),
         );
     }
 }
@@ -143,7 +143,7 @@ mod tests {
             [
                 format!("{at}[0].from: name the folder of the computer: relative to the project folder, `~/...` or an absolute path"),
                 format!("{at}[1].from: `${{HOME}}/x`: no `$`, `{{`, `}}` or control characters (Compose would read them as its own)"),
-                format!("{at}[2].from: `~bob/x`: `~` or `~/...` is the home folder of the user running the lab; another user's (`~name`) isn't one"),
+                format!("{at}[2].from: `~bob/x`: `~` or `~/...` is the home folder of the user running the environment; another user's (`~name`) isn't one"),
             ]
         );
     }

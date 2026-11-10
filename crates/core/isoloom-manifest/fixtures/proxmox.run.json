@@ -286,7 +286,7 @@
       },
       {
         "id": "apply",
-        "note": "Creating the lab's VMs on the server…",
+        "note": "Creating the environment's VMs on the server…",
         "argv": [
           "terraform",
           "apply",
@@ -332,7 +332,7 @@
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the server…",
+        "note": "Removing the environment from the server…",
         "argv": [
           "terraform",
           "destroy",

@@ -458,6 +458,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   quality` wrote a new one from today's counts and passed, so any count could go up; a source
   folder it couldn't read counted as empty. A missing baseline now fails (`--init` writes the
   first one), and a folder that can't be read is the error.
+- **What Isoloom says calls the environment an environment.** A run manifest's notes (`Starting
+  the lab's containers…`), refusals and messages said "lab" where the spec, the README and the
+  manifest say environment; they say environment now. `ARCHITECTURE.md` defines the terms: the
+  library's `Lab` is an `isoloom.yml` project ready to generate, from which each target's
+  environment is planned.
 - **A template filled in for two places generates.** Two `template:` steps of one machine
   reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
   file is written once per source.

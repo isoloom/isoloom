@@ -718,7 +718,7 @@ variable "node" {
   description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
   validation {
     condition     = var.node != ""
-    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+    error_message = "Set `node` to the Proxmox node the environment's VMs go on (`pvesh get /nodes` lists them)."
   }
 }
 
@@ -1275,7 +1275,7 @@ output "ssh_user" {
       },
       {
         "id": "apply",
-        "note": "Creating the lab's VMs on the server…",
+        "note": "Creating the environment's VMs on the server…",
         "argv": [
           "terraform",
           "apply",
@@ -1328,7 +1328,7 @@ output "ssh_user" {
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
           "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name cisco-dynamips --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
@@ -1365,7 +1365,7 @@ output "ssh_user" {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the server…",
+        "note": "Removing the environment from the server…",
         "argv": [
           "terraform",
           "destroy",
@@ -2044,7 +2044,7 @@ systemctl enable --now isoloom-published.service
       },
       {
         "id": "up",
-        "note": "Building the lab's VM with Docker in it…",
+        "note": "Building the environment's VM with Docker in it…",
         "argv": [
           "vagrant",
           "up",
@@ -2057,7 +2057,7 @@ systemctl enable --now isoloom-published.service
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "argv": [
           "vagrant",
           "ssh",

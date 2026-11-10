@@ -119,7 +119,7 @@ pub(super) fn node() -> Variable {
         .describe("The Proxmox node the VMs go on (`pvesh get /nodes` lists them)")
         .validated(
             is_set("node"),
-            "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them).",
+            "Set `node` to the Proxmox node the environment's VMs go on (`pvesh get /nodes` lists them).",
         )
 }
 

@@ -86,7 +86,7 @@ fn uplink_checked(env: &Environment) -> Block {
     );
     let message = Template::text("The router got no address on its uplink port group `")
         .with_expr(reference("var.uplink_port_group"))
-        .with_text("`: it has no DHCP (VMware Tools then reports a lab address). Give it an uplink with DHCP and internet (`uplink_port_group`; on a nested ESXi, promiscuous mode on).");
+        .with_text("`: it has no DHCP (VMware Tools then reports one of the environment's addresses). Give it an uplink with DHCP and internet (`uplink_port_group`; on a nested ESXi, promiscuous mode on).");
     crate::server::router::postcondition(condition, message)
 }
 

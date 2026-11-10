@@ -182,7 +182,7 @@ crash.*.log
       },
       {
         "id": "copy-module",
-        "note": "Copying the lab's Terraform module…",
+        "note": "Copying the environment's Terraform module…",
         "action": "terraform.copy_module",
         "with": {
           "from": "../../terraform"
@@ -208,7 +208,7 @@ crash.*.log
       },
       {
         "id": "apply",
-        "note": "Creating the lab's services…",
+        "note": "Creating the environment's services…",
         "argv": [
           "terraform",
           "-chdir=${run.state_dir}/module",
@@ -235,7 +235,7 @@ crash.*.log
       },
       {
         "id": "copy-module",
-        "note": "Copying the lab's Terraform module…",
+        "note": "Copying the environment's Terraform module…",
         "action": "terraform.copy_module",
         "with": {
           "from": "../../terraform",
@@ -262,7 +262,7 @@ crash.*.log
       },
       {
         "id": "destroy",
-        "note": "Removing the lab's services…",
+        "note": "Removing the environment's services…",
         "argv": [
           "terraform",
           "-chdir=${run.state_dir}/module",

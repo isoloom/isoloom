@@ -129,7 +129,7 @@ fn a_step_names_no_other_machine_and_no_secrets_value() {
     let lab_in_step = edited("demo/entry.yml", |t| {
         t.replace("echo {{ with.greeting }}", "echo {{ with.greeting }} {{ machines.app.addresses.lab }}")
     });
-    breaks(&lab_in_step, "the lab's machines are named in a template's file only");
+    breaks(&lab_in_step, "the environment's machines are named in a template's file only");
     let value_in_step = edited("demo/entry.yml", |t| t.replace("\"{{ with.admin.path }}\"", "\"{{ with.admin }}\""));
     breaks(
         &value_in_step,
@@ -291,7 +291,7 @@ fn an_item_fields_file_path_is_read_from_the_named_field() {
 #[test]
 fn a_lab_machine_reference_is_refused_outside_a_template() {
     let files = demo_with_steps("    - command: \"echo {{ machine.name }}\"\n");
-    breaks(&files, "`{{ machine.name }}`: the lab's machines are named in a template");
+    breaks(&files, "`{{ machine.name }}`: the environment's machines are named in a template");
 }
 
 #[test]

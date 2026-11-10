@@ -11,7 +11,7 @@ pub enum Error {
     #[error("a template's placeholder: {0}")]
     Placeholder(#[source] isoloom_spec::Error),
     /// A template's placeholder that names nothing the lab has.
-    #[error("`{{{{ {0} }}}}` names nothing this lab has")]
+    #[error("`{{{{ {0} }}}}` names nothing this environment has")]
     Unfilled(Reference),
 }
 

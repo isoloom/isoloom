@@ -12,7 +12,7 @@ const PUBLIC_KEY: &str = "-var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\"";
 /// What follows a module whose machines wait for the project.
 fn then_runner() -> String {
     format!(
-        "# Then:   the machines wait for the project: run the lab through {RUNNER} beside this file,\n#         which delivers the project over SSH, waits for each set-up and runs the checks.\n"
+        "# Then:   the machines wait for the project: run the environment through {RUNNER} beside this file,\n#         which delivers the project over SSH, waits for each set-up and runs the checks.\n"
     )
 }
 

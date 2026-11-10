@@ -77,7 +77,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 # Start:  terraform -chdir=.isoloom/cloud-docker/aws init && terraform -chdir=.isoloom/cloud-docker/aws apply \
 #           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/aws destroy (same variables)
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
@@ -619,7 +619,7 @@ output "ssh_user" {
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
           "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name configured-app --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
@@ -654,7 +654,7 @@ output "ssh_user" {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the cloud…",
+        "note": "Removing the environment from the cloud…",
         "argv": [
           "terraform",
           "destroy",
@@ -926,7 +926,7 @@ systemctl enable --now isoloom-published.service
 # Start:  terraform -chdir=.isoloom/cloud-docker/azure init && terraform -chdir=.isoloom/cloud-docker/azure apply \
 #           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/azure destroy (same variables)
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
@@ -1463,7 +1463,7 @@ output "ssh_user" {
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
           "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name configured-app --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
@@ -1498,7 +1498,7 @@ output "ssh_user" {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the cloud…",
+        "note": "Removing the environment from the cloud…",
         "argv": [
           "terraform",
           "destroy",
@@ -1771,7 +1771,7 @@ systemctl enable --now isoloom-published.service
 # Start:  terraform -chdir=.isoloom/cloud-docker/digitalocean init && terraform -chdir=.isoloom/cloud-docker/digitalocean apply \
 #           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/digitalocean destroy (same variables)
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
@@ -2197,7 +2197,7 @@ output "ssh_user" {
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
           "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name configured-app --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
@@ -2232,7 +2232,7 @@ output "ssh_user" {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the cloud…",
+        "note": "Removing the environment from the cloud…",
         "argv": [
           "terraform",
           "destroy",
@@ -2504,7 +2504,7 @@ systemctl enable --now isoloom-published.service
 # Start:  terraform -chdir=.isoloom/cloud-docker/gcp init && terraform -chdir=.isoloom/cloud-docker/gcp apply \
 #           -var billing_account=<id> -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/gcp destroy (same variables)
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
@@ -3036,7 +3036,7 @@ output "ssh_user" {
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
           "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name configured-app --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
@@ -3071,7 +3071,7 @@ output "ssh_user" {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the cloud…",
+        "note": "Removing the environment from the cloud…",
         "argv": [
           "terraform",
           "destroy",
@@ -3344,7 +3344,7 @@ systemctl enable --now isoloom-published.service
 # Start:  terraform -chdir=.isoloom/cloud-docker/linode init && terraform -chdir=.isoloom/cloud-docker/linode apply \
 #           -var allowed_cidr=<your IP>/32 -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/linode destroy (same variables)
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
@@ -3746,7 +3746,7 @@ output "ssh_user" {
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
           "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name configured-app --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
@@ -3781,7 +3781,7 @@ output "ssh_user" {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the cloud…",
+        "note": "Removing the environment from the cloud…",
         "argv": [
           "terraform",
           "destroy",
@@ -4055,7 +4055,7 @@ systemctl enable --now isoloom-published.service
 #           -var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)"
 # Stop:   terraform -chdir=.isoloom/cloud-docker/oci destroy (same variables)
 # Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.
-# Then:   the machines wait for the project: run the lab through the runner (run.json) beside this file,
+# Then:   the machines wait for the project: run the environment through the runner (run.json) beside this file,
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
@@ -4530,7 +4530,7 @@ output "ssh_user" {
       },
       {
         "id": "start",
-        "note": "Starting the lab's containers in the VM…",
+        "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
         "with": {
           "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name configured-app --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600",
@@ -4565,7 +4565,7 @@ output "ssh_user" {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the cloud…",
+        "note": "Removing the environment from the cloud…",
         "argv": [
           "terraform",
           "destroy",

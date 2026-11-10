@@ -447,7 +447,7 @@ variable "node" {
   description = "The Proxmox node the VMs go on (`pvesh get /nodes` lists them)"
   validation {
     condition     = var.node != ""
-    error_message = "Set `node` to the Proxmox node the lab's VMs go on (`pvesh get /nodes` lists them)."
+    error_message = "Set `node` to the Proxmox node the environment's VMs go on (`pvesh get /nodes` lists them)."
   }
 }
 
@@ -1121,7 +1121,7 @@ locals {
   router_address = try([for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.70.10.254", "10.70.20.254", "10.70.99.254"], a)][0], "")
 }
 
-# The router's uplink address: the lab's way in.
+# The router's uplink address: the environment's way in.
 output "ip" {
   value = local.router_address
 }
@@ -1552,7 +1552,7 @@ locals {
       },
       {
         "id": "apply",
-        "note": "Creating the lab's VMs on the server…",
+        "note": "Creating the environment's VMs on the server…",
         "argv": [
           "terraform",
           "apply",
@@ -1598,7 +1598,7 @@ locals {
       },
       {
         "id": "destroy",
-        "note": "Removing the lab from the server…",
+        "note": "Removing the environment from the server…",
         "argv": [
           "terraform",
           "destroy",

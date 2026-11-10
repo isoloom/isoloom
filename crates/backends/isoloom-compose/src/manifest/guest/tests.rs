@@ -70,7 +70,7 @@ fn a_published_build_pulls_first_in_the_vm_as_on_the_host_its_failure_tolerated(
     assert_eq!(ids, ["pull", "start"]);
     assert!(g.start[0].command.to_string().ends_with("pull --ignore-pull-failures"));
     assert_eq!(g.start[0].failure, Failure::Tolerate);
-    assert_eq!(g.start[0].note.as_deref(), Some("Pulling the lab's published images in the VM…"));
+    assert_eq!(g.start[0].note.as_deref(), Some("Pulling the environment's published images in the VM…"));
     assert!(!g.start[1].command.to_string().contains("--build"));
     assert_eq!(g.start[1].failure, Failure::Fail);
 }

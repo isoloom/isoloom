@@ -181,7 +181,7 @@ expression: json
       },
       {
         "id": "copy-module",
-        "note": "Copying the lab's Terraform module…",
+        "note": "Copying the environment's Terraform module…",
         "action": "terraform.copy_module",
         "with": {
           "from": "../../terraform"
@@ -208,7 +208,7 @@ expression: json
       },
       {
         "id": "apply",
-        "note": "Creating the lab's services…",
+        "note": "Creating the environment's services…",
         "argv": [
           "terraform",
           "-chdir=${run.state_dir}/module",
@@ -237,7 +237,7 @@ expression: json
       },
       {
         "id": "copy-module",
-        "note": "Copying the lab's Terraform module…",
+        "note": "Copying the environment's Terraform module…",
         "action": "terraform.copy_module",
         "with": {
           "from": "../../terraform",
@@ -265,7 +265,7 @@ expression: json
       },
       {
         "id": "destroy",
-        "note": "Removing the lab's services…",
+        "note": "Removing the environment's services…",
         "argv": [
           "terraform",
           "-chdir=${run.state_dir}/module",

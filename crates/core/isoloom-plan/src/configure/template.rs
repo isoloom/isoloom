@@ -102,7 +102,7 @@ mod tests {
             &Context::new(&spec, "web"),
         )
         .unwrap_err();
-        assert_eq!(wrong.to_string(), "`{{ machines.db.ports.nope.port }}` names nothing this lab has");
+        assert_eq!(wrong.to_string(), "`{{ machines.db.ports.nope.port }}` names nothing this environment has");
         let run_time = fill("{{ machines.web.ports.site.published }}", &Context::new(&spec, "web")).unwrap_err();
         assert!(matches!(run_time, Error::Placeholder(isoloom_spec::Error::NotHere { .. })), "{run_time:?}");
         assert_eq!(fill("no placeholder {", &Context::new(&spec, "web")).ok().as_deref(), Some("no placeholder {"));
