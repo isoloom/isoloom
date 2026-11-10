@@ -14,7 +14,7 @@ use super::tasks::{rendered, step_tasks};
 /// an identifier, as Ansible wants a role's name and Jinja a variable's, which prefixes the
 /// variables the role registers. A machine's name has no `_`, so each keeps its own.
 #[must_use]
-pub(crate) fn role_name(machine: &str) -> String {
+pub fn role_name(machine: &str) -> String {
     format!("isoloom_machine_{}", machine.replace('-', "_"))
 }
 

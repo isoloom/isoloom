@@ -191,14 +191,16 @@ pub(super) fn ansible_files(family: Family) -> Res<Vec<GeneratedFile>> {
     let lab = lab(family)?;
     let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
     let c = Configured::of(&env, "m").ok_or_else(|| format!("{}: the machine has no recipe", family.id))?;
-    let mut files = isoloom_ansible::configure::role_files(&c, "roles/isoloom_machine_m")?;
+    let role = isoloom_ansible::configure::role_name("m");
+    let mut files = isoloom_ansible::configure::role_files(&c, &format!("roles/{role}"))?;
     if files.is_empty() {
         return Err(format!("{}: the recipe rendered no Ansible role", family.id).into());
     }
     files.push(GeneratedFile {
         path: "site.yml".to_owned(),
-        contents: "- name: Conformance\n  hosts: all\n  gather_facts: false\n  vars:\n    isoloom_project: /opt/isoloom\n  roles:\n    - isoloom_machine_m\n"
-            .to_owned(),
+        contents: format!(
+            "- name: Conformance\n  hosts: all\n  gather_facts: false\n  vars:\n    isoloom_project: /opt/isoloom\n  roles:\n    - {role}\n"
+        ),
     });
     Ok(files)
 }

@@ -1,13 +1,14 @@
 //! The Ansible configuration-management renderer: a
 //! machine's resolved recipe ([`Recipe`](isoloom_plan::configure::Recipe)) as native tasks from
 //! `ansible.builtin` and `ansible.posix` only, in a generated role per machine
-//! (`isoloom_machine_<m>`), run by `site.yml` through the one Ansible inventory (the controller on
-//! VM targets, the user on the `external` target). It reaches the same end state as the shell
-//! library, so the forms stay equal; the resource conformance harness proves it.
+//! (`isoloom_machine_<m>`), run by `site.yml` through the one Ansible inventory: the `external`
+//! target's, which the user runs (the VM targets set their machines up with the shell library).
+//! It reaches the same end state as the shell library, so the forms stay equal; the resource
+//! conformance harness proves it.
 //!
 //! - `project`: an environment's whole Ansible project (`site.yml`, the roles, and
 //!   `requirements.yml` when a role names a pinned collection), under a target's folder.
-//! - [`role_files`] and `role_name`: one machine's role, which the conformance harness renders
+//! - [`role_files`] and [`role_name`]: one machine's role, which the conformance harness renders
 //!   and runs on its own.
 //!
 //! Pure: it reads the planned environment and the embedded catalogue's pinned collections, and
@@ -27,7 +28,7 @@ use isoloom_render::{GeneratedFile, header};
 use serde_json::{Value, json};
 
 pub use role::files as role_files;
-pub(crate) use role::role_name;
+pub use role::role_name;
 
 /// The project variable each play sets to the project folder, so a role's `copy` and `script`
 /// find a project file wherever `site.yml` is run from (relative to the playbook's own folder).
