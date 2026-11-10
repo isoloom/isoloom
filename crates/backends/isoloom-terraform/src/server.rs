@@ -211,6 +211,22 @@ pub(crate) fn slotted(suffix: &str) -> Expression {
     slot_name(ISO, suffix).hcl()
 }
 
+/// `slot`, the environment's slot on the server: 1 by default, checked to be 1 to `max`, which its
+/// description starts with before `unique` (how unique it must be, and why).
+pub(crate) fn slot_variable(max: u64, unique: &str) -> Variable {
+    use crate::hcl_builder::{BinaryOperator, binary, number};
+    let v = || reference("var.slot");
+    let condition = binary(
+        binary(v(), BinaryOperator::GreaterEq, number(1)),
+        BinaryOperator::And,
+        binary(v(), BinaryOperator::LessEq, number(max)),
+    );
+    Variable::new("slot", "number")
+        .default(number(1))
+        .describe(&format!("1 to {max}, {unique}"))
+        .validated(condition, &format!("slot is 1 to {max}."))
+}
+
 /// The `isoloom` user cloud-init creates on a server's VMs, with `sudo` and the SSH keys
 /// `keys`.
 pub(crate) fn user(keys: Expression) -> Expression {

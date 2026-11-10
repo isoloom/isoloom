@@ -2,7 +2,7 @@
 //! connection to the host, the locals every VM shares, the generated credentials, and the
 //! networks (`networks`, `outside`).
 
-use crate::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, for_list, list, number, object, reference, string};
+use crate::hcl_builder::{Block, Module, Template, call, for_list, list, object, reference, string};
 use isoloom_plan::Environment;
 
 use super::{SERVICE_OS, default_image};
@@ -48,7 +48,10 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
         s("uplink_port_group")
             .default(string("VM Network"))
             .describe("The port group the router reaches the internet through (DHCP)"),
-        slot(),
+        server::slot_variable(
+            MAX_SLOT,
+            "unique per environment on this host: it names the vSwitches and the VMs, and makes the MACs",
+        ),
         images(env),
         variable::ssh_public_key(false),
         s("ssh_private_key_file").describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router"),
@@ -61,20 +64,6 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
         );
     }
     out
-}
-
-/// `slot`, checked: 1 to [`MAX_SLOT`].
-fn slot() -> Variable {
-    let v = || reference("var.slot");
-    let condition = binary(
-        binary(v(), BinaryOperator::GreaterEq, number(1)),
-        BinaryOperator::And,
-        binary(v(), BinaryOperator::LessEq, number(MAX_SLOT)),
-    );
-    Variable::new("slot", "number")
-        .default(number(1))
-        .describe("1 to 63, unique per environment on this host: it names the vSwitches and the VMs, and makes the MACs")
-        .validated(condition, "slot is 1 to 63.")
 }
 
 /// `images`: an OVA (a path or a URL) per OS. Ubuntu's come with defaults, whose SHA-256 the

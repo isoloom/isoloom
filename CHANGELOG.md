@@ -533,6 +533,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **`docker-vm` on libvirt takes a machine with host folders added while it runs**: the host VM's
   memory is shared from the start (memfd), which virtiofs needs and libvirt can't add to a running
   VM; adding one used to fail its reload with "'virtiofs' requires shared memory".
+- **Proxmox's `slot` is checked**: the `proxmox` module and `docker-vm`'s Proxmox module refuse a
+  slot outside 1 to 99 at plan time, as ESXi's does outside 1 to 63, instead of making SDN ids
+  and MACs the server refused at apply time.
 - **`external`'s `requirements.yml` installs**: it names a collection by its archive's URL with
   `type: url`, the form `ansible-galaxy collection install -r` takes (a `source:` was read as a
   Galaxy server, and the install failed). Galaxy checks no hash of such an archive, so the file

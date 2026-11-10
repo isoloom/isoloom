@@ -16,6 +16,9 @@ use crate::module::variable::{self, Variable};
 use crate::module::{ident, resource};
 use crate::server::{self, PinnedImage, slotted, user};
 
+/// The highest slot, two digits: the SDN's ids (`iso<slot>`, `i<slot>n<network>`) are kept short.
+const MAX_SLOT: u64 = 99;
+
 /// The environment's pool, as a VM or a container names it.
 pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
 
@@ -79,7 +82,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     [
         server(
             "The bridge the router reaches the internet through",
-            "1 to 99, unique per environment on this server (SDN ids are short)",
+            "unique per environment on this server (SDN ids are short)",
         ),
         super::windows::variables(env),
         super::lxc::variables(env),
@@ -90,8 +93,8 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
 
 /// The server's variables, the same in both modules (`proxmox`'s and `docker-vm`'s): the
 /// connection, the node, where the disks, images and snippets go, the uplink bridge (`uplink`
-/// says what it is for), the environment's slot (`slot` says how unique) and the key the
-/// `isoloom` user takes.
+/// says what it is for), the environment's slot, 1 to [`MAX_SLOT`] (`slot` says how unique) and
+/// the key the `isoloom` user takes.
 pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
     let mut v = connection("Uploading cloud-init snippets goes over SSH to the node");
@@ -105,7 +108,7 @@ pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
             .default(string("local"))
             .describe("A datastore with 'snippets' content, for cloud-init"),
         s("uplink_bridge").default(string("vmbr0")).describe(uplink),
-        Variable::new("slot", "number").default(number(1)).describe(slot),
+        server::slot_variable(MAX_SLOT, slot),
         variable::ssh_public_key(true).default(string("")),
     ]);
     v

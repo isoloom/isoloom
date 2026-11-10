@@ -44,6 +44,7 @@ mod report;
 mod reserved_names;
 mod resolved;
 mod run_manifest;
+mod server_slot;
 mod shared_volumes;
 mod spaced_paths;
 mod tags;

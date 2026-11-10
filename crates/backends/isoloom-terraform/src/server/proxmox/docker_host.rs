@@ -80,7 +80,7 @@ fn setup(env: &Environment) -> GeneratedFile {
 pub(super) fn variables() -> Vec<Variable> {
     super::base::server(
         "The bridge the VM gets its address (DHCP) and the internet from",
-        "1 to 99, unique per environment on this server",
+        "unique per environment on this server",
     )
 }
 

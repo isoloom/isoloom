@@ -771,6 +771,10 @@ variable "slot" {
   type        = number
   default     = 1
   description = "1 to 99, unique per environment on this server"
+  validation {
+    condition     = var.slot >= 1 && var.slot <= 99
+    error_message = "slot is 1 to 99."
+  }
 }
 
 variable "ssh_public_key" {
