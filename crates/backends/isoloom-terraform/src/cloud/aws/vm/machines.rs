@@ -3,8 +3,8 @@
 
 use crate::cloud::user_data_limit::Limit;
 use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string};
+use crate::machine::controller::WinrmAuth;
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::inventory::WinrmAuth;
 
 use super::network::{controller_group, security_group};
 use super::{RULES, addresses, image_user, machine_type, nesting};

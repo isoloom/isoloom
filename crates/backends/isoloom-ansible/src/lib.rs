@@ -6,7 +6,7 @@
 //!
 //! - `inventory.ini`: every machine with its `external` address, user, port and key, in the
 //!   `linux` / `windows` groups and the inventory groups, for `provision:` playbooks run from
-//!   there ([`isoloom_render::inventory`] with [`Access::external`]).
+//!   there ([`isoloom_render::inventory`], each host reached as its `external:` says).
 //! - `site.yml` and `roles/isoloom_machine_<m>/` (`-` in `<m>` as `_`): each configured machine's recipe as a play and
 //!   a role of native tasks ([`configure`]), and `requirements.yml` when a role needs a pinned
 //!   collection.
@@ -21,8 +21,6 @@
 //! It sits with the other backends, above the rendering layer (`isoloom-render`) and below the
 //! targets' registry (`isoloom-targets`), and depends on no other backend: [`ExternalBackend`]
 //! renders a planned [`Environment`](isoloom_plan::Environment), purely, into files.
-//!
-//! [`Access::external`]: isoloom_render::inventory::Access::external
 //!
 //! # Example
 //!

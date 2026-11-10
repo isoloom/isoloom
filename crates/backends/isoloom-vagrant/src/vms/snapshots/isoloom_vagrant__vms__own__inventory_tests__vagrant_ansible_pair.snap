@@ -1,0 +1,24 @@
+---
+source: crates/backends/isoloom-vagrant/src/vms/own.rs
+expression: "render(&example(\"ansible-pair\", Target::Vagrant), &access())"
+---
+[linux]
+web ansible_host=10.63.0.10
+cache ansible_host=10.63.0.20 maxmemory='"64mb"'
+
+[windows]
+
+[linux:vars]
+ansible_user=vagrant
+ansible_password=vagrant
+ansible_become=true
+
+[webservers]
+web
+
+[caches]
+cache
+
+[pair]
+web
+cache

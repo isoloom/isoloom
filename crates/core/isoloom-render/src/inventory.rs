@@ -6,8 +6,9 @@
 //! `windows` groups, each host's `ansible_host` and its `host_vars`, `ansible_become` on Linux,
 //! and the inventory groups (`provision[].groups`, then the spec's `groups:`, members limited to
 //! the hosts). What differs per target is how a host is reached (users, keys, passwords, WinRM
-//! or SSH on Windows), which the target says with an [`Access`]. The presets ([`Access::vagrant`],
-//! [`Access::proxmox`], [`Access::cloud`], [`Access::external`]) are the targets' own.
+//! or SSH on Windows), which the target says with an [`Access`], each backend its own
+//! ([`Access::new`], from the shared pieces: [`winrm_vars`], [`WINRM_PATIENCE`],
+//! [`WINDOWS_OVER_SSH`]).
 //!
 //! ```text
 //! [linux]
@@ -27,7 +28,7 @@
 //! <host>
 //! ```
 //!
-//! A backend calls `inventory::render(env, &Access::vagrant())` and writes the text where its
+//! A backend calls `inventory::render(env, &access)` and writes the text where its
 //! controller (or the user) runs Ansible; a header, if the file has one, is the caller's.
 
 use std::fmt;
@@ -78,13 +79,30 @@ impl fmt::Debug for Access<'_> {
     }
 }
 
-fn vars(pairs: &[(&str, &str)]) -> Vars {
+impl<'a> Access<'a> {
+    /// How a target reaches its hosts: `linux` and `windows` as its groups' variables, `host`
+    /// each host's own. Each backend builds its own (the Vagrant boxes' account, the `isoloom`
+    /// user of Isoloom's server and cloud VMs, an existing host's own SSH).
+    #[must_use]
+    pub fn new(linux: Vars, windows: Vars, host: impl Fn(&Host<'_>) -> Vars + 'a) -> Access<'a> {
+        Access {
+            linux,
+            windows,
+            host: Box::new(host),
+        }
+    }
+}
+
+/// `pairs` as [`Vars`], in their order.
+#[must_use]
+pub fn vars(pairs: &[(&str, &str)]) -> Vars {
     pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
 }
 
 /// WinRM's certificate check off and its timeouts longer than Ansible's defaults: a domain
-/// controller's promotion or a reboot keeps a call waiting.
-const WINRM_PATIENCE: [(&str, &str); 3] = [
+/// controller's promotion or a reboot keeps a call waiting. Every target reaching Windows over
+/// WinRM sets them.
+pub const WINRM_PATIENCE: [(&str, &str); 3] = [
     ("ansible_winrm_server_cert_validation", "ignore"),
     ("ansible_winrm_operation_timeout_sec", "400"),
     ("ansible_winrm_read_timeout_sec", "500"),
@@ -92,124 +110,15 @@ const WINRM_PATIENCE: [(&str, &str); 3] = [
 
 /// The WinRM port, scheme and transport of a Windows machine that answers `winrm` that way.
 #[must_use]
-fn winrm_vars(winrm: Winrm) -> Vars {
+pub fn winrm_vars(winrm: Winrm) -> Vars {
     match winrm {
         Winrm::Ssl => vars(&[("ansible_port", "5986"), ("ansible_winrm_scheme", "https"), ("ansible_winrm_transport", "ntlm")]),
         Winrm::Plaintext => vars(&[("ansible_port", "5985"), ("ansible_winrm_scheme", "http"), ("ansible_winrm_transport", "basic")]),
     }
 }
 
-impl Access<'static> {
-    /// Vagrant: the boxes' own `vagrant` account (password auth); WinRM set per box, so a lab
-    /// can mix plain-HTTP and HTTPS Windows boxes, and a box reached over OpenSSH instead
-    /// (`vm.image.winssh`) gets SSH with PowerShell on its line.
-    #[must_use]
-    pub fn vagrant() -> Access<'static> {
-        let account = [("ansible_user", "vagrant"), ("ansible_password", "vagrant")];
-        let mut windows = vars(&account);
-        windows.extend(vars(&[("ansible_connection", "winrm")]));
-        windows.extend(vars(&WINRM_PATIENCE));
-        Access {
-            linux: vars(&account),
-            windows,
-            host: Box::new(|h| {
-                if h.machine.winssh {
-                    vars(&WINDOWS_OVER_SSH)
-                } else {
-                    h.machine.winrm.map(winrm_vars).unwrap_or_default()
-                }
-            }),
-        }
-    }
-
-    /// External: each existing host's SSH user, port and key as its `external:` gives them;
-    /// Windows hosts over SSH with PowerShell (OpenSSH on Windows), not WinRM.
-    #[must_use]
-    pub fn external() -> Access<'static> {
-        Access {
-            linux: Vars::new(),
-            windows: vars(&WINDOWS_OVER_SSH),
-            host: Box::new(|h| external_vars(h.machine)),
-        }
-    }
-}
-
 /// A Windows host reached over OpenSSH, its commands run by PowerShell.
-const WINDOWS_OVER_SSH: [(&str, &str); 2] = [("ansible_connection", "ssh"), ("ansible_shell_type", "powershell")];
-
-/// How a Windows machine set up by Isoloom (on Proxmox and the clouds) is reached: as
-/// `isoloom` with a generated password, over WinRM on plain HTTP.
-fn isoloom_over_winrm(password: &str, transport: WinrmAuth) -> Vars {
-    let mut windows = vars(&[("ansible_user", "isoloom"), ("ansible_password", password), ("ansible_connection", "winrm")]);
-    windows.extend(match transport {
-        WinrmAuth::Basic => winrm_vars(Winrm::Plaintext),
-        WinrmAuth::Ntlm => vars(&[("ansible_port", "5985"), ("ansible_winrm_scheme", "http"), ("ansible_winrm_transport", "ntlm")]),
-    });
-    windows.extend(vars(&WINRM_PATIENCE));
-    windows
-}
-
-/// How WinRM authenticates over plain HTTP: Basic where the image allows it, NTLM where it
-/// doesn't (Azure's Windows images).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WinrmAuth {
-    /// Basic authentication (the user data allows it).
-    Basic,
-    /// NTLM.
-    Ntlm,
-}
-
-impl<'a> Access<'a> {
-    /// Proxmox: the `isoloom` user cloud-init creates on each Linux VM, with the controller's
-    /// key; on a Windows VM, the `isoloom` administrator its set-up makes, whose password is
-    /// `windows_password` (a Terraform expression, as the module writes it), over WinRM.
-    #[must_use]
-    pub fn proxmox(windows_password: &str) -> Access<'a> {
-        Access {
-            linux: vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
-            windows: isoloom_over_winrm(windows_password, WinrmAuth::Basic),
-            host: Box::new(|h| {
-                if h.machine.is_windows() {
-                    Vars::new()
-                } else {
-                    vars(&[("ansible_user", "isoloom")])
-                }
-            }),
-        }
-    }
-
-    /// A cloud: each Linux VM as its image's user (`linux_user` of its OS) with the
-    /// controller's key; Windows over plain-HTTP WinRM as `isoloom`, whose password is
-    /// `windows_password` (a Terraform expression, as the module writes it), authenticated as
-    /// the cloud's images allow (`auth`, as Terraform's own connection does).
-    #[must_use]
-    pub fn cloud(linux_user: impl Fn(&str) -> String + 'a, windows_password: &str, auth: WinrmAuth) -> Access<'a> {
-        Access {
-            linux: vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
-            windows: isoloom_over_winrm(windows_password, auth),
-            host: Box::new(move |h| match h.machine.os.as_deref() {
-                Some(os) if !h.machine.is_windows() => vec![("ansible_user".to_owned(), linux_user(os))],
-                _ => Vars::new(),
-            }),
-        }
-    }
-}
-
-/// An existing host's `ansible_user`, `ansible_port` and key: the ones its `external:` sets.
-fn external_vars(m: &MachinePlan) -> Vars {
-    let Some(e) = &m.external else { return Vars::new() };
-    let mut out = Vars::new();
-    if let Some(u) = &e.user {
-        out.push(("ansible_user".into(), u.clone()));
-    }
-    if let Some(p) = e.port {
-        out.push(("ansible_port".into(), p.to_string()));
-    }
-    if let Some(k) = &e.key {
-        out.push(("ansible_ssh_private_key_file".into(), k.clone()));
-    }
-    out
-}
+pub const WINDOWS_OVER_SSH: [(&str, &str); 2] = [("ansible_connection", "ssh"), ("ansible_shell_type", "powershell")];
 
 /// The machines Ansible reaches on the environment's target, in spec order: on `external`, the
 /// existing hosts (at their `external` address); elsewhere, the VMs (at their first address).

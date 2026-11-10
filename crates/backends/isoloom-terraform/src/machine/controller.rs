@@ -9,9 +9,10 @@ use crate::hcl_builder::{Expression, Module, Template, call, reference, string};
 use indexmap::IndexMap;
 use isoloom_plan::addressing::{address, names_of};
 use isoloom_plan::{Controller, Environment, Step};
-use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_KEY, WinrmAuth};
+use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_KEY, Vars, vars};
 use isoloom_render::{controller, steps};
 use isoloom_spec::linux::CONFIG_DIR;
+use isoloom_spec::model::Winrm;
 use isoloom_spec::validate::Cidr;
 
 use super::provisioner::{Connection, Provisioner, Upload};
@@ -133,7 +134,62 @@ pub(crate) fn playbooks(env: &Environment) -> String {
 /// image's user (`user(os)`), the Windows VMs over WinRM (authenticated with `auth`, as
 /// Terraform's own connection is) with the generated password.
 pub(crate) fn cloud_inventory(env: &Environment, user: impl Fn(&str) -> String, auth: WinrmAuth) -> Template {
-    inventory_template(env, |password| Access::cloud(user, password, auth))
+    inventory_template(env, |password| cloud_access(user, password, auth))
+}
+
+/// How WinRM authenticates over plain HTTP: Basic where the image allows it, NTLM where it
+/// doesn't (Azure's Windows images).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WinrmAuth {
+    /// Basic authentication (the user data allows it).
+    Basic,
+    /// NTLM.
+    Ntlm,
+}
+
+/// How a Windows machine set up by Isoloom (on the servers and the clouds) is reached: as
+/// `isoloom` with a generated password, over WinRM on plain HTTP.
+fn isoloom_over_winrm(password: &str, transport: WinrmAuth) -> Vars {
+    let mut windows = vars(&[("ansible_user", "isoloom"), ("ansible_password", password), ("ansible_connection", "winrm")]);
+    windows.extend(match transport {
+        WinrmAuth::Basic => inventory::winrm_vars(Winrm::Plaintext),
+        WinrmAuth::Ntlm => vars(&[("ansible_port", "5985"), ("ansible_winrm_scheme", "http"), ("ansible_winrm_transport", "ntlm")]),
+    });
+    windows.extend(vars(&inventory::WINRM_PATIENCE));
+    windows
+}
+
+/// How the controller reaches the VMs of Isoloom's server targets (Proxmox, ESXi): the `isoloom`
+/// user cloud-init creates on each Linux VM, with the controller's key; on a Windows VM, the
+/// `isoloom` administrator its set-up makes, whose password is `windows_password` (a Terraform
+/// expression, as the module writes it), over WinRM.
+pub(crate) fn server_access<'a>(windows_password: &str) -> Access<'a> {
+    Access::new(
+        vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
+        isoloom_over_winrm(windows_password, WinrmAuth::Basic),
+        |h| {
+            if h.machine.is_windows() {
+                Vars::new()
+            } else {
+                vars(&[("ansible_user", "isoloom")])
+            }
+        },
+    )
+}
+
+/// How the controller reaches a cloud's VMs: each Linux VM as its image's user (`linux_user` of
+/// its OS) with the controller's key; Windows over plain-HTTP WinRM as `isoloom`, whose password
+/// is `windows_password` (a Terraform expression), authenticated as the cloud's images allow
+/// (`auth`, as Terraform's own connection does).
+pub(crate) fn cloud_access<'a>(linux_user: impl Fn(&str) -> String + 'a, windows_password: &str, auth: WinrmAuth) -> Access<'a> {
+    Access::new(
+        vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
+        isoloom_over_winrm(windows_password, auth),
+        move |h| match h.machine.os.as_deref() {
+            Some(os) if !h.machine.is_windows() => vec![("ansible_user".to_owned(), linux_user(os))],
+            _ => Vars::new(),
+        },
+    )
 }
 
 /// The inventory `access` gives (from the generated Windows password's Terraform expression),
@@ -248,4 +304,136 @@ pub(crate) fn windows_waits(env: &Environment) -> Vec<String> {
             )
         })
         .collect()
+}
+
+/// The controller's inventory as Isoloom's server and cloud VMs are reached.
+#[cfg(test)]
+mod inventory_tests {
+    use isoloom_plan::Environment;
+    use isoloom_render::inventory::render;
+    use isoloom_spec::model::Target;
+
+    use super::{Access, WinrmAuth, cloud_access, server_access};
+
+    const SPEC: &str = r"
+    version: 1
+    name: inv
+    networks:
+      lab: { cidr: 10.9.0.0/24 }
+      back: { cidr: 10.8.0.0/24 }
+    groups:
+      servers: { members: [web, dc, box] }
+    machines:
+      web:
+        networks: { back: 10, lab: 10 }
+        os: debian@12
+      dc:
+        networks: { lab: 20 }
+        os: windows-server@2022
+      box:
+        networks: { lab: 30 }
+        app: { image: alpine }
+    provision:
+      - ansible: site.yml
+        groups: { dcs: [dc], boxes: [box] }
+        host_vars:
+          web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
+    overrides:
+      vagrant: { machines: { dc: { box: some/box, winrm: ssl } } }
+      external:
+        machines:
+          web: { ssh: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id } }
+          dc: { ssh: { address: 192.168.1.20 } }
+    ";
+
+    /// The lines of section `[name]`, up to the next section (its blank line kept).
+    fn section<'a>(inv: &'a str, name: &str) -> &'a str {
+        let (_, rest) = inv.split_once(&format!("[{name}]\n")).unwrap_or_else(|| panic!("[{name}] in\n{inv}"));
+        rest.split_inclusive("\n[").next().map_or(rest, |s| s.strip_suffix('[').unwrap_or(s))
+    }
+
+    /// Example `name` of the project, which must be valid, planned for `target`.
+    fn example(name: &str, target: Target) -> Environment {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
+        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).expect("the example loads"));
+        assert_eq!(lab.problems(), [], "{name} is valid");
+        Environment::build(&lab.for_target(target), target, None)
+    }
+
+    /// AWS's image users, as the cloud-vm module names them.
+    fn aws() -> Access<'static> {
+        let user = |os: &str| if os.starts_with("ubuntu") { "ubuntu" } else { "admin" }.to_owned();
+        cloud_access(user, "${random_password.windows.result}", WinrmAuth::Basic)
+    }
+
+    #[test]
+    fn a_server_keeps_the_groups_and_gives_windows_its_winrm_account() {
+        let inv = render(&crate::testing::environment(SPEC, Target::Proxmox), &server_access("pw"));
+        assert!(section(&inv, "linux").starts_with("web ansible_host=10.8.0.10 ansible_user=isoloom code="));
+        assert_eq!(section(&inv, "windows"), "dc ansible_host=10.9.0.20\n\n");
+        assert!(
+            section(&inv, "windows:vars").starts_with("ansible_user=isoloom\nansible_password=pw\nansible_connection=winrm\n"),
+            "{inv}"
+        );
+        assert_eq!(section(&inv, "servers"), "web\ndc\n");
+    }
+
+    #[test]
+    fn a_cloud_names_each_linux_user_and_the_windows_password() {
+        let access = cloud_access(
+            |os| if os == "debian-12" { "admin".into() } else { "ubuntu".into() },
+            "${random_password.windows.result}",
+            WinrmAuth::Basic,
+        );
+        let inv = render(&crate::testing::environment(SPEC, Target::CloudVm), &access);
+        assert!(section(&inv, "linux").starts_with("web ansible_host=10.8.0.10 ansible_user=admin code="));
+        assert!(section(&inv, "windows:vars").contains("ansible_password=${random_password.windows.result}\n"));
+        assert!(section(&inv, "linux:vars").starts_with("ansible_ssh_private_key_file=/etc/isoloom/id_ed25519\n"));
+    }
+
+    #[test]
+    fn proxmox_ansible_pair_keeps_the_groups() {
+        insta::assert_snapshot!(render(
+            &example("ansible-pair", Target::Proxmox),
+            &server_access("${random_password.windows.result}")
+        ));
+    }
+
+    #[test]
+    fn aws_ansible_pair() {
+        insta::assert_snapshot!(render(&example("ansible-pair", Target::CloudVm), &aws()));
+    }
+
+    #[test]
+    fn aws_corp_ad_basics_windows() {
+        insta::assert_snapshot!(render(&example("corp-ad-basics", Target::CloudVm), &aws()));
+    }
+
+    #[test]
+    fn azure_windows_hosts_authenticate_with_ntlm() {
+        let azure = cloud_access(|_| "isoloom".to_owned(), "${random_password.windows.result}", WinrmAuth::Ntlm);
+        let inv = render(&example("corp-ad-basics", Target::CloudVm), &azure);
+        assert!(inv.contains("ansible_winrm_transport=ntlm\n"), "{inv}");
+        assert!(!inv.contains("ansible_winrm_transport=basic"), "{inv}");
+    }
+
+    #[test]
+    fn server_windows_hosts_get_the_isoloom_account_over_winrm() {
+        let inv = render(&example("windows-hello", Target::Proxmox), &server_access("${random_password.windows.result}"));
+        for v in [
+            "ansible_user=isoloom",
+            "ansible_password=${random_password.windows.result}",
+            "ansible_connection=winrm",
+        ] {
+            assert!(inv.contains(&format!("{v}\n")), "{v}: {inv}");
+        }
+    }
+
+    #[test]
+    fn rendering_twice_gives_the_same_inventory() {
+        for (name, target) in [("ansible-pair", Target::Vagrant), ("corp-ad-basics", Target::CloudVm)] {
+            let once = render(&example(name, target), &aws());
+            assert_eq!(once, render(&example(name, target), &aws()), "{name}");
+        }
+    }
 }

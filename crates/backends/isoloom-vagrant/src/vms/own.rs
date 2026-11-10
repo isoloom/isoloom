@@ -229,13 +229,30 @@ fn controller_box_line(r: &mut Ruby, bx: &str, version: Option<&str>) {
     }
 }
 
+/// How the controller reaches the VMs: the boxes' own `vagrant` account (password auth); WinRM
+/// set per box, so an environment can mix plain-HTTP and HTTPS Windows boxes, and a box reached
+/// over OpenSSH instead (`vm.image.winssh`) gets SSH with PowerShell on its line.
+pub(crate) fn access() -> Access<'static> {
+    let account = [("ansible_user", "vagrant"), ("ansible_password", "vagrant")];
+    let mut windows = inventory::vars(&account);
+    windows.extend(inventory::vars(&[("ansible_connection", "winrm")]));
+    windows.extend(inventory::vars(&inventory::WINRM_PATIENCE));
+    Access::new(inventory::vars(&account), windows, |h| {
+        if h.machine.winssh {
+            inventory::vars(&inventory::WINDOWS_OVER_SSH)
+        } else {
+            h.machine.winrm.map(inventory::winrm_vars).unwrap_or_default()
+        }
+    })
+}
+
 /// Ansible and the inventory, the environment's playbooks, going offline, halting.
 fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     let spec = env.spec();
     let setup = format!(
         "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\ncat > {CONTROLLER_INVENTORY} <<'INV'\n{}INV\n",
         controller::INSTALL_ANSIBLE,
-        inventory::render(env, &Access::vagrant())
+        inventory::render(env, &access())
     );
     shell(r, "controller", &setup);
     if !spec.provision.is_empty() {
@@ -250,5 +267,84 @@ fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     // provisioner returns before the VM goes; the runner's `check` boots it again for the checks.
     if !spec.controller.as_ref().is_some_and(|c| c.keep_running) {
         shell(r, "halt", "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &");
+    }
+}
+
+/// The controller's inventory as the Vagrant boxes' account reaches the hosts.
+#[cfg(test)]
+mod inventory_tests {
+    use isoloom_plan::Environment;
+    use isoloom_render::inventory::render;
+    use isoloom_spec::model::Target;
+
+    use super::access;
+
+    const SPEC: &str = r"
+    version: 1
+    name: inv
+    networks:
+      lab: { cidr: 10.9.0.0/24 }
+      back: { cidr: 10.8.0.0/24 }
+    groups:
+      servers: { members: [web, dc, box] }
+    machines:
+      web:
+        networks: { back: 10, lab: 10 }
+        os: debian@12
+      dc:
+        networks: { lab: 20 }
+        os: windows-server@2022
+      box:
+        networks: { lab: 30 }
+        app: { image: alpine }
+    provision:
+      - ansible: site.yml
+        groups: { dcs: [dc], boxes: [box] }
+        host_vars:
+          web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
+    overrides:
+      vagrant: { machines: { dc: { box: some/box, winrm: ssl } } }
+      external:
+        machines:
+          web: { ssh: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id } }
+          dc: { ssh: { address: 192.168.1.20 } }
+    ";
+
+    /// The lines of section `[name]`, up to the next section (its blank line kept).
+    fn section<'a>(inv: &'a str, name: &str) -> &'a str {
+        let (_, rest) = inv.split_once(&format!("[{name}]\n")).unwrap_or_else(|| panic!("[{name}] in\n{inv}"));
+        rest.split_inclusive("\n[").next().map_or(rest, |s| s.strip_suffix('[').unwrap_or(s))
+    }
+
+    /// Example `name` of the project, which must be valid, planned for `target`.
+    fn example(name: &str, target: Target) -> Environment {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
+        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).expect("the example loads"));
+        assert_eq!(lab.problems(), [], "{name} is valid");
+        Environment::build(&lab.for_target(target), target, None)
+    }
+
+    #[test]
+    fn windows_hosts_get_their_winrm_and_the_boxes_account() {
+        let inv = render(&crate::testing::environment(SPEC), &access());
+        assert_eq!(
+            section(&inv, "windows"),
+            "dc ansible_host=10.9.0.20 ansible_port=5986 ansible_winrm_scheme=https ansible_winrm_transport=ntlm\n\n"
+        );
+        assert!(section(&inv, "windows:vars").starts_with("ansible_user=vagrant\nansible_password=vagrant\nansible_connection=winrm\n"));
+        assert_eq!(
+            section(&inv, "linux:vars"),
+            "ansible_user=vagrant\nansible_password=vagrant\nansible_become=true\n\n"
+        );
+    }
+
+    #[test]
+    fn vagrant_ansible_pair() {
+        insta::assert_snapshot!(render(&example("ansible-pair", Target::Vagrant), &access()));
+    }
+
+    #[test]
+    fn vagrant_corp_ad_basics_windows() {
+        insta::assert_snapshot!(render(&example("corp-ad-basics", Target::Vagrant), &access()));
     }
 }

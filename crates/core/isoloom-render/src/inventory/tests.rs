@@ -35,6 +35,11 @@ overrides:
       dc: { ssh: { address: 192.168.1.20 } }
 ";
 
+/// An access with one Linux group variable and nothing per host.
+fn plain() -> Access<'static> {
+    Access::new(vars(&[("ansible_user", "u")]), Vars::new(), |_| Vars::new())
+}
+
 fn env(spec: &str, target: Target) -> Environment {
     testing::env(spec, target)
 }
@@ -61,7 +66,7 @@ fn existing_hosts_are_reached_at_their_external_address() {
 
 #[test]
 fn groups_keep_only_the_hosts_and_stay_declared_when_empty() {
-    let inv = render(&env(SPEC, Target::Vagrant), &Access::vagrant());
+    let inv = render(&env(SPEC, Target::Vagrant), &plain());
     assert_eq!(section(&inv, "dcs"), "dc\n\n");
     assert_eq!(section(&inv, "boxes"), "\n\n");
     assert_eq!(section(&inv, "servers"), "web\ndc\n");
@@ -70,7 +75,7 @@ fn groups_keep_only_the_hosts_and_stay_declared_when_empty() {
 
 #[test]
 fn host_vars_keep_their_python_types_on_the_host_line() {
-    let inv = render(&env(SPEC, Target::Vagrant), &Access::vagrant());
+    let inv = render(&env(SPEC, Target::Vagrant), &plain());
     let web = section(&inv, "linux").lines().next().unwrap();
     assert_eq!(
         web,
@@ -79,64 +84,13 @@ fn host_vars_keep_their_python_types_on_the_host_line() {
 }
 
 #[test]
-fn windows_hosts_get_their_winrm_and_the_windows_vars() {
-    let inv = render(&env(SPEC, Target::Vagrant), &Access::vagrant());
-    assert_eq!(
-        section(&inv, "windows"),
-        "dc ansible_host=10.9.0.20 ansible_port=5986 ansible_winrm_scheme=https ansible_winrm_transport=ntlm\n\n"
-    );
-    assert!(section(&inv, "windows:vars").starts_with("ansible_user=vagrant\nansible_password=vagrant\nansible_connection=winrm\n"));
-    assert_eq!(
-        section(&inv, "linux:vars"),
-        "ansible_user=vagrant\nansible_password=vagrant\nansible_become=true\n\n"
-    );
-}
-
-#[test]
 fn no_windows_vars_without_a_windows_host() {
     let linux_only = "version: 1\nname: l\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    os: debian@12\n";
-    let inv = render(&env(linux_only, Target::Vagrant), &Access::vagrant());
+    let inv = render(&env(linux_only, Target::Vagrant), &plain());
     assert_eq!(
         inv,
-        "[linux]\na ansible_host=10.9.0.10\n\n[windows]\n\n[linux:vars]\nansible_user=vagrant\nansible_password=vagrant\nansible_become=true\n"
+        "[linux]\na ansible_host=10.9.0.10\n\n[windows]\n\n[linux:vars]\nansible_user=u\nansible_become=true\n"
     );
-}
-
-#[test]
-fn external_hosts_carry_their_user_port_and_quoted_key() {
-    let inv = render(&env(SPEC, Target::External), &Access::external());
-    assert!(
-        inv.starts_with("[linux]\nweb ansible_host=web.example.org ansible_user=ops ansible_port=2222 ansible_ssh_private_key_file='~/my keys/id' code="),
-        "{inv}"
-    );
-    assert_eq!(section(&inv, "windows"), "dc ansible_host=192.168.1.20\n\n");
-    assert_eq!(section(&inv, "windows:vars"), "ansible_connection=ssh\nansible_shell_type=powershell\n\n");
-    assert_eq!(section(&inv, "linux:vars"), "ansible_become=true\n\n");
-}
-
-#[test]
-fn proxmox_keeps_the_groups_and_gives_windows_its_winrm_account() {
-    let inv = render(&env(SPEC, Target::Proxmox), &Access::proxmox("pw"));
-    assert!(section(&inv, "linux").starts_with("web ansible_host=10.8.0.10 ansible_user=isoloom code="));
-    assert_eq!(section(&inv, "windows"), "dc ansible_host=10.9.0.20\n\n");
-    assert!(
-        section(&inv, "windows:vars").starts_with("ansible_user=isoloom\nansible_password=pw\nansible_connection=winrm\n"),
-        "{inv}"
-    );
-    assert_eq!(section(&inv, "servers"), "web\ndc\n");
-}
-
-#[test]
-fn a_cloud_names_each_linux_user_and_the_windows_password() {
-    let access = Access::cloud(
-        |os| if os == "debian-12" { "admin".into() } else { "ubuntu".into() },
-        "${random_password.windows.result}",
-        WinrmAuth::Basic,
-    );
-    let inv = render(&env(SPEC, Target::CloudVm), &access);
-    assert!(section(&inv, "linux").starts_with("web ansible_host=10.8.0.10 ansible_user=admin code="));
-    assert!(section(&inv, "windows:vars").contains("ansible_password=${random_password.windows.result}\n"));
-    assert!(section(&inv, "linux:vars").starts_with("ansible_ssh_private_key_file=/etc/isoloom/id_ed25519\n"));
 }
 
 #[test]
@@ -150,6 +104,19 @@ fn host_values_are_quoted_only_when_the_split_needs_it() {
 
 #[test]
 fn an_access_shows_its_group_variables() {
-    let shown = format!("{:?}", Access::external());
+    let shown = format!("{:?}", Access::new(Vars::new(), vars(&WINDOWS_OVER_SSH), |_| Vars::new()));
     assert!(shown.starts_with("Access { linux: [], windows: [(\"ansible_connection\", \"ssh\")"), "{shown}");
+}
+
+#[test]
+fn each_host_gets_its_access_s_own_variables_after_its_address() {
+    let access = Access::new(Vars::new(), vars(&[("ansible_connection", "winrm")]), |h| {
+        h.machine.winrm.map(winrm_vars).unwrap_or_default()
+    });
+    let inv = render(&env(SPEC, Target::Vagrant), &access);
+    assert_eq!(
+        section(&inv, "windows"),
+        "dc ansible_host=10.9.0.20 ansible_port=5986 ansible_winrm_scheme=https ansible_winrm_transport=ntlm\n\n"
+    );
+    assert_eq!(section(&inv, "windows:vars"), "ansible_connection=winrm\n\n");
 }

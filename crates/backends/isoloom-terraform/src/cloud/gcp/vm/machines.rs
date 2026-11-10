@@ -5,9 +5,9 @@ use std::net::Ipv4Addr;
 
 use crate::cloud::user_data_limit::Limit;
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
+use crate::machine::controller::WinrmAuth;
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
-use isoloom_render::inventory::WinrmAuth;
 
 use super::network::vpc;
 use super::{RULES, image, user};

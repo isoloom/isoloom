@@ -621,6 +621,7 @@ dependencies = [
 name = "isoloom-ansible"
 version = "1.0.9"
 dependencies = [
+ "insta",
  "isoloom-catalogue",
  "isoloom-plan",
  "isoloom-render",

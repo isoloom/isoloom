@@ -6,7 +6,7 @@
 
 use crate::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
-use isoloom_render::inventory::{Access, CONTROLLER_INVENTORY, CONTROLLER_KEY};
+use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
 use isoloom_spec::model::resolvers;
 use isoloom_spec::validate::Cidr;
@@ -67,7 +67,7 @@ fn cloud_config(env: &Environment) -> CloudConfig {
     config.packages = controller::PACKAGES.map(String::from).to_vec();
     config.bootcmd.extend(cloud_init::prelude(env));
     config.file_lists.push(reference("local.project_files"));
-    let inventory = controller::inventory_template(env, Access::proxmox).into_expression();
+    let inventory = controller::inventory_template(env, controller::server_access).into_expression();
     config.files = vec![
         file(CONTROLLER_KEY, Some(OWNER_ONLY), crate::machine::controller::private_key()),
         file(CONTROLLER_INVENTORY, Some(OWNER_ONLY), inventory),

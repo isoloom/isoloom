@@ -5,7 +5,6 @@
 
 use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_render::inventory::Access;
 use isoloom_render::router;
 use isoloom_spec::model::resolvers;
 use isoloom_spec::validate::Cidr;
@@ -173,7 +172,7 @@ fn controller(env: &Environment, m: &mut Module) {
         host: string(host),
         user: crate::machine::USER.to_owned(),
         at_boot: Vec::new(),
-        inventory: controller::inventory_template(env, Access::proxmox),
+        inventory: controller::inventory_template(env, controller::server_access),
     };
     let mut setup = controller::provisioner_waiting(ssh, &controller::windows_waits(env));
     // A Windows machine has no Terraform set-up: its VM, and the wait above, stand for it.
