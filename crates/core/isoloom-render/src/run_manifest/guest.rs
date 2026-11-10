@@ -19,6 +19,11 @@ use crate::container::{DOCKER_HOST, HostSize};
 
 use crate::steps::{CLOUD_INIT_WAIT, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE, install_docker};
 
+/// Isoloom's outputs a Compose VM reads in its copy of the project: the `docker` target's folder
+/// (its Compose file, check scripts and builds) and the configuration files its images copy.
+/// Never another target's folder, nor what the tools write beside them.
+pub const COMPOSE_OUTPUTS: [&str; 2] = [".isoloom/docker", crate::configure::DIR];
+
 /// The sshd drop-in directory where a VM readied over SSH learns which variables it accepts from a
 /// session (the launch's values): the runner forwards them with `SendEnv`, and sshd drops any not
 /// listed in `isoloom-env.conf` here. A bare Terraform-made VM (cloud-docker) may ship without this
@@ -306,7 +311,7 @@ pub fn ssh_run(host: Template, user: &str) -> impl Fn(&Template) -> Result<Run, 
 const SETUP_S: u32 = 1800;
 
 /// A VM Terraform made, readied for Compose through `way_in`: the project archived
-/// (`project.archive`, `root` its folder from the manifest's) and piped into `tar` in the VM's
+/// (`project.archive`, `root` its folder from the manifest's, with [`COMPOSE_OUTPUTS`]) and piped into `tar` in the VM's
 /// project folder, replacing what an earlier copy left, then `setup` (the generated
 /// [`setup_script`], beside the manifest) piped into `sudo sh -s`, which trusts the project's
 /// certificate authorities before it downloads Docker.
@@ -324,9 +329,7 @@ pub fn into_vm(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, setup: 
     };
     let mut docker = docker.step(way_in)?;
     docker.stdin = Some(PathTemplate::relative(setup));
-    let mut archive = Step::action(StepId::parse("archive")?, Action::ProjectArchive);
-    archive.run = super::action_with(Action::ProjectArchive, [("root", Template::text(root))])?;
-    archive.note = Some("Archiving the project…".into());
+    let archive = super::project_archive(root, &COMPOSE_OUTPUTS)?;
     let copy = GuestCommand {
         id: StepId::parse("project")?,
         note: Some("Copying the project into the VM…".into()),
@@ -442,12 +445,20 @@ mod tests {
         );
         let Run::Action {
             action: Action::ProjectArchive,
-            with: root,
+            with: archived,
         } = &steps[0].run
         else {
             panic!()
         };
-        assert_eq!(root.values().map(ToString::to_string).collect::<Vec<_>>(), ["../../.."]);
+        let archived: Vec<(String, String)> = archived.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        // The outputs Compose reads go in, no other.
+        assert_eq!(
+            archived,
+            [
+                ("outputs".into(), ".isoloom/docker .isoloom/configure".into()),
+                ("root".into(), "../../..".into())
+            ]
+        );
     }
 
     #[test]

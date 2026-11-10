@@ -77,8 +77,12 @@ pub enum Action {
     #[serde(rename = "ssh.run")]
     SshRun,
     /// Archives the project as `${run.state_dir}/project.tgz` (`with`: `root`, the project's folder
-    /// relative to the manifest's): Isoloom's outputs in, version control, the tools' state and
-    /// what `.isoloomignore` lists ([`crate::ignore`]) out. A step pipes it to a guest.
+    /// relative to the manifest's; `outputs`, optional, the paths of Isoloom's outputs the guest
+    /// reads, relative to the project and separated by spaces). What
+    /// [`Rules::for_copy`](crate::ignore::Rules::for_copy) leaves out stays out: what
+    /// `.isoloomignore` lists, Isoloom's outputs but `outputs`, and, at any depth, version control
+    /// and the tools' state (a Terraform state, a Vagrant machine folder, the runner's logins). A
+    /// step pipes it to a guest.
     #[serde(rename = "project.archive")]
     ProjectArchive,
 }

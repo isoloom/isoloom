@@ -55,16 +55,13 @@ require "zlib"
 require "tempfile"
 
 module IsoloomProject
-  # Never copied, at any depth: version control and the tools' own state.
-  SKIP = [".git", ".vagrant", ".terraform"].freeze
-
-  # Writes the archive of `root` to `io`, gzipped. Isoloom's outputs (the top-level `.isoloom*`
-  # folders) stay out but `extra`: files or folders in them that go in, a folder with all it holds
-  # (paths from `root`, with `/`). What `.isoloomignore` lists stays out.
-  def self.write(root, io, extra: [])
+  # Writes the archive of `root` to `io`, gzipped, leaving out what `.isoloomignore` lists, then
+  # what `rules` (lines of its syntax, read after the file's) list: Isoloom's outputs but those
+  # the machine reads, version control and the tools' state (`COPY_RULES`, the generator's).
+  def self.write(root, io, rules: COPY_RULES)
     gz = Zlib::GzipWriter.new(io)
-    rules = ignore_rules(root)
-    walk(root, nil, extra, rules) { |rel, st| entry(gz, root, rel, st) }
+    rules = ignore_rules(root, rules)
+    walk(root, nil, rules) { |rel, st| entry(gz, root, rel, st) }
     gz.write("\0" * 1024)
     gz.finish
   end
@@ -73,11 +70,16 @@ module IsoloomProject
   # `!` brings a path back, a trailing `/` matches folders only, a `/` at the start or in the
   # middle anchors the pattern at the root (otherwise it matches at any depth), `*`, `?`,
   # `[abc]` and `**`. A pattern matching a folder matches everything in it, and the last pattern
-  # matching a path (or a folder it is in) decides. As [regexp, keep] pairs; the Terraform
-  # outputs translate the patterns the same way, so every target leaves out the same files.
-  def self.ignore_rules(root)
-    text = File.binread(File.join(root, ".isoloomignore")).force_encoding("UTF-8")
-    text.split("\n").filter_map do |line|
+  # matching a path (or a folder it is in) decides. As [regexp, keep] pairs, `copy` read after
+  # the file; the Terraform outputs translate the patterns the same way, so every target leaves
+  # out the same files.
+  def self.ignore_rules(root, copy)
+    text = begin
+      File.binread(File.join(root, ".isoloomignore")).force_encoding("UTF-8")
+    rescue Errno::ENOENT
+      ""
+    end
+    "#{text}\n#{copy}".split("\n").filter_map do |line|
       line = line.strip
       next if line.empty? || line.start_with?("#")
       keep = line.start_with?("!")
@@ -90,8 +92,6 @@ module IsoloomProject
                    .gsub("\u0001", "(.*/)?").gsub("\u0002", ".*")
       [Regexp.new(glob == pat ? "^#{re}(/|$)" : "^#{re}/"), keep]
     end
-  rescue Errno::ENOENT
-    []
   end
 
   # Whether the rules leave a path out (a folder's path ends with `/`).
@@ -100,18 +100,14 @@ module IsoloomProject
   end
 
   # Every entry under `dir` (relative to `root`), parents first, in name order.
-  def self.walk(root, dir, extra, rules, &block)
+  def self.walk(root, dir, rules, &block)
     names = begin
       Dir.children(dir ? File.join(root, dir) : root).sort
     rescue Errno::ENOENT, Errno::ENOTDIR
       return # removed while the archive was being written
     end
     names.each do |name|
-      next if SKIP.include?(name)
       rel = dir ? "#{dir}/#{name}" : name
-      if rel.start_with?(".isoloom")
-        next unless extra.any? { |e| e == rel || e.start_with?("#{rel}/") || rel.start_with?("#{e}/") }
-      end
       st = begin
         File.lstat(File.join(root, rel))
       rescue Errno::ENOENT
@@ -121,7 +117,7 @@ module IsoloomProject
       out = ignored?(rules, folder ? "#{rel}/" : rel)
       yield rel, st unless out
       # An ignored folder is skipped, unless a `!` pattern may bring back something in it.
-      walk(root, rel, extra, rules, &block) if folder && (!out || rules.any? { |_, keep| keep })
+      walk(root, rel, rules, &block) if folder && (!out || rules.any? { |_, keep| keep })
     end
   end
 
@@ -182,17 +178,17 @@ end
 if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
   module IsoloomProject
     class Config < Vagrant.plugin("2", :config)
-      attr_accessor :name, :extra
+      attr_accessor :name, :rules
 
       def initialize
         super
         @name = UNSET_VALUE
-        @extra = UNSET_VALUE
+        @rules = UNSET_VALUE
       end
 
       def finalize!
         @name = nil if @name == UNSET_VALUE
-        @extra = [] if @extra == UNSET_VALUE
+        @rules = COPY_RULES if @rules == UNSET_VALUE
       end
     end
 
@@ -203,7 +199,7 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
         windows = %w[winrm winssh].include?(@machine.config.vm.communicator.to_s)
         Tempfile.create(["isoloom-project", ".tgz"]) do |f|
           f.binmode
-          IsoloomProject.write(ROOT, f, extra: config.extra)
+          IsoloomProject.write(ROOT, f, rules: config.rules)
           f.close
           dest = windows ? "C:\\isoloom" : "/opt/isoloom"
           @machine.ui.info("The project, #{(File.size(f.path) / 1024.0).ceil} KB compressed, to #{dest}")
@@ -232,6 +228,18 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
   end
 end
 
+# What a copy of the project leaves out beyond .isoloomignore.
+IsoloomProject::COPY_RULES = "/.isoloom*
+.git/
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+.vagrant/
+.isoloom-reach/
+"
 # Unpacks the project on Windows (no tar.exe before Windows Server 2019).
 IsoloomProject::UNTAR_PS1 = <<'PS1'
 # The project into a Windows machine: unpacks the tar.gz $archive into $dest (replacing an older
@@ -1454,7 +1462,18 @@ Vagrant.configure("2") do |config|
       v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
       v.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
     end
-    m.vm.provision "isoloom_project", name: "project", extra: [".isoloom/hybrid/compose.yml"]
+    m.vm.provision "isoloom_project", name: "project", rules: "/.isoloom*
+!/.isoloom/hybrid/compose.yml
+.git/
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+.vagrant/
+.isoloom-reach/
+"
     m.vm.provision "shell", name: "docker", inline: "command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   set -e
   export DEBIAN_FRONTEND=noninteractive

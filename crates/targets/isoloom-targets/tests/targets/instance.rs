@@ -72,7 +72,7 @@ fn vagrant_instances_differ_by_name_only() -> Outcome {
     // falls back to, so two instances can both forward even without a runner choosing.
     assert!(vf.contains("guest: 80, host: ISOLOOM_HOSTPORTS.fetch(") && vf.contains(", 8180)"), "{vf}");
     // The project copy leaves every instance folder behind.
-    assert!(vf.contains("rel.start_with?(\".isoloom\")"));
+    assert!(vf.contains("IsoloomProject::COPY_RULES = \"/.isoloom*\n"), "{vf}");
     Ok(())
 }
 

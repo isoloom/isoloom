@@ -37,4 +37,16 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
     end
   end
   config.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
-  config.vm.provision "project", type: "isoloom_project", extra: [".isoloom/docker", ".isoloom/configure"]
+  config.vm.provision "project", type: "isoloom_project", rules: "/.isoloom*
+!/.isoloom/docker
+!/.isoloom/configure
+.git/
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+.vagrant/
+.isoloom-reach/
+"

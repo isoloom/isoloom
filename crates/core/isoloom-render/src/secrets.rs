@@ -22,10 +22,6 @@ pub mod windows;
 pub(crate) const KEPT_DIR: &str = isoloom_spec::linux_state_path!("/secrets");
 /// The mark delivery leaves once every secret is kept.
 pub const DELIVERED: &str = isoloom_spec::linux_state_path!("/secrets/.delivered");
-/// Where a Terraform set-up that waits for its secrets says how to reach its machine, under
-/// its module: one file per machine, `<user>@<address>`. The runner reads it while Terraform
-/// runs (the module's outputs come only once every set-up is done) and delivers there.
-pub const REACH_DIR: &str = ".isoloom-reach";
 /// Seconds the set-up waits for the runner to deliver the secrets.
 pub(crate) const DELIVERY_TIMEOUT: u32 = 1800;
 /// The boot service putting the secrets back in place (`/run` is emptied at every boot). Its

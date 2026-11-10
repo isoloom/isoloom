@@ -31,6 +31,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+- **Breaking (runner): `project.archive` leaves Isoloom's outputs out but `with.outputs`.** The
+  action's new optional `with.outputs` names the outputs the guest reads (paths from the project,
+  separated by spaces; `.isoloom/docker .isoloom/configure` for a Compose VM); the archive follows
+  `isoloom_manifest::ignore::Rules::for_copy(<.isoloomignore>, <outputs>)`, which also leaves out
+  version control and the tools' state at any depth. A runner that took every output in copied
+  other targets' Terraform state and logins into the guest. The tools' state patterns are
+  `isoloom_manifest::ignore::{TERRAFORM_STATE, VAGRANT_STATE, RUNNER_STATE}`, and the reach folder
+  is `isoloom_manifest::ignore::REACH_DIR` (was `isoloom_render::secrets::REACH_DIR`).
 - **Breaking (library): `Manifest::validate` refuses a name twice in any of the manifest's lists**
   (machines, networks, tools, params, secret slots, outputs) with one error,
   `isoloom_manifest::Error::Duplicate { list, name }` (code `duplicate`), which replaces
@@ -374,11 +382,17 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `/var/lib/isoloom/setup.sh` under the default umask, readable by every account on the machine,
   and it holds the sensitive inputs in base64 (and, on the controller, its private key and the
   inventory with the Windows password). It is now a fresh file written under umask 077.
-- **`docker-vm`'s VM gets only the outputs Compose reads.** Its project step copied every one of
-  Isoloom's outputs into `/opt/isoloom`, other targets' folders included, with what the tools
-  write there: a Terraform state (the secrets Terraform saw) and a cloud machine's login
-  (`.isoloom-reach/`). It now copies the `docker` target's folder and `.isoloom/configure/` only;
-  the Vagrant project step's `generated:` option is gone, and `extra:` takes folders.
+- **No copy of the project takes the tools' state, nor outputs its machine doesn't read.**
+  `docker-vm`'s project step, the runner's `project.archive` (`cloud-docker`, `docker-vm` on
+  Proxmox, `cloud-vm`) and ESXi's archive copied every one of Isoloom's outputs into the machines,
+  other targets' folders included, with what the tools write there: a Terraform state (the secrets
+  Terraform saw) and a cloud machine's login (`.isoloom-reach/`); ESXi's also took a state of the
+  project's own. Every copy now follows one rule, `isoloom_manifest::ignore::copy_rules`, read
+  after the project's `.isoloomignore` so it can't bring any of it back: Isoloom's outputs out but
+  those the machine reads (a Compose VM, the `docker` target's folder and `.isoloom/configure/`;
+  hybrid's host, its Compose file), version control, Terraform's cache, state, lock and crash
+  logs, Vagrant's machine folders and the runner's logins out at any depth. The Vagrant project
+  step takes `rules:` (the lines to follow) in place of `generated:` and `extra:`.
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

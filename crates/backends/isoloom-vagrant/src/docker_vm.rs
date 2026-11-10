@@ -31,7 +31,7 @@ use crate::error::Result;
 use isoloom_manifest::{Failure, Manifest};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container::{self as docker, DOCKER_HOST as VM};
-use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
+use isoloom_render::run_manifest::guest::{COMPOSE_OUTPUTS, GuestCommand, GuestCompose};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::model::Target;
 use isoloom_spec::shell::quote;
@@ -207,7 +207,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
     }
     // The project, with the outputs Compose reads: first, so the certificate authorities it holds
     // are trusted before Docker downloads.
-    r.provision(named(PROJECT, "isoloom_project").kw("extra", compose_outputs()));
+    r.provision(named(PROJECT, "isoloom_project").kw("rules", crate::vms::copy_rules(&COMPOSE_OUTPUTS)));
     if let Some(sh) = steps::trust_authorities(env) {
         r.provision(named(CA_CERTIFICATES, "shell").kw("inline", Value::str(&sh)));
     }
@@ -224,15 +224,6 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
     if let Some(script) = &scripts.checks {
         checks(r, env, script);
     }
-}
-
-/// What of Isoloom's outputs the VM gets with the project: the `docker` target's folder (its
-/// Compose file, check scripts and builds) and the configuration files its images copy. Never
-/// another target's folder, nor what the tools write beside them (a Terraform state, a cloud
-/// machine's login).
-fn compose_outputs() -> Value {
-    let docker = format!("{OUTPUT_DIR}/{}", Target::Docker.id());
-    Value::array([Value::str(&docker), Value::str(isoloom_render::configure::DIR)])
 }
 
 /// The size on the providers of this machine (VirtualBox, VMware, Parallels, UTM, QEMU,

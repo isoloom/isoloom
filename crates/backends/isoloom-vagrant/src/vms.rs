@@ -74,15 +74,23 @@ const TOOL_SHELL: &str = "isoloom-tool-shell";
 const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
 
 /// The Ruby that copies the project into a VM (`vagrant_project.rb`): a tar.gz built when the
-/// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`; on Windows
-/// unpacked by PowerShell (`untar.ps1`, as `IsoloomProject::UNTAR_PS1`). Every Vagrantfile
-/// Isoloom writes carries it, after `ROOT`.
+/// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`, leaving out
+/// what a copy leaves out (`IsoloomProject::COPY_RULES`, [`copy_rules`] for a machine that reads
+/// none of Isoloom's outputs); on Windows unpacked by PowerShell (`untar.ps1`, as
+/// `IsoloomProject::UNTAR_PS1`). Every Vagrantfile Isoloom writes carries it, after `ROOT`.
 pub(crate) fn project_rb() -> String {
     format!(
-        "{}\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n{}PS1\n",
+        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n{}PS1\n",
         include_str!("vagrant_project.rb"),
+        copy_rules(&[]),
         powershell::UNTAR
     )
+}
+
+/// What the project step of a machine reading Isoloom's `outputs` leaves out (its `rules:`), as a
+/// Ruby string: [`isoloom_manifest::ignore::copy_rules`].
+pub(crate) fn copy_rules(outputs: &[&str]) -> Value {
+    Value::str(&isoloom_manifest::ignore::copy_rules(outputs))
 }
 
 /// Where a Vagrantfile goes and what it carries besides the environment's VMs: `hybrid` writes

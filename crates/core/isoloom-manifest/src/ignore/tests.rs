@@ -1,6 +1,6 @@
 use proptest::prelude::*;
 
-use super::{Rules, Token, tokens};
+use super::{Rules, Token, copy_rules, tokens};
 
 fn kept<'a>(rules: &str, paths: &[&'a str]) -> Vec<&'a str> {
     let r = Rules::parse(rules);
@@ -124,4 +124,49 @@ proptest! {
         let r = Rules::parse(&text);
         prop_assert_eq!(r.ignored(&path), Rules::parse(&text).ignored(&path));
     }
+}
+
+#[test]
+fn a_copy_leaves_out_the_outputs_but_those_it_keeps_and_the_tools_state_everywhere() {
+    let paths = [
+        "provision/web.sh",
+        ".isoloomignore",
+        ".isoloom-project-web.tgz",
+        ".isoloom/.generated",
+        ".isoloom/docker/compose.yml",
+        ".isoloom/docker/checks/web.sh",
+        ".isoloom/configure/lib/configure.sh",
+        ".isoloom/cloud-vm/aws/main.tf",
+        ".isoloom/cloud-vm/aws/terraform.tfstate",
+        ".isoloom/cloud-vm/aws/.isoloom-reach/web",
+        ".isoloom/docker/terraform.tfstate.backup",
+        ".git/HEAD",
+        "infra/.terraform/providers/x",
+        "infra/terraform.tfstate",
+        "infra/.terraform.tfstate.lock.info",
+        "infra/crash.1.log",
+        "vm/.vagrant/machines/default/id",
+        "deep/.isoloom-reach/web",
+    ];
+    // The project's own `!` can't bring any of them back.
+    let rules = Rules::for_copy("*.bak\n!**\n", &[".isoloom/docker", ".isoloom/configure"]);
+    let kept: Vec<&str> = paths.iter().copied().filter(|p| !rules.ignored(p)).collect();
+    assert_eq!(
+        kept,
+        [
+            "provision/web.sh",
+            ".isoloom/docker/compose.yml",
+            ".isoloom/docker/checks/web.sh",
+            ".isoloom/configure/lib/configure.sh"
+        ]
+    );
+    assert!(Rules::for_copy("", &[]).ignored(".isoloom/docker/compose.yml"), "no output kept unless named");
+}
+
+#[test]
+fn the_copy_rules_are_lines_of_the_files_syntax() {
+    assert_eq!(
+        copy_rules(&[".isoloom/hybrid/compose.yml"]),
+        "/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n.terraform/\n*.tfstate\n*.tfstate.*\n.terraform.tfstate.lock.info\ncrash.log\ncrash.*.log\n.vagrant/\n.isoloom-reach/\n"
+    );
 }

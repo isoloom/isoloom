@@ -658,6 +658,7 @@ output "ssh_user" {
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
+          "outputs": ".isoloom/docker .isoloom/configure",
           "root": "../../..",
           "wait_s": "300"
         }
@@ -1620,6 +1621,7 @@ output "ssh_user" {
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
+          "outputs": ".isoloom/docker .isoloom/configure",
           "root": "../../..",
           "wait_s": "300"
         }
@@ -2467,6 +2469,7 @@ output "ssh_user" {
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
+          "outputs": ".isoloom/docker .isoloom/configure",
           "root": "../../..",
           "wait_s": "300"
         }
@@ -3424,6 +3427,7 @@ output "ssh_user" {
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
+          "outputs": ".isoloom/docker .isoloom/configure",
           "root": "../../..",
           "wait_s": "300"
         }
@@ -4252,6 +4256,7 @@ output "ssh_user" {
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
+          "outputs": ".isoloom/docker .isoloom/configure",
           "root": "../../..",
           "wait_s": "300"
         }
@@ -5146,6 +5151,7 @@ output "ssh_user" {
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
+          "outputs": ".isoloom/docker .isoloom/configure",
           "root": "../../..",
           "wait_s": "300"
         }

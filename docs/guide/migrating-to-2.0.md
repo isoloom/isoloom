@@ -86,6 +86,13 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   `docker`), as `cloud-docker`'s is: read it from `guest.machine` and `machines[]`. On QEMU, the
   VM's SSH port is `ISOLOOM_HOSTPORTS`' `isoloom-docker-host/ssh` key (was `docker/ssh`). The
   Vagrant define stays `default`.
+- **`project.archive` leaves Isoloom's outputs out but `with.outputs`** (optional: paths from the
+  project, separated by spaces, each a file or a folder with all it holds). Build the archive's
+  rules with `isoloom_manifest::ignore::Rules::for_copy(<the project's .isoloomignore>, <outputs>)`
+  and drop any list of your own: it also leaves out version control and the tools' state
+  (`.terraform/`, `*.tfstate*`, `.vagrant/`, `.isoloom-reach/`) at any depth, and an earlier
+  archive at the top. `docker-vm/proxmox/run.json` and `cloud-docker`'s manifests name
+  `.isoloom/docker .isoloom/configure`; `cloud-vm`'s name none.
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.
 - On Vagrant (and `hybrid`), the controller's check runner step is `check-isoloom-controller`
   (was `check-controller`) and its runner script `checks/isoloom-controller.sh` (was

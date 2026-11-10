@@ -37,6 +37,16 @@ Two exceptions are by design, and worth knowing:
   controller's SSH private key. Keep state where only the people who run the environment can read
   it ([remote state](../guide/remote-terraform-state.md)).
 
+## What a machine gets of the project
+
+A copy of the project into a machine (Vagrant's project step, Proxmox's cloud-init, ESXi's
+archive, the runner's `project.archive`) leaves out what the project's `.isoloomignore` lists,
+then, whatever that file says: Isoloom's outputs but those the machine reads (a Compose VM, the
+`docker` target's folder and `.isoloom/configure/`), version control, and what the tools write at
+any depth: Terraform's cache, state, lock and crash logs, Vagrant's machine folders (their private
+keys) and the runner's logins (`.isoloom-reach/`). One rule,
+`isoloom_manifest::ignore::copy_rules`, which `.isoloom/.gitignore` shares.
+
 ## Published ports
 
 - **Compose**: published on `127.0.0.1` only, on a free port, unless you set

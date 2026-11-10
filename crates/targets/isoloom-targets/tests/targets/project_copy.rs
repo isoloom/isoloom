@@ -27,11 +27,17 @@ fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
     assert!(vagrant.contains("    m.vm.provision \"isoloom_project\", name: \"project\"\n"), "{vagrant}");
     // docker-vm runs the generated Compose file: the `docker` target's outputs go in, no other's.
     assert!(
-        docker_vm.contains("  config.vm.provision \"project\", type: \"isoloom_project\", extra: [\".isoloom/docker\", \".isoloom/configure\"]\n"),
+        docker_vm
+            .contains("  config.vm.provision \"project\", type: \"isoloom_project\", rules: \"/.isoloom*\n!/.isoloom/docker\n!/.isoloom/configure\n.git/\n"),
         "{docker_vm}"
     );
     // hybrid's Docker host gets its Compose file, and nothing else of the outputs.
-    assert!(hybrid.contains("m.vm.provision \"isoloom_project\", name: \"project\", extra: [\".isoloom/hybrid/compose.yml\"]\n"));
+    assert!(
+        hybrid.contains("m.vm.provision \"isoloom_project\", name: \"project\", rules: \"/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n"),
+        "{hybrid}"
+    );
+    // Every other step: the rules of a machine reading none of the outputs.
+    assert!(vagrant.contains("IsoloomProject::COPY_RULES = \"/.isoloom*\n.git/\n"), "{vagrant}");
     Ok(())
 }
 
@@ -44,15 +50,23 @@ fn have(tool: &str) -> bool {
 /// it first when it's missing.
 const FILTER_MAP_FOR_OLD_RUBY: &str = "Enumerable.module_eval { def filter_map; each_with_object([]) { |x, out| v = yield(x); out << v if v }; end } unless Enumerable.method_defined?(:filter_map); ";
 
-/// Archives `root` with the Ruby of a generated Vagrantfile, Isoloom's outputs `extra` in (Ruby
-/// strings), and lists the archive (`tar -tv`).
-fn archive(dir: &Path, root: &Path, extra: &str, out: &str) -> Outcome<String> {
+/// Archives `root` with the Ruby of a generated Vagrantfile, Isoloom's `outputs` in, and lists the
+/// archive (`tar -tv`).
+fn archive(dir: &Path, root: &Path, outputs: &[&str], out: &str) -> Outcome<String> {
     let rb = dir.join("project.rb");
     std::fs::write(&rb, file(&example("hello-stack")?, Target::Vagrant, "vagrant/Vagrantfile")?)?;
     let script = format!(
-        "{FILTER_MAP_FOR_OLD_RUBY}eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, extra: [{extra}]) }}"
+        "{FILTER_MAP_FOR_OLD_RUBY}eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, rules: ARGV[3]) }}"
     );
-    let st = Command::new("ruby").arg("-e").arg(script).arg(&rb).arg(root).arg(dir.join(out)).status()?;
+    let rules = isoloom_manifest::ignore::copy_rules(outputs);
+    let st = Command::new("ruby")
+        .arg("-e")
+        .arg(script)
+        .arg(&rb)
+        .arg(root)
+        .arg(dir.join(out))
+        .arg(rules)
+        .status()?;
     if !st.success() {
         return Err("the archive wasn't written".into());
     }
@@ -103,6 +117,8 @@ fn tricky_project(dir: &Path) -> Outcome<(PathBuf, String)> {
     std::fs::write(root.join(".isoloom/configure/lib/configure.sh"), "true\n")?;
     std::fs::write(root.join(".isoloom/cloud-vm/aws/terraform.tfstate"), "{}")?;
     std::fs::write(root.join(".isoloom/cloud-vm/aws/.isoloom-reach/web"), "admin@203.0.113.7")?;
+    // The tools' state outside the outputs too: a module of the project's own, applied in place.
+    std::fs::write(root.join("sub/terraform.tfstate"), "{}")?;
     std::fs::write(root.join("sub/.vagrant/private_key"), "secret")?;
     // Kubernetes Goat's vendored tree: a link to its own folder, and two links to each other.
     symlink(".", root.join("vendor/goat/self"))?;
@@ -124,9 +140,9 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
     }
     let dir = scratch("project-tar")?;
     let (root, long) = tricky_project(&dir)?;
-    let run = |extra: &str, out: &str| archive(&dir, &root, extra, out);
+    let run = |outputs: &[&str], out: &str| archive(&dir, &root, outputs, out);
 
-    let list = run("\".isoloom/hybrid/compose.yml\"", "project.tgz")?;
+    let list = run(&[".isoloom/hybrid/compose.yml"], "project.tgz")?;
     let has = |l: &str, entry: &str| l.lines().any(|x| x.ends_with(entry));
     assert!(has(&list, "vendor/goat/self -> ."), "{list}");
     assert!(has(&list, "loop1 -> loop2"), "{list}");
@@ -146,10 +162,17 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
         assert!(!list.contains(gone), "{gone} went in: {list}");
     }
     // docker-vm's: the `docker` target's folder and the configuration files, all they hold.
-    let compose = run("\".isoloom/docker\", \".isoloom/configure\"", "compose.tgz")?;
+    let compose = run(&[".isoloom/docker", ".isoloom/configure"], "compose.tgz")?;
     assert!(has(&compose, ".isoloom/docker/checks/web.sh"), "{compose}");
     assert!(has(&compose, ".isoloom/configure/lib/configure.sh"), "{compose}");
-    for gone in [".isoloom/vagrant/", ".isoloom/hybrid/", ".isoloom/cloud-vm/", "tfstate", ".isoloom-reach"] {
+    for gone in [
+        ".isoloom/vagrant/",
+        ".isoloom/hybrid/",
+        ".isoloom/cloud-vm/",
+        "tfstate",
+        ".isoloom-reach",
+        "private_key",
+    ] {
         assert!(!compose.contains(gone), "{gone} went in: {compose}");
     }
     unpacks_as_packed(&dir, &long)?;
@@ -205,7 +228,7 @@ fn isoloomignore_leaves_paths_out() -> Outcome {
         "# not copied into the VMs\n\nlogs/\n!logs/keep.txt\nbuild/\n/x.tmp\nsub/*.tmp\nvendor/big\n.env\ndocs/**\nsrc/*.py\ndata.js?n\nw/a+b.txt   \r\n",
     )
     .unwrap();
-    let list = archive(&dir, &root, "", "project.tgz")?;
+    let list = archive(&dir, &root, &[], "project.tgz")?;
     let went: Vec<&str> = files.iter().copied().filter(|f| list.lines().any(|l| l.ends_with(&format!(" {f}")))).collect();
     // `src/*.py` is anchored (a `/` in the middle): `src/deeper/z.py` stays; `.env` matches at any
     // depth; `!logs/keep.txt` brings back a file of an ignored folder.
@@ -287,7 +310,7 @@ fn the_windows_extractor_unpacks_the_archive() -> Outcome {
     }
     std::fs::create_dir_all(root.join("empty")).unwrap();
     std::fs::write(root.join(".isoloomignore"), "*.log\n").unwrap();
-    archive(&dir, &root, "", "ruby.tgz")?;
+    archive(&dir, &root, &[], "ruby.tgz")?;
     // A host's tar, as the cloud modules run it (GNU tar's long names, here).
     let st = Command::new("tar")
         .arg("-czf")

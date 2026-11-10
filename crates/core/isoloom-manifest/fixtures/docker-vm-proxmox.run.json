@@ -427,6 +427,7 @@
         "note": "Archiving the project…",
         "action": "project.archive",
         "with": {
+          "outputs": ".isoloom/docker .isoloom/configure",
           "root": "../../.."
         }
       },

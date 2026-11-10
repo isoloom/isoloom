@@ -1,7 +1,10 @@
 //! `.isoloomignore`: the project's paths the machines don't get when the project is copied into
 //! them (Vagrant's `project` step, Proxmox's cloud-init, the cloud modules' archive, and the
 //! runner's `project.archive`). Part of the contract: a runner archiving the project leaves out
-//! exactly what the generated files do. Gitignore-style, at the project's root:
+//! exactly what the generated files do. Every copy also leaves out what [`copy_rules`] says,
+//! whatever the file says: Isoloom's outputs (but those a machine reads, as each copy names
+//! them), version control and what the tools write in a project ([`TERRAFORM_STATE`],
+//! [`VAGRANT_STATE`], [`RUNNER_STATE`]). Gitignore-style, at the project's root:
 //!
 //! - one pattern per line; blank lines and `#` comments are skipped, spaces around a pattern
 //!   too;
@@ -31,6 +34,65 @@ use std::collections::BTreeSet;
 
 /// The file's name, at the project's root.
 pub const FILE: &str = ".isoloomignore";
+
+/// Isoloom's outputs, at the project's top: `.isoloom/` and every other `.isoloom*` entry there
+/// (an earlier copy's archive).
+pub const OUTPUTS: &str = "/.isoloom*";
+
+/// Version control's folder.
+const VERSION_CONTROL: &str = ".git/";
+
+/// What Terraform writes beside a module: its provider cache, the state and its backups (the
+/// secrets Terraform saw, in plain text), the state's lock, its crash logs.
+pub const TERRAFORM_STATE: &[&str] = &[
+    ".terraform/",
+    "*.tfstate",
+    "*.tfstate.*",
+    ".terraform.tfstate.lock.info",
+    "crash.log",
+    "crash.*.log",
+];
+
+/// What Vagrant writes beside a Vagrantfile: each machine's folder (its id, its private key).
+pub const VAGRANT_STATE: &[&str] = &[".vagrant/"];
+
+/// Where a Terraform set-up that waits for its secrets says how to reach its machine, under its
+/// module: one file per machine, `<user>@<address>`. The runner reads it while Terraform runs (the
+/// module's outputs come only once every set-up is done) and delivers there.
+pub const REACH_DIR: &str = ".isoloom-reach";
+
+/// What the runner reads beside a module: each cloud machine's SSH login ([`REACH_DIR`]).
+pub const RUNNER_STATE: &[&str] = &[".isoloom-reach/"];
+
+/// What a copy of the project into a machine leaves out beyond the project's `.isoloomignore`, as
+/// lines of its syntax, read after the project's own so none of them is brought back: Isoloom's
+/// outputs but `outputs` (paths of them a machine reads, relative to the project, with `/`: a
+/// folder with all it holds), then, at any depth, version control and what the tools write
+/// ([`TERRAFORM_STATE`], [`VAGRANT_STATE`], [`RUNNER_STATE`]), in the outputs a machine reads too.
+///
+/// ```
+/// use isoloom_manifest::ignore::{Rules, copy_rules};
+///
+/// let rules = Rules::parse(&copy_rules(&[".isoloom/docker"]));
+/// assert!(rules.ignored(".isoloom/cloud-vm/aws/main.tf") && !rules.ignored(".isoloom/docker/compose.yml"));
+/// assert!(rules.ignored("sub/terraform.tfstate") && rules.ignored(".isoloom/docker/.terraform/"));
+/// ```
+#[must_use]
+pub fn copy_rules(outputs: &[&str]) -> String {
+    let read = outputs.iter().map(|o| format!("!/{}", o.trim_start_matches('/')));
+    let state = never_copied().map(str::to_owned);
+    std::iter::once(OUTPUTS.to_owned()).chain(read).chain(state).map(|l| l + "\n").collect()
+}
+
+/// What no copy of the project takes, at any depth, as patterns of this file's syntax: version
+/// control and what the tools write ([`TERRAFORM_STATE`], [`VAGRANT_STATE`], [`RUNNER_STATE`]).
+pub fn never_copied() -> impl Iterator<Item = &'static str> {
+    [VERSION_CONTROL]
+        .into_iter()
+        .chain(TERRAFORM_STATE.iter().copied())
+        .chain(VAGRANT_STATE.iter().copied())
+        .chain(RUNNER_STATE.iter().copied())
+}
 
 /// One piece of a pattern, as matched.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +135,13 @@ impl Rules {
     #[must_use]
     pub fn parse(text: &str) -> Rules {
         Rules(text.split('\n').filter_map(rule).collect())
+    }
+
+    /// The rules a copy of the project follows: the project's `.isoloomignore` (its text, empty
+    /// without one), then [`copy_rules`] with the outputs the copy keeps.
+    #[must_use]
+    pub fn for_copy(project: &str, outputs: &[&str]) -> Rules {
+        Rules::parse(&format!("{project}\n{}", copy_rules(outputs)))
     }
 
     /// Whether the rules leave a path out (relative to the project, with `/`; a folder's path

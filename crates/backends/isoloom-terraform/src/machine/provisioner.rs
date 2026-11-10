@@ -3,7 +3,8 @@
 //! restarting between two of them.
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Template, boolean, call, list, reference, string};
-use isoloom_render::secrets::REACH_DIR;
+use isoloom_manifest::ignore::REACH_DIR;
+use isoloom_render::project::{self, TarExclusion};
 
 /// How Terraform reaches the machine.
 #[derive(Debug, Clone, PartialEq)]
@@ -71,7 +72,7 @@ pub(crate) struct Provisioner {
     /// The resources it waits for.
     pub(crate) depends_on: Vec<Expression>,
     /// The name it tells the runner how to reach the machine under, before anything else
-    /// (`isoloom_render::secrets::REACH_DIR`): a machine whose set-up waits for its secrets.
+    /// (`isoloom_manifest::ignore::REACH_DIR`): a machine whose set-up waits for its secrets.
     pub(crate) announce: Option<String>,
 }
 
@@ -198,15 +199,26 @@ fn upload(u: Upload) -> Vec<Block> {
     }
 }
 
-/// `tar` of the project's folder, its top folder kept (stripped when unpacked), leaving out
-/// version control, the tools' state, the archives themselves and `.isoloomignore`'s files.
+/// `tar` of the project's folder, its top folder kept (stripped when unpacked), leaving out what
+/// a copy leaves out: the files the module listed (`.isoloomignore`'s, Isoloom's outputs, the
+/// tools' state), and what appears once Terraform is applying (the archive itself, a state, a
+/// machine's login), by `tar`'s own exclusions of the same rules.
 fn archive_command(archive: &str) -> Expression {
     let q = "\"";
-    Template::text("tar -czf \"")
+    let mut command = Template::text("tar -czf \"")
         .with_expr(reference("path.module"))
-        .with_text(format!(
-            "{archive}{q} --exclude=.git --exclude=.vagrant --exclude=.terraform --exclude=.isoloom-project* -X {q}"
-        ))
+        .with_text(format!("{archive}{q}"));
+    for exclusion in project::tar_exclusions() {
+        command = match exclusion {
+            TarExclusion::UnderTop(p) => command
+                .with_text(format!(" --exclude={q}"))
+                .with_expr(call("basename", [reference("local.root")]))
+                .with_text(format!("/{p}{q}")),
+            TarExclusion::Anywhere(p) => command.with_text(format!(" --exclude={q}{p}{q}")),
+        };
+    }
+    command
+        .with_text(format!(" -X {q}"))
         .with_expr(call("abspath", [reference("local_file.isoloom_project.filename")]))
         .with_text("\" -C \"")
         .with_expr(call("dirname", [reference("local.root")]))

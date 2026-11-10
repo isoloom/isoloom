@@ -96,7 +96,10 @@ fn proxmox_makes_the_vm_then_copies_the_project_sets_it_up_and_starts_compose_ov
     else {
         panic!()
     };
-    assert_eq!(with.values().map(ToString::to_string).collect::<Vec<_>>(), ["../../.."]);
+    assert_eq!(
+        with.values().map(ToString::to_string).collect::<Vec<_>>(),
+        [".isoloom/docker .isoloom/configure", "../../.."]
+    );
     assert_eq!(
         step("project").stdin.as_ref().map(ToString::to_string).as_deref(),
         Some("${run.state_dir}/project.tgz")

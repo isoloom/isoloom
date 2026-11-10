@@ -3,8 +3,6 @@
 //! (the apply, then each machine's ready file); the seal (a second apply with `isoloom_sealed`);
 //! and the param saying whether the derived checks run.
 
-use std::collections::BTreeMap;
-
 use isoloom_manifest::{
     Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RelPath, Run, RunVar, Seal,
     SnakeName, Step, Template,
@@ -69,14 +67,9 @@ fn ssh_run(step: &str, guest: &Guest, command: Template, more: &[(&str, Template
 }
 
 /// The project archived in the run's state folder (from the project's folder, three levels up
-/// from the module's).
+/// from the module's), none of Isoloom's outputs in: the machines read none.
 fn archive() -> Result<Step, ManifestError> {
-    let mut s = Step::action(id("archive")?, Action::ProjectArchive);
-    s.run = Run::Action {
-        action: Action::ProjectArchive,
-        with: BTreeMap::from([(SnakeName::parse("root")?, Template::text("../../.."))]),
-    };
-    Ok(noted(s, "Archiving the project…"))
+    isoloom_render::run_manifest::project_archive("../../..", &[])
 }
 
 /// The archive piped into `guest`'s `/opt/isoloom`, then the mark its set-up waits for. Retried

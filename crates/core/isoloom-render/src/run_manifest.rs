@@ -125,6 +125,20 @@ pub fn action_with<'a>(action: Action, with: impl IntoIterator<Item = (&'a str, 
     })
 }
 
+/// `project.archive` of the project's folder `root` (from the manifest's), with Isoloom's `outputs`
+/// the guest reads (`with.outputs`, left out when there are none).
+///
+/// # Errors
+///
+/// None in practice: the step's id and keys are fixed.
+pub fn project_archive(root: &str, outputs: &[&str]) -> Result<Step, ManifestError> {
+    let outputs = (!outputs.is_empty()).then(|| ("outputs", Template::text(&outputs.join(" "))));
+    let mut s = Step::action(StepId::parse("archive")?, Action::ProjectArchive);
+    s.run = action_with(Action::ProjectArchive, std::iter::once(("root", Template::text(root))).chain(outputs))?;
+    s.note = Some("Archiving the project…".into());
+    Ok(s)
+}
+
 /// `ISOLOOM_DERIVED`, the switch of the checks derived from the spec (`0` skips them), delivered
 /// to the check runners' `steps`; `None` when there is none.
 ///
