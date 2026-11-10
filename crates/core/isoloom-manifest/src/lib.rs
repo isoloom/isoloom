@@ -65,6 +65,7 @@ mod outputs;
 mod path;
 mod port;
 mod provenance;
+mod ready_line;
 mod schema;
 mod slots;
 mod step;
@@ -89,6 +90,7 @@ pub use outputs::{Check, CheckKind, CheckProtocol, CheckRunner, Checks, Output, 
 pub use path::{GuestPath, PathTemplate, RelPath};
 pub use port::{Port, PortKind, Protocol, Publish, PublishMode};
 pub use provenance::{EnvironmentRef, Generator, GeneratorName, Instance, ManifestVersion};
+pub use ready_line::ReadyLine;
 pub use schema::{COMPATIBILITY, SCHEMA_URL, schema};
 pub use slots::{Delivery, Param, SecretSlot, SecretSource, SetBy, SlotKind, StateFileFormat, Store, TfVarShape, Transport};
 pub use step::{Action, Failure, Run, Step, When};

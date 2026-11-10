@@ -270,10 +270,10 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
 /// forwards), then the ready mark.
 fn environment_script(guest: &GuestCompose) -> Result<String> {
     Ok(format!(
-        "{}{} && echo ready > {}",
+        "{}{} && {}",
         sequence(&guest.start)?,
         steps::MAKE_STATE_DIR,
-        steps::READY_FILE
+        steps::ready_mark(&isoloom_manifest::ReadyLine::Ready)
     ))
 }
 

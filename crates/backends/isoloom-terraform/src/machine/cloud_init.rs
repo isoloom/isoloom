@@ -11,9 +11,7 @@ use isoloom_plan::configure::Resource;
 use isoloom_plan::{DataDisk, Environment, MachinePlan, Step};
 use isoloom_render::configure::Configured;
 use isoloom_render::configure::cloud_init as cloud_init_carrier;
-use isoloom_render::steps::{self, READY_FILE};
-
-use isoloom_spec::shell::quote;
+use isoloom_render::steps;
 
 use super::{Shell, at_every_boot};
 use crate::module::inputs;
@@ -49,7 +47,7 @@ pub(crate) struct CloudConfig {
     pub(crate) restart: bool,
     /// The data disks it formats and mounts (raw ones are left as they are).
     pub(crate) disks: Vec<DataDisk>,
-    /// Whether a command says its progress in [`READY_FILE`] (its folder is made first).
+    /// Whether a command says its progress in [`steps::READY_FILE`] (its folder is made first).
     tracked: bool,
 }
 
@@ -126,16 +124,10 @@ pub(crate) fn site_authorities(env: &Environment) -> Vec<Expression> {
         .collect()
 }
 
-/// `command` as the set-up step `label`: its name in [`READY_FILE`] first; when it fails,
-/// `failed: <label>` there and the end of the set-up (cloud-init runs `runcmd` as one script
-/// that otherwise goes on to the next command, and to `ready`). The progress mark is
-/// best-effort, its own command rather than chained with `&&` (`A && B || C` reads as an
-/// if-then-else that isn't one): a mark that can't be written doesn't skip the step, and the
-/// step's own failure always reaches the failure mark.
+/// `command` as the set-up step `label` ([`steps::tracked`], as root already): cloud-init runs
+/// `runcmd` as one script that otherwise goes on to the next command, and to `ready`.
 pub(crate) fn tracked(label: &str, command: &str) -> String {
-    let running = quote(&format!("running: {label}"));
-    let failed = quote(&format!("failed: {label}"));
-    format!("echo {running} > {READY_FILE}; {command} || {{ echo {failed} > {READY_FILE}; exit 1; }}")
+    steps::tracked(label, command, &str::to_owned)
 }
 
 /// What the ready file calls a step of `machine`'s set-up.

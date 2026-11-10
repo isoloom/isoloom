@@ -3,6 +3,7 @@
 //! machine (a Vagrant provisioner, cloud-init, `remote-exec`, WinRM), so every target sets a
 //! machine up the same way.
 
+use isoloom_manifest::ReadyLine;
 use isoloom_plan::Environment;
 use isoloom_plan::lifecycle::{RunKind, Step};
 use isoloom_spec::shell::quote;
@@ -137,6 +138,32 @@ pub const KEPT_INPUTS_FILE: &str = isoloom_spec::linux_state_path!("/inputs.env"
 /// Where a Linux VM's set-up says how far it got, for the runner to poll (the `isoloom-ready/1`
 /// grammar: `running: <step>`, `failed: <step>`, then `ready`; no file yet: still booting).
 pub const READY_FILE: &str = isoloom_spec::linux_state_path!("/ready");
+
+/// `line` written to [`READY_FILE`], as a shell command: the one writer of the ready file's
+/// lines on Linux. Its folder must exist ([`MAKE_STATE_DIR`]).
+#[must_use]
+pub fn ready_mark(line: &ReadyLine) -> String {
+    match line {
+        // One word with nothing to quote, as the other lines are once quoted.
+        ReadyLine::Ready => format!("echo {line} > {READY_FILE}"),
+        _ => format!("echo {} > {READY_FILE}", quote(&line.to_string())),
+    }
+}
+
+/// `command` as the set-up step `label` of the ready file: `running: <label>` before it, and
+/// `failed: <label>` with the set-up stopped (`exit 1`) when it fails. `as_root` gives each
+/// mark the way the command gets root (the identity when the script runs as root already). The
+/// running mark is its own command rather than chained with `&&` (`A && B || C` reads as an
+/// if-then-else that isn't one): a mark that can't be written doesn't skip the step, and the
+/// step's own failure always reaches the failure mark.
+#[must_use]
+pub fn tracked(label: &str, command: &str, as_root: &dyn Fn(&str) -> String) -> String {
+    format!(
+        "{}; {command} || {{ {}; exit 1; }}",
+        as_root(&ready_mark(&ReadyLine::running(label))),
+        as_root(&ready_mark(&ReadyLine::failed(label)))
+    )
+}
 /// Waits for cloud-init to be done (its packages in, `apt` free): the first command of a set-up
 /// run over SSH on a VM cloud-init boots. Its failure doesn't stop the set-up.
 pub const CLOUD_INIT_WAIT: &str = "cloud-init status --wait >/dev/null 2>&1 || true";
@@ -301,8 +328,9 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Command => process::command(env, machine),
         Step::Setup { paths } => process::setup(env, machine, paths),
         Step::Ready => Some(format!(
-            "{}{MAKE_STATE_DIR} && echo ready > {READY_FILE}\n",
-            process::healthy(env, machine).unwrap_or_default()
+            "{}{MAKE_STATE_DIR} && {}\n",
+            process::healthy(env, machine).unwrap_or_default(),
+            ready_mark(&ReadyLine::Ready)
         )),
     }
 }
@@ -347,9 +375,10 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Command => process::windows_command(env, machine),
         Step::Setup { paths } => Some(process::windows_setup(paths)),
         Step::Ready => Some(format!(
-            "{}New-Item -ItemType Directory -Force {WINDOWS_PROJECT_DIR} | Out-Null; Set-Content {} ready",
+            "{}New-Item -ItemType Directory -Force {WINDOWS_PROJECT_DIR} | Out-Null; Set-Content {} {}",
             process::windows_healthy(env, machine).unwrap_or_default(),
-            isoloom_spec::windows::READY_FILE
+            isoloom_spec::windows::READY_FILE,
+            ReadyLine::Ready
         )),
         // Linux's alone: the constraints, trunks, forwarding and impairment are Linux tools (a
         // Windows gateway is refused); a Windows VM's volumes, inputs and reboots are its own

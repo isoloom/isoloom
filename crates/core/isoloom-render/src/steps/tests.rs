@@ -468,3 +468,23 @@ fn the_windows_project_unpack_reads_the_uploaded_archive_into_the_project_folder
     assert!(unpack.ends_with(crate::powershell::UNTAR), "{unpack}");
     assert!(super::windows_project_unpack(true).contains("; $strip = 1\n"));
 }
+
+#[cfg(unix)]
+#[test]
+fn a_tracked_step_writes_lines_of_the_ready_grammar() {
+    use isoloom_manifest::ReadyLine;
+    let dir = std::env::temp_dir().join(format!("isoloom-tracked-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let ready = dir.join("ready");
+    let run = |command: &str| {
+        let script = super::tracked("a step's 'name'", command, &|mark| format!("{{ {mark}; }}")).replace(super::READY_FILE, &ready.display().to_string());
+        let ok = std::process::Command::new("sh").args(["-c", &script]).status().unwrap().success();
+        (ok, ReadyLine::parse(&std::fs::read_to_string(&ready).unwrap()))
+    };
+    assert_eq!(run("true"), (true, Some(ReadyLine::running("a step's 'name'"))));
+    assert_eq!(run("false"), (false, Some(ReadyLine::failed("a step's 'name'"))));
+    let done = super::ready_mark(&ReadyLine::Ready).replace(super::READY_FILE, &ready.display().to_string());
+    assert!(std::process::Command::new("sh").args(["-c", &done]).status().unwrap().success());
+    assert_eq!(ReadyLine::parse(&std::fs::read_to_string(&ready).unwrap()), Some(ReadyLine::Ready));
+    std::fs::remove_dir_all(&dir).ok();
+}

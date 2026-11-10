@@ -23,10 +23,10 @@ use crate::hcl_builder::{Expression, Piece, Template, reference};
 use isoloom_render::run_manifest::RUNNER;
 use isoloom_render::steps::wait_for_mark;
 use isoloom_spec::model::Target;
-use isoloom_spec::shell::quote;
 
 use crate::{Error, Result};
-use isoloom_render::steps::READY_FILE;
+use isoloom_manifest::ReadyLine;
+use isoloom_render::steps::{READY_FILE, ready_mark};
 
 /// Where the set-up writes its output: the runner shows its tail when a step failed.
 pub(crate) const SETUP_LOG: &str = "/var/log/isoloom-setup.log";
@@ -131,11 +131,9 @@ pub(crate) fn project_wait() -> Tracked {
 /// `command` as the step `label` of the ready file: its name first, then `failed: <label>` and
 /// the end of the set-up when it fails.
 fn tracked(t: &Tracked) -> Template {
-    let running = quote(&format!("running: {}", t.label));
-    let failed = quote(&format!("failed: {}", t.label));
-    let mut line = Template::text(format!("echo {running} > {READY_FILE}; {{ "));
+    let mut line = Template::text(format!("{}; {{ ", ready_mark(&ReadyLine::running(&t.label))));
     line.append(t.command.clone());
-    line.push_text(format!("; }} || {{ echo {failed} > {READY_FILE}; exit 1; }}"));
+    line.push_text(format!("; }} || {{ {}; exit 1; }}", ready_mark(&ReadyLine::failed(&t.label))));
     line
 }
 
@@ -172,7 +170,7 @@ fn body(s: &SetUp) -> Template {
         }
         t.push_text("fi\n");
     }
-    t.push_text(format!("echo ready > {READY_FILE}\nrm -f {DIR}/part\nexit 0\n"));
+    t.push_text(format!("{}\nrm -f {DIR}/part\nexit 0\n", ready_mark(&ReadyLine::Ready)));
     t
 }
 

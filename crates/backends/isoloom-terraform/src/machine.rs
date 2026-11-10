@@ -144,10 +144,7 @@ impl Shell {
     /// root (the same shell), so a set-up over `remote-exec` (ESXi) reports its progress too.
     pub(crate) fn tracked_step(self, env: &Environment, machine: &str, step: &Step) -> Option<String> {
         let label = cloud_init::label(step);
-        steps::linux(env, machine, step).map(|sh| {
-            let mark = |word: &str| self.command(&format!("echo {} > {}", quote(&format!("{word}: {label}")), isoloom_render::steps::READY_FILE));
-            format!("{}; {} || {{ {}; exit 1; }}", mark("running"), self.command(&sh), mark("failed"))
-        })
+        steps::linux(env, machine, step).map(|sh| steps::tracked(&label, &self.command(&sh), &|mark| self.command(mark)))
     }
 }
 
