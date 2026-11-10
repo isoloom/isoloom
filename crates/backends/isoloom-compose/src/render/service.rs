@@ -239,9 +239,7 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
     } else {
         svc.cap_add = vec!["NET_ADMIN".into(), "NET_RAW".into()];
     }
-    let outside: Vec<(String, Option<String>)> = outside::attachments(m.plan)
-        .map(|(net, a)| (net, a.and_then(|a| a.ipv4_address)))
-        .collect();
+    let outside: Vec<(String, Option<String>)> = outside::attachments(m.plan).map(|(net, a)| (net, a.and_then(|a| a.ipv4_address))).collect();
     svc.networks = appliance_networks(spec, name, &w.ports, outside);
 }
 

@@ -336,7 +336,10 @@ machines:
         kustomization.contains("build__cache__my_20seed.sh=chart/files/project/build/cache/my seed.sh"),
         "{kustomization}"
     );
-    assert!(kustomization.contains("build__cache__a_5fb.sh=chart/files/project/build/cache/a_b.sh"), "{kustomization}");
+    assert!(
+        kustomization.contains("build__cache__a_5fb.sh=chart/files/project/build/cache/a_b.sh"),
+        "{kustomization}"
+    );
     let environment = file(&files, "kubernetes/environment.yaml")?;
     assert!(
         environment.contains("sh /isoloom/scripts/build__cache__my_20seed.sh && sh /isoloom/scripts/build__cache__a_5fb.sh"),

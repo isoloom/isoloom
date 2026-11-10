@@ -451,10 +451,7 @@ fn check_compares_the_list_of_generated_files_like_any_generated_file() -> Outco
     assert!(missing.stdout.contains("✗ .isoloom/.generated is missing"), "{}", missing.stdout);
     std::fs::write(
         &list,
-        text.lines()
-            .filter(|l| *l != ".isoloom/.gitignore")
-            .flat_map(|l| [l, "\n"])
-            .collect::<String>(),
+        text.lines().filter(|l| *l != ".isoloom/.gitignore").flat_map(|l| [l, "\n"]).collect::<String>(),
     )?;
     let short = isoloom(&home, &[&"check", &dir, &"--quiet"])?;
     assert!(short.stdout.contains("✗ .isoloom/.generated is out of date"), "{}", short.stdout);
@@ -495,7 +492,9 @@ fn listing(name: &str, entry: &str) -> Outcome<std::path::PathBuf> {
 /// `generate` and `check` on `dir` both refuse its list, naming `entry`, and leave `outside` be;
 /// `generate` writes nothing before it refuses (a generated file removed stays removed).
 fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Path) -> Outcome {
-    let home = scratch("refused-list-home")?;
+    // A home of the project's own: the tests calling this run at once.
+    let project = dir.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+    let home = scratch(&format!("{project}-refused-home"))?;
     let compose = dir.join(".isoloom/docker/compose.yml");
     if compose.exists() {
         std::fs::remove_file(&compose)?;
