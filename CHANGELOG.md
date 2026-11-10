@@ -143,6 +143,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Added
 
+- **The run manifest's `identity.terraform.gone`**: the errors a Terraform module's providers
+  print for a resource of the state that is already gone, where its delete fails rather than
+  counting it done, one per resource type, the instance's attributes written `{<attribute>}`
+  (`{ "resource": "proxmox_virtual_environment_firewall_ipset", "error": "no such IPSet '{id}'" }`).
+  When a destroy fails, a runner fills each with the attributes of each instance of that type the
+  state holds, drops an instance whose text the destroy printed (`terraform state rm`), and
+  destroys again. An optional field of manifest version 1 (`isoloom_manifest::GoneError`,
+  `GoneText`).
 - **`esxi` writes a run manifest** (`.isoloom/esxi/run.json`), Proxmox's own: Terraform makes
   the environment and sets its machines up (the runner gives it its slot and key, and the host's
   password as `TF_VAR_esxi_password`), the runner waits for every machine's ready file, seals the
@@ -246,6 +254,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Changed
 
+- **The Proxmox modules pin `bpg/proxmox ~> 0.116.1`** (was `~> 0.115.0`): from 0.116.1 a VM's
+  delete finds the VM on whichever node of the cluster it is on before it reads its status, so
+  Proxmox's answer that its configuration file doesn't exist means the VM is gone, which the run
+  manifest's `identity.terraform.gone` relies on. 0.116.0 and 0.116.1 list no breaking change.
 - **The cloud refusals state each cloud's fact.** DigitalOcean and Linode refuse arm64 because
   they have no arm64 droplets or plans, not as something that comes later; `cloud-docker`'s arm64
   refusal says every cloud's Docker host is x86-64 instead of naming AWS's Graviton; the
@@ -418,6 +430,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A Proxmox lab whose server lost one of its resources can be destroyed.** The `down` runs
+  `terraform destroy` without a refresh (a refresh waits on a router whose guest agent never ran),
+  so a resource the server no longer has (a host reset after an apply cut short) reaches
+  bpg/proxmox's delete, and the IP set's, the VM's and the container's fail on it rather than
+  counting it done: an IP set a reset host lost failed every destroy of the lab with `no such
+  IPSet 'iso1n0'`. The `proxmox` and Proxmox `docker-vm` run manifests now name those errors
+  (`identity.terraform.gone`, above), and a runner that reads them drops such a resource from the
+  state and destroys again. The other resources' deletes already count one that is gone done.
 - **On Hyper-V, a VM's published port answers on the host port the run reports.** Hyper-V
   ignores `forwarded_port`, so the Vagrantfile relays each published TCP port itself (Windows'
   port proxy), but the relay listened on the spec's `publish` number while the forward, and the
