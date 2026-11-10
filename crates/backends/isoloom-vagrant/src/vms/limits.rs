@@ -6,7 +6,7 @@ use crate::boxes;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::images;
 use isoloom_spec::model::{Machine, is_reboot};
-use isoloom_spec::syntax::has_extension;
+use isoloom_spec::syntax::{has_extension, is_yaml_file};
 
 /// Why Vagrant can't render `env`, if it can't: the first machine it can't build.
 pub(crate) fn refusal(env: &Environment) -> Option<String> {
@@ -30,7 +30,7 @@ fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
     }
     vm.provision
         .iter()
-        .find(|s| !(["sh", "yml", "yaml"].iter().any(|e| has_extension(s, e)) || is_reboot(s)))
+        .find(|s| !(has_extension(s, "sh") || is_yaml_file(s) || is_reboot(s)))
         .map(|step| format!("machine `{name}`: provisioning step `{step}` isn't a .sh, .yml or .yaml file (or `reboot`)"))
 }
 

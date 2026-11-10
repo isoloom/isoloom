@@ -49,7 +49,7 @@ pub use spans::Spans;
 pub use step::{
     AbsPath, AptWord, Argv, CommandStep, Copy, FileState, FileStep, Firewall, FirewallPort, GroupName, GroupStep, Guard, HttpsUrl, Invocation, Package,
     PackageName, PackageVersion, Password, ProjectPath, Repository, RepositoryKey, RepositoryName, Service, Sha256, Step, Template, UnitName, UserName,
-    UserStep, has_extension,
+    UserStep, has_extension, is_yaml_file,
 };
 pub use warning::Warning;
 

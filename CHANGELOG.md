@@ -351,6 +351,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A check or `provision:` file is a playbook by its extension in any case**, as a step's file
+  is (`checks/site.YML` ran as a shell script): one rule, `isoloom_spec::syntax::is_yaml_file`.
 - **A tag from the environment or a `-s` is its text as written**: `ISOLOOM_TAGS__ACCOUNT=0x1F`
   was read as YAML, the tag `31` (`1e3` was `1000`).
 - **Docker: a network appliance joins the existing networks it is on** (`overrides.docker.networks.<n>.external`),

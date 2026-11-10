@@ -120,6 +120,13 @@ pub fn has_extension(path: &str, extension: &str) -> bool {
     std::path::Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(extension))
 }
 
+/// Whether `path` names a YAML file (an Ansible playbook): `.yml` or `.yaml`, in any case, by
+/// [`has_extension`].
+#[must_use]
+pub fn is_yaml_file(path: &str) -> bool {
+    has_extension(path, "yml") || has_extension(path, "yaml")
+}
+
 impl schemars::JsonSchema for Step {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         "Step".into()

@@ -27,13 +27,8 @@ impl Check {
 
     /// Whether this check is an Ansible playbook (`.yml` / `.yaml`).
     pub fn is_playbook(&self) -> bool {
-        self.path().is_some_and(is_yaml_file)
+        self.path().is_some_and(crate::syntax::is_yaml_file)
     }
-}
-
-/// Whether `path` names a YAML file (an Ansible playbook): `.yml` or `.yaml`, as written.
-pub(crate) fn is_yaml_file(path: &str) -> bool {
-    std::path::Path::new(path).extension().is_some_and(|e| e == "yml" || e == "yaml")
 }
 
 // A string is a script; a map is a declared check. Written by hand (not `untagged`) so a typo in
@@ -180,6 +175,11 @@ mod tests {
         assert_eq!(read("checks/site.yml")?, (Some("checks/site.yml".into()), true));
         assert_eq!(read("{ script: checks/site.yaml, from: web }")?, (Some("checks/site.yaml".into()), true));
         assert_eq!(read("{ http: \"http://web/\" }")?, (None, false));
+        assert_eq!(
+            read("checks/Site.YML")?,
+            (Some("checks/Site.YML".into()), true),
+            "in any case, as a step's file"
+        );
         Ok(())
     }
 

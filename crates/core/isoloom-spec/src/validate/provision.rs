@@ -23,7 +23,7 @@ pub(super) fn controller(spec: &Spec, p: &mut Problems) {
 /// variables for machines that exist.
 pub(super) fn steps(spec: &Spec, p: &mut Problems) {
     for (i, step) in spec.provision.iter().enumerate() {
-        if !crate::model::is_yaml_file(&step.ansible) {
+        if !crate::syntax::is_yaml_file(&step.ansible) {
             p.add(format!("provision[{i}].ansible"), "an Ansible playbook: a .yml or .yaml file");
         }
         for (group, members) in &step.groups {

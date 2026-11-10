@@ -24,7 +24,6 @@ mod target;
 mod virtiofs;
 
 pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
-pub(crate) use checks::is_yaml_file;
 pub use checks::{Check, Declared, Expect};
 pub use cloud::{CloudProvider, CloudServices};
 pub use configuration::Configuration;

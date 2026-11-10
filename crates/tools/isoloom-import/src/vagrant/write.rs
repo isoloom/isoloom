@@ -54,9 +54,7 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
 
 /// A provisioning step as an `app.steps` item: a playbook, a script, or a reboot.
 fn step(s: &str) -> String {
-    let playbook = std::path::Path::new(s)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("yml") || e.eq_ignore_ascii_case("yaml"));
+    let playbook = isoloom_spec::syntax::is_yaml_file(s);
     if s == REBOOT {
         s.to_owned()
     } else if playbook {

@@ -6,7 +6,7 @@
 use serde_yaml_ng::{Mapping, Value};
 
 use super::problem::{Code, FieldPath, Problem};
-use super::step::has_extension;
+use super::step::is_yaml_file;
 
 /// The old keys of a spec document, each a `removed-field` problem with its fix (a list of
 /// ports is an `invalid-value`: the field stays, its shape changed).
@@ -176,7 +176,7 @@ fn vm_fix(name: &str, v: &Mapping) -> String {
 fn step_fix(s: &str) -> String {
     if s == "reboot" {
         "reboot".to_owned()
-    } else if has_extension(s, "yml") || has_extension(s, "yaml") {
+    } else if is_yaml_file(s) {
         format!("{{ playbook: {s} }}")
     } else {
         format!("{{ run: {s} }}")

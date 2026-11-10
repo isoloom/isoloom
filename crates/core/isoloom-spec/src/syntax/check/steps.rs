@@ -4,7 +4,7 @@
 
 use super::super::machine::Machine;
 use super::super::problem::{Code, FieldPath, Problem, Problems};
-use super::super::step::{FirewallPort, Step, has_extension};
+use super::super::step::{FirewallPort, Step, has_extension, is_yaml_file};
 use super::port_reference;
 
 /// Step `step` of machine `m`, at `at` (`machines.web.app.steps[2]`).
@@ -67,7 +67,7 @@ fn linux_step(at: &FieldPath, m: &Machine, step: &Step, out: &mut Problems) {
                     .fix("a playbook is `{ playbook: <file>.yml }`"),
             );
         }
-        Step::Playbook(p) if !has_extension(p.as_str(), "yml") && !has_extension(p.as_str(), "yaml") => {
+        Step::Playbook(p) if !is_yaml_file(p.as_str()) => {
             out.push(Problem::new(
                 Code::InvalidValue,
                 at.key("playbook"),
