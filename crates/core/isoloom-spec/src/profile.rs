@@ -76,7 +76,7 @@ struct File {
 /// A profile name: kebab-case, as a spec's name.
 #[must_use]
 fn valid_name(name: &str) -> bool {
-    crate::validate::kebab(name)
+    isoloom_manifest::is_kebab(name)
 }
 
 /// The profile file for `name` in `project`: `profiles/<name>.yml` or `.yaml`, never both.

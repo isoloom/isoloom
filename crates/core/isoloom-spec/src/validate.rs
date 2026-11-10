@@ -43,6 +43,8 @@ mod tests;
 
 use std::collections::BTreeSet;
 
+use isoloom_manifest::is_kebab;
+
 use crate::model::{Machine, Spec};
 use crate::net::Cidr;
 use crate::syntax::Code;
@@ -156,21 +158,11 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     p.0
 }
 
-/// Kebab case, as an environment's name (`my-env`, `shop-2`): lowercase letters and digits in
-/// words joined by single dashes, at most 63 characters.
-#[must_use]
-pub fn kebab(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 63
-        && s.split('-')
-            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
-}
-
 /// Machine and network names become DNS names (machines resolve each other by name): kebab
 /// case from a letter, at most 63 characters. The one rule the catalogue's names follow too.
 #[must_use]
 pub fn dns_label(s: &str) -> bool {
-    kebab(s) && !s.starts_with(|c: char| c.is_ascii_digit())
+    is_kebab(s) && !s.starts_with(|c: char| c.is_ascii_digit())
 }
 
 /// Whether `s` is an environment variable's (or Ansible variable's) name: letters, digits and

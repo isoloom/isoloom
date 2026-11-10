@@ -1,7 +1,9 @@
 //! The top level of the spec: `version`, `name`, the declared `inputs` and the `tags` (the
 //! `message`'s placeholders are the placeholder grammar's, [`crate::syntax::placeholder`]).
 
-use super::{Problems, is_variable, kebab};
+use isoloom_manifest::is_kebab;
+
+use super::{Problems, is_variable};
 use crate::model::Spec;
 use crate::tags;
 
@@ -10,7 +12,7 @@ pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
     if spec.version != 1 {
         p.add("version", format!("unsupported version {}; this isoloom reads version 1", spec.version));
     }
-    if !kebab(&spec.name) {
+    if !is_kebab(&spec.name) {
         p.add("name", "use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)");
     } else if spec.name.len() > 55 {
         // The name becomes the Kubernetes namespace `isoloom-<name>`, which must be a 63-character

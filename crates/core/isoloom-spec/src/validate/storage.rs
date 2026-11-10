@@ -6,7 +6,9 @@ use std::collections::BTreeSet;
 
 use super::machines::Subject;
 use super::volumes::safe_path;
-use super::{Problems, kebab};
+use isoloom_manifest::is_kebab;
+
+use super::Problems;
 use crate::model::{Disk, Filesystem};
 
 /// The largest data disk, in GB: what every cloud's block storage takes (16 TiB).
@@ -52,7 +54,7 @@ pub(super) fn of_machine(s: &Subject, volume_paths: &BTreeSet<&str>, p: &mut Pro
 
 /// What is wrong with disk `name`'s name on this machine, if anything.
 fn disk_name_problem(s: &Subject, name: &str) -> Option<String> {
-    if !kebab(name) || name.len() > MAX_DISK_NAME {
+    if !is_kebab(name) || name.len() > MAX_DISK_NAME {
         Some(format!(
             "disk names are kebab-case, at most {MAX_DISK_NAME} characters: the filesystem's label is the name"
         ))

@@ -4,7 +4,9 @@
 use std::collections::BTreeSet;
 
 use super::machines::Subject;
-use super::{Problems, kebab};
+use isoloom_manifest::is_kebab;
+
+use super::Problems;
 use crate::model::{SharedVolume, Spec};
 
 /// The volumes shared between machines: mounted, held by one of their users, reachable from
@@ -148,7 +150,7 @@ fn subpath(s: &Subject, v: &str, sub: &str, at: &str, p: &mut Problems) {
 
 /// What is wrong with volume `v`'s name on machine `machine`, if anything.
 fn name_problem(machine: &str, v: &str) -> Option<&'static str> {
-    if !kebab(v) {
+    if !is_kebab(v) {
         Some("volume names are kebab-case: lowercase letters, digits and dashes")
     } else if machine.len() + 1 + v.len() > 63 {
         // The volume's Kubernetes claim is named `<machine>-<volume>`, a 63-character label.

@@ -19,12 +19,20 @@ use crate::{Error, Result};
 /// not its characters); the caller then writes the [`Ord`]/[`PartialOrd`] impls.
 macro_rules! pattern_type {
     ($(#[$doc:meta])* $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
+        pattern_type!(@ordered None; $(#[$doc])* $ty, $what, $pattern, $rule, $check);
+    };
+    // A name the pattern can't bound: its longest, as the schema's `maxLength` (`$check` holds
+    // the same bound).
+    (max_len $max:expr; $(#[$doc:meta])* $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
+        pattern_type!(@ordered Some($max); $(#[$doc])* $ty, $what, $pattern, $rule, $check);
+    };
+    (@ordered $max:expr; $(#[$doc:meta])* $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
         $(#[$doc])*
         #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
         #[serde(transparent)]
         pub struct $ty(String);
 
-        pattern_type!(@shared $ty, $what, $pattern, $rule, $check);
+        pattern_type!(@shared $ty, $what, $pattern, $rule, $check, $max);
     };
     (custom_ord $(#[$doc:meta])* $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
         $(#[$doc])*
@@ -32,9 +40,9 @@ macro_rules! pattern_type {
         #[serde(transparent)]
         pub struct $ty(String);
 
-        pattern_type!(@shared $ty, $what, $pattern, $rule, $check);
+        pattern_type!(@shared $ty, $what, $pattern, $rule, $check, None);
     };
-    (@shared $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr) => {
+    (@shared $ty:ident, $what:literal, $pattern:literal, $rule:literal, $check:expr, $max:expr) => {
         impl $ty {
             /// The value, when it matches the pattern.
             ///
@@ -97,19 +105,40 @@ macro_rules! pattern_type {
             }
 
             fn json_schema(_: &mut SchemaGenerator) -> Schema {
-                json_schema!({ "type": "string", "pattern": $pattern, "description": $rule })
+                let mut schema = json_schema!({ "type": "string", "pattern": $pattern, "description": $rule });
+                let max: Option<usize> = $max;
+                if let Some(max) = max {
+                    schema.insert("maxLength".into(), max.into());
+                }
+                schema
             }
         }
     };
 }
 
+/// The longest kebab-case name ([`is_kebab`]): an environment's name is a DNS label and a
+/// Kubernetes namespace.
+pub const KEBAB_MAX: usize = 63;
+
+/// Kebab case, as an environment's name (`my-env`, `shop-2`): lowercase letters and digits in
+/// words joined by single dashes, at most [`KEBAB_MAX`] characters. The one rule the spec's
+/// kebab-case names follow too.
+#[must_use]
+pub fn is_kebab(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= KEBAB_MAX
+        && s.split('-')
+            .all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
+}
+
 pattern_type!(
-    /// An environment's name: kebab-case (`my-env`, `shop-2`), as the spec's `name:`.
+    max_len KEBAB_MAX;
+    /// An environment's name: kebab-case (`my-env`, `shop-2`), as the spec's `name:` ([`is_kebab`]).
     EnvironmentName,
     "environment name",
     "^[a-z0-9]+(-[a-z0-9]+)*$",
-    "lowercase letters and digits in words joined by single dashes (`my-env`)",
-    |v| v.split('-').all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
+    "lowercase letters and digits in words joined by single dashes (`my-env`), at most 63 characters",
+    is_kebab
 );
 
 pattern_type!(
@@ -401,6 +430,18 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    /// An environment's name is kebab case of at most 63 characters wherever it is read: the
+    /// spec's validation, the manifest's parser and its schema (whose pattern can't bound it).
+    #[test]
+    fn an_environment_name_has_one_length_everywhere() {
+        let longest = "a".repeat(KEBAB_MAX);
+        assert!(is_kebab(&longest) && EnvironmentName::parse(&longest).is_ok());
+        let longer = format!("{longest}b");
+        assert!(!is_kebab(&longer) && EnvironmentName::parse(&longer).is_err());
+        let schema = schemars::schema_for!(EnvironmentName);
+        assert_eq!(schema.get("maxLength").and_then(serde_json::Value::as_u64), Some(63));
+    }
 
     #[test]
     fn names_follow_their_patterns() {

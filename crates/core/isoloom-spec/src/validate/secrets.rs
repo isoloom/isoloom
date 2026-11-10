@@ -3,14 +3,16 @@
 
 use std::collections::BTreeSet;
 
-use super::{Problems, is_variable, kebab};
+use isoloom_manifest::is_kebab;
+
+use super::{Problems, is_variable};
 use crate::model::{MachineSecret, SecretSource, Spec, after_drive};
 
 /// The declared secrets, then every machine's.
 pub(super) fn check(spec: &Spec, p: &mut Problems) {
     for (name, source) in &spec.secrets {
         let at = format!("secrets.{name}");
-        if !kebab(name) {
+        if !is_kebab(name) {
             p.add(&at, "secret names are kebab-case: lowercase letters, digits and dashes (e.g. db-password)");
         }
         if let Some(why) = source_problem(source) {

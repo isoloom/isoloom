@@ -246,7 +246,8 @@
     "EnvironmentName": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-      "description": "lowercase letters and digits in words joined by single dashes (`my-env`)"
+      "description": "lowercase letters and digits in words joined by single dashes (`my-env`), at most 63 characters",
+      "maxLength": 63
     },
     "Instance": {
       "type": "integer",
