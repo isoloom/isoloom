@@ -9,13 +9,14 @@
 
 pub(super) mod docker_vm;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use isoloom_manifest::{Error as ManifestError, GoneError, GoneText, HostOs, Manifest, PinnedImage, SnakeName, Tool};
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 
 use crate::server::manifest::{self as shared, Server};
+use crate::server::slot_name;
 
 /// The Terraform image macOS runs the module from, pinned by the digest of its multi-arch index:
 /// a release new enough for every module Isoloom writes ([`TERRAFORM_MIN`](crate::module::providers::TERRAFORM_MIN) or later).
@@ -26,11 +27,8 @@ pub(super) const PRIVATE_KEY: &str = "proxmox_ssh_private_key_file";
 
 /// The run manifest of `env` on Proxmox; its message is left to the caller.
 pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
-    let vnets: BTreeMap<&str, String> = super::links::vnet_ids(env).into_iter().collect();
-    let native = |net: &str| {
-        let on = env.networks.get(net).and_then(|n| n.vlan.as_ref().map(|(l, _)| l.as_str())).unwrap_or(net);
-        shared::slotted("i", vnets.get(on).cloned().unwrap_or_default())
-    };
+    let vnets = super::links::vnet_of(env);
+    let native = |net: &str| slot_name(super::links::VNET, vnets.get(net).map_or("", String::as_str)).manifest();
     let server = Server {
         target: Target::Proxmox,
         names: isoloom_manifest::Target::Proxmox,

@@ -169,9 +169,46 @@ pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
     }
 }
 
-/// `iso<slot><suffix>`: a name unique per environment on the server (`var.slot`).
+/// What starts most names the servers' modules give: `iso<slot><suffix>`.
+pub(crate) const ISO: &str = "iso";
+
+/// A name unique per environment on the server: `prefix`, the run's slot, `suffix`. The module
+/// writes it with the slot as `var.slot` ([`SlotName::hcl`]), the run manifest with the slot as
+/// `${run.slot}` ([`SlotName::manifest`]), so the names a runner reads are the module's.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SlotName<'a> {
+    prefix: &'a str,
+    suffix: &'a str,
+}
+
+/// The name `prefix`, slot, `suffix` (`iso${var.slot}-lan`, `i${var.slot}n0`).
+pub(crate) fn slot_name<'a>(prefix: &'a str, suffix: &'a str) -> SlotName<'a> {
+    SlotName { prefix, suffix }
+}
+
+impl SlotName<'_> {
+    /// The name in the module, after `var.slot`.
+    pub(crate) fn hcl(self) -> Expression {
+        Template::text(self.prefix)
+            .with_expr(reference("var.slot"))
+            .with_text(self.suffix)
+            .into_expression()
+    }
+
+    /// The name in the run manifest, after `${run.slot}`.
+    pub(crate) fn manifest(self) -> isoloom_manifest::Template {
+        use isoloom_manifest::{Part, Placeholder, RunVar};
+        isoloom_manifest::Template::from_parts([
+            Part::Text(self.prefix.into()),
+            Part::Placeholder(Placeholder::Run(RunVar::Slot)),
+            Part::Text(self.suffix.into()),
+        ])
+    }
+}
+
+/// `iso<slot><suffix>` in the module ([`slot_name`] with [`ISO`]).
 pub(crate) fn slotted(suffix: &str) -> Expression {
-    Template::text("iso").with_expr(reference("var.slot")).with_text(suffix).into_expression()
+    slot_name(ISO, suffix).hcl()
 }
 
 /// The `isoloom` user cloud-init creates on a server's VMs, with `sudo` and the SSH keys

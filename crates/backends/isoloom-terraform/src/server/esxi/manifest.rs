@@ -12,10 +12,11 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 
 use crate::server::manifest::{self as shared, Server};
+use crate::server::{ISO, slot_name};
 
 /// The run manifest of `env` on ESXi; its message is left to the caller.
 pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
-    let native = |net: &str| shared::slotted("iso", super::networks::suffix(net));
+    let native = |net: &str| slot_name(ISO, &super::networks::suffix(net)).manifest();
     let server = Server {
         target: Target::Esxi,
         names: isoloom_manifest::Target::Esxi,

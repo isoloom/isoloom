@@ -5,10 +5,13 @@
 //! A machine on several VLANs of one LAN gets an access device per VLAN, each tagged: the
 //! addresses and the routing are the same as over a trunk, and the guest needs no VLAN set-up.
 
-use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, number, reference};
+use std::collections::BTreeMap;
+
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, number, reference};
 use isoloom_plan::{Environment, MachinePlan};
 
 use crate::module::ident;
+use crate::server::slot_name;
 
 /// The VNet a network's frames travel on: its own, or its LAN's when it is a VLAN (then with
 /// its tag).
@@ -43,6 +46,19 @@ pub(super) fn vnet_ids(env: &Environment) -> Vec<(&str, String)> {
     out
 }
 
+/// What starts a VNet's id, before the slot: Proxmox takes 8 characters at most.
+pub(super) const VNET: &str = "i";
+
+/// The id ([`vnet_ids`]) of the VNet each network's devices are bridged to ([`on`]): its own, or
+/// its LAN's for a VLAN.
+pub(super) fn vnet_of(env: &Environment) -> BTreeMap<&str, String> {
+    let ids: BTreeMap<&str, String> = vnet_ids(env).into_iter().collect();
+    env.networks
+        .keys()
+        .filter_map(|net| Some((net.as_str(), ids.get(segment(env, net).0.as_str())?.clone())))
+        .collect()
+}
+
 /// A VNet per network that is no VLAN, then one per LAN that is only the frame around its
 /// VLANs ([`vnet_ids`]). Their references, for the applier to wait on.
 pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
@@ -51,7 +67,7 @@ pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
         let mut b = Block::builder("resource")
             .add_label("proxmox_sdn_vnet")
             .add_label(ident(name))
-            .add_attribute(("id", Template::text("i").with_expr(reference("var.slot")).with_text(id).into_expression()))
+            .add_attribute(("id", slot_name(VNET, &id).hcl()))
             .add_attribute(("zone", reference("proxmox_sdn_zone_simple.env.id")));
         if carries_vlans(env, name) {
             b = b.add_attribute(("vlan_aware", boolean(true)));

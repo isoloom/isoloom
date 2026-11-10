@@ -20,9 +20,7 @@ mod machines;
 pub(super) mod slots;
 pub(super) mod steps;
 
-use isoloom_manifest::{
-    Checks, Driver, Error as ManifestError, GoneError, Manifest, ManifestVersion, Part, Placeholder, RunVar, SCHEMA_URL, Template, Tool, Version,
-};
+use isoloom_manifest::{Checks, Driver, Error as ManifestError, GoneError, Manifest, ManifestVersion, SCHEMA_URL, Template, Tool, Version};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{self, environment, generator};
 use isoloom_spec::model::Target;
@@ -103,12 +101,6 @@ pub(super) fn terraform() -> Result<Tool, ManifestError> {
 /// `ssh`, which reaches every machine through the router.
 pub(super) fn ssh() -> Result<Tool, ManifestError> {
     run_manifest::tool("ssh", run_manifest::argv("ssh", &["-V"])?)
-}
-
-/// A name the module gives after the run's slot (`var.slot`): `before`, the slot, `after`
-/// (`iso${run.slot}-lan`, `i${run.slot}n0`).
-pub(super) fn slotted(before: &str, after: String) -> Template {
-    Template::from_parts([Part::Text(before.into()), Part::Placeholder(Placeholder::Run(RunVar::Slot)), Part::Text(after)])
 }
 
 #[cfg(test)]
