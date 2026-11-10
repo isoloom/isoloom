@@ -21,9 +21,7 @@ use crate::vagrantfile;
 
 /// Whether lab machine `name` is a VM with a Vagrant box: one the Vagrantfile defines.
 pub(crate) fn has_vm(env: &Environment, name: &str) -> bool {
-    let vm = env.machines.get(name).filter(|mp| mp.shape == isoloom_plan::MachineShape::Vm);
-    let spec = env.spec().machines.get(name).and_then(|m| m.vm.as_ref());
-    vm.is_some() && spec.and_then(boxes::vagrant).is_some()
+    env.vm(name).and_then(boxes::vagrant).is_some()
 }
 
 /// Lab machine `name`'s VM, and the check runner it uploads, if it has checks. Nothing when it
@@ -32,7 +30,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let env = ctx.env;
     let planned = env.vm(name)?;
     let mp = planned.plan;
-    let image = boxes::vagrant(env.spec().machines.get(name)?.vm.as_ref()?)?;
+    let image = boxes::vagrant(planned)?;
     let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);

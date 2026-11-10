@@ -3,32 +3,32 @@
 //! have (`isoloom_render::windows`). Found from the plan, without rendering.
 
 use crate::boxes;
-use isoloom_plan::{Environment, MachineShape};
-use isoloom_spec::images;
-use isoloom_spec::model::{Machine, is_reboot};
+use isoloom_plan::{Environment, Vm};
+use isoloom_spec::model::is_reboot;
 use isoloom_spec::syntax::{has_extension, is_yaml_file};
 
-/// Why Vagrant can't render `env`, if it can't: the first machine it can't build.
+/// Why Vagrant can't render `env`, if it can't: the first VM it can't build, in spec order.
 pub(crate) fn refusal(env: &Environment) -> Option<String> {
-    let spec = env.spec();
     env.machines
         .iter()
-        .filter(|(_, mp)| mp.shape == MachineShape::Vm)
-        .find_map(|(name, mp)| machine(env, name, spec.machines.get(name)?).or_else(|| super::bridged::refusal(env, name, mp)))
+        .filter_map(|(name, mp)| Vm::of(name, mp))
+        .find_map(|vm| machine(env, vm).or_else(|| super::bridged::refusal(env, vm.name, vm.plan)))
 }
 
-fn machine(env: &Environment, name: &str, m: &Machine) -> Option<String> {
-    let vm = m.vm.as_ref()?;
+fn machine(env: &Environment, vm: Vm) -> Option<String> {
+    let name = vm.name;
     if boxes::vagrant(vm).is_none() {
         return Some(format!(
             "machine `{name}`: no Vagrant box for `{}`; give one with `overrides.vagrant.machines.{name}.box`",
             vm.os
         ));
     }
-    if images::is_windows(&vm.os) {
+    if vm.plan.is_windows() {
         return windows(env, name);
     }
-    vm.provision
+    // The steps as the spec writes them: the plan keeps only those it can run.
+    let provision = &env.spec().machines.get(name)?.vm.as_ref()?.provision;
+    provision
         .iter()
         .find(|s| !(has_extension(s, "sh") || is_yaml_file(s) || is_reboot(s)))
         .map(|step| format!("machine `{name}`: provisioning step `{step}` isn't a .sh, .yml or .yaml file (or `reboot`)"))

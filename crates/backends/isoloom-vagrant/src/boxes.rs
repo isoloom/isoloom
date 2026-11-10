@@ -2,8 +2,8 @@
 //! (`vm.image.vagrant`) winning, and the boxes a provider boots instead of the main one
 //! (libvirt, QEMU, Hyper-V) where the main one has no build for it.
 
+use isoloom_plan::Vm;
 use isoloom_spec::images::is_windows;
-use isoloom_spec::model::VmImpl;
 
 /// A Vagrant box: its name, a pinned version when known-good, and the libvirt, QEMU and Hyper-V
 /// boxes when the main one has no build for them.
@@ -161,11 +161,12 @@ fn builtin_windows(os: &str) -> Option<VagrantBox> {
     })
 }
 
-/// The Vagrant box for a machine: the spec's `vm.image.vagrant` when set, else the built-in one;
-/// on Hyper-V, the spec's `vm.image.hyperv` when set (its latest version with a Hyper-V build).
+/// The Vagrant box for VM `vm`: its own image's `vagrant` when it has one, else the built-in one
+/// for its OS; on Hyper-V, its own image's `hyperv` when set (its latest version with a Hyper-V
+/// build).
 #[must_use]
-pub(crate) fn vagrant(vm: &VmImpl) -> Option<VagrantBox> {
-    let image = vm.image.as_ref();
+pub(crate) fn vagrant(vm: Vm) -> Option<VagrantBox> {
+    let image = vm.plan.vm_image.as_ref();
     let mut b = match image.and_then(|i| i.vagrant.clone()) {
         Some(name) => VagrantBox {
             name,
@@ -174,7 +175,7 @@ pub(crate) fn vagrant(vm: &VmImpl) -> Option<VagrantBox> {
             qemu: image.and_then(|i| i.qemu.clone()),
             hyperv: HyperVBox::Main,
         },
-        None => builtin_vagrant(&vm.os)?,
+        None => builtin_vagrant(vm.os)?,
     };
     if let Some(name) = image.and_then(|i| i.hyperv.clone()) {
         b.hyperv = HyperVBox::Other { name, version: None };
@@ -215,11 +216,10 @@ mod tests {
 
     #[test]
     fn the_specs_hyperv_box_wins() {
-        let mut image = isoloom_spec::model::VmImage::default();
-        image.hyperv = Some("my/debian13".into());
-        let mut vm = VmImpl::new("debian-13");
-        vm.image = Some(image);
-        let b = vagrant(&vm).unwrap();
+        let env = crate::testing::environment(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@13, networks: { lan: 10 } }\noverrides: { vagrant: { machines: { web: { boxes: { hyperv: my/debian13 } } } } }\n",
+        );
+        let b = vagrant(env.vm("web").unwrap()).unwrap();
         assert_eq!(b.name, "bento/debian-13");
         let mine = HyperVBox::Other {
             name: "my/debian13".into(),

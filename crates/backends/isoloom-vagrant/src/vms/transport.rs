@@ -182,12 +182,7 @@ fn default_route(r: &mut Ruby, env: &Environment, machine: &str, routes: Vec<Rou
 /// Waits for a dependency by name, or by address when it is a Windows machine (left out of a
 /// Linux machine's /etc/hosts, see the plan's hosts step).
 fn wait_for(r: &mut Ruby, env: &Environment, machine: &str, dep: &str, ports: &[u16]) {
-    let windows = env
-        .spec()
-        .machines
-        .get(dep)
-        .and_then(|m| m.vm.as_ref())
-        .is_some_and(|vm| isoloom_spec::images::is_windows(&vm.os));
+    let windows = env.vm(dep).is_some_and(|vm| vm.plan.is_windows());
     let target = if windows { env.address_for(machine, dep).to_string() } else { dep.to_owned() };
     let step = Step::WaitFor {
         machine: target,

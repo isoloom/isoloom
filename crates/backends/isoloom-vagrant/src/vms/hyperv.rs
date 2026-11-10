@@ -20,7 +20,7 @@
 use std::net::Ipv4Addr;
 
 use crate::boxes::{self, HyperVBox};
-use isoloom_plan::{Environment, MachineShape};
+use isoloom_plan::{Environment, Vm};
 use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::windows::Tpm;
 
@@ -284,14 +284,12 @@ fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
 /// Why this environment's VMs can't all boot on Hyper-V, if they can't: the first machine whose
 /// OS has no known Hyper-V box and whose spec gives none.
 pub(crate) fn refusal(env: &Environment) -> Option<String> {
-    let spec = env.spec();
-    env.machines.iter().filter(|(_, mp)| mp.shape == MachineShape::Vm).find_map(|(name, _)| {
-        let vm = spec.machines.get(name)?.vm.as_ref()?;
+    env.machines.iter().filter_map(|(name, mp)| Vm::of(name, mp)).find_map(|vm| {
         let b = boxes::vagrant(vm)?;
         (b.hyperv == HyperVBox::Missing).then(|| {
             format!(
-                "machine `{name}`: `{}` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.{name}.boxes.hyperv`",
-                vm.os
+                "machine `{}`: `{}` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.{}.boxes.hyperv`",
+                vm.name, vm.os, vm.name
             )
         })
     })

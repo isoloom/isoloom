@@ -3,12 +3,11 @@
 //! (`vagrant provision --provision-with checks`).
 
 use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
-use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::GeneratedFile;
 use isoloom_render::inventory::CONTROLLER_INVENTORY;
 use isoloom_render::steps::PROJECT_DIR;
-use isoloom_spec::images;
 use isoloom_spec::shell::quote;
 
 use crate::ruby::{Ruby, Value};
@@ -51,18 +50,9 @@ impl<'a> Checks<'a> {
 /// Whether a position's checks run on that machine itself: a Linux VM of the environment.
 fn runs_on_vm(env: &Environment, pos: &Position) -> bool {
     match pos {
-        Position::Machine(m) => env.machines.get(m).is_some_and(|mp| mp.shape == MachineShape::Vm) && !windows(env, m),
+        Position::Machine(m) => env.vm(m).is_some_and(|vm| !vm.plan.is_windows()),
         Position::Networks => false,
     }
-}
-
-/// Whether machine `name` is a Windows VM.
-pub(crate) fn windows(env: &Environment, name: &str) -> bool {
-    env.spec()
-        .machines
-        .get(name)
-        .and_then(|m| m.vm.as_ref())
-        .is_some_and(|vm| images::is_windows(&vm.os))
 }
 
 /// The derived checks the controller runs from the networks when the spec's machines could run
