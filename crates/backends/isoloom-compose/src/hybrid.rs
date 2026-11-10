@@ -14,9 +14,13 @@ use crate::error::Result;
 use crate::file::{ComposeFile, Network, Service};
 use crate::names::tool_of;
 use crate::render::{compose_file, to_yaml};
+use crate::start::StartPlan;
 
 /// The bridge network of the containers with published ports.
 const PUBLISH_NET: &str = "isoloom-publish";
+
+/// How long the host waits for the containers to answer once started (`--wait-timeout`, seconds).
+const START_TIMEOUT: u32 = 900;
 
 /// The Compose file of `env`'s containers, with what the Docker host needs to run it.
 ///
@@ -53,11 +57,14 @@ pub fn render(env: &Environment) -> Result<HybridContainers> {
         .cloned()
         .collect();
     compose.networks = external_networks(env, &networks, !published.is_empty());
+    let path = format!("{OUTPUT_DIR}/hybrid/compose.yml");
+    let start = StartPlan::of(&compose).command(&format!("docker compose -f {path}"), Some(START_TIMEOUT));
     Ok(HybridContainers {
         file: GeneratedFile {
-            path: format!("{OUTPUT_DIR}/hybrid/compose.yml"),
             contents: contents(&compose)?,
+            path,
         },
+        start,
         published,
         networks,
     })

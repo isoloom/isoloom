@@ -2,7 +2,7 @@ use isoloom_plan::{Health, HealthTest};
 use isoloom_spec::model::{CommandLine, Target};
 
 use super::{
-    copied_from_project, docker_net, exec_runner, host_environment, init_names, leaf_jobs, probe, project_variables, ready_test, start_commands, variable,
+    copied_from_project, docker_net, exec_runner, host_environment, init_names, probe, project_variables, ready_test, variable,
 };
 use crate::testing;
 
@@ -53,19 +53,9 @@ fn readiness_is_the_ports_then_the_machine_s_own_healthcheck() {
 }
 
 #[test]
-fn the_jobs_nothing_waits_for_run_attached_after_the_rest() {
+fn a_machine_s_jobs_are_named_after_it_in_order() {
     let spec = testing::spec(SPEC);
     assert_eq!(init_names("web", &spec.machines["web"]), ["isoloom-init-web-1", "isoloom-init-web-2"]);
-    assert_eq!(
-        leaf_jobs(&spec),
-        ["isoloom-init-web-1", "isoloom-init-web-2"],
-        "api waits for db: its job is not a leaf"
-    );
-    assert_eq!(start_commands("dc", &[], Some(60)), "dc up -d --build --wait --wait-timeout 60");
-    assert_eq!(
-        start_commands("dc", &leaf_jobs(&spec), None),
-        "{ set --; for w in $(dc config --services | grep -vx -e isoloom-init-web-1 -e isoloom-init-web-2); do set -- \"$@\" \"$w\"; done; } && dc up -d --build --wait \"$@\" && dc up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1 && dc up --no-deps --exit-code-from isoloom-init-web-2 isoloom-init-web-2"
-    );
 }
 
 #[test]

@@ -1,7 +1,6 @@
 //! The `docker` target's Compose file: addresses, health, init jobs, routes through the router or a
 //! gateway, Docker's blocks and the start plan.
 
-use isoloom_render::container::{leaf_jobs, start_commands};
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
@@ -186,21 +185,19 @@ machines:
     app: { image: "nginx:1.27-alpine" }
     setup: [setup.sh, warm.sh]
 "#)?;
-    // db's job is waited for by web; web's two jobs by nothing (the Compose backend's start plan
-    // says the same of the file it renders).
-    let jobs = leaf_jobs(&spec.for_target(Target::Docker));
-    assert_eq!(jobs, ["isoloom-init-web-1", "isoloom-init-web-2"]);
-    let cmd = start_commands("docker compose", &jobs, Some(900));
-    assert_eq!(
-        cmd,
-        "{ set --; for w in $(docker compose config --services | grep -vx -e isoloom-init-web-1 -e isoloom-init-web-2); do set -- \"$@\" \"$w\"; done; } \
-         && docker compose up -d --build --wait --wait-timeout 900 \"$@\" \
-         && docker compose up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1 \
-         && docker compose up --no-deps --exit-code-from isoloom-init-web-2 isoloom-init-web-2"
+    // db's job is waited for by web; web's two jobs by nothing: the file's start line brings
+    // the rest up and waited for, then runs them attached (`up --wait` fails on an exiting job).
+    let compose = generated(&spec, Target::Docker, "docker/compose.yml")?;
+    let dc = "docker compose -f .isoloom/docker/compose.yml";
+    let start = format!(
+        "# Start:  {dc} up -d --build --wait db isoloom-init-db-1 web isoloom-probe-amd64 \
+         && {dc} up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1 \
+         && {dc} up --no-deps --exit-code-from isoloom-init-web-2 isoloom-init-web-2\n"
     );
+    assert!(compose.contains(&start), "{compose}");
     // Nothing left over: the one command it always was.
-    assert_eq!(start_commands("docker compose", &[], None), "docker compose up -d --build --wait");
-    assert_eq!(leaf_jobs(&example("hello-stack")?.for_target(Target::Docker)), Vec::<String>::new());
+    let plain = generated(&example("hello-stack")?, Target::Docker, "docker/compose.yml")?;
+    assert!(plain.contains(&format!("# Start:  {dc} up -d --build --wait\n")), "{plain}");
     Ok(())
 }
 

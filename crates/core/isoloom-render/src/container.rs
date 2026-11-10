@@ -1,7 +1,6 @@
 //! What every target that runs the machines as containers shares, whichever backend writes the
 //! files (Compose, Kubernetes) or builds the host they run on (a cloud VM, a local VM): the
-//! images Isoloom brings and the readiness probe here; the one-shot jobs and how a Compose
-//! project starts (`jobs`); the project files read into Compose's environment
+//! images Isoloom brings and the readiness probe here; the one-shot jobs' names (`jobs`); the project files read into Compose's environment
 //! (`project_files`); where the containers' host folders are bound from ([`host_folders`]); the size of the VM the containers run on (`host`); the containers' side
 //! of a hybrid environment (`hybrid`); the access machine's stand-in and what is done to it around
 //! the checks ([`STAND_INS_UP`], [`STAND_INS_DOWN`]). Pure functions over the spec and the plan.
@@ -14,7 +13,7 @@ mod project_files;
 
 pub use host::HostSize;
 pub use hybrid::{HybridContainers, docker_net};
-pub use jobs::{as_arguments, init_names, leaf_jobs, start_commands};
+pub use jobs::init_names;
 pub use project_files::{copied_from_project, host_environment, project_variables, variable};
 
 use isoloom_manifest::Failure;

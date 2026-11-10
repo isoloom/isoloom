@@ -28,12 +28,16 @@ use crate::images::TOOLBOX_IMAGE;
 use crate::layout::DIR;
 use crate::machine::Machine;
 use crate::names::{probe_service, tool_service};
+use crate::start::StartPlan;
 use crate::{check_runners, ipv6, labels, networks, outside, router, storage};
 
-/// How to start, check and stop the file by hand, at its top.
-fn usage() -> String {
+/// How to start, check and stop `file` by hand, at its top: started as its [`StartPlan`] says,
+/// so a set-up job nothing waits for runs after the rest is up.
+fn usage(file: &ComposeFile) -> String {
+    let compose = format!("docker compose -f {OUTPUT_DIR}/{DIR}/compose.yml");
+    let start = StartPlan::of(file).command(&compose, None);
     format!(
-        "# Start:  docker compose -f .isoloom/docker/compose.yml up -d --wait\n# Checks: {RUNNER}, or by hand: docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check, and isoloom-check-<machine>\n# Stop:   docker compose -f .isoloom/docker/compose.yml down -v\n"
+        "# Start:  {start}\n# Checks: {RUNNER}, or by hand: {compose} --profile check run --rm isoloom-check, and isoloom-check-<machine>\n# Stop:   {compose} down -v\n"
     )
 }
 
@@ -52,7 +56,7 @@ pub fn render(target: Target, env: &Environment) -> Result<Files> {
         contents: format!(
             "{}{}{}{}{}\n{yaml}",
             header("#"),
-            usage(),
+            usage(&file),
             secrets::usage(&file),
             configs::usage(env),
             Moved(env)

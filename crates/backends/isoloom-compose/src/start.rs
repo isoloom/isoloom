@@ -1,6 +1,7 @@
 //! How to start a Compose file: `wait` for everything but its leaf jobs (`up -d --wait`), then
 //! run each of those jobs attached, in order, failing on its exit code. Computed from the typed
-//! file this backend renders.
+//! file this backend renders, for the run manifests' start steps and, as one shell line
+//! ([`StartPlan::command`]), the start written atop the file and the hybrid Docker host's.
 
 use crate::file::ComposeFile;
 
@@ -36,6 +37,20 @@ impl StartPlan {
             })
             .collect();
         plan_of(&started)
+    }
+
+    /// The shell line that starts the file by hand with `compose` (e.g. `docker compose -f x`):
+    /// everything but the jobs up, built and waited for (at most `wait_timeout` seconds when
+    /// given), then each job attached, its exit code failing the line.
+    pub(crate) fn command(&self, compose: &str, wait_timeout: Option<u32>) -> String {
+        let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
+        let services: String = self.wait.iter().map(|s| format!(" {s}")).collect();
+        let jobs: String = self
+            .jobs
+            .iter()
+            .map(|j| format!(" && {compose} up --no-deps --exit-code-from {j} {j}"))
+            .collect();
+        format!("{compose} up -d --build --wait{timeout}{services}{jobs}")
     }
 }
 
@@ -108,6 +123,19 @@ mod tests {
     fn without_leaf_jobs_everything_is_waited_for() {
         assert_eq!(StartPlan::of(&file(&[("web", service(false, &[], &[]))])), StartPlan::default());
         assert_eq!(StartPlan::of(&ComposeFile::default()), StartPlan::default());
+        assert_eq!(StartPlan::default().command("dc", Some(60)), "dc up -d --build --wait --wait-timeout 60");
+    }
+
+    #[test]
+    fn the_command_waits_for_the_rest_then_runs_each_job_attached() {
+        let plan = StartPlan {
+            wait: vec!["web".into(), "db".into()],
+            jobs: vec!["seed".into(), "warm".into()],
+        };
+        assert_eq!(
+            plan.command("dc", None),
+            "dc up -d --build --wait web db && dc up --no-deps --exit-code-from seed seed && dc up --no-deps --exit-code-from warm warm"
+        );
     }
 
     #[test]

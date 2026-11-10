@@ -21,10 +21,15 @@ step, or VM-only hardware has none: `isoloom targets` says why `docker` is refus
 
 ```sh
 isoloom generate --target docker
-docker compose -f .isoloom/docker/compose.yml up -d --wait
+docker compose -f .isoloom/docker/compose.yml up -d --build --wait
 docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
 docker compose -f .isoloom/docker/compose.yml down -v
 ```
+
+When a machine with `setup:` is one no other machine depends on, its set-up job exits once done,
+and `up --wait` fails on a service that exits. The `# Start:` line at the top of the generated
+`compose.yml` is the start command for your spec: it brings everything else up and waits for it,
+then runs each such job attached.
 
 The checks that run from a machine's own position run as `isoloom-check-<machine>`:
 

@@ -15,9 +15,6 @@ use crate::ruby::{Call, Provision, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 use crate::vms::values;
 
-/// The containers' Compose file, the one output of Isoloom's the host reads.
-const COMPOSE_FILE: &str = ".isoloom/hybrid/compose.yml";
-
 /// One lab network on the host: its interface and the macvlan network on it.
 pub(super) struct Nic {
     /// The address Vagrant requires on a private network (the host takes none itself).
@@ -65,9 +62,9 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     }
     virtualbox(r, env, nics.len());
     vagrantfile::prelude(r, env, "m");
-    // The project, with this Compose file from Isoloom's outputs: before Docker, so the
-    // certificate authorities it holds are trusted first.
-    let rules = crate::vms::copy_rules(&[COMPOSE_FILE]);
+    // The project, with the containers' Compose file, the one output of Isoloom's the host
+    // reads: before Docker, so the certificate authorities it holds are trusted first.
+    let rules = crate::vms::copy_rules(&[containers.file.path.as_str()]);
     r.provision(Provision::new("m", "isoloom_project").kw("name", Value::str("project")).kw("rules", rules));
     if let Some(sh) = isoloom_render::steps::trust_authorities(env) {
         r.provision(shell("m", "certificate authorities").kw("inline", Value::str(&sh)));
@@ -78,7 +75,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     let files = host_environment(env);
     let inputs = &env.spec().inputs;
     let decode = values::linux_decode(inputs);
-    let up = format!("{decode}{secrets}cd {PROJECT_DIR} && {files}docker compose -f {COMPOSE_FILE} up -d --build --wait --wait-timeout 900");
+    let up = format!("{decode}{secrets}cd {PROJECT_DIR} && {files}{}", containers.start);
     let encoded = (!inputs.is_empty()).then(|| values::encoded(inputs));
     r.provision(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", encoded));
 }

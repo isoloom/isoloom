@@ -74,7 +74,7 @@ by hand, or commit it. `run.json` is the run manifest a runner reads. `isoloom g
 ## 5. Run it with Docker Compose
 
 ```sh
-docker compose -f .isoloom/docker/compose.yml up -d --wait
+docker compose -f .isoloom/docker/compose.yml up -d --build --wait
 docker compose -f .isoloom/docker/compose.yml port web 80
 ```
 

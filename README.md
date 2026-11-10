@@ -93,7 +93,7 @@ isoloom validate                    # ✓ hello-stack is valid
 isoloom targets                     # where it can run, and each target's tier
 isoloom generate --target docker    # writes .isoloom/docker/compose.yml and run.json
 
-docker compose -f .isoloom/docker/compose.yml up -d --wait
+docker compose -f .isoloom/docker/compose.yml up -d --build --wait
 docker compose -f .isoloom/docker/compose.yml port web 80     # 127.0.0.1:<port>
 docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check
 docker compose -f .isoloom/docker/compose.yml down -v

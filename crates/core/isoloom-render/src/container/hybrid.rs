@@ -11,6 +11,10 @@ use crate::GeneratedFile;
 pub struct HybridContainers {
     /// `.isoloom/hybrid/compose.yml`.
     pub file: GeneratedFile,
+    /// The shell line the Docker host starts [`file`](Self::file) with, from the project's copy:
+    /// everything but the set-up jobs nothing waits for up and answering, then each of those
+    /// jobs attached (Compose's `up --wait` fails when a one-shot job exits).
+    pub start: String,
     /// The ports published on the host, in the order of the services: the Docker host forwards
     /// them.
     pub published: Vec<(u16, Protocol)>,
