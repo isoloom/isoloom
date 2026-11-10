@@ -210,8 +210,9 @@ impl Import<'_> {
         self.unread(kat, Some(v), &["resources"], "only resource limits are kept; not");
     }
 
-    /// A GPU reservation becomes the machine's `hardware.gpus`; the rest is noted (Isoloom gives a
-    /// machine its size, not a reservation).
+    /// The first GPU reservation becomes the machine's `hardware.gpus`, which holds one; every
+    /// other device, a later GPU one included, and the rest are noted (Isoloom gives a machine
+    /// its size, not a reservation).
     fn reservations(&mut self, at: &str, v: &Value, m: &mut Machine) {
         self.unread(at, Some(v), &["devices"], "a machine has a size (`resources`), not a reservation; not kept");
         for (i, device) in v.get("devices").and_then(Value::as_sequence).into_iter().flatten().enumerate() {
@@ -224,7 +225,23 @@ impl Import<'_> {
                 self.notes.add(device_at, NoteKind::Changed, LEFT_OUT);
                 continue;
             }
-            m.gpus = Some(gpus(device));
+            if m.gpus.is_some() {
+                self.notes.add(
+                    device_at,
+                    NoteKind::Changed,
+                    "a machine has one GPU request (`hardware.gpus`), the first GPU device's: this one is left out",
+                );
+                continue;
+            }
+            let (request, unread_count) = gpus(device);
+            m.gpus = Some(request);
+            if let Some(count) = unread_count {
+                self.notes.add(
+                    format!("{device_at}.count"),
+                    NoteKind::Changed,
+                    format!("`{count}` is neither a number nor `all`: read as `all`, every GPU"),
+                );
+            }
             self.unread(
                 &device_at,
                 Some(device),
@@ -315,26 +332,25 @@ fn dockerfile(context: &str, b: &Mapping) -> Option<String> {
 }
 
 /// A GPU device reservation as `hardware.gpus`: its ids (and driver) when it names them, else its
-/// count, `all` when it gives none (Compose's default).
-fn gpus(device: &Value) -> String {
+/// count, `all` when it gives none (Compose's default); and the count as written when it is
+/// neither a number nor `all`, which reads as `all` too.
+fn gpus(device: &Value) -> (String, Option<String>) {
     let driver = device
         .get("driver")
         .and_then(str_of)
         .map(|d| format!(", driver: {}", crate::draft::quoting::scalar(&d)));
     if let Some(ids) = device.get("device_ids").and_then(Value::as_sequence) {
         let ids: Vec<String> = ids.iter().filter_map(str_of).map(|i| crate::draft::quoting::scalar(&i)).collect();
-        return format!("{{ ids: [{}]{} }}", ids.join(", "), driver.unwrap_or_default());
+        return (format!("{{ ids: [{}]{} }}", ids.join(", "), driver.unwrap_or_default()), None);
     }
-    // A count is a number or `all`; anything else reads as every GPU, as Compose's default.
-    let count = device
-        .get("count")
-        .and_then(str_of)
-        .filter(|c| c.parse::<u32>().is_ok())
-        .unwrap_or_else(|| "all".to_owned());
-    match driver {
+    let written = device.get("count").map(|c| str_of(c).unwrap_or_else(|| flat(c)));
+    let unread = written.clone().filter(|c| c != "all" && c.parse::<u32>().is_err());
+    let count = written.filter(|c| c.parse::<u32>().is_ok()).unwrap_or_else(|| "all".to_owned());
+    let request = match driver {
         Some(driver) => format!("{{ count: {count}{driver} }}"),
         None => count,
-    }
+    };
+    (request, unread)
 }
 
 #[cfg(test)]

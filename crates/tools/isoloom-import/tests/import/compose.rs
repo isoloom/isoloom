@@ -272,3 +272,28 @@ fn a_gpu_reservation_becomes_gpus_and_every_other_resource_key_is_noted() -> Out
     assert!(all.notes.iter().all(|n| !n.at.contains("deploy")), "{:?}", all.notes);
     Ok(())
 }
+
+#[test]
+fn a_second_gpu_device_and_a_count_that_isnt_one_are_noted_not_dropped() -> Outcome {
+    let yaml = "services:
+  train:
+    image: pytorch/pytorch
+    deploy:
+      resources:
+        reservations:
+          devices: [{ device_ids: ['0'], capabilities: [gpu] }, { driver: amd, count: 1, capabilities: [gpu] }]
+  infer:
+    image: pytorch/pytorch
+    deploy: { resources: { reservations: { devices: [{ count: some, capabilities: [gpu] }] } } }
+";
+    let two = draft(yaml, "ml", "compose.yml")?;
+    assert!(two.yaml.contains("hardware: { gpus: { ids: [\"0\"] } }"), "the first one kept: {}", two.yaml);
+    let devices = "services.train.deploy.resources.reservations.devices";
+    let second = format!("{devices}[1]");
+    assert!(has(&two, NoteKind::Changed, &second, "one GPU request"), "{:?}", two.notes);
+    assert!(two.yaml.contains("hardware: { gpus: all }"), "{}", two.yaml);
+    let count = "services.infer.deploy.resources.reservations.devices[0].count";
+    assert!(has(&two, NoteKind::Changed, count, "`some` is neither a number nor `all`"), "{:?}", two.notes);
+    assert_eq!(validate(&two)?, Vec::<String>::new(), "{}", two.yaml);
+    Ok(())
+}
