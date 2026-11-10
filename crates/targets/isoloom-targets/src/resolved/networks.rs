@@ -47,7 +47,7 @@ pub(super) fn tools(spec: &Spec, docker: &Spec) -> Map<String, Value> {
         .map(|(n, t)| {
             let docker_addresses = on_docker.get(&n).map(|d| &d.addresses);
             let tool = json!({
-                "image": t.tool.image.clone().or_else(|| (n == "shell").then(|| "nicolaka/netshoot".to_owned())),
+                "image": t.image,
                 "port": t.tool.port,
                 "publish": t.tool.publish,
                 "addresses": t.addresses,

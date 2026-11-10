@@ -446,7 +446,7 @@ services:
       isoloom.environment: vlan-office
     restart: unless-stopped
   isoloom-switch-office:
-    image: nicolaka/netshoot:v0.13
+    image: nicolaka/netshoot:v0.14@sha256:7f08c4aff13ff61a35d30e30c5c1ea8396eac6ab4ce19fd02d5a4b3b5d0d09a2
     init: true
     entrypoint:
     - /bin/sh
@@ -644,7 +644,7 @@ services:
       isoloom.environment: vlan-office
     restart: unless-stopped
   isoloom-routes-admin:
-    image: nicolaka/netshoot:v0.13
+    image: nicolaka/netshoot:v0.14@sha256:7f08c4aff13ff61a35d30e30c5c1ea8396eac6ab4ce19fd02d5a4b3b5d0d09a2
     init: true
     entrypoint:
     - /bin/sh

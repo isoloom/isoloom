@@ -149,10 +149,7 @@ pub(crate) fn tools(r: &mut Ruby, ctx: &Ctx) {
             r.comment("Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).");
             tool_shell(r, ctx, tool);
         } else {
-            r.comment(&format!(
-                "Tool `{name}` ({}) runs on the container targets; no VM form.",
-                tool.tool.image.as_deref().unwrap_or("image")
-            ));
+            r.comment(&format!("Tool `{name}` ({}) runs on the container targets; no VM form.", tool.image));
         }
     }
 }

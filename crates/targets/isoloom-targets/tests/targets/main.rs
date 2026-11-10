@@ -27,6 +27,7 @@ mod generate;
 mod groups;
 mod guides;
 mod hardware;
+mod helper_images;
 mod host_folders;
 mod instance;
 mod launch_values;

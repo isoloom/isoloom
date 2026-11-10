@@ -27,7 +27,6 @@ use crate::file::{Attachment, ComposeFile, NetworkMode, Restart, Service, Volume
 use crate::trunks;
 use isoloom_render::run_manifest::RUNNER;
 
-use crate::images::TOOLBOX_IMAGE;
 use crate::layout::DIR;
 use crate::machine::Machine;
 use crate::names::{check_runner_service, probe_service, tool_service};
@@ -167,7 +166,7 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
         let tool = &plan.tool;
         let shell = name == "shell";
         let mut t = Service {
-            image: Some(env.images.pull(tool.image.as_deref().unwrap_or(TOOLBOX_IMAGE))),
+            image: Some(env.images.pull(&plan.image)),
             hostname: Some(name.clone()),
             command: tool.command.clone(),
             restart: Some(Restart::UnlessStopped),

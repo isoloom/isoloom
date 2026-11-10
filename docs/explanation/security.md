@@ -135,10 +135,17 @@ off networks other people reach.
 
 ## Supply chain
 
-- Container images of the catalogue and the OS base images are pinned by digest; Isoloom's helper
-  images are pinned by digest too; Ansible Galaxy collections by version and `sha256` in the
-  catalogue (on `external`, `requirements.yml` names the pin for you to check: `ansible-galaxy`
-  doesn't); the Docker install in VMs uses the official repository with a pinned key.
+- Pinned by digest: the catalogue's container images, the containers' OS base images (`FROM
+  debian:12@sha256:…`) and Isoloom's helper images (the check runner, the probe, the utility
+  image, the `shell` toolbox and the `tc` sidecar); Proxmox's cloud images by SHA-512, ESXi's
+  default OVAs by a SHA-256 the module's `images` description gives you to check (the provider
+  checks none). Taken as their source publishes them, not pinned: Vagrant boxes (`box_version`
+  pins the Windows boxes; the Linux boxes take the latest), the clouds' VM images (each cloud's
+  newest image of the OS: an AMI found by name, Azure's `latest`, a Google Cloud image family, a
+  DigitalOcean or Linode image slug, Oracle Cloud's newest Canonical image) and an OVA you give. Ansible
+  Galaxy collections are pinned by version and `sha256` in the catalogue (on `external`,
+  `requirements.yml` names the pin for you to check: `ansible-galaxy` doesn't); the Docker install
+  in VMs uses the official repository with a pinned key.
 - Terraform providers are pinned to a patch range ([tool versions](../reference/tool-versions.md)).
 - `constraints.registries` and `constraints.mirrors` send every pull through your own mirrors
   ([corporate network](../guide/corporate-network.md)).
