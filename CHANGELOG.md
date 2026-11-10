@@ -365,6 +365,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   written where the link led, outside the project. A generated file whose path goes through a
   link, or is one, now stops `generate` and `check` before anything is written, and each file is
   written beside its place and renamed into it.
+- **`docker-vm` and hybrid's containers' host never run a value given at launch.** Their
+  Vagrantfiles handed the inputs to the `environment`, `checks` and `containers` provisioners as
+  they were, and Vagrant writes a provisioner's environment into a double-quoted shell string: a
+  `$(...)` or a backquote in a value ran in the VM, as root. The values now travel in base64, as
+  the other VMs' always did, and each script decodes them first.
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

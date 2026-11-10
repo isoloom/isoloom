@@ -1,7 +1,7 @@
 //! The values a VM gets at launch, from the host's environment when Vagrant runs (Vagrant's own
 //! way, decided for the Vagrant targets: the runner hands them to `vagrant up` and `vagrant
 //! provision`, never to a generated file): its inputs, and its secret files (an input's file
-//! included).
+//! included). The containers' VMs (`docker-vm`'s, hybrid's host) get their inputs the same way.
 //!
 //! Vagrant passes a provisioner's `env` by writing `NAME="value"` into the shell (or `$env:NAME
 //! = "value"` into the PowerShell) that runs the script, escaping quotes only: a `$(...)` or a
@@ -23,11 +23,28 @@ fn input(name: &str) -> Value {
     Value::raw(format!("isoloom_b64(INPUTS[{}])", Value::str(name)))
 }
 
+/// Inputs `names` from the host's environment, each in base64: a provisioner's environment, which
+/// its script decodes (PowerShell, [`windows_decode`]; a shell, [`linux_decode`] or the inputs
+/// file of [`linux_inputs`]).
+pub(crate) fn encoded(names: &[String]) -> Value {
+    Value::hash(names.iter().map(|n| (Value::str(n), input(n))))
+}
+
 /// The machine's inputs from the host's environment, in base64, when it reads some: the
 /// environment its steps run with.
 pub(crate) fn inputs_env(env: &Environment, machine: &str) -> Option<Value> {
     let names = &env.machines.get(machine)?.inputs;
-    (!names.is_empty()).then(|| Value::hash(names.iter().map(|n| (Value::str(n), input(n)))))
+    (!names.is_empty()).then(|| encoded(names))
+}
+
+/// Shell decoding inputs `names`, each in base64 in its own variable ([`encoded`]), in place and
+/// exported, before the script reads them; a value's last line breaks kept. Empty without any.
+pub(crate) fn linux_decode(names: &[String]) -> String {
+    names
+        .iter()
+        .map(|k| format!("{k}=\"$(printenv {k} | base64 -d; printf x)\"; {k}=\"${{{k}%x}}\"; export {k}\n"))
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 /// PowerShell decoding the machine's inputs in its own environment before a step runs: what the
@@ -113,10 +130,10 @@ pub(crate) fn secret_files(r: &mut Ruby, env: &Environment, machine: &str, os: O
     r.provision(vagrantfile::shell("m", "secrets").kw("env", hash).script("inline", &script));
 }
 
-/// Whether a provisioner of `env`'s VMs reads a value from the host's environment: the
-/// Vagrantfile then defines `isoloom_b64`.
-pub(crate) fn any(env: &Environment) -> bool {
-    !env.spec().inputs.is_empty() || env.machines.values().any(|mp| !mp.secrets.is_empty())
+/// Whether a provisioner of `env`'s VMs reads a secret from the host's environment (in base64,
+/// as inputs always are).
+pub(crate) fn any_secret(env: &Environment) -> bool {
+    env.machines.values().any(|mp| !mp.secrets.is_empty())
 }
 
 #[cfg(test)]
@@ -253,9 +270,31 @@ machines:
     }
 
     #[test]
-    fn the_vagrantfile_defines_the_encoder_when_a_provisioner_reads_a_value() {
-        assert!(any(&environment(SPEC)));
-        let none = "version: 1\nname: t\nnetworks: { lab: { cidr: 10.84.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, os: debian@12, app: { steps: [{ run: a.sh }] } }\n";
-        assert!(!any(&environment(none)));
+    fn a_secret_from_the_hosts_environment_is_one_a_machine_gets() {
+        assert!(any_secret(&environment(SPEC)));
+        let none = "version: 1\nname: t\ninputs: [MODE]\nnetworks: { lab: { cidr: 10.84.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, os: debian@12, app: { steps: [{ run: a.sh }] } }\n";
+        assert!(!any_secret(&environment(none)));
+    }
+
+    #[test]
+    fn a_value_decoded_in_place_is_read_as_given_and_never_run() {
+        let tricky = "it's $(touch ran) \"quoted\" `touch ran`\n\n";
+        let dir = std::env::temp_dir().join(format!("isoloom-decode-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("a temporary folder");
+        let script = format!("{}printf %s \"$TOKEN\" > read\n", linux_decode(&["TOKEN".to_owned()]));
+        std::fs::write(dir.join("decode.sh"), script).expect("the script written");
+        let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
+        let status = posix
+            .arg("decode.sh")
+            .current_dir(&dir)
+            .env("TOKEN", isoloom_spec::shell::base64(tricky.as_bytes()))
+            .status()
+            .expect("sh runs");
+        let read = std::fs::read_to_string(dir.join("read")).unwrap_or_default();
+        let ran = dir.join("ran").exists();
+        std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
+        assert!(status.success());
+        assert_eq!(read, tricky);
+        assert!(!ran, "a command in the value ran");
     }
 }

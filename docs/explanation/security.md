@@ -20,8 +20,11 @@ decide when you run it. To report a vulnerability: [SECURITY.md](../../.github/S
 A secret or input is declared by name and source (`env`, `file`, Vault, SOPS). Its value is never
 in the spec, a generated file, `resolved.json` or the run manifest: the manifest holds a slot (a
 name and a destination). A runner reads the value at run time and delivers it as the slot says,
-usually as a file in the machine over SSH standard input, never on a command line. Cloud
-credentials reach only the Terraform steps' environment.
+usually as a file in the machine over SSH standard input, never on a command line. Vagrant hands
+a value to a provisioner in its environment, which it writes into a shell string: every
+Vagrantfile passes it in base64, which the provisioner's script decodes, so a `$(...)` or a
+backquote in a value is read as text, never run. Cloud credentials reach only the Terraform
+steps' environment.
 
 Two exceptions are by design, and worth knowing:
 

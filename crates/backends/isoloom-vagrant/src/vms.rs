@@ -41,7 +41,7 @@ pub(crate) mod providers;
 pub(crate) mod qemu;
 mod transport;
 pub(crate) mod utm;
-mod values;
+pub(crate) mod values;
 mod windows;
 
 /// The name of a network on the host, `isoloom-<environment>-<network>`: its VirtualBox
@@ -198,7 +198,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(vagrantfile::PORT_CHECK_RB);
     utm::constant(r);
     r.blank();
-    vagrantfile::inputs(r, &env.spec().inputs, values::any(env));
+    vagrantfile::inputs(r, &env.spec().inputs, values::any_secret(env));
     if env.machines.values().any(|m| !m.ports.is_empty()) {
         vagrantfile::chosen_ports(r);
     }

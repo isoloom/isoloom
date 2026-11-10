@@ -12,6 +12,7 @@ use isoloom_spec::validate::Cidr;
 use crate::error::{Error, Result};
 use crate::ruby::{Call, Provision, Ruby, Value};
 use crate::vagrantfile::{self, shell};
+use crate::vms::values;
 
 /// One lab network on the host: its interface and the macvlan network on it.
 pub(super) struct Nic {
@@ -71,9 +72,11 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     r.provision(shell("m", "networks").heredoc("inline", "SH", &networks_script(nics)));
     let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
     let files = host_environment(env);
-    let up = format!("{secrets}cd /opt/isoloom && {files}docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900");
-    let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
-    r.provision(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", inputs));
+    let inputs = &env.spec().inputs;
+    let decode = values::linux_decode(inputs);
+    let up = format!("{decode}{secrets}cd /opt/isoloom && {files}docker compose -f .isoloom/hybrid/compose.yml up -d --build --wait --wait-timeout 900");
+    let encoded = (!inputs.is_empty()).then(|| values::encoded(inputs));
+    r.provision(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", encoded));
 }
 
 /// Sized for every container at once plus Docker's own 1 GB (2 to 16 CPUs), every lab

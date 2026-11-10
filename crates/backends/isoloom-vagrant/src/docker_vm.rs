@@ -37,6 +37,7 @@ use isoloom_spec::shell::quote;
 use crate::host_folders::Share;
 use crate::ruby::{BootStatements, Call, Provision, Ruby, Value};
 use crate::vagrantfile::{self, shell};
+use crate::vms::values;
 
 const DIR: &str = "docker-vm";
 /// Vagrant's name for the file's one machine.
@@ -126,7 +127,7 @@ struct Scripts {
 fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
     let scripts = Scripts {
         environment: environment_script(env, guest)?,
-        checks: checks_script(guest)?,
+        checks: checks_script(env, guest)?,
     };
     let mut r = Ruby::new();
     r.text(&header("#"));
@@ -300,18 +301,20 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
 
 /// The Compose file up as `guest` starts it (published on every address of the VM, at the fixed
 /// host ports Vagrant forwards), with the containers' secrets once they were delivered and the
-/// values given at launch, then the ready mark.
+/// values given at launch (in base64, which the script decodes), then the ready mark.
 fn environment(r: &mut Ruby, env: &Environment, script: &str) {
-    let inputs = (!env.spec().inputs.is_empty()).then(|| Value::raw("INPUTS"));
-    r.provision(shell("config", "environment").kw("inline", Value::str(script)).kw_opt("env", inputs));
+    let inputs = &env.spec().inputs;
+    let encoded = (!inputs.is_empty()).then(|| values::encoded(inputs));
+    r.provision(shell("config", "environment").kw("inline", Value::str(script)).kw_opt("env", encoded));
 }
 
-/// The environment's start in the VM: the containers' secrets, `guest`'s start steps, the ready
-/// mark.
+/// The environment's start in the VM: the values given at launch decoded, the containers'
+/// secrets, `guest`'s start steps, the ready mark.
 fn environment_script(env: &Environment, guest: &GuestCompose) -> Result<String> {
     let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
     Ok(format!(
-        "{secrets}{}{} && echo ready > {}",
+        "{}{secrets}{}{} && echo ready > {}",
+        values::linux_decode(&env.spec().inputs),
         sequence(&guest.start)?,
         steps::MAKE_STATE_DIR,
         steps::READY_FILE
@@ -333,22 +336,24 @@ fn sequence(commands: &[GuestCommand]) -> Result<String> {
         .collect()
 }
 
-/// Checks on demand (`script`); the derived checks switched off with `ISOLOOM_DERIVED=0` on the
-/// host.
+/// Checks on demand (`script`), with the values given at launch (in base64, which the script
+/// decodes); the derived checks switched off with `ISOLOOM_DERIVED=0` on the host.
 fn checks(r: &mut Ruby, env: &Environment, script: &str) {
     let derived = crate::vagrantfile::derived_from_host();
-    let vars = if env.spec().inputs.is_empty() {
+    let inputs = &env.spec().inputs;
+    let vars = if inputs.is_empty() {
         derived
     } else {
-        Value::raw(format!("INPUTS.merge({derived})"))
+        Value::raw(format!("{}.merge({derived})", values::encoded(inputs)))
     };
     let call = shell("config", "checks").kw("run", Value::str("never"));
     r.provision(call.kw("inline", Value::str(script)).kw("env", vars));
 }
 
-/// The checks as the run manifest runs them (`guest`'s): the stand-ins set up, every runner, then
-/// the stand-ins taken down whatever the runners found. None without runners.
-fn checks_script(guest: &GuestCompose) -> Result<Option<String>> {
+/// The checks as the run manifest runs them (`guest`'s), after the values given at launch are
+/// decoded: the stand-ins set up, every runner, then the stand-ins taken down whatever the
+/// runners found. None without runners.
+fn checks_script(env: &Environment, guest: &GuestCompose) -> Result<Option<String>> {
     if guest.runners.is_empty() {
         return Ok(None);
     }
@@ -363,5 +368,9 @@ fn checks_script(guest: &GuestCompose) -> Result<Option<String>> {
     } else {
         format!("if (\n{setup}); then\n{runners}else\n  failed=1\nfi\n")
     };
-    Ok(Some(format!("failed=0\n{checked}{}exit \"$failed\"", sequence(&guest.check_teardown)?)))
+    Ok(Some(format!(
+        "{}failed=0\n{checked}{}exit \"$failed\"",
+        values::linux_decode(&env.spec().inputs),
+        sequence(&guest.check_teardown)?
+    )))
 }

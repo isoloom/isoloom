@@ -28,6 +28,7 @@ mod groups;
 mod hardware;
 mod host_folders;
 mod instance;
+mod launch_values;
 mod machine_settings;
 mod managed;
 mod message;
