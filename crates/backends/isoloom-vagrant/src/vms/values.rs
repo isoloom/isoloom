@@ -9,9 +9,9 @@
 //! (`isoloom_b64`, defined with the inputs), which no shell reads anything into, and the script
 //! decodes it.
 
+use isoloom_manifest::contract::secret_variable;
 use isoloom_plan::{Environment, SecretFile, ValueSource};
 use isoloom_render::{secrets, steps};
-use isoloom_spec::model::secret_variable;
 use isoloom_spec::shell::quote;
 
 use super::transport::Os;

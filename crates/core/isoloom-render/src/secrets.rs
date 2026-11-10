@@ -9,9 +9,10 @@
 //! the target's own tool (`vagrant up`, `terraform apply`, cloud-init), so the step is a gate:
 //! it waits for the mark, and the runner delivers while the tool runs.
 
+use isoloom_manifest::contract::secret_variable;
 use isoloom_plan::secrets::VM_DEFAULT_MODE;
 use isoloom_plan::{Environment, MachineShape, SecretFile};
-use isoloom_spec::model::{SecretSource, secret_variable};
+use isoloom_spec::model::SecretSource;
 use isoloom_spec::shell::quote;
 
 use crate::boot;

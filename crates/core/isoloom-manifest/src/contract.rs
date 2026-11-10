@@ -1,8 +1,9 @@
 //! The names the generated files and a runner share outside `run.json`: the variables a
-//! Vagrantfile reads, the tags a cloud resource carries, the paths a machine's set-up writes, the
-//! folder every output is under. A runner uses them as they are; Isoloom's backends write them
-//! from here, so the two can't drift. Each is part of the contract as the run manifest's fields
-//! are: a rename is a breaking change.
+//! Vagrantfile reads, the derived checks' switch, the variable each secret is handed over in, the
+//! variables an access machine's image or box is picked with, the tags a cloud resource carries,
+//! the paths a machine's set-up writes, the folder every output is under. A runner uses them as
+//! they are; Isoloom's backends write them from here, so the two can't drift. Each is part of the
+//! contract as the run manifest's fields are: a rename is a breaking change.
 
 /// The folder Isoloom writes a project's outputs under (`.isoloom/<target>/`), and the start of
 /// every instance's own (`.isoloom-<n>/`): a run manifest's folder is under one.
@@ -68,6 +69,33 @@ pub const PUBLISH_ADDRESS: &str = "ISOLOOM_PUBLISH_ADDRESS";
 /// one: a Compose file's and a Vagrantfile's.
 pub const PUBLISH_FIXED: &str = "ISOLOOM_PUBLISH_FIXED";
 
+/// The switch of the checks derived from the spec (reachability, no internet): the check
+/// runners read it, `0` skipping them, and every target passes it through from the host; a run
+/// manifest's param.
+pub const DERIVED: &str = "ISOLOOM_DERIVED";
+
+/// The start of the variable a secret's value is handed over in, to the tool that delivers it
+/// ([`secret_variable`]).
+pub const SECRET_PREFIX: &str = "ISOLOOM_SECRET_";
+
+/// The variable secret `name`'s value is handed over in: [`SECRET_PREFIX`] and the name in upper
+/// snake case (`ISOLOOM_SECRET_DB_PASSWORD` for `db-password`). Secret names are kebab-case, so
+/// two secrets never share one.
+#[must_use]
+pub fn secret_variable(name: &str) -> String {
+    format!("{SECRET_PREFIX}{}", name.to_ascii_uppercase().replace('-', "_"))
+}
+
+/// The variable the access machine's Compose service reads its image from (its default, the
+/// resolved access image, is the Compose `${VAR:-default}` fallback). The runner sets it to the
+/// image it was given when it hot-adds the machine ([`crate::access`]).
+pub const ACCESS_IMAGE: &str = "ISOLOOM_ACCESS_IMAGE";
+
+/// The variable the access machine's Vagrant VM reads its box name from (its default is the
+/// `ENV.fetch` fallback). The runner sets it to the box it was given when it hot-adds the
+/// machine ([`crate::access`]).
+pub const ACCESS_BOX: &str = "ISOLOOM_ACCESS_BOX";
+
 /// The folder on a Linux machine its guest-delivered secrets are kept in, one root-only file per
 /// slot.
 pub const SECRETS_DIR: &str = "/var/lib/isoloom/secrets";
@@ -88,5 +116,14 @@ mod tests {
         assert!(EXPIRES_TAG.starts_with(EXPIRES_WORD));
         assert_eq!(DELIVERED, format!("{SECRETS_DIR}/.delivered"));
         assert!(OUTPUT_DIR.starts_with('.') && RESERVED_PREFIX.starts_with(OUTPUT_DIR.trim_start_matches('.')));
+    }
+
+    #[test]
+    fn the_runners_variables_are_named_as_released() {
+        assert_eq!(DERIVED, "ISOLOOM_DERIVED");
+        assert_eq!(ACCESS_IMAGE, "ISOLOOM_ACCESS_IMAGE");
+        assert_eq!(ACCESS_BOX, "ISOLOOM_ACCESS_BOX");
+        assert_eq!(secret_variable("db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
+        assert!(secret_variable("db-password").starts_with(SECRET_PREFIX));
     }
 }

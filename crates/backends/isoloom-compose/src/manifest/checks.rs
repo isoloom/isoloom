@@ -5,11 +5,12 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
+use isoloom_manifest::contract::DERIVED;
 use isoloom_manifest::{Action, CheckRunner, Failure, Name, PathTemplate, RelPath, SnakeName, Step, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{Position, Probe, Resolved};
 use isoloom_render::container::{exec_runner, exec_runner_name};
-use isoloom_render::run_manifest::{DERIVED, check, timeout_s};
+use isoloom_render::run_manifest::{check, timeout_s};
 
 use super::compose;
 use super::stand_ins::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};

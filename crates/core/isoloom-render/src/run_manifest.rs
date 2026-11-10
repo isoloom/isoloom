@@ -180,8 +180,9 @@ pub fn project_archive(root: &str, outputs: &[&str]) -> Result<Step, ManifestErr
     Ok(s)
 }
 
-/// `ISOLOOM_DERIVED`, the switch of the checks derived from the spec (`0` skips them), delivered
-/// to the check runners' `steps`; `None` when there is none.
+/// `ISOLOOM_DERIVED` ([`isoloom_manifest::contract::DERIVED`]), the switch of the checks derived
+/// from the spec (`0` skips them), delivered to the check runners' `steps`; `None` when there is
+/// none.
 ///
 /// # Errors
 ///
@@ -191,7 +192,7 @@ pub fn derived_switch(steps: Vec<StepId>) -> Result<Option<Param>, ManifestError
         return Ok(None);
     };
     let what = "0: the checks derived from the spec (reachability, no internet) are skipped.";
-    embedder_param(DERIVED, what, Some("1"), &["0", "1"], StepSelection::Only(steps)).map(Some)
+    embedder_param(isoloom_manifest::contract::DERIVED, what, Some("1"), &["0", "1"], StepSelection::Only(steps)).map(Some)
 }
 
 /// An optional param `name` the embedder sets (its `default` and the `values` it takes, if any
@@ -233,9 +234,6 @@ pub fn publish_fixed(machines: &[Machine]) -> Result<Option<Param>, ManifestErro
     let what = "Set: each published port takes its own `publish` number on the host, instead of a free one.";
     embedder_param(isoloom_manifest::contract::PUBLISH_FIXED, what, None, &["1"], StepSelection::Every).map(Some)
 }
-
-/// The derived checks' switch, as a runner reads it.
-pub const DERIVED: &str = isoloom_plan::checks::DERIVED;
 
 /// Every host a run starts from: Linux, macOS and Windows.
 #[must_use]

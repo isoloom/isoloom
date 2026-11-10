@@ -162,14 +162,6 @@ impl MachineSecret {
     }
 }
 
-/// The environment variable a secret's value is handed over in, to the tool that delivers it
-/// (`ISOLOOM_SECRET_DB_PASSWORD` for `db-password`). Secret names are kebab-case, so two
-/// secrets never share one.
-#[must_use]
-pub fn secret_variable(name: &str) -> String {
-    format!("ISOLOOM_SECRET_{}", name.to_ascii_uppercase().replace('-', "_"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,10 +214,5 @@ mod tests {
         }
         assert_eq!(paths, ["/run/secrets/db", "/etc/db.pw", "C:\\app\\db", "/run/secrets/db.pw", "/run/secrets/db"]);
         Ok(())
-    }
-
-    #[test]
-    fn a_secret_is_handed_over_in_a_variable_of_its_name() {
-        assert_eq!(secret_variable("db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
     }
 }

@@ -136,7 +136,7 @@ fn access_box(plan: &isoloom_plan::MachinePlan, svc: &mut Service) {
     svc.init = true;
     svc.entrypoint = vec!["sleep".into(), "infinity".into()];
     if let (None, Some(Image::Container { reference, .. })) = (&svc.build, &plan.image) {
-        svc.image = Some(format!("${{{}:-{reference}}}", manifest::access::IMAGE_ENV));
+        svc.image = Some(format!("${{{}:-{reference}}}", manifest::contract::ACCESS_IMAGE));
     }
 }
 

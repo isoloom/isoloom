@@ -6,11 +6,11 @@
 
 use std::collections::BTreeSet;
 
+use isoloom_manifest::contract::secret_variable;
 use isoloom_manifest::{
     CheckRunner, Delivery, EnvName, HostOs, Identifier, Lifecycle, Machine, Name, NonEmpty, Param, Provider, SecretSlot, SetBy, SlotKind, StepId, StepSelection,
 };
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_spec::model::secret_variable;
 
 use isoloom_render::run_manifest::{derived_switch, held_secrets, publish_fixed};
 

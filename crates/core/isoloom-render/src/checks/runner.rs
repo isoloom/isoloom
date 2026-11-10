@@ -2,7 +2,8 @@
 //! protocol's, written from [`CheckLine`], which the runner's `check` reads them back with.
 
 use isoloom_manifest::CheckLine;
-use isoloom_plan::checks::{DERIVED, Host, HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
+use isoloom_manifest::contract::DERIVED;
+use isoloom_plan::checks::{Host, HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
 use isoloom_spec::shell::quote as sq;
 
 /// How many redirects an `http` check with `follow` goes through before giving up (the status

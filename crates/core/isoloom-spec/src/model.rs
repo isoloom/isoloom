@@ -41,7 +41,7 @@ pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use private_dns::EnvironmentDns;
 pub use process::{CommandLine, Healthcheck, HttpCheck, seconds};
 pub(crate) use secrets::after_drive;
-pub use secrets::{MachineSecret, SecretMount, SecretSource, is_drive_path, secret_variable};
+pub use secrets::{MachineSecret, SecretMount, SecretSource, is_drive_path};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, Tool, Ulimit};
 pub(crate) use shared::{TOOL_RECIPES, ULIMITS};
 pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMode, TmpfsMount};

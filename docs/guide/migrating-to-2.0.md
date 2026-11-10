@@ -137,6 +137,9 @@ among others (the CHANGELOG's **Removed** section lists every item):
   `controller`, `router`) are `isoloom_spec::net::NetworkBlock`'s, a /24 to /29:
   `NetworkBlock::parse(text)?.host(octet)`. `isoloom_spec::validate::RESERVED_PREFIX`,
   `isoloom_targets::OUTPUT_DIR` are `isoloom_manifest::contract`'s.
+- `isoloom_spec::model::secret_variable` is `isoloom_manifest::contract::secret_variable` (beside
+  `contract::SECRET_PREFIX`), and `isoloom_manifest::access::{IMAGE_ENV, BOX_ENV}` are
+  `isoloom_manifest::contract::{ACCESS_IMAGE, ACCESS_BOX}`, with the same values.
 - `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}`: the lab takes
   the regions (`Lab::with_regions`, from `Defaults::regions`); `isoloom_targets::default_regions`
   gives each cloud's built-in one.

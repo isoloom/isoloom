@@ -4,19 +4,12 @@
 //!
 //! - Compose: the access service sits in the [`PROFILE`] Compose profile, so `up` skips it; the
 //!   runner hot-adds it with `docker compose --profile access up -d --no-deps <service>`, setting
-//!   [`IMAGE_ENV`] to the image the runner was given (its default is baked into the service).
+//!   [`contract::ACCESS_IMAGE`](crate::contract::ACCESS_IMAGE) to the image the runner was given
+//!   (its default is baked into the service).
 //! - Vagrant: the access VM is defined `autostart: false`, so `vagrant up` skips it; the runner
-//!   hot-adds it with `vagrant up <name> --provider=<p>`, setting [`BOX_ENV`] to the box it
-//!   was given, and takes it out with `vagrant destroy -f <name>`.
+//!   hot-adds it with `vagrant up <name> --provider=<p>`, setting
+//!   [`contract::ACCESS_BOX`](crate::contract::ACCESS_BOX) to the box it was given, and takes it
+//!   out with `vagrant destroy -f <name>`.
 
 /// The Compose profile the access service sits in (so the initial `up` skips it).
 pub const PROFILE: &str = "access";
-
-/// The environment variable the access Compose service reads its image from (its default, the
-/// resolved access image, is the Compose `${VAR:-default}` fallback). The runner sets it to the
-/// image it was given when it hot-adds the machine.
-pub const IMAGE_ENV: &str = "ISOLOOM_ACCESS_IMAGE";
-
-/// The environment variable the access Vagrant box reads its box name from (its default is the
-/// `ENV.fetch` fallback). The runner sets it to the box it was given when it hot-adds.
-pub const BOX_ENV: &str = "ISOLOOM_ACCESS_BOX";

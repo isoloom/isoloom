@@ -50,6 +50,13 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   the secrets folder and its mark are defined there once; `isoloom_render::OUTPUT_DIR`,
   `isoloom_targets::OUTPUT_DIR`, `isoloom_render::controller::NAME`,
   `isoloom_render::secrets::DELIVERED` and `isoloom_spec::validate::RESERVED_PREFIX` are removed.
+- **Breaking (library): the runner's variables are `isoloom_manifest::contract`'s too.** The
+  derived checks' switch is `contract::DERIVED` (`isoloom_plan::checks::DERIVED` and
+  `isoloom_render::run_manifest::DERIVED` are removed), a secret's variable
+  `contract::secret_variable`, which starts with `contract::SECRET_PREFIX`
+  (`isoloom_spec::model::secret_variable` is removed), and the access machine's image and box
+  variables `contract::ACCESS_IMAGE` and `contract::ACCESS_BOX` (were
+  `isoloom_manifest::access::IMAGE_ENV` and `BOX_ENV`). Their values are unchanged.
 - **Breaking (library): the address blocks are `isoloom_spec::net`'s** (`Cidr`, `Cidr6`,
   `PRIVATE`, `IPV6_PREFIX`, `docker_cidrs`), no longer under `validate`, and `Cidr` and `Cidr6`
   keep their fields private: build one with `Cidr::new`, `parse`, `enclosing` or `ALL` (read it

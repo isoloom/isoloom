@@ -6,9 +6,9 @@
 use std::collections::BTreeSet;
 
 use isoloom_manifest::contract::PUBLISH_ADDRESS;
+use isoloom_manifest::contract::secret_variable;
 use isoloom_manifest::{Delivery, EnvName, Identifier, Machine, Name, NonEmpty, Param, Role, SecretSlot, SecretSource, SlotKind, StepId, StepSelection, Store};
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_spec::model::secret_variable;
 
 use isoloom_render::container::project_variables;
 use isoloom_render::run_manifest::{derived_switch, embedder_param, held_secrets, publish_fixed};

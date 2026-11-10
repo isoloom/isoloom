@@ -99,7 +99,7 @@ pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnc
 /// `ISOLOOM_ACCESS_BOX` (its resolved box the fallback), so the runner can give another.
 fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, access: bool) {
     if access {
-        let fetch = format!("ENV.fetch({}, {})", Value::str(manifest::access::BOX_ENV), Value::str(&image.name));
+        let fetch = format!("ENV.fetch({}, {})", Value::str(manifest::contract::ACCESS_BOX), Value::str(&image.name));
         r.assign("m.vm.box", Value::raw(fetch));
     } else {
         r.assign("m.vm.box", Value::str(&image.name));
