@@ -3,7 +3,7 @@
 
 use crate::hcl_builder::{Expression, Module, Template, null, object, string};
 use isoloom_plan::checks::Position;
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, Vm};
 use isoloom_render::run_manifest::RUNNER;
 use isoloom_spec::model::Target;
 
@@ -23,9 +23,9 @@ pub(crate) struct Reach<'a> {
 }
 
 impl Reach<'_> {
-    /// The SSH user on machine `mp`.
-    fn user_of(&self, mp: &MachinePlan) -> &'static str {
-        (self.user)(mp.os.as_deref().unwrap_or_default())
+    /// The SSH user on VM `vm`.
+    fn user_of(&self, vm: Vm<'_>) -> &'static str {
+        (self.user)(vm.os)
     }
 }
 
@@ -55,11 +55,11 @@ pub(crate) fn write_named(env: &Environment, user: fn(&str) -> &'static str, pub
 /// `terraform output`), `ip`, `ready_file`, `checks` and `published`.
 pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
     let machines: Vec<(&str, Expression)> = vms(env).map(|(n, _)| (n, (reach.public_ip)(n))).collect();
-    let users: Vec<(&str, Expression)> = vms(env).map(|(n, mp)| (n, string(reach.user_of(mp)))).collect();
+    let users: Vec<(&str, Expression)> = env.vms().map(|vm| (vm.name, string(reach.user_of(vm)))).collect();
     m.block(output("machines", object(machines)));
-    for (n, mp) in vms(env) {
-        m.block(output(&super::manifest::address_output(n), (reach.public_ip)(n)));
-        m.block(output(&super::manifest::ssh_user_output(n), string(reach.user_of(mp))));
+    for vm in env.vms() {
+        m.block(output(&super::manifest::address_output(vm.name), (reach.public_ip)(vm.name)));
+        m.block(output(&super::manifest::ssh_user_output(vm.name), string(reach.user_of(vm))));
     }
     if let Some(address) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
         m.block(output(&super::manifest::address_output(controller::NAME), address.clone()));
@@ -112,14 +112,14 @@ fn stand_at(env: &Environment, reach: &Reach) -> Expression {
 /// controller when there is one.
 fn runner(env: &Environment, reach: &Reach, p: &Position) -> Option<Runner> {
     let on_vm = match p {
-        Position::Machine(m) => vms(env).find(|(n, _)| n == m),
+        Position::Machine(m) => env.vm(m),
         Position::Networks => None,
     };
     match on_vm {
-        Some((n, mp)) => Some(Runner {
-            machine: n.to_owned(),
-            host: (reach.public_ip)(n),
-            user: string(reach.user_of(mp)),
+        Some(vm) => Some(Runner {
+            machine: vm.name.to_owned(),
+            host: (reach.public_ip)(vm.name),
+            user: string(reach.user_of(vm)),
         }),
         None => reach.controller.clone().filter(|_| controller::needed(env)).map(|host| Runner {
             machine: controller::NAME.to_owned(),
@@ -135,7 +135,6 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use crate::cloud::{aws, azure, digitalocean, gcp, linode, oci};
-    use crate::machine::vms;
 
     /// Each `ssh_user_<machine>` output is the user the cloud's driver gives the run manifest's
     /// guest: the runner's secret delivery signs in as the one, its ready and SSH steps as the
@@ -155,8 +154,8 @@ mod tests {
             let mut m = Module::new("");
             (driver.write)(&env, &mut m).unwrap();
             let text = m.render().unwrap();
-            for (name, mp) in vms(&env) {
-                let user = (driver.base.user)(mp.os.as_deref().unwrap_or_default());
+            for vm in env.vms() {
+                let (name, user) = (vm.name, (driver.base.user)(vm.os));
                 let output = format!("output \"{}\" {{\n  value = \"{user}\"\n}}", super::super::manifest::ssh_user_output(name));
                 assert!(text.contains(&output), "{name}: {output}\n{text}");
             }

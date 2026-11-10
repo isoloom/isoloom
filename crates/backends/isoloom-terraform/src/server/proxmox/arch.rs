@@ -8,7 +8,6 @@ use crate::hcl_builder::{Block, BlockBuilder, number, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_spec::model::Arch;
 
-use crate::machine::vms;
 use crate::module::ident;
 use crate::server::PinnedImage;
 
@@ -58,8 +57,8 @@ pub(super) fn image_res(mp: &MachinePlan) -> String {
 /// Why an arm64 machine can't run here, if one can't: Windows, or an OS with no arm64 image of
 /// Isoloom's and none of its own.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    vms(env).filter(|(_, mp)| is_arm(mp)).find_map(|(name, mp)| {
-        let o = mp.os.as_deref().unwrap_or_default();
+    env.vms().filter(|vm| is_arm(vm.plan)).find_map(|vm| {
+        let (name, mp, o) = (vm.name, vm.plan, vm.os);
         (mp.is_windows() || (pinned(o).is_none() && !super::image::has_own(mp))).then(|| {
             format!("machine `{name}`: no arm64 Proxmox image for `{o}` (Debian 11 to 13, Ubuntu 20.04 to 24.04, or `overrides.proxmox.machines.{name}.image`)")
         })

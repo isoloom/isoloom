@@ -34,7 +34,7 @@ pub(crate) mod windows;
 mod tests;
 
 use crate::hcl_builder::Expression;
-use isoloom_plan::{Environment, Feature, MachinePlan, MachineShape, Step};
+use isoloom_plan::{Environment, Feature, MachinePlan, Step};
 use isoloom_render::steps;
 use isoloom_spec::shell::quote;
 
@@ -76,13 +76,10 @@ pub(crate) const FEATURES: [Feature; 17] = [
     Feature::RawDisks,
 ];
 
-/// The VMs of the environment, in start order.
+/// The VMs of the environment, in start order (the plan's [`Environment::vms`], whose OS the
+/// callers that need it read there).
 pub(crate) fn vms(env: &Environment) -> impl Iterator<Item = (&str, &MachinePlan)> {
-    env.start_order
-        .iter()
-        .filter_map(|n| env.machines.get_key_value(n))
-        .filter(|(_, mp)| mp.shape == MachineShape::Vm)
-        .map(|(n, mp)| (n.as_str(), mp))
+    env.vms().map(|vm| (vm.name, vm.plan))
 }
 
 /// Where a position's checks run, the one rule of every Terraform target: on its machine when

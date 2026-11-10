@@ -543,10 +543,8 @@ impl Rules {
                 "machine `{name}` asks for a virtual TPM (`hardware.tpm: required`): {cloud} gives none"
             ));
         }
-        vms(env).find_map(|(name, mp)| {
-            let os = mp.os.as_deref().unwrap_or_default();
-            self.images.missing(self.cloud, name, os, own_image::of(mp, self.images.own))
-        })
+        env.vms()
+            .find_map(|vm| self.images.missing(self.cloud, vm.name, vm.os, own_image::of(vm.plan, self.images.own)))
     }
 
     /// Why the cloud's networks can't model the environment's, if they can't.

@@ -203,9 +203,10 @@ fn public_ip(name: &str) -> Expression {
 
 /// The newest Canonical Ubuntu for the shape, one lookup per version the machines use.
 fn images(env: &Environment, m: &mut Module) {
-    let mut versions: Vec<&str> = vms(env)
-        .filter(|(_, mp)| own_image::of(mp, own_image::oci).is_none())
-        .map(|(_, mp)| ubuntu(mp.os.as_deref().unwrap_or_default()))
+    let mut versions: Vec<&str> = env
+        .vms()
+        .filter(|vm| own_image::of(vm.plan, own_image::oci).is_none())
+        .map(|vm| ubuntu(vm.os))
         .collect();
     versions.sort_unstable();
     versions.dedup();

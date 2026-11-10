@@ -21,8 +21,10 @@ use isoloom_spec::windows::{self, Tpm};
 
 mod image;
 mod size;
+mod vm;
 
 pub use image::{Build, Image};
+pub use vm::Vm;
 
 use crate::addressing::{address, address_for, host_address, start_order};
 use crate::ansible;
@@ -684,6 +686,20 @@ overrides:
         );
         assert_eq!(shape_of(Target::Vagrant, "both"), Some(Vm));
         assert_eq!(shape_of(Target::External, "both"), Some(External));
+    }
+
+    #[test]
+    fn every_vm_comes_with_its_os_and_nothing_else_is_one() {
+        for t in [Target::Hybrid, Target::Proxmox, Target::Vagrant, Target::Docker] {
+            let env = testing::environment(SHAPES, t);
+            let vms: Vec<(&str, &str)> = env.vms().map(|vm| (vm.name, vm.os)).collect();
+            let shaped = env.machines.values().filter(|m| m.shape == super::MachineShape::Vm).count();
+            assert_eq!(vms.len(), shaped, "{t:?}: {vms:?}");
+            assert!(vms.iter().all(|(_, os)| !os.is_empty()), "{t:?}: {vms:?}");
+        }
+        let env = testing::environment(SHAPES, Target::Proxmox);
+        assert_eq!(env.vm("win").map(|vm| vm.os), Some("windows-server-2022"));
+        assert!(env.vm("ct").is_none(), "a container is no VM");
     }
 
     #[test]

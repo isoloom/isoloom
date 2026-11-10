@@ -10,7 +10,7 @@ use std::net::IpAddr;
 
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SecretSlot, SnakeName, Template};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{outputs_with, timeout_s};
 
 use crate::module::manifest::terraform_output as state;
@@ -42,13 +42,13 @@ fn at(machine: &str) -> Result<Template, ManifestError> {
 
 /// The run manifest of `env` on `cloud`, whose module `driver` writes.
 pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Result<isoloom_manifest::Manifest, ManifestError> {
-    let user = |mp: &MachinePlan| (driver.base.user)(mp.os.as_deref().unwrap_or_default());
-    let mut guests: Vec<Guest> = vms(env)
-        .filter(|(_, mp)| !mp.is_windows())
-        .map(|(name, mp)| {
+    let mut guests: Vec<Guest> = env
+        .vms()
+        .filter(|vm| !vm.plan.is_windows())
+        .map(|vm| {
             Ok(Guest {
-                machine: name.to_owned(),
-                login: Login::new(at(name)?, user(mp)),
+                machine: vm.name.to_owned(),
+                login: Login::new(at(vm.name)?, (driver.base.user)(vm.os)),
                 setup_s: manifest::SETUP_S,
             })
         })

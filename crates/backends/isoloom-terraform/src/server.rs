@@ -19,7 +19,7 @@ use isoloom_render::backend::Files;
 use isoloom_spec::images::is_windows;
 use isoloom_spec::model::Target;
 
-use crate::machine::{self, vms, windows};
+use crate::machine::{self, windows};
 use crate::module::providers::{self, Provider};
 use crate::module::variable::Variable;
 use crate::module::{ProjectCopy, Usage, inputs};
@@ -147,10 +147,8 @@ impl PinnedImage {
 /// The first Linux VM whose OS has no image on the server (`has`: whether the server has one for
 /// that OS and machine), with its OS.
 pub(crate) fn without_image(env: &Environment, has: impl Fn(&str, &MachinePlan) -> bool) -> Option<(&str, &str)> {
-    vms(env).find_map(|(name, mp)| {
-        let os = mp.os.as_deref().unwrap_or_default();
-        (!is_windows(os) && !has(os, mp)).then_some((name, os))
-    })
+    env.vms()
+        .find_map(|vm| (!is_windows(vm.os) && !has(vm.os, vm.plan)).then_some((vm.name, vm.os)))
 }
 
 /// The resolvers machine `name` asks: its own (`dns.servers`; an AD member points at its domain
