@@ -11,10 +11,16 @@
 //!
 //! The list is a file in the project, so it is read as untrusted: a line that isn't a plain path
 //! under `.isoloom/` (`..`, an absolute path), or a file reached through a symbolic link, is an
-//! error before anything is removed, so a removal never leaves `.isoloom/`.
+//! error before anything is removed, so a removal never leaves `.isoloom/`. The folders a file is
+//! written in are the project's too (a clone can hold `.isoloom/docker` as a link elsewhere): a
+//! file whose path goes through a symbolic link, or is one, is an error before anything is
+//! written, and each file is written beside its place and renamed into it, which replaces what
+//! was there rather than writing through it.
 
 use std::collections::BTreeSet;
-use std::path::{Component, Path};
+use std::fs::Metadata;
+use std::io::Write as _;
+use std::path::{Component, Path, PathBuf};
 
 use isoloom_targets::{GeneratedFile, OUTPUT_DIR};
 
@@ -33,13 +39,37 @@ pub(crate) fn finish(mut files: Vec<GeneratedFile>, dir: &Path) -> Result<Vec<Ge
     Ok(files)
 }
 
-/// Writes one file under `dir`, creating its folders.
+/// Refuses `files` when one of them would be written through a symbolic link: its path goes
+/// through one under `dir`, or is one. Nothing is written before.
+pub(crate) fn writable<'a>(dir: &Path, files: impl IntoIterator<Item = &'a GeneratedFile>) -> Result<()> {
+    for f in files {
+        if let Reach::Linked(link) = reach(dir, &f.path)? {
+            return Err(CliError::LinkedOutput { path: f.path.clone(), link });
+        }
+    }
+    Ok(())
+}
+
+/// Writes one file under `dir`, creating its folders: into a fresh file beside it, then renamed
+/// into its place, so what was there is replaced, never written through. [`writable`] first.
 pub(crate) fn write_file(dir: &Path, f: &GeneratedFile) -> Result<()> {
     let path = dir.join(&f.path);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(CliError::writing(parent))?;
+    let parent = path.parent().unwrap_or(dir);
+    std::fs::create_dir_all(parent).map_err(CliError::writing(parent))?;
+    let mut fresh = path.clone().into_os_string();
+    fresh.push(".isoloom-new");
+    let fresh = PathBuf::from(fresh);
+    match std::fs::remove_file(&fresh) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(CliError::writing(&fresh)(e)),
+        _ => {}
     }
-    std::fs::write(&path, &f.contents).map_err(CliError::writing(path))
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&fresh)
+        .and_then(|mut file| file.write_all(f.contents.as_bytes()))
+        .map_err(CliError::writing(&fresh))?;
+    std::fs::rename(&fresh, &path).map_err(CliError::writing(path))
 }
 
 /// The files the list names (none without one); a line naming anything but a file under
@@ -70,24 +100,44 @@ fn under_output(entry: &str) -> bool {
     plain && parts.next() == Some(Component::Normal(OUTPUT_DIR.as_ref())) && parts.next().is_some()
 }
 
-/// Whether `entry` is still a file under `dir`, reached through real folders only: a symbolic
-/// link on its way (`.isoloom` or `.isoloom/docker` linked elsewhere) could lead a removal out of
-/// the project, so it is an error.
-fn still_there(dir: &Path, entry: &str) -> Result<bool> {
+/// What the way from a project folder to one of its paths found.
+enum Reach {
+    /// The path, or a folder on its way, isn't there.
+    Missing,
+    /// The path, reached through real folders only.
+    Found(Metadata),
+    /// The first symbolic link on the way, the path itself included.
+    Linked(PathBuf),
+}
+
+/// `entry` under `dir`, each part of its path looked at without following a link: a symbolic
+/// link on its way (`.isoloom` or `.isoloom/docker` linked elsewhere) could lead a write or a
+/// removal out of the project.
+fn reach(dir: &Path, entry: &str) -> Result<Reach> {
     let mut path = dir.to_path_buf();
-    let mut is_file = false;
+    let mut found = None;
     for part in Path::new(entry).components() {
         path.push(part);
         match std::fs::symlink_metadata(&path) {
-            Ok(m) if m.file_type().is_symlink() => return Err(refused(entry, "is reached through a symbolic link")),
-            Ok(m) => is_file = m.is_file(),
+            Ok(m) if m.file_type().is_symlink() => return Ok(Reach::Linked(path)),
+            Ok(m) => found = Some(m),
             Err(e) if matches!(e.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory) => {
-                return Ok(false);
+                return Ok(Reach::Missing);
             }
             Err(e) => return Err(CliError::reading(path)(e)),
         }
     }
-    Ok(is_file)
+    Ok(found.map_or(Reach::Missing, Reach::Found))
+}
+
+/// Whether `entry` is still a file under `dir`, reached through real folders only; a symbolic
+/// link on its way is an error.
+fn still_there(dir: &Path, entry: &str) -> Result<bool> {
+    match reach(dir, entry)? {
+        Reach::Linked(_) => Err(refused(entry, "is reached through a symbolic link")),
+        Reach::Missing => Ok(false),
+        Reach::Found(m) => Ok(m.is_file()),
+    }
 }
 
 /// The error for a list entry Isoloom won't remove, and `why`.

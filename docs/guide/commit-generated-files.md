@@ -16,7 +16,10 @@ that ignores them, so `git add .isoloom` picks up only the generated files. Keep
 Isoloom owns exactly the files listed in `.isoloom/.generated`: it never deletes anything else in
 `.isoloom/`, so the tools' state survives a regeneration. The list is read as untrusted: a line
 that isn't a plain path under `.isoloom/` (an absolute path, a `..`), or a file reached through a
-symbolic link, stops `generate` and `check` before anything is removed.
+symbolic link, stops `generate` and `check` before anything is removed. So does a generated
+file whose path goes through a symbolic link (`.isoloom/docker` linked elsewhere), or is one:
+Isoloom writes only into the project's own folders, and replaces a file rather than writing into
+it.
 
 ## Keep them in step with the spec
 

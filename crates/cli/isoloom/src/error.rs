@@ -81,6 +81,15 @@ pub(crate) enum CliError {
         /// Why it is refused.
         why: &'static str,
     },
+    /// A generated file's path goes through a symbolic link under the project folder, or is one:
+    /// writing it would follow the link out of the project.
+    #[error("{path} is reached through a symbolic link, {}, so Isoloom won't write it; remove the link", link.display())]
+    LinkedOutput {
+        /// The generated file, relative to the project folder.
+        path: String,
+        /// The link.
+        link: PathBuf,
+    },
     /// The command's own output (stdout or stderr) can't be written.
     #[error("can't write the output")]
     Output(#[source] std::io::Error),

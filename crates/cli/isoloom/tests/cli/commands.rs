@@ -554,6 +554,76 @@ fn generate_refuses_to_remove_through_a_linked_output_folder() -> Outcome {
     refuses_the_list(&dir, entry, &outside)
 }
 
+/// A generated project (`docker`) whose `.isoloom/docker/<file>` is replaced by a link to
+/// `outside`; its folder.
+#[cfg(unix)]
+fn with_linked_output(name: &str, file: &str, outside: &std::path::Path) -> Outcome<std::path::PathBuf> {
+    let home = scratch(&format!("{name}-home"))?;
+    let dir = project(name, &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    let linked = dir.join(".isoloom/docker").join(file);
+    std::fs::remove_file(&linked)?;
+    std::os::unix::fs::symlink(outside, &linked)?;
+    Ok(dir)
+}
+
+#[cfg(unix)]
+#[test]
+fn generate_and_check_refuse_to_write_through_a_linked_generated_file() -> Outcome {
+    let victim = scratch("linked-file-victim")?.join("keys");
+    std::fs::write(&victim, "someone else's\n")?;
+    let dir = with_linked_output("linked-file", "run.json", &victim)?;
+    let home = scratch("linked-file-refused-home")?;
+    for command in ["generate", "check"] {
+        let o = isoloom(&home, &[&command, &dir, &"--target", &"docker"])?;
+        assert_eq!(o.code, Some(2), "{command}: {o:?}");
+        assert!(
+            o.stderr.contains(".isoloom/docker/run.json is reached through a symbolic link"),
+            "{command}: {}",
+            o.stderr
+        );
+        assert_eq!(std::fs::read_to_string(&victim)?, "someone else's\n", "{command} wrote through the link");
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn generate_refuses_to_write_through_a_linked_output_folder() -> Outcome {
+    let elsewhere = scratch("linked-folder-victim")?;
+    let home = scratch("linked-folder-home")?;
+    let dir = project("linked-folder", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    std::fs::create_dir_all(dir.join(".isoloom"))?;
+    std::os::unix::fs::symlink(&elsewhere, dir.join(".isoloom/docker"))?;
+    let o = isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?;
+    assert_eq!(o.code, Some(2), "{o:?}");
+    assert!(o.stderr.contains("is reached through a symbolic link"), "{}", o.stderr);
+    assert_eq!(std::fs::read_dir(&elsewhere)?.count(), 0, "written through the link");
+    assert!(!dir.join(".isoloom/.generated").exists(), "nothing is written before the refusal");
+    Ok(())
+}
+
+#[test]
+fn generate_replaces_each_file_rather_than_writing_into_it() -> Outcome {
+    let home = scratch("replaced-home")?;
+    let dir = project("replaced", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    let compose = dir.join(".isoloom/docker/compose.yml");
+    let written = std::fs::read_to_string(&compose)?;
+    std::fs::write(&compose, "stale\n")?;
+    std::fs::write(dir.join(".isoloom/docker/compose.yml.isoloom-new"), "a half-written file left over\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    assert_eq!(std::fs::read_to_string(&compose)?, written);
+    assert!(
+        !dir.join(".isoloom/docker/compose.yml.isoloom-new").exists(),
+        "the fresh file is renamed into place"
+    );
+    Ok(())
+}
+
 #[test]
 fn schema_prints_the_committed_schema_with_the_catalogues_rules() -> Outcome {
     let home = scratch("schema-home")?;

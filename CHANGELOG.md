@@ -360,6 +360,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`isoloom generate` never writes through a symbolic link.** A clone holding
+  `.isoloom/docker/run.json` (or `.isoloom/docker`) as a link elsewhere had the generated file
+  written where the link led, outside the project. A generated file whose path goes through a
+  link, or is one, now stops `generate` and `check` before anything is written, and each file is
+  written beside its place and renamed into it.
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

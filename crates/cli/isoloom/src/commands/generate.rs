@@ -27,7 +27,8 @@ pub(crate) struct Args {
 /// Writes the files, removes those Isoloom wrote before and no longer writes (in the target's
 /// folder, or anywhere under `.isoloom/` for every target: `generated`), then says why each
 /// target left out wasn't generated. The list of what Isoloom wrote is read, and refused when it
-/// names a path Isoloom won't remove, before anything is written. Asking for one target that can't be generated is a no;
+/// names a path Isoloom won't remove, and a file that would be written through a symbolic link
+/// is refused, before anything is written. Asking for one target that can't be generated is a no;
 /// skipping some of all of them isn't, unless one was left out for a failure of its backend
 /// rather than a refusal of the lab: then nothing is written or removed.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
@@ -43,6 +44,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
         Vec::new()
     };
     let list = generated::list(dir, &files, &stale)?;
+    generated::writable(dir, files.iter().chain(&list))?;
     for f in &files {
         generated::write_file(dir, f)?;
         console.line(format_args!("✓ {}", f.path))?;
