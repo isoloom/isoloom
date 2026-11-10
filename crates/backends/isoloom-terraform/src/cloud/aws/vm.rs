@@ -25,9 +25,9 @@ mod private_dns;
 mod routing;
 
 use crate::hcl_builder::{Block, BlockBuilder, Module, string};
-use isoloom_plan::{Environment, MachinePlan};
-use isoloom_spec::images::is_windows;
+use isoloom_plan::{Environment, MachinePlan, Vm};
 use isoloom_spec::net::Cidr;
+use isoloom_spec::windows::Tpm;
 
 use super::{INSTANCE_TYPES, ami, ami_filter, zones};
 use crate::cloud::Cloud;
@@ -220,22 +220,23 @@ fn networks_refusal(env: &Environment) -> Option<String> {
     RULES
         .subnets(env)
         .or_else(|| mixed().then(|| "AWS can't mix private ranges (10/8, 172.16/12, 192.168/16) in one VPC".to_owned()))
-        .or_else(|| windows::udp_redirect(env.spec()))
+        .or_else(|| windows::udp_redirect(env))
 }
 
+/// Why one of the VMs can't run on AWS, if one can't, the first in spec order.
 fn machines_refusal(env: &Environment) -> Option<String> {
-    env.spec().machines.iter().find_map(|(name, m)| {
-        let vm = m.vm.as_ref()?;
+    env.machines.iter().filter_map(|(name, mp)| Vm::of(name, mp)).find_map(|vm| {
+        let name = vm.name;
         RULES
-            .image(name, m)
-            .or_else(|| windows::refusal(env, name, m))
+            .image(vm)
+            .or_else(|| windows::refusal(env, vm))
             .or_else(|| {
-                (is_windows(&vm.os) && vm.tpm == Some(true)).then(|| {
+                (vm.plan.is_windows() && vm.plan.tpm == Some(Tpm::Required)).then(|| {
                     format!("machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which Isoloom doesn't use")
                 })
             })
-            .or_else(|| env.machines.get(name).and_then(|mp| addresses::refusal(name, mp)))
-            .or_else(|| RULES.kept(env, name, m))
+            .or_else(|| addresses::refusal(name, vm.plan))
+            .or_else(|| RULES.kept(env, vm))
     })
 }
 

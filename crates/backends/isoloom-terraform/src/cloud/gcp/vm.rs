@@ -25,8 +25,7 @@ mod private_dns;
 use std::net::Ipv4Addr;
 
 use crate::hcl_builder::Module;
-use isoloom_plan::{Environment, NetworkPlan};
-use isoloom_spec::images::is_windows;
+use isoloom_plan::{Environment, NetworkPlan, Vm};
 
 use super::{own_project, public_ip};
 use crate::cloud::Cloud;
@@ -125,16 +124,14 @@ const MACHINE_TYPES: Sizes = Sizes::ordered(&[
 /// controller's size among them), its address rules, then Linux machines with images, a GPU
 /// type's interfaces, and a gateway machine's address.
 fn refusal(env: &Environment) -> Option<String> {
-    let spec = env.spec();
     if let Some(why) = RULES.features(env).or_else(|| RULES.subnets(env)) {
         return Some(why);
     }
-    let machine = spec.machines.iter().find_map(|(name, m)| {
-        let vm = m.vm.as_ref()?;
-        if is_windows(&vm.os) {
-            return Some(format!("machine `{name}`: Isoloom generates no Windows VM on Google Cloud"));
+    let machine = env.machines.iter().filter_map(|(name, mp)| Vm::of(name, mp)).find_map(|vm| {
+        if vm.plan.is_windows() {
+            return Some(format!("machine `{}`: Isoloom generates no Windows VM on Google Cloud", vm.name));
         }
-        gpu_interfaces(env, name).or_else(|| RULES.image(name, m)).or_else(|| RULES.kept(env, name, m))
+        gpu_interfaces(env, vm.name).or_else(|| RULES.image(vm)).or_else(|| RULES.kept(env, vm))
     });
     if machine.is_some() {
         return machine;

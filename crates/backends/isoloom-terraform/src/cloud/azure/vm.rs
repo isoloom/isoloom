@@ -26,7 +26,7 @@ mod routing;
 pub(super) use machines::{os_disk, source_image};
 
 use crate::hcl_builder::{Expression, Module, reference};
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Vm};
 
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
@@ -129,21 +129,17 @@ const SIZES: Sizes = Sizes::ordered(&[
 /// Why Azure can't run this environment, if it can't: its features, its address rules, its
 /// images, then what no cloud does yet for a Windows machine.
 fn refusal(env: &Environment) -> Option<String> {
-    let spec = env.spec();
     let machine = || {
-        spec.machines.iter().find_map(|(name, m)| {
-            m.vm.as_ref()?;
-            RULES
-                .image(name, m)
-                .or_else(|| windows::refusal(env, name, m))
-                .or_else(|| RULES.kept(env, name, m))
-        })
+        env.machines
+            .iter()
+            .filter_map(|(name, mp)| Vm::of(name, mp))
+            .find_map(|vm| RULES.image(vm).or_else(|| windows::refusal(env, vm)).or_else(|| RULES.kept(env, vm)))
     };
     RULES
         .features(env)
         .or_else(|| RULES.subnets(env))
         .or_else(machine)
-        .or_else(|| windows::udp_redirect(spec))
+        .or_else(|| windows::udp_redirect(env))
 }
 
 /// Its `cloud-vm` driver.

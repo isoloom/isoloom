@@ -5,7 +5,7 @@
 use std::ops::RangeInclusive;
 
 use isoloom_plan::{Environment, MachinePlan, Vm};
-use isoloom_spec::model::{Ipv6Addresses, Machine};
+use isoloom_spec::model::Ipv6Addresses;
 use isoloom_spec::windows::Tpm;
 
 use super::gpus::{self, GpuSizes};
@@ -427,18 +427,15 @@ impl Rules {
         small.then(|| format!("{} {called} are /{longest} or larger", self.cloud))
     }
 
-    /// Why VM `name` has no image on the cloud, if it hasn't: none for its OS, and none of its
-    /// own.
-    pub(crate) fn image(&self, name: &str, m: &Machine) -> Option<String> {
-        let vm = m.vm.as_ref()?;
-        self.images.missing(self.cloud, name, &vm.os, own_image::of_machine(m, self.images.own))
+    /// Why `vm` has no image on the cloud, if it hasn't: none for its OS, and none of its own.
+    pub(crate) fn image(&self, vm: Vm) -> Option<String> {
+        self.images.missing(self.cloud, vm.name, vm.os, own_image::of(vm.plan, self.images.own))
     }
 
-    /// Why machine `name` can't have its address on one of its networks, if it can't: one the
-    /// cloud keeps.
-    pub(crate) fn kept(&self, env: &Environment, name: &str, m: &Machine) -> Option<String> {
+    /// Why `vm` can't have its address on one of its networks, if it can't: one the cloud keeps.
+    pub(crate) fn kept(&self, env: &Environment, vm: Vm) -> Option<String> {
         let Kept { octets: (first, last), said } = self.kept?;
-        kept_address(env, name, m, first..=last).map(|net| format!("machine `{name}`: {} keeps {said} on `{net}`", self.cloud))
+        kept_address(env, vm, first..=last).map(|net| format!("machine `{}`: {} keeps {said} on `{net}`", vm.name, self.cloud))
     }
 
     /// Why the cloud can't give the machines their GPUs, if it can't.
@@ -575,10 +572,11 @@ fn mb(memory_mb: u32) -> String {
 /// The network where machine `name` takes one of the `kept` addresses of its subnet, which the
 /// cloud keeps for itself. A gateway machine's gateway address doesn't count: it moves elsewhere
 /// (`gateways`).
-fn kept_address<'a>(env: &Environment, name: &str, m: &'a Machine, kept: RangeInclusive<u8>) -> Option<&'a str> {
-    m.networks
+fn kept_address<'a>(env: &Environment, vm: Vm<'a>, kept: RangeInclusive<u8>) -> Option<&'a str> {
+    vm.plan
+        .addresses
         .iter()
-        .find(|(n, o)| kept.contains(o) && !gateways::is_gateway_address(env, name, n))
+        .find(|(n, a)| kept.contains(&a.octets()[3]) && !gateways::is_gateway_address(env, vm.name, n))
         .map(|(n, _)| n.as_str())
 }
 

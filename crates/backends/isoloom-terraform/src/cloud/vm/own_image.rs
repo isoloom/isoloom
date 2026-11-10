@@ -3,7 +3,7 @@
 //! is (Linux or Windows, and the account the cloud's images log in with).
 
 use isoloom_plan::MachinePlan;
-use isoloom_spec::model::{Machine, VmImage};
+use isoloom_spec::model::VmImage;
 
 /// Which field of `vm.image` a cloud reads.
 pub(crate) type Field = fn(&VmImage) -> Option<&String>;
@@ -41,9 +41,4 @@ pub(crate) fn oci(i: &VmImage) -> Option<&String> {
 /// The machine's own image on the cloud whose field is `field`, when the spec gives one.
 pub(crate) fn of(mp: &MachinePlan, field: Field) -> Option<&str> {
     mp.vm_image.as_ref().and_then(field).map(String::as_str)
-}
-
-/// [`of`], for a machine of the spec (the refusals that read it).
-pub(crate) fn of_machine(m: &Machine, field: Field) -> Option<&str> {
-    m.vm.as_ref()?.image.as_ref().and_then(field).map(String::as_str)
 }
