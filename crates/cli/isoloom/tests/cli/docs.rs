@@ -124,13 +124,35 @@ fn the_changelog_and_the_migration_guide_name_the_published_service_kubernetes_w
 /// What a roadmap says where a fact belongs: what a target, a check or an import does today.
 const PROMISES: [&str; 7] = ["come later", "comes later", "comes next", "for now", "so far", " yet", "(yet)"];
 
-#[test]
-fn the_matrix_states_each_targets_facts_not_a_roadmap() -> Outcome {
-    let matrix = std::fs::read_to_string(root().join("docs/matrix.md"))?;
-    for promise in PROMISES {
-        let found: Vec<&str> = matrix.lines().filter(|l| l.contains(promise)).collect();
-        assert!(found.is_empty(), "`{promise}`: {found:#?}");
+/// Every Markdown page under `dir`.
+fn pages(dir: &Path, out: &mut Vec<PathBuf>) -> Outcome {
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            pages(&path, out)?;
+        } else if path.extension().is_some_and(|e| e == "md") {
+            out.push(path);
+        }
     }
+    Ok(())
+}
+
+/// The README and every page of the docs, the generated matrix among them, state facts, not a
+/// roadmap (the changelog, a record of what changed when, aside).
+#[test]
+fn the_docs_state_facts_not_a_roadmap() -> Outcome {
+    let mut files = vec![root().join("README.md")];
+    pages(&root().join("docs"), &mut files)?;
+    assert!(files.iter().any(|f| f.ends_with("docs/matrix.md")), "the matrix is a page of the docs");
+    let mut found = Vec::new();
+    for file in &files {
+        for (n, line) in std::fs::read_to_string(file)?.lines().enumerate() {
+            if let Some(promise) = PROMISES.iter().find(|p| line.contains(**p)) {
+                found.push(format!("{}:{}: `{promise}` in {line:?}", file.display(), n + 1));
+            }
+        }
+    }
+    assert!(found.is_empty(), "{found:#?}");
     Ok(())
 }
 

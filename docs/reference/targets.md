@@ -47,7 +47,7 @@ Two targets fan out:
 
 A Vagrant run manifest is one file for every provider, chosen when the runner brings it up; the
 cloud targets write one per cloud (`.isoloom/cloud-vm/<cloud>/run.json`). `kubernetes`,
-`hybrid`, `external` and `hosted` write no run manifest yet, and `cloud-services` none
+`hybrid`, `external` and `hosted` write no run manifest, and `cloud-services` none
 without `cloud:`: [the run manifest](run-manifest.md) lists which target has one, and where.
 
 ## Tiers: how far a target is proven
@@ -59,7 +59,7 @@ evidence.
 - **Tier 1** — proven by a full real run (up, checks, down) from every host OS the target exists
   on.
 - **Tier 2** — generated and validated: every generated file passes its format's official
-  validator (`cargo xtask verify`), but a full real run from every host isn't yet recorded.
+  validator (`cargo xtask verify`), with no full real run recorded from every host.
 - **Tier 3** — experimental.
 
 A later failing run takes a target's Tier 1 back; a target aiming for Tier 1 lists the host OSes

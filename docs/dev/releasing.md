@@ -125,7 +125,8 @@ cargo publish --dry-run -p isoloom-spec
 cargo publish --dry-run -p isoloom-manifest
 ```
 
-The other crates depend on sibling crates not yet on crates.io at the new version: point those at
+The other crates depend on sibling crates that are not on crates.io at the new version until they
+are published: point those at
 the checkout with a `[patch.crates-io]` table passed to cargo
 (`cargo --config patch.toml publish --dry-run -p <crate>`).
 

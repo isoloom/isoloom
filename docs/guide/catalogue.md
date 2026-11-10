@@ -61,7 +61,7 @@ A service machine's forms:
 source (`vendor`, `distro` or `download`) and the official image with its digest (or null when the
 container is built).
 
-Some entry recipes are refused on a form the configuration renderers don't yet carry; the refusal
+Some entry recipes are refused on a form the configuration renderers don't carry; the refusal
 names the step and the phase. One service per container is the rule (several services share a VM,
 but a container runs one).
 

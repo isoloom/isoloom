@@ -17,7 +17,7 @@ Which targets have one, and where:
 | `cloud-vm` | `.isoloom/cloud-vm/<cloud>/run.json`, one per cloud that takes the lab |
 | `cloud-docker` | `.isoloom/cloud-docker/<cloud>/run.json`, one per cloud that takes the lab |
 | `cloud-services` | `.isoloom/cloud-services/run.json`, when the spec has `cloud:`, unless it has `before` steps (host scripts) or a variable holding a launch value inside a larger value |
-| `kubernetes`, `hybrid`, `external`, `hosted` | none yet: their files are run by hand |
+| `kubernetes`, `hybrid`, `external`, `hosted` | none: their files are run by hand |
 
 A runner executes it: any program that reads the manifest and follows this contract.
 [Isothrum](https://github.com/Isothrum/isothrum) is the reference runner. You can

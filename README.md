@@ -202,7 +202,7 @@ manifest instead: it checks the tools' versions, brings the environment up, deli
 - **It is optional** for `docker`, `vagrant`, `docker-vm`, `proxmox`, `esxi` and
   `cloud-services`; on `proxmox` and `esxi` it also seals `internet: false` networks at the
   router once the machines are set up.
-- `kubernetes`, `hybrid`, `external` and `hosted` have no run manifest yet: run them by hand.
+- `kubernetes`, `hybrid`, `external` and `hosted` have no run manifest: run them by hand.
 
 [Isothrum](https://github.com/Isothrum/isothrum) is the reference runner; any program that follows
 [the run manifest contract](docs/reference/run-manifest.md) can be one.

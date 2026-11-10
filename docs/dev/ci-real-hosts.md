@@ -26,7 +26,7 @@ cloud); it has no tier list of its own and uploads its evidence for a maintainer
 Isoloom's `tiers.json`.
 
 AWS is the only cloud with a real-run job; the other clouds are generated and validated (Tier 2),
-and no Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud job is wired yet.
+and Azure, Google Cloud, DigitalOcean, Linode and Oracle Cloud have no job.
 
 ## Self-hosted runners
 
@@ -115,7 +115,7 @@ the tier list knows it:
 | Variable | Meaning |
 |---|---|
 | `REAL_TIERS_HOST` | The host name in `tiers.json`'s `hosts` (`linux-1`, `linux-2`, `macos-arm64`, `windows-11`, …). Unset means the run is not recorded, only logged. |
-| `REAL_TIERS_OS` | The host's OS (`linux`, `macos`, `windows`), used with `--os` to add a host the list does not name yet |
+| `REAL_TIERS_OS` | The host's OS (`linux`, `macos`, `windows`), used with `--os` to add a host the list does not name |
 | `REAL_PROXMOX_SERVER` | The server name recorded for the proxmox run (default `pve-lab`) |
 
 The **isothrum** runner-cert workflow has no tier list; it uploads its up/check/down/reap records as
