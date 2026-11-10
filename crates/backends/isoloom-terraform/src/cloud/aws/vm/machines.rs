@@ -228,17 +228,23 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
         },
         password: reference(windows::PASSWORD),
         skip: hooks::network_does,
-        platform: windows::Platform::default(),
+        platform: windows::Platform {
+            ntlm: true,
+            ..windows::Platform::default()
+        },
     }));
 }
 
 /// First boot on Windows: the `isoloom` administrator with the generated password, WinRM over
-/// HTTP, and the auto-stop.
+/// HTTP with NTLM (Windows' own; Basic, which sends the password with every request, stays off),
+/// and the auto-stop. The service takes unencrypted messages: Terraform's WinRM client (masterzen/
+/// winrm at its 2020 version) doesn't seal NTLM messages, so a service refusing them would refuse
+/// Terraform's set-up; the controller's Ansible (pywinrm) seals its own.
 fn windows_user_data() -> Expression {
     let stop = auto_stop::windows_task();
     Template::text("<powershell>\n$p = ConvertTo-SecureString '")
         .with_expr(reference(windows::PASSWORD))
-        .with_text("' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n")
+        .with_text("' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n")
         .with_expr(auto_stop::if_expires(stop.into_expression(), string("")))
         .with_text("\n</powershell>\n")
         .into_expression()
@@ -259,7 +265,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     }
     let first = env.networks.keys().next().map(|n| nic(n)).unwrap_or_default();
     let (_, _, disk) = controller::size(env);
-    let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Basic);
+    let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Ntlm);
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n))));
     let user = |mp: &MachinePlan| image_user(mp.os.as_deref().unwrap_or_default()).to_owned();
     let setup = controller_setup::set_up(env, &user, inventory, &at_boot);

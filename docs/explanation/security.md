@@ -87,7 +87,10 @@ limited to what the module creates ([Proxmox](../guide/targets/proxmox.md#creden
 ## WinRM
 
 Windows machines are set up over WinRM. Its default is plain HTTP on port 5985 with basic
-authentication, as Vagrant's Windows boxes and cloudbase-init images expect:
+authentication, as Vagrant's Windows boxes and cloudbase-init images expect; on AWS and Azure
+`cloud-vm` it is HTTP with NTLM, so the password never crosses the network (Basic stays off).
+Terraform's own WinRM client doesn't encrypt NTLM messages, so what it sends over HTTP is
+readable on the path; the controller's Ansible encrypts its own. It is reached:
 
 - on Vagrant, on the host's private network;
 - on AWS and Azure `cloud-vm`, from `allowed_cidr` only;

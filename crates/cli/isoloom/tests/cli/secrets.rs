@@ -214,7 +214,7 @@ fn no_secret_value_reaches_a_windows_machines_file() -> Outcome {
         assert!(task, "{target} doesn't put them back at boot");
     }
     // A cloud's set-up says how to reach its Windows machine over WinRM, never its password.
-    assert!(find(&generated, "cloud-vm/aws/main.tf")?.contains(" winrm\\\" > \\\""));
+    assert!(find(&generated, "cloud-vm/aws/main.tf")?.contains(" winrm-ntlm\\\" > \\\""));
     Ok(())
 }
 

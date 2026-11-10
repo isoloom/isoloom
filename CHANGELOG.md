@@ -550,6 +550,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   than the largest has is refused, naming what is short. Oracle Cloud's shape gets an OCPU per
   two CPUs or per 8 GB, whichever is more (at most 64 OCPUs and 1024 GB). Google Cloud's sizes
   carry their real memory (`e2-small` 2 GB, `e2-medium` 4 GB) and go up to `e2-standard-8`.
+- **An AWS Windows machine answers WinRM with NTLM, not Basic.** Its first boot turned on Basic
+  authentication, which sends the password with every request over plain HTTP; Terraform's
+  set-up and the controller's Ansible sign in with NTLM now, as on Azure, and Basic stays off.
+  The service still takes unencrypted messages, which Terraform's WinRM client needs.
 
 - **QEMU's hub ports are one block per environment.** Each network had its own hashed base
   port, its VMs the ports after it, so two networks could hand one port to two hubs (`n9` and
