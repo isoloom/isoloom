@@ -170,6 +170,8 @@ pub(crate) struct Provision {
     call: Call,
     /// The heredoc the call ends with: its keyword, its tag, the script.
     heredoc: Option<(String, String, String)>,
+    /// Its name, when `vagrant up --provision-with` takes it ([`Provision::named`]).
+    named: Option<String>,
 }
 
 impl Provision {
@@ -179,6 +181,18 @@ impl Provision {
         Provision {
             call: Call::new(format!("{var}.vm.provision")).arg(Value::str(name)),
             heredoc: None,
+            named: None,
+        }
+    }
+
+    /// `<var>.vm.provision "<name>", type: "<kind>"`: a provisioner named at its own level, which
+    /// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
+    /// provisioner's own `name:` option, and the project provisioner has no such option). The
+    /// writer records the name ([`Ruby::named_provisioners`]).
+    pub(crate) fn named(var: &str, name: &str, kind: &str) -> Provision {
+        Provision {
+            named: Some(name.to_owned()),
+            ..Provision::new(var, name).kw("type", Value::str(kind))
         }
     }
 
@@ -227,6 +241,8 @@ pub(crate) struct Ruby {
     recording: Option<Recording>,
     /// What the configure block applied at boot, once written.
     boot: BootStatements,
+    /// The named provisioners written ([`Provision::named`]), each once, in the file's order.
+    named: Vec<String>,
 }
 
 /// The statements of a Vagrantfile's configure block that Vagrant applies to a VM only when it
@@ -345,6 +361,12 @@ impl Ruby {
         &self.boot
     }
 
+    /// The names of the provisioners written with [`Provision::named`], each once, in the file's
+    /// order: what `vagrant up --provision-with` can take.
+    pub(crate) fn named_provisioners(&self) -> &[String] {
+        &self.named
+    }
+
     /// An empty line.
     pub(crate) fn blank(&mut self) -> &mut Ruby {
         self.out.push('\n');
@@ -392,6 +414,11 @@ impl Ruby {
     /// A provisioner: its call, then its heredoc's lines one level deeper and its closing tag,
     /// when it has one. Never recorded ([`BootStatements`]).
     pub(crate) fn provision(&mut self, p: Provision) -> &mut Ruby {
+        if let Some(name) = p.named
+            && !self.named.contains(&name)
+        {
+            self.named.push(name);
+        }
         let recording = self.recording.take();
         match p.heredoc {
             None => self.line(p.call),

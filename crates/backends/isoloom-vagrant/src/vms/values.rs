@@ -47,6 +47,9 @@ pub(crate) fn linux_decode(names: &[String]) -> String {
         .concat()
 }
 
+/// PowerShell's text of `$v`, a value in base64 ([`encoded`]): UTF-8, as the host encoded it.
+const DECODED: &str = "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v))";
+
 /// PowerShell decoding the machine's inputs in its own environment before a step runs: what the
 /// step's script reads is the value itself. Empty when it reads none.
 pub(crate) fn windows_decode(env: &Environment, machine: &str) -> String {
@@ -54,7 +57,7 @@ pub(crate) fn windows_decode(env: &Environment, machine: &str) -> String {
         return String::new();
     };
     format!(
-        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v))) }} }}; ",
+        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}) }} }}; ",
         list(&mp.inputs)
     )
 }
@@ -94,7 +97,7 @@ pub(crate) fn windows_inputs(r: &mut Ruby, env: &Environment, machine: &str) {
         return;
     };
     let script = format!(
-        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); $t = if ($v) {{ [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v)) }} else {{ '' }}; [Environment]::SetEnvironmentVariable($k, $t, 'Machine') }}",
+        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); $t = if ($v) {{ {DECODED} }} else {{ '' }}; [Environment]::SetEnvironmentVariable($k, $t, 'Machine') }}",
         list(&mp.inputs)
     );
     let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));

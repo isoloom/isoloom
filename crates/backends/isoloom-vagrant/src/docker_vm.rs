@@ -36,6 +36,7 @@ use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, steps};
 use isoloom_spec::model::Target;
 use isoloom_spec::shell::quote;
 
+use crate::docker_host;
 use crate::host_folders::Share;
 use crate::ruby::{BootStatements, Call, Provision, Ruby, Value};
 use crate::vagrantfile::{self, shell};
@@ -60,35 +61,15 @@ pub fn manifest(env: &Environment, guest: &GuestCompose) -> crate::Result<Manife
     crate::manifest::docker_vm::manifest(env, guest).map_err(|e| e.on(Target::DockerVm))
 }
 
-/// The VM's own provisioners, in order: everything `vagrant up` runs but the lab's start (UTM's
-/// default route, a no-op elsewhere; the constraints, when the spec has some; the project; its
-/// certificate authorities trusted, when the spec names some; Docker; SSH accepting the
-/// forwarded values, when there are some).
-pub(crate) fn prepares(env: &Environment, guest: &GuestCompose) -> Vec<&'static str> {
-    let constraints = steps::linux(env, "", &isoloom_plan::Step::Prelude).map(|_| vagrantfile::CONSTRAINTS);
-    let authorities = steps::trust_authorities(env).map(|_| CA_CERTIFICATES);
-    let accept = (!guest.forwarded().is_empty()).then_some(ACCEPT_ENV);
-    [crate::vms::utm::NAT_ROUTE]
-        .into_iter()
-        .chain(constraints)
-        .chain([PROJECT])
-        .chain(authorities)
-        .chain([vagrantfile::DOCKER])
-        .chain(accept)
-        .collect()
-}
-
-/// The project provisioner.
-const PROJECT: &str = "project";
-
-/// The provisioner trusting the spec's certificate authorities, from the project's copy.
-const CA_CERTIFICATES: &str = "ca-certificates";
-
-/// `config.vm.provision "<name>", type: "<kind>"`: a provisioner named at the top level, which
-/// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
-/// provisioner's own `name:` option, and the project provisioner has no such option).
-fn named(name: &str, kind: &str) -> Provision {
-    Provision::new("config", name).kw("type", Value::str(kind))
+/// The VM's own provisioners: everything `vagrant up` runs but the environment's start and its
+/// checks (UTM's default route, a no-op elsewhere; the Docker host's set-up; SSH accepting the
+/// forwarded values, when there are some), as the Vagrantfile names them.
+///
+/// # Errors
+///
+/// As [`vagrantfile`].
+pub(crate) fn prepares(env: &Environment, guest: &GuestCompose) -> Result<Vec<String>> {
+    Ok(written(env, guest)?.named_provisioners().to_vec())
 }
 
 /// The CPUs and memory (MB) of the VM: the containers' host's.
@@ -128,7 +109,7 @@ struct Scripts {
 /// The Vagrantfile of `env`, written.
 fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
     let scripts = Scripts {
-        environment: environment_script(env, guest)?,
+        environment: environment_script(guest)?,
         checks: checks_script(env, guest)?,
     };
     let mut r = Ruby::new();
@@ -197,25 +178,16 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
         .collect();
     crate::host_folders::render(r, "config", &shares);
     crate::vms::utm::placeholder(r, "config");
-    if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
-        r.provision(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
-    }
-    // The project, with the outputs Compose reads: first, so the certificate authorities it holds
-    // are trusted before Docker downloads.
-    r.provision(named(PROJECT, "isoloom_project").kw("rules", crate::vms::copy_rules(&COMPOSE_OUTPUTS)));
-    if let Some(sh) = steps::trust_authorities(env) {
-        r.provision(named(CA_CERTIFICATES, "shell").kw("inline", Value::str(&sh)));
-    }
-    let docker = format!("{}\n{}", steps::install_docker(), steps::PUBLISHED_FROM_OUTSIDE);
-    r.provision(named(vagrantfile::DOCKER, "shell").kw("inline", Value::str(&docker)));
+    // The project, with the outputs Compose reads.
+    docker_host::set_up(r, env, "config", &COMPOSE_OUTPUTS);
     if !forwarded.is_empty() {
         let accept = format!(
             "mkdir -p /etc/ssh/sshd_config.d && echo {} > {ACCEPT_ENV_FILE} && (systemctl reload ssh || systemctl reload sshd)",
             isoloom_spec::shell::quote(&format!("AcceptEnv {}", forwarded.join(" ")))
         );
-        r.provision(named(ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
+        r.provision(Provision::named("config", ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
     }
-    environment(r, env, &scripts.environment);
+    docker_host::start(r, env, "config", "environment", &scripts.environment);
     if let Some(script) = &scripts.checks {
         checks(r, env, script);
     }
@@ -296,26 +268,11 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
     });
 }
 
-/// The Compose file up as `guest` starts it (published on every address of the VM, at the fixed
-/// host ports Vagrant forwards), with the containers' secrets once they were delivered and the
-/// values given at launch (in base64, which the script decodes), then the ready mark.
-fn environment(r: &mut Ruby, env: &Environment, script: &str) {
-    let inputs = &env.spec().inputs;
-    let encoded = (!inputs.is_empty()).then(|| values::encoded(inputs));
-    r.provision(shell("config", "environment").kw("inline", Value::str(script)).kw_opt("env", encoded));
-}
-
-/// The environment's start in the VM: the values given at launch decoded, the containers'
-/// secrets, `guest`'s start steps, the ready mark.
-fn environment_script(env: &Environment, guest: &GuestCompose) -> Result<String> {
-    let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
-    Ok(format!(
-        "{}{secrets}{}{} && echo ready > {}",
-        values::linux_decode(&env.spec().inputs),
-        sequence(&guest.start)?,
-        steps::MAKE_STATE_DIR,
-        steps::READY_FILE
-    ))
+/// The environment's start in the VM, after the Docker host's own ([`docker_host::start`]):
+/// `guest`'s start steps (published on every address of the VM, at the fixed host ports Vagrant
+/// forwards), then the ready mark.
+fn environment_script(guest: &GuestCompose) -> Result<String> {
+    Ok(format!("{}{} && echo ready > {}", sequence(&guest.start)?, steps::MAKE_STATE_DIR, steps::READY_FILE))
 }
 
 /// `commands` as script lines, in order, each as its failure policy says: a failed one ends the

@@ -27,6 +27,8 @@ pub(crate) const STATE_DIR: &str = isoloom_spec::linux::STATE_DIR;
 pub const MAKE_STATE_DIR: &str = concat!("mkdir -p ", isoloom_spec::linux_state_path!());
 /// The project's archive, uploaded before the steps run.
 pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
+/// The project's archive on a Windows VM, uploaded before the steps run.
+pub const WINDOWS_PROJECT_ARCHIVE: &str = "C:\\Windows\\Temp\\isoloom-project.tgz";
 /// The inputs, uploaded before the steps run (`KEY=value` lines).
 pub const INPUTS_FILE: &str = "/tmp/isoloom-inputs.env";
 /// Where the inputs are kept when a reboot comes (`/tmp` is emptied at boot).
@@ -141,7 +143,7 @@ pub fn wait_for_mark(mark: &str, timeout_s: u32, waiting: &str, missing: &str) -
 
 /// Where the project is unpacked on a Windows VM, and the machine's own scripts with it; where
 /// a Windows recipe runs from too (see [`crate::configure::powershell`]).
-pub(crate) const WINDOWS_PROJECT_DIR: &str = isoloom_spec::windows::ISOLOOM_DIR;
+pub const WINDOWS_PROJECT_DIR: &str = isoloom_spec::windows::ISOLOOM_DIR;
 
 /// Installs packages with the machine's own package manager (Debian and Ubuntu, or the RHEL
 /// family: Rocky, AlmaLinux, CentOS, Fedora).
@@ -219,7 +221,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
         Step::Ipv6 { addresses, routes } => Some(ipv6::windows(addresses, routes)),
         Step::MoreAddresses { addresses } => Some(more_addresses::windows(addresses)),
         Step::Project => Some(format!(
-            "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = '{WINDOWS_PROJECT_DIR}'; $strip = 1\n{}",
+            "$archive = '{WINDOWS_PROJECT_ARCHIVE}'; $dest = '{WINDOWS_PROJECT_DIR}'; $strip = 1\n{}",
             powershell::UNTAR
         )),
         Step::CaCertificates { files } => Some(constraints::trust_windows(

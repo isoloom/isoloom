@@ -43,6 +43,10 @@ pub(crate) enum HyperVBox {
 /// there too.
 pub(crate) const HYPERV_DEBIAN_12: (&str, &str) = ("generic/debian12", ROBOXES);
 
+/// Debian 12's box, the built-in one, which Isoloom's own Debian VMs (router, tool shell, the
+/// containers' host) boot too.
+pub(crate) const DEBIAN_12: &str = "bento/debian-12";
+
 /// The last version of the roboxes `generic/*` boxes, which have Hyper-V builds.
 const ROBOXES: &str = "4.3.12";
 
@@ -93,7 +97,7 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
     Some(match os {
         "debian-11" => h(b("bento/debian-11", None, Some("generic/debian11")), "generic/debian11", ROBOXES),
         "debian-12" => h(
-            with_qemu(b("bento/debian-12", None, Some("generic/debian12")), QEMU_DEBIAN_12),
+            with_qemu(b(DEBIAN_12, None, Some("generic/debian12")), QEMU_DEBIAN_12),
             HYPERV_DEBIAN_12.0,
             HYPERV_DEBIAN_12.1,
         ),

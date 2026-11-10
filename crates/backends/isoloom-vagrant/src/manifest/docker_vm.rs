@@ -153,7 +153,7 @@ fn lifecycle(env: &Environment, guest: &GuestCompose, way_in: &dyn Fn(&Template)
 /// `vagrant up --provider ${run.provider} --provision-with <the VM's own>`: the VM with Docker and
 /// the project, not the lab's start, which the next steps run.
 fn up_step(env: &Environment, guest: &GuestCompose) -> Result<Step> {
-    let with = prepares(env, guest).join(",");
+    let with = prepares(env, guest)?.join(",");
     let mut s = run(UP, on_provider(&["up"], &["--provision-with", &with])?, UP_TIMEOUT_S)?;
     s.note = Some("Building the environment's VM with Docker in it…".into());
     Ok(s)

@@ -11,9 +11,9 @@ use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::error::{Error, Result};
-use crate::ruby::{Call, Provision, Ruby, Value};
+use crate::docker_host;
+use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
-use crate::vms::values;
 
 /// One lab network on the host: its interface and the macvlan network on it.
 pub(super) struct Nic {
@@ -44,7 +44,7 @@ pub(super) fn write(r: &mut Ruby, env: &Environment, containers: &Containers, ni
 /// The host's VM: its box, published ports and lab interfaces, its size, then Docker, the
 /// project, the macvlan networks and the containers.
 fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]) {
-    r.assign("m.vm.box", Value::str("bento/debian-12"));
+    r.assign("m.vm.box", Value::str(crate::boxes::DEBIAN_12));
     r.assign("m.vm.hostname", Value::str(HOST));
     for (port, protocol) in &containers.published {
         r.call(vagrantfile::forwarded_port("m", *port, *port, *protocol));
@@ -61,23 +61,11 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
         r.call(call);
     }
     virtualbox(r, env, nics.len());
-    vagrantfile::prelude(r, env, "m");
-    // The project, with the containers' Compose file, the one output of Isoloom's the host
-    // reads: before Docker, so the certificate authorities it holds are trusted first.
-    let rules = crate::vms::copy_rules(&[containers.file.path.as_str()]);
-    r.provision(Provision::new("m", "isoloom_project").kw("name", Value::str("project")).kw("rules", rules));
-    if let Some(sh) = isoloom_render::steps::trust_authorities(env) {
-        r.provision(shell("m", "certificate authorities").kw("inline", Value::str(&sh)));
-    }
-    vagrantfile::install_docker(r, "m");
+    // The project, with the containers' Compose file, the one output of Isoloom's the host reads.
+    docker_host::set_up(r, env, "m", &[containers.file.path.as_str()]);
     r.provision(shell("m", "networks").heredoc("inline", "SH", &networks_script(nics)));
-    let secrets = isoloom_render::secrets::host_environment(env.spec(), &isoloom_render::secrets::of_containers(env));
-    let files = host_environment(env);
-    let inputs = &env.spec().inputs;
-    let decode = values::linux_decode(inputs);
-    let up = format!("{decode}{secrets}cd {PROJECT_DIR} && {files}{}", containers.start);
-    let encoded = (!inputs.is_empty()).then(|| values::encoded(inputs));
-    r.provision(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", encoded));
+    let up = format!("cd {PROJECT_DIR} && {}{}", host_environment(env), containers.start);
+    docker_host::start(r, env, "m", "containers", &up);
 }
 
 /// Sized for every container at once plus Docker's own 1 GB (2 to 16 CPUs), every lab

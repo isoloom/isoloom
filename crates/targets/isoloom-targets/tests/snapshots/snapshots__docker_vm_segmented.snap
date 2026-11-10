@@ -154,8 +154,9 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
       end
     end
 
-    # Builds the archive, uploads it, unpacks it in /opt/isoloom (C:\isoloom on Windows, over
-    # WinRM or OpenSSH, with UNTAR_PS1), replacing an older copy.
+    # Builds the archive, uploads it, unpacks it in LINUX_DIR (WINDOWS_DIR on Windows, over
+    # WinRM or OpenSSH, with UNTAR_PS1), replacing an older copy. The folders and the archives'
+    # paths are the generator's, set after this file.
     class Provisioner < Vagrant.plugin("2", :provisioner)
       def provision
         windows = %w[winrm winssh].include?(@machine.config.vm.communicator.to_s)
@@ -163,20 +164,21 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
           f.binmode
           IsoloomProject.write(ROOT, f, rules: config.rules)
           f.close
-          dest = windows ? "C:\\isoloom" : "/opt/isoloom"
+          dest = windows ? WINDOWS_DIR : LINUX_DIR
           @machine.ui.info("The project, #{(File.size(f.path) / 1024.0).ceil} KB compressed, to #{dest}")
           comm = @machine.communicate
           if windows
-            archive = "C:\\Windows\\Temp\\isoloom-project.tgz"
+            archive = WINDOWS_ARCHIVE
             comm.upload(f.path, archive)
             script = "$archive = '#{archive}'; $dest = '#{dest}'; $strip = 0\n#{UNTAR_PS1}"
             comm.execute(script, elevated: true) do |type, data|
               @machine.ui.info(data.chomp) if type == :stdout && !data.strip.empty?
             end
           else
-            comm.upload(f.path, "/tmp/isoloom-project.tgz")
-            comm.execute("rm -rf /tmp/isoloom-project && mkdir /tmp/isoloom-project && tar -xzf /tmp/isoloom-project.tgz -C /tmp/isoloom-project && rm -f /tmp/isoloom-project.tgz")
-            comm.sudo("rm -rf /opt/isoloom && mv /tmp/isoloom-project /opt/isoloom")
+            unpacked = LINUX_ARCHIVE.delete_suffix(".tgz")
+            comm.upload(f.path, LINUX_ARCHIVE)
+            comm.execute("rm -rf #{unpacked} && mkdir #{unpacked} && tar -xzf #{LINUX_ARCHIVE} -C #{unpacked} && rm -f #{LINUX_ARCHIVE}")
+            comm.sudo("rm -rf #{dest} && mv #{unpacked} #{dest}")
           end
         end
       end
@@ -202,6 +204,11 @@ crash.*.log
 .vagrant/
 .isoloom-reach/
 "
+# Where the project goes, and its archive on the way.
+IsoloomProject::LINUX_DIR = "/opt/isoloom"
+IsoloomProject::LINUX_ARCHIVE = "/tmp/isoloom-project.tgz"
+IsoloomProject::WINDOWS_DIR = "C:\\isoloom"
+IsoloomProject::WINDOWS_ARCHIVE = "C:\\Windows\\Temp\\isoloom-project.tgz"
 # Unpacks the project on Windows (no tar.exe before Windows Server 2019).
 IsoloomProject::UNTAR_PS1 = <<'PS1'
 # The project into a Windows machine: unpacks the tar.gz $archive into $dest (replacing an older

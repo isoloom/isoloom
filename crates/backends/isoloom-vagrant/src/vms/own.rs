@@ -25,7 +25,7 @@ use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
 use crate::ruby::{Ruby, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
-const HELPER_BOX: &str = "bento/debian-12";
+const HELPER_BOX: &str = crate::boxes::DEBIAN_12;
 
 /// The controller's box by default: Alpine, about 100 MB (Python, ansible-core and pywinrm run
 /// fine on it), for VirtualBox, libvirt, VMware and Parallels alike.

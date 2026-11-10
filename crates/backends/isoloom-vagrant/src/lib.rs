@@ -39,6 +39,7 @@
 mod backend;
 mod boot_digest;
 mod boxes;
+mod docker_host;
 pub mod docker_vm;
 mod error;
 mod host_folders;

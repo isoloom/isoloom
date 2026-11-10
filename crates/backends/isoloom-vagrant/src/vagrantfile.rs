@@ -121,11 +121,6 @@ pub(crate) fn esxi_host(r: &mut Ruby) {
     r.assign_if("v.esxi_disk_store", Value::raw("ENV[\"ESXI_DATASTORE\"]"), "ENV[\"ESXI_DATASTORE\"]");
 }
 
-/// Docker from Docker's own install script, unless the box has it.
-pub(crate) fn install_docker(r: &mut Ruby, var: &str) {
-    r.provision(shell(var, DOCKER).kw("inline", Value::str(&steps::install_docker())));
-}
-
 #[cfg(test)]
 mod tests {
     use isoloom_spec::model::Protocol;

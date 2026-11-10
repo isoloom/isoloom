@@ -33,7 +33,7 @@ fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
     );
     // hybrid's Docker host gets its Compose file, and nothing else of the outputs.
     assert!(
-        hybrid.contains("m.vm.provision \"isoloom_project\", name: \"project\", rules: \"/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n"),
+        hybrid.contains("m.vm.provision \"project\", type: \"isoloom_project\", rules: \"/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n"),
         "{hybrid}"
     );
     // Every other step: the rules of a machine reading none of the outputs.

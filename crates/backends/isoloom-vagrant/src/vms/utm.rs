@@ -118,7 +118,7 @@ pub(crate) fn override_in_block(r: &mut Ruby) {
 
 /// The named shell provisioner, run at every `vagrant up`.
 fn named(var: &str) -> Provision {
-    Provision::new(var, NAT_ROUTE).kw("type", Value::str("shell")).kw("run", Value::str("always"))
+    Provision::named(var, NAT_ROUTE, "shell").kw("run", Value::str("always"))
 }
 
 #[cfg(all(test, unix))]

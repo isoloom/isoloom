@@ -55,7 +55,7 @@ use indexmap::IndexMap;
 use isoloom_plan::checks::{Position, Resolved};
 use isoloom_plan::{Controller, Environment, MachineShape};
 use isoloom_render::backend::Files;
-use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, powershell, router};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, header, powershell, router, steps};
 use isoloom_spec::model::{Spec, Target};
 
 use crate::backend::capabilities;
@@ -80,9 +80,13 @@ const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
 /// `IsoloomProject::UNTAR_PS1`). Every Vagrantfile Isoloom writes carries it, after `ROOT`.
 pub(crate) fn project_rb() -> String {
     format!(
-        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n{}PS1\n",
+        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project goes, and its archive on the way.\nIsoloomProject::LINUX_DIR = {}\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::WINDOWS_DIR = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\n# Unpacks the project on Windows (no tar.exe before Windows Server 2019).\nIsoloomProject::UNTAR_PS1 = <<'PS1'\n{}PS1\n",
         include_str!("vagrant_project.rb"),
         copy_rules(&[]),
+        Value::str(steps::PROJECT_DIR),
+        Value::str(steps::PROJECT_ARCHIVE),
+        Value::str(steps::WINDOWS_PROJECT_DIR),
+        Value::str(steps::WINDOWS_PROJECT_ARCHIVE),
         powershell::UNTAR
     )
 }

@@ -55,3 +55,20 @@ machines:
     assert!(vagrantfile.contains(&start), "{vagrantfile}");
     Ok(())
 }
+
+/// The containers' host is the Docker host docker-vm's VM is: the same set-up under the same
+/// names, published ports reaching every container included.
+#[test]
+fn the_containers_host_is_set_up_as_docker_vm_s_vm() -> Outcome {
+    let hybrid = file(&generate(&example("mixed-office")?, Target::Hybrid)?, "hybrid/Vagrantfile")?.to_owned();
+    let docker_vm = file(&generate(&example("hello-stack")?, Target::DockerVm)?, "docker-vm/Vagrantfile")?.to_owned();
+    for (name, kind) in [("project", "isoloom_project"), ("docker", "shell")] {
+        assert!(hybrid.contains(&format!("m.vm.provision \"{name}\", type: \"{kind}\"")), "{name}: {hybrid}");
+        assert!(docker_vm.contains(&format!("config.vm.provision \"{name}\", type: \"{kind}\"")), "{name}: {docker_vm}");
+    }
+    for v in [&hybrid, &docker_vm] {
+        assert!(v.contains("isoloom-published.service"), "{v}");
+    }
+    assert!(hybrid.contains("m.vm.box = \"bento/debian-12\""), "{hybrid}");
+    Ok(())
+}
