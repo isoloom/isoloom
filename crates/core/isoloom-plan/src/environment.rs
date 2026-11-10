@@ -476,9 +476,15 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
 fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan {
     let shape = shape(target, m);
     // Lowering reports a configuration that doesn't resolve (an app's steps per target, a
-    // service's for the lab), so a lab that lowered clean has its recipe; a plan of one that
-    // didn't (its problems already said why) has none.
-    let recipe = m.configuration.as_ref().and_then(|c| Recipe::of(c, &m.ports, &DaemonTable::common()).ok());
+    // service's for the lab), so the validated spec `build` plans has its recipe.
+    let recipe = m.configuration.as_ref().and_then(|c| {
+        let resolved = Recipe::of(c, &m.ports, &DaemonTable::common());
+        debug_assert!(
+            resolved.is_ok(),
+            "machine `{name}`: lowering let through a recipe that doesn't resolve: {resolved:?}"
+        );
+        resolved.ok()
+    });
     MachinePlan {
         shape,
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),

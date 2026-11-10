@@ -89,10 +89,16 @@ pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, reci
                         command: image.command.clone(),
                     },
                     (BaseImage::Entry, None) => ContainerProcess::Image,
-                    // Lowering refuses a container whose services it can't run, so this resolves.
-                    _ => recipe
-                        .and_then(|r| ContainerProcess::resolve(r, m.command.as_ref(), !m.ports.is_empty()).ok())
-                        .unwrap_or(ContainerProcess::Idle),
+                    // Lowering refuses a container whose services it can't run, so the validated
+                    // spec `build` plans resolves; no recipe at all is an idle container.
+                    _ => recipe.map_or(ContainerProcess::Idle, |r| {
+                        let process = ContainerProcess::resolve(r, m.command.as_ref(), !m.ports.is_empty());
+                        debug_assert!(
+                            process.is_ok(),
+                            "machine `{name}`: lowering let through a process that doesn't resolve: {process:?}"
+                        );
+                        process.unwrap_or(ContainerProcess::Idle)
+                    }),
                 },
             });
             Some(Image::Container {
