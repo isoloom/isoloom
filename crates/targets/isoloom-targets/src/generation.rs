@@ -202,7 +202,11 @@ fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, placed: Placed)
         source: std::sync::Arc::new(e),
     };
     let mut manifest = placed.manifest;
-    manifest.environment.message = resolved::manifest_message(lab, instance, target);
+    manifest.environment.message = resolved::manifest_message(lab, instance, target).map_err(|e| GenerateError::Internal {
+        target,
+        what: "the run manifest's message couldn't be filled in".to_owned(),
+        source: std::sync::Arc::new(e),
+    })?;
     manifest.validate().map_err(refused)?;
     let folder = placed.sub.map_or_else(|| target.id().to_owned(), |sub| format!("{}/{sub}", target.id()));
     Ok(GeneratedFile {

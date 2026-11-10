@@ -100,22 +100,31 @@ pub fn fill(text: &str, snapshot: &Value) -> Result<String> {
 /// generated filled in, and what only the runner knows left to it: each published port's host
 /// port (`{{ machines.web.ports.site.published }}` becomes `${published.web.site}`, and its `.url`
 /// the page at it) and each cloud output (`{{ cloud.outputs.site }}` becomes `${outputs.site}`).
-/// `None` without a message, or when a placeholder points at nothing (the snapshot's message is
-/// null then too).
-pub(crate) fn manifest_message(lab: &Lab, instance: Option<u8>, target: Target) -> Option<Template> {
-    let text = lab.source().message.as_ref()?;
-    let snapshot = on_target(resolve_with(lab, instance).ok()?, target);
+/// `None` without a message, or when a placeholder points at nothing in the snapshot (the
+/// snapshot's message is null then too).
+///
+/// # Errors
+///
+/// As [`render_message`], but a placeholder that points at nothing: the lab can't be made
+/// instance `instance`, or the message can't be read.
+pub(crate) fn manifest_message(lab: &Lab, instance: Option<u8>, target: Target) -> Result<Option<Template>> {
+    let Some(text) = lab.source().message.as_ref() else { return Ok(None) };
+    let snapshot = on_target(resolve_with(lab, instance)?, target);
     let mut parts = Vec::new();
-    for part in self::parts(text).ok()? {
+    for part in self::parts(text)? {
         match part {
             SpecPart::Text(t) => parts.push(Part::Text(t)),
             SpecPart::Placeholder(r) => match at_run_time(&snapshot, &r) {
                 Some(found) => parts.extend(found),
-                None => parts.push(Part::Text(shown(&snapshot, &r).ok()?)),
+                None => match shown(&snapshot, &r) {
+                    Ok(value) => parts.push(Part::Text(value)),
+                    Err(Error::Placeholder { .. }) => return Ok(None),
+                    Err(other) => return Err(other),
+                },
             },
         }
     }
-    Some(Template::from_parts(parts))
+    Ok(Some(Template::from_parts(parts)))
 }
 
 /// What a placeholder only the runner knows reads as in the manifest: a cloud output; a published
@@ -170,6 +179,29 @@ mod tests {
         assert!(matches!(fill("{{ machines.db.addresses.lab }}", &snapshot), Err(Error::Placeholder { .. })));
         assert!(matches!(fill("{{ machines.db }}", &snapshot), Err(Error::Placeholder { .. })));
         Ok(())
+    }
+
+    #[test]
+    fn the_manifests_message_fails_on_a_real_error_and_is_none_for_a_placeholder_that_points_at_nothing() {
+        let lab = |message: &str| {
+            Lab::parse(&format!(
+                "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, ports: {{ site: 80 }}, app: {{ image: nginx }} }}\nmessage: \"{message}\"\n"
+            ))
+            .unwrap()
+        };
+        let at = lab("at {{ machines.web.addresses.lan }}");
+        let filled = manifest_message(&at, None, Target::Docker).unwrap().unwrap();
+        assert_eq!(filled.parts(), [Part::Text("at 10.9.0.10".into())]);
+        assert!(matches!(manifest_message(&at, Some(0), Target::Docker), Err(Error::Instance { number: 0, .. })));
+        assert!(matches!(
+            manifest_message(&lab("at {{ machines.web"), None, Target::Docker),
+            Err(Error::Unclosed)
+        ));
+        assert!(
+            manifest_message(&lab("at {{ machines.web.addresses.wan }}"), None, Target::Docker)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
