@@ -1,73 +1,11 @@
 //! What a lab's steps say beyond the spec's own checks: the project files they name (each
-//! `copy`'s source, each `template` and its placeholders), and the daemons a recipe installs
-//! that no step says where to run (a warning).
+//! `copy`'s source, each `template` and its placeholders, each folder or file a catalogue
+//! service's settings name), present in the project folder.
 
 use std::path::Path;
 
-use isoloom_spec::model::Seal;
 use isoloom_spec::syntax::placeholder::Place;
-use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Step, Warning};
-
-use super::Lab;
-use crate::configure::{DaemonTable, unstarted};
-
-impl Lab {
-    /// What the spec says that is likely not what its author means, in file order: a daemon a
-    /// recipe installs with no `service` step for it (it would start on Debian VMs only), a
-    /// best-effort seal, an access machine left to the runner that the image table gives no
-    /// form. Never a problem: validation passes with warnings.
-    #[must_use]
-    pub fn warnings(&self) -> Vec<Warning> {
-        let daemons = DaemonTable::common();
-        let mut out: Vec<Warning> = Vec::new();
-        for (name, m) in &self.source.machines {
-            let Some(os) = m.os else { continue };
-            let base = self.written_as(name);
-            for u in unstarted(os, m, &daemons) {
-                let path = FieldPath::new("machines").key(base).key("app").key("steps").index(u.step);
-                if out.iter().any(|w| w.path == path && w.reason.starts_with(&format!("`{}`", u.package))) {
-                    continue;
-                }
-                let mut w = Warning::new(
-                    path,
-                    format!(
-                        "`{}` installs a daemon that starts on Debian VMs only (their packages start it): nothing starts it in a container or on another family's VM",
-                        u.package
-                    ),
-                )
-                .fix(format!("`service: {unit}`, or `{{ service: {{ name: {unit}, enabled: false }} }}`", unit = u.unit));
-                w.span = self.source.spans.find(&w.path);
-                out.push(w);
-            }
-        }
-        for (name, m) in &self.source.machines {
-            let path = FieldPath::new("machines").key(self.written_as(name)).key("seal");
-            if m.seal != Seal::BestEffort || out.iter().any(|w| w.path == path) {
-                continue;
-            }
-            let mut w = Warning::new(
-                path,
-                "`seal: best-effort` makes this machine's `internet: false` seal advisory: it is applied, but a privileged container can lift it from inside, so treat the machine as able to reach the internet",
-            );
-            w.span = self.source.spans.find(&w.path);
-            out.push(w);
-        }
-        out.extend(self.unsupplied_warning());
-        out.sort_by_key(|w| w.span.map(|s| (s.line, s.column)));
-        out
-    }
-
-    /// The machine the spec writes machine `name` as: the base a clone is made of (`ws` for
-    /// `ws-1`, from `count:`), else `name`. A warning about a clone is about its base's lines,
-    /// once.
-    fn written_as<'a>(&'a self, name: &'a str) -> &'a str {
-        self.source
-            .clones
-            .iter()
-            .find(|(_, c)| c.iter().any(|n| n == name))
-            .map_or(name, |(b, _)| b.as_str())
-    }
-}
+use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Step};
 
 /// The project files the steps name, each present in `dir`, and each template's placeholders
 /// resolving against the spec.

@@ -18,6 +18,7 @@ use crate::lower::{Lowered, Scope, lower};
 mod access;
 mod steps;
 mod templates;
+mod warnings;
 
 /// A lab: an `isoloom.yml` project ready to generate, its authored spec with what it reads
 /// besides (the catalogue, the image table, the clouds' regions, the template files). Each
