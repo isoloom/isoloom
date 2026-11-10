@@ -6,7 +6,6 @@ use isoloom_spec::model::Target;
 use serde_json::{Map, Value, json};
 
 use crate::refusal::{cloud_refusals, not_possible_reason, refusal};
-use crate::registry::backend;
 
 /// The targets section.
 pub(super) fn section(lab: &Lab) -> Value {
@@ -17,8 +16,6 @@ pub(super) fn section(lab: &Lab) -> Value {
     for t in Target::ALL {
         if !possible.contains(&t) {
             not_possible.insert(t.id().into(), json!(not_possible_reason(lab, t)));
-        } else if backend(t).is_none() {
-            refused.insert(t.id().into(), json!("no generator"));
         } else if let Some(why) = refusal(lab, t) {
             refused.insert(t.id().into(), json!(why));
         } else {

@@ -1188,7 +1188,7 @@ volumes:
       "esxi": "machines.vios.app.appliance: an appliance's packaging exists only as a container",
       "cloud-vm": "machines.vios.app.appliance: an appliance's packaging exists only as a container",
       "external": "overrides.external.machines.vios: the external target reaches machines that exist already, and `vios` names no host",
-      "cloud-services": "left out by `targets:`"
+      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },
     "clouds": {
       "cloud-docker": {

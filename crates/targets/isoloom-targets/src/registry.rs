@@ -25,26 +25,23 @@ static CLOUD_VM: CloudVmBackend = CloudVmBackend;
 static EXTERNAL: ExternalBackend = ExternalBackend;
 static CLOUD_SERVICES: CloudServicesBackend = CloudServicesBackend;
 
-/// Every backend, in the order targets are listed.
-static BACKENDS: &[&dyn Backend] = &[
-    &DOCKER,
-    &HOSTED,
-    &DOCKER_VM,
-    &CLOUD_DOCKER,
-    &KUBERNETES,
-    &HYBRID,
-    &VAGRANT,
-    &PROXMOX,
-    &ESXI,
-    &CLOUD_VM,
-    &EXTERNAL,
-    &CLOUD_SERVICES,
-];
-
-/// The backend of `target`, if it has one.
+/// The backend of `target`: every target has one.
 #[must_use]
-pub fn backend(target: Target) -> Option<&'static dyn Backend> {
-    BACKENDS.iter().copied().find(|b| b.target() == target)
+pub fn backend(target: Target) -> &'static dyn Backend {
+    match target {
+        Target::Docker => &DOCKER,
+        Target::Hosted => &HOSTED,
+        Target::DockerVm => &DOCKER_VM,
+        Target::CloudDocker => &CLOUD_DOCKER,
+        Target::Kubernetes => &KUBERNETES,
+        Target::Hybrid => &HYBRID,
+        Target::Vagrant => &VAGRANT,
+        Target::Proxmox => &PROXMOX,
+        Target::Esxi => &ESXI,
+        Target::CloudVm => &CLOUD_VM,
+        Target::External => &EXTERNAL,
+        Target::CloudServices => &CLOUD_SERVICES,
+    }
 }
 
 #[cfg(test)]
@@ -52,8 +49,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_target_has_one_backend_in_the_order_targets_are_listed() {
-        let registered: Vec<Target> = BACKENDS.iter().map(|b| b.target()).collect();
-        assert_eq!(registered, Target::ALL);
+    fn each_targets_backend_renders_that_target() {
+        for t in Target::ALL {
+            assert_eq!(backend(t).target(), t);
+        }
     }
 }

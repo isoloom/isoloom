@@ -50,7 +50,7 @@ pub(crate) struct Listing {
 }
 
 /// The targets `generate_all` left out, each a refusal of the lab; those left out for any other
-/// reason (a backend failed, or there is no generator) as the error, every one of them, so
+/// reason (a backend failed) as the error, every one of them, so
 /// neither `generate` nor `check` passes over a target whose files it couldn't make.
 fn refusals(skipped: Vec<GenerateError>) -> Result<Vec<GenerateError>> {
     let (refused, failed): (Vec<_>, Vec<_>) = skipped.into_iter().partition(GenerateError::is_refusal);
@@ -127,7 +127,6 @@ mod tests {
                 "{rendered}"
             );
         }
-        assert!(refusals(vec![GenerateError::NoGenerator(Target::Docker)]).is_err());
     }
 
     #[test]

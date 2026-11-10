@@ -16,8 +16,8 @@ use crate::{Error, GenerateError, Result, gitignore, resolved};
 ///
 /// # Errors
 ///
-/// [`Error::Generate`]: the target isn't possible for the lab, has no backend, or its backend
-/// refuses the lab or fails.
+/// [`Error::Generate`]: the target isn't possible for the lab, or its backend refuses the lab or
+/// fails.
 pub fn generate(lab: &Lab, target: Target) -> Result<Vec<GeneratedFile>> {
     Ok(with_snapshot(lab, target)?)
 }
@@ -131,7 +131,7 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     if !lab.possible().contains(&target) {
         return Err(GenerateError::NotPossible(target));
     }
-    let backend = backend(target).ok_or(GenerateError::NoGenerator(target))?;
+    let backend = backend(target);
     let spec = lowered(lab, target, instance)?;
     let env = lab.plan(&spec, target, instance);
     let rendered = backend.render(&env)?;

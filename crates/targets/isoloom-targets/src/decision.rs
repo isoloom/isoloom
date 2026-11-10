@@ -1,12 +1,11 @@
 //! What a target decides about a lab, typed: it generates it, or it refuses it and at which step
 //! (lowering, the backend's capabilities, the backend's own limits, a Vagrant provider's, a
-//! cloud's), or the lab isn't one the target takes at all. The same decisions as [`refusal`],
-//! [`refusal_on`] and [`cloud_refusals`], per [`Column`], so the capability matrix
-//! ([`crate::matrix`]) is what the generators decide and nothing more.
+//! cloud's), or the lab isn't one the target takes at all. The one place a target decides:
+//! [`refusal`], [`refusal_on`] and the capability matrix ([`crate::matrix`]) read these
+//! decisions, so the matrix is what the generators decide and nothing more.
 //!
 //! [`refusal`]: crate::refusal()
 //! [`refusal_on`]: crate::refusal_on
-//! [`cloud_refusals`]: crate::cloud_refusals
 
 use isoloom_plan::{Environment, Feature, Lab};
 use isoloom_spec::model::Target;
@@ -105,6 +104,19 @@ pub(crate) struct Refused {
     pub reason: String,
 }
 
+impl Refused {
+    /// The refusal on one line, as `isoloom targets` and the resolved snapshot give it: the field
+    /// (when the step names one) then the reason, an invalid spec's said so.
+    #[must_use]
+    pub(crate) fn line(&self) -> String {
+        match (&self.field, self.code) {
+            (Some(field), Code::Invalid) => format!("the spec is invalid: {field}: {}", self.reason),
+            (Some(field), _) => format!("{field}: {}", self.reason),
+            (None, _) => self.reason.clone(),
+        }
+    }
+}
+
 /// What a column decides about a lab.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Decision {
@@ -127,12 +139,12 @@ fn refused(code: Code, field: Option<String>, reason: impl Into<String>) -> Deci
     })
 }
 
-/// What `column` decides about `lab`: the spec's own problems, lowering, then the backend's
-/// capabilities and its own limits (a cloud's, for a `cloud-vm` column), then the Vagrant
-/// provider's.
+/// What `target` decides about `lab`, run with `variant` when it names one: the spec's own
+/// problems, lowering, then the backend's capabilities and its own limits (a cloud's, on
+/// `cloud-vm` with a cloud: `aws`), then a provider's: a Vagrant provider's on `vagrant`
+/// (`libvirt`), on `docker-vm` the Proxmox server's (`proxmox`) or a Vagrant provider's.
 #[must_use]
-pub(crate) fn decide(lab: &Lab, column: &Column) -> Decision {
-    let target = column.target;
+pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Decision {
     if let Some(p) = lab.problems().into_iter().next() {
         return refused(Code::Invalid, Some(p.path.to_string()), p.reason);
     }
@@ -146,12 +158,10 @@ pub(crate) fn decide(lab: &Lab, column: &Column) -> Decision {
     if let Some(p) = isoloom_spec::validate::validate(&spec).first() {
         return refused(Code::Invalid, None, format!("the spec is invalid on {}: {p}", target.id()));
     }
-    let Some(backend) = backend(target) else {
-        return refused(Code::Target, None, "no generator");
-    };
+    let backend = backend(target);
     let env = Environment::build(&spec, target, None);
     let lacking = isoloom_plan::refusal(&env.requirements, &backend.capabilities());
-    let own = match (target, column.variant.and_then(cloud)) {
+    let own = match (target, variant.and_then(cloud)) {
         (Target::CloudVm, Some(c)) => CloudVmModule::new(c).refusal(&env).map(|r| (Code::Cloud, r)),
         _ => backend.refusal(&env).map(|r| (Code::Target, r)),
     };
@@ -159,12 +169,17 @@ pub(crate) fn decide(lab: &Lab, column: &Column) -> Decision {
         (Some(lack), Some((_, reason))) => refused(Code::Capability(lack.requirement.feature()), None, reason),
         (Some(lack), None) => refused(Code::Capability(lack.requirement.feature()), None, lack.to_string()),
         (None, Some((code, reason))) => refused(code, None, reason),
-        (None, None) => match (target, column.variant) {
-            (Target::Vagrant, Some(p)) => isoloom_vagrant::provider_refusal(&spec, p)
-                .or_else(|| isoloom_vagrant::disk_refusal(&spec, p))
-                .map_or(Decision::Generated, |r| refused(Code::Provider, None, r)),
-            _ => Decision::Generated,
-        },
+        (None, None) => provider_refusal(&spec, &env, target, variant).map_or(Decision::Generated, |r| refused(Code::Provider, None, r)),
+    }
+}
+
+/// Why `target`'s `provider` can't run the environment it otherwise generates, if it can't.
+fn provider_refusal(spec: &isoloom_spec::model::Spec, env: &Environment, target: Target, provider: Option<&str>) -> Option<String> {
+    match (target, provider?) {
+        (Target::Vagrant, p) => isoloom_vagrant::provider_refusal(spec, p),
+        (Target::DockerVm, crate::composite::PROXMOX) => crate::composite::docker_vm_proxmox_refusal(env),
+        (Target::DockerVm, p) => isoloom_vagrant::docker_vm_refusal(env, p),
+        _ => None,
     }
 }
 
@@ -197,7 +212,7 @@ mod tests {
 
     /// What `column` refuses `lab` for; a test failure when it doesn't.
     fn refused_on(lab: &Lab, column: Column) -> Refused {
-        match decide(lab, &column) {
+        match decide(lab, column.target, column.variant) {
             Decision::Refused(r) => r,
             other => panic!("{}: {other:?}", column.id()),
         }
@@ -206,7 +221,7 @@ mod tests {
     #[test]
     fn each_step_refuses_with_its_own_code() {
         let two = lab(TWO);
-        assert_eq!(decide(&two, &on(Target::Docker, None)), Decision::Generated);
+        assert_eq!(decide(&two, Target::Docker, None), Decision::Generated);
         let cloud = refused_on(&two, on(Target::CloudVm, Some("digitalocean")));
         assert_eq!(cloud.code, Code::Cloud, "{cloud:?}");
         assert!(cloud.reason.contains("one machine on one network"), "{cloud:?}");
@@ -225,7 +240,7 @@ mod tests {
     #[test]
     fn a_lab_a_target_doesnt_take_is_not_applicable_there() {
         let two = lab(TWO);
-        assert_eq!(decide(&two, &on(Target::CloudServices, None)), Decision::NotApplicable);
-        assert_eq!(decide(&two, &on(Target::Hybrid, None)), Decision::NotApplicable, "no VM-only machine");
+        assert_eq!(decide(&two, Target::CloudServices, None), Decision::NotApplicable);
+        assert_eq!(decide(&two, Target::Hybrid, None), Decision::NotApplicable, "no VM-only machine");
     }
 }

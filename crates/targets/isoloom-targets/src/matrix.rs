@@ -189,7 +189,7 @@ fn cell(p: &Probe, labs: &Labs, column: &Column) -> Cell {
             field: None,
             reason: why.clone(),
         }),
-        Ok(lab) => match decide(lab, column) {
+        Ok(lab) => match decide(lab, column.target, column.variant) {
             Decision::Generated => Cell::Supported,
             Decision::Refused(r) => Cell::Refused(r),
             Decision::NotApplicable => Cell::NotApplicable,

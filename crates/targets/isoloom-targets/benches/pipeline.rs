@@ -33,7 +33,7 @@ fn example(name: &'static str) -> Result<Example, String> {
     let path = examples().join(name).join("isoloom.yml");
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let lab = Lab::new(isoloom_spec::parse(&text).map_err(|e| format!("{name}: {e}"))?);
-    let targets = lab.possible().into_iter().filter(|t| backend(*t).is_some()).collect();
+    let targets = lab.possible();
     Ok(Example { name, text, lab, targets })
 }
 
@@ -48,12 +48,7 @@ fn measure(c: &mut Criterion, e: &Example) {
     };
     c.bench_function(&format!("lower/{}", e.name), |b| b.iter(lower));
     let plans: Vec<(Target, Environment)> = e.targets.iter().copied().zip(lower()).collect();
-    let render = || {
-        plans
-            .iter()
-            .filter_map(|(t, env)| backend(*t).map(|b| b.render(black_box(env))))
-            .collect::<Vec<_>>()
-    };
+    let render = || plans.iter().map(|(t, env)| backend(*t).render(black_box(env))).collect::<Vec<_>>();
     c.bench_function(&format!("render/{}", e.name), |b| b.iter(render));
 }
 

@@ -99,7 +99,7 @@ fn every_refusal_a_generator_gives_an_example_shows_in_the_matrix() -> Outcome {
     let mut checked = 0;
     for e in every_example()? {
         for column in &m.columns {
-            if let Decision::Refused(r) = decide(&e.lab, column) {
+            if let Decision::Refused(r) = decide(&e.lab, column.target, column.variant) {
                 checked += 1;
                 if !shown(&m, &e, column, &r) {
                     missing.push(format!("{} on {}: {} {:?}: {}", e.name, column.id(), r.code.id(), r.field, r.reason));
@@ -118,7 +118,7 @@ fn no_row_an_example_uses_is_refused_where_the_example_is_generated() -> Outcome
     let mut wrong = Vec::new();
     let mut used = 0;
     for e in every_example()? {
-        for column in m.columns.iter().filter(|c| decide(&e.lab, c) == Decision::Generated) {
+        for column in m.columns.iter().filter(|c| decide(&e.lab, c.target, c.variant) == Decision::Generated) {
             used += m.rows.iter().filter(|row| row.used_by(&e.written, &e.lab, column.target)).count();
             for row in refused_but_used(&m, &e, column) {
                 wrong.push(format!("{} on {}: {} ({})", e.name, column.id(), row.name(), row.about));
@@ -151,7 +151,7 @@ fn each_column_decides_what_its_generator_does() -> Outcome {
         for column in &m.columns {
             let theirs = generators(&e.lab, column);
             let at = format!("{} on {}", e.name, column.id());
-            match decide(&e.lab, column) {
+            match decide(&e.lab, column.target, column.variant) {
                 Decision::Generated => {
                     assert_eq!(theirs, None, "{at}");
                     assert!(e.lab.possible().contains(&column.target), "{at}");

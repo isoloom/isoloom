@@ -7,9 +7,8 @@
 //! It sits with the other backends, above the rendering layer (`isoloom-render`) and below the
 //! targets' registry (`isoloom-targets`), and depends on no other backend: [`VagrantBackend`]
 //! renders a planned [`Environment`](isoloom_plan::Environment), purely, into files;
-//! [`docker_vm`] and [`hybrid`] write those targets' Vagrant sides; [`provider_refusal`] and
-//! [`disk_refusal`] say what a provider can't run ([`docker_vm_refusal`], what `docker-vm`'s VM
-//! can't).
+//! [`docker_vm`] and [`hybrid`] write those targets' Vagrant sides; [`provider_refusal`] says
+//! what a provider can't run ([`docker_vm_refusal`], what `docker-vm`'s VM can't).
 //!
 //! # Example
 //!
@@ -58,4 +57,4 @@ pub use host_folders::docker_vm_refusal;
 /// A Ruby string literal holding any text, as every Vagrantfile string is written.
 pub use ruby::quote as ruby_quote;
 pub use vms::network_name;
-pub use vms::provider::{disk_refusal, provider_refusal};
+pub use vms::provider::provider_refusal;

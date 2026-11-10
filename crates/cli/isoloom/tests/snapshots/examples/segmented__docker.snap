@@ -1645,7 +1645,7 @@ volumes:
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.cache: the external target reaches machines that exist already, and `cache` names no host",
-      "cloud-services": "left out by `targets:`"
+      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },
     "clouds": {
       "cloud-docker": {

@@ -358,17 +358,17 @@ crash.*.log
     ],
     "refused": {},
     "not_possible": {
-      "docker": "left out by `targets:`",
-      "hosted": "left out by `targets:`",
-      "docker-vm": "left out by `targets:`",
-      "cloud-docker": "left out by `targets:`",
-      "kubernetes": "left out by `targets:`",
-      "hybrid": "only when some machines are containers and others are VMs",
-      "vagrant": "left out by `targets:`",
-      "proxmox": "left out by `targets:`",
-      "esxi": "left out by `targets:`",
-      "cloud-vm": "left out by `targets:`",
-      "external": "left out by `targets:`"
+      "docker": "cloud services run on `cloud-services` only",
+      "hosted": "cloud services run on `cloud-services` only",
+      "docker-vm": "cloud services run on `cloud-services` only",
+      "cloud-docker": "cloud services run on `cloud-services` only",
+      "kubernetes": "cloud services run on `cloud-services` only",
+      "hybrid": "cloud services run on `cloud-services` only",
+      "vagrant": "cloud services run on `cloud-services` only",
+      "proxmox": "cloud services run on `cloud-services` only",
+      "esxi": "cloud services run on `cloud-services` only",
+      "cloud-vm": "cloud services run on `cloud-services` only",
+      "external": "cloud services run on `cloud-services` only"
     },
     "clouds": {}
   },

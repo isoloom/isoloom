@@ -42,7 +42,7 @@ fn listing(lab: &Lab) -> Vec<String> {
     let mut lines = Vec::new();
     for t in Target::ALL {
         if !possible.contains(&t) {
-            lines.push(format!("✗ {} ({})", t.id(), why_not(lab, t)));
+            lines.push(format!("✗ {} ({})", t.id(), isoloom_targets::not_possible_reason(lab, t)));
             continue;
         }
         // A target can be possible by its machines' forms and still be refused by its generator
@@ -98,17 +98,6 @@ fn tier_lines(entries: &[TierEntry], ready: &[Target], lab: &Lab) -> Vec<String>
         }
     }
     lines
-}
-
-/// Why the lab can't run on a target at all.
-fn why_not(lab: &Lab, t: Target) -> String {
-    if lab.source().cloud.is_some() && t != Target::CloudServices {
-        "cloud services run on `cloud-services` only".to_owned()
-    } else if t == Target::CloudServices {
-        "needs `cloud:` (cloud services instead of machines)".to_owned()
-    } else {
-        isoloom_targets::not_possible_reason(lab, t)
-    }
 }
 
 #[cfg(test)]

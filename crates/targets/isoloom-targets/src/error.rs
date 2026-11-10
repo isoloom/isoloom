@@ -10,8 +10,7 @@ use isoloom_spec::model::Target;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// A target's files weren't generated: the target refuses the lab, has no generator, or its
-    /// backend failed.
+    /// A target's files weren't generated: the target refuses the lab, or its backend failed.
     #[error(transparent)]
     Generate(#[from] GenerateError),
     /// The lab can't be made the instance asked for (`isoloom_spec::instance::apply`).
@@ -88,9 +87,6 @@ pub enum GenerateError {
         /// What it doesn't support, as the refusal reads.
         what: String,
     },
-    /// No generator exists for this target yet.
-    #[error("{}: no generator", .0.id())]
-    NoGenerator(Target),
     /// The backend failed, not the lab (a bug: a value the run manifest's types refused, a file
     /// its writer couldn't write), with the error it failed with.
     #[error("{}: {what}", target.id())]
@@ -108,8 +104,7 @@ pub enum GenerateError {
 impl GenerateError {
     /// Whether the target refuses the lab ([`GenerateError::NotPossible`],
     /// [`GenerateError::Unsupported`]): the one reason a target may be left out of `generate`
-    /// and `check` without failing them. No generator, or a failed one, is never the lab's
-    /// doing.
+    /// and `check` without failing them. A failed backend is never the lab's doing.
     #[must_use]
     pub fn is_refusal(&self) -> bool {
         matches!(self, GenerateError::NotPossible(_) | GenerateError::Unsupported { .. })
@@ -150,8 +145,8 @@ mod tests {
 
     #[test]
     fn a_refusal_reads_as_the_generator_wrote_it() {
-        let e = Error::from(GenerateError::NoGenerator(Target::Docker));
-        assert_eq!(e.to_string(), "docker: no generator");
+        let e = Error::from(GenerateError::NotPossible(Target::Docker));
+        assert_eq!(e.to_string(), "docker: not possible for this spec (see `isoloom targets`)");
     }
 
     #[test]
@@ -169,6 +164,6 @@ mod tests {
         });
         assert_eq!(refused.to_string(), "proxmox: machine `w`: no image");
         assert!(refused.is_refusal() && GenerateError::NotPossible(Target::Docker).is_refusal());
-        assert!(!failed.is_refusal() && !GenerateError::NoGenerator(Target::Docker).is_refusal());
+        assert!(!failed.is_refusal());
     }
 }

@@ -22,7 +22,7 @@ fn paragraphs(text: &str) -> Vec<String> {
 #[test]
 fn a_guide_never_has_the_runner_deliver_secrets_its_target_refuses() -> Outcome {
     for (target, page) in [(Target::Proxmox, "proxmox"), (Target::Esxi, "esxi")] {
-        let backend = isoloom_targets::backend(target).ok_or("no backend")?;
+        let backend = isoloom_targets::backend(target);
         if backend.capabilities().has(Feature::Secrets) {
             continue;
         }

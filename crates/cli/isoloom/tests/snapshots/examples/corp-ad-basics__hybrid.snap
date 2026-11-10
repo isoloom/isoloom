@@ -2243,7 +2243,7 @@ volumes:
       "cloud-docker": "machines.dc01.os: Windows has no container form",
       "kubernetes": "machines.dc01.os: Windows has no container form",
       "external": "overrides.external.machines.dc01: the external target reaches machines that exist already, and `dc01` names no host",
-      "cloud-services": "left out by `targets:`"
+      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },
     "clouds": {}
   },

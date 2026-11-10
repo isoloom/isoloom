@@ -156,7 +156,8 @@ impl<'a> Provider<'a> {
 /// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks, then a
 /// machine's own boot, which only libvirt (and QEMU, for UEFI's format) boots, then a machine's
 /// host folders, which Hyper-V and ESXi don't share (nor QEMU read-only), then a machine of
-/// another architecture than ESXi's on ESXi.
+/// another architecture than ESXi's on ESXi, then a machine's data disks, which QEMU's,
+/// Parallels' and UTM's plugins don't attach.
 #[must_use]
 pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
     let env = Environment::build(spec, Target::Vagrant, None);
@@ -166,6 +167,7 @@ pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
         .or_else(|| boot::refusal(&env, provider))
         .or_else(|| crate::host_folders::refusal(&env, provider))
         .or_else(|| arch_refusal(&env, provider))
+        .or_else(|| disk_refusal(spec, provider))
 }
 
 /// A VM ESXi can't run: one of another architecture than the ESXi host's ([`ESXI_ARCH`]).
@@ -181,9 +183,7 @@ fn arch_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
 
 /// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,
 /// Parallels' and UTM's plugins attach none.
-#[must_use]
-pub fn disk_refusal(spec: &Spec, provider: &str) -> Option<String> {
-    let provider = Provider::from(provider);
+fn disk_refusal(spec: &Spec, provider: Provider<'_>) -> Option<String> {
     if provider.attaches_disks() {
         return None;
     }

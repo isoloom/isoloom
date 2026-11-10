@@ -1261,7 +1261,7 @@ volumes:
       "esxi": "machines.r1.app.appliance: an appliance's packaging exists only as a container",
       "cloud-vm": "machines.r1.app.appliance: an appliance's packaging exists only as a container",
       "external": "overrides.external.machines.r1: the external target reaches machines that exist already, and `r1` names no host",
-      "cloud-services": "left out by `targets:`"
+      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },
     "clouds": {
       "cloud-docker": {

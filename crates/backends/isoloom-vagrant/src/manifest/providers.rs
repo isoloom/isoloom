@@ -10,7 +10,7 @@ use isoloom_render::run_manifest;
 
 use super::vagrant_argv;
 use crate::error::Result;
-use crate::vms::provider::{Known, Provider as Vagrant, disk_refusal, provider_refusal};
+use crate::vms::provider::{Known, Provider as Vagrant, provider_refusal};
 
 /// Known provider `k` as a manifest provider, with `elevation` and this lab's `refusal` on it.
 fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<VagrantProvider> {
@@ -33,7 +33,7 @@ pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Iden
             // Hyper-V takes management commands from an administrator only.
             let elevation = if k.manifest == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None };
             let name = k.provider.id();
-            provider(k, elevation, provider_refusal(spec, name).or_else(|| disk_refusal(spec, name)))
+            provider(k, elevation, provider_refusal(spec, name))
         })
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {

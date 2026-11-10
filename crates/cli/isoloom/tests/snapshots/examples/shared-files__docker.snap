@@ -1209,7 +1209,7 @@ volumes:
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.writer: the external target reaches machines that exist already, and `writer` names no host",
-      "cloud-services": "left out by `targets:`"
+      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },
     "clouds": {
       "cloud-docker": {

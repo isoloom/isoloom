@@ -144,7 +144,7 @@ crash.*.log
       "kubernetes": "machines.web01.os: Windows has no container form",
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.web01: the external target reaches machines that exist already, and `web01` names no host",
-      "cloud-services": "left out by `targets:`"
+      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },
     "clouds": {
       "cloud-vm": {
