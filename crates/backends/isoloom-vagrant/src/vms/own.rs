@@ -55,7 +55,7 @@ fn steps_of(r: &mut Ruby, env: &Environment, vm: &str, steps: &[Step]) {
 /// spec's certificate authorities before it installs anything: the project, then them. Nothing
 /// when the spec names none.
 fn trusting(env: &Environment) -> Vec<Step> {
-    isoloom_plan::lifecycle::ca_certificates(env.spec()).map_or_else(Vec::new, |ca| vec![Step::Project, ca])
+    isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()).map_or_else(Vec::new, |ca| vec![Step::Project, ca])
 }
 
 /// Every machine by name, at its address on its first network (Isoloom's own VMs are on all).
@@ -201,7 +201,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let mut steps = vec![Step::Prelude];
     steps.extend(size.disk.map(|_| Step::DiskGrow));
     steps.extend([every_machine(env), Step::Project]);
-    steps.extend(isoloom_plan::lifecycle::ca_certificates(env.spec()));
+    steps.extend(isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()));
     let on_controller = &ctx.checks.controller;
     define(r, CONTROLLER, false, |r| {
         controller_box_line(r, bx, version);

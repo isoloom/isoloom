@@ -143,7 +143,7 @@ fn resources(m: &Machine) -> Resources {
 /// The machine's environment: the spec's constraints (proxy, package mirrors), its own fixed
 /// values, then its inputs from the `isoloom-inputs` Secret (optional: unset inputs are empty).
 fn env(m: &Machine) -> Vec<EnvVar> {
-    let mut fixed = constraints::machine_env(m.env.spec());
+    let mut fixed = constraints::machine_env(m.env.constraints.as_ref());
     fixed.extend(m.plan.settings.environment.iter().map(|(k, v)| (k.clone(), v.clone())));
     let inputs = m.plan.inputs.iter().map(|i| EnvVar::Secret {
         name: i.clone(),

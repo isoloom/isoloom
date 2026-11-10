@@ -4,9 +4,10 @@
 //! re-deriving them from the spec.
 //!
 //! The plan is typed and target-aware (on the Docker targets, networks sit on their Docker
-//! blocks); a backend reads it and writes its own format. What the plan doesn't model yet
-//! (appliance wiring, trunk scripts) a backend still reads from [`Environment::spec`], the spec
-//! as laid out for the target.
+//! blocks); a backend reads it and writes its own format. What a backend only writes out as the
+//! author gave it (a machine's port list, its DNS and VM settings), or what it alone does
+//! (Compose's appliance wiring and trunks), it reads from [`Environment::spec`], the spec as laid
+//! out for the target.
 
 use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -69,7 +70,9 @@ pub struct Environment {
     pub checks: Vec<Resolved>,
     /// The controller VM running playbooks, when the environment needs one.
     pub controller: Option<Controller>,
-    /// The spec's constraints (proxy, mirrors, registries, NTP), when it has any.
+    /// The spec's constraints (proxy, mirrors, registries, NTP), when it has any: the proxy's
+    /// `no_proxy` lists everything reached without it, localhost and the environment's machine
+    /// names and network blocks before the spec's own.
     pub constraints: Option<Constraints>,
     /// The launch values it reads (`inputs`), in spec order, each with whether it is sensitive:
     /// names only, never values.
@@ -383,7 +386,7 @@ impl Environment {
             start_order: start_order(&laid_out).into_iter().map(String::from).collect(),
             checks: checks::plan(&laid_out),
             controller: Controller::needed(&laid_out).then(|| Controller::of(&laid_out)),
-            constraints: laid_out.constraints.clone(),
+            constraints: crate::constraints::of(&laid_out),
             inputs: laid_out.inputs.clone(),
             secrets: laid_out.secrets.clone(),
             tools: tools::of(&laid_out),
@@ -396,7 +399,9 @@ impl Environment {
         }
     }
 
-    /// The spec as laid out for the target, for what the plan doesn't model yet.
+    /// The spec as laid out for the target: for what a backend only writes out as the author gave
+    /// it (a machine's port list, its DNS and VM settings) or what it alone does, which the plan
+    /// decides nothing about.
     #[must_use]
     pub fn spec(&self) -> &Spec {
         &self.spec

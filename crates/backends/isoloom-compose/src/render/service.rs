@@ -158,7 +158,7 @@ fn port(p: &PublishedPort) -> String {
 /// the constraints'. `$$`: a literal value, not Compose's interpolation. A generated Dockerfile
 /// builds with the project folder as its context.
 fn build_of(env: &Environment, machine: &str, b: &isoloom_plan::Build) -> Build {
-    let constraints = constraints::build_args(env.spec());
+    let constraints = constraints::machine_env(env.constraints.as_ref());
     let (context, dockerfile, target, own) = match b {
         isoloom_plan::Build::Own {
             context,
@@ -190,7 +190,7 @@ fn build_of(env: &Environment, machine: &str, b: &isoloom_plan::Build) -> Build 
 /// A machine's environment: the spec's constraints (proxy, package mirrors), its own fixed
 /// values (`$$`: literal, not Compose's interpolation), then its inputs, read from the shell.
 fn environment(env: &Environment, plan: &isoloom_plan::MachinePlan) -> Option<IndexMap<String, String>> {
-    let constraints = constraints::machine_env(env.spec());
+    let constraints = constraints::machine_env(env.constraints.as_ref());
     if plan.inputs.is_empty() && constraints.is_empty() && plan.settings.environment.is_empty() {
         return None;
     }

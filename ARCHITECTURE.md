@@ -53,12 +53,15 @@ and the backends render from that plan. Adding a spec feature means teaching the
 lower it; the backends keep working. Parity between a machine's container form and its VM form
 holds by construction, and the catalogue's parity contract checks it for real.
 
-The plan carries what the backends share (machines and their shapes, addresses, VMs with their
-OS, networks, routes, checks, constraints, inputs, requirements). What it doesn't model, a
-backend reads from the spec as laid out for its target (`Environment::spec`): a machine's port
-list, its tools, its provisioning steps, the spec's secrets. Both are the same lowered spec, so
-a backend never sees the authored form; a field that more than one backend reads belongs in the
-plan.
+The plan carries every decision the backends share, worked out once: machines with their shapes,
+roles and addresses, VMs with their OS, networks, routes, the tools and their addresses, checks,
+the constraints (the proxy's `no_proxy` completed), the inputs with their sensitivity, the
+secrets, requirements. A backend never works such a fact out from the spec on its own: a rule two
+backends would each apply to the spec belongs in the plan. A backend reads the spec as laid out
+for its target (`Environment::spec`) for what it only writes out as the author gave it (a
+machine's port list, its DNS and VM settings, its provisioning steps), and for what it alone
+does (Compose's appliance wiring and VLAN trunks). Both are the same lowered spec, so a backend
+never sees the authored form.
 
 ## Functional core, imperative shell
 

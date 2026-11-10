@@ -228,7 +228,7 @@ fi"#
 /// would fail otherwise. `None` when the spec names none.
 #[must_use]
 pub fn trust_authorities(env: &Environment) -> Option<String> {
-    isoloom_plan::lifecycle::ca_certificates(env.spec()).and_then(|step| linux(env, "", &step))
+    isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()).and_then(|step| linux(env, "", &step))
 }
 
 /// A shell loop waiting for the file `mark`, the runner's sign that it delivered something,
@@ -273,7 +273,7 @@ fn forwarding(sysctls: &[(&str, &str)]) -> String {
 #[must_use]
 pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
     match step {
-        Step::Prelude => constraints::linux_prelude(env.spec()),
+        Step::Prelude => constraints::linux_prelude(env.constraints.as_ref()),
         Step::DiskGrow => Some(disks::GROW_ROOT_SH.to_owned()),
         Step::Disks { disks } => disks::linux(disks),
         Step::Settings => env.spec().machines.get(machine).and_then(settings::linux),

@@ -5,7 +5,7 @@
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-use isoloom_spec::model::{Machine, MachineFile, Spec};
+use isoloom_spec::model::{Constraints, Machine, MachineFile, Spec};
 
 use crate::addressing::address_for;
 use crate::configure::{Recipe, Resource, Shell};
@@ -185,13 +185,13 @@ pub enum RunKind {
     PowerShell,
 }
 
-/// The step trusting the spec's certificate authorities (`constraints.ca_certificates`) from the
-/// unpacked project, which comes after [`Step::Project`] and before anything downloads: on a
-/// lab machine and on Isoloom's own VMs (a Docker host, the controller, the router) alike. None
-/// when the spec names none.
+/// The step trusting the certificate authorities of `constraints` (`ca_certificates`, the
+/// plan's [`crate::Environment::constraints`]) from the unpacked project, which comes after
+/// [`Step::Project`] and before anything downloads: on a lab machine and on Isoloom's own VMs (a
+/// Docker host, the controller, the router) alike. None when they name none.
 #[must_use]
-pub fn ca_certificates(spec: &Spec) -> Option<Step> {
-    let files = spec.constraints.as_ref().map(|c| c.ca_certificates.clone()).filter(|f| !f.is_empty())?;
+pub fn ca_certificates(constraints: Option<&Constraints>) -> Option<Step> {
+    let files = constraints.map(|c| c.ca_certificates.clone()).filter(|f| !f.is_empty())?;
     Some(Step::CaCertificates { files })
 }
 
@@ -208,7 +208,7 @@ pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) 
         });
     }
     steps.push(Step::Project);
-    steps.extend(ca_certificates(spec));
+    steps.extend(ca_certificates(spec.constraints.as_ref()));
     steps.push(hosts(spec, name));
     steps.push(Step::Settings);
     steps.extend(shared_volumes(spec, name, m));
