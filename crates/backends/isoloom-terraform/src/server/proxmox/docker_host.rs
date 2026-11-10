@@ -13,7 +13,7 @@ use crate::hcl_builder::{Block, BlockBuilder, Expression, boolean, list, number,
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
 use isoloom_render::run_manifest::guest::{self, GuestCompose};
-use isoloom_render::{GeneratedFile, OUTPUT_DIR};
+use isoloom_render::{GeneratedFile, OUTPUT_DIR, steps};
 use isoloom_spec::model::Target;
 
 use super::base::{download, provider};
@@ -32,9 +32,6 @@ pub(super) fn folder() -> String {
 
 /// The Docker host's set-up, beside the module: the run manifest pipes it into `sudo sh -s`.
 pub(super) const SETUP: &str = "setup.sh";
-
-/// Where SSH learns which variables it accepts from a session (the values given at launch).
-const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
 
 /// The module and the set-up script, for Compose running in the VM as `guest` says.
 ///
@@ -101,9 +98,9 @@ fn cloud_config(env: &Environment, guest: &GuestCompose) -> CloudConfig {
     config.bootcmd.extend(cloud_init::prelude(env));
     let forwarded = guest.forwarded();
     if !forwarded.is_empty() {
-        let accept = format!("AcceptEnv {}\n", forwarded.join(" "));
-        config.files.push(cloud_init::file(ACCEPT_ENV_FILE, Some("0644"), string(accept)));
-        config.runcmd.push("systemctl reload ssh || systemctl reload sshd || true".to_owned());
+        let accept = format!("{}\n", steps::accept_env_line(&forwarded));
+        config.files.push(cloud_init::file(steps::ACCEPT_ENV_FILE, Some("0644"), string(accept)));
+        config.runcmd.push(steps::RELOAD_SSHD.to_owned());
     }
     config.runcmd.push("systemctl enable --now qemu-guest-agent".to_owned());
     config

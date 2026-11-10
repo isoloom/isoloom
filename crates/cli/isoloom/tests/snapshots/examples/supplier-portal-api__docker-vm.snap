@@ -660,7 +660,7 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now isoloom-published.service
 "
-  config.vm.provision "accept-env", type: "shell", inline: "mkdir -p /etc/ssh/sshd_config.d && echo 'AcceptEnv API_URL LAUNCH_TOKEN' > /etc/ssh/sshd_config.d/isoloom-env.conf && (systemctl reload ssh || systemctl reload sshd)"
+  config.vm.provision "accept-env", type: "shell", inline: "mkdir -p /etc/ssh/sshd_config.d && echo \"AcceptEnv API_URL LAUNCH_TOKEN\" > /etc/ssh/sshd_config.d/isoloom-env.conf && (systemctl reload ssh || systemctl reload sshd || true)"
   config.vm.provision "shell", name: "environment", inline: "API_URL=\"$(printenv API_URL | base64 -d; printf x)\"; API_URL=\"${API_URL%x}\"; export API_URL
 LAUNCH_TOKEN=\"$(printenv LAUNCH_TOKEN | base64 -d; printf x)\"; LAUNCH_TOKEN=\"${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN
 i=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$i\" -gt 0 ] || echo 'the Docker host: waiting for its secrets, which the runner (run.json) delivers'; i=$((i+5)); if [ \"$i\" -gt 1800 ]; then echo 'the Docker host: its secrets never came; start the environment with the runner (run.json), which reads them from their stores and delivers them' >&2; exit 1; fi; sleep 5; done

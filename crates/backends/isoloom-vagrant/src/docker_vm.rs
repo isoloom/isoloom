@@ -47,8 +47,6 @@ const DIR: &str = "docker-vm";
 pub(crate) const DEFINE: &str = "default";
 /// The provisioner letting SSH carry the values given at launch into the VM.
 const ACCEPT_ENV: &str = "accept-env";
-/// Where that provisioner tells `sshd` which variables to accept.
-const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
 
 /// The run manifest of `env` on a VM Vagrant makes, Compose running in it as `guest` says (the
 /// Compose backend's, [`isoloom_compose::guest`](https://docs.rs/isoloom-compose)); its message is
@@ -181,10 +179,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
     // The project, with the outputs Compose reads.
     docker_host::set_up(r, env, "config", &COMPOSE_OUTPUTS);
     if !forwarded.is_empty() {
-        let accept = format!(
-            "mkdir -p /etc/ssh/sshd_config.d && echo {} > {ACCEPT_ENV_FILE} && (systemctl reload ssh || systemctl reload sshd)",
-            isoloom_spec::shell::quote(&format!("AcceptEnv {}", forwarded.join(" ")))
-        );
+        let accept = steps::accept_env(&forwarded);
         r.provision(Provision::named("config", ACCEPT_ENV, "shell").kw("inline", Value::str(&accept)));
     }
     docker_host::start(r, env, "config", "environment", &scripts.environment);

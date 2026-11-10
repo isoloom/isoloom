@@ -17,18 +17,12 @@ use isoloom_plan::Environment;
 
 use crate::container::{DOCKER_HOST, HostSize};
 
-use crate::steps::{CLOUD_INIT_WAIT, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE, install_docker};
+use crate::steps::{ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, CLOUD_INIT_WAIT, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE, RELOAD_SSHD, install_docker};
 
 /// Isoloom's outputs a Compose VM reads in its copy of the project: the `docker` target's folder
 /// (its Compose file, check scripts and builds) and the configuration files its images copy.
 /// Never another target's folder, nor what the tools write beside them.
 pub const COMPOSE_OUTPUTS: [&str; 2] = [".isoloom/docker", crate::configure::DIR];
-
-/// The sshd drop-in directory where a VM readied over SSH learns which variables it accepts from a
-/// session (the launch's values): the runner forwards them with `SendEnv`, and sshd drops any not
-/// listed in `isoloom-env.conf` here. A bare Terraform-made VM (cloud-docker) may ship without this
-/// directory, so it is created before the drop-in is written.
-const ACCEPT_ENV_DIR: &str = "/etc/ssh/sshd_config.d";
 
 /// A shell command line run in the VM, as one step of the VM's backend. One line for the VM's
 /// login shell, with no single quote: `vagrant ssh -c` wraps it in single quotes.
@@ -205,12 +199,12 @@ impl GuestCompose {
         if forwarded.is_empty() {
             return Ok(None);
         }
-        let vars = forwarded.join(" ");
+        let line = crate::steps::accept_env_line(&forwarded);
         Ok(Some(GuestCommand {
             id: StepId::parse("accept-env")?,
             note: Some("Letting the VM accept the launch's values…".into()),
             command: Template::text(&format!(
-                "sudo mkdir -p {ACCEPT_ENV_DIR} && echo AcceptEnv {vars} | sudo tee {ACCEPT_ENV_DIR}/isoloom-env.conf >/dev/null && sudo sh -c \"systemctl reload ssh || systemctl reload sshd || true\""
+                "sudo mkdir -p {ACCEPT_ENV_DIR} && echo {line} | sudo tee {ACCEPT_ENV_FILE} >/dev/null && sudo sh -c \"{RELOAD_SSHD}\""
             )),
             timeout_s: 60,
             failure: Failure::Fail,

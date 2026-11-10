@@ -29,6 +29,33 @@ pub const MAKE_STATE_DIR: &str = concat!("mkdir -p ", isoloom_spec::linux_state_
 pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
 /// The project's archive on a Windows VM, uploaded before the steps run.
 pub const WINDOWS_PROJECT_ARCHIVE: &str = "C:\\Windows\\Temp\\isoloom-project.tgz";
+/// The sshd drop-in directory where a VM readied over SSH learns which variables it accepts from a
+/// session (the launch's values): the runner forwards them with `SendEnv`, and sshd drops any not
+/// listed in [`ACCEPT_ENV_FILE`]. A bare VM may ship without it: it is created first.
+pub const ACCEPT_ENV_DIR: &str = "/etc/ssh/sshd_config.d";
+/// The drop-in naming the variables sshd accepts ([`accept_env_line`]).
+pub const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
+/// sshd reloaded, whichever of its two unit names the OS gives it; one not running yet (it reads
+/// the drop-in when it starts) doesn't fail the set-up.
+pub const RELOAD_SSHD: &str = "systemctl reload ssh || systemctl reload sshd || true";
+
+/// The line of [`ACCEPT_ENV_FILE`] letting sshd accept `forwarded`, environment variables' names
+/// (upper snake case, so no quoting is needed).
+#[must_use]
+pub fn accept_env_line(forwarded: &[String]) -> String {
+    format!("AcceptEnv {}", forwarded.join(" "))
+}
+
+/// As root, sshd accepting `forwarded` from a session: [`ACCEPT_ENV_FILE`] written, then sshd
+/// reloaded.
+#[must_use]
+pub fn accept_env(forwarded: &[String]) -> String {
+    format!(
+        "mkdir -p {ACCEPT_ENV_DIR} && echo \"{}\" > {ACCEPT_ENV_FILE} && ({RELOAD_SSHD})",
+        accept_env_line(forwarded)
+    )
+}
+
 /// The inputs, uploaded before the steps run (`KEY=value` lines).
 pub const INPUTS_FILE: &str = "/tmp/isoloom-inputs.env";
 /// Where the inputs are kept when a reboot comes (`/tmp` is emptied at boot).
