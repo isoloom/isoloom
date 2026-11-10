@@ -53,6 +53,13 @@ pub const SSH_PROXY_COMMAND: &str = "ISOLOOM_SSH_PROXY_COMMAND";
 /// its `publish` number.
 pub const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
 
+/// The variable holding the graphical consoles the runner chooses for a Vagrant run's VMs
+/// ([`crate::ConsoleSource::Runner`]), as a JSON object `{"<machine>": {"port": <loopback port>,
+/// "password": "<8 characters>"}}`: the Vagrantfile reads it, and turns on a machine's console
+/// only when the machine is in it. It holds passwords: a runner gives it to the run's own Vagrant
+/// processes only, never to a command an embedder runs.
+pub const CONSOLES: &str = "ISOLOOM_CONSOLES";
+
 /// The param naming the host address a Compose file's published ports listen on (`127.0.0.1`
 /// when unset; `0.0.0.0` inside a VM that forwards them).
 pub const PUBLISH_ADDRESS: &str = "ISOLOOM_PUBLISH_ADDRESS";

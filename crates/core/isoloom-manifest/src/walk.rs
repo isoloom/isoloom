@@ -92,7 +92,40 @@ impl Manifest {
                 let address = p.publish.as_ref().and_then(|p| p.address.as_ref());
                 out.extend(address.map(|t| (format!("machines[{i}].ports[{j}].publish.address"), t)));
             }
+            for (j, c) in m.consoles.iter().enumerate() {
+                console(&format!("machines[{i}].consoles[{j}]"), c, out);
+            }
         }
+    }
+}
+
+fn console<'a>(at: &str, c: &'a crate::Console, out: &mut Vec<(String, &'a Template)>) {
+    use crate::ConsoleSource;
+    match &c.source {
+        Some(ConsoleSource::ProxmoxApi {
+            endpoint,
+            node,
+            vm_id,
+            insecure,
+            username,
+            ..
+        }) => {
+            let fields = [
+                ("endpoint", endpoint),
+                ("node", node),
+                ("vm_id", vm_id),
+                ("insecure", insecure),
+                ("username", username),
+            ];
+            out.extend(fields.map(|(k, t)| (format!("{at}.source.{k}"), t)));
+        }
+        Some(ConsoleSource::SshTunnel { via, user, host, .. }) => {
+            out.extend([("via", via), ("user", user), ("host", host)].map(|(k, t)| (format!("{at}.source.{k}"), t)));
+        }
+        Some(ConsoleSource::Libvirt {} | ConsoleSource::QemuMonitor {} | ConsoleSource::Vrde {} | ConsoleSource::Runner {}) | None => {}
+    }
+    if let Some(a) = &c.account {
+        out.extend([("user", &a.user), ("password", &a.password)].map(|(k, t)| (format!("{at}.account.{k}"), t)));
     }
 }
 

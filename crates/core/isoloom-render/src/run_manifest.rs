@@ -387,6 +387,7 @@ pub fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
         native: None,
         volumes: Vec::new(),
         ports: Vec::new(),
+        consoles: Vec::new(),
     })
 }
 

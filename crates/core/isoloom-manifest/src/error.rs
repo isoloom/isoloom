@@ -253,6 +253,30 @@ pub enum Error {
         /// The fields that bind it.
         only: &'static str,
     },
+    /// A machine's console whose fields don't hold together.
+    #[error("{at}: {reason}")]
+    ConsoleShape {
+        /// Where the console is (`machines[0].consoles[1]`).
+        at: String,
+        /// What is wrong.
+        reason: &'static str,
+    },
+    /// Two consoles of one machine for the same provider (or both for every provider).
+    #[error("machine `{machine}`: two consoles under {provider}; a machine lists one console per provider")]
+    ConsoleTwice {
+        /// The machine.
+        machine: String,
+        /// The provider both name, or `every provider`.
+        provider: String,
+    },
+    /// A console naming a slot the manifest doesn't declare.
+    #[error("{at}: no slot `{name}` in this manifest's `secrets`")]
+    UnknownSlot {
+        /// Where the name is.
+        at: String,
+        /// The slot it names.
+        name: String,
+    },
 }
 
 /// What reading or building a manifest returns.
@@ -299,6 +323,9 @@ impl Error {
             Error::UnknownParam { .. } => "unknown_param",
             Error::UnknownOutput { .. } => "unknown_output",
             Error::PlaceholderOutOfPlace { .. } => "placeholder_out_of_place",
+            Error::ConsoleShape { .. } => "console_shape",
+            Error::ConsoleTwice { .. } => "console_twice",
+            Error::UnknownSlot { .. } => "unknown_slot",
         }
     }
 }

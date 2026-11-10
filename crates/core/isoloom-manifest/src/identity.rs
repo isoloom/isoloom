@@ -113,6 +113,21 @@ pub enum Provider {
 }
 
 impl Provider {
+    /// The provider as the manifest writes it (`vmware_desktop`), and `vagrant up --provider`.
+    #[must_use]
+    pub const fn id(self) -> &'static str {
+        match self {
+            Provider::Virtualbox => "virtualbox",
+            Provider::VmwareDesktop => "vmware_desktop",
+            Provider::Hyperv => "hyperv",
+            Provider::Parallels => "parallels",
+            Provider::Libvirt => "libvirt",
+            Provider::Qemu => "qemu",
+            Provider::Utm => "utm",
+            Provider::VmwareEsxi => "vmware_esxi",
+        }
+    }
+
     /// The Vagrant plugin it needs, `None` when Vagrant has it built in (VirtualBox, Hyper-V):
     /// what a manifest's provider names as its `plugin`.
     ///

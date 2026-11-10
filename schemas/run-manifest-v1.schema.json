@@ -1394,6 +1394,13 @@
             "$ref": "#/$defs/Port"
           },
           "description": "The ports it answers on."
+        },
+        "consoles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Console"
+          },
+          "description": "Its graphical consoles, or why it has none, each provider at most once (a VM's; a container has none to list). Absent from older manifests: nothing said."
         }
       },
       "required": [
@@ -1698,6 +1705,243 @@
         }
       ],
       "description": "How a port is published on the host."
+    },
+    "Console": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "providers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/Provider"
+          },
+          "description": "Only under these Vagrant providers (empty: wherever the run goes). A machine's consoles name each provider once."
+        },
+        "protocol": {
+          "$ref": "#/$defs/ConsoleProtocol",
+          "description": "The protocol it speaks, or `none`."
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConsoleSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the runner finds it; absent for `none`."
+        },
+        "account": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConsoleAccount"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account it signs in as, when it signs in to the machine's own OS."
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why there is none, or what it needs (the extension pack VirtualBox's takes), in Isoloom's words. Required for `none`."
+        }
+      },
+      "required": [
+        "protocol"
+      ],
+      "description": "A machine's graphical console under some providers (Vagrant) or wherever it runs, or why it has none there."
+    },
+    "ConsoleProtocol": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "vnc",
+          "description": "VNC (RFB)."
+        },
+        {
+          "type": "string",
+          "const": "rdp",
+          "description": "Microsoft's Remote Desktop Protocol."
+        },
+        {
+          "type": "string",
+          "const": "none",
+          "description": "No graphical console: the console's `note` says why."
+        }
+      ],
+      "description": "The protocol a graphical console speaks."
+    },
+    "ConsoleSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "libvirt"
+            }
+          },
+          "required": [
+            "from"
+          ],
+          "description": "libvirt's VNC display of the VM (its domain: the machine's `native.vm_names.libvirt`), on this computer's loopback at a port libvirt picks when the VM starts: `virsh domdisplay` says which, on the connection the run's Vagrant uses (`qemu:///system` unless `LIBVIRT_DEFAULT_URI` says otherwise)."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "qemu_monitor"
+            }
+          },
+          "required": [
+            "from"
+          ],
+          "description": "The VNC display of a VM vagrant-qemu runs, on this computer's loopback at the first free port from 5900: the VM's QEMU monitor says which (`info vnc`), on the socket vagrant-qemu keeps under its machine folder of the run's Vagrant state."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "vrde"
+            }
+          },
+          "required": [
+            "from"
+          ],
+          "description": "VirtualBox's remote display (VRDE), which speaks RDP, on this computer's loopback: on only when the Oracle VM VirtualBox Extension Pack was installed when the VM booted. `VBoxManage showvminfo` says whether it is on, and its port."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "runner"
+            }
+          },
+          "required": [
+            "from"
+          ],
+          "description": "A VNC server the hypervisor runs on this computer's loopback at a port and with a password the runner chooses for the run (8 characters, the most VNC's authentication reads), kept until `down`. The runner hands both to every Vagrant process of the run's operations in [`crate::contract::CONSOLES`], never to a command it gives an embedder to run."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "endpoint": {
+              "$ref": "#/$defs/Template",
+              "description": "The API's address (`https://<server>:8006/`)."
+            },
+            "node": {
+              "$ref": "#/$defs/Template",
+              "description": "The node the VM is on."
+            },
+            "vm_id": {
+              "$ref": "#/$defs/Template",
+              "description": "The VM's id."
+            },
+            "insecure": {
+              "$ref": "#/$defs/Template",
+              "description": "`true`: the server's certificate isn't verified (a self-signed one)."
+            },
+            "username": {
+              "$ref": "#/$defs/Template",
+              "description": "The user a password signs in as (`root@pam`)."
+            },
+            "token": {
+              "$ref": "#/$defs/Identifier",
+              "description": "The slot holding an API token (`user@realm!id=secret`); used when it has a value."
+            },
+            "password": {
+              "$ref": "#/$defs/Identifier",
+              "description": "The slot holding the user's password, used when the token has none."
+            },
+            "from": {
+              "type": "string",
+              "const": "proxmox_api"
+            }
+          },
+          "required": [
+            "from",
+            "endpoint",
+            "node",
+            "vm_id",
+            "insecure",
+            "username",
+            "token",
+            "password"
+          ],
+          "description": "Proxmox VE's own console, through its API: `vncproxy`, then `vncwebsocket`, of the VM `vm_id` on `node`. The ticket `vncproxy` gives is the VNC password too."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "via": {
+              "$ref": "#/$defs/Template",
+              "description": "The SSH host the tunnel goes through (a machine of the run, by the address the run gives it)."
+            },
+            "user": {
+              "$ref": "#/$defs/Template",
+              "description": "The user the runner's key lets in on `via`."
+            },
+            "host": {
+              "$ref": "#/$defs/Template",
+              "description": "The machine's address, as `via` reaches it."
+            },
+            "port": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535,
+              "description": "The machine's port."
+            },
+            "from": {
+              "type": "string",
+              "const": "ssh_tunnel"
+            }
+          },
+          "required": [
+            "from",
+            "via",
+            "user",
+            "host",
+            "port"
+          ],
+          "description": "A port of the machine reached through an SSH tunnel the runner opens from this computer's loopback to `host:port`, signed in to `via` as `user` with the runner's key."
+        }
+      ],
+      "description": "Where a runner finds a machine's graphical console. The sources a runner reads with no argument are written with none (`{\"from\": \"libvirt\"}`), and refuse one as every field does."
+    },
+    "ConsoleAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "$ref": "#/$defs/Template",
+          "description": "The account's user name."
+        },
+        "password": {
+          "$ref": "#/$defs/Template",
+          "description": "Its password, from an output of the run (a sensitive one: `${outputs.<name>}`)."
+        }
+      },
+      "required": [
+        "user",
+        "password"
+      ],
+      "description": "The account a console signs in as, when its protocol signs in to the machine's own OS (RDP to a Windows machine)."
     },
     "Lifecycle": {
       "type": "object",

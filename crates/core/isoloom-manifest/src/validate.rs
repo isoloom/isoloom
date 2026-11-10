@@ -21,7 +21,8 @@ impl Manifest {
     /// [`Error::DuplicatePort`], [`Error::UnknownMachine`] (the
     /// guest's VM among them),
     /// [`Error::UnknownPublished`], [`Error::UnknownParam`] (the seal's param among them),
-    /// [`Error::UnknownOutput`] and [`Error::PlaceholderOutOfPlace`].
+    /// [`Error::UnknownOutput`], [`Error::PlaceholderOutOfPlace`], then a console's
+    /// [`Error::ConsoleShape`], [`Error::ConsoleTwice`] and [`Error::UnknownSlot`].
     pub fn validate(&self) -> Result<()> {
         if self.hosts.is_empty() {
             return Err(Error::NoHosts);
@@ -46,7 +47,52 @@ impl Manifest {
                 name: seal.param.to_string(),
             });
         }
-        self.placeholders()
+        self.placeholders()?;
+        self.consoles()
+    }
+
+    /// Each machine's consoles: each one's fields holding together, one per provider (or one for
+    /// every provider), and the slots a Proxmox console signs in with declared.
+    fn consoles(&self) -> Result<()> {
+        for (i, m) in self.machines.iter().enumerate() {
+            let mut providers = BTreeSet::new();
+            for (j, c) in m.consoles.iter().enumerate() {
+                let at = format!("machines[{i}].consoles[{j}]");
+                if let Some(reason) = c.shape_error() {
+                    return Err(Error::ConsoleShape { at, reason });
+                }
+                // Every provider (`None`) clashes with any other console; a provider with itself.
+                let everywhere = c.providers.is_empty();
+                let clash = if everywhere {
+                    (j > 0).then_some(None)
+                } else if providers.contains(&None) {
+                    Some(None)
+                } else {
+                    c.providers.iter().find(|p| providers.contains(&Some(**p))).map(|p| Some(*p))
+                };
+                if let Some(p) = clash {
+                    return Err(Error::ConsoleTwice {
+                        machine: m.name.to_string(),
+                        provider: p.map_or_else(|| "every provider".to_owned(), |p| format!("`{}`", p.id())),
+                    });
+                }
+                if everywhere {
+                    providers.insert(None);
+                }
+                providers.extend(c.providers.iter().map(|p| Some(*p)));
+                if let Some(crate::ConsoleSource::ProxmoxApi { token, password, .. }) = &c.source {
+                    for (field, name) in [("token", token), ("password", password)] {
+                        if !self.secrets.iter().any(|s| &s.name == name) {
+                            return Err(Error::UnknownSlot {
+                                at: format!("{at}.source.{field}"),
+                                name: name.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn unique_steps(&self) -> Result<()> {

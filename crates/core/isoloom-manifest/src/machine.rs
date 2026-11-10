@@ -10,6 +10,7 @@ use std::str::FromStr;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::console::Console;
 use crate::identity::Provider;
 use crate::names::{Name, OsName};
 use crate::path::GuestPath;
@@ -314,6 +315,18 @@ pub struct Machine {
     /// The ports it answers on.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ports: Vec<Port>,
+    /// Its graphical consoles, or why it has none, each provider at most once (a VM's; a
+    /// container has none to list). Absent from older manifests: nothing said.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub consoles: Vec<Console>,
+}
+
+impl Machine {
+    /// Its console under `provider` (`None`: a run with no provider), if it lists one.
+    #[must_use]
+    pub fn console(&self, provider: Option<Provider>) -> Option<&Console> {
+        self.consoles.iter().find(|c| c.applies_to(provider))
+    }
 }
 
 #[cfg(test)]

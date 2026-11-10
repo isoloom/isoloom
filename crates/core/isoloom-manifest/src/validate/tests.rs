@@ -225,3 +225,44 @@ fn every_template_of_a_manifest_is_checked_where_it_sits() {
         "lifecycle.up[1].with.file"
     );
 }
+
+#[test]
+fn a_machine_lists_one_console_per_provider() {
+    let consoles = |list: Value| move |d: &mut Value| d["machines"][0]["consoles"] = list;
+    let libvirt = json!({ "providers": ["libvirt"], "protocol": "vnc", "source": { "from": "libvirt" } });
+    let utm = json!({ "providers": ["utm", "hyperv"], "protocol": "none", "note": "SPICE only" });
+    let everywhere = json!({ "protocol": "none", "note": "a container" });
+    assert_eq!(read(consoles(json!([libvirt, utm]))), Ok(()));
+    assert_eq!(read(consoles(json!([everywhere]))), Ok(()));
+    let err = read(consoles(json!([libvirt, libvirt]))).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "machine `web`: two consoles under `libvirt`; a machine lists one console per provider"
+    );
+    assert_eq!(refused(consoles(json!([libvirt, everywhere]))), "console_twice");
+    assert_eq!(refused(consoles(json!([everywhere, libvirt]))), "console_twice");
+    assert_eq!(refused(consoles(json!([everywhere, everywhere]))), "console_twice");
+}
+
+#[test]
+fn a_console_holds_together_and_names_what_the_manifest_declares() {
+    let console = |c: Value| move |d: &mut Value| d["machines"][0]["consoles"] = json!([c]);
+    let shape = read(console(json!({ "protocol": "none" }))).unwrap_err();
+    assert!(matches!(&shape, Error::ConsoleShape { at, .. } if at == "machines[0].consoles[0]"), "{shape}");
+    assert_eq!(refused(console(json!({ "protocol": "rdp", "source": { "from": "libvirt" } }))), "console_shape");
+    assert_eq!(refused(console(json!({ "protocol": "vnc" }))), "console_shape");
+    let tunnel = json!({ "protocol": "rdp", "source": { "from": "ssh_tunnel", "via": "${outputs.nope}", "user": "u", "host": "10.0.0.2", "port": 3389 } });
+    let err = read(console(tunnel)).unwrap_err();
+    assert!(
+        matches!(&err, Error::UnknownOutput { at, .. } if at == "machines[0].consoles[0].source.via"),
+        "{err}"
+    );
+    let proxmox = json!({ "protocol": "vnc", "source": {
+        "from": "proxmox_api", "endpoint": "https://pve:8006/", "node": "pve", "vm_id": "101",
+        "insecure": "true", "username": "root@pam", "token": "proxmox_api_token", "password": "proxmox_password" } });
+    let slot = read(console(proxmox)).unwrap_err();
+    assert!(
+        matches!(&slot, Error::UnknownSlot { at, name } if at == "machines[0].consoles[0].source.token" && name == "proxmox_api_token"),
+        "{slot}"
+    );
+}

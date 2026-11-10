@@ -51,6 +51,7 @@
 pub mod access;
 mod argv;
 mod check_line;
+mod console;
 pub mod contract;
 mod error;
 mod guest;
@@ -75,6 +76,7 @@ mod walk;
 
 pub use argv::{Argv, HostArgv, PerHostArgv, Program};
 pub use check_line::CheckLine;
+pub use console::{Console, ConsoleAccount, ConsoleProtocol, ConsoleSource};
 pub use error::{Error, Result};
 pub use guest::Guest;
 pub use identity::{
