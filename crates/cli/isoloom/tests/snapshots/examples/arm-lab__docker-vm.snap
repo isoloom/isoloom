@@ -369,10 +369,11 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
   end
 end
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown

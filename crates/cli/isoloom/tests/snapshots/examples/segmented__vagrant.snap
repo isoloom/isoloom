@@ -529,10 +529,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -612,9 +613,9 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "back" => { "cache" => 22340 },
-  "front" => { "web" => 35024 },
-  "access" => { "user" => 23499 },
+  "back" => { "cache" => 24007 },
+  "front" => { "web" => 24008 },
+  "access" => { "user" => 24009 },
 }
 
 Vagrant.configure("2") do |config|
@@ -818,10 +819,10 @@ Vagrant.configure("2") do |config|
       v.memory = "1024M"
       v.ssh_auto_correct = true
       v.disk_resize = IsoloomQemu.disk("cloud-image/debian-12", 10)
-      # Port 22340 of network `back`'s hub (see IsoloomQemu).
+      # Port 24007 of network `back`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:22340"
+      v.socket_opts = "connect=127.0.0.1:24007"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1064,10 +1065,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 35024 of network `front`'s hub (see IsoloomQemu).
+      # Port 24008 of network `front`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:35024"
+      v.socket_opts = "connect=127.0.0.1:24008"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1252,10 +1253,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 23499 of network `access`'s hub (see IsoloomQemu).
+      # Port 24009 of network `access`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:23499"
+      v.socket_opts = "connect=127.0.0.1:24009"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -2105,7 +2106,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · cache",
           "vmware_esxi": "segmented-cache"
         },
-        "boot_digest": "sha256:7dd651cf69dd4361784edb4b494b4f3146a45498a1e2df269cea6b3558375748"
+        "boot_digest": "sha256:17a6a7000bb047674fe2b6aa8b5041522f3d0cbc0ff8de7d111de6b252bddeff"
       },
       "ports": [
         {
@@ -2139,7 +2140,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · web",
           "vmware_esxi": "segmented-web"
         },
-        "boot_digest": "sha256:31cd2b1d231b8a001ab4e841ddd8d81d29abf0860dd179a493cb41a6b61d7045"
+        "boot_digest": "sha256:7fba7e83c6a420932e843501792caa9113aa3f5a1629517964f9a41d441aea4c"
       },
       "ports": [
         {
@@ -2180,7 +2181,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "segmented · user",
           "vmware_esxi": "segmented-user"
         },
-        "boot_digest": "sha256:8430639367a74434e2eddaaf7909539e6c57d4ba9160791ad95ba3fa7ef8485f"
+        "boot_digest": "sha256:8d728c4efd3815b9e78de115cfb86ba160c70275e13de2ffc392d3c206949d1a"
       }
     }
   ],

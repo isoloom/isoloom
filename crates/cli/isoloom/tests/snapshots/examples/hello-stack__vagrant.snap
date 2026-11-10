@@ -532,10 +532,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -615,7 +616,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "app" => { "cache" => 38162, "web" => 38163, "isoloom-controller" => 38164 },
+  "app" => { "cache" => 36642, "web" => 36643, "isoloom-controller" => 36644 },
 }
 
 Vagrant.configure("2") do |config|
@@ -662,10 +663,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 38162 of network `app`'s hub (see IsoloomQemu).
+      # Port 36642 of network `app`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:38162"
+      v.socket_opts = "connect=127.0.0.1:36642"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -858,10 +859,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 38163 of network `app`'s hub (see IsoloomQemu).
+      # Port 36643 of network `app`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:38163"
+      v.socket_opts = "connect=127.0.0.1:36643"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1044,10 +1045,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "512M"
       v.ssh_auto_correct = true
-      # Port 38164 of network `app`'s hub (see IsoloomQemu).
+      # Port 36644 of network `app`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:38164"
+      v.socket_opts = "connect=127.0.0.1:36644"
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("app", QEMU_HUBS["app"].values) }
@@ -1883,7 +1884,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · cache",
           "vmware_esxi": "hello-stack-cache"
         },
-        "boot_digest": "sha256:a5fcb089b54365f99f8d55c28868736a0886564b31aefc473a0873fbc1807c6b"
+        "boot_digest": "sha256:ca0949ccfa3994f95b22c39d62bff104b98b9b7ba5e79f7b12d23fa5002fb88f"
       },
       "ports": [
         {
@@ -1917,7 +1918,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · web",
           "vmware_esxi": "hello-stack-web"
         },
-        "boot_digest": "sha256:9c4ef348ac43d7ec53117f5c62c466909883f82c24c43ef34e4cefb71649cde0"
+        "boot_digest": "sha256:f6812f77c58cccf6fe4439febd3b26418c9e3383fe2a92ac3324b87ccb08fe1c"
       },
       "ports": [
         {
@@ -1954,7 +1955,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack · isoloom-controller",
           "vmware_esxi": "hello-stack-isoloom-controller"
         },
-        "boot_digest": "sha256:17418b7161f2a38407d5293a0f81e546a2ce8bd5aea86f40d94d8de8171a135f"
+        "boot_digest": "sha256:2768c70959fcd9093050423701b0b8d04e0d8192b69460a8a97b2d9eab33c719"
       }
     }
   ],

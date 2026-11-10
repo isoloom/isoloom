@@ -67,24 +67,25 @@ fn vms_and_networks(env: &Environment, with_controller: bool) -> Vec<(String, Ve
     vms
 }
 
-/// Each VM's link, by its define name.
+/// Each VM's link, by its define name: a VM on one network gets the environment's next hub
+/// port ([`hub_port`]), so no two of its VMs share one, whatever their networks are called.
 pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String, Link> {
-    let vms = vms_and_networks(env, with_controller);
-    let members = |net: &str| -> Vec<&str> { vms.iter().filter(|(_, nets)| nets.contains(&net)).map(|(n, _)| n.as_str()).collect() };
-    vms.iter()
+    let mut linked = 0;
+    vms_and_networks(env, with_controller)
+        .into_iter()
         .map(|(name, nets)| {
             let link = match nets.as_slice() {
                 [] => Link::None,
                 [net] => {
-                    let at = members(net).iter().position(|n| n == name).unwrap_or_default();
-                    Link::Hub(HubPort {
-                        net: (*net).to_owned(),
-                        port: hub_port(&env.name, net, at),
-                    })
+                    linked += 1;
+                    match hub_port(&env.name, linked - 1) {
+                        Some(port) => Link::Hub(HubPort { net: (*net).to_owned(), port }),
+                        None => Link::Refused(format!("`{name}`: QEMU links at most {PORTS} VMs of an environment, a host port each")),
+                    }
                 }
                 more => Link::Refused(format!("`{name}` is on {} networks, and QEMU gives a VM one", more.len())),
             };
-            (name.clone(), link)
+            (name, link)
         })
         .collect()
 }
@@ -111,18 +112,18 @@ const FIRST_PORT: u16 = 20_000;
 /// How many host ports they use, from [`FIRST_PORT`].
 const PORTS: u16 = 20_000;
 
-/// The host port a network's QEMU link uses: stable for the environment and network, in
-/// 20000-39999.
-fn port(env: &str, net: &str) -> u16 {
-    let offset = stable_hash::of(&format!("{env}/{net}")) % u32::from(PORTS);
+/// The first hub port of environment `env`: stable for it, in 20000-39999.
+fn first_port(env: &str) -> u16 {
+    let offset = stable_hash::of(env) % u32::from(PORTS);
     FIRST_PORT + u16::try_from(offset).unwrap_or_default()
 }
 
-/// The hub port of a network's `at`-th VM: the network's port, then one more a VM (wrapping
-/// within the range).
-fn hub_port(env: &str, net: &str, at: usize) -> u16 {
-    let offset = u16::try_from(at % usize::from(PORTS)).unwrap_or_default();
-    FIRST_PORT + (port(env, net) - FIRST_PORT + offset) % PORTS
+/// The environment's `n`-th hub port (its VMs in the order they are defined, whatever their
+/// network): its first port, then one more each, wrapping within the range. One block, so no two
+/// are the same; `None` past the range's [`PORTS`] ports.
+fn hub_port(env: &str, n: usize) -> Option<u16> {
+    let offset = u16::try_from(n).ok().filter(|n| *n < PORTS)?;
+    Some(FIRST_PORT + (first_port(env) - FIRST_PORT + offset) % PORTS)
 }
 
 /// The first VM that can't have its network, as the reason.
@@ -135,29 +136,35 @@ pub(crate) fn refusal(links: IndexMap<String, Link>) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
+    use super::{HubPort, Link};
+
     #[test]
-    fn ports_are_stable_and_in_range() {
-        let p = super::port("lab", "app");
-        assert_eq!(p, super::port("lab", "app"));
+    fn the_first_port_is_stable_and_in_range() {
+        let p = super::first_port("lab");
+        assert_eq!(p, super::first_port("lab"));
         assert!((20000..40000).contains(&p));
-        assert_ne!(p, super::port("lab", "db"));
+        assert_ne!(p, super::first_port("other"));
     }
 
     #[test]
-    fn hub_ports_follow_the_network_port_and_stay_in_range() {
-        let base = super::port("lab", "app");
-        assert_eq!(super::hub_port("lab", "app", 0), base);
-        for at in [1, 2, 50, 19_999, 20_000] {
-            let p = super::hub_port("lab", "app", at);
-            assert!((20000..40000).contains(&p), "{at}: {p}");
-        }
-        assert_ne!(super::hub_port("lab", "app", 1), base);
+    fn hub_ports_follow_the_first_port_and_stay_in_range() {
+        let base = super::first_port("lab");
+        assert_eq!(super::hub_port("lab", 0), Some(base));
+        let block: Vec<u16> = (0..20_000).filter_map(|n| super::hub_port("lab", n)).collect();
+        assert!(block.iter().all(|p| (20000..40000).contains(p)));
+        assert_eq!(
+            block.iter().collect::<BTreeSet<_>>().len(),
+            20_000,
+            "the block wraps within the range, each port once"
+        );
+        assert_eq!(super::hub_port("lab", 20_000), None, "past the range there is no port left");
     }
 
     #[test]
     fn hubs_name_every_vm_of_the_network_with_its_port() {
-        use super::{HubPort, Link};
-        let base = super::port("lab", "app");
+        let base = super::first_port("lab");
         let hub = |at: u16| {
             Link::Hub(HubPort {
                 net: "app".into(),
@@ -186,15 +193,33 @@ mod tests {
             "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 } }\n  b: { os: debian@12, networks: { lab: 11 } }\n",
         );
         let links = super::links(&env, false);
-        let base = super::port("t", "lab");
-        assert_eq!(links["a"], super::Link::Hub(super::HubPort { net: "lab".into(), port: base }));
+        let base = super::first_port("t");
+        assert_eq!(links["a"], Link::Hub(HubPort { net: "lab".into(), port: base }));
         assert_eq!(
             links["b"],
-            super::Link::Hub(super::HubPort {
+            Link::Hub(HubPort {
                 net: "lab".into(),
                 port: base + 1
             })
         );
         assert_eq!(super::hubs(&links)["lab"].len(), 2);
+    }
+
+    #[test]
+    fn no_two_hub_ports_of_an_environment_are_the_same_whatever_its_networks() {
+        // `n9` and `n235` in `lab` hashed to ports one apart when each network had its own
+        // base: the first network's second VM took the second network's first port.
+        let env = crate::testing::environment(
+            "version: 1\nname: lab\nnetworks:\n  n9: { cidr: 10.9.0.0/24 }\n  n235: { cidr: 10.10.0.0/24 }\nmachines:\n  a: { os: debian@12, networks: { n9: 10 } }\n  b: { os: debian@12, networks: { n9: 11 } }\n  c: { os: debian@12, networks: { n235: 10 } }\n  d: { os: debian@12, networks: { n235: 11 } }\n",
+        );
+        let ports: Vec<u16> = super::links(&env, false)
+            .values()
+            .filter_map(|l| match l {
+                Link::Hub(h) => Some(h.port),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(ports.len(), 4);
+        assert_eq!(ports.iter().collect::<BTreeSet<_>>().len(), 4, "{ports:?}");
     }
 }

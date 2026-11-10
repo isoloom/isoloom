@@ -662,10 +662,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -745,7 +746,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "lab" => { "box" => 36677 },
+  "lab" => { "box" => 29589 },
 }
 
 Vagrant.configure("2") do |config|
@@ -791,10 +792,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 36677 of network `lab`'s hub (see IsoloomQemu).
+      # Port 29589 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:36677"
+      v.socket_opts = "connect=127.0.0.1:29589"
       if "aarch64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1375,7 +1376,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "arm-vm · box",
           "vmware_esxi": "arm-vm-box"
         },
-        "boot_digest": "sha256:c8c76281f79fcfe1f2bd2a8349b0a6dea08308dcdcedf219dc0948eb4b52374a"
+        "boot_digest": "sha256:1e0b81a15eab907e28e9087069f114f087e4fbdc515ff209848aac64c5c9735f"
       },
       "ports": [
         {

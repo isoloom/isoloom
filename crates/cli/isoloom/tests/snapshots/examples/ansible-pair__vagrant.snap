@@ -771,10 +771,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -854,7 +855,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "lab" => { "web" => 27246, "cache" => 27247, "isoloom-controller" => 27248 },
+  "lab" => { "web" => 37770, "cache" => 37771, "isoloom-controller" => 37772 },
 }
 
 Vagrant.configure("2") do |config|
@@ -901,10 +902,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 27246 of network `lab`'s hub (see IsoloomQemu).
+      # Port 37770 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:27246"
+      v.socket_opts = "connect=127.0.0.1:37770"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1050,10 +1051,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 27247 of network `lab`'s hub (see IsoloomQemu).
+      # Port 37771 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:27247"
+      v.socket_opts = "connect=127.0.0.1:37771"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1197,10 +1198,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "768M"
       v.ssh_auto_correct = true
-      # Port 27248 of network `lab`'s hub (see IsoloomQemu).
+      # Port 37772 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:27248"
+      v.socket_opts = "connect=127.0.0.1:37772"
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("lab", QEMU_HUBS["lab"].values) }
@@ -2092,7 +2093,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · web",
           "vmware_esxi": "ansible-pair-web"
         },
-        "boot_digest": "sha256:032cc8b7d7e0a6bd412c686c6597418de2fee12dd66bde81d5d85fbe856ec7e3"
+        "boot_digest": "sha256:dae9e0c2e482b87305bae3bf1fc30112d862919d6fe7b97b78f5ffb58fbb81a6"
       },
       "ports": [
         {
@@ -2126,7 +2127,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · cache",
           "vmware_esxi": "ansible-pair-cache"
         },
-        "boot_digest": "sha256:698e3600c82989c863ba1af4798af86f2f136e9bd8095ae1a04db81da0fb8a4c"
+        "boot_digest": "sha256:bdda436e86485f92b1c5ac01914f5139841e9b3ce1bfb25bcc78774af0861b02"
       },
       "ports": [
         {
@@ -2158,7 +2159,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "ansible-pair · isoloom-controller",
           "vmware_esxi": "ansible-pair-isoloom-controller"
         },
-        "boot_digest": "sha256:3ee2ab3f39f7a1a27b9d8bd3810f019c059ef8bee20c3f5371e2e9bd30f6bba4"
+        "boot_digest": "sha256:20d9d7c53cc215f7eed7a492e1e8302b83b7f8b32630e1e9d43b0a99d6af582d"
       }
     }
   ],

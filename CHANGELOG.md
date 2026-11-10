@@ -525,6 +525,12 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   not `target`), and **an AWS machine's root disk is at least its image's** (Kali's snapshot is
   25 GB; AWS refuses a smaller root volume), or the spec's when it asks for more.
 
+- **QEMU's hub ports are one block per environment.** Each network had its own hashed base
+  port, its VMs the ports after it, so two networks could hand one port to two hubs (`n9` and
+  `n235` in a lab named `lab`: 38221 twice), and one hub couldn't start. The environment's VMs
+  now take consecutive ports from one base, never the same twice; past 20 000 linked VMs QEMU
+  refuses the environment.
+
 ### Removed
 
 - **The Ansible renderer's `ansible.windows.win_feature` task**, which no lab reached: the lab

@@ -699,10 +699,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -782,7 +783,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "app" => { "web" => 34694 },
+  "app" => { "web" => 23790 },
 }
 
 Vagrant.configure("2") do |config|
@@ -831,10 +832,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 34694 of network `app`'s hub (see IsoloomQemu).
+      # Port 23790 of network `app`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:34694"
+      v.socket_opts = "connect=127.0.0.1:23790"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1475,7 +1476,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "tuned-web · web",
           "vmware_esxi": "tuned-web-web"
         },
-        "boot_digest": "sha256:603606292daa770286024499b7c068805a695bda58237e7e13f0c5b330443aba"
+        "boot_digest": "sha256:a30bfab3df159905c496806689b3bea03d192868127d10f2f48e85b959d32ced"
       },
       "ports": [
         {

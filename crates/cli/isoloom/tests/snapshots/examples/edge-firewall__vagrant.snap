@@ -531,10 +531,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -614,9 +615,9 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "dmz" => { "web" => 20432 },
-  "lan" => { "cache" => 32104 },
-  "outside" => { "user" => 35676 },
+  "dmz" => { "web" => 36011 },
+  "lan" => { "cache" => 36012 },
+  "outside" => { "user" => 36013 },
 }
 
 Vagrant.configure("2") do |config|
@@ -809,10 +810,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 20432 of network `dmz`'s hub (see IsoloomQemu).
+      # Port 36011 of network `dmz`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:20432"
+      v.socket_opts = "connect=127.0.0.1:36011"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1032,10 +1033,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 32104 of network `lan`'s hub (see IsoloomQemu).
+      # Port 36012 of network `lan`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:32104"
+      v.socket_opts = "connect=127.0.0.1:36012"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1255,10 +1256,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 35676 of network `outside`'s hub (see IsoloomQemu).
+      # Port 36013 of network `outside`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:35676"
+      v.socket_opts = "connect=127.0.0.1:36013"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -2218,7 +2219,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · web",
           "vmware_esxi": "edge-firewall-web"
         },
-        "boot_digest": "sha256:931a2534c525068c2b903464447165575e67cebb40ead6c9359609689d294c38"
+        "boot_digest": "sha256:c292aad717866e9e82b8b6c571b4f81d4fbc8eb85e31f649473ac4159009d34d"
       },
       "ports": [
         {
@@ -2252,7 +2253,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · cache",
           "vmware_esxi": "edge-firewall-cache"
         },
-        "boot_digest": "sha256:afe7f1fced555fe68518a8dd54d9ee54cc25a5598156f47402181d47e8225b65"
+        "boot_digest": "sha256:d3e95469b359fe1b32a013e9e102797cf423ba3c23b6dc1b098a89d7ba54fc8f"
       },
       "ports": [
         {
@@ -2287,7 +2288,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall · user",
           "vmware_esxi": "edge-firewall-user"
         },
-        "boot_digest": "sha256:48647e0fe861e60fa2845a1888a036734c7440d416cc413d7fe7533c7f13d762"
+        "boot_digest": "sha256:f391e942ba6b53a1f3c31666909b58ad0780f6c8e03107abd31ddf4001951451"
       }
     }
   ],

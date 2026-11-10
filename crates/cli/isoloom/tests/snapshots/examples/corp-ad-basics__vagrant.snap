@@ -527,10 +527,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -610,7 +611,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "corp" => { "dc01" => 29497, "ws-01" => 29498, "ws-02" => 29499 },
+  "corp" => { "dc01" => 33047, "ws-01" => 33048, "ws-02" => 33049 },
 }
 
 Vagrant.configure("2") do |config|
@@ -818,10 +819,10 @@ Vagrant.configure("2") do |config|
       v.memory = "4096M"
       v.ssh_auto_correct = true
       v.disk_resize = IsoloomQemu.disk("gusztavvargadr/windows-server-2022-standard", 60)
-      # Port 29497 of network `corp`'s hub (see IsoloomQemu).
+      # Port 33047 of network `corp`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29497"
+      v.socket_opts = "connect=127.0.0.1:33047"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -939,10 +940,10 @@ Vagrant.configure("2") do |config|
       v.memory = "4096M"
       v.ssh_auto_correct = true
       v.disk_resize = IsoloomQemu.disk("gusztavvargadr/windows-11", 60)
-      # Port 29498 of network `corp`'s hub (see IsoloomQemu).
+      # Port 33048 of network `corp`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29498"
+      v.socket_opts = "connect=127.0.0.1:33048"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1064,10 +1065,10 @@ Vagrant.configure("2") do |config|
       v.memory = "4096M"
       v.ssh_auto_correct = true
       v.disk_resize = IsoloomQemu.disk("gusztavvargadr/windows-11", 60)
-      # Port 29499 of network `corp`'s hub (see IsoloomQemu).
+      # Port 33049 of network `corp`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29499"
+      v.socket_opts = "connect=127.0.0.1:33049"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -2230,7 +2231,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:523892cdbe8ef1e99718fbe1c560ef26761a4406f951d526da492fb686602c0b"
+        "boot_digest": "sha256:86294ff2a6941135b0f0fad9dc2ddc7b27e220dc3489450c3605f5d0032f0372"
       },
       "ports": [
         {
@@ -2283,7 +2284,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:80dcf53f35443b7ad383d1a2b145d010d4207ae9803d962b5bc495dff817d329"
+        "boot_digest": "sha256:2d726beb91cc3d6eddbfee3f3e76323008bb9a5396cbf84a865046fbcec30c5b"
       }
     },
     {
@@ -2310,7 +2311,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics · ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:ab0691463ba759b96df1010f329f49f07396d67713788965b98c1696c2f12b2a"
+        "boot_digest": "sha256:0445f5b45fe6d8cbee7b8f2e9c509766c52eefe4db01b61f397b52c1a87c5644"
       }
     },
     {

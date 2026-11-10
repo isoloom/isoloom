@@ -857,10 +857,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -940,7 +941,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "office" => { "web" => 39759, "block" => 39760, "client" => 39761 },
+  "office" => { "web" => 24774, "block" => 24775, "client" => 24776 },
 }
 
 Vagrant.configure("2") do |config|
@@ -987,10 +988,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 39759 of network `office`'s hub (see IsoloomQemu).
+      # Port 24774 of network `office`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:39759"
+      v.socket_opts = "connect=127.0.0.1:24774"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1174,10 +1175,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 39760 of network `office`'s hub (see IsoloomQemu).
+      # Port 24775 of network `office`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:39760"
+      v.socket_opts = "connect=127.0.0.1:24775"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1376,10 +1377,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 39761 of network `office`'s hub (see IsoloomQemu).
+      # Port 24776 of network `office`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:39761"
+      v.socket_opts = "connect=127.0.0.1:24776"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -2074,7 +2075,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "several-addresses · web",
           "vmware_esxi": "several-addresses-web"
         },
-        "boot_digest": "sha256:0bdc7f484ee24d79b8a9ac37b51bdcac9b50d5098276dbe99d0a3ca254c32a2e"
+        "boot_digest": "sha256:413d8d81b6ce268e874a63b2f3b7b6cff4b9090c8ed0edf8e6f7b7fe34de3832"
       },
       "ports": [
         {
@@ -2108,7 +2109,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "several-addresses · block",
           "vmware_esxi": "several-addresses-block"
         },
-        "boot_digest": "sha256:75a167953e7b49cba3bcd443c01319c6a43b2c6b11d07d045229191c7789e204"
+        "boot_digest": "sha256:9e67a82b53f83fe716a6ef78e78c716a61dfbcbe666e28439bf4f85add13488a"
       }
     },
     {
@@ -2134,7 +2135,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "several-addresses · client",
           "vmware_esxi": "several-addresses-client"
         },
-        "boot_digest": "sha256:13da1043783fc5de6e02ba6480604cc027c2229dd6c3b7b146307d5c14da7a65"
+        "boot_digest": "sha256:8f00632faa7e732bed752ecb4956ebcebe98e89d7acc7f1ba22202d0d3b81766"
       }
     }
   ],

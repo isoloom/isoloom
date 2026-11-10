@@ -530,10 +530,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -613,7 +614,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "office" => { "files01" => 32196, "intranet" => 32197, "isoloom-controller" => 32198 },
+  "office" => { "files01" => 27891, "intranet" => 27892, "isoloom-controller" => 27893 },
 }
 
 Vagrant.configure("2") do |config|
@@ -668,10 +669,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=2"
       v.memory = "3072M"
       v.ssh_auto_correct = true
-      # Port 32196 of network `office`'s hub (see IsoloomQemu).
+      # Port 27891 of network `office`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:32196"
+      v.socket_opts = "connect=127.0.0.1:27891"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -787,10 +788,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 32197 of network `office`'s hub (see IsoloomQemu).
+      # Port 27892 of network `office`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:32197"
+      v.socket_opts = "connect=127.0.0.1:27892"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -936,10 +937,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "512M"
       v.ssh_auto_correct = true
-      # Port 32198 of network `office`'s hub (see IsoloomQemu).
+      # Port 27893 of network `office`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:32198"
+      v.socket_opts = "connect=127.0.0.1:27893"
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("office", QEMU_HUBS["office"].values) }
@@ -1639,7 +1640,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · files01",
           "vmware_esxi": "mixed-office-files01"
         },
-        "boot_digest": "sha256:88b58dc78abb9385e186a6593527a36ad3929a4774100a013a32f14e720a1efa"
+        "boot_digest": "sha256:76f4bc2c6a46c9c7eca57f02c2c52a5317e26d8f83e939e5518081571fea9adf"
       },
       "ports": [
         {
@@ -1673,7 +1674,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · intranet",
           "vmware_esxi": "mixed-office-intranet"
         },
-        "boot_digest": "sha256:92bf53103d5a95f85c9f6ec6cdc0cbc4b66ff4ec9033ce17001edea82eebbf47"
+        "boot_digest": "sha256:0aa19a03233f57e5ab28fab13f2323758c0cd07252446d9bb85594869eb88b90"
       },
       "ports": [
         {
@@ -1710,7 +1711,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "mixed-office · isoloom-controller",
           "vmware_esxi": "mixed-office-isoloom-controller"
         },
-        "boot_digest": "sha256:26761ff493ce1555f768cf38287aeae95e6eb7cdcfd72b7cb8969d3baac58347"
+        "boot_digest": "sha256:0dc16798c1a77cc3f4118dd00fc24afb7649b7a11934e0131feb85f29038bb8a"
       }
     }
   ],

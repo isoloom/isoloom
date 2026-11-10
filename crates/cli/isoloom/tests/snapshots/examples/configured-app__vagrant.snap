@@ -536,10 +536,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -619,7 +620,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "lab" => { "web" => 20659, "api" => 20660, "isoloom-controller" => 20661 },
+  "lab" => { "web" => 37339, "api" => 37340, "isoloom-controller" => 37341 },
 }
 
 Vagrant.configure("2") do |config|
@@ -667,10 +668,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 20659 of network `lab`'s hub (see IsoloomQemu).
+      # Port 37339 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:20659"
+      v.socket_opts = "connect=127.0.0.1:37339"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1213,10 +1214,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 20660 of network `lab`'s hub (see IsoloomQemu).
+      # Port 37340 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:20660"
+      v.socket_opts = "connect=127.0.0.1:37340"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1614,10 +1615,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "512M"
       v.ssh_auto_correct = true
-      # Port 20661 of network `lab`'s hub (see IsoloomQemu).
+      # Port 37341 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:20661"
+      v.socket_opts = "connect=127.0.0.1:37341"
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("lab", QEMU_HUBS["lab"].values) }
@@ -2402,7 +2403,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · web",
           "vmware_esxi": "configured-app-web"
         },
-        "boot_digest": "sha256:5f964eb288f72848cb98555b5606eb9c24e9f7bb20292e73a0240901c2db4498"
+        "boot_digest": "sha256:a24a019321e90789b5f13849979fc7d110b068f9379708a9175cdd559eae67f5"
       },
       "ports": [
         {
@@ -2441,7 +2442,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · api",
           "vmware_esxi": "configured-app-api"
         },
-        "boot_digest": "sha256:bf76c2abc542cb878b97909592d161d7d2cb79f818dbc4bba495b139981ad04c"
+        "boot_digest": "sha256:ea3217776330e8dfdb676381bfb21e8b8c6b80f25fb9141503eea8ea8dcfe759"
       },
       "ports": [
         {
@@ -2479,7 +2480,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-app · isoloom-controller",
           "vmware_esxi": "configured-app-isoloom-controller"
         },
-        "boot_digest": "sha256:f9e6ff26da897106fa3203bdd6ce2598ce14cfe3c4285fb727d0d572d33b241a"
+        "boot_digest": "sha256:371ff3f2051bddc9ee992927a71bee5e3e428bfa59c639362f63a4cc279bf4fd"
       }
     }
   ],

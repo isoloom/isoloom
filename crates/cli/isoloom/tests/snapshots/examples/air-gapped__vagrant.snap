@@ -527,10 +527,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -610,7 +611,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "lab" => { "store" => 29127, "app" => 29128 },
+  "lab" => { "store" => 38831, "app" => 38832 },
 }
 
 Vagrant.configure("2") do |config|
@@ -657,10 +658,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 29127 of network `lab`'s hub (see IsoloomQemu).
+      # Port 38831 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29127"
+      v.socket_opts = "connect=127.0.0.1:38831"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -843,10 +844,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 29128 of network `lab`'s hub (see IsoloomQemu).
+      # Port 38832 of network `lab`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29128"
+      v.socket_opts = "connect=127.0.0.1:38832"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1564,7 +1565,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "air-gapped · store",
           "vmware_esxi": "air-gapped-store"
         },
-        "boot_digest": "sha256:cb8d6eaae8c3cc1b42b437b0df40b6dc993c458ab2ee6faa8392d5bc0102f46c"
+        "boot_digest": "sha256:890fd5ff99405592651726335ecbcdf401f0966b7e8461e0be6c793cda5daf92"
       },
       "ports": [
         {
@@ -1598,7 +1599,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "air-gapped · app",
           "vmware_esxi": "air-gapped-app"
         },
-        "boot_digest": "sha256:7e74e016e31f614ff50bd7967e3b706b5c3a879f28cd89574be906ee74643903"
+        "boot_digest": "sha256:3cd5f0e9934fa957a1554b6929d03c556a02d87a2d28696512e3d160bc3f2574"
       },
       "ports": [
         {

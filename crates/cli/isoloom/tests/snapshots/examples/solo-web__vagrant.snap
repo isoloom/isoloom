@@ -528,10 +528,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -611,7 +612,7 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "app" => { "web" => 29129, "isoloom-controller" => 29130 },
+  "app" => { "web" => 39761, "isoloom-controller" => 39762 },
 }
 
 Vagrant.configure("2") do |config|
@@ -659,10 +660,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 29129 of network `app`'s hub (see IsoloomQemu).
+      # Port 39761 of network `app`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29129"
+      v.socket_opts = "connect=127.0.0.1:39761"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -807,10 +808,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "512M"
       v.ssh_auto_correct = true
-      # Port 29130 of network `app`'s hub (see IsoloomQemu).
+      # Port 39762 of network `app`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29130"
+      v.socket_opts = "connect=127.0.0.1:39762"
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("app", QEMU_HUBS["app"].values) }
@@ -1413,7 +1414,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "solo-web · web",
           "vmware_esxi": "solo-web-web"
         },
-        "boot_digest": "sha256:caa61677a298cb8da706f73d7f09604da18f9ce3498697d036257120957c631b"
+        "boot_digest": "sha256:66fa00dec6d70ad00655cfdbb097b264ec3423371f848d9469979f5933ff43d1"
       },
       "ports": [
         {
@@ -1450,7 +1451,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "solo-web · isoloom-controller",
           "vmware_esxi": "solo-web-isoloom-controller"
         },
-        "boot_digest": "sha256:b217de8a6650ec6e69dd836787e2f9f3bcc9749801b967fbad5e16561f6f18b3"
+        "boot_digest": "sha256:9d4f57eceb0dcdeb3271bf95f6f10a73f1eb99b1d3cf0caafc86a81f8d8a41e0"
       }
     }
   ],

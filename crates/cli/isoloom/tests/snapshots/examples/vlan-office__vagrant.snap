@@ -531,10 +531,11 @@ def esxi_networks(indexes)
 end
 
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
-# - A network of other than two VMs gets a hub: one QEMU process with no machine, a port per VM
-#   on one emulated hub, each VM connecting to its own (no root; multicast doesn't send on a
-#   Mac). It starts before a VM on that network does, unless it runs, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+# - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
+#   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
+#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
+#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
+#   destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -614,9 +615,9 @@ module IsoloomQemu
 end
 # QEMU: each network's hub port of each of its VMs, in the order they start.
 QEMU_HUBS = {
-  "servers" => { "intranet" => 35217 },
-  "office-vlan10" => { "staff" => 39472 },
-  "office-vlan20" => { "guest" => 29621 },
+  "servers" => { "intranet" => 26727 },
+  "office-vlan10" => { "staff" => 26728 },
+  "office-vlan20" => { "guest" => 26729 },
 }
 
 Vagrant.configure("2") do |config|
@@ -817,10 +818,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 35217 of network `servers`'s hub (see IsoloomQemu).
+      # Port 26727 of network `servers`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:35217"
+      v.socket_opts = "connect=127.0.0.1:26727"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1040,10 +1041,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 39472 of network `office-vlan10`'s hub (see IsoloomQemu).
+      # Port 26728 of network `office-vlan10`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:39472"
+      v.socket_opts = "connect=127.0.0.1:26728"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1262,10 +1263,10 @@ Vagrant.configure("2") do |config|
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 29621 of network `office-vlan20`'s hub (see IsoloomQemu).
+      # Port 26729 of network `office-vlan20`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:29621"
+      v.socket_opts = "connect=127.0.0.1:26729"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -2410,7 +2411,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · intranet",
           "vmware_esxi": "vlan-office-intranet"
         },
-        "boot_digest": "sha256:7f28169dc6f204deb94766595bf0d1888c42f613d57ea8cbd06476bba630fc14"
+        "boot_digest": "sha256:5cc56fb60ef7d3b753b1ab3e32a2df6ef95eb88bc7c9ce77d8dba0dbe4cc17e9"
       },
       "ports": [
         {
@@ -2445,7 +2446,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · staff",
           "vmware_esxi": "vlan-office-staff"
         },
-        "boot_digest": "sha256:49285770bd9f1f9f4efaaadb3b6faa833b9d579d1e3804f49ace22c4fafa4365"
+        "boot_digest": "sha256:d4f5e1f830b3301c3239256e0a94c2828da99a87c01f49be7a8d42be6d523e23"
       }
     },
     {
@@ -2471,7 +2472,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "vlan-office · guest",
           "vmware_esxi": "vlan-office-guest"
         },
-        "boot_digest": "sha256:71579df61a6e2bd1b1da7fbbe7243864944628f600183847c7bc81712281ff2c"
+        "boot_digest": "sha256:e9dea7b261aeddf474d112cf89b24ca1e8afb54b3d0fb58062c6334da442ba5d"
       }
     },
     {
