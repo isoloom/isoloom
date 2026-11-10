@@ -1,5 +1,5 @@
 //! Helpers shared by the Terraform run-manifest builders (the clouds and the Proxmox server):
-//! the small template and step-id utilities, a bare machine, a target machine with its ports
+//! the small template and step-id utilities, a bare machine, a lab machine with its ports
 //! fixed, and a state-read output. Each builder differs in its lifecycle, credentials and the
 //! machines it makes; these are what they have in common, kept in one place so no copy drifts.
 
@@ -106,9 +106,10 @@ pub(crate) fn machine(name: &str, role: Role, addresses: BTreeMap<Name, IpAddr>)
     Ok(m)
 }
 
-/// A target machine: a bare machine with its OS, Windows flag and architecture, then each spec
-/// port fixed at its own number on `at` (the machine's public address).
-pub(crate) fn target_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::model::Machine, at: &Template) -> Result<Machine, ManifestError> {
+/// A lab machine (role `member`, or `access`): a bare machine with its OS, Windows flag and
+/// architecture, then each spec port fixed at its own number on `at` (the machine's public
+/// address).
+pub(crate) fn lab_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::model::Machine, at: &Template) -> Result<Machine, ManifestError> {
     // The access machine keeps its role (where the user works from); every machine is made at `up`.
     let role = if spec.access { Role::Access } else { Role::Member };
     let mut m = machine(name, role, addresses(mp)?)?;

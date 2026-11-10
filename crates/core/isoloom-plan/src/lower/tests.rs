@@ -22,7 +22,7 @@ fn on(name: &str, target: Target) -> Lowered {
 }
 
 #[test]
-fn a_flag_becomes_a_secret_file_read_from_its_input() {
+fn an_input_becomes_a_secret_file_on_its_machine() {
     let l = on("help-desk", Target::Docker);
     assert_eq!(l.spec.secrets["input-demo-secret"], SecretSource::Input { input: "DEMO_SECRET".into() });
     let web = &l.spec.machines["web"];

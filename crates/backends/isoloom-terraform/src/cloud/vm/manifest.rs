@@ -81,7 +81,7 @@ fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError> {
     let mut out = Vec::new();
     for (name, mp) in vms(env) {
         let Some(spec) = env.spec().machines.get(name) else { continue };
-        out.push(manifest::target_machine(name, mp, spec, &at(name)?)?);
+        out.push(manifest::lab_machine(name, mp, spec, &at(name)?)?);
     }
     if controller::needed(env) {
         let on = controller::addresses(env);
