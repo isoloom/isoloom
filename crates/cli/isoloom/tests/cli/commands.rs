@@ -174,6 +174,10 @@ fn check_tells_a_missing_file_from_one_it_cant_read() -> Outcome {
     let generated = isoloom(&dir, &[&"generate", &dir])?;
     assert_eq!(generated.code, Some(0), "{generated:?}");
     // A folder where the Compose file was: it exists, but can't be read as a file.
+    let compose = dir.join(".isoloom/docker/compose.yml");
+    if compose.exists() {
+        std::fs::remove_file(&compose)?;
+    }
     std::fs::create_dir(&compose)?;
     std::fs::remove_file(dir.join(".isoloom/docker/run.json"))?;
     let checked = isoloom(&dir, &[&"check", &dir])?;
@@ -482,14 +486,20 @@ fn listing(name: &str, entry: &str) -> Outcome<std::path::PathBuf> {
     Ok(dir)
 }
 
-/// `generate` and `check` on `dir` both refuse its list, naming `entry`, and leave `outside` be.
+/// `generate` and `check` on `dir` both refuse its list, naming `entry`, and leave `outside` be;
+/// `generate` writes nothing before it refuses (a generated file removed stays removed).
 fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Path) -> Outcome {
     let home = scratch("refused-list-home")?;
+    let compose = dir.join(".isoloom/docker/compose.yml");
+    if compose.exists() {
+        std::fs::remove_file(&compose)?;
+    }
     for command in ["generate", "check"] {
         let o = isoloom(&home, &[&command, &dir])?;
         assert_eq!(o.code, Some(2), "{command}: {o:?}");
         assert!(o.stderr.contains(&format!("`.isoloom/.generated` lists `{entry}`")), "{command}: {}", o.stderr);
         assert!(outside.is_file(), "{command} removed {}", outside.display());
+        assert!(!compose.exists(), "{command} wrote files before refusing the list");
     }
     Ok(())
 }

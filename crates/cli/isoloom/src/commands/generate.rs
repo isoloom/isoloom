@@ -26,7 +26,8 @@ pub(crate) struct Args {
 
 /// Writes the files, removes those Isoloom wrote before and no longer writes (in the target's
 /// folder, or anywhere under `.isoloom/` for every target: `generated`), then says why each
-/// target left out wasn't generated. Asking for one target that can't be generated is a no;
+/// target left out wasn't generated. The list of what Isoloom wrote is read, and refused when it
+/// names a path Isoloom won't remove, before anything is written. Asking for one target that can't be generated is a no;
 /// skipping some of all of them isn't, unless one was left out for a failure of its backend
 /// rather than a refusal of the lab: then nothing is written or removed.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
@@ -36,16 +37,16 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     let lab = spec::checked(lab, dir)?;
     let (files, skipped) = files(&lab, target.as_deref())?;
     let files = generated::finish(files, dir)?;
-    for f in &files {
-        generated::write_file(dir, f)?;
-        console.line(format_args!("✓ {}", f.path))?;
-    }
     let stale = if target.is_none() || !files.is_empty() {
         generated::stale(dir, &files, &generated::scope(target.as_deref()))?
     } else {
         Vec::new()
     };
     let list = generated::list(dir, &files, &stale)?;
+    for f in &files {
+        generated::write_file(dir, f)?;
+        console.line(format_args!("✓ {}", f.path))?;
+    }
     generated::remove(dir, &stale)?;
     for p in &stale {
         console.line(format_args!("− {p} (no longer generated)"))?;

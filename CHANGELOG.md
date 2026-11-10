@@ -337,6 +337,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`isoloom generate` refuses a bad `.isoloom/.generated` before it writes anything**: it wrote
+  every file, then refused the list (a path outside `.isoloom/`, one reached through a link),
+  leaving a half-done generation.
 - **`isoloom check` checks `.isoloom/.generated`** like any generated file: a list deleted or
   edited passed, and `generate` then removed nothing it should. Files a 1.x `generate` wrote are
   in no list, so they are never removed: regenerate once from scratch
