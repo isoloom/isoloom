@@ -111,8 +111,8 @@ fn firewalls(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Vec<Block> 
     out
 }
 
-/// Once the run is sealed, a machine with no internet goes out to the lab's blocks only, in
-/// network `net`'s VPC: everything out denied, the lab's blocks allowed before it. A machine's
+/// Once the run is sealed, a machine with no internet goes out to the environment's blocks only,
+/// in network `net`'s VPC: everything out denied, the environment's blocks allowed before it. A machine's
 /// replies to what came in are let out regardless (Google Cloud's firewall is stateful).
 fn sealed((id, who): (&str, &str), env: &Environment, net: &str) -> [Block; 2] {
     let rule = |what: &str, priority: u64, to: Expression, verdict: Block| {
@@ -130,7 +130,7 @@ fn sealed((id, who): (&str, &str), env: &Environment, net: &str) -> [Block; 2] {
     };
     let all = |verdict: &str| Block::builder(verdict).add_attribute(("protocol", string("all"))).build();
     [
-        rule("lab", 900, seal::lab_blocks(env), all("allow")),
+        rule("environment", 900, seal::environment_blocks(env), all("allow")),
         rule("sealed", 1000, list([string("0.0.0.0/0")]), all("deny")),
     ]
 }

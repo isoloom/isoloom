@@ -562,7 +562,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **"environment", not "lab", in the generated files left**: Hyper-V's Linux VMs set their
   addresses with `/etc/isoloom/env-net.sh` (`isoloom-env-net.service`), and a Cisco appliance's
   IOS domain is the environment's private DNS domain, `<name>.internal` unless `dns.private` sets
-  one.
+  one. On Google Cloud, the firewall rule that lets a sealed machine reach the environment's own
+  blocks is `<machine>_environment_<network>` (named `<env>-<machine>-environment-<network>`), not
+  `<machine>_lab_<network>`: a module applied with the old name replaces that rule on its next
+  apply.
 - **What the code says states facts, not a roadmap**: no "(yet)" in the `cloud:` validation
   message or a Compose draft's header; a test holds every string literal of the sources to it.
   ESXi's `images` variable gives its default OVAs' SHA-256, which its provider checks none of.

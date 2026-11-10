@@ -95,3 +95,36 @@ fn the_examples_reference_lists_every_example_with_the_targets_it_allows() -> Ou
     assert!(extra.is_empty(), "docs/reference/examples.md lists examples that don't exist: {extra:?}");
     Ok(())
 }
+
+/// Whether `text` holds `lab` as one part of a name written with dashes or underscores
+/// (`cache_lab_back`, `-cache-lab-back"`).
+fn names_lab(text: &str) -> bool {
+    text.match_indices("lab").any(|(at, _)| {
+        let before = text.get(..at).and_then(|t| t.chars().next_back());
+        let after = text.get(at + 3..).and_then(|t| t.chars().next());
+        matches!(before, Some('-' | '_')) && matches!(after, Some('-' | '_' | '"'))
+    })
+}
+
+/// No generated name says "lab" for the environment: an example that names nothing `lab` gets
+/// none (GCP's sealed machines' firewall rule was `<machine>_lab_<network>`).
+#[test]
+fn no_generated_name_says_lab_unless_the_spec_does() -> Outcome {
+    let mut looked = 0;
+    for dir in &example_dirs()? {
+        let spec = std::fs::read_to_string(dir.join("isoloom.yml"))?;
+        if spec.split(|c: char| !c.is_ascii_alphanumeric()).any(|w| w == "lab") {
+            continue;
+        }
+        let lab = isoloom_targets::Lab::new(isoloom_spec::load(dir)?);
+        for target in lab.possible().into_iter().filter(|t| refusal(&lab, *t).is_none()) {
+            let files = generate(&lab, target).map_err(|e| format!("{}: {}: {e}", dir.display(), target.id()))?;
+            for f in &files {
+                assert!(!names_lab(&f.contents), "{}: {}", dir.display(), f.path);
+            }
+            looked += 1;
+        }
+    }
+    assert!(looked > 0);
+    Ok(())
+}

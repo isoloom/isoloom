@@ -29,15 +29,19 @@ pub(crate) fn when_sealed(yes: Expression, no: Expression) -> Expression {
     conditional(reference(&format!("var.{SEALED}")), yes, no)
 }
 
-/// The lab's own blocks, every network's: where a sealed machine may still go.
-pub(crate) fn lab_blocks(env: &Environment) -> Expression {
+/// The environment's own blocks, every network's: where a sealed machine may still go.
+pub(crate) fn environment_blocks(env: &Environment) -> Expression {
     list(env.networks.values().map(|p| string(p.cidr.to_string())))
 }
 
-/// `["0.0.0.0/0"]`, or the lab's blocks once sealed: where machine `mp` may go.
+/// `["0.0.0.0/0"]`, or the environment's blocks once sealed: where machine `mp` may go.
 pub(crate) fn destinations(env: &Environment, mp: &MachinePlan) -> Expression {
     let anywhere = list([string("0.0.0.0/0")]);
-    if sealed(env, mp) { when_sealed(lab_blocks(env), anywhere) } else { anywhere }
+    if sealed(env, mp) {
+        when_sealed(environment_blocks(env), anywhere)
+    } else {
+        anywhere
+    }
 }
 
 #[cfg(test)]

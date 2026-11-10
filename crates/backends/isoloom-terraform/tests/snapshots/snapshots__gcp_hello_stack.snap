@@ -145,10 +145,10 @@ resource "google_compute_firewall" "cache_ssh" {
   }
 }
 
-resource "google_compute_firewall" "cache_lab_app" {
+resource "google_compute_firewall" "cache_environment_app" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-cache-lab-app"
+  name               = "${local.name}-cache-environment-app"
   network            = google_compute_network.app.id
   direction          = "EGRESS"
   priority           = 900
@@ -248,10 +248,10 @@ resource "google_compute_firewall" "web_published" {
   }
 }
 
-resource "google_compute_firewall" "web_lab_app" {
+resource "google_compute_firewall" "web_environment_app" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-web-lab-app"
+  name               = "${local.name}-web-environment-app"
   network            = google_compute_network.app.id
   direction          = "EGRESS"
   priority           = 900

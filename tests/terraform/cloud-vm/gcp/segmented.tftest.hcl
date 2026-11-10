@@ -226,7 +226,7 @@ run "a_network_without_internet_is_sealed_at_the_network_after_set_up" {
     error_message = "once sealed, cache (on back) must deny all egress to the internet"
   }
   assert {
-    condition     = toset(google_compute_firewall.cache_lab_back[0].destination_ranges) == toset(["10.61.10.0/24", "10.61.20.0/24", "10.61.99.0/24"]) && google_compute_firewall.cache_lab_back[0].priority == 900 && [for a in google_compute_firewall.cache_lab_back[0].allow : a.protocol] == ["all"]
+    condition     = toset(google_compute_firewall.cache_environment_back[0].destination_ranges) == toset(["10.61.10.0/24", "10.61.20.0/24", "10.61.99.0/24"]) && google_compute_firewall.cache_environment_back[0].priority == 900 && [for a in google_compute_firewall.cache_environment_back[0].allow : a.protocol] == ["all"]
     error_message = "once sealed, cache may still reach the lab's own networks, a higher-priority allow before the deny"
   }
 }

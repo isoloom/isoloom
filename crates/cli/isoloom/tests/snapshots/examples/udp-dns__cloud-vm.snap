@@ -2329,10 +2329,10 @@ resource "google_compute_firewall" "dns_published" {
   }
 }
 
-resource "google_compute_firewall" "dns_lab_servers" {
+resource "google_compute_firewall" "dns_environment_servers" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-dns-lab-servers"
+  name               = "${local.name}-dns-environment-servers"
   network            = google_compute_network.servers.id
   direction          = "EGRESS"
   priority           = 900
@@ -2419,10 +2419,10 @@ resource "google_compute_firewall" "client_ssh" {
   }
 }
 
-resource "google_compute_firewall" "client_lab_users" {
+resource "google_compute_firewall" "client_environment_users" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-client-lab-users"
+  name               = "${local.name}-client-environment-users"
   network            = google_compute_network.users.id
   direction          = "EGRESS"
   priority           = 900

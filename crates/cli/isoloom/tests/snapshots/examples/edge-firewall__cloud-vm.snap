@@ -3810,10 +3810,10 @@ resource "google_compute_firewall" "cache_reach_dmz" {
   }
 }
 
-resource "google_compute_firewall" "cache_lab_lan" {
+resource "google_compute_firewall" "cache_environment_lan" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-cache-lab-lan"
+  name               = "${local.name}-cache-environment-lan"
   network            = google_compute_network.lan.id
   direction          = "EGRESS"
   priority           = 900

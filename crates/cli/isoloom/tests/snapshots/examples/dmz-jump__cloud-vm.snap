@@ -3724,10 +3724,10 @@ resource "google_compute_firewall" "app_reach_dmz" {
   }
 }
 
-resource "google_compute_firewall" "app_lab_internal" {
+resource "google_compute_firewall" "app_environment_internal" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-app-lab-internal"
+  name               = "${local.name}-app-environment-internal"
   network            = google_compute_network.internal.id
   direction          = "EGRESS"
   priority           = 900
@@ -3831,10 +3831,10 @@ resource "google_compute_firewall" "db_reach_dmz" {
   }
 }
 
-resource "google_compute_firewall" "db_lab_internal" {
+resource "google_compute_firewall" "db_environment_internal" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-db-lab-internal"
+  name               = "${local.name}-db-environment-internal"
   network            = google_compute_network.internal.id
   direction          = "EGRESS"
   priority           = 900

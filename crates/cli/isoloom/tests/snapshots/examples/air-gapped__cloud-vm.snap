@@ -2138,10 +2138,10 @@ resource "google_compute_firewall" "store_ssh" {
   }
 }
 
-resource "google_compute_firewall" "store_lab_lab" {
+resource "google_compute_firewall" "store_environment_lab" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-store-lab-lab"
+  name               = "${local.name}-store-environment-lab"
   network            = google_compute_network.lab.id
   direction          = "EGRESS"
   priority           = 900
@@ -2228,10 +2228,10 @@ resource "google_compute_firewall" "app_ssh" {
   }
 }
 
-resource "google_compute_firewall" "app_lab_lab" {
+resource "google_compute_firewall" "app_environment_lab" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-app-lab-lab"
+  name               = "${local.name}-app-environment-lab"
   network            = google_compute_network.lab.id
   direction          = "EGRESS"
   priority           = 900

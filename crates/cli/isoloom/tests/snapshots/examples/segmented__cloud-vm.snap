@@ -2881,10 +2881,10 @@ resource "google_compute_firewall" "cache_reach_front" {
   }
 }
 
-resource "google_compute_firewall" "cache_lab_back" {
+resource "google_compute_firewall" "cache_environment_back" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-cache-lab-back"
+  name               = "${local.name}-cache-environment-back"
   network            = google_compute_network.back.id
   direction          = "EGRESS"
   priority           = 900

@@ -3331,10 +3331,10 @@ resource "google_compute_firewall" "intranet_reach_office_vlan10" {
   }
 }
 
-resource "google_compute_firewall" "intranet_lab_servers" {
+resource "google_compute_firewall" "intranet_environment_servers" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-intranet-lab-servers"
+  name               = "${local.name}-intranet-environment-servers"
   network            = google_compute_network.servers.id
   direction          = "EGRESS"
   priority           = 900
@@ -3421,10 +3421,10 @@ resource "google_compute_firewall" "staff_ssh" {
   }
 }
 
-resource "google_compute_firewall" "staff_lab_office_vlan10" {
+resource "google_compute_firewall" "staff_environment_office_vlan10" {
   count              = var.isoloom_sealed ? 1 : 0
   project            = local.project
-  name               = "${local.name}-staff-lab-office-vlan10"
+  name               = "${local.name}-staff-environment-office-vlan10"
   network            = google_compute_network.office_vlan10.id
   direction          = "EGRESS"
   priority           = 900
