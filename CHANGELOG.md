@@ -235,6 +235,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **`isoloom_manifest::CheckLine::parse`** reads a line a check runner prints
   (`isoloom-check/1`): the protocol's one reader, which a runner uses instead of a copy. It
   replaces `isoloom_plan::checks::{parse_line, Line}`.
+- **`isoloom_manifest::Provider::plugin`**: the Vagrant plugin a provider needs, the one table
+  the Vagrant backend writes into a manifest's providers and a runner can read without one.
 
 ### Changed
 

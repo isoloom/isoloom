@@ -112,6 +112,30 @@ pub enum Provider {
     VmwareEsxi,
 }
 
+impl Provider {
+    /// The Vagrant plugin it needs, `None` when Vagrant has it built in (VirtualBox, Hyper-V):
+    /// what a manifest's provider names as its `plugin`.
+    ///
+    /// ```
+    /// use isoloom_manifest::Provider;
+    ///
+    /// assert_eq!(Provider::Libvirt.plugin(), Some("vagrant-libvirt"));
+    /// assert_eq!(Provider::Virtualbox.plugin(), None);
+    /// ```
+    #[must_use]
+    pub const fn plugin(self) -> Option<&'static str> {
+        match self {
+            Provider::Virtualbox | Provider::Hyperv => None,
+            Provider::VmwareDesktop => Some("vagrant-vmware-desktop"),
+            Provider::Parallels => Some("vagrant-parallels"),
+            Provider::Libvirt => Some("vagrant-libvirt"),
+            Provider::Qemu => Some("vagrant-qemu"),
+            Provider::Utm => Some("vagrant_utm"),
+            Provider::VmwareEsxi => Some("vagrant-vmware-esxi"),
+        }
+    }
+}
+
 /// A native tool the steps run, probed before `up`: a missing one fails with its name, not a raw
 /// spawn error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

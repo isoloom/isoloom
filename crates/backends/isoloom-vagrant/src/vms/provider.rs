@@ -43,8 +43,6 @@ pub(crate) struct Known {
     pub(crate) share: Option<&'static str>,
     /// The hosts it exists on.
     pub(crate) hosts: &'static [HostOs],
-    /// Its Vagrant plugin, if it needs one.
-    pub(crate) plugin: Option<&'static str>,
 }
 
 const EVERY_HOST: &[HostOs] = &[HostOs::Linux, HostOs::Macos, HostOs::Windows];
@@ -58,14 +56,12 @@ impl Provider<'static> {
             manifest: ManifestProvider::Virtualbox,
             share: Some("virtualbox"),
             hosts: EVERY_HOST,
-            plugin: None,
         },
         Known {
             provider: Provider::VmwareDesktop,
             manifest: ManifestProvider::VmwareDesktop,
             share: Some("vmware"),
             hosts: EVERY_HOST,
-            plugin: Some("vagrant-vmware-desktop"),
         },
         // Its only two-way shared folder is SMB, which asks for a password at every `vagrant up`.
         Known {
@@ -73,35 +69,30 @@ impl Provider<'static> {
             manifest: ManifestProvider::Hyperv,
             share: None,
             hosts: &[HostOs::Windows],
-            plugin: None,
         },
         Known {
             provider: Provider::Parallels,
             manifest: ManifestProvider::Parallels,
             share: Some("parallels"),
             hosts: &[HostOs::Macos],
-            plugin: Some("vagrant-parallels"),
         },
         Known {
             provider: Provider::Libvirt,
             manifest: ManifestProvider::Libvirt,
             share: Some("virtiofs"),
             hosts: &[HostOs::Linux],
-            plugin: Some("vagrant-libvirt"),
         },
         Known {
             provider: Provider::Qemu,
             manifest: ManifestProvider::Qemu,
             share: Some("qemu_virtiofs"),
             hosts: &[HostOs::Linux, HostOs::Macos],
-            plugin: Some("vagrant-qemu"),
         },
         Known {
             provider: Provider::Utm,
             manifest: ManifestProvider::Utm,
             share: Some("utm"),
             hosts: &[HostOs::Macos],
-            plugin: Some("vagrant_utm"),
         },
         // Its VMs run on the ESXi host, not on the computer that runs the lab: nothing to share.
         Known {
@@ -109,7 +100,6 @@ impl Provider<'static> {
             manifest: ManifestProvider::VmwareEsxi,
             share: None,
             hosts: EVERY_HOST,
-            plugin: Some("vagrant-vmware-esxi"),
         },
     ];
 }

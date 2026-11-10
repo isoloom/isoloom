@@ -17,7 +17,7 @@ fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<
     Ok(VagrantProvider {
         id: k.manifest,
         hosts: k.hosts.iter().copied().collect(),
-        plugin: k.plugin.map(ToolName::parse).transpose()?,
+        plugin: k.manifest.plugin().map(ToolName::parse).transpose()?,
         elevation,
         remote: k.manifest == Provider::VmwareEsxi,
         refusal,
