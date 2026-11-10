@@ -1,7 +1,7 @@
 //! The kustomizations: the environment's (its manifests, and the project's scripts as a
 //! `ConfigMap` read from the chart's copies, inside the kustomization's folder) and the checks'
-//! (their runners). Typed, so the command line reads back which project files to copy
-//! ([`project_scripts`]).
+//! (their runners); and how a container runs a script of that `ConfigMap` ([`run_script`]).
+//! Typed, so the command line reads back which project files to copy ([`project_scripts`]).
 
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +50,15 @@ pub(crate) struct ConfigMapGenerator {
 
 /// The `ConfigMap` of the project's scripts the pods run (init jobs, checks).
 pub(crate) const SCRIPTS: &str = "isoloom-scripts";
+
+/// Where a container running the project's scripts mounts the [`SCRIPTS`] `ConfigMap`.
+pub(crate) const SCRIPTS_DIR: &str = "/isoloom/scripts";
+
+/// The command running the project's script `path` from the [`SCRIPTS`] `ConfigMap`, mounted at
+/// [`SCRIPTS_DIR`].
+pub(crate) fn run_script(path: &str) -> String {
+    format!("sh {SCRIPTS_DIR}/{}", key(path))
+}
 
 /// The `ConfigMap` of the check runners.
 pub(crate) const CHECK_SCRIPTS: &str = "isoloom-check-runners";

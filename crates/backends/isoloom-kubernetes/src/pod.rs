@@ -10,14 +10,14 @@ use isoloom_render::constraints;
 use isoloom_spec::shell;
 
 use crate::files;
-use crate::kustomize::{SCRIPTS, key};
+use crate::kustomize::{SCRIPTS, SCRIPTS_DIR, run_script};
 use crate::machine::{Machine, udp};
 use crate::network::MACHINE_LABEL;
 use crate::objects::{
     Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Image, Labels, Limits, NameValue, PodAffinity, PodSpec, Resources,
     SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
 };
-use crate::process::{self, SCRIPTS_DIR};
+use crate::process;
 use crate::storage;
 
 // Isoloom's static busybox (the probe needs nothing from the machine's image) and its utility
@@ -185,7 +185,7 @@ fn jobs_container(m: &Machine, mounts: &[VolumeMount]) -> Option<Container> {
         return None;
     }
     let wait = m.probed().then(|| format!("until {}; do sleep 2; done", process::ready_test(m)));
-    let run = m.init().iter().map(|script| format!("sh {SCRIPTS_DIR}/{}", key(script)));
+    let run = m.init().iter().map(|script| run_script(script));
     let steps: Vec<String> = wait.into_iter().chain(run).chain(["exec sleep infinity".to_owned()]).collect();
     let mut c = Container::new("init", m.image());
     c.image_pull_policy = IF_NOT_PRESENT;

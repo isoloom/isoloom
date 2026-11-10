@@ -12,9 +12,6 @@ use isoloom_render::container::PROBE_DIR;
 use crate::machine::Machine;
 use crate::objects::{Container, Exec, HttpGet, Probe};
 
-/// Where the project's scripts are, in a container running them.
-pub(crate) const SCRIPTS_DIR: &str = "/isoloom/scripts";
-
 /// The command and the working directory on the machine's container.
 pub(crate) fn apply(m: &Machine, c: &mut Container) {
     let p = &m.plan.process;

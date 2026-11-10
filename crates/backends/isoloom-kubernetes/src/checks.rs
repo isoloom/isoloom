@@ -10,7 +10,7 @@ use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, check_runner, exec_runner};
 
 use crate::error::Result;
-use crate::kustomize::{CHECK_SCRIPTS, Kustomization, key};
+use crate::kustomize::{CHECK_SCRIPTS, Kustomization, SCRIPTS_DIR, run_script};
 use crate::layout::output;
 use crate::network::{self, CHECK_LABEL};
 use crate::objects::{Container, Image, JobSpec, Labels, Manifest, Metadata, PodSpec, PodTemplate, Selector, Volume, VolumeMount};
@@ -49,11 +49,6 @@ fn host(h: &Host, _: &Position) -> String {
         Host::Literal(l) => l.clone(),
         Host::Machine { name, .. } => name.clone(),
     }
-}
-
-/// A project script, from the `ConfigMap` the pod mounts.
-fn run_script(path: &str) -> String {
-    format!("sh /isoloom/scripts/{}", key(path))
 }
 
 /// One position's runners, its Job and, standing on offline networks only, its egress policy
@@ -115,7 +110,7 @@ impl Check<'_> {
             source: config_map_volume(CHECK_SCRIPTS),
         }];
         if self.scripts {
-            check.volume_mounts.push(VolumeMount::at("scripts", "/isoloom/scripts"));
+            check.volume_mounts.push(VolumeMount::at("scripts", SCRIPTS_DIR));
             volumes.push(Volume {
                 name: "scripts".into(),
                 source: scripts_volume(),
