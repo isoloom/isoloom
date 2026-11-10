@@ -29,7 +29,7 @@ type Table = (Vec<String>, Vec<Vec<String>>);
 pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String> {
     let (head, rows) = match name {
         "addressing" => addressing(r),
-        "ports" | "services" => ports(r),
+        "ports" => ports(r),
         "wiring" => wiring(r),
         "resources" => resources(r),
         other => {
@@ -246,5 +246,6 @@ mod tests {
     fn an_unknown_report_names_the_known_ones() {
         let e = report("nope", &Value::Null, false).err().map(|e| e.to_string());
         assert_eq!(e.as_deref(), Some("no report named `nope`; one of: addressing, ports, wiring, resources"));
+        assert!(report("services", &Value::Null, false).is_err(), "only the names it lists");
     }
 }
