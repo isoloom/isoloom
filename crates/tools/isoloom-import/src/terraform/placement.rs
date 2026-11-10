@@ -3,14 +3,14 @@
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::vms::Machine;
 use crate::draft::writer::{Header, Writer};
 use crate::naming::{network_names, unique};
 
 /// The network the draft adds for machines without an address when nothing else is used.
-const FALLBACK_NETWORK: Cidr = Cidr { base: 0x0a58_0100, len: 24 };
+const FALLBACK_NETWORK: Cidr = Cidr::enclosing(Ipv4Addr::new(10, 88, 1, 0), 24);
 
 /// Where the machines sit: the networks used, by block, with the subnet's name (empty when
 /// none), and each machine's networks with its address's last octet.
@@ -103,15 +103,12 @@ impl Placement {
 
 /// The one-address block of `ip`.
 fn host(ip: Ipv4Addr) -> Cidr {
-    Cidr { base: u32::from(ip), len: 32 }
+    Cidr::enclosing(ip, 32)
 }
 
 /// The /24 an address outside every subnet makes its own network of.
 fn own_block(ip: Ipv4Addr) -> Cidr {
-    Cidr {
-        base: u32::from(ip) & 0xffff_ff00,
-        len: 24,
-    }
+    Cidr::enclosing(ip, 24)
 }
 
 #[cfg(test)]

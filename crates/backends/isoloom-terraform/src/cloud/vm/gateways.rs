@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan, Step};
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 /// The networks a machine routes, each with that machine, in spec order.
 pub(crate) fn routed(env: &Environment) -> Vec<(&str, &str)> {
@@ -112,7 +112,7 @@ pub(crate) fn free_address(env: &Environment, net: &str, c: Cidr) -> Option<Ipv4
     let tools = u32::try_from(env.spec().tools.len()).unwrap_or(u32::MAX);
     let top = u32::from(c.controller()).checked_sub(1)?.checked_sub(tools)?;
     let taken: Vec<Ipv4Addr> = env.machines.values().filter_map(|m| m.addresses.get(net).copied()).collect();
-    (c.base + 2..=top).rev().map(Ipv4Addr::from).find(|a| !taken.contains(a))
+    (c.base() + 2..=top).rev().map(Ipv4Addr::from).find(|a| !taken.contains(a))
 }
 
 /// The smallest block holding every network, when one of `shortest` bits or longer does: a
@@ -120,9 +120,9 @@ pub(crate) fn free_address(env: &Environment, net: &str, c: Cidr) -> Option<Ipv4
 pub(crate) fn covering(env: &Environment, shortest: u8) -> Option<Cidr> {
     let nets: Vec<Cidr> = env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).collect();
     let first = nets.first()?;
-    (shortest..=first.len)
+    (shortest..=first.prefix())
         .rev()
-        .map(|len| Cidr::enclosing(Ipv4Addr::from(first.base), len))
+        .map(|len| Cidr::enclosing(first.address(), len))
         .find(|c| nets.iter().all(|n| c.contains(*n)))
 }
 

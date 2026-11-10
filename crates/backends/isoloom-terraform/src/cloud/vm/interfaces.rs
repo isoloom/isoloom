@@ -6,7 +6,7 @@ use std::net::Ipv4Addr;
 use crate::hcl_builder::{Expression, Template};
 use indexmap::IndexMap;
 use isoloom_plan::Environment;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 /// The commands bringing up the interfaces after the first (found by MAC, `mac(network)` the
 /// expression of its interface's MAC address, lowercase and colon-separated as `ip link`
@@ -27,7 +27,7 @@ fn up_with(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>, mac: &dyn 
         .iter()
         .skip(1)
         .map(|(n, a)| {
-            let len = env.networks.get(n).and_then(|p| Cidr::parse(&p.cidr)).map_or(32, |c| c.len);
+            let len = env.networks.get(n).and_then(|p| Cidr::parse(&p.cidr)).map_or(32, Cidr::prefix);
             let mut t = Template::text("IF=$(ip -o link | grep -i \"");
             t.append(mac(n, *a));
             t.push_text(format!(

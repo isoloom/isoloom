@@ -6,7 +6,7 @@
 use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::router;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::SERVICE_OS;
 use super::guest::{Guest, Nic};
@@ -27,7 +27,7 @@ fn bastion() -> Expression {
 
 /// The prefix length of a network's range.
 fn len(env: &Environment, net: &str) -> u8 {
-    env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(32, |c| c.len)
+    env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(32, Cidr::prefix)
 }
 
 /// An interface on network `net` at `address`: its MTU, and the default route through the
@@ -128,7 +128,7 @@ fn controller(env: &Environment, m: &mut Module) {
         .enumerate()
         .filter_map(|(n, (net, plan))| {
             let c = Cidr::parse(&plan.cidr)?;
-            Some(nic(env, net, format!("{}/{}", c.controller(), c.len), n == 0))
+            Some(nic(env, net, format!("{}/{}", c.controller(), c.prefix()), n == 0))
         })
         .collect();
     let Some(host) = nics.first().and_then(|n| n.addresses.first()?.split('/').next().map(str::to_owned)) else {

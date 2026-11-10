@@ -6,8 +6,8 @@ use std::net::Ipv4Addr;
 use isoloom_plan::Environment;
 use isoloom_plan::addressing::address;
 use isoloom_plan::environment::Route;
+use isoloom_spec::net::Cidr;
 use isoloom_spec::shell::quote;
-use isoloom_spec::validate::Cidr;
 
 use crate::network::{ipv6, router, trunks};
 use crate::{boot, powershell};
@@ -56,7 +56,7 @@ pub(super) fn windows_routes(routes: &[Route]) -> Option<String> {
         .iter()
         .filter_map(|r| {
             let block = Cidr::parse(&r.cidr)?;
-            Some(format!("route -p add {} MASK {} {}", Ipv4Addr::from(block.base), block.netmask(), r.via))
+            Some(format!("route -p add {} MASK {} {}", block.address(), block.netmask(), r.via))
         })
         .collect();
     (!lines.is_empty()).then(|| lines.join("; "))

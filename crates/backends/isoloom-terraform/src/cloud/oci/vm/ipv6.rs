@@ -9,7 +9,7 @@
 use crate::hcl_builder::{Block, BlockBuilder, Template, boolean, string};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_spec::model::Ipv6Addresses;
-use isoloom_spec::validate::IPV6_PREFIX;
+use isoloom_spec::net::IPV6_PREFIX;
 
 /// Whether `net` is dual-stack and leaves its machines' addresses to Oracle Cloud.
 fn auto(env: &Environment, net: &str) -> bool {

@@ -23,6 +23,7 @@ pub mod instance;
 pub mod linux;
 mod load;
 pub mod model;
+pub mod net;
 pub mod os;
 pub mod placeholders;
 pub mod probe;

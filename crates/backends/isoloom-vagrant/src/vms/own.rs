@@ -15,7 +15,7 @@ use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY};
 use isoloom_render::router;
 use isoloom_render::{GeneratedFile, controller};
 use isoloom_spec::model::Spec;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::hyperv::HyperV;
 use super::machine::{define, private_network};

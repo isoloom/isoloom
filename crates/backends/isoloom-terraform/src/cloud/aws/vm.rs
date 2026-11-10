@@ -27,7 +27,7 @@ mod routing;
 use crate::hcl_builder::{Block, BlockBuilder, Module, string};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_spec::images::is_windows;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::{INSTANCE_TYPES, ami, ami_filter, zones};
 use crate::cloud::Cloud;
@@ -215,7 +215,7 @@ fn refusal(env: &Environment) -> Option<String> {
 
 fn networks_refusal(env: &Environment) -> Option<String> {
     let nets: Vec<Cidr> = env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).collect();
-    let family = |c: &Cidr| c.base >> 24;
+    let family = |c: &Cidr| c.base() >> 24;
     let mixed = || nets.iter().any(|c| family(c) != nets.first().map_or(0, family));
     RULES
         .subnets(env)

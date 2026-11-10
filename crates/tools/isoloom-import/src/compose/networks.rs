@@ -12,7 +12,8 @@ use super::text::str_of;
 use crate::draft::{LEFT_OUT, NoteKind, Notes};
 use crate::naming::{label, unique};
 use crate::{Error, Result};
-use isoloom_spec::validate::{Cidr, PRIVATE};
+use isoloom_spec::net::Cidr;
+use isoloom_spec::net::PRIVATE;
 
 /// Where re-addressed networks go: `10.88.<n>.0/24`.
 const READDRESS_BASE: &str = "10.88";
@@ -129,7 +130,7 @@ impl Blocks {
         let usable = subnet
             .as_deref()
             .and_then(Cidr::parse)
-            .filter(|c| c.len >= 24 && c.len <= 29 && PRIVATE.iter().any(|r| r.contains(*c)));
+            .filter(|c| c.prefix() >= 24 && c.prefix() <= 29 && PRIVATE.iter().any(|r| r.contains(*c)));
         if let Some(c) = usable {
             return Ok(c);
         }

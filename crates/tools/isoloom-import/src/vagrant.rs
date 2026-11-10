@@ -9,7 +9,7 @@ mod write;
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 use serde_json::Value;
 
 pub use recording::Recording;
@@ -64,10 +64,7 @@ struct Bridge {
 }
 
 /// The block a DHCP public network is given: the Vagrantfile doesn't say the LAN's.
-const LAN_PLACEHOLDER: Cidr = Cidr {
-    base: u32::from_be_bytes([192, 168, 1, 0]),
-    len: 24,
-};
+const LAN_PLACEHOLDER: Cidr = Cidr::enclosing(std::net::Ipv4Addr::new(192, 168, 1, 0), 24);
 
 /// What the import collects across the machines.
 #[derive(Debug)]

@@ -3,7 +3,8 @@
 
 use isoloom_render::router;
 use isoloom_spec::model::Spec;
-use isoloom_spec::validate::{Cidr, docker_cidrs};
+use isoloom_spec::net::Cidr;
+use isoloom_spec::net::docker_cidrs;
 use serde_json::{Map, Value, json};
 
 /// One address per network of the spec, `at` its block. A network whose block doesn't parse

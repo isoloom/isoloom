@@ -7,8 +7,9 @@
 //! networks), so machines keep the addresses the spec writes.
 
 use crate::model::{NetworkDocker, Spec};
-use crate::validate::docker_cidrs;
-use crate::validate::{Cidr, Cidr6};
+use crate::net::Cidr;
+use crate::net::Cidr6;
+use crate::net::docker_cidrs;
 use crate::{Error, Result};
 use isoloom_manifest::contract::OUTPUT_DIR;
 
@@ -43,10 +44,10 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
     // Docker blocks: the second octet moves by n (10.61.10.0/24 -> 10.63.10.0/24 for instance 2),
     // staying inside 10.0.0.0/8; networks keep their distance from each other.
     for (name, block) in docker_cidrs(spec) {
-        let [_, second, third, fourth] = std::net::Ipv4Addr::from(block.base).octets();
-        let shifted = Cidr {
-            base: u32::from_be_bytes([10, second.wrapping_add(n), third, fourth]),
-            len: block.len,
+        let [_, second, third, fourth] = block.address().octets();
+        // The low octets are the block's own, so the shifted one is a block too.
+        let Some(shifted) = Cidr::new(u32::from_be_bytes([10, second.wrapping_add(n), third, fourth]), block.prefix()) else {
+            continue;
         };
         if let Some(net) = copy.networks.get_mut(&name) {
             net.docker = Some(NetworkDocker { cidr: shifted.to_string() });
@@ -76,16 +77,11 @@ fn shift_ipv6(copy: &mut Spec, n: u8) -> Result<()> {
     for (name, net) in &mut copy.networks {
         let Some(v6) = net.ipv6.as_mut() else { continue };
         let Some(block) = Cidr6::parse(&v6.cidr) else { continue };
-        let moved = Cidr6 {
-            base: block.base.wrapping_add(u128::from(n) << 80),
-        };
-        if Cidr6::parse(&moved.to_string()).is_none() {
-            return Err(Error::InstanceIpv6 {
-                network: name.clone(),
-                cidr: v6.cidr.clone(),
-                instance: n,
-            });
-        }
+        let moved = Cidr6::new(block.base().wrapping_add(u128::from(n) << 80)).ok_or_else(|| Error::InstanceIpv6 {
+            network: name.clone(),
+            cidr: v6.cidr.clone(),
+            instance: n,
+        })?;
         v6.cidr = moved.to_string();
     }
     Ok(())

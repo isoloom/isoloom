@@ -19,7 +19,7 @@ use isoloom_render::backend::Files;
 use isoloom_render::container::PROBE_IMAGE;
 use isoloom_render::{GeneratedFile, header, trunks};
 use isoloom_spec::model::{Arch, Target};
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use crate::error::{Error, Result};
 use crate::file::{Attachment, ComposeFile, NetworkMode, Restart, Service, Volume};

@@ -15,7 +15,7 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_render::router;
 use isoloom_spec::model::{Arch, Machine};
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::firewall::{self, Guest};
 use crate::machine::cloud_init::file;
@@ -201,7 +201,7 @@ fn initialization(env: &Environment, c: Container) -> Block {
         .add_attribute(("hostname", string(name)))
         .add_block(dns.build());
     for (i, (net, addr)) in mp.addresses.iter().enumerate() {
-        let len = env.networks.get(net).and_then(|p| Cidr::parse(&p.cidr)).map_or(32, |cidr| cidr.len);
+        let len = env.networks.get(net).and_then(|p| Cidr::parse(&p.cidr)).map_or(32, Cidr::prefix);
         let mut ipv4 = Block::builder("ipv4").add_attribute(("address", string(format!("{addr}/{len}"))));
         if i == 0 {
             ipv4 = ipv4.add_attribute(("gateway", string(first.as_str())));

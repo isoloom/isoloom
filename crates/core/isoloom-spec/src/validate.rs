@@ -10,8 +10,6 @@
 
 mod boot;
 mod checks;
-mod cidr;
-mod cidr6;
 mod cloud;
 mod constraints;
 mod dns;
@@ -46,11 +44,9 @@ mod tests;
 use std::collections::BTreeSet;
 
 use crate::model::{Machine, Spec};
+use crate::net::Cidr;
 use crate::syntax::Code;
 
-pub(crate) use cidr::DOCKER_BLOCK;
-pub use cidr::{Cidr, PRIVATE, docker_cidrs};
-pub use cidr6::{Cidr6, PREFIX as IPV6_PREFIX};
 pub use files::validate_files;
 
 /// One thing wrong with a lowered spec: the field's path and what to do about it. The plan

@@ -5,7 +5,7 @@
 
 use crate::hcl_builder::{Block, number, reference, string};
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::machine::ip_config;
 
@@ -28,7 +28,7 @@ pub(super) fn interfaces(env: &Environment, mp: &MachinePlan) -> Vec<(Block, Blo
                 }
             };
             let ip = match address {
-                OutsideAddress::Fixed(ip) => format!("{ip}/{}", Cidr::parse(&n.cidr).map_or(32, |c| c.len)),
+                OutsideAddress::Fixed(ip) => format!("{ip}/{}", Cidr::parse(&n.cidr).map_or(32, Cidr::prefix)),
                 OutsideAddress::Dhcp => "dhcp".to_owned(),
             };
             // The machine's rate limit holds on every link; reach rules don't reach outside.

@@ -27,7 +27,7 @@ use std::net::Ipv4Addr;
 use crate::hcl_builder::Module;
 use isoloom_plan::{Environment, NetworkPlan};
 use isoloom_spec::images::is_windows;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::{own_project, public_ip};
 use crate::cloud::Cloud;

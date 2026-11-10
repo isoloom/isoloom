@@ -7,7 +7,8 @@ use isoloom_plan::Environment;
 use isoloom_plan::ipv6;
 use isoloom_render::router;
 use isoloom_spec::model::Target;
-use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
+use isoloom_spec::net::Cidr;
+use isoloom_spec::net::IPV6_PREFIX;
 
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::machine::cloud_init::file;
@@ -88,7 +89,7 @@ fn interface(m: Expression, rest: &[&str]) -> Expression {
 fn networks(env: &Environment) -> Vec<Expression> {
     let mut out = Vec::new();
     for (i, (net, plan)) in (0..).zip(&env.networks) {
-        let len = Cidr::parse(&plan.cidr).map_or(32, |c| c.len);
+        let len = Cidr::parse(&plan.cidr).map_or(32, Cidr::prefix);
         let address = format!("Address={}/{len}", router::address(env.spec(), net));
         // An IPv6 network's router address too (the routes6 of the machines go through it).
         let address6 = ipv6::router_address(env.spec(), net).map(|a| format!("Address={a}/{IPV6_PREFIX}"));

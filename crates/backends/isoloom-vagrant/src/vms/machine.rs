@@ -10,7 +10,7 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, PublishedPort};
 use isoloom_render::GeneratedFile;
 use isoloom_spec::model::Arch;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::hyperv::{HyperV, Nic};
 use super::providers::{self, Guest, Qemu, Size};
@@ -143,7 +143,7 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
         call = call
             .kw("libvirt__guest_ipv6", Value::str("yes"))
             .kw("libvirt__ipv6_address", Value::str(&v6.gateway.to_string()))
-            .kw("libvirt__ipv6_prefix", Value::str(&isoloom_spec::validate::IPV6_PREFIX.to_string()));
+            .kw("libvirt__ipv6_prefix", Value::str(&isoloom_spec::net::IPV6_PREFIX.to_string()));
     }
     r.call(call);
 }
@@ -153,7 +153,7 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
 fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a VagrantBox, link: &'a Link) -> Guest<'a> {
     let os = Os::of(mp);
     // No cloud-init on Windows: its lab address is set from PowerShell.
-    let prefix = |net: &str| env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(24, |c| c.len);
+    let prefix = |net: &str| env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(24, Cidr::prefix);
     let windows_address = mp.addresses.first().filter(|_| os == Os::Windows).map(|(net, ip)| (*ip, prefix(net)));
     let hyperv = HyperV {
         env: &env.name,

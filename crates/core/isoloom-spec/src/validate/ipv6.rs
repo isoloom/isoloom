@@ -2,8 +2,8 @@
 //! goes through Isoloom's IPv4 router or NAT).
 
 use super::Problems;
-use super::cidr6::Cidr6;
 use crate::model::{Network, Spec};
+use crate::net::Cidr6;
 
 /// Each network's IPv6 block: valid, not shared, and an IPv6-only network kept to what works
 /// without IPv4.

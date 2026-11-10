@@ -50,7 +50,7 @@ pub(crate) fn step(spec: &Spec, m: &Machine) -> Option<Step> {
         .filter_map(|(n, more)| {
             Some(MoreAddresses {
                 primary: address(spec, &n, *m.networks.get(&n)?),
-                prefix: cidr(spec, &n).len,
+                prefix: cidr(spec, &n).prefix(),
                 more,
             })
         })

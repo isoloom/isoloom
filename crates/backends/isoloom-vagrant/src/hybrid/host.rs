@@ -8,7 +8,7 @@ use isoloom_render::router;
 use isoloom_render::stable_hash;
 use isoloom_spec::linux::PROJECT_DIR;
 use isoloom_spec::model::Target;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use crate::docker_host;
 use crate::error::{Error, Result};

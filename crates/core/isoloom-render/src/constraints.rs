@@ -15,8 +15,8 @@ use std::collections::HashSet;
 
 pub use isoloom_plan::images::rewrite_image;
 use isoloom_spec::model::{Constraints, Mirrors, Spec};
+use isoloom_spec::net::docker_cidrs;
 use isoloom_spec::shell::quote;
-use isoloom_spec::validate::docker_cidrs;
 
 /// The spec's constraints, when it has any that change something.
 #[must_use]

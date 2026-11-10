@@ -96,7 +96,7 @@ pub(super) fn ready(env: &Environment, applied: &str) -> Result<Vec<Condition>, 
         }
     }
     if controller::needed(env) {
-        let first = env.networks.values().next().and_then(|n| isoloom_spec::validate::Cidr::parse(&n.cidr));
+        let first = env.networks.values().next().and_then(|n| isoloom_spec::net::Cidr::parse(&n.cidr));
         if let Some(c) = first {
             out.push(ready_file(&c.controller().to_string(), PLAYBOOKS_S)?);
         }

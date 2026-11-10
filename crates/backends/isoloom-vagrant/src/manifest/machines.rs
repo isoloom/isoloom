@@ -11,7 +11,7 @@ use isoloom_manifest::{Machine, Name, Native, OsName, Provider, Role, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{addresses, arch, port};
 use isoloom_spec::model::Target;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::keeps_controller;
 use crate::error::{Error, Result};

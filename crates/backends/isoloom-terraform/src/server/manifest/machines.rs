@@ -9,7 +9,7 @@ use isoloom_manifest::{Error as ManifestError, Machine, Name, Output, OutputRole
 use isoloom_plan::Environment;
 use isoloom_render::router;
 use isoloom_render::run_manifest::outputs_with;
-use isoloom_spec::validate::Cidr as SpecCidr;
+use isoloom_spec::net::Cidr as SpecCidr;
 
 use crate::machine::controller;
 use crate::module::manifest;

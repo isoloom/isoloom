@@ -5,7 +5,8 @@
 
 use isoloom_plan::{Environment, NetworkPlan};
 use isoloom_spec::model::{Machine, Reach};
-use isoloom_spec::validate::{Cidr, PRIVATE};
+use isoloom_spec::net::Cidr;
+use isoloom_spec::net::PRIVATE;
 
 /// Machine `m`'s own networks, each with its plan.
 pub(crate) fn own<'a>(env: &'a Environment, m: &'a Machine) -> impl Iterator<Item = (&'a String, &'a NetworkPlan)> {
@@ -72,7 +73,7 @@ pub(crate) fn out_of<'a>(env: &'a Environment, net: &str) -> Vec<Rule<'a>> {
 /// these without opening the environment's other networks.
 pub(crate) fn public_blocks() -> Vec<String> {
     let mut out = Vec::new();
-    split(Cidr { base: 0, len: 0 }, &mut out);
+    split(Cidr::ALL, &mut out);
     out.into_iter().map(|c| c.to_string()).collect()
 }
 
@@ -84,15 +85,11 @@ fn split(block: Cidr, out: &mut Vec<Cidr>) {
         out.push(block);
         return;
     }
-    let len = block.len + 1;
-    split(Cidr { base: block.base, len }, out);
-    split(
-        Cidr {
-            base: block.base | (1u32 << (32 - len)),
-            len,
-        },
-        out,
-    );
+    // A block overlapping a private range without lying in it is wider than a /32.
+    if let Some((low, high)) = block.halves() {
+        split(low, out);
+        split(high, out);
+    }
 }
 
 #[cfg(test)]
@@ -102,7 +99,7 @@ mod tests {
     #[test]
     fn the_public_blocks_leave_out_exactly_the_private_ranges() {
         let blocks: Vec<Cidr> = public_blocks().iter().filter_map(|b| Cidr::parse(b)).collect();
-        let size = |c: &Cidr| 1u64 << (32 - c.len);
+        let size = |c: &Cidr| 1u64 << (32 - c.prefix());
         let private: u64 = PRIVATE.iter().map(size).sum();
         assert_eq!(blocks.iter().map(size).sum::<u64>() + private, 1u64 << 32);
         assert!(blocks.iter().all(|b| PRIVATE.iter().all(|p| !b.overlaps(*p))));

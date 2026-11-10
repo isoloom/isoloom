@@ -3,7 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 use proptest::prelude::*;
 
 fn mask(len: u8) -> u32 {
@@ -28,7 +28,7 @@ proptest! {
     #[test]
     fn a_network_address_parses_to_itself((base, len) in block()) {
         let c = parsed(base, len)?;
-        prop_assert_eq!((c.base, c.len), (base, len));
+        prop_assert_eq!((c.base(), c.prefix()), (base, len));
     }
 
     #[test]

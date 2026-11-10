@@ -10,7 +10,7 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use crate::checks::{Invocation, Runner, output_block};
 use crate::machine::cloud_init::{self, CloudConfig, file};

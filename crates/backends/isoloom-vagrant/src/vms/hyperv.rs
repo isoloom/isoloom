@@ -23,7 +23,7 @@ use crate::boxes::{self, HyperVBox};
 use isoloom_plan::addressing::netmask;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::linux::CONFIG_DIR;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 use isoloom_spec::windows::Tpm;
 
 use super::providers::Size;
@@ -84,7 +84,7 @@ impl<'a> Nic<'a> {
         Nic {
             net,
             ip,
-            len: env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(24, |c| c.len),
+            len: env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(24, Cidr::prefix),
             mask: netmask(env.spec(), net),
         }
     }

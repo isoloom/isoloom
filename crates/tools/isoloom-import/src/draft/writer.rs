@@ -4,7 +4,7 @@
 
 use std::fmt::Display;
 
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 /// A draft being written, top to bottom.
 #[derive(Debug)]

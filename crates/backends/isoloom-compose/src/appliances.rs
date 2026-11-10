@@ -32,7 +32,7 @@ use isoloom_render::trunks;
 pub(crate) use isoloom_spec::appliance::MGMT_CIDR;
 use isoloom_spec::appliance::is_switch;
 use isoloom_spec::model::{Appliance, Machine, Spec};
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 use isoloom_spec::vlans;
 
 /// Isoloom's management network for appliances, outside the environment (no `reach`, no checks).
@@ -50,10 +50,7 @@ pub(crate) fn appliances(spec: &Spec) -> Vec<(&String, &Machine, Appliance)> {
 }
 
 /// [`MGMT_CIDR`] as a block, written out so reading it can't fail (a test checks they agree).
-const MGMT: Cidr = Cidr {
-    base: u32::from_be_bytes([10, 255, 255, 0]),
-    len: 24,
-};
+const MGMT: Cidr = Cidr::enclosing(std::net::Ipv4Addr::new(10, 255, 255, 0), 24);
 
 /// An appliance's position among the environment's appliances (0 for a machine that isn't one).
 fn position(spec: &Spec, name: &str) -> usize {
@@ -62,7 +59,7 @@ fn position(spec: &Spec, name: &str) -> usize {
 
 /// An appliance's management address: .10 and up on the management network.
 pub(crate) fn mgmt_address(spec: &Spec, name: &str) -> Ipv4Addr {
-    Ipv4Addr::from(MGMT.base + 10 + u32::try_from(position(spec, name)).unwrap_or(0))
+    Ipv4Addr::from(MGMT.base() + 10 + u32::try_from(position(spec, name)).unwrap_or(0))
 }
 
 /// IOL's instance number: unique in the environment (1, 2...).

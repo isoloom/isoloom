@@ -8,7 +8,7 @@ use crate::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
 use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::machine::cloud_init::{self, CloudConfig, file};
@@ -28,7 +28,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     for (net, plan) in &env.networks {
         nics.push(super::links::device(env, net, None, None));
         let c = Cidr::parse(&plan.cidr);
-        ips.push(ip_config(&c.map(|c| format!("{}/{}", c.controller(), c.len)).unwrap_or_default(), None));
+        ips.push(ip_config(&c.map(|c| format!("{}/{}", c.controller(), c.prefix())).unwrap_or_default(), None));
     }
     let (cpus, memory, disk) = controller::size(env);
     let mut depends_on = vec![reference("proxmox_virtual_environment_vm.isoloom_router")];

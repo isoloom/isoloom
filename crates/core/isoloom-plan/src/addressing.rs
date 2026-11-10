@@ -5,11 +5,12 @@
 use std::net::Ipv4Addr;
 
 use isoloom_spec::model::{Machine, Spec};
-use isoloom_spec::validate::{Cidr, starts_after};
+use isoloom_spec::net::Cidr;
+use isoloom_spec::validate::starts_after;
 
 /// A block that stands in for one that doesn't parse: 0.0.0.0/24, whose reserved addresses
 /// (gateway, controller, router, tools) all exist, so nothing computed from it overflows.
-const UNPARSED: Cidr = Cidr { base: 0, len: 24 };
+const UNPARSED: Cidr = Cidr::enclosing(std::net::Ipv4Addr::UNSPECIFIED, 24);
 
 /// A network's block: the one place the plan and the backends read a network's `cidr`.
 /// Validation rejects a block that doesn't parse and a network nothing declares, so a validated
@@ -25,7 +26,7 @@ pub fn cidr(spec: &Spec, network: &str) -> Cidr {
 /// and the block a /24 or smaller, so the address lies in the block.
 #[must_use]
 pub fn address(spec: &Spec, network: &str, octet: u8) -> Ipv4Addr {
-    Ipv4Addr::from((cidr(spec, network).base & !0xff) | u32::from(octet))
+    Ipv4Addr::from((cidr(spec, network).base() & !0xff) | u32::from(octet))
 }
 
 /// Dotted netmask of a network.

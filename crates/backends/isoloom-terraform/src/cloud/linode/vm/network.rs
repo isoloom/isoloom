@@ -7,7 +7,7 @@
 
 use crate::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::linode::{Action, Way, rule};

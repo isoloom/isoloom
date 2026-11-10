@@ -16,7 +16,7 @@ use isoloom_spec::images;
 use isoloom_spec::model::{
     Arch, Boot, Constraints, External, HostFolder, Machine, MachineFile, Network, Protocol, Resources, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
 };
-use isoloom_spec::validate::docker_cidrs;
+use isoloom_spec::net::docker_cidrs;
 use isoloom_spec::windows::{self, Tpm};
 
 mod image;

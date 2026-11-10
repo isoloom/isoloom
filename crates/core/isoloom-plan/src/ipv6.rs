@@ -7,7 +7,7 @@ use std::net::Ipv6Addr;
 
 use indexmap::IndexMap;
 use isoloom_spec::model::{Ipv6Addresses, Machine, Spec};
-use isoloom_spec::validate::Cidr6;
+use isoloom_spec::net::Cidr6;
 
 use crate::addressing::cidr;
 use crate::requirements::Requirement;

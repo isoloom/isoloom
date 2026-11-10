@@ -7,8 +7,8 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use isoloom_plan::Environment;
 use isoloom_plan::ipv6::{Route6, block};
 use isoloom_spec::model::Spec;
+use isoloom_spec::net::IPV6_PREFIX as PREFIX;
 use isoloom_spec::shell::quote;
-use isoloom_spec::validate::IPV6_PREFIX as PREFIX;
 
 /// Shell that puts each `(IPv4 address, IPv6 address)` pair's IPv6 address on the interface
 /// holding the IPv4 one, then installs the routes. Idempotent (`replace`); no duplicate address

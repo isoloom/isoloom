@@ -10,8 +10,8 @@
 use indexmap::IndexMap;
 
 use crate::model::{Network, Reach, Spec, Vlan};
+use crate::net::Cidr;
 use crate::syntax::{Code, FieldPath, Problem};
-use crate::validate::Cidr;
 
 /// The network a VLAN becomes: `office` + 10 -> `office-vlan10`.
 pub(crate) fn vlan_network(lan: &str, id: u16) -> String {

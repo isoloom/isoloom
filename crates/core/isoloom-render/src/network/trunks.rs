@@ -221,7 +221,7 @@ pub fn machine_commands(spec: &Spec, m: &Machine, t: &Trunk, address: impl Fn(&s
         cmds.push(format!(
             "ip link add link {name} name {name}.{id} type vlan id {id} && ip addr add {}/{} dev {name}.{id} && ip link set {name}.{id} up",
             address(&v.network, v.octet),
-            cidr(spec, &v.network).len,
+            cidr(spec, &v.network).prefix(),
             id = v.id
         ));
     }
@@ -261,7 +261,7 @@ pub(crate) fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> 
     ];
     for v in &t.vlans {
         let (id, addr) = (v.id, address(&v.network, v.octet));
-        let len = cidr(spec, &v.network).len;
+        let len = cidr(spec, &v.network).prefix();
         // The NIC keeps a local MAC; `<lan>.<id>` takes the one the hypervisor gave it.
         let local = format!("02:1f:{}", addr.octets().map(|o| format!("{o:02x}")).join(":"));
         steps.push(format!(

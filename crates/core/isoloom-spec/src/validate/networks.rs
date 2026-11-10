@@ -1,8 +1,9 @@
 //! `networks`: blocks (valid, private, /24 to /29, not overlapping), gateways, a LAN's switch,
 //! the appliances' management network, link impairment, and the blocks on Docker.
 
-use super::{Blocks, Cidr, DOCKER_BLOCK, PRIVATE, Problems, block, dns_label};
+use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Network, Spec, Tc};
+use crate::net::{Cidr, DOCKER_BLOCK, PRIVATE};
 
 /// At least one network, unless the environment is cloud services.
 pub(super) fn declared(spec: &Spec, p: &mut Problems) {
@@ -25,7 +26,7 @@ pub(super) fn blocks(spec: &Spec, p: &mut Problems) -> Blocks {
         };
         if !PRIVATE.iter().any(|r| r.contains(c)) {
             p.add(format!("{at}.cidr"), "use a private block: inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16");
-        } else if c.len < 24 || c.len > 29 {
+        } else if c.prefix() < 24 || c.prefix() > 29 {
             p.add(format!("{at}.cidr"), "use a /24 to /29 block");
         }
         for (other, oc) in &blocks {
@@ -43,12 +44,12 @@ pub(super) fn blocks(spec: &Spec, p: &mut Problems) -> Blocks {
 fn docker_block(at: &str, net: &Network, c: Cidr, p: &mut Problems) {
     let Some(d) = &net.docker else { return };
     match Cidr::parse(&d.cidr) {
-        Some(dc) if dc.len == c.len && DOCKER_BLOCK.contains(dc) => {}
+        Some(dc) if dc.prefix() == c.prefix() && DOCKER_BLOCK.contains(dc) => {}
         Some(_) => p.add(
             format!("{at}.docker.cidr"),
             format!(
                 "use a /{} block inside 10.0.0.0/8 (the same size as `cidr`, so addresses keep their last octet)",
-                c.len
+                c.prefix()
             ),
         ),
         None => p.add(format!("{at}.docker.cidr"), format!("`{}` isn't a network address like 10.20.0.0/24", d.cidr)),
@@ -218,7 +219,7 @@ fn tc_values(at: &str, tc: &Tc, p: &mut Problems) {
 
 /// On Docker, the networks (moved or not) mustn't overlap either. Valid blocks only.
 pub(super) fn docker_overlaps(spec: &Spec, p: &mut Problems) {
-    let docker = super::docker_cidrs(spec);
+    let docker = crate::net::docker_cidrs(spec);
     for (i, (a, ca)) in docker.iter().enumerate() {
         for (b, cb) in docker.iter().skip(i + 1) {
             if ca.overlaps(*cb) {

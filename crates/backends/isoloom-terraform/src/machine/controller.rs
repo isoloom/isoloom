@@ -13,7 +13,7 @@ use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_K
 use isoloom_render::{controller, steps};
 use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::model::Winrm;
-use isoloom_spec::validate::Cidr;
+use isoloom_spec::net::Cidr;
 
 use super::provisioner::{Connection, Provisioner, Upload};
 use super::{Shell, linux, vms, windows};

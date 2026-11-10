@@ -15,10 +15,30 @@ pub const PREFIX: u8 = 64;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cidr6 {
     /// The network address, as a number.
-    pub base: u128,
+    base: u128,
 }
 
 impl Cidr6 {
+    /// The /64 of network address `base`, when it is one: no host bit set, unique local
+    /// (`fc00::/7`) or global unicast (`2000::/3`).
+    #[must_use]
+    pub const fn new(base: u128) -> Option<Cidr6> {
+        let host_bits = (1u128 << (128 - PREFIX)) - 1;
+        let unique_local = base >> 121 == 0x7e;
+        let global = base >> 125 == 1;
+        if base & host_bits == 0 && (unique_local || global) {
+            Some(Cidr6 { base })
+        } else {
+            None
+        }
+    }
+
+    /// Its network address, as a number.
+    #[must_use]
+    pub const fn base(self) -> u128 {
+        self.base
+    }
+
     /// The block written `prefix::/64`, when it is one: the address must be the network
     /// address itself, unique local (`fc00::/7`) or global unicast (`2000::/3`).
     #[must_use]
@@ -28,11 +48,7 @@ impl Cidr6 {
         if len.parse::<u8>().ok()? != PREFIX {
             return None;
         }
-        let base = u128::from(ip);
-        let host_bits = (1u128 << (128 - PREFIX)) - 1;
-        let unique_local = base >> 121 == 0x7e;
-        let global = base >> 125 == 1;
-        (base & host_bits == 0 && (unique_local || global)).then_some(Cidr6 { base })
+        Cidr6::new(u128::from(ip))
     }
 
     /// Whether the two blocks are the same: two /64 blocks share an address only then.
