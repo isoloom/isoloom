@@ -350,9 +350,16 @@ mod tests {
         assert!(StepId::parse("Up").is_err());
         assert!(SnakeName::parse("web_portal").is_ok());
         assert!(SnakeName::parse("web-portal").is_err());
-        assert_eq!(SnakeName::from_label("Web-Admin.ui").map(|s| s.as_str().to_owned()).ok().as_deref(), Some("web_admin_ui"));
-        assert!(SnakeName::from_label("9lives").is_err());
         assert!(OsName::parse("alpine-3.19").is_ok());
+    }
+
+    #[test]
+    fn a_label_in_snake_case_is_lowercase_with_underscores() {
+        assert_eq!(
+            SnakeName::from_label("Web-Admin.ui").map(|s| s.as_str().to_owned()).ok().as_deref(),
+            Some("web_admin_ui")
+        );
+        assert!(SnakeName::from_label("9lives").is_err());
     }
 
     #[test]
