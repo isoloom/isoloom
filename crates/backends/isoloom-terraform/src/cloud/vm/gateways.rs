@@ -122,15 +122,8 @@ pub(crate) fn covering(env: &Environment, shortest: u8) -> Option<Cidr> {
     let first = nets.first()?;
     (shortest..=first.len)
         .rev()
-        .map(|len| Cidr {
-            base: first.base & mask(len),
-            len,
-        })
+        .map(|len| Cidr::enclosing(Ipv4Addr::from(first.base), len))
         .find(|c| nets.iter().all(|n| c.contains(*n)))
-}
-
-fn mask(len: u8) -> u32 {
-    if len == 0 { 0 } else { u32::MAX << (32 - len) }
 }
 
 #[cfg(test)]

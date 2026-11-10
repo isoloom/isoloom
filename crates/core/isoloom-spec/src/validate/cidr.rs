@@ -34,6 +34,23 @@ impl Cidr {
         (base & mask == base).then_some(Cidr { base, len })
     }
 
+    /// The block of `len` bits (32 at most) that holds `address`: `10.9.3.0/24` for
+    /// `10.9.3.10` and 24.
+    #[must_use]
+    pub fn enclosing(address: Ipv4Addr, len: u8) -> Cidr {
+        let len = len.min(32);
+        Cidr {
+            base: u32::from(address) & Self::mask(len),
+            len,
+        }
+    }
+
+    /// The block's netmask: `255.255.255.0` for a /24.
+    #[must_use]
+    pub fn netmask(self) -> Ipv4Addr {
+        Ipv4Addr::from(Self::mask(self.len))
+    }
+
     fn mask(len: u8) -> u32 {
         if len == 0 { 0 } else { u32::MAX << (32 - len) }
     }
@@ -185,6 +202,17 @@ mod tests {
 
     fn ip(text: &str) -> Ipv4Addr {
         text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_blocks_netmask_and_the_block_enclosing_an_address() {
+        assert_eq!(block("10.20.0.0/24").netmask(), ip("255.255.255.0"));
+        assert_eq!(block("10.20.0.64/28").netmask(), ip("255.255.255.240"));
+        assert_eq!(block("0.0.0.0/0").netmask(), Ipv4Addr::UNSPECIFIED);
+        assert_eq!(block("10.20.0.5/32").netmask(), Ipv4Addr::BROADCAST);
+        assert_eq!(Cidr::enclosing(ip("10.9.3.77"), 28), block("10.9.3.64/28"));
+        assert_eq!(Cidr::enclosing(ip("10.9.3.77"), 0), block("0.0.0.0/0"));
+        assert_eq!(Cidr::enclosing(ip("10.9.3.77"), 40), block("10.9.3.77/32"));
     }
 
     #[test]

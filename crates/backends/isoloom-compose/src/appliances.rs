@@ -97,11 +97,6 @@ fn dynamips_port(k: usize) -> (usize, usize) {
     if k == 1 { (0, 0) } else { (k / 2, k % 2) }
 }
 
-/// The netmask of a prefix length.
-fn mask(len: u8) -> Ipv4Addr {
-    Ipv4Addr::from(u32::MAX.checked_shl(32 - u32::from(len.min(32))).unwrap_or(0))
-}
-
 /// One data interface of an appliance: `eth1`, `eth2`... in order.
 pub(crate) struct Port {
     /// The Compose network it is on.
@@ -206,7 +201,7 @@ impl StartupConfig<'_> {
             "no aaa new-model\nip cef\n!\nvrf definition isoloom-mgmt\n description Isoloom management\n address-family ipv4\n exit-address-family\n!\ninterface Ethernet0/0\n{}vrf forwarding isoloom-mgmt\n description Isoloom management\n ip address {} {}\n no shutdown\n!\n",
             if is_switch(self.kind) { " no switchport\n " } else { " " },
             mgmt_address(self.spec, self.name),
-            mask(MGMT.len),
+            MGMT.netmask(),
         )
     }
 
@@ -240,7 +235,7 @@ impl StartupConfig<'_> {
                 // The spec is validated: its blocks parse.
                 let block = self.spec.networks.get(&port.network).and_then(|n| Cidr::parse(&n.cidr));
                 if let (false, Some(addr), Some(block)) = (is_switch(self.kind), port.address, block) {
-                    writeln!(f, " ip address {addr} {}", mask(block.len))?;
+                    writeln!(f, " ip address {addr} {}", block.netmask())?;
                 }
             }
             Role::Access(id) => write!(f, " description {}\n switchport mode access\n switchport access vlan {id}\n", port.network)?,
@@ -410,13 +405,6 @@ mod tests {
     #[test]
     fn the_management_block_is_the_shared_constant() {
         assert_eq!(Cidr::parse(MGMT_CIDR), Some(MGMT));
-    }
-
-    #[test]
-    fn a_mask_has_its_prefix_length_in_ones() {
-        assert_eq!(mask(24), Ipv4Addr::new(255, 255, 255, 0));
-        assert_eq!(mask(0), Ipv4Addr::UNSPECIFIED);
-        assert_eq!(mask(32), Ipv4Addr::BROADCAST);
     }
 
     #[test]

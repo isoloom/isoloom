@@ -56,8 +56,7 @@ pub(super) fn windows_routes(routes: &[Route]) -> Option<String> {
         .iter()
         .filter_map(|r| {
             let block = Cidr::parse(&r.cidr)?;
-            let mask = u32::MAX.checked_shl(32 - u32::from(block.len)).unwrap_or(0);
-            Some(format!("route -p add {} MASK {} {}", Ipv4Addr::from(block.base), Ipv4Addr::from(mask), r.via))
+            Some(format!("route -p add {} MASK {} {}", Ipv4Addr::from(block.base), block.netmask(), r.via))
         })
         .collect();
     (!lines.is_empty()).then(|| lines.join("; "))

@@ -445,11 +445,7 @@ fn block(ip: Ipv4Addr, netmask: Option<&str>) -> (Cidr, Option<u32>) {
     let clamped = asked.clamp(24, 29);
     // The clamp keeps it within 24..=29, so it fits a `u8`.
     let len = u8::try_from(clamped).unwrap_or(24);
-    let cidr = Cidr {
-        base: u32::from(ip) & (u32::MAX << (32 - u32::from(len))),
-        len,
-    };
-    (cidr, (asked != clamped).then_some(asked))
+    (Cidr::enclosing(ip, len), (asked != clamped).then_some(asked))
 }
 
 #[cfg(test)]

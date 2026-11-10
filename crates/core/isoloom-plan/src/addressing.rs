@@ -31,8 +31,7 @@ pub fn address(spec: &Spec, network: &str, octet: u8) -> Ipv4Addr {
 /// Dotted netmask of a network.
 #[must_use]
 pub fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
-    let len = cidr(spec, network).len;
-    Ipv4Addr::from(if len == 0 { 0 } else { u32::MAX << (32 - len) })
+    cidr(spec, network).netmask()
 }
 
 /// The host's own address on a network (Docker's bridge): the gateway address, unless a
