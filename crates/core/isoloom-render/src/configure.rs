@@ -84,14 +84,16 @@ impl<'a> Configured<'a> {
         fill(text, &Context::new(self.env, self.machine)).map_err(|e| format!("the template {from}: {e}"))
     }
 
-    /// Each template of the recipe that can be filled in, as the file at `path(from)`; the
-    /// others are left to the recipe's own failure at apply.
+    /// Each template of the recipe that can be filled in, once per source (two steps filling one
+    /// template in for two places read the same file), as the file at `path(from)`; the others
+    /// are left to the recipe's own failure at apply.
     #[must_use]
     pub fn templates(&self, path: impl Fn(&ProjectPath) -> String) -> Vec<GeneratedFile> {
+        let mut seen = std::collections::BTreeSet::new();
         self.recipe
             .resources()
             .filter_map(|r| match r {
-                Resource::Template(t) => Some(GeneratedFile {
+                Resource::Template(t) if seen.insert(&t.from) => Some(GeneratedFile {
                     path: path(&t.from),
                     contents: self.template(&t.from).ok()?,
                 }),

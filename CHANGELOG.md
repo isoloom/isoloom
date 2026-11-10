@@ -405,6 +405,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   knows it. Library: `isoloom_targets::Error::Placeholder` says `why` (was `hint`), `fill` takes
   the message's paths only, `isoloom_spec::placeholders` (the `{{ }}` scanner) is public, and
   `isoloom_spec::syntax::placeholder::Part` is exhaustive.
+- **A template filled in for two places generates.** Two `template:` steps of one machine
+  reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
+  file is written once per source.
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

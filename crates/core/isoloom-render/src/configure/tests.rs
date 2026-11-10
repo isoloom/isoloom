@@ -19,6 +19,18 @@ fn a_template_is_filled_in_for_its_machine_on_its_target() {
 }
 
 #[test]
+fn a_template_filled_in_for_two_places_is_one_file() {
+    let env = testing::machine(
+        "os: debian@12, app: { steps: [{ template: { from: conf/a.conf, to: /etc/a.conf } }, { template: { from: conf/a.conf, to: /etc/b.conf } }] }",
+        Target::Vagrant,
+        &[("conf/a.conf", "name={{ machine.name }}\n")],
+    );
+    let c = Configured::of(&env, "m").expect("a recipe");
+    let paths: Vec<String> = c.templates(|from| format!("rendered/{from}")).into_iter().map(|f| f.path).collect();
+    assert_eq!(paths, ["rendered/conf/a.conf"]);
+}
+
+#[test]
 fn a_machine_without_steps_has_nothing_to_configure() {
     let env = testing::machine("os: debian@12", Target::Vagrant, &[]);
     assert!(Configured::of(&env, "m").is_none());
