@@ -149,8 +149,8 @@ pub(crate) const INSTANCE_TYPES: Sizes = Sizes::ordered(&[
     Size::new("m7i-flex.xlarge", 4, 16384, 4).with_addresses(15),
 ]);
 
-/// The `cloud-docker` host's instance type for `memory_mb`: by its memory alone, as every cloud
-/// sizes its containers' host (`HostSize::pick`).
+/// The `cloud-docker` host's instance type for `memory_mb`: the smallest of [`INSTANCE_TYPES`]
+/// with that memory, the host sized by its memory alone (`HostSizes::ByMemory`).
 pub(crate) fn host_instance_type(memory_mb: u32) -> &'static str {
     INSTANCE_TYPES.fit(&Need::new(1, memory_mb, 0))
 }

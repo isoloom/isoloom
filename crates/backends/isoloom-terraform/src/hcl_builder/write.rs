@@ -59,8 +59,8 @@ impl Module {
         }
     }
 
-    /// Adds a fixed fragment of HCL, written as it is: for the static parts shared with modules
-    /// not built here yet (the `.isoloomignore` lists).
+    /// Adds a fixed fragment of HCL, written as it is: the project's lists a module reads
+    /// (`isoloom_render::project::lists`), which the rendering layer writes as HCL text.
     pub(crate) fn fragment(&mut self, hcl: &str) {
         self.sections.push(Section::Fragment(hcl.trim_matches('\n').to_owned()));
     }

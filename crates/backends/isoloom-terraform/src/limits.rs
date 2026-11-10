@@ -42,10 +42,11 @@ impl Limits {
     }
 }
 
-/// The first machine the target builds on arm64, if any: the cloud and Proxmox targets refuse
-/// these for now (they still assume x86-64 images and instance types). Only machines that
-/// declare a container or a VM count: an access machine with neither isn't built, so its arch is
-/// moot, but one that declares a form is, and must not silently get an x86 image.
+/// The first machine the target builds on arm64, if any: the cloud targets and ESXi refuse
+/// these (x86-64 images and instance types; ESXi runs x86-64 VMs only), and Proxmox emulates
+/// them (`server::proxmox`). Only machines that declare a container or a VM count: an access
+/// machine with neither isn't built, so its arch is moot, but one that declares a form is, and
+/// must not silently get an x86 image.
 pub(crate) fn arm64_machine(spec: &Spec) -> Option<&str> {
     spec.machines
         .iter()
