@@ -2331,7 +2331,12 @@
           "description": "Its most memory: bytes, or a number with `k`, `m` or `g` (`64m`)."
         },
         "mode": {
-          "type": "string",
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ],
+          "pattern": "^[0-7]{3,4}$",
           "description": "Its permissions, in octal (`\"1777\"`, `\"0700\"`). Quote it: YAML reads `0700` unquoted as\na number."
         }
       },

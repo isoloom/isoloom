@@ -6,7 +6,7 @@
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, Lifetime, MachinePlan, MachineShape, VolumeKind};
 use isoloom_render::container::{UTILITY_IMAGE, host_folders};
-use isoloom_spec::model::Machine;
+use isoloom_spec::model::{Machine, TmpfsMode};
 use isoloom_spec::shell;
 
 use crate::file::{BindOptions, Condition, LongMount, Mount, NetworkMode, Restart, Service, TmpfsOptions, Volume, VolumeOptions};
@@ -44,8 +44,7 @@ pub(crate) fn tmpfs(machine: &Machine) -> (Vec<String>, Vec<Mount>) {
             target: t.path().to_owned(),
             tmpfs: TmpfsOptions {
                 size: t.size().map(String::from),
-                // Validated: three or four octal digits.
-                mode: t.mode().and_then(|mode| u32::from_str_radix(mode, 8).ok()),
+                mode: t.mode().map(TmpfsMode::bits),
             },
         }));
     }

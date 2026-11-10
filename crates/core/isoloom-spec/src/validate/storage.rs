@@ -29,12 +29,6 @@ pub(super) fn of_machine(s: &Subject, volume_paths: &BTreeSet<&str>, p: &mut Pro
                 format!("`{size}` isn't a size: bytes, or a number with k, m or g, like 64m"),
             );
         }
-        if let Some(mode) = t.mode().filter(|m| !mode_ok(m)) {
-            p.add(
-                format!("{at}.mode"),
-                format!("`{mode}` isn't a mode: three or four octal digits, like \"1777\""),
-            );
-        }
     }
     let mut mounts = BTreeSet::new();
     for (name, d) in &s.m.disks {
@@ -112,11 +106,6 @@ fn size_ok(size: &str) -> bool {
     !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()) && !digits.trim_start_matches('0').is_empty()
 }
 
-/// A mode: three or four octal digits.
-fn mode_ok(mode: &str) -> bool {
-    (3..=4).contains(&mode.len()) && mode.chars().all(|c| ('0'..='7').contains(&c))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,11 +127,9 @@ mod tests {
     }
 
     #[test]
-    fn sizes_and_modes() {
+    fn sizes() {
         assert!(size_ok("64m") && size_ok("1048576") && size_ok("2G"));
         assert!(!size_ok("m") && !size_ok("0") && !size_ok("64mb") && !size_ok("-1"));
-        assert!(mode_ok("1777") && mode_ok("700") && mode_ok("0755"));
-        assert!(!mode_ok("8") && !mode_ok("17777") && !mode_ok("rwx"));
     }
 
     #[test]
@@ -157,9 +144,20 @@ mod tests {
             tmpfs("{ path: /cache, size: 64mb }"),
             ["machines.web.tmpfs[0].size: `64mb` isn't a size: bytes, or a number with k, m or g, like 64m"]
         );
-        assert_eq!(
-            tmpfs("{ path: /cache, mode: '888' }"),
-            ["machines.web.tmpfs[0].mode: `888` isn't a mode: three or four octal digits, like \"1777\""]
+    }
+
+    /// A mode that isn't one stops the spec where it is read, at its line.
+    #[test]
+    fn a_tmpfs_mode_that_isnt_one_is_a_problem_at_its_path() {
+        let spec = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx }, tmpfs: [{ path: /cache, mode: '888' }] }\n";
+        let Err(crate::Error::Invalid { problems, .. }) = crate::parse(spec) else {
+            panic!("the spec reads")
+        };
+        let problems: Vec<String> = problems.iter().map(crate::syntax::Problem::line).collect();
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].starts_with("machines.web.tmpfs[0].mode") && problems[0].contains("`888` isn't a mode: three or four octal digits"),
+            "{problems:?}"
         );
     }
 

@@ -13,6 +13,7 @@ mod inputs;
 mod machine;
 mod mistake;
 mod names;
+pub(crate) use names::Text;
 mod old_keys;
 mod os;
 mod overrides;

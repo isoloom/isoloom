@@ -44,7 +44,7 @@ pub(crate) use secrets::after_drive;
 pub use secrets::{MachineSecret, SecretMount, SecretSource, is_drive_path, secret_variable};
 pub use shared::{External, Group, Shared, SharedDocker, SharedVm, SharedVolume, Tool, Ulimit};
 pub(crate) use shared::{TOOL_RECIPES, ULIMITS};
-pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMount};
+pub use storage::{Disk, Filesystem, Mount, MountPart, Tmpfs, TmpfsMode, TmpfsMount};
 pub use target::{Shape, Target};
 pub(crate) use virtiofs::mapping_id;
 pub use virtiofs::{MAX_VIRTIOFS, Virtiofs, VirtiofsCache};

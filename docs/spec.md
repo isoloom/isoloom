@@ -1147,7 +1147,8 @@ Its most memory: bytes, or a number with `k`, `m` or `g` (`64m`).
 
 Its permissions, in octal (`"1777"`, `"0700"`). Quote it: YAML reads `0700` unquoted as a number.
 
-- **Type:** string
+- **Type:** value
+- **Limits:** matches `^[0-7]{3,4}$`
 
 ### `machines.*.resources`
 

@@ -97,7 +97,74 @@ pub struct TmpfsMount {
     /// Its permissions, in octal (`"1777"`, `"0700"`). Quote it: YAML reads `0700` unquoted as
     /// a number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mode: Option<String>,
+    pub mode: Option<TmpfsMode>,
+}
+
+/// A tmpfs mount's permissions: three or four octal digits (`"1777"`: the sticky bit too), read
+/// once, so every target writes the same bits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TmpfsMode(u32);
+
+impl TmpfsMode {
+    /// The mode as a number (`0o1777`).
+    #[must_use]
+    pub fn bits(self) -> u32 {
+        self.0
+    }
+}
+
+impl std::str::FromStr for TmpfsMode {
+    type Err = String;
+
+    /// The mode `digits` names: three or four octal digits.
+    ///
+    /// # Errors
+    ///
+    /// Why they aren't one, as a spec's problem says it.
+    fn from_str(digits: &str) -> Result<TmpfsMode, String> {
+        let octal = (3..=4).contains(&digits.len()) && digits.chars().all(|c| ('0'..='7').contains(&c));
+        u32::from_str_radix(digits, 8)
+            .ok()
+            .filter(|_| octal)
+            .map(TmpfsMode)
+            .ok_or_else(|| format!("`{digits}` isn't a mode: three or four octal digits, like \"1777\""))
+    }
+}
+
+impl std::fmt::Display for TmpfsMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04o}", self.0)
+    }
+}
+
+impl Serialize for TmpfsMode {
+    /// The mode as a spec writes it, `"1777"`.
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for TmpfsMode {
+    /// Octal digits as text (`"1777"`), or the number YAML reads them as (`1777`).
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<TmpfsMode, D::Error> {
+        d.deserialize_any(crate::syntax::Text("octal digits, like \"1777\""))?
+            .parse()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+impl JsonSchema for TmpfsMode {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "TmpfsMode".into()
+    }
+
+    fn inline_schema() -> bool {
+        true
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({ "type": ["string", "integer"], "pattern": "^[0-7]{3,4}$" })
+    }
 }
 
 impl Tmpfs {
@@ -119,12 +186,12 @@ impl Tmpfs {
         }
     }
 
-    /// Its mode, when given (octal digits).
+    /// Its mode, when given.
     #[must_use]
-    pub fn mode(&self) -> Option<&str> {
+    pub fn mode(&self) -> Option<TmpfsMode> {
         match self {
             Tmpfs::Path(_) => None,
-            Tmpfs::Sized(t) => t.mode.as_deref(),
+            Tmpfs::Sized(t) => t.mode,
         }
     }
 }
@@ -223,8 +290,18 @@ mod tests {
         let bare: Tmpfs = serde_yaml_ng::from_str("/run")?;
         assert_eq!((bare.path(), bare.size(), bare.mode()), ("/run", None, None));
         let sized: Tmpfs = serde_yaml_ng::from_str("{ path: /tmp, size: 64m, mode: \"1777\" }")?;
-        assert_eq!((sized.path(), sized.size(), sized.mode()), ("/tmp", Some("64m"), Some("1777")));
+        assert_eq!((sized.path(), sized.size()), ("/tmp", Some("64m")));
+        assert_eq!(sized.mode().map(TmpfsMode::bits), Some(0o1777));
         assert!(refusal::<Tmpfs>("3").ends_with("expected an absolute path, or `{ path, size, mode }`"));
+        // Read once: a mode that isn't one never reaches a target.
+        for bad in ["\"888\"", "\"8\"", "\"17777\"", "rwx"] {
+            assert!(
+                refusal::<Tmpfs>(&format!("{{ path: /tmp, mode: {bad} }}")).contains("isn't a mode: three or four octal digits"),
+                "{bad}"
+            );
+        }
+        let unquoted: Tmpfs = serde_yaml_ng::from_str("{ path: /tmp, mode: 755 }")?;
+        assert_eq!(unquoted.mode().map(TmpfsMode::bits), Some(0o755));
         Ok(())
     }
 

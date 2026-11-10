@@ -29,7 +29,7 @@ fn every_form_parses_and_a_valid_spec_has_no_problem() {
     assert_eq!(app.volumes["site"].subpath(), Some("www/html"));
     assert_eq!(s.machines["web"].volumes["site"], Mount::from("/srv"));
     assert_eq!(s.machines["web"].tmpfs[0], Tmpfs::from("/tmp"));
-    assert_eq!(s.machines["web"].tmpfs[1].mode(), Some("1777"));
+    assert_eq!(s.machines["web"].tmpfs[1].mode().map(isoloom_spec::model::TmpfsMode::bits), Some(0o1777));
     assert_eq!(app.disks["blk"].fs, Some(Filesystem::Raw));
 }
 
@@ -64,9 +64,10 @@ fn only_a_shared_volume_has_folders_and_not_for_its_owner() {
 
 #[test]
 fn a_tmpfs_size_and_mode_are_checked() {
-    let yaml = spec("", ", tmpfs: [{ path: /run, size: 64mb, mode: '999' }]", "");
-    assert_problem(&yaml, "machines.web.tmpfs[0].size", "isn't a size");
-    assert_problem(&yaml, "machines.web.tmpfs[0].mode", "octal");
+    let size = spec("", ", tmpfs: [{ path: /run, size: 64mb }]", "");
+    assert_problem(&size, "machines.web.tmpfs[0].size", "isn't a size");
+    let mode = spec("", ", tmpfs: [{ path: /run, mode: '999' }]", "");
+    assert_problem(&mode, "machines.web.tmpfs[0].mode", "octal");
 }
 
 #[test]
