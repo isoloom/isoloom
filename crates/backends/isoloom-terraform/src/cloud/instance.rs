@@ -10,14 +10,14 @@ use isoloom_plan::Environment;
 pub(crate) fn tags(env: &Environment) -> Expression {
     let mut tags = named(env);
     tags.push(("isoloom-expires-at", reference("var.expires_at")));
-    with_own(isoloom_render::tags::written(env.spec()), tags)
+    with_own(isoloom_spec::tags::written(env.spec()), tags)
 }
 
 /// The same as labels (Google Cloud's): the spec's own made labels, then Isoloom's.
 pub(crate) fn labels(env: &Environment) -> Expression {
     let mut tags = named(env);
     tags.push(("isoloom-expires-at", reference("var.expires_at")));
-    with_own(isoloom_render::tags::labels(env.spec()), tags)
+    with_own(isoloom_spec::tags::labels(env.spec()), tags)
 }
 
 /// `own` (the spec's), then Isoloom's `tags`, as one object.
@@ -34,7 +34,7 @@ pub(crate) fn tags_when_set(env: &Environment) -> Expression {
     call(
         "merge",
         [
-            with_own(isoloom_render::tags::written(env.spec()), named(env)),
+            with_own(isoloom_spec::tags::written(env.spec()), named(env)),
             conditional(none, object::<&str>([]), expiry),
         ],
     )
@@ -93,7 +93,7 @@ pub(crate) fn tag_list(env: &Environment) -> Expression {
             list(
                 [string("isoloom"), string(env.name.as_str()), reference("local.name")]
                     .into_iter()
-                    .chain(isoloom_render::tags::words(env.spec()).into_iter().map(string)),
+                    .chain(isoloom_spec::tags::words(env.spec()).into_iter().map(string)),
             ),
             conditional(none, list(Vec::new()), list([expires])),
         ],

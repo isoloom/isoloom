@@ -25,6 +25,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 | A Vagrant box name with anything but letters, digits, `.`, `_` and `-` after an optional `<org>/` (in `overrides.vagrant` or an image table) | `invalid-value` (an error reading the image table) | the box's name as `vagrant box list` shows it |
 | A message naming `.published` or `.url` of a port without `publish:` | `unknown-reference` (`isoloom message` refused it already) | the port's `.port`, or publish the port |
 | A machine using the `openssh` entry and signing in as `ctf` without saying so | the login account defaults to `user` | `with: { username: ctf }` to keep the old account |
+| A tag key starting with a digit, two keys equal but for case or lowercasing to one label (`Cost.Center`, `cost_center`), or `Managed-By`/`Isoloom…` in any case | refused at `tags.<key>` | one key per tag, starting with a letter |
 
 ## Behavior that changed
 

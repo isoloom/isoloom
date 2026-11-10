@@ -101,6 +101,33 @@ fn a_tag_is_one_every_cloud_takes_and_not_isoloom_s_own() {
 }
 
 #[test]
+fn tags_that_one_cloud_would_merge_or_refuse_are_refused() {
+    let found = problems(
+        &lab("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\ntags:\n  Cost.Center: a\n  cost_center: b\n  Managed-By: me\n  9lives: x\n")
+            .unwrap(),
+    );
+    for (at, says) in [
+        (
+            "tags.cost_center",
+            "`Cost.Center` and `cost_center` are one label, `cost_center`, on Google Cloud and Kubernetes",
+        ),
+        ("tags.Managed-By", "`Managed-By` is Isoloom's own tag"),
+        ("tags.9lives", "starting with a letter"),
+    ] {
+        assert!(found.iter().any(|p| p.starts_with(at) && p.contains(says)), "{at}: {found:?}");
+    }
+    let cased = problems(
+        &lab("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\ntags: { Team: a, team: b }\n").unwrap(),
+    );
+    assert!(
+        cased
+            .iter()
+            .any(|p| p.starts_with("tags.team") && p.contains("Azure, whose tag names ignore case")),
+        "{cased:?}"
+    );
+}
+
+#[test]
 fn a_tag_written_as_a_number_or_a_flag_is_its_text() -> Outcome {
     let numbered = valid(
         "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\ntags: { cost-center: 1234, billable: true }\n",

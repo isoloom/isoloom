@@ -94,6 +94,12 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   (one step id twice in the Vagrant run manifest), on `hybrid` its runner and the controller's were one file, the
   second replacing the first, and a machine named `router` or `containers` shared its VM name
   with Isoloom's. A backend writing two files at one path is now an error of the target.
+- **Breaking: tags one cloud would merge or refuse are refused.** A key must start with a letter
+  (Google Cloud's labels do: `9lives` failed at apply there); two keys equal but for case
+  (`Team`, `team`: one tag on Azure) or one label once lowercased (`Cost.Center` and
+  `cost_center`: one label on Google Cloud and Kubernetes, the second silently lost) are
+  refused, and so are Isoloom's own keys in any case (`Managed-By`). Library: the tags' forms
+  are `isoloom_spec::tags` (was `isoloom_render::tags`).
 
 ### Added
 

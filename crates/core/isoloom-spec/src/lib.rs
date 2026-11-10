@@ -32,6 +32,7 @@ pub mod schema;
 pub mod shell;
 mod sizing;
 pub mod syntax;
+pub mod tags;
 pub mod targets;
 #[cfg(test)]
 mod testing;

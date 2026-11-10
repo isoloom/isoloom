@@ -3,6 +3,7 @@
 use super::{Problems, kebab, variable_name};
 use crate::model::Spec;
 use crate::placeholders::{self, Piece};
+use crate::tags;
 
 /// The format version this isoloom reads, and a name every target can carry.
 pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
@@ -18,21 +19,29 @@ pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
     }
 }
 
-/// The tags every cloud takes: a key of letters, digits and `_ . : -` (at most 63, the
-/// strictest cloud's limit), not one Isoloom writes itself; a value of at most 255 characters on
-/// one line.
+/// The tags every cloud takes, by the strictest cloud's rules: a key of at most 63 letters, digits
+/// and `_ . : -` starting with a letter (Google Cloud's labels), not one Isoloom writes itself in
+/// any case (Azure's tag names ignore case), and none clashing with another where a cloud carries
+/// them ([`tags::clash`]); a value of at most 255 characters on one line.
 pub(super) fn tags(spec: &Spec, p: &mut Problems) {
     for (key, value) in &spec.tags {
         let at = format!("tags.{key}");
         let allowed = |c: char| c.is_ascii_alphanumeric() || "_.:-".contains(c);
-        if key.is_empty() || key.len() > 63 || !key.chars().all(allowed) {
-            p.add(at.clone(), "a key of at most 63 letters, digits and `_ . : -`, e.g. cost-center");
-        } else if key.starts_with("isoloom") || key == "managed-by" {
+        let lower = key.to_ascii_lowercase();
+        if key.len() > 63 || !key.starts_with(|c: char| c.is_ascii_alphabetic()) || !key.chars().all(allowed) {
+            p.add(
+                at.clone(),
+                "a key of at most 63 letters, digits and `_ . : -`, starting with a letter, e.g. cost-center",
+            );
+        } else if lower.starts_with("isoloom") || lower == "managed-by" {
             p.add(at.clone(), format!("`{key}` is Isoloom's own tag: name yours otherwise"));
         }
         if value.len() > 255 || value.chars().any(char::is_control) {
             p.add(at, "a value of at most 255 characters, on one line");
         }
+    }
+    if let Some((key, why)) = tags::clash(&spec.tags) {
+        p.add(format!("tags.{key}"), format!("{why}: name them apart"));
     }
 }
 

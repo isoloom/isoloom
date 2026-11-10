@@ -115,8 +115,11 @@ pub struct Spec {
     /// (`cost-center: 1234`, `team: platform`): AWS's default tags, Azure's tags, Oracle
     /// Cloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those
     /// can't hold lowercased, its other characters `_`), DigitalOcean's and Linode's
-    /// `key:value` tags. A value is text; a number or `true`/`false` is read as its text (quote
-    /// one whose form matters: `"007"`). The defaults' `tags:` add theirs under these.
+    /// `key:value` tags. A key starts with a letter, then letters, digits and `_ . : -` (63 at
+    /// most); two keys equal but for case (Azure ignores it), or one label once lowercased
+    /// (`Cost.Center` and `cost_center`), are refused, as are Isoloom's own (`isoloom*`,
+    /// `managed-by`) in any case. A value is text; a number or `true`/`false` is read as its text
+    /// (quote one whose form matters: `"007"`). The defaults' `tags:` add theirs under these.
     #[schemars(default, schema_with = "tags::schema")]
     pub tags: IndexMap<String, String>,
     /// Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `proxmox`,

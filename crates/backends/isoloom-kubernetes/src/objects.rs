@@ -233,7 +233,7 @@ pub(crate) const MANAGED_BY: (&str, &str) = ("app.kubernetes.io/managed-by", "is
 /// [`MANAGED_BY`], then the spec's tags.
 pub(crate) fn common_labels(spec: &isoloom_spec::model::Spec) -> Labels {
     std::iter::once((MANAGED_BY.0.to_owned(), MANAGED_BY.1.to_owned()))
-        .chain(isoloom_render::tags::labels(spec))
+        .chain(isoloom_spec::tags::labels(spec))
         .collect()
 }
 
