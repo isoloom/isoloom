@@ -96,12 +96,8 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
 /// Where a user stands (checks, a session): the access machine, else the first Linux machine,
 /// else the controller.
 fn stand_at(env: &Environment, reach: &Reach) -> Expression {
-    let linux: Vec<&str> = env.vms().filter(|vm| !vm.plan.is_windows()).map(|Vm { name: n, .. }| n).collect();
-    let access = linux
-        .iter()
-        .rev()
-        .find(|n| env.spec().machines.get(**n).is_some_and(|m| m.access))
-        .or(linux.first());
+    let linux: Vec<(&str, &isoloom_plan::MachinePlan)> = env.vms().filter(|vm| !vm.plan.is_windows()).map(|vm| (vm.name, vm.plan)).collect();
+    let access = linux.iter().rev().find(|(_, mp)| mp.is_access()).or(linux.first()).map(|(n, _)| n);
     match (access, &reach.controller) {
         (Some(n), _) => (reach.public_ip)(n),
         (None, Some(c)) if controller::needed(env) => c.clone(),

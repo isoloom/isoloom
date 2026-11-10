@@ -38,7 +38,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
     // The access machine is defined but not started by `vagrant up`: the runner hot-adds it,
     // overriding its box with one it is given.
-    let access = env.spec().machines.get(name).is_some_and(|m| m.access);
+    let access = mp.is_access();
     define(r, name, access, |r| {
         boxed(r, &image, mp.arch, access);
         hostname(r, name, os);

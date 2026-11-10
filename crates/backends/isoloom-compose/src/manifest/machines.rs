@@ -54,10 +54,10 @@ fn bug_unknown(name: &str) -> Error {
 }
 
 fn role_of(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, Option<String>)> {
-    let spec = env.spec();
-    if let Some(m) = spec.machines.get(name) {
-        return Some((if m.access { Role::Access } else { Role::Member }, None));
+    if let Some(m) = env.machines.get(name) {
+        return Some((isoloom_render::run_manifest::role(m), None));
     }
+    let spec = env.spec();
     let owned = spec.machines.iter().find_map(|(m, machine)| {
         if init_names(m, machine).iter().any(|j| j == name) {
             Some((Role::Job, Some(m.clone())))
@@ -115,7 +115,7 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member, project: &Pro
     out.native = Some(Native::Compose { service: name });
     let spec = env.spec();
     if let (Some(mp), Some(m)) = (env.machines.get(&member.name), spec.machines.get(&member.name)) {
-        out.on_demand = m.access;
+        out.on_demand = mp.is_access();
         out.arch = Some(arch(mp.arch));
         out.resources = Some(isoloom_render::run_manifest::resources(mp));
         out.addresses = addresses(mp)?;

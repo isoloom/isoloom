@@ -69,7 +69,7 @@ fn runner(env: &Environment, pos: &Position, scripts: bool, services: &mut Index
     // The access machine sits in the `access` profile, which the check
     // profile doesn't bring up; a check runner must not depend_on it, or Compose rejects the project
     // ("depends on undefined service") when it runs the checks without `access`.
-    for m in Machine::all(env).filter(|m| m.spec.docker.is_some() && !m.spec.access) {
+    for m in Machine::all(env).filter(|m| m.spec.docker.is_some() && !m.plan.is_access()) {
         if m.spec.has_readiness() {
             c.after(m.name, Condition::Healthy);
         }
@@ -98,7 +98,7 @@ fn namespace(env: &Environment, m: Machine<'_>, c: &mut Service, services: &mut 
     // An access machine lives in the `access` profile (the runner brings it up on demand), so a
     // check in the `check` profile can't share its namespace: it uses the stand-in (a check-profile
     // idle container at the same addresses) instead, even when the access box has a container form.
-    if m.spec.docker.is_some() && !m.spec.access {
+    if m.spec.docker.is_some() && !m.plan.is_access() {
         if !m.spec.has_readiness() {
             c.after(m.name, Condition::Started);
         }

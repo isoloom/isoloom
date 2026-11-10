@@ -69,8 +69,8 @@ fn lab_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
     let (Some(mp), Some(m)) = (env.machines.get(name), env.spec().machines.get(name)) else {
         return Ok(());
     };
-    out.role = if m.access { Role::Access } else { Role::Member };
-    out.on_demand = m.access;
+    out.role = isoloom_render::run_manifest::role(mp);
+    out.on_demand = mp.is_access();
     out.os = env.vm(name).map(|vm| OsName::parse(vm.os)).transpose()?;
     out.windows = mp.is_windows();
     out.arch = Some(arch(mp.arch));

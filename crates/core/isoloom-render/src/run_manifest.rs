@@ -37,6 +37,16 @@ pub fn secret_source(source: &model::SecretSource) -> Option<isoloom_manifest::S
     })
 }
 
+/// An environment machine's role in a run manifest: `access` for the machine the user lands on,
+/// `member` for every other.
+#[must_use]
+pub fn role(mp: &MachinePlan) -> Role {
+    match mp.role {
+        isoloom_plan::MachineRole::Access => Role::Access,
+        isoloom_plan::MachineRole::Member => Role::Member,
+    }
+}
+
 /// A secret the runner reads from its store, and the machines of one shape that get it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeldSecret<'a> {

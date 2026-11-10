@@ -128,11 +128,23 @@ pub enum MachineShape {
     External,
 }
 
+/// What a machine is to the user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MachineRole {
+    /// A machine of the environment.
+    Member,
+    /// The access machine (`access: true`): the one the user lands on and works from, started
+    /// on demand.
+    Access,
+}
+
 /// One machine of the environment.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MachinePlan {
     /// How the target produces it.
     pub shape: MachineShape,
+    /// What it is to the user: the access machine, or a member of the environment.
+    pub role: MachineRole,
     /// Its address on each of its networks, in its order (the first is its primary network).
     pub addresses: IndexMap<String, Ipv4Addr>,
     /// Its addresses after the primary one on each network where it has several (`lan: [10,
@@ -217,6 +229,12 @@ pub struct MachinePlan {
 }
 
 impl MachinePlan {
+    /// Whether it is the access machine.
+    #[must_use]
+    pub fn is_access(&self) -> bool {
+        self.role == MachineRole::Access
+    }
+
     /// Whether it runs Windows.
     pub fn is_windows(&self) -> bool {
         self.os.as_deref().is_some_and(images::is_windows)
@@ -509,6 +527,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
     });
     MachinePlan {
         shape,
+        role: if m.access { MachineRole::Access } else { MachineRole::Member },
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
         more_addresses: crate::more_addresses::of(spec, m),
         addresses6: ipv6::addresses(spec, m),

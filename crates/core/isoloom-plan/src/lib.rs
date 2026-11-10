@@ -58,7 +58,9 @@ mod storage;
 #[cfg(test)]
 mod testing;
 
-pub use environment::{Build, Controller, Environment, Image, MachinePlan, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Vm, Volume, VolumeKind};
+pub use environment::{
+    Build, Controller, Environment, Image, MachinePlan, MachineRole, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Vm, Volume, VolumeKind,
+};
 pub use error::{Error, Result};
 pub use lab::Lab;
 pub use lifecycle::{MachineLifecycle, Step};

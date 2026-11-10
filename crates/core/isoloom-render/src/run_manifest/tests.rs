@@ -324,3 +324,13 @@ fn a_secret_slot_names_the_machines_of_its_shape_that_get_it_and_no_input_s_file
     let vms = super::held_secrets(&env, isoloom_plan::MachineShape::Vm);
     assert_eq!(vms.iter().map(|h| h.holders.clone()).collect::<Vec<_>>(), [vec!["vm"]]);
 }
+
+#[test]
+fn the_access_machine_is_access_in_a_run_manifest_and_every_other_a_member() {
+    let env = testing::env(
+        "version: 1\nname: s\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n  desk: { networks: { lan: 11 }, os: debian@12, access: true }\n",
+        Target::Vagrant,
+    );
+    let roles: Vec<Role> = env.machines.values().map(super::role).collect();
+    assert_eq!(roles, [Role::Member, Role::Access]);
+}

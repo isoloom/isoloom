@@ -33,7 +33,7 @@ pub(super) fn machine(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk], o
         let mut routes = sidecars::routes(env, m.name, m);
         // The access box's route keeper follows it into the `access` profile: a non-profiled
         // service that depends on a profiled one would drag it into the initial `up`.
-        if m.spec.access {
+        if m.plan.is_access() {
             routes.profiles = vec![manifest::access::PROFILE.to_owned()];
         }
         out.services.insert(routes_service(m.name), routes);
@@ -89,7 +89,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
     // The access machine: brought up on demand, never by the initial `up`. It sits in the
     // `access` Compose profile (so `up` skips it) and runs a parameterizable image the runner can
     // override when it hot-adds it; it stays up idle for the user to work from.
-    if spec.access {
+    if plan.is_access() {
         access_box(plan, &mut svc);
     }
     // Isoloom's supervisor runs its services: under the engine's init, which reaps what they leave.

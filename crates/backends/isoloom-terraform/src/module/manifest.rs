@@ -121,8 +121,7 @@ pub(crate) fn machine(name: &str, role: Role, addresses: BTreeMap<Name, IpAddr>)
 /// address).
 pub(crate) fn lab_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::model::Machine, at: &Template) -> Result<Machine, ManifestError> {
     // The access machine keeps its role (where the user works from); every machine is made at `up`.
-    let role = if spec.access { Role::Access } else { Role::Member };
-    let mut m = machine(name, role, addresses(mp)?)?;
+    let mut m = machine(name, isoloom_render::run_manifest::role(mp), addresses(mp)?)?;
     // A VM's OS; a container (an LXC one on Proxmox) runs its image's.
     m.os = Vm::of(name, mp).map(|vm| OsName::parse(vm.os)).transpose()?;
     m.windows = mp.is_windows();

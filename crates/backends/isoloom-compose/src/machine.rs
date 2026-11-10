@@ -39,7 +39,7 @@ impl<'a> Machine<'a> {
     /// The access boxes of `env` that are `Supplied` (no form of their own), each rendered as an
     /// on-demand service; Container-shape access boxes are already in [`Machine::containers`].
     pub(crate) fn supplied_access(env: &'a Environment) -> impl Iterator<Item = Machine<'a>> {
-        Machine::all(env).filter(|m| m.spec.access && m.plan.shape != MachineShape::Container)
+        Machine::all(env).filter(|m| m.plan.is_access() && m.plan.shape != MachineShape::Container)
     }
 
     /// Whether it is a network appliance (a router or switch OS in its container).
