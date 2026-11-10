@@ -169,7 +169,12 @@ fn a_synced_folder_is_a_host_folder() -> Outcome {
         d.yaml
     );
     let at = "define web.vm.synced_folder";
-    assert!(has(&d, NoteKind::Changed, at, "`notes`: each target shares a host folder its own way; not kept: type: rsync"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        at,
+        "`notes`: each target shares a host folder its own way; not kept: type: rsync"
+    ));
     assert!(has(&d, NoteKind::Equivalent, at, "the project: Isoloom copies it"), "{:?}", d.notes);
     // A Windows machine has none: left out, and said.
     let windows = one_machine("gusztavvargadr/windows-server", r#"{"name":"synced_folder","args":["data","C:/data"]}"#)?;

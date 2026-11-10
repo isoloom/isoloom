@@ -131,7 +131,11 @@ fn a_services_network_aliases_are_its_machines_aliases() -> Outcome {
     assert!(has(&d, NoteKind::Changed, at, "`web` left out: it names a machine"), "{:?}", d.notes);
     assert!(has(&d, NoteKind::Changed, at, "`bad_name` left out"), "{:?}", d.notes);
     // On one of its two networks in Compose, on both in the spec: said.
-    assert!(has(&d, NoteKind::Changed, at, "on every network it is on, not only on `front`"), "{:?}", d.notes);
+    assert!(
+        has(&d, NoteKind::Changed, at, "on every network it is on, not only on `front`"),
+        "{:?}",
+        d.notes
+    );
     assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", d.notes);
     Ok(())
 }

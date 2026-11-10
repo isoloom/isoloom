@@ -8,7 +8,9 @@ use crate::testing::Outcome;
 
 /// The guide of the targets in `docs/guide/targets/<page>.md`.
 fn guide(page: &str) -> Outcome<String> {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../docs/guide/targets").join(format!("{page}.md"));
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../docs/guide/targets")
+        .join(format!("{page}.md"));
     Ok(std::fs::read_to_string(path)?)
 }
 

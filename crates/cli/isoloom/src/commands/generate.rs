@@ -63,12 +63,7 @@ pub(super) fn planned(generation: &Generation, profile: &spec::Profile, dir: &Pa
     let stale = generated::stale(dir, &files, &generated::scope(target.as_deref()))?;
     let list = generated::list(dir, &files, &stale)?;
     generated::writable(dir, files.iter().chain(&list))?;
-    Ok(Planned {
-        files,
-        stale,
-        list,
-        skipped,
-    })
+    Ok(Planned { files, stale, list, skipped })
 }
 
 /// Writes the files, removes those Isoloom wrote before and no longer writes (in the target's
@@ -80,12 +75,7 @@ pub(super) fn planned(generation: &Generation, profile: &spec::Profile, dir: &Pa
 /// of the lab: then nothing is written or removed.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
-    let Planned {
-        files,
-        stale,
-        list,
-        skipped,
-    } = planned(&a.generation, profile, dir)?;
+    let Planned { files, stale, list, skipped } = planned(&a.generation, profile, dir)?;
     if files.is_empty() {
         for e in &skipped {
             console.line(format_args!("· {e}"))?;

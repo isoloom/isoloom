@@ -4,8 +4,8 @@ use std::path::Path;
 
 use isoloom_targets::GeneratedFile;
 
-use super::{Console, Project, Result, Verdict};
 use super::generate::{Generation, Planned, planned};
+use super::{Console, Project, Result, Verdict};
 use crate::spec;
 
 #[derive(Debug, clap::Args)]

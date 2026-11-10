@@ -1,9 +1,7 @@
 use isoloom_plan::{Health, HealthTest};
 use isoloom_spec::model::{CommandLine, Target};
 
-use super::{
-    copied_from_project, docker_net, exec_runner, host_environment, init_names, probe, project_variables, ready_test, variable,
-};
+use super::{copied_from_project, docker_net, exec_runner, host_environment, init_names, probe, project_variables, ready_test, variable};
 use crate::testing;
 
 /// `web` serves two ports (one dormant) and has two setup jobs; `api` waits for `db`, whose job

@@ -84,8 +84,7 @@ pub(crate) fn with_settings(profile: &Profile, dir: &Path, given: &Settings) -> 
     let profile = profile.load(dir)?;
     let sets = &given.sets;
     let mut spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
-    let settings =
-        isoloom_spec::defaults::load(&defaults_of(dir, given.images.as_deref(), profile.as_ref(), sets)).map_err(CliError::Defaults)?;
+    let settings = isoloom_spec::defaults::load(&defaults_of(dir, given.images.as_deref(), profile.as_ref(), sets)).map_err(CliError::Defaults)?;
     spec.tags = settings.tags_under(&spec.tags).map_err(CliError::Defaults)?;
     let lab = Lab::new(spec)
         .with_images(settings.defaults.images.clone())

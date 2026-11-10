@@ -236,7 +236,10 @@ impl<'a> Import<'a> {
                     self.notes.add(
                         &at,
                         NoteKind::Changed,
-                        format!("several interfaces to bridge to: the first, `{}`, is kept", first.as_deref().unwrap_or_default()),
+                        format!(
+                            "several interfaces to bridge to: the first, `{}`, is kept",
+                            first.as_deref().unwrap_or_default()
+                        ),
                     );
                 }
                 first

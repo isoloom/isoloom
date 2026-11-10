@@ -303,7 +303,13 @@ impl<'a> Import<'a> {
                 for (key, opts) in map {
                     let n = str_of(key).unwrap_or_default();
                     let ip = opts.get("ipv4_address").and_then(str_of);
-                    let aliases = opts.get("aliases").and_then(Value::as_sequence).into_iter().flatten().filter_map(str_of).collect();
+                    let aliases = opts
+                        .get("aliases")
+                        .and_then(Value::as_sequence)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(str_of)
+                        .collect();
                     wanted.push((n, ip, aliases));
                 }
             }
