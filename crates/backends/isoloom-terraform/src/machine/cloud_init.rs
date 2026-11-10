@@ -6,7 +6,7 @@
 //! cloud-init's own: each found by its serial (the disk's name, as the target attaches it),
 //! partitioned, formatted with its name as the label and mounted from `/etc/fstab`.
 
-use crate::hcl_builder::{Expression, boolean, call, list, object, string};
+use crate::hcl_builder::{Expression, Template, boolean, call, list, object, reference, string};
 use isoloom_plan::configure::Resource;
 use isoloom_plan::{DataDisk, Environment, MachinePlan, Step};
 use isoloom_render::configure::Configured;
@@ -34,6 +34,9 @@ pub(crate) struct CloudConfig {
     pub(crate) users: Expression,
     /// Packages cloud-init installs.
     pub(crate) packages: Vec<String>,
+    /// Certificate authorities cloud-init trusts before it installs the packages (its `ca_certs`
+    /// module), each a PEM text (an expression: see [`site_authorities`]).
+    pub(crate) ca_certs: Vec<Expression>,
     /// Commands at every boot, before anything else.
     pub(crate) bootcmd: Vec<String>,
     /// Lists of files (an expression each: the project's).
@@ -58,6 +61,7 @@ impl CloudConfig {
             fqdn: None,
             users,
             packages: Vec::new(),
+            ca_certs: Vec::new(),
             bootcmd: Vec::new(),
             file_lists: Vec::new(),
             files: Vec::new(),
@@ -88,6 +92,9 @@ impl CloudConfig {
         let mut items = vec![("hostname", string(self.hostname))];
         items.extend(self.fqdn.map(|f| ("fqdn", string(f))));
         items.push(("users", self.users));
+        if !self.ca_certs.is_empty() {
+            items.push(("ca_certs", object([("trusted", list(self.ca_certs))])));
+        }
         items.extend(commands("packages", self.packages));
         items.extend(commands("bootcmd", self.bootcmd));
         items.extend(disks(&self.disks));
@@ -103,6 +110,20 @@ impl CloudConfig {
         }
         call("format", [string("#cloud-config\n%s"), call("yamlencode", [object(items)])])
     }
+}
+
+/// The spec's certificate authorities (`constraints.ca_certificates`), each a PEM text read from
+/// the project at `local.root`, for [`CloudConfig::ca_certs`]: what one of Isoloom's own VMs that
+/// takes nothing else from the project (the router) trusts before it downloads.
+pub(crate) fn site_authorities(env: &Environment) -> Vec<Expression> {
+    let files = env.spec().constraints.as_ref().map(|c| c.ca_certificates.as_slice()).unwrap_or_default();
+    files
+        .iter()
+        .map(|f| {
+            let path = Template::new().with_expr(reference("local.root")).with_text(format!("/{f}"));
+            call("file", [path.into_expression()])
+        })
+        .collect()
 }
 
 /// `command` as the set-up step `label`: its name in [`READY_FILE`] first; when it fails,

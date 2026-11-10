@@ -267,6 +267,28 @@ fn isoloom_s_own_vms_trust_the_certificate_authority_before_they_install_anythin
     );
     let proxmox = file(&paired, Target::Proxmox, "proxmox/main.tf")?;
     in_order(between(&proxmox, "The controller: runs", "\n}\n")?, &[TRUST, "installing Ansible"]);
+    let esxi = file(&paired, Target::Esxi, "esxi/main.tf")?;
+    in_order(
+        between(&esxi, "resource \"terraform_data\" \"isoloom_controller\"", "\n}\n")?,
+        &[TRUST, "python3 -m venv"],
+    );
+    Ok(())
+}
+
+#[test]
+fn the_server_routers_trust_the_certificate_authority_before_they_install_their_packages() -> Outcome {
+    // cloud-init's `ca_certs` runs before its `packages`: the router trusts the file from the
+    // project before apt downloads.
+    const AUTHORITY: &str = "ca_certs = { trusted = [file(\"${local.root}/certs/corp-ca.pem\")] }";
+    let lab = example_with_ca("segmented")?;
+    for (target, module, router) in [
+        (Target::Proxmox, "proxmox/main.tf", "resource \"proxmox_virtual_environment_file\" \"router\""),
+        (Target::Esxi, "esxi/main.tf", "resource \"esxi_guest\" \"isoloom_router\""),
+    ] {
+        let tf = file(&lab, target, module)?;
+        let config = between(&tf, router, "\n}\n")?;
+        in_order(config, &[AUTHORITY, "packages"]);
+    }
     Ok(())
 }
 

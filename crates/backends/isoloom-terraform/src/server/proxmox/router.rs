@@ -19,6 +19,7 @@ use crate::server::router::{forwarding, ruleset_content};
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
     let mut config = CloudConfig::new("isoloom-router", reference("local.users"));
     config.packages = vec!["nftables".to_owned(), "qemu-guest-agent".to_owned()];
+    config.ca_certs = cloud_init::site_authorities(env);
     config.bootcmd.extend(cloud_init::prelude(env));
     config.files = files(env);
     config.runcmd = [

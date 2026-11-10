@@ -562,6 +562,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   authentication, which sends the password with every request over plain HTTP; Terraform's
   set-up and the controller's Ansible sign in with NTLM now, as on Azure, and Basic stays off.
   The service still takes unencrypted messages, which Terraform's WinRM client needs.
+- **The Proxmox and ESXi routers trust the site's certificate authorities** before they install
+  their packages (cloud-init's `ca_certs`, each file read from the project), as the CHANGELOG's
+  entry on Isoloom's own VMs said: only Vagrant's router did.
 
 - **QEMU's hub ports are one block per environment.** Each network had its own hashed base
   port, its VMs the ports after it, so two networks could hand one port to two hubs (`n9` and

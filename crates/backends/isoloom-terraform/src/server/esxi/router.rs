@@ -26,6 +26,7 @@ const ADDRESS_WAIT_SECS: u64 = 600;
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
     let mut config = CloudConfig::new("isoloom-router", reference("local.users"));
     config.packages = vec!["nftables".to_owned()];
+    config.ca_certs = cloud_init::site_authorities(env);
     config.bootcmd.extend(cloud_init::prelude(env));
     config.files = vec![
         file("/etc/nftables.conf", None, ruleset_content(env)),
