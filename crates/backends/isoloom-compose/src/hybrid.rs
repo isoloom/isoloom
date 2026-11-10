@@ -100,8 +100,8 @@ fn ports_of(env: &Environment, name: &str) -> Vec<PublishedPort> {
     if let Some(mp) = env.machines.get(name) {
         return mp.ports.clone();
     }
-    let tool = tool_of(name).and_then(|t| env.spec().tools.get(t));
-    match tool.map(|t| (t.port, t.publish)) {
+    let tool = tool_of(name).and_then(|t| env.tools.get(t));
+    match tool.map(|t| (t.tool.port, t.tool.publish)) {
         Some((Some(port), Some(publish))) => vec![PublishedPort {
             name: "web".into(),
             port,

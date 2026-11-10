@@ -78,7 +78,7 @@ fn isoloom_own(env: &Environment, name: &str) -> Option<(Role, Option<String>)> 
     if name == routes_service(STAND_IN) {
         return Some((Role::Infra, Some(STAND_IN.into())));
     }
-    if spec.tools.keys().any(|t| tool_service(t) == name) {
+    if env.tools.keys().any(|t| tool_service(t) == name) {
         return Some((Role::Tool, None));
     }
     let switch = || trunks::containers(spec).iter().any(|t| trunks::switch_name(&t.lan) == name);
@@ -135,8 +135,8 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member, project: &Pro
     } else if member.name == router::NAME {
         let router = env.router.iter().flatten().map(|(n, a)| Ok((Name::parse(n)?, IpAddr::V4(*a))));
         out.addresses = router.collect::<Result<_>>()?;
-    } else if let Some(tool) = spec.tools.iter().find(|(t, _)| tool_service(t) == member.name).map(|(_, t)| t) {
-        out.ports = tool_port(tool)?.into_iter().collect();
+    } else if let Some(tool) = env.tools.iter().find(|(t, _)| tool_service(t) == member.name).map(|(_, t)| t) {
+        out.ports = tool_port(&tool.tool)?.into_iter().collect();
     }
     Ok(out)
 }

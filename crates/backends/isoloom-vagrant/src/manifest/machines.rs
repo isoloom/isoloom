@@ -48,9 +48,9 @@ fn machine(env: &Environment, d: &Define, boot_digest: &str) -> Result<Machine> 
             out.resources = Some(Size::HELPER.resources());
         }
         Kind::ToolShell => {
-            let index = env.spec().tools.keys().position(|t| t == "shell").unwrap_or_default();
             out.role = Role::Tool;
-            out.addresses = on_every_network(env, |c| c.tool(index))?;
+            let shell = env.tools.get("shell").into_iter().flat_map(|t| &t.addresses);
+            out.addresses = shell.map(|(net, ip)| Ok((Name::parse(net)?, IpAddr::V4(*ip)))).collect::<Result<_>>()?;
             out.resources = Some(Size::HELPER.resources());
         }
         Kind::Controller => {

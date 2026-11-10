@@ -57,6 +57,7 @@ pub mod secrets;
 mod storage;
 #[cfg(test)]
 mod testing;
+pub mod tools;
 
 pub use environment::{
     Build, Controller, Environment, Image, MachinePlan, MachineRole, MachineShape, NetworkPlan, PublishedPort, Route, Settings, Vm, Volume, VolumeKind,

@@ -41,6 +41,7 @@ use crate::requirements::{self, Requirement};
 use crate::routing;
 use crate::secrets::SecretFile;
 use crate::storage::{self, DataDisk, Lifetime};
+use crate::tools::{self, ToolPlan};
 
 /// One environment, planned for one target.
 #[derive(Debug, Clone, PartialEq)]
@@ -73,6 +74,8 @@ pub struct Environment {
     /// The launch values it reads (`inputs`), in spec order, each with whether it is sensitive:
     /// names only, never values.
     pub inputs: Vec<Input>,
+    /// The tools beside it (`tools:`), by name, in spec order, each at its addresses.
+    pub tools: IndexMap<String, ToolPlan>,
     /// The secrets, by name, each with where the runner reads its value (an input's file: the
     /// input), in spec order: never their values.
     pub secrets: IndexMap<String, SecretSource>,
@@ -383,6 +386,7 @@ impl Environment {
             constraints: laid_out.constraints.clone(),
             inputs: laid_out.inputs.clone(),
             secrets: laid_out.secrets.clone(),
+            tools: tools::of(&laid_out),
             requirements,
             images: Images::of(&laid_out),
             inventory_groups: ansible::groups(&laid_out),

@@ -163,8 +163,8 @@ impl fmt::Display for Moved<'_> {
 /// Tools: observers on every network at the reserved addresses, outside the environment's
 /// contract (no reach rule, no check names them).
 fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
-    let spec = env.spec();
-    for (i, (name, tool)) in spec.tools.iter().enumerate() {
+    for (name, plan) in &env.tools {
+        let tool = &plan.tool;
         let shell = name == "shell";
         let mut t = Service {
             image: Some(env.images.pull(tool.image.as_deref().unwrap_or(TOOLBOX_IMAGE))),
@@ -180,13 +180,10 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
         if shell {
             t.cap_add = vec!["NET_ADMIN".into(), "NET_RAW".into()];
         }
-        for (net, n) in &env.networks {
+        for (net, ip) in &plan.addresses {
             // On an IPv6-only network, Docker hands the tool its address.
-            if ipv6::only(env, net) {
-                t.networks.insert(net.clone(), None);
-            } else if let Some(at) = n.cidr.tool(i) {
-                t.networks.insert(net.clone(), Some(Attachment::at(at)));
-            }
+            let at = (!ipv6::only(env, net)).then(|| Attachment::at(*ip));
+            t.networks.insert(net.clone(), at);
         }
         if let (Some(port), Some(host)) = (tool.port, tool.publish) {
             t.ports = vec![format!("${{{PUBLISH_ADDRESS}:-127.0.0.1}}:{host}:{port}")];

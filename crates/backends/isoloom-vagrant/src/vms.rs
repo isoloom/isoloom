@@ -361,7 +361,7 @@ impl Shape {
                 });
             }
         }
-        if env.spec().tools.contains_key("shell") {
+        if env.tools.contains_key("shell") {
             defines.push(define(TOOL_SHELL, Kind::ToolShell));
         }
         if with_controller(env, &checks) {

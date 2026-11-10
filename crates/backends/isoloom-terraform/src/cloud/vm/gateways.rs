@@ -110,7 +110,7 @@ pub(crate) fn relocated_with<'a>(env: &'a Environment, to: &dyn Fn(&Environment,
 /// machine goes on a cloud that keeps both the gateway's and the router's addresses.
 pub(crate) fn free_address(env: &Environment, net: &str, c: NetworkBlock) -> Option<Ipv4Addr> {
     // Just below the tools: where the tool after the last would go.
-    let top = u32::from(c.tool(env.spec().tools.len())?);
+    let top = u32::from(c.tool(env.tools.len())?);
     let taken: Vec<Ipv4Addr> = env.machines.values().filter_map(|m| m.addresses.get(net).copied()).collect();
     (u32::from(c.gateway()) + 1..=top).rev().map(Ipv4Addr::from).find(|a| !taken.contains(a))
 }

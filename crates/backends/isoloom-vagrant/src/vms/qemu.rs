@@ -58,7 +58,7 @@ fn vms_and_networks(env: &Environment, with_controller: bool) -> Vec<(String, Ve
     for (name, m) in machines.filter(|(_, m)| m.shape == MachineShape::Vm) {
         vms.push((name.clone(), m.addresses.keys().map(String::as_str).collect()));
     }
-    if env.spec().tools.contains_key("shell") {
+    if env.tools.contains_key("shell") {
         vms.push((TOOL_SHELL.to_owned(), all.clone()));
     }
     if with_controller {

@@ -41,20 +41,19 @@ pub(super) fn networks(spec: &Spec, routed: bool) -> Map<String, Value> {
 
 /// The tools, with their addresses on every network (in the spec's blocks and on Docker's).
 pub(super) fn tools(spec: &Spec, docker: &Spec) -> Map<String, Value> {
-    spec.tools
-        .iter()
-        .enumerate()
-        .map(|(i, (n, t))| {
-            (
-                n.clone(),
-                json!({
-                    "image": t.image.clone().or_else(|| (n == "shell").then(|| "nicolaka/netshoot".to_owned())),
-                    "port": t.port,
-                    "publish": t.publish,
-                    "addresses": per_network(spec, |c| c.tool(i).map(|a| a.to_string())),
-                    "docker_addresses": per_network(docker, |c| c.tool(i).map(|a| a.to_string())),
-                }),
-            )
+    let on_docker = isoloom_plan::tools::of(docker);
+    isoloom_plan::tools::of(spec)
+        .into_iter()
+        .map(|(n, t)| {
+            let docker_addresses = on_docker.get(&n).map(|d| &d.addresses);
+            let tool = json!({
+                "image": t.tool.image.clone().or_else(|| (n == "shell").then(|| "nicolaka/netshoot".to_owned())),
+                "port": t.tool.port,
+                "publish": t.tool.publish,
+                "addresses": t.addresses,
+                "docker_addresses": docker_addresses,
+            });
+            (n, tool)
         })
         .collect()
 }

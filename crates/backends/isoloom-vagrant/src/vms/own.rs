@@ -10,6 +10,7 @@ use crate::boxes::HyperVBox;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
+use isoloom_plan::tools::ToolPlan;
 use isoloom_render::boot::{self, Trigger};
 use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY};
 use isoloom_render::router;
@@ -141,28 +142,30 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
 /// The tools: `shell` is a Debian VM on every network at the tool's address, with the usual
 /// observation tools, outside the environment's contract; the others have no VM form.
 pub(crate) fn tools(r: &mut Ruby, ctx: &Ctx) {
-    for (i, (name, tool)) in ctx.env.spec().tools.iter().enumerate() {
+    for (name, tool) in &ctx.env.tools {
         r.blank();
         if name == "shell" {
             r.comment("Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).");
-            tool_shell(r, ctx, i);
+            tool_shell(r, ctx, tool);
         } else {
             r.comment(&format!(
                 "Tool `{name}` ({}) runs on the container targets; no VM form.",
-                tool.image.as_deref().unwrap_or("image")
+                tool.tool.image.as_deref().unwrap_or("image")
             ));
         }
     }
 }
 
-fn tool_shell(r: &mut Ruby, ctx: &Ctx, index: usize) {
+fn tool_shell(r: &mut Ruby, ctx: &Ctx, tool: &ToolPlan) {
     let env = ctx.env;
     let link = ctx.links.get(TOOL_SHELL).unwrap_or(&Link::None);
     r.define(TOOL_SHELL, true, |r| {
         r.assign("m.vm.box", Value::str(HELPER_BOX));
         r.assign("m.vm.hostname", Value::str("shell"));
-        networks(r, env, |c| c.tool(index));
-        let at = addresses(env, |c| c.tool(index));
+        for (net, ip) in &tool.addresses {
+            private_network(r, env, net, *ip);
+        }
+        let at = tool.addresses.iter().map(|(net, ip)| (net.as_str(), *ip)).collect();
         providers::blocks(r, &helper(env, TOOL_SHELL, Size::HELPER, at, link));
         steps_of(r, env, TOOL_SHELL, &[vec![Step::Prelude, every_machine(env)], trusting(env)].concat());
         shell(
