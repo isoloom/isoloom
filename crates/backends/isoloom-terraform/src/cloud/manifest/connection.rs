@@ -1,14 +1,13 @@
-//! What a cloud run is given at run time beyond the lab's own values: the module's variables as
-//! params (the region, the account, the sizes, who may reach the machines), the provider's
-//! profile, the seal's switch, and the provider's credentials as connection slots.
+//! What a cloud run is given at run time beyond the environment's own values: the module's
+//! variables as params (the region, the account, the sizes, who may reach the machines), the
+//! provider's profile, the seal's switch, and the provider's credentials as connection slots.
 //!
 //! The credentials reach Terraform's own steps only, as the provider's environment: never a
 //! command line, never a file, never the SSH sessions to the machines. Each slot also names the
 //! runner's environment as its source, so a command line run with the cloud's variables
-//! exported just works; a program embedding the runner gives them from the cloud CLI's profile
-//! instead (`Lab::with_connection`). The profile, region and account are params, so the runner
-//! records them at `up` and a `down` replays them (risk R2): the runner gives Terraform no
-//! ambient cloud variable of its own.
+//! exported just works; a program embedding a runner can give them another way. The profile,
+//! region and account are params, so the runner records them at `up` and a `down` replays them:
+//! the runner gives Terraform no ambient cloud variable of its own.
 
 use std::collections::BTreeSet;
 
