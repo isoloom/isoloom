@@ -427,7 +427,7 @@
           "utm": "web-vm - web",
           "vmware_esxi": "web-vm-web"
         },
-        "boot_digest": "sha256:b162da8dbc43dafc214bdb2f11a4da169d72f4659a4b60d298d745ef83d03ea8"
+        "boot_digest": "sha256:0ab275c603083baf6e9e6b8fcfdc29f58411e25d7bde3fbbfb86d4ead11fa680"
       },
       "ports": [
         {
@@ -464,7 +464,7 @@
           "utm": "web-vm - isoloom-controller",
           "vmware_esxi": "web-vm-isoloom-controller"
         },
-        "boot_digest": "sha256:267f8921f064f907002e5cb06a41c6535396a85a43b08ad314cb4663df0044d3"
+        "boot_digest": "sha256:75caff8bbaeba12a39e179a48c358f80ed668342ee0a9f59adcc1d55465bc484"
       }
     }
   ],

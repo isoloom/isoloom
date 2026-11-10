@@ -735,10 +735,10 @@ Vagrant.configure("2") do |config|
         IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
-          cat > /etc/isoloom/lab-net.sh <<'NET'
+          cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.
-          lab() {
+          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
               IF=${d##*/}
@@ -751,37 +751,37 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:57:96:85:eb 10.20.0.32/24 || rc=1
+          set_address 02:15:57:96:85:eb 10.20.0.32/24 || rc=1
           exit $rc
           NET
-          chmod +x /etc/isoloom/lab-net.sh
+          chmod +x /etc/isoloom/env-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:57:96:85:eb\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:57:96:85:eb\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
           if [ -d /run/systemd/system ]; then
-            cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
-          Description=Addresses on the isoloom networks
+          Description=Isoloom: addresses on the environment networks
           After=network-pre.target NetworkManager.service systemd-networkd.service
           Before=network-online.target isoloom-routes.service
 
           [Service]
           Type=oneshot
           RemainAfterExit=yes
-          ExecStart=/etc/isoloom/lab-net.sh
+          ExecStart=/etc/isoloom/env-net.sh
 
           [Install]
           WantedBy=multi-user.target
           UNIT
             systemctl daemon-reload
-            systemctl enable -q isoloom-lab-net.service
+            systemctl enable -q isoloom-env-net.service
           elif command -v rc-update >/dev/null; then
-            printf '#!/bin/sh\nexec /etc/isoloom/lab-net.sh\n' > /etc/local.d/isoloom-lab-net.start
-            chmod +x /etc/local.d/isoloom-lab-net.start
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
             rc-update add local default >/dev/null
           fi
-          /etc/isoloom/lab-net.sh
+          /etc/isoloom/env-net.sh
         SH
       end
     end
@@ -954,10 +954,10 @@ Vagrant.configure("2") do |config|
         IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
-          cat > /etc/isoloom/lab-net.sh <<'NET'
+          cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.
-          lab() {
+          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
               IF=${d##*/}
@@ -970,37 +970,37 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:e3:7a:fa:b4 10.20.0.31/24 || rc=1
+          set_address 02:15:e3:7a:fa:b4 10.20.0.31/24 || rc=1
           exit $rc
           NET
-          chmod +x /etc/isoloom/lab-net.sh
+          chmod +x /etc/isoloom/env-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:e3:7a:fa:b4\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:e3:7a:fa:b4\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
           if [ -d /run/systemd/system ]; then
-            cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
-          Description=Addresses on the isoloom networks
+          Description=Isoloom: addresses on the environment networks
           After=network-pre.target NetworkManager.service systemd-networkd.service
           Before=network-online.target isoloom-routes.service
 
           [Service]
           Type=oneshot
           RemainAfterExit=yes
-          ExecStart=/etc/isoloom/lab-net.sh
+          ExecStart=/etc/isoloom/env-net.sh
 
           [Install]
           WantedBy=multi-user.target
           UNIT
             systemctl daemon-reload
-            systemctl enable -q isoloom-lab-net.service
+            systemctl enable -q isoloom-env-net.service
           elif command -v rc-update >/dev/null; then
-            printf '#!/bin/sh\nexec /etc/isoloom/lab-net.sh\n' > /etc/local.d/isoloom-lab-net.start
-            chmod +x /etc/local.d/isoloom-lab-net.start
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
             rc-update add local default >/dev/null
           fi
-          /etc/isoloom/lab-net.sh
+          /etc/isoloom/env-net.sh
         SH
         IsoloomHyperV.ports(machine, [[3206, ISOLOOM_HOSTPORTS.fetch("web/portal", 3206)]])
       end
@@ -1100,10 +1100,10 @@ Vagrant.configure("2") do |config|
         IsoloomHyperV.address(machine, <<~'SH')
           set -e
           mkdir -p /etc/isoloom
-          cat > /etc/isoloom/lab-net.sh <<'NET'
+          cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.
-          lab() {
+          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
               IF=${d##*/}
@@ -1116,37 +1116,37 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:26:36:e7:95 10.20.0.253/24 || rc=1
+          set_address 02:15:26:36:e7:95 10.20.0.253/24 || rc=1
           exit $rc
           NET
-          chmod +x /etc/isoloom/lab-net.sh
+          chmod +x /etc/isoloom/env-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:26:36:e7:95\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:26:36:e7:95\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
           if [ -d /run/systemd/system ]; then
-            cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
-          Description=Addresses on the isoloom networks
+          Description=Isoloom: addresses on the environment networks
           After=network-pre.target NetworkManager.service systemd-networkd.service
           Before=network-online.target isoloom-routes.service
 
           [Service]
           Type=oneshot
           RemainAfterExit=yes
-          ExecStart=/etc/isoloom/lab-net.sh
+          ExecStart=/etc/isoloom/env-net.sh
 
           [Install]
           WantedBy=multi-user.target
           UNIT
             systemctl daemon-reload
-            systemctl enable -q isoloom-lab-net.service
+            systemctl enable -q isoloom-env-net.service
           elif command -v rc-update >/dev/null; then
-            printf '#!/bin/sh\nexec /etc/isoloom/lab-net.sh\n' > /etc/local.d/isoloom-lab-net.start
-            chmod +x /etc/local.d/isoloom-lab-net.start
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
             rc-update add local default >/dev/null
           fi
-          /etc/isoloom/lab-net.sh
+          /etc/isoloom/env-net.sh
         SH
       end
     end
@@ -1894,7 +1894,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api - database",
           "vmware_esxi": "supplier-portal-api-database"
         },
-        "boot_digest": "sha256:bed99d382afa127f4b7d6244894072852a2fc33666e402fb43a788e05a1ba908"
+        "boot_digest": "sha256:f4f80674c4fbd9a3b0654b8911df1aee65c9c5061937df062a912061e0792322"
       },
       "ports": [
         {
@@ -1928,7 +1928,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api - web",
           "vmware_esxi": "supplier-portal-api-web"
         },
-        "boot_digest": "sha256:3d5f1dc8d1858f5165e671ca64a3d5f4a8a9e850f736b69dcfcd718a672e687c"
+        "boot_digest": "sha256:be300880433d75d7fc19639198e8acb8355c510dc9434f9f8856a7cdb56c194e"
       },
       "ports": [
         {
@@ -1965,7 +1965,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "supplier-portal-api - isoloom-controller",
           "vmware_esxi": "supplier-portal-api-isoloom-controller"
         },
-        "boot_digest": "sha256:78aa165f96512d7f47e55c121d6e24f7644ea98fa0609d1e014782a660c770af"
+        "boot_digest": "sha256:41fbc0ff4cba94c21f05fd005952f55a50427ef71815dbf69cd26ff7c64b42b4"
       }
     }
   ],

@@ -16,7 +16,7 @@ use super::SERVICE_OS;
 use super::guest::{Guest, Nic};
 use super::machines;
 use crate::module::ident;
-use crate::server::router::{NAME, Platform, outputs as lab_outputs};
+use crate::server::router::{NAME, Platform};
 
 /// The router's place among the VMs (the controller is next, then the machines).
 pub(super) const INDEX: u64 = 0;
@@ -87,5 +87,5 @@ pub(super) fn outputs(env: &Environment, m: &mut Module) {
             .add_attribute(("router_address", reference("esxi_guest.isoloom_router.ip_address")))
             .build(),
     );
-    lab_outputs(env, Target::Esxi, m);
+    crate::server::router::outputs(env, Target::Esxi, m);
 }

@@ -11,7 +11,7 @@ use super::windows;
 use crate::machine::cloud_init::{self, CloudConfig};
 use crate::machine::cloudbase_init;
 use crate::module::{ident, resource};
-use crate::server::{router as lab_router, slotted};
+use crate::server::{router as server_router, slotted};
 
 /// A machine's snippet and VM: a cloud-init document on a cloud image, or on Windows a
 /// cloudbase-init script on a clone of the OS's template (see `windows`).
@@ -46,7 +46,7 @@ fn vm(env: &Environment, name: &str, mp: &MachinePlan, boot: Boot) -> Vm {
     let mut nics = Vec::new();
     let mut ips = Vec::new();
     // The default route is the router's on the first network, unless the LAN's DHCP gives it.
-    let routed = lab_router::is_default_gateway(env, mp);
+    let routed = server_router::is_default_gateway(env, mp);
     for (i, (net, addr)) in mp.addresses.iter().enumerate() {
         nics.push(super::links::device(env, net, None, Some(mp)));
         let len = env.block(net).prefix();

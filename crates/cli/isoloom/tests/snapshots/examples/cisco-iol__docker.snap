@@ -57,7 +57,7 @@ crash.*.log
 hostname r1
 !
 no ip domain lookup
-ip domain name lab
+ip domain name cisco-iol.internal
 !
 username admin privilege 15 secret admin
 !
@@ -114,7 +114,7 @@ eth_dev = eth2
 hostname r2
 !
 no ip domain lookup
-ip domain name lab
+ip domain name cisco-iol.internal
 !
 username admin privilege 15 secret admin
 !

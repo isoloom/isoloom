@@ -211,10 +211,10 @@ pub(crate) fn machine(name: &str, role: Role, addresses: BTreeMap<Name, IpAddr>)
     Ok(m)
 }
 
-/// A lab machine (role `member`, or `access`): a bare machine with its OS, Windows flag and
+/// A machine of the environment (role `member`, or `access`): a bare machine with its OS, Windows flag and
 /// architecture, then each spec port fixed at its own number on `at` (the machine's public
 /// address).
-pub(crate) fn lab_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::model::Machine, at: &Template) -> Result<Machine, ManifestError> {
+pub(crate) fn environment_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::model::Machine, at: &Template) -> Result<Machine, ManifestError> {
     // The access machine keeps its role (where the user works from); every machine is made at `up`.
     let mut m = machine(name, isoloom_render::run_manifest::role(mp), addresses(mp)?)?;
     // A VM's OS; a container (an LXC one on Proxmox) runs its image's.

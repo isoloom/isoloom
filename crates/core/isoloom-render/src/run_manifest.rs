@@ -1,5 +1,5 @@
 //! What every backend's run manifest is built from: its header, steps (a native command or a
-//! driver action, with their policies), tools, the lab's networks, a machine's addresses and
+//! driver action, with their policies), tools, the environment's networks, a machine's addresses and
 //! ports, the outputs of its published ports, and the checks a runner reports with the time
 //! its step may take. Pure functions over the plan, shared so each target says them once.
 //! Compose inside a VM is [`guest`]: what both backends of `docker-vm` share.
@@ -282,7 +282,7 @@ pub fn tool(name: &str, probe: HostArgv) -> Result<Tool, ManifestError> {
     })
 }
 
-/// The lab's networks, each with its name where the target creates it (`native`).
+/// The environment's networks, each with its name where the target creates it (`native`).
 ///
 /// # Errors
 ///
@@ -329,7 +329,7 @@ pub fn addresses(mp: &MachinePlan) -> Result<BTreeMap<Name, IpAddr>, ManifestErr
     v4.chain(v6).map(|(n, a)| Ok((Name::parse(n)?, a))).collect()
 }
 
-/// A port of the lab's, named `label` (the spec's name), published as `published` plans it,
+/// A port of the environment's, named `label` (the spec's name), published as `published` plans it,
 /// listening on `address` on the host.
 ///
 /// # Errors
@@ -354,7 +354,7 @@ pub fn port(label: &str, p: &model::Port, published: &[PublishedPort], address: 
     })
 }
 
-/// A lab machine's size in its run manifest: its CPUs and memory as it runs on the target (a
+/// A machine's size in its run manifest: its CPUs and memory as it runs on the target (a
 /// container or a VM), each the spec leaves out the default of that form
 /// (`isoloom_spec::MachineSize`).
 #[must_use]
@@ -390,7 +390,7 @@ pub fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
     })
 }
 
-/// An output per published port of the lab's machines and tools, named `<machine>__<port>`: an
+/// An output per published port of the environment's machines and tools, named `<machine>__<port>`: an
 /// HTTP port is an entry (the address a user opens first), the others information; each shown
 /// at the host's loopback.
 ///

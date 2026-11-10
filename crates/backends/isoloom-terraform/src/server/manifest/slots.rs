@@ -1,7 +1,7 @@
 //! What a server's run is given at run time: the module's variables as params (on Proxmox the
 //! API, the node, the datastores, the uplink bridge, each Windows OS's template; on ESXi the host,
 //! the datastore, the uplink port group, the OVAs), its sensitive ones (the passwords, the API
-//! token) as connection slots, the lab's inputs as entries of the module's `inputs` map, the check
+//! token) as connection slots, the environment's inputs as entries of the module's `inputs` map, the check
 //! runners' switch, and the seal switch when the run seals. The runner sets three variables
 //! itself, through the steps' environment (`super::steps::runner_set`).
 

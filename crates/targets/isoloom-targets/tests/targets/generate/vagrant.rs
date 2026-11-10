@@ -170,7 +170,7 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
         "{web}"
     );
     assert!(
-        web.contains("systemctl enable -q isoloom-lab-net.service") && web.contains("rc-update add local default"),
+        web.contains("systemctl enable -q isoloom-env-net.service") && web.contains("rc-update add local default"),
         "{web}"
     );
     assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-front\"])"), "{web}");

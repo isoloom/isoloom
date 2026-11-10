@@ -9,7 +9,7 @@ use crate::naming::network_names;
 /// The draft: the header, the networks, the machines, then the boxes kept and the
 /// environment-level playbooks.
 pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, source: &str) -> String {
-    // Network names: the VirtualBox internal network's, else lab, lab-2...
+    // Network names: the VirtualBox internal network's, else net, net-2...
     let names = network_names(
         import
             .nets

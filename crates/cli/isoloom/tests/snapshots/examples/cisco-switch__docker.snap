@@ -56,7 +56,7 @@ crash.*.log
 hostname sw1
 !
 no ip domain lookup
-ip domain name lab
+ip domain name cisco-switch.internal
 !
 username admin privilege 15 secret admin
 !

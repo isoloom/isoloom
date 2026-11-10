@@ -44,7 +44,7 @@ crash.*.log
 hostname csr
 !
 no ip domain lookup
-ip domain name lab
+ip domain name cisco-qemu.internal
 !
 username admin privilege 15 secret admin
 !
@@ -69,7 +69,7 @@ line vty 0 4
 hostname vios
 !
 no ip domain lookup
-ip domain name lab
+ip domain name cisco-qemu.internal
 !
 username admin privilege 15 secret admin
 !

@@ -9,7 +9,7 @@
 //!   (`host`). Their Compose file is the Compose backend's, plugged into those networks
 //!   (`isoloom_compose::hybrid`); `isoloom-targets` renders it and hands it to [`render`].
 //! - Published ports: macvlan can't publish, so a container with published ports also joins
-//!   Docker's bridge network (its default route stays on its lab network), and the Docker host
+//!   Docker's bridge network (its default route stays on its environment network), and the Docker host
 //!   VM forwards each port to this machine's loopback.
 //! - VirtualBox only: promiscuous network interfaces are set per provider, and this writes
 //!   VirtualBox's.

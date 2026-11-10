@@ -1,4 +1,4 @@
-//! Compose inside a VM (`docker-vm`, `cloud-docker`): the lab's containers, and the shell commands
+//! Compose inside a VM (`docker-vm`, `cloud-docker`): the environment's containers, and the shell commands
 //! that start, check and read them there, as the Compose backend works them out
 //! ([`GuestCompose`]). The backend that makes the VM runs each command through its own way in
 //! (`vagrant ssh`, or SSH to a VM Terraform made) and adds the VM itself. Shared here, below the
@@ -94,14 +94,14 @@ impl GuestRunner {
     }
 }
 
-/// The lab's containers in a VM, and the commands that run them there.
+/// The environment's containers in a VM, and the commands that run them there.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GuestCompose {
     /// The containers and Compose's own services, as the `docker` target's manifest has them,
     /// each published port `fixed` at its `publish` number (the VM's backend says where it
     /// answers).
     pub machines: Vec<Machine>,
-    /// The lab's networks, named as Compose makes them in the VM.
+    /// The environment's networks, named as Compose makes them in the VM.
     pub networks: Vec<Network>,
     /// What the containers read at start (inputs, secrets), each delivered as an environment
     /// variable to the [`start`](Self::start) steps creating the containers that read it: the
@@ -177,7 +177,7 @@ impl GuestCompose {
 pub struct DockerHost {
     /// The VM: Isoloom's own ([`DOCKER_HOST`], `infra`), sized for every container at once.
     pub machine: Machine,
-    /// When the lab counts as ready: the step that made the VM succeeded, then the containers'.
+    /// When the environment counts as ready: the step that made the VM succeeded, then the containers'.
     pub ready: Vec<Condition>,
     /// Where the runner reads the containers: in the VM, at its own address when it has one.
     pub guest: Guest,

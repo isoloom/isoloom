@@ -187,6 +187,12 @@ struct StartupConfig<'a> {
 }
 
 impl StartupConfig<'_> {
+    /// The domain the appliance names itself under (IOS needs one for its SSH keys): the private
+    /// DNS zone's when `dns.private` is on, else `<environment>.internal`, the zone's default.
+    fn domain(&self) -> String {
+        self.spec.private_domain().unwrap_or_else(|| format!("{}.internal", self.spec.name))
+    }
+
     /// Whether the kind is IOL, whose management port lives in a VRF of its own.
     fn iol(&self) -> bool {
         matches!(self.kind, Appliance::CiscoIol | Appliance::CiscoIolL2)
@@ -252,8 +258,9 @@ impl fmt::Display for StartupConfig<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "hostname {}\n!\nno ip domain lookup\nip domain name lab\n!\nusername admin privilege 15 secret admin\n!\n",
-            self.name
+            "hostname {}\n!\nno ip domain lookup\nip domain name {}\n!\nusername admin privilege 15 secret admin\n!\n",
+            self.name,
+            self.domain()
         )?;
         if self.iol() {
             self.management(f)?;
@@ -411,5 +418,26 @@ mod tests {
         assert_eq!(interface(Appliance::CiscoC8000v, 1), "GigabitEthernet2");
         assert_eq!(interface(Appliance::CiscoDynamips, 1), "FastEthernet0/0");
         assert_eq!(interface(Appliance::CiscoDynamips, 3), "FastEthernet1/1");
+    }
+
+    /// The startup configuration of appliance `r` of `yaml`.
+    fn config(yaml: &str) -> String {
+        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).unwrap());
+        let spec = lab.for_target(isoloom_spec::model::Target::Docker);
+        StartupConfig {
+            spec: &spec,
+            name: "r",
+            kind: Appliance::CiscoIol,
+            ports: &[],
+        }
+        .to_string()
+    }
+
+    #[test]
+    fn an_appliance_names_itself_under_the_environments_domain() {
+        let plain = "version: 1\nname: shop\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  r: { networks: { lan: 1 }, app: { image: x, appliance: cisco-iol } }\n";
+        assert!(config(plain).contains("\nip domain name shop.internal\n"), "{}", config(plain));
+        let private = format!("{plain}dns: {{ private: true, domain: corp.test }}\n");
+        assert!(config(&private).contains("\nip domain name corp.test\n"), "{}", config(&private));
     }
 }

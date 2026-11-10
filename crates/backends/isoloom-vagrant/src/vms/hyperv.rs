@@ -236,32 +236,38 @@ fn published(hv: &HyperV) -> Value {
     Value::array(hv.published.iter().map(|(g, h)| Value::array([Value::from(*g), h.clone()])))
 }
 
-/// Where a Linux VM keeps the script that sets its addresses at boot ([`LAB_NET`]).
-const LAB_NET_SCRIPT: &str = isoloom_spec::linux_config_path!("/lab-net.sh");
+/// Where a Linux VM keeps the script that sets its addresses at boot ([`ENV_NET`]).
+const ENV_NET_SCRIPT: &str = isoloom_spec::linux_config_path!("/env-net.sh");
 
-/// The script that sets a Linux VM's addresses at boot ([`LAB_NET_SCRIPT`]): each
+/// The unit (systemd) or `local.d` script (OpenRC) that runs [`ENV_NET_SCRIPT`] at every boot.
+const ENV_NET_UNIT: &str = "isoloom-env-net";
+
+/// The script that sets a Linux VM's addresses at boot ([`ENV_NET_SCRIPT`]): each
 /// adapter found by its MAC, its address set with `ip` (NetworkManager told to leave it
 /// alone). Every network is tried; a missing adapter fails it.
-const LAB_NET: &str = "#!/bin/sh\n# This machine's addresses on the isoloom networks (Hyper-V sets none), by adapter MAC.\nlab() {\n  for d in /sys/class/net/*; do\n    [ \"$(cat \"$d/address\" 2>/dev/null)\" = \"$1\" ] || continue\n    IF=${d##*/}\n    if command -v nmcli >/dev/null; then nmcli device set \"$IF\" managed no 2>/dev/null || true; fi\n    ip link set \"$IF\" up\n    ip -4 addr show dev \"$IF\" | grep -q \" $2 \" || ip addr add \"$2\" dev \"$IF\"\n    return 0\n  done\n  echo \"isoloom: no network adapter with MAC $1\" >&2\n  return 1\n}\nrc=0\n";
+const ENV_NET: &str = "#!/bin/sh\n# This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.\nset_address() {\n  for d in /sys/class/net/*; do\n    [ \"$(cat \"$d/address\" 2>/dev/null)\" = \"$1\" ] || continue\n    IF=${d##*/}\n    if command -v nmcli >/dev/null; then nmcli device set \"$IF\" managed no 2>/dev/null || true; fi\n    ip link set \"$IF\" up\n    ip -4 addr show dev \"$IF\" | grep -q \" $2 \" || ip addr add \"$2\" dev \"$IF\"\n    return 0\n  done\n  echo \"isoloom: no network adapter with MAC $1\" >&2\n  return 1\n}\nrc=0\n";
 
-/// Runs `lab-net.sh` at every boot: a systemd unit, or OpenRC's `local` on Alpine.
-const LAB_NET_AT_BOOT: &str = concat!(
-    "if [ -d /run/systemd/system ]; then\n  cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'\n[Unit]\nDescription=Addresses on the isoloom networks\nAfter=network-pre.target NetworkManager.service systemd-networkd.service\nBefore=network-online.target isoloom-routes.service\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=",
-    isoloom_spec::linux_config_path!("/lab-net.sh"),
-    "\n\n[Install]\nWantedBy=multi-user.target\nUNIT\n  systemctl daemon-reload\n  systemctl enable -q isoloom-lab-net.service\nelif command -v rc-update >/dev/null; then\n  printf '#!/bin/sh\\nexec ",
-    isoloom_spec::linux_config_path!("/lab-net.sh"),
-    "\\n' > /etc/local.d/isoloom-lab-net.start\n  chmod +x /etc/local.d/isoloom-lab-net.start\n  rc-update add local default >/dev/null\nfi\n"
-);
+/// Runs [`ENV_NET_SCRIPT`] at every boot: a systemd unit, or OpenRC's `local` on Alpine.
+fn env_net_at_boot() -> String {
+    format!(
+        "if [ -d /run/systemd/system ]; then\n  cat > /etc/systemd/system/{ENV_NET_UNIT}.service <<'UNIT'\n[Unit]\nDescription=Isoloom: addresses on the environment networks\nAfter=network-pre.target NetworkManager.service systemd-networkd.service\nBefore=network-online.target isoloom-routes.service\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart={ENV_NET_SCRIPT}\n\n[Install]\nWantedBy=multi-user.target\nUNIT\n  systemctl daemon-reload\n  systemctl enable -q {ENV_NET_UNIT}.service\nelif command -v rc-update >/dev/null; then\n  printf '#!/bin/sh\\nexec {ENV_NET_SCRIPT}\\n' > /etc/local.d/{ENV_NET_UNIT}.start\n  chmod +x /etc/local.d/{ENV_NET_UNIT}.start\n  rc-update add local default >/dev/null\nfi\n"
+    )
+}
 
-/// A Linux VM's addresses on its networks under Hyper-V: `lab-net.sh` written, run at every
-/// boot, and now.
+/// A Linux VM's addresses on its networks under Hyper-V: [`ENV_NET_SCRIPT`] written, run at
+/// every boot, and now.
 fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let macs: Vec<String> = nics.iter().map(|n| mac_text(mac(vm_name, n.net), ":", false)).collect();
-    let lines: Vec<String> = nics.iter().zip(&macs).map(|(n, m)| format!("lab {m} {}/{} || rc=1\n", n.ip, n.len)).collect();
+    let lines: Vec<String> = nics
+        .iter()
+        .zip(&macs)
+        .map(|(n, m)| format!("set_address {m} {}/{} || rc=1\n", n.ip, n.len))
+        .collect();
     let lines = lines.concat();
     let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
     format!(
-        "set -e\nmkdir -p {CONFIG_DIR}\ncat > {LAB_NET_SCRIPT} <<'NET'\n{LAB_NET}{lines}exit $rc\nNET\nchmod +x {LAB_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf\nfi\n{LAB_NET_AT_BOOT}{LAB_NET_SCRIPT}\n"
+        "set -e\nmkdir -p {CONFIG_DIR}\ncat > {ENV_NET_SCRIPT} <<'NET'\n{ENV_NET}{lines}exit $rc\nNET\nchmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{ENV_NET_SCRIPT}\n",
+        env_net_at_boot()
     )
 }
 

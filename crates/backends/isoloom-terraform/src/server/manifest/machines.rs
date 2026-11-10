@@ -28,7 +28,7 @@ pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError>
         let (Some(mp), Some(spec)) = (env.machines.get(name), env.spec().machines.get(name)) else {
             continue;
         };
-        out.push(manifest::lab_machine(name, mp, spec, &at)?);
+        out.push(manifest::environment_machine(name, mp, spec, &at)?);
     }
     let router_at = |net: &str| IpAddr::V4(router::address(env.spec(), net));
     out.push(manifest::machine(ROUTER, Role::Infra, by_network(env, router_at)?)?);

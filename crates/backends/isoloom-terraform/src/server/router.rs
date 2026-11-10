@@ -18,7 +18,7 @@ use crate::module::output;
 use crate::seal;
 
 /// The router's name: its host name, its VM's and snippet's, and its machine in a run manifest.
-/// A lab machine can't take it (`isoloom-` names are Isoloom's own).
+/// A machine of the environment can't take it (`isoloom-` names are Isoloom's own).
 pub(crate) const NAME: &str = "isoloom-router";
 
 /// What a server's platform adds to its router's cloud-config ([`cloud_config`]).
@@ -59,7 +59,7 @@ pub(crate) fn cloud_config(env: &Environment, platform: Platform) -> CloudConfig
     config
 }
 
-/// Forwarding on, as a sysctl file: IPv4, and IPv6 when the lab routes IPv6
+/// Forwarding on, as a sysctl file: IPv4, and IPv6 when the environment routes IPv6
 /// (`isoloom_plan::routing::forwarding`).
 pub(crate) fn forwarding(env: &Environment) -> String {
     let lines: Vec<String> = isoloom_plan::routing::forwarding(!env.router6.is_empty())
@@ -110,7 +110,7 @@ fn forwarded(env: &Environment, sealed: bool) -> Option<String> {
     (!cidrs.is_empty()).then(|| format!("{{ {} }}", cidrs.join(", ")))
 }
 
-/// The ruleset, sealed or not (see [`ruleset_content`]). The lab's whole set is
+/// The ruleset, sealed or not (see [`ruleset_content`]). The environment's whole set is
 /// the DNAT's source exclusion (published ports reach a machine whatever its network); once
 /// sealed, traffic to an `internet: false` network from elsewhere is dropped (so it keeps only
 /// its `reach` rules), and that network is dropped from the internet forward and masquerade.

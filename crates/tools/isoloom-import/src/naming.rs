@@ -45,11 +45,12 @@ pub(crate) fn unique(base: &str, taken: impl Fn(&str) -> bool) -> String {
         .unwrap_or_else(|| base.to_owned())
 }
 
-/// Names for the draft's networks, keyed like the networks: the name the source gave, else
-/// `lab`, `lab-2`... by position, each one unique.
-/// The network a draft names when its source gives none: the first one's name, `net-2`... after.
+/// The name a draft gives the first network its source leaves unnamed (`net`); the next ones
+/// are `net-2`, `net-3`... by position.
 pub(crate) const DRAFT_NETWORK: &str = "net";
 
+/// Names for the draft's networks, keyed like the networks: the name the source gave, else
+/// [`DRAFT_NETWORK`], `net-2`... by position, each one unique.
 pub(crate) fn network_names(networks: impl IntoIterator<Item = (String, Option<String>)>) -> indexmap::IndexMap<String, String> {
     let mut names = indexmap::IndexMap::new();
     for (i, (key, named)) in networks.into_iter().enumerate() {
