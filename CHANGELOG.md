@@ -453,6 +453,18 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   network (by DHCP, with a placeholder block to set, when it has no `ip`), and a
   `synced_folder` a `host_folders` entry. A `synced_folder`'s options after its paths
   (`disabled: true` among them) were not read either.
+- **A tmpfs `mode` that isn't three or four octal digits stops the spec where it is written.**
+  Validation said so, but Compose dropped such a mode silently when it rendered; the mode is read
+  once now, as a file's is.
+- **docker-vm's Vagrant VM doesn't fail its set-up on an sshd not reloaded yet.** Its
+  `accept-env` step reloaded sshd with no fallback, unlike the Terraform-made Docker hosts; one
+  rule now writes the drop-in and reloads sshd for every VM the launch's values reach over SSH.
+- **hybrid's containers' host is set up as docker-vm's VM is.** One builder writes both, under the
+  same provisioner names (`project`, `ca-certificates`, `docker`), and the hybrid host gains the
+  rule letting published ports reach containers whose networks have no default route.
+- **`isoloom report ports` on Hyper-V says only what isn't there.** Its note said no port is
+  forwarded on Hyper-V; the Vagrantfile relays each published TCP port on the host port the run
+  reports, so the note names the UDP ones alone.
 - **ESXi says its `internet: false` networks keep the internet.** Its router wrote a sealed
   ruleset that nothing applied (ESXi has no run manifest, so no seal step), and every network kept
   the internet without a word. The router no longer writes it; the module's router comment and the
@@ -788,6 +800,19 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   is_variable}` and `validate::Cidr::{netmask, enclosing}` are public. The catalogue's
   `conformance` module and `Fetches`, `KeyCheck` and `RepositoryFetch` are behind its
   `maintenance` feature, which only `cargo xtask` turns on.
+- **Library: no backend's builder in `isoloom-render`.** `container::{start_commands, leaf_jobs,
+  as_arguments}` are gone (the Compose backend's start plan is the one rule;
+  `HybridContainers::start` carries the hybrid host's line). The run-manifest builders only
+  Terraform used (`run_manifest::{terraform_output, outputs_at}`, `guest::{ssh_run, into_vm,
+  setup_script, docker_host_outputs}`, `GuestCompose::accept_env_command`) and the one Vagrant
+  used (`GuestCommand::in_vm_shell`) are those backends' own. `inventory::Access`'s presets
+  (`vagrant`, `proxmox`, `cloud`, `external`) and `WinrmAuth` are gone: a backend builds its own
+  with `Access::new`, from `inventory::{vars, winrm_vars, WINRM_PATIENCE, WINDOWS_OVER_SSH}`.
+  New: `controller::{NAME, INSTALL_ANSIBLE, PLAYBOOK_ENVIRONMENT}`, `steps::{accept_env,
+  accept_env_line, ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, RELOAD_SSHD, WINDOWS_PROJECT_ARCHIVE}`,
+  `isoloom_manifest::SnakeName::from_label`, `isoloom_spec::validate::dns_name`,
+  `isoloom_ansible::configure::role_name`. `isoloom_spec::model::TmpfsMount::mode` (and
+  `Tmpfs::mode`) is a `TmpfsMode`, read once, rather than text.
 - **The Ansible renderer's `ansible.windows.win_feature` task**, which no lab reached: the lab
   refuses a `packages` step on a Windows host that already exists. The renderer writes
   `ansible.builtin` and `ansible.posix` tasks only, as its docs say; reaching that step is an
