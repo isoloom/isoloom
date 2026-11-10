@@ -121,8 +121,9 @@ off networks other people reach.
 ## Supply chain
 
 - Container images of the catalogue and the OS base images are pinned by digest; Isoloom's helper
-  images are pinned by digest too; Ansible Galaxy collections by `sha256`; the Docker install in
-  VMs uses the official repository with a pinned key.
+  images are pinned by digest too; Ansible Galaxy collections by version and `sha256` in the
+  catalogue (on `external`, `requirements.yml` names the pin for you to check: `ansible-galaxy`
+  doesn't); the Docker install in VMs uses the official repository with a pinned key.
 - Terraform providers are pinned to a patch range ([tool versions](../reference/tool-versions.md)).
 - `constraints.registries` and `constraints.mirrors` send every pull through your own mirrors
   ([corporate network](../guide/corporate-network.md)).

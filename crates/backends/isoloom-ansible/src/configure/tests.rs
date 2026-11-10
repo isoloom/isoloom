@@ -225,22 +225,26 @@ overrides:
 ",
     );
     let reqs = file(&files, ".isoloom/external/requirements.yml");
-    assert!(reqs.contains("name: ansible.posix"), "{reqs}");
-    assert!(reqs.contains("version:"), "{reqs}");
-    // The pinned sha256 from collections.yml is carried, not dropped, so a run can't fetch a
-    // mutated collection (security finding C2).
     let posix = isoloom_catalogue::Catalogue::embedded()
         .expect("catalogue")
         .collections()
         .get("ansible.posix")
         .expect("posix pinned")
-        .sha256
-        .to_string();
-    assert_eq!(posix.len(), 64, "a sha256 is 64 hex chars: {posix}");
-    assert!(
-        reqs.contains(&format!("sha256: \"{posix}\"")),
-        "requirements.yml carries the pinned sha256: {reqs}"
-    );
+        .clone();
+    // As `ansible-galaxy collection install -r` reads it: a collection by URL is `name: <url>`
+    // with `type: url` (a `source:` would be read as a Galaxy server), and nothing else.
+    let read: serde_yaml_ng::Value = serde_yaml_ng::from_str(&reqs).expect("YAML");
+    let entries = read["collections"].as_sequence().expect("a list of collections");
+    assert_eq!(entries.len(), 1, "{reqs}");
+    let entry = entries[0].as_mapping().expect("a collection is a mapping");
+    let keys: Vec<&str> = entry.keys().filter_map(serde_yaml_ng::Value::as_str).collect();
+    assert_eq!(keys, ["name", "type"], "{reqs}");
+    assert_eq!(entries[0]["name"].as_str(), Some(posix.url.to_string().as_str()), "{reqs}");
+    assert_eq!(entries[0]["type"].as_str(), Some("url"), "{reqs}");
+    // The pinned sha256, which galaxy doesn't check, is named for the user to check it.
+    let sha = posix.sha256.to_string();
+    assert_eq!(sha.len(), 64, "a sha256 is 64 hex chars: {sha}");
+    assert!(reqs.contains(&format!("# ansible.posix {}: sha256 {sha}\n", posix.version)), "{reqs}");
 }
 
 #[test]

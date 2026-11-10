@@ -33,8 +33,15 @@ no host is refused (`isoloom targets` names it).
 
 ```sh
 isoloom generate --target external
+ansible-galaxy collection install -r .isoloom/external/requirements.yml   # when it is written
 ansible-playbook -i .isoloom/external/inventory.ini .isoloom/external/site.yml
 ```
+
+`requirements.yml` is written when a role needs a collection (`ansible.posix`, for a `firewall`
+step). It names the archive by URL, and above it, in a comment, the SHA-256 the catalogue pins.
+`ansible-galaxy` doesn't check that hash: to check it, download the archive, compare
+`sha256sum <archive>` with the pin, and install the file you checked
+(`ansible-galaxy collection install <archive>`).
 
 Then run the checks from each machine: `.isoloom/external/checks/<machine>.sh` prints a `PASS` or
 `FAIL` line per check (copy it to the machine and run it there, or over `ssh`). The checks are

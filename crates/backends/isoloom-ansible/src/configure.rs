@@ -88,9 +88,10 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
 /// `ansible.posix`: a bug its tests and `a_firewall_recipe_pins_ansible_posix_in_requirements`
 /// catch first.
 ///
-/// Each entry carries the exact version, its archive `source`, and the `sha256` that
-/// `catalogue/collections.yml` pins (never dropped): a run checks the archive against it before
-/// installing, so it can't fetch a mutated collection (the design's vendored/pinned rule).
+/// Each entry is the pinned archive's URL, of `type: url`, which `ansible-galaxy collection
+/// install -r` fetches as is. Galaxy checks no hash of such an archive, so the file names the
+/// `sha256` that `catalogue/collections.yml` pins in a comment above it, for the user to check
+/// the archive against before installing it (the external guide says how).
 fn requirements(configured: &[(String, Configured<'_>)]) -> crate::Result<Option<String>> {
     const POSIX: &str = "ansible.posix";
     let firewall = configured
@@ -105,14 +106,13 @@ fn requirements(configured: &[(String, Configured<'_>)]) -> crate::Result<Option
         .collections()
         .get(POSIX)
         .ok_or_else(|| missing("the embedded catalogue's collections.yml has none".to_owned()))?;
-    let collections = json!([{
-        "name": posix.name,
-        "version": posix.version,
-        "source": posix.url.to_string(),
-        "sha256": posix.sha256.to_string(),
-    }]);
+    let pins = format!(
+        "# ansible-galaxy checks no hash of an archive it fetches by URL: before installing, check\n# each one against the SHA-256 the catalogue pins.\n# {} {}: sha256 {}\n",
+        posix.name, posix.version, posix.sha256
+    );
+    let collections = json!([{ "name": posix.url.to_string(), "type": "url" }]);
     let body = task::document(&json!({ "collections": collections }));
-    Ok(Some(format!("{}{body}", header("#"))))
+    Ok(Some(format!("{}{pins}{body}", header("#"))))
 }
 
 #[cfg(test)]
