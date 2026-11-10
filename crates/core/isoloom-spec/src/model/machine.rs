@@ -69,7 +69,7 @@ impl Seal {
 #[serde(deny_unknown_fields)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "the lowered form keeps one independent switch per field the backends read (spec.md §7.1); it shrinks as they read the plan instead"
+    reason = "the lowered form keeps one independent switch per field a spec writes (`privileged`, `read_only`, `access`, ...), each read on its own by the backends"
 )]
 #[non_exhaustive]
 pub struct Machine {
@@ -258,7 +258,7 @@ pub struct Machine {
 #[serde(deny_unknown_fields)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "the lowered form keeps the backends' port switches one to one (spec.md §7.3 item 2 turns them into one `PortKind`)"
+    reason = "the lowered form keeps a port's switches as the spec writes them (`http`, `tls`, `fixed`, `dormant`); the run manifest joins `http` and `tls` with the protocol into one `PortKind`"
 )]
 pub struct Port {
     /// The port the machine listens on (what the other machines and the

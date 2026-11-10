@@ -1,7 +1,8 @@
-//! How the common mistakes of the spec (spec.md §9.2) read: each one's problems rendered the way
-//! an author sees them (`error[<code>] <path>  (isoloom.yml:<line>:<column>)`, the reason, the
-//! fix), and as JSON for apps and editors. The rendering is the user-facing format, so a
-//! change to a code, a path, a place, a reason or a fix shows here.
+//! How the common mistakes of a spec (a 1.x block, ports as a list, an unknown OS version, ...)
+//! read: each one's problems rendered the way an author sees them
+//! (`error[<code>] <path>  (isoloom.yml:<line>:<column>)`, the reason, the fix), and as JSON for
+//! apps and editors. The rendering is the user-facing format, so a change to a code, a path, a
+//! place, a reason or a fix shows here.
 
 use isoloom_spec::syntax::{self, Problem};
 
