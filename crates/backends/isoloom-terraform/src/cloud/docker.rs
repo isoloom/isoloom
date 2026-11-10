@@ -88,7 +88,8 @@ impl Driver {
 }
 
 /// Why the clouds can't host the environment's containers, if they can't: arm64 (their images
-/// and VM sizes are x86-64), or no cloud's largest Docker host holds them ([`refusals`], [`super::none_takes`]).
+/// and VM sizes are x86-64), or no cloud's largest Docker host holds them ([`refusals`]), each
+/// cloud's reason named.
 #[must_use]
 pub fn refusal(env: &Environment) -> Option<String> {
     crate::limits::arm64_machine(env.spec())
