@@ -110,8 +110,10 @@ readable on the path; the controller's Ansible encrypts its own. It is reached:
 - on Vagrant, on the host's private network;
 - on AWS and Azure `cloud-vm`, from `allowed_cidr` only;
 - on Proxmox and ESXi, cloudbase-init opens 5985 at the Windows firewall, on the environment's
-  networks;
-- on `external`, to the hosts you name.
+  networks.
+
+On `external`, Windows hosts are reached over SSH instead (OpenSSH on Windows, its commands run by
+PowerShell), with the keys you name: Isoloom opens no WinRM port there.
 
 An image whose box answers WinRM over HTTPS takes `winrm: ssl` in the image table (NTLM, the
 certificate not verified), or `winssh` for OpenSSH ([golden images](../guide/golden-images.md)).

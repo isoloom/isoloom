@@ -10,8 +10,8 @@ Tier 2. There is no run manifest: run the playbook with Ansible.
 
 - Ansible (`ansible-playbook`) and an OpenSSH client on the machine that runs it.
 - SSH access to every machine, with a user that can `sudo` (the playbook runs with `become`).
-  Windows hosts are reached over WinRM (HTTP on port 5985, basic authentication: see
-  [security considerations](../../explanation/security.md#winrm)).
+  Windows hosts are reached over SSH too: OpenSSH on Windows (port 22 unless `ssh.port` says
+  otherwise), its commands run by PowerShell.
 - The machines on the networks and at the addresses the spec gives them: Isoloom doesn't change
   your switches or firewalls; the derived checks tell you whether they match the spec's `reach`.
 
