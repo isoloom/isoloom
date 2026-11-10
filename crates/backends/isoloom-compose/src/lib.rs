@@ -82,6 +82,7 @@ mod start;
 mod storage;
 #[cfg(test)]
 mod testing;
+mod trunks;
 
 pub use backend::{ComposeBackend, capabilities_on_a_vm, guest};
 pub use error::{Error, Result};

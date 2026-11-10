@@ -8,11 +8,11 @@ use std::num::NonZeroU32;
 use isoloom_manifest::{Action, CheckRunner, Failure, Name, PathTemplate, RelPath, SnakeName, Step, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Position, Probe, Resolved};
+use isoloom_render::container::{exec_runner, exec_runner_name};
 use isoloom_render::run_manifest::{DERIVED, check, timeout_s};
 
-use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep, exec_runner, exec_runner_name};
-
 use super::compose;
+use super::stand_ins::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
 use crate::error::Result;
 use crate::file::ComposeFile;
 use crate::names::{STAND_IN, check_runner_service, routes_service};

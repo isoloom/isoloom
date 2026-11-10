@@ -4,7 +4,7 @@
 //! so both run the same Compose file.
 
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_spec::model::{HostFolder, HostPath};
+use isoloom_spec::model::HostFolder;
 
 /// Where Compose in a VM finds the host folders: `<VM_ROOT>/<machine>/<n>`.
 const VM_ROOT: &str = "/mnt/isoloom";
@@ -28,17 +28,6 @@ pub struct ContainerFolder<'a> {
 #[must_use]
 pub fn variable(machine: &str, n: usize) -> String {
     format!("ISOLOOM_HOST_FOLDER_{}_{n}", machine.to_ascii_uppercase().replace('-', "_"))
-}
-
-/// Where Compose on this computer finds `f`, from its file `root` (the project folder, relative
-/// to the Compose file): a project folder under `root`, a home one as `~` (Compose expands it),
-/// an absolute one as it is.
-#[must_use]
-pub fn on_this_computer(f: &HostFolder, root: &str) -> String {
-    match f.host() {
-        HostPath::Project(p) => format!("{root}/{}", p.trim_start_matches("./")),
-        HostPath::Home(p) | HostPath::Absolute(p) => p.to_owned(),
-    }
 }
 
 /// The host folders of the containers of `env`, machine by machine in the spec's order.
@@ -77,20 +66,6 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::*;
-
-    fn folder(from: &str) -> HostFolder {
-        HostFolder {
-            from: from.into(),
-            path: "/x".into(),
-            read_only: false,
-        }
-    }
-
-    #[test]
-    fn compose_on_this_computer_reads_a_project_folder_from_its_root_and_the_others_as_written() {
-        let read = ["shared", "./shared", "../up", "~/notes", "/srv/share", "C:\\share"].map(|f| on_this_computer(&folder(f), "../.."));
-        assert_eq!(read, ["../../shared", "../../shared", "../../../up", "~/notes", "/srv/share", "C:\\share"]);
-    }
 
     #[test]
     fn each_containers_folder_has_its_own_variable_and_place_in_the_vm() {

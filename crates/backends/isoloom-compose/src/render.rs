@@ -17,13 +17,14 @@ use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_render::container::PROBE_IMAGE;
-use isoloom_render::{GeneratedFile, header, trunks};
+use isoloom_render::{GeneratedFile, header};
 use isoloom_spec::model::Arch;
 use isoloom_spec::net::Cidr;
 
 use crate::backend::ComposeTarget;
 use crate::error::{Error, Result};
 use crate::file::{Attachment, ComposeFile, NetworkMode, Restart, Service, Volume};
+use crate::trunks;
 use isoloom_render::run_manifest::RUNNER;
 
 use crate::images::TOOLBOX_IMAGE;

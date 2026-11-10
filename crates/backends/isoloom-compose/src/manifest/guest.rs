@@ -16,12 +16,12 @@ use isoloom_render::steps;
 use isoloom_render::steps::AsRoot;
 
 use super::Project;
-use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
 
 use super::checks::{Planned, inside, planned, stand_ins};
 use super::lifecycle::{self, ready};
 use super::machines::{Member, classify, machines};
 use super::slots::{Starts, slots};
+use super::stand_ins::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
 use crate::error::Result;
 use crate::file::ComposeFile;
 use crate::start::StartPlan;

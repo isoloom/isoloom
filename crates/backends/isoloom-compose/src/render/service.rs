@@ -6,7 +6,7 @@ use isoloom_manifest as manifest;
 use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_FIXED};
 use isoloom_plan::{Environment, Image, PublishedPort};
 use isoloom_render::container::{PROBE_DIR, init_names};
-use isoloom_render::{GeneratedFile, constraints, steps::PROJECT_DIR, trunks};
+use isoloom_render::{GeneratedFile, constraints, steps::PROJECT_DIR};
 use isoloom_spec::model;
 
 use super::{Out, configs, hardware, process, secrets};
@@ -16,6 +16,7 @@ use crate::interpolation::literal;
 use crate::layout::{DIR, ROOT, file_name, relative_to};
 use crate::machine::Machine;
 use crate::names::{probe_service, routes_service};
+use crate::trunks;
 use crate::{labels, networks, outside, sidecars, storage};
 
 /// A machine's service, then its sidecar and its `init:` jobs.

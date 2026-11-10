@@ -3,7 +3,21 @@
 
 use isoloom_spec::model::Arch;
 
-pub(crate) use isoloom_render::container::{STAND_IN, check_runner as check_runner_service, routes_service};
+pub(crate) use isoloom_render::container::check_runner as check_runner_service;
+
+/// The service that stands in for the access machine while the checks run, so checks run from its
+/// seat: the access machine is on demand (the `access` profile), so the checks can't count on it
+/// running, and the stand-in, at its addresses, is never up beside it (only the `check` profile
+/// starts it, and the checks' teardown takes it down).
+pub(crate) const STAND_IN: &str = "isoloom-access";
+
+/// The network sidecar of a machine (or of the [`STAND_IN`]), which sets its routes:
+/// `isoloom-routes-<machine>`, under the prefix a lab's machines can't take, so no machine's name
+/// is another's sidecar.
+#[must_use]
+pub(crate) fn routes_service(machine: &str) -> String {
+    format!("isoloom-routes-{machine}")
+}
 
 /// The one-shot service that copies the probe for machines of this architecture.
 pub(crate) fn probe_service(arch: Arch) -> String {

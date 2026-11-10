@@ -25,6 +25,8 @@ thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+# The shared test fixtures (`isoloom_render::test_support`).
+isoloom-render = { workspace = true, features = ["test-support"] }
 proptest.workspace = true
 
 [lints]

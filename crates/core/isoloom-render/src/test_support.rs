@@ -3,6 +3,28 @@
 
 use crate::run_manifest::guest::{GuestCommand, GuestCompose};
 
+/// An office LAN split into VLAN 10 (offline) and VLAN 20 (online): `admin` and `nas` are on
+/// both, `staff` on one, `ops` on both and a network of its own, `win` is a Windows VM on both.
+/// The trunks' tests read it, a VM's and a container's alike.
+pub const VLAN_OFFICE: &str = r"
+version: 1
+name: v
+networks:
+  office:
+    cidr: 10.70.0.0/16
+    internet: false
+    vlans:
+      10: { cidr: 10.70.10.0/24 }
+      20: { cidr: 10.70.20.0/24, internet: true }
+  servers: { cidr: 10.70.99.0/24 }
+machines:
+  admin: { os: debian@12, networks: { office.vlan10: 50, office.vlan20: 50 } }
+  nas: { os: debian@12, networks: { office.vlan20: 60, office.vlan10: 60 } }
+  staff: { os: debian@12, networks: { office.vlan10: 10 } }
+  ops: { os: debian@12, networks: { office.vlan10: 70, office.vlan20: 70, servers: 70 } }
+  win: { os: windows-server@2022, networks: { office.vlan10: 80, office.vlan20: 80 } }
+";
+
 /// A guest with nothing in it but `status`: no machines, slots, steps or checks.
 #[must_use]
 pub fn empty_guest(status: GuestCommand) -> GuestCompose {

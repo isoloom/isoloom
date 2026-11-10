@@ -10,8 +10,8 @@ use isoloom_manifest::{
 };
 use isoloom_plan::checks::{self, Position};
 use isoloom_plan::{Environment, Lifetime, MachinePlan};
+use isoloom_render::router;
 use isoloom_render::run_manifest::{addresses, arch, port};
-use isoloom_render::{router, trunks};
 use isoloom_spec::model;
 
 use isoloom_render::container::init_names;
@@ -21,6 +21,7 @@ use crate::error::{Error, Result};
 use crate::file::ComposeFile;
 use crate::names::{STAND_IN, check_runner_service, probe_service, routes_service, tool_service};
 use crate::storage::FOLDERS_JOB;
+use crate::trunks;
 
 /// A service of the Compose file, told apart.
 pub(super) struct Member {

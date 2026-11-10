@@ -9,6 +9,7 @@ mod guest;
 mod lifecycle;
 mod machines;
 mod slots;
+mod stand_ins;
 
 pub(crate) use guest::guest;
 

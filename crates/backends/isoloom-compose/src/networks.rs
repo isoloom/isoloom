@@ -6,12 +6,13 @@ use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_render::{router, trunks};
+use isoloom_render::router;
 
 use crate::appliances;
 use crate::file::{Attachment, Block, Ipam, Network};
 use crate::ipv6;
 use crate::machine::Machine;
+use crate::trunks;
 
 /// The networks: each on its block, Docker at the host's address. Without routing,
 /// `internet: false` is Docker's internal network; then the trunks' links and the appliances'

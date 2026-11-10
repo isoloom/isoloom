@@ -7,13 +7,14 @@ use std::net::Ipv4Addr;
 use indexmap::IndexMap;
 use isoloom_plan::Environment;
 use isoloom_render::container::UTILITY_IMAGE;
-use isoloom_render::{router, trunks};
+use isoloom_render::router;
 use isoloom_spec::vlans;
 
 use crate::file::{Attachment, Healthcheck, Restart, Seconds, Service};
 use crate::images::TC_IMAGE;
 use crate::interpolation::literal;
 use crate::ipv6;
+use crate::trunks;
 
 /// The router's service when the environment has one, then each switch's.
 pub(crate) fn services(env: &Environment, ts: &[trunks::Trunk], services: &mut IndexMap<String, Service>) {

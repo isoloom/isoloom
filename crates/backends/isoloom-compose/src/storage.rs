@@ -6,7 +6,7 @@
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, Lifetime, MachinePlan, MachineShape, VolumeKind};
 use isoloom_render::container::{UTILITY_IMAGE, host_folders};
-use isoloom_spec::model::{Machine, TmpfsMode};
+use isoloom_spec::model::{HostFolder, HostPath, Machine, TmpfsMode};
 use isoloom_spec::shell;
 
 use crate::file::{BindOptions, Condition, LongMount, Mount, NetworkMode, Restart, Service, TmpfsOptions, Volume, VolumeOptions};
@@ -60,13 +60,23 @@ pub(crate) fn host_folders(name: &str, mp: &MachinePlan) -> Vec<Mount> {
         .enumerate()
         .map(|(n, f)| {
             Mount::Long(LongMount::Bind {
-                source: format!("${{{}:-{}}}", host_folders::variable(name, n), host_folders::on_this_computer(f, ROOT)),
+                source: format!("${{{}:-{}}}", host_folders::variable(name, n), on_this_computer(f, ROOT)),
                 target: f.path.clone(),
                 read_only: f.read_only,
                 bind: BindOptions { create_host_path: true },
             })
         })
         .collect()
+}
+
+/// Where Compose on this computer finds `f`, from its file `root` (the project folder, relative
+/// to the Compose file): a project folder under `root`, a home one as `~` (Compose expands it),
+/// an absolute one as it is.
+fn on_this_computer(f: &HostFolder, root: &str) -> String {
+    match f.host() {
+        HostPath::Project(p) => format!("{root}/{}", p.trim_start_matches("./")),
+        HostPath::Home(p) | HostPath::Absolute(p) => p.to_owned(),
+    }
 }
 
 /// The named volumes of the containers: each machine's (shared ones once), then its disks'. A
@@ -136,8 +146,24 @@ pub(crate) fn folders(env: &Environment, services: &mut IndexMap<String, Service
 
 #[cfg(test)]
 mod tests {
+    use isoloom_spec::model::HostFolder;
+
     use crate::labels::PERSISTENT_LABEL;
     use crate::testing::environment;
+
+    fn folder(from: &str) -> HostFolder {
+        HostFolder {
+            from: from.into(),
+            path: "/x".into(),
+            read_only: false,
+        }
+    }
+
+    #[test]
+    fn compose_on_this_computer_reads_a_project_folder_from_its_root_and_the_others_as_written() {
+        let read = ["shared", "./shared", "../up", "~/notes", "/srv/share", "C:\\share"].map(|f| super::on_this_computer(&folder(f), "../.."));
+        assert_eq!(read, ["../../shared", "../../shared", "../../../up", "~/notes", "/srv/share", "C:\\share"]);
+    }
 
     const SPEC: &str = "version: 1
 name: store

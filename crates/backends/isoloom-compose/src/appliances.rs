@@ -28,12 +28,13 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
-use isoloom_render::trunks;
 pub(crate) use isoloom_spec::appliance::MGMT_CIDR;
 use isoloom_spec::appliance::is_switch;
 use isoloom_spec::model::{Appliance, Machine, Spec};
 use isoloom_spec::net::Cidr;
 use isoloom_spec::vlans;
+
+use crate::trunks;
 
 /// Isoloom's management network for appliances, outside the environment (no `reach`, no checks).
 pub(crate) const MGMT_NETWORK: &str = "isoloom-mgmt";

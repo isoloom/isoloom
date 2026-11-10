@@ -6,7 +6,7 @@ use std::net::Ipv4Addr;
 
 use isoloom_plan::Environment;
 use isoloom_render::container::UTILITY_IMAGE;
-use isoloom_render::{router, trunks};
+use isoloom_render::router;
 use isoloom_spec::{validate, vlans};
 
 use crate::file::{Condition, Healthcheck, NetworkMode, Restart, Seconds, Service};
@@ -14,6 +14,7 @@ use crate::images::TC_IMAGE;
 use crate::interpolation::literal;
 use crate::machine::Machine;
 use crate::render::readiness;
+use crate::trunks;
 use crate::{appliances, ipv6, networks};
 
 /// Whether a machine gets a network sidecar, so dependents can wait for it.
