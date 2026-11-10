@@ -25,6 +25,7 @@ use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::windows::Tpm;
 
 use super::providers::Size;
+use super::windows::Adapter;
 use crate::ruby::{Call, Ruby, Value};
 use isoloom_render::stable_hash;
 
@@ -264,25 +265,14 @@ fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
     )
 }
 
-/// A Windows VM's addresses on its networks under Hyper-V: each adapter found by its MAC, a
-/// static address (kept across restarts) set through WMI, as on every Windows since 2008 R2,
-/// its network then Private where the cmdlet exists.
+/// A Windows VM's addresses on its networks under Hyper-V: each adapter found by the MAC Isoloom
+/// gives it ([`super::windows::static_addresses`]).
 fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
-    let items = nics
+    let nics: Vec<_> = nics
         .iter()
-        .map(|n| {
-            format!(
-                "@{{ mac = '{}'; ip = '{}'; mask = '{}' }}",
-                mac_text(mac(vm_name, n.net), ":", true),
-                n.ip,
-                n.mask
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!(
-        "$ErrorActionPreference = 'Stop'\nforeach ($n in @({items})) {{\n  $c = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {{ $_.MACAddress -eq $n.mac }} | Select-Object -First 1\n  if (-not $c) {{ throw ('no network adapter with MAC ' + $n.mac) }}\n  if (@($c.IPAddress) -notcontains $n.ip) {{\n    $r = $c.EnableStatic(@($n.ip), @($n.mask))\n    if ($r.ReturnValue -gt 1) {{ throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }}\n  }}\n  if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) {{ Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }}\n  'environment network: ' + $n.ip + ' on ' + $c.Description\n}}\n"
-    )
+        .map(|n| (Adapter::Mac(mac_text(mac(vm_name, n.net), ":", true)), n.ip, n.mask))
+        .collect();
+    super::windows::static_addresses(&nics)
 }
 
 /// Why this environment's VMs can't all boot on Hyper-V, if they can't: the first machine whose

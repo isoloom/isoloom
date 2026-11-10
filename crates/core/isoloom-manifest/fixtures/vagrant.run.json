@@ -411,7 +411,7 @@
           "utm": "mini-ad - dc01",
           "vmware_esxi": "mini-ad-dc01"
         },
-        "boot_digest": "sha256:c7d5563870254473f688c63a3e7039559d197aab64d782c837d4e3f171dd781c"
+        "boot_digest": "sha256:ba5b23c09b95ebc3e128851eefe092a6f786f91936eda14d239f30464f5b9ee7"
       },
       "ports": [
         {
@@ -452,7 +452,7 @@
           "utm": "mini-ad - ws01",
           "vmware_esxi": "mini-ad-ws01"
         },
-        "boot_digest": "sha256:55337d35d252686e54430ba6da09682cb893f0ad8463f5a63cf318474f274250"
+        "boot_digest": "sha256:108f2cfa21fb7978d5ee02021e15d006246c5faec9877aa88b12a10d1dd3d87f"
       }
     },
     {

@@ -97,3 +97,35 @@ mod tests {
         assert_eq!(r.finish(), "v.customize [\"modifyvm\", :id, \"--tpm-type\", \"2.0\"]\n");
     }
 }
+
+/// Which adapter of a Windows VM is on a network, for [`static_addresses`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Adapter {
+    /// The one with this MAC address, as WMI writes it (`02:15:AB:00:01:FF`): Hyper-V, where
+    /// Isoloom sets each adapter's MAC.
+    Mac(String),
+    /// The first one with IP on but no default gateway (QEMU, whose first adapter is its
+    /// user-mode NAT, the way Vagrant comes in).
+    NoGateway,
+}
+
+/// PowerShell giving a Windows VM its static addresses on its networks, each `(adapter, address,
+/// mask)`: the adapter found through WMI, its address set unless it has it (kept across
+/// restarts), as on every Windows since 2008 R2, its network then Private where the cmdlet
+/// exists. Each says what it set; a missing adapter or a refused address fails it.
+pub(super) fn static_addresses(nics: &[(Adapter, std::net::Ipv4Addr, std::net::Ipv4Addr)]) -> String {
+    let items = nics
+        .iter()
+        .map(|(adapter, ip, mask)| {
+            let mac = match adapter {
+                Adapter::Mac(m) => m.as_str(),
+                Adapter::NoGateway => "",
+            };
+            format!("@{{ mac = '{mac}'; ip = '{ip}'; mask = '{mask}' }}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "$ErrorActionPreference = 'Stop'\nforeach ($n in @({items})) {{\n  $all = Get-WmiObject Win32_NetworkAdapterConfiguration\n  $c = if ($n.mac) {{ $all | Where-Object {{ $_.MACAddress -eq $n.mac }} | Select-Object -First 1 }} else {{ $all | Where-Object {{ $_.IPEnabled -and -not $_.DefaultIPGateway }} | Select-Object -First 1 }}\n  if (-not $c) {{ throw ('no network adapter for ' + $n.ip + $(if ($n.mac) {{ ' with MAC ' + $n.mac }} else {{ ' without a default gateway' }})) }}\n  if (@($c.IPAddress) -notcontains $n.ip) {{\n    $r = $c.EnableStatic(@($n.ip), @($n.mask))\n    if ($r.ReturnValue -gt 1) {{ throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }}\n  }}\n  if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) {{ Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }}\n  'environment network: ' + $n.ip + ' on ' + $c.Description\n}}\n"
+    )
+}

@@ -839,7 +839,20 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.5 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.5/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: <<~'SH'
+        $ErrorActionPreference = 'Stop'
+        foreach ($n in @(@{ mac = ''; ip = '10.40.20.5'; mask = '255.255.255.0' })) {
+          $all = Get-WmiObject Win32_NetworkAdapterConfiguration
+          $c = if ($n.mac) { $all | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1 } else { $all | Where-Object { $_.IPEnabled -and -not $_.DefaultIPGateway } | Select-Object -First 1 }
+          if (-not $c) { throw ('no network adapter for ' + $n.ip + $(if ($n.mac) { ' with MAC ' + $n.mac } else { ' without a default gateway' })) }
+          if (@($c.IPAddress) -notcontains $n.ip) {
+            $r = $c.EnableStatic(@($n.ip), @($n.mask))
+            if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
+          }
+          if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
+          'environment network: ' + $n.ip + ' on ' + $c.Description
+        }
+      SH
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -884,8 +897,9 @@ Vagrant.configure("2") do |config|
         IsoloomHyperV.address(machine, <<~'PS1')
           $ErrorActionPreference = 'Stop'
           foreach ($n in @(@{ mac = '02:15:88:E4:6B:79'; ip = '10.40.20.5'; mask = '255.255.255.0' })) {
-            $c = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1
-            if (-not $c) { throw ('no network adapter with MAC ' + $n.mac) }
+            $all = Get-WmiObject Win32_NetworkAdapterConfiguration
+            $c = if ($n.mac) { $all | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1 } else { $all | Where-Object { $_.IPEnabled -and -not $_.DefaultIPGateway } | Select-Object -First 1 }
+            if (-not $c) { throw ('no network adapter for ' + $n.ip + $(if ($n.mac) { ' with MAC ' + $n.mac } else { ' without a default gateway' })) }
             if (@($c.IPAddress) -notcontains $n.ip) {
               $r = $c.EnableStatic(@($n.ip), @($n.mask))
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
@@ -960,7 +974,20 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.21 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.21/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: <<~'SH'
+        $ErrorActionPreference = 'Stop'
+        foreach ($n in @(@{ mac = ''; ip = '10.40.20.21'; mask = '255.255.255.0' })) {
+          $all = Get-WmiObject Win32_NetworkAdapterConfiguration
+          $c = if ($n.mac) { $all | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1 } else { $all | Where-Object { $_.IPEnabled -and -not $_.DefaultIPGateway } | Select-Object -First 1 }
+          if (-not $c) { throw ('no network adapter for ' + $n.ip + $(if ($n.mac) { ' with MAC ' + $n.mac } else { ' without a default gateway' })) }
+          if (@($c.IPAddress) -notcontains $n.ip) {
+            $r = $c.EnableStatic(@($n.ip), @($n.mask))
+            if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
+          }
+          if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
+          'environment network: ' + $n.ip + ' on ' + $c.Description
+        }
+      SH
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -1008,8 +1035,9 @@ Vagrant.configure("2") do |config|
         IsoloomHyperV.address(machine, <<~'PS1')
           $ErrorActionPreference = 'Stop'
           foreach ($n in @(@{ mac = '02:15:08:0C:28:51'; ip = '10.40.20.21'; mask = '255.255.255.0' })) {
-            $c = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1
-            if (-not $c) { throw ('no network adapter with MAC ' + $n.mac) }
+            $all = Get-WmiObject Win32_NetworkAdapterConfiguration
+            $c = if ($n.mac) { $all | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1 } else { $all | Where-Object { $_.IPEnabled -and -not $_.DefaultIPGateway } | Select-Object -First 1 }
+            if (-not $c) { throw ('no network adapter for ' + $n.ip + $(if ($n.mac) { ' with MAC ' + $n.mac } else { ' without a default gateway' })) }
             if (@($c.IPAddress) -notcontains $n.ip) {
               $r = $c.EnableStatic(@($n.ip), @($n.mask))
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
@@ -1085,7 +1113,20 @@ Vagrant.configure("2") do |config|
         o.winrm.max_tries = 180
         o.winrm.timeout = 1800
       end
-      o.vm.provision "shell", name: "environment network", inline: "$a = Get-NetAdapter | Where-Object { -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway } | Select-Object -First 1; if (-not $a) { throw 'no second network adapter for the environment network' }; if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -ErrorAction SilentlyContinue)) { Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 10.40.20.22 -PrefixLength 24 | Out-Null }; Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \"environment network: 10.40.20.22/24 on $($a.Name)\""
+      o.vm.provision "shell", name: "environment network", inline: <<~'SH'
+        $ErrorActionPreference = 'Stop'
+        foreach ($n in @(@{ mac = ''; ip = '10.40.20.22'; mask = '255.255.255.0' })) {
+          $all = Get-WmiObject Win32_NetworkAdapterConfiguration
+          $c = if ($n.mac) { $all | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1 } else { $all | Where-Object { $_.IPEnabled -and -not $_.DefaultIPGateway } | Select-Object -First 1 }
+          if (-not $c) { throw ('no network adapter for ' + $n.ip + $(if ($n.mac) { ' with MAC ' + $n.mac } else { ' without a default gateway' })) }
+          if (@($c.IPAddress) -notcontains $n.ip) {
+            $r = $c.EnableStatic(@($n.ip), @($n.mask))
+            if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
+          }
+          if (Get-Command Set-NetConnectionProfile -ErrorAction SilentlyContinue) { Set-NetConnectionProfile -InterfaceIndex $c.InterfaceIndex -NetworkCategory Private -ErrorAction SilentlyContinue }
+          'environment network: ' + $n.ip + ' on ' + $c.Description
+        }
+      SH
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
@@ -1133,8 +1174,9 @@ Vagrant.configure("2") do |config|
         IsoloomHyperV.address(machine, <<~'PS1')
           $ErrorActionPreference = 'Stop'
           foreach ($n in @(@{ mac = '02:15:0F:45:D2:02'; ip = '10.40.20.22'; mask = '255.255.255.0' })) {
-            $c = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1
-            if (-not $c) { throw ('no network adapter with MAC ' + $n.mac) }
+            $all = Get-WmiObject Win32_NetworkAdapterConfiguration
+            $c = if ($n.mac) { $all | Where-Object { $_.MACAddress -eq $n.mac } | Select-Object -First 1 } else { $all | Where-Object { $_.IPEnabled -and -not $_.DefaultIPGateway } | Select-Object -First 1 }
+            if (-not $c) { throw ('no network adapter for ' + $n.ip + $(if ($n.mac) { ' with MAC ' + $n.mac } else { ' without a default gateway' })) }
             if (@($c.IPAddress) -notcontains $n.ip) {
               $r = $c.EnableStatic(@($n.ip), @($n.mask))
               if ($r.ReturnValue -gt 1) { throw ('setting ' + $n.ip + ' failed: ' + $r.ReturnValue) }
@@ -2451,7 +2493,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:19ddecdbb2e227a71d2f16e76abd7460441be3cc481d26cf94b06ca433c45757"
+        "boot_digest": "sha256:b6828dac9a1697512f8adb5c5eb0191a2f42ef1ebe9a9856e5ac2833d58b824a"
       },
       "ports": [
         {
@@ -2504,7 +2546,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:b31ba6a02d9a6f90c843a52d97c35cb468d05d81f6f02e3dc81b81771a1c7025"
+        "boot_digest": "sha256:e07cce096aeb4179bbcd49a1036ef2bbc8ff0c32f9aec8b74d8d70d54808d08b"
       }
     },
     {
@@ -2531,7 +2573,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:ec24e46a299d51dc75ec83bec18e4cfd08fa74733711ed3943972914f2517677"
+        "boot_digest": "sha256:bae492514af396b7c624a4f476d726091f14c4194354e91e5eedd75e31faa4b8"
       }
     },
     {

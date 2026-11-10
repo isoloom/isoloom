@@ -68,8 +68,9 @@ pub(crate) struct Qemu<'a> {
     pub(crate) arch: Option<Arch>,
     /// Its link on its private network.
     pub(crate) link: &'a Link,
-    /// A Windows machine's lab address and prefix length (no cloud-init to set it).
-    pub(crate) windows_address: Option<(Ipv4Addr, u8)>,
+    /// A Windows machine's address on its first network, and the network's mask (no cloud-init
+    /// to set it).
+    pub(crate) windows_address: Option<(Ipv4Addr, Ipv4Addr)>,
 }
 
 impl<'a> Qemu<'a> {
@@ -277,8 +278,11 @@ fn qemu(r: &mut Ruby, size: Size, q: &Qemu) {
     if let Some(a) = q.arch {
         emulated(r, a, q.windows_address.is_some());
     }
-    if let Some((ip, len)) = q.windows_address {
-        r.provision(vagrantfile::shell("o", "environment network").script("inline", &windows_lab_address(ip, len)));
+    if let Some((ip, mask)) = q.windows_address {
+        // QEMU's first adapter is its user-mode NAT, the way Vagrant comes in: the environment's
+        // network is the one without a gateway.
+        let nic = [(windows::Adapter::NoGateway, ip, mask)];
+        r.provision(vagrantfile::shell("o", "environment network").script("inline", &windows::static_addresses(&nic)));
     }
 }
 
@@ -330,20 +334,6 @@ fn emulated(r: &mut Ruby, a: Arch, windows: bool) {
             r.assign("o.winrm.timeout", 1800u32);
         }
     });
-}
-
-/// PowerShell setting a Windows VM's lab address on QEMU's second adapter: the one without a
-/// default gateway (the first is QEMU's user-mode NAT, through which Vagrant reaches it).
-fn windows_lab_address(ip: Ipv4Addr, len: u8) -> String {
-    format!(
-        "$a = Get-NetAdapter | Where-Object {{ -not (Get-NetIPConfiguration -InterfaceIndex $_.ifIndex).IPv4DefaultGateway }} | Select-Object -First 1; \
-         if (-not $a) {{ throw 'no second network adapter for the environment network' }}; \
-         if (-not (Get-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress {ip} -ErrorAction SilentlyContinue)) {{ \
-         Remove-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue; \
-         New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress {ip} -PrefixLength {len} | Out-Null }}; \
-         Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; \
-         \"environment network: {ip}/{len} on $($a.Name)\""
-    )
 }
 
 /// The vagrant-vmware-esxi provider: the host from the ESXI_* variables, a port group per NIC.

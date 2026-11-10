@@ -108,10 +108,13 @@ fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
         "{dc}"
     );
     assert!(dc.contains("o.winrm.max_tries = 180"), "{dc}");
-    assert!(
-        dc.contains("New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress 192.168.56.10 -PrefixLength 24"),
-        "{dc}"
-    );
+    // Its address on the adapter without a gateway (QEMU's first is its NAT), by the script
+    // Hyper-V's adapters found by MAC run too.
+    let address = [
+        "@{ mac = ''; ip = '192.168.56.10'; mask = '255.255.255.0' }",
+        "$_.IPEnabled -and -not $_.DefaultIPGateway",
+    ];
+    assert!(address.iter().all(|a| dc.contains(a)), "{dc}");
 
     let ctl = provider_block(vf, "isoloom-controller", "qemu")?;
     assert!(ctl.contains("o.vm.box = \"cloud-image/debian-12\""), "{ctl}");
