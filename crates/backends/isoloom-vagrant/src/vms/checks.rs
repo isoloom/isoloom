@@ -4,6 +4,7 @@
 
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_plan::{Environment, MachineShape};
+use isoloom_render::inventory::CONTROLLER_INVENTORY;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::images;
 
@@ -80,7 +81,7 @@ pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Positi
     let run_playbook = |path: &str| {
         let (folder, playbook) = path.rsplit_once('/').unwrap_or((".", path));
         format!(
-            "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False && cd /opt/isoloom/{folder} && ansible-playbook -i /etc/isoloom/inventory.ini {playbook}"
+            "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False && cd /opt/isoloom/{folder} && ansible-playbook -i {CONTROLLER_INVENTORY} {playbook}"
         )
     };
     let render = checks::Render {

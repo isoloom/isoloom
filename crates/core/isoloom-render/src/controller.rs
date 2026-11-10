@@ -18,6 +18,8 @@
 use isoloom_spec::model::{Provision, Spec};
 use isoloom_spec::shell;
 
+use crate::inventory::CONTROLLER_INVENTORY;
+
 /// Runs of a playbook in all: the first and up to three again.
 const ATTEMPTS: u32 = 4;
 
@@ -55,7 +57,7 @@ fn play(step: &Provision, limit: &str) -> String {
         None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
     };
     format!(
-        "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i /etc/isoloom/inventory.ini{extra}{}{limit} {file}\n",
+        "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i {CONTROLLER_INVENTORY}{extra}{}{limit} {file}\n",
         vars(step)
     )
 }

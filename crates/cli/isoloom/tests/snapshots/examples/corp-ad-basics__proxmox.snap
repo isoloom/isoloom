@@ -1022,7 +1022,7 @@ resource "proxmox_virtual_environment_file" "controller" {
         },
         {
           path        = "/etc/isoloom/inventory.ini"
-          permissions = "0644"
+          permissions = "0600"
           content     = "[linux]\nweb01 ansible_host=10.40.10.10 ansible_user=isoloom\n\n[windows]\ndc01 ansible_host=10.40.20.5\nws-01 ansible_host=10.40.20.21\nws-02 ansible_host=10.40.20.22\n\n[linux:vars]\nansible_ssh_private_key_file=/etc/isoloom/id_ed25519\nansible_become=true\n\n[windows:vars]\nansible_user=isoloom\nansible_password=${random_password.windows.result}\nansible_connection=winrm\nansible_port=5985\nansible_winrm_scheme=http\nansible_winrm_transport=basic\nansible_winrm_server_cert_validation=ignore\nansible_winrm_operation_timeout_sec=400\nansible_winrm_read_timeout_sec=500\n\n[domain]\ndc01\nws-01\nws-02\n"
         }
       ])

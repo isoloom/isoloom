@@ -332,6 +332,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **Security: the controller's inventory is owner-only.** On the clouds, Proxmox and ESXi the
+  controller wrote `/etc/isoloom/inventory.ini`, which holds the Windows machines' generated
+  password, world-readable (`0644`); it is `0600` like the controller's key, and only root (the
+  playbooks, the checks) reads it.
 - **Security: a box name never runs as Ruby.** The access machine's box was written into the
   Vagrantfile with Rust's debug quoting, which leaves Ruby's `#{…}` live: an image table giving
   `vagrant: 'corp/deb#{`id`}'` ran `id` on the host whenever Vagrant read the file. It is a

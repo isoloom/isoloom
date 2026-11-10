@@ -9,7 +9,7 @@ use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
 use isoloom_render::boot::{self, Trigger};
-use isoloom_render::inventory::{self, Access};
+use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY};
 use isoloom_render::router;
 use isoloom_render::{GeneratedFile, controller};
 use isoloom_spec::model::Spec;
@@ -232,7 +232,7 @@ fn controller_box_line(r: &mut Ruby, bx: &str, version: Option<&str>) {
 fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     let spec = env.spec();
     let setup = format!(
-        "set -e\n{CONTROLLER_PACKAGES}[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/inventory.ini <<'INV'\n{}INV\n",
+        "set -e\n{CONTROLLER_PACKAGES}[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > {CONTROLLER_INVENTORY} <<'INV'\n{}INV\n",
         inventory::render(env, &Access::vagrant())
     );
     shell(r, "controller", &setup);

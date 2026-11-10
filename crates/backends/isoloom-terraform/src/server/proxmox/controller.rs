@@ -6,11 +6,13 @@
 
 use crate::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
+use isoloom_render::inventory::{Access, CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
 use isoloom_spec::validate::Cidr;
 
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::machine::cloud_init::{self, CloudConfig, file};
+use crate::machine::controller::OWNER_ONLY;
 use crate::machine::{Shell, controller, vms};
 use crate::module::ident;
 
@@ -60,14 +62,10 @@ fn cloud_config(env: &Environment) -> CloudConfig {
     config.packages = controller::PACKAGES.map(String::from).to_vec();
     config.bootcmd.extend(cloud_init::prelude(env));
     config.file_lists.push(reference("local.project_files"));
-    let inventory = controller::inventory_template(env, isoloom_render::inventory::Access::proxmox).into_expression();
+    let inventory = controller::inventory_template(env, Access::proxmox).into_expression();
     config.files = vec![
-        file(
-            "/etc/isoloom/id_ed25519",
-            Some("0600"),
-            reference("tls_private_key.controller.private_key_openssh"),
-        ),
-        file("/etc/isoloom/inventory.ini", Some("0644"), inventory),
+        file(CONTROLLER_KEY, Some(OWNER_ONLY), reference("tls_private_key.controller.private_key_openssh")),
+        file(CONTROLLER_INVENTORY, Some(OWNER_ONLY), inventory),
     ];
     if let Some(trust) = steps::trust_authorities(env) {
         config.track("certificate authorities", &Shell::Root.command(&trust));

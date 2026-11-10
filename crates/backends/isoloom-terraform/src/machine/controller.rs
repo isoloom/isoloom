@@ -9,7 +9,7 @@ use crate::hcl_builder::{Expression, Module, Template, call, reference, string};
 use indexmap::IndexMap;
 use isoloom_plan::addressing::{address, names_of};
 use isoloom_plan::{Controller, Environment, Step};
-use isoloom_render::inventory::{self, Access, WinrmAuth};
+use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_KEY, WinrmAuth};
 use isoloom_render::{controller, steps};
 use isoloom_spec::validate::Cidr;
 
@@ -26,6 +26,10 @@ pub(crate) const NAME: &str = "isoloom-controller";
 const KEY_UPLOAD: &str = "/tmp/isoloom-controller-key";
 /// Where its inventory is uploaded before its set-up.
 const INVENTORY_UPLOAD: &str = "/tmp/isoloom-inventory.ini";
+
+/// The mode of its key and its inventory: owner-only (root's), as the inventory holds the Windows
+/// machines' password and only root runs the playbooks and checks that read it.
+pub(crate) const OWNER_ONLY: &str = "0600";
 
 /// Ansible in a virtual environment (pywinrm for the Windows machines), once.
 pub(crate) const ANSIBLE: &str =
@@ -174,7 +178,7 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     cmds.extend(root(steps::trust_authorities(env)));
     cmds.extend(root(hosts(env)));
     let install = format!(
-        "mkdir -p /etc/isoloom && install -m 0600 {KEY_UPLOAD} /etc/isoloom/id_ed25519 && install -m 0644 {INVENTORY_UPLOAD} /etc/isoloom/inventory.ini && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"
+        "mkdir -p /etc/isoloom && install -m {OWNER_ONLY} {KEY_UPLOAD} {CONTROLLER_KEY} && install -m {OWNER_ONLY} {INVENTORY_UPLOAD} {CONTROLLER_INVENTORY} && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"
     );
     let packages = install_packages();
     for script in [install.as_str(), packages.as_str(), ANSIBLE] {
@@ -219,7 +223,7 @@ pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&isoloom_plan::Machin
             let ready = isoloom_render::steps::READY_FILE;
             // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
             let wait = format!(
-                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /etc/isoloom/id_ed25519 {u}@{a} head -n 1 {ready} 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
+                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i {CONTROLLER_KEY} {u}@{a} head -n 1 {ready} 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
             );
             Some((name.to_owned(), Shell::Root.command(&wait)))
         })
@@ -234,7 +238,7 @@ pub(crate) fn windows_waits(env: &Environment) -> Vec<String> {
         .filter(|(_, mp)| mp.is_windows())
         .map(|(name, _)| {
             format!(
-                "i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini {name} -m raw -a 'if (-not (Test-Path {ready})) {{ exit 1 }}' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 10; done",
+                "i=0; until /opt/ansible/bin/ansible -i {CONTROLLER_INVENTORY} {name} -m raw -a 'if (-not (Test-Path {ready})) {{ exit 1 }}' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 10; done",
                 ready = isoloom_spec::windows::READY_FILE
             )
         })

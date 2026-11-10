@@ -5,16 +5,18 @@
 
 use crate::hcl_builder::{Expression, Template, call, reference};
 use isoloom_plan::{Environment, MachinePlan, Step};
+use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
 
 use crate::machine::user_data::{SetUp, Tracked, expiry_shutdown, project_wait};
+use crate::machine::controller::OWNER_ONLY;
 use crate::machine::{Shell, controller};
 
-/// `content` written owner-only at `path`, base64 on its way (a key, the inventory).
-fn written(path: &str, mode: &str, content: Expression) -> Template {
+/// `content` written owner-only at `path`, base64 on its way (the key, the inventory).
+fn written(path: &str, content: Expression) -> Template {
     Template::text("mkdir -p /etc/isoloom && (umask 077 && echo ")
         .with_expr(call("base64encode", [content]))
-        .with_text(format!(" | base64 -d > {path}) && chmod {mode} {path}"))
+        .with_text(format!(" | base64 -d > {path}) && chmod {OWNER_ONLY} {path}"))
 }
 
 /// The controller's set-up: `at_boot` first (its interfaces after the first), then the project,
@@ -25,12 +27,9 @@ pub(crate) fn set_up(env: &Environment, user: &dyn Fn(&MachinePlan) -> String, i
     part.push(project_wait());
     part.push(Tracked::new(
         "the controller's key",
-        written("/etc/isoloom/id_ed25519", "0600", reference("tls_private_key.controller.private_key_openssh")),
+        written(CONTROLLER_KEY, reference("tls_private_key.controller.private_key_openssh")),
     ));
-    part.push(Tracked::new(
-        "the inventory",
-        written("/etc/isoloom/inventory.ini", "0644", inventory.into_expression()),
-    ));
+    part.push(Tracked::new("the inventory", written(CONTROLLER_INVENTORY, inventory.into_expression())));
     let root = |s: Option<String>| s.map(|s| Shell::Root.command(&s));
     if let Some(prelude) = root(steps::linux(env, "", &Step::Prelude)) {
         part.push(Tracked::new("system constraints", prelude));

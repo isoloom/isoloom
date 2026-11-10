@@ -419,7 +419,7 @@ resource "terraform_data" "isoloom_controller" {
       "cloud-init status --wait >/dev/null 2>&1 || true",
       "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''192.168.57.10 web01'\\'' >> /etc/hosts'",
-      "sudo sh -c 'mkdir -p /etc/isoloom && install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && install -m 0644 /tmp/isoloom-inventory.ini /etc/isoloom/inventory.ini && rm -f /tmp/isoloom-controller-key /tmp/isoloom-inventory.ini'",
+      "sudo sh -c 'mkdir -p /etc/isoloom && install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && install -m 0600 /tmp/isoloom-inventory.ini /etc/isoloom/inventory.ini && rm -f /tmp/isoloom-controller-key /tmp/isoloom-inventory.ini'",
       "sudo sh -c 'DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd openssh-client >/dev/null'",
       "sudo sh -c '[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q '\\''ansible-core>=2.15,<2.17'\\'' pywinrm; }'",
       "sudo sh -c 'i=0; until /opt/ansible/bin/ansible -i /etc/isoloom/inventory.ini web01 -m raw -a '\\''if (-not (Test-Path C:\\isoloom\\ready)) { exit 1 }'\\'' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && { echo '\\''web01 not ready'\\''; exit 1; }; sleep 10; done'",
