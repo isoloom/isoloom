@@ -246,7 +246,7 @@
     "EnvironmentName": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-      "description": "lowercase letters and digits in words joined by single dashes (`my-lab`)"
+      "description": "lowercase letters and digits in words joined by single dashes (`my-env`)"
     },
     "Instance": {
       "type": "integer",
@@ -298,7 +298,7 @@
         {
           "type": "string",
           "const": "cloud-services",
-          "description": "A cloud's own services, through the lab's Terraform module."
+          "description": "A cloud's own services, through the environment's Terraform module."
         }
       ],
       "description": "The target whose files the manifest sits next to."
@@ -632,7 +632,7 @@
       "properties": {
         "project": {
           "$ref": "#/$defs/Template",
-          "description": "The project name: `${run.name}`, which the program running it may set (`<app>-<lab id>`)."
+          "description": "The project name: `${run.name}`, which the runner may set (`<runner>-<run id>`)."
         },
         "files": {
           "type": "array",
@@ -691,7 +691,7 @@
               "type": "null"
             }
           ],
-          "description": "The folder Vagrant keeps its machines' state in (`VAGRANT_DOTFILE_PATH`, which the runner sets for every Vagrant command of the run, its actions' included), in the run's state folder (`${run.state_dir}/vagrant`): a reinstalled or replaced lab folder never loses track of its VMs. Absent: Vagrant's own `.vagrant` next to the Vagrantfile."
+          "description": "The folder Vagrant keeps its machines' state in (`VAGRANT_DOTFILE_PATH`, which the runner sets for every Vagrant command of the run, its actions' included), in the run's state folder (`${run.state_dir}/vagrant`): a replaced project folder never loses track of its VMs. Absent: Vagrant's own `.vagrant` next to the Vagrantfile."
         }
       },
       "required": [
@@ -740,7 +740,7 @@
             "string",
             "null"
           ],
-          "description": "Why this lab can't run on this provider, in Isoloom's words, or null.",
+          "description": "Why this environment can't run on this provider, in Isoloom's words, or null.",
           "default": null
         }
       },
@@ -801,7 +801,7 @@
         {
           "type": "string",
           "const": "runner",
-          "description": "The runner: local state in the run's state folder, outside the lab's files (a reinstalled lab must not orphan what it created)."
+          "description": "The runner: local state in the run's state folder, outside the project's files (a replaced project folder must not orphan what it created)."
         }
       ],
       "description": "Who keeps a Terraform state."
@@ -1160,7 +1160,7 @@
         {
           "type": "string",
           "const": "input",
-          "description": "A launch-time value of the lab (`inputs:`: an access token, a password)."
+          "description": "A launch-time value of the environment (`inputs:`: an access token, a password)."
         },
         {
           "type": "string",
@@ -1244,7 +1244,7 @@
               "type": "null"
             }
           ],
-          "description": "Its name where the target creates it: the Docker network (`${run.name}_lab`), the hypervisor's internal network (`isoloom-<lab>-lab`)."
+          "description": "Its name where the target creates it: the Docker network (`${run.name}_<network>`), the hypervisor's internal network (`isoloom-<environment>-<network>`)."
         }
       },
       "required": [
@@ -1252,7 +1252,7 @@
         "cidr",
         "internet"
       ],
-      "description": "One of the lab's networks."
+      "description": "One of the environment's networks."
     },
     "Cidr": {
       "description": "A network block: an IPv4 or IPv6 address and a prefix length (`10.30.0.0/24`).",
@@ -1317,7 +1317,7 @@
               "type": "null"
             }
           ],
-          "description": "Its size: a lab machine's as it runs on this target, its `resources` each field they leave out the default of its form (a container: 1 CPU, 512 MB; a VM: 1 CPU, 1024 MB); one of Isoloom's own, its own size when it has one."
+          "description": "Its size: an environment's machine's as it runs on this target, its `resources` each field they leave out the default of its form (a container: 1 CPU, 512 MB; a VM: 1 CPU, 1024 MB); one of Isoloom's own, its own size when it has one."
         },
         "addresses": {
           "type": "object",
@@ -1328,15 +1328,15 @@
               "format": "ip"
             }
           },
-          "description": "Its static address on each lab network, by network name (what the status shows)."
+          "description": "Its static address on each of the environment's networks, by network name (what the status shows)."
         },
         "keep_running": {
           "type": "boolean",
-          "description": "Infra that stays on once the lab is built (a controller with `keep_running`)."
+          "description": "Infra that stays on once the environment is built (a controller with `keep_running`)."
         },
         "on_demand": {
           "type": "boolean",
-          "description": "Brought up on demand, never by the initial `up`: the access machine, which the runner hot-adds onto a chosen lab network when asked."
+          "description": "Brought up on demand, never by the initial `up`: the access machine, which the runner hot-adds onto a chosen network of the environment when asked."
         },
         "native": {
           "anyOf": [
@@ -1725,7 +1725,7 @@
               "type": "null"
             }
           ],
-          "description": "What closes the lab off once its machines are set up, before the run counts as ready."
+          "description": "What closes the environment off once its machines are set up, before the run counts as ready."
         },
         "status": {
           "$ref": "#/$defs/Step",
@@ -1951,7 +1951,7 @@
         {
           "type": "string",
           "const": "vagrant.check_forwarded_ports",
-          "description": "Fails with `PortInUse` when a host port the VMs forward (a published port with a `fixed` host port) is taken, unless the run's VMs exist: two labs forwarding one port collide."
+          "description": "Fails with `PortInUse` when a host port the VMs forward (a published port with a `fixed` host port) is taken, unless the run's VMs exist: two runs forwarding one port collide."
         },
         {
           "type": "string",
@@ -1966,7 +1966,7 @@
         {
           "type": "string",
           "const": "terraform.copy_module",
-          "description": "Copies the lab's own Terraform module (`with`: `from`, its folder relative to the manifest's, inside the project) into `${run.state_dir}/module`, where the steps run it: the lock file and what the module writes stay with the run, out of the project. The copy's Terraform files are replaced (a file renamed or removed in the module isn't applied any more), what the module wrote there before is kept, and `.terraform` and state files are left out. `with.when: missing` copies only when there is no copy (a `down` destroys with the module as it was applied)."
+          "description": "Copies the environment's own Terraform module (`with`: `from`, its folder relative to the manifest's, inside the project) into `${run.state_dir}/module`, where the steps run it: the lock file and what the module writes stay with the run, out of the project. The copy's Terraform files are replaced (a file renamed or removed in the module isn't applied any more), what the module wrote there before is kept, and `.terraform` and state files are left out. `with.when: missing` copies only when there is no copy (a `down` destroys with the module as it was applied)."
         },
         {
           "type": "string",
@@ -2080,7 +2080,7 @@
         "param",
         "steps"
       ],
-      "description": "What closes a lab off once its machines are set up: a cloud's `internet: false` networks sealed at the network (its firewalls), where root in a guest can't undo it. The machines had what they needed to set themselves up; from then on they don't.\n\nOnce `up` succeeded and the ready conditions hold, the runner sets [`Seal::param`] to `true`, records it with the run, then runs [`Seal::steps`] (a second `terraform apply`, the module's variable switching its rules). A failed seal fails `up`: the run is never ready unsealed. Every later operation replays the recorded value, so a later apply keeps the seal; a successful `down` forgets it, and the next `up` starts unsealed."
+      "description": "What closes an environment off once its machines are set up: its `internet: false` networks sealed where root in a guest can't undo it (a cloud's firewalls, a server's router). The machines had what they needed to set themselves up; from then on they don't.\n\nOnce `up` succeeded and the ready conditions hold, the runner sets [`Seal::param`] to `true`, records it with the run, then runs [`Seal::steps`] (on a cloud, a second `terraform apply`, the module's variable switching its rules; on Proxmox, the router's sealed ruleset applied over SSH). A failed seal fails `up`: the run is never ready unsealed. Every later operation replays the recorded value, so a later apply keeps the seal; a successful `down` forgets it, and the next `up` starts unsealed."
     },
     "Condition": {
       "oneOf": [
@@ -2138,7 +2138,7 @@
           "properties": {
             "host": {
               "$ref": "#/$defs/Template",
-              "description": "The lab host."
+              "description": "The machine's address."
             },
             "user": {
               "$ref": "#/$defs/Template",
@@ -2172,7 +2172,7 @@
                   "type": "null"
                 }
               ],
-              "description": "A jump host (`user@host`), when the lab host sits behind one."
+              "description": "A jump host (`user@host`), when the machine sits behind one."
             },
             "timeout_s": {
               "type": "integer",
@@ -2209,7 +2209,7 @@
             "timeout_s",
             "interval_s"
           ],
-          "description": "A file on the lab host says the bootstrap finished, read over SSH."
+          "description": "A file on the machine says its bootstrap finished, read over SSH."
         },
         {
           "type": "object",
@@ -2413,7 +2413,7 @@
         "protocol",
         "runners"
       ],
-      "description": "The lab's checks, run by the runners Isoloom generated."
+      "description": "The environment's checks, run by the runners Isoloom generated."
     },
     "CheckProtocol": {
       "oneOf": [
@@ -2534,7 +2534,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Case-insensitive substrings of the failed step's output that mean leftovers, not a lab failure."
+          "description": "Case-insensitive substrings of the failed step's output that mean leftovers, not a failure of the environment."
         },
         "steps": {
           "type": "array",
@@ -2633,7 +2633,7 @@
         "machine",
         "status"
       ],
-      "description": "The VM the lab's containers run in, and how the runner reads them there: its own machines are the VM's driver's (Vagrant, Terraform), the containers' are Compose's inside it."
+      "description": "The VM the environment's containers run in, and how the runner reads them there: its own machines are the VM's driver's (Vagrant, Terraform), the containers' are Compose's inside it."
     }
   }
 }

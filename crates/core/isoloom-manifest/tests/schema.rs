@@ -32,6 +32,16 @@ fn write_the_committed_schema() {
     std::fs::write(path, generated().unwrap()).unwrap();
 }
 
+/// What the schema says calls the environment an environment, as every user-facing text does:
+/// never a lab (a word in a pattern or an example name aside).
+#[test]
+fn the_schema_says_environment() {
+    let text = generated().unwrap();
+    let words = text.split(|c: char| !c.is_ascii_alphanumeric() && c != '\'');
+    let lab: Vec<&str> = words.filter(|w| matches!(w.to_ascii_lowercase().as_str(), "lab" | "labs" | "lab's")).collect();
+    assert!(lab.is_empty(), "the schema says {lab:?}");
+}
+
 #[test]
 fn the_schema_is_a_valid_json_schema() {
     jsonschema::validator_for(&isoloom_manifest::schema()).unwrap();

@@ -52,7 +52,7 @@ pub enum Action {
     #[serde(rename = "vagrant.park_controller")]
     VagrantParkController,
     /// Fails with `PortInUse` when a host port the VMs forward (a published port with a `fixed`
-    /// host port) is taken, unless the run's VMs exist: two labs forwarding one port collide.
+    /// host port) is taken, unless the run's VMs exist: two runs forwarding one port collide.
     #[serde(rename = "vagrant.check_forwarded_ports")]
     VagrantCheckForwardedPorts,
     /// Removes a stale Terraform state lock.
@@ -61,7 +61,7 @@ pub enum Action {
     /// Reads the Terraform state's outputs, resources and taint.
     #[serde(rename = "terraform.read_state")]
     TerraformReadState,
-    /// Copies the lab's own Terraform module (`with`: `from`, its folder relative to the
+    /// Copies the environment's own Terraform module (`with`: `from`, its folder relative to the
     /// manifest's, inside the project) into `${run.state_dir}/module`, where the steps run it:
     /// the lock file and what the module writes stay with the run, out of the project. The
     /// copy's Terraform files are replaced (a file renamed or removed in the module isn't applied

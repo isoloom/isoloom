@@ -8,7 +8,7 @@ use crate::names::Name;
 use crate::step::Step;
 use crate::template::Template;
 
-/// The VM the lab's containers run in, and how the runner reads them there: its own machines are
+/// The VM the environment's containers run in, and how the runner reads them there: its own machines are
 /// the VM's driver's (Vagrant, Terraform), the containers' are Compose's inside it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

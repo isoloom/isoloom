@@ -119,7 +119,7 @@ pub struct CheckRunner {
     pub on_timeout: Vec<Step>,
 }
 
-/// The lab's checks, run by the runners Isoloom generated.
+/// The environment's checks, run by the runners Isoloom generated.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Checks {

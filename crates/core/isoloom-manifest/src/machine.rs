@@ -112,7 +112,7 @@ impl JsonSchema for Cidr {
     }
 }
 
-/// One of the lab's networks.
+/// One of the environment's networks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
@@ -124,8 +124,8 @@ pub struct Network {
     /// `isoloom-routes-<machine>` sidecars (role `infra`), not an `internal:` network, so
     /// published ports still work.
     pub internet: bool,
-    /// Its name where the target creates it: the Docker network (`${run.name}_lab`), the
-    /// hypervisor's internal network (`isoloom-<lab>-lab`).
+    /// Its name where the target creates it: the Docker network (`${run.name}_<network>`), the
+    /// hypervisor's internal network (`isoloom-<environment>-<network>`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native: Option<Template>,
 }
@@ -279,18 +279,18 @@ pub struct Machine {
     /// Its CPU architecture, for the environment's own machines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arch: Option<Arch>,
-    /// Its size: a lab machine's as it runs on this target, its `resources` each field they leave
+    /// Its size: an environment's machine's as it runs on this target, its `resources` each field they leave
     /// out the default of its form (a container: 1 CPU, 512 MB; a VM: 1 CPU, 1024 MB); one of
     /// Isoloom's own, its own size when it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
-    /// Its static address on each lab network, by network name (what the status shows).
+    /// Its static address on each of the environment's networks, by network name (what the status shows).
     pub addresses: BTreeMap<Name, IpAddr>,
-    /// Infra that stays on once the lab is built (a controller with `keep_running`).
+    /// Infra that stays on once the environment is built (a controller with `keep_running`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub keep_running: bool,
     /// Brought up on demand, never by the initial `up`: the access machine, which the runner
-    /// hot-adds onto a chosen lab network when asked.
+    /// hot-adds onto a chosen network of the environment when asked.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub on_demand: bool,
     /// Its name where the target creates it.

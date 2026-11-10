@@ -31,7 +31,7 @@ pub enum Target {
     CloudDocker,
     /// One cloud VM per machine.
     CloudVm,
-    /// A cloud's own services, through the lab's Terraform module.
+    /// A cloud's own services, through the environment's Terraform module.
     CloudServices,
 }
 
@@ -167,7 +167,7 @@ pub struct Tool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ComposeIdentity {
-    /// The project name: `${run.name}`, which the program running it may set (`<app>-<lab id>`).
+    /// The project name: `${run.name}`, which the runner may set (`<runner>-<run id>`).
     pub project: Template,
     /// The Compose files, in order.
     pub files: NonEmpty<PathTemplate>,
@@ -207,7 +207,7 @@ pub struct VagrantProvider {
     /// The VMs run on a server (ESXi): its connection slots apply.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub remote: bool,
-    /// Why this lab can't run on this provider, in Isoloom's words, or null.
+    /// Why this environment can't run on this provider, in Isoloom's words, or null.
     #[serde(default)]
     pub refusal: Option<String>,
 }
@@ -220,8 +220,8 @@ pub struct VagrantIdentity {
     pub providers: Vec<VagrantProvider>,
     /// The folder Vagrant keeps its machines' state in (`VAGRANT_DOTFILE_PATH`, which the runner
     /// sets for every Vagrant command of the run, its actions' included), in the run's state
-    /// folder (`${run.state_dir}/vagrant`): a reinstalled or replaced lab folder never loses
-    /// track of its VMs. Absent: Vagrant's own `.vagrant` next to the Vagrantfile.
+    /// folder (`${run.state_dir}/vagrant`): a replaced project folder never loses track of its
+    /// VMs. Absent: Vagrant's own `.vagrant` next to the Vagrantfile.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dotfile: Option<PathTemplate>,
 }
@@ -230,8 +230,8 @@ pub struct VagrantIdentity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum StateOwner {
-    /// The runner: local state in the run's state folder, outside the lab's files (a reinstalled
-    /// lab must not orphan what it created).
+    /// The runner: local state in the run's state folder, outside the project's files (a replaced
+    /// project folder must not orphan what it created).
     Runner,
 }
 

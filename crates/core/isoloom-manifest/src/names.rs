@@ -104,11 +104,11 @@ macro_rules! pattern_type {
 }
 
 pattern_type!(
-    /// An environment's name: kebab-case (`my-lab`, `shop-2`), as the spec's `name:`.
+    /// An environment's name: kebab-case (`my-env`, `shop-2`), as the spec's `name:`.
     EnvironmentName,
     "environment name",
     "^[a-z0-9]+(-[a-z0-9]+)*$",
-    "lowercase letters and digits in words joined by single dashes (`my-lab`)",
+    "lowercase letters and digits in words joined by single dashes (`my-env`)",
     |v| v.split('-').all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
 );
 

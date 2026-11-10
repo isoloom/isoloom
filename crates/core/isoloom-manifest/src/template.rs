@@ -15,7 +15,7 @@ use crate::{Error, Result};
 /// A value the runner knows about the run itself (`${run.…}`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RunVar {
-    /// The run's name (`${run.name}`): the embedder's, else the lab's name.
+    /// The run's name (`${run.name}`): the embedder's, else the environment's name.
     Name,
     /// The manifest's folder, absolute (`${run.dir}`).
     Dir,

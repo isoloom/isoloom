@@ -56,7 +56,8 @@ pub struct Lifecycle {
     /// Set-up again on running machines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provision: Option<Provision>,
-    /// What closes the lab off once its machines are set up, before the run counts as ready.
+    /// What closes the environment off once its machines are set up, before the run counts as
+    /// ready.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seal: Option<Seal>,
     /// The read-only probe the driver parses into machine states (an argv) or reads from files
@@ -64,13 +65,14 @@ pub struct Lifecycle {
     pub status: Step,
 }
 
-/// What closes a lab off once its machines are set up: a cloud's `internet: false` networks
-/// sealed at the network (its firewalls), where root in a guest can't undo it. The machines had
-/// what they needed to set themselves up; from then on they don't.
+/// What closes an environment off once its machines are set up: its `internet: false` networks
+/// sealed where root in a guest can't undo it (a cloud's firewalls, a server's router). The
+/// machines had what they needed to set themselves up; from then on they don't.
 ///
 /// Once `up` succeeded and the ready conditions hold, the runner sets [`Seal::param`] to `true`,
-/// records it with the run, then runs [`Seal::steps`] (a second `terraform apply`, the module's
-/// variable switching its rules). A failed seal fails `up`: the run is never ready unsealed. Every
+/// records it with the run, then runs [`Seal::steps`] (on a cloud, a second `terraform apply`,
+/// the module's variable switching its rules; on Proxmox, the router's sealed ruleset applied
+/// over SSH). A failed seal fails `up`: the run is never ready unsealed. Every
 /// later operation replays the recorded value, so a later apply keeps the seal; a successful `down`
 /// forgets it, and the next `up` starts unsealed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -109,9 +111,9 @@ pub enum Condition {
         /// The machines.
         machines: Vec<Name>,
     },
-    /// A file on the lab host says the bootstrap finished, read over SSH.
+    /// A file on the machine says its bootstrap finished, read over SSH.
     ReadyFile {
-        /// The lab host.
+        /// The machine's address.
         host: Template,
         /// The SSH user.
         user: Template,
@@ -122,7 +124,7 @@ pub enum Condition {
         log: Option<Template>,
         /// The file's grammar.
         grammar: ReadyGrammar,
-        /// A jump host (`user@host`), when the lab host sits behind one.
+        /// A jump host (`user@host`), when the machine sits behind one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         via: Option<Template>,
         /// How long the bootstrap may take, in seconds.
@@ -215,8 +217,8 @@ impl JsonSchema for Retries {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Recovery {
-    /// Case-insensitive substrings of the failed step's output that mean leftovers, not a lab
-    /// failure.
+    /// Case-insensitive substrings of the failed step's output that mean leftovers, not a failure
+    /// of the environment.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_markers: Vec<String>,
     /// What clears the leftovers.

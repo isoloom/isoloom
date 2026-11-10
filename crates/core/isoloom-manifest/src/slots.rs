@@ -124,7 +124,7 @@ pub struct Param {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum SlotKind {
-    /// A launch-time value of the lab (`inputs:`: an access token, a password).
+    /// A launch-time value of the environment (`inputs:`: an access token, a password).
     Input,
     /// The spec's `secrets:`, and the project files Compose takes from its environment.
     Secret,
