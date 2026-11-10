@@ -233,17 +233,16 @@ fn quoted(s: &str) -> String {
         .collect()
 }
 
-/// Whether `s` is safe as a plain scalar: a path, a name, a package spec or an FQCN, never empty,
-/// a reserved word, an all-digit string (a mode must stay a string) or anything with a space,
-/// quote, colon or other indicator.
+/// Whether `s` is safe as a plain scalar: a path, a name, a package spec or an FQCN, starting with
+/// a letter, `_` or `/`. Never a word YAML 1.1 (Ansible's) reads as a boolean or null in any case
+/// (`yes`, `n`, `Off`, `null`), never one starting with a digit, a sign or a dot, which it may read
+/// as a number or a date (`1.10`, `0x10`, `1_000`, `.5`, `2024-01-02`; a mode must stay a
+/// string), and nothing with a space, quote, colon or other indicator.
 fn plain(s: &str) -> bool {
-    let reserved = ["true", "false", "null", "yes", "no", "on", "off", "~"];
-    if s.is_empty() || reserved.contains(&s.to_ascii_lowercase().as_str()) || s.bytes().all(|b| b.is_ascii_digit()) {
-        return false;
-    }
+    let reserved = ["true", "false", "null", "yes", "no", "on", "off", "y", "n"];
+    let first = s.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '/');
     let safe = |c: char| c.is_ascii_alphanumeric() || "_/.=+@,-".contains(c);
-    let first = s.chars().next().is_some_and(|c| c.is_ascii_alphanumeric() || c == '_' || c == '/');
-    first && s.chars().all(safe)
+    first && !reserved.contains(&s.to_ascii_lowercase().as_str()) && s.chars().all(safe)
 }
 
 /// Appends a structural `line` (a key, a `- `, a scalar on its line) and a newline, with no
@@ -289,6 +288,34 @@ mod tests {
         assert!(text.contains("dest: /etc/app.conf\n"), "a path is plain: {text}");
         assert!(text.contains("mode: \"0640\"\n"), "a mode stays a string: {text}");
         assert!(text.contains("src: \"{{ isoloom_project }}/a\"\n"), "a jinja value is quoted: {text}");
+    }
+
+    #[test]
+    fn a_string_yaml_would_read_as_a_number_a_boolean_null_or_a_date_is_quoted() {
+        for text in [
+            "1.10",
+            "0x10",
+            "1_000",
+            "0o17",
+            ".5",
+            "1e3",
+            "-1",
+            "+1",
+            "2024-01-02",
+            "y",
+            "N",
+            "Off",
+            "NULL",
+            "yes",
+            "~",
+        ] {
+            assert_eq!(scalar(text), quoted(text), "{text}");
+            let read: serde_yaml_ng::Value = serde_yaml_ng::from_str(&scalar(text)).expect("YAML");
+            assert_eq!(read.as_str(), Some(text), "{text} reads back as itself");
+        }
+        for text in ["nginx", "/etc/app.conf", "python3-pip=1.2", "ansible.posix", "_x"] {
+            assert_eq!(scalar(text), text, "{text} stays plain");
+        }
     }
 
     #[test]

@@ -116,7 +116,7 @@ fn a_firewall_uses_ansible_posix_guarded_by_whether_firewalld_runs() {
         &[],
     );
     assert!(t.contains("ansible.posix.firewalld:"), "{t}");
-    assert!(t.contains("port: 80/tcp"), "{t}");
+    assert!(t.contains("port: \"80/tcp\""), "{t}");
     assert!(t.contains("isoloom_machine_m_firewalld_0.rc == 0"), "{t}");
     assert!(!t.contains("community"), "{t}");
 }
@@ -237,7 +237,7 @@ overrides:
         .sha256
         .to_string();
     assert_eq!(posix.len(), 64, "a sha256 is 64 hex chars: {posix}");
-    assert!(reqs.contains(&format!("sha256: {posix}")), "requirements.yml carries the pinned sha256: {reqs}");
+    assert!(reqs.contains(&format!("sha256: \"{posix}\"")), "requirements.yml carries the pinned sha256: {reqs}");
 }
 
 #[test]
