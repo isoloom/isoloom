@@ -58,15 +58,10 @@ pub fn refusal(lab: &Lab, target: Target) -> Option<String> {
 /// as `defaults.yml` sets it: for Vagrant, `vagrant up --provider` (`virtualbox`, `libvirt`,
 /// `qemu`, ...). `None` is the target whatever the provider, which is [`refusal`].
 ///
-/// Today `vagrant` refuses more on some providers: a machine requiring a TPM (`hardware.tpm:
-/// required`) anywhere but `virtualbox`, `libvirt` and `hyperv`; on `qemu`, a VM is on one
-/// network (QEMU gives it one); on `utm`, a VM is on none (`vagrant_utm` has no private
-/// networks); on `hyperv`, a machine whose OS has no known Hyper-V box needs a box override;
-/// `qemu`, `hyperv` and `libvirt` have no bridged networks yet; a machine booting its own way
-/// (`hardware.boot`) runs on `libvirt` (on `qemu` with UEFI and `firmware_format` only); a
-/// machine's host folders (`host_folders`) aren't shared on `hyperv` and `vmware_esxi` (nor
-/// read-only on `qemu`). `docker-vm` refuses a container's host folders on `vmware_esxi` and
-/// `proxmox` (its Proxmox module isn't written then).
+/// On `vagrant`, a provider refuses what [`isoloom_vagrant::provider_refusal`] and
+/// [`isoloom_vagrant::disk_refusal`] say; on `docker-vm`, what
+/// [`isoloom_vagrant::docker_vm_refusal`] says of a provider, and the Proxmox server (`proxmox`)
+/// a container's host folders (its Proxmox module isn't written then).
 #[must_use]
 pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<String> {
     refusal(lab, target).or_else(|| match (target, provider) {
