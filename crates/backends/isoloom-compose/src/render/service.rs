@@ -239,26 +239,36 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
     } else {
         svc.cap_add = vec!["NET_ADMIN".into(), "NET_RAW".into()];
     }
-    svc.networks = appliance_networks(spec, name, &w.ports);
+    let outside: Vec<(String, Option<String>)> = outside::attachments(m.plan)
+        .map(|(net, a)| (net, a.and_then(|a| a.ipv4_address)))
+        .collect();
+    svc.networks = appliance_networks(spec, name, &w.ports, outside);
 }
 
 /// The interface names the image expects, set outright (Compose 2.36+, Docker 28.1+): the order
-/// Docker attaches networks in isn't theirs to rely on.
-fn appliance_networks(spec: &isoloom_spec::model::Spec, name: &str, ports: &[Port]) -> IndexMap<String, Option<Attachment>> {
+/// Docker attaches networks in isn't theirs to rely on. The existing networks it joins (`outside`,
+/// each with its fixed address) come after its own, as a machine's do.
+fn appliance_networks(
+    spec: &isoloom_spec::model::Spec,
+    name: &str,
+    ports: &[Port],
+    outside: Vec<(String, Option<String>)>,
+) -> IndexMap<String, Option<Attachment>> {
     let mgmt = Attachment {
         interface_name: Some("eth0".into()),
         priority: Some(1000),
         ..Attachment::at(appliances::mgmt_address(spec, name))
     };
+    let own = ports.iter().map(|p| (p.network.clone(), p.address.map(|a| a.to_string())));
     let mut nets = IndexMap::from([(appliances::MGMT_NETWORK.to_owned(), Some(mgmt))]);
-    for (k, p) in ports.iter().enumerate() {
+    for (k, (network, address)) in own.chain(outside).enumerate() {
         let a = Attachment {
-            ipv4_address: p.address.map(|a| a.to_string()),
+            ipv4_address: address,
             interface_name: Some(format!("eth{}", k + 1)),
             priority: Some(999u32.saturating_sub(u32::try_from(k).unwrap_or(u32::MAX))),
             ..Attachment::default()
         };
-        nets.insert(p.network.clone(), Some(a));
+        nets.insert(network, Some(a));
     }
     nets
 }
@@ -413,6 +423,19 @@ mod tests {
     }
 
     #[test]
+    fn an_appliance_keeps_the_existing_networks_it_joins_after_its_own() {
+        let env = crate::testing::environment(
+            "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, corp: { cidr: 192.168.50.0/24 } }\nmachines:\n  r: { networks: { a: 1, corp: 7 }, app: { image: iol, appliance: cisco-iol } }\noverrides:\n  docker: { networks: { corp: { external: corp-net } } }\n",
+        );
+        let file = crate::render::compose_file(isoloom_spec::model::Target::Docker, &env).unwrap().file;
+        let nets = &file.services["r"].networks;
+        assert_eq!(nets.keys().collect::<Vec<_>>(), ["isoloom-mgmt", "a", "corp"], "{nets:?}");
+        let corp = nets["corp"].as_ref().unwrap();
+        assert_eq!(corp.ipv4_address.as_deref(), Some("192.168.50.7"));
+        assert_eq!((corp.interface_name.as_deref(), corp.priority), (Some("eth2"), Some(998)));
+    }
+
+    #[test]
     fn appliance_interfaces_attach_in_order_from_the_highest_priority() {
         let spec = isoloom_plan::Lab::parse(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  r: { networks: { a: 1, b: 1 }, app: { image: iol, appliance: cisco-iol } }\n",
@@ -420,7 +443,7 @@ mod tests {
         .expect("parses")
         .for_target(isoloom_spec::model::Target::Docker);
         let ports = appliances::ports(&spec, "r", &spec.machines["r"], &|n, o| isoloom_plan::addressing::address(&spec, n, o));
-        let nets = appliance_networks(&spec, "r", &ports);
+        let nets = appliance_networks(&spec, "r", &ports, Vec::new());
         let order: Vec<(&str, Option<u32>)> = nets.iter().map(|(n, a)| (n.as_str(), a.as_ref().and_then(|a| a.priority))).collect();
         assert_eq!(order, [("isoloom-mgmt", Some(1000)), ("a", Some(999)), ("b", Some(998))]);
     }

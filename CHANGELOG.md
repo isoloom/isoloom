@@ -337,6 +337,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **Docker: a network appliance joins the existing networks it is on** (`overrides.docker.networks.<n>.external`),
+  at its fixed address and after its own interfaces (the next `ethN`); its interfaces replaced
+  every network, so it was left off them silently.
 - **Kubernetes: a project script's `ConfigMap` key is valid and its own.** A key was the path
   with `/` as `__`: a space (`setup: [build/cache/my seed.sh]`) gave an invalid key and an
   unquoted `sh` command, and `a/b__c` and `a__b/c` shared one. Any byte but a letter, digit, `-`
