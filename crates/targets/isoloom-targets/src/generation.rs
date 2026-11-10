@@ -184,28 +184,24 @@ pub fn default_regions() -> Vec<(&'static str, &'static str)> {
 mod tests {
     use super::*;
 
-    fn file(path: &str, contents: &str) -> GeneratedFile {
-        GeneratedFile {
-            path: path.to_owned(),
-            contents: contents.to_owned(),
-        }
-    }
-
     #[test]
     fn a_run_manifest_or_a_backend_file_written_twice_is_an_error() {
-        let compose = file(".isoloom/docker/compose.yml", "a");
-        let manifest = file(".isoloom/docker/run.json", "{}");
+        let compose = GeneratedFile::new(".isoloom/docker/compose.yml", "a");
+        let manifest = GeneratedFile::new(".isoloom/docker/run.json", "{}");
         // A configuration file the backend wrote already is the backend's, once.
         let fine = assembled(
             Target::Docker,
             vec![compose.clone()],
-            vec![file(".isoloom/docker/compose.yml", "b")],
+            vec![GeneratedFile::new(".isoloom/docker/compose.yml", "b")],
             vec![manifest.clone()],
         );
         assert_eq!(fine.map(|f| f.len()).ok(), Some(2));
         // A run manifest at a path the backend wrote is caught, as two of the backend's are.
         for (rendered, manifests) in [
-            (vec![compose.clone(), file(".isoloom/docker/run.json", "x")], vec![manifest.clone()]),
+            (
+                vec![compose.clone(), GeneratedFile::new(".isoloom/docker/run.json", "x")],
+                vec![manifest.clone()],
+            ),
             (vec![compose.clone(), compose.clone()], vec![]),
         ] {
             let e = assembled(Target::Docker, rendered, vec![], manifests)

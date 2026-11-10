@@ -477,12 +477,18 @@ fn generating_one_target_leaves_the_others_files_alone() -> Outcome {
     Ok(())
 }
 
-/// A generated project whose list also names `entry`, and the file under `dir` it would reach.
-fn listing(name: &str, entry: &str) -> Outcome<std::path::PathBuf> {
+/// A one-VM project `name` with its `docker` files generated: its folder.
+fn generated(name: &str) -> Outcome<std::path::PathBuf> {
     let home = scratch(&format!("{name}-home"))?;
     let dir = project(name, &one_vm("debian@12"))?;
     std::fs::write(dir.join("p.sh"), "true\n")?;
     assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    Ok(dir)
+}
+
+/// A generated project whose list also names `entry`, and the file under `dir` it would reach.
+fn listing(name: &str, entry: &str) -> Outcome<std::path::PathBuf> {
+    let dir = generated(name)?;
     let list = dir.join(".isoloom/.generated");
     let text = std::fs::read_to_string(&list)?;
     std::fs::write(&list, format!("{text}{entry}\n"))?;
@@ -558,10 +564,7 @@ fn generate_refuses_to_remove_through_a_linked_output_folder() -> Outcome {
 /// `outside`; its folder.
 #[cfg(unix)]
 fn with_linked_output(name: &str, file: &str, outside: &std::path::Path) -> Outcome<std::path::PathBuf> {
-    let home = scratch(&format!("{name}-home"))?;
-    let dir = project(name, &one_vm("debian@12"))?;
-    std::fs::write(dir.join("p.sh"), "true\n")?;
-    assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    let dir = generated(name)?;
     let linked = dir.join(".isoloom/docker").join(file);
     std::fs::remove_file(&linked)?;
     std::os::unix::fs::symlink(outside, &linked)?;

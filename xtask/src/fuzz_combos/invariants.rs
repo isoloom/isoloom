@@ -130,29 +130,22 @@ fn secret_leak(files: &[GeneratedFile], values: &[String]) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn file(path: &str, contents: &str) -> GeneratedFile {
-        GeneratedFile {
-            path: path.to_owned(),
-            contents: contents.to_owned(),
-        }
-    }
-
     #[test]
     fn a_leaked_secret_value_is_caught_and_a_hashed_one_is_not() {
         let value = "P6FUZZ-SENTINEL-deadbeef".to_owned();
-        let leaked = [file(".isoloom/docker/compose.yaml", "password: P6FUZZ-SENTINEL-deadbeef")];
+        let leaked = [GeneratedFile::new(".isoloom/docker/compose.yaml", "password: P6FUZZ-SENTINEL-deadbeef")];
         assert!(secret_leak(&leaked, std::slice::from_ref(&value)).is_some());
-        let safe = [file(".isoloom/docker/compose.yaml", "password: $6$rounds$abc")];
+        let safe = [GeneratedFile::new(".isoloom/docker/compose.yaml", "password: $6$rounds$abc")];
         assert!(secret_leak(&safe, std::slice::from_ref(&value)).is_none());
     }
 
     #[test]
     fn a_byte_difference_or_a_changed_file_set_breaks_determinism() {
-        let one = [file("a", "x"), file("b", "y")];
+        let one = [GeneratedFile::new("a", "x"), GeneratedFile::new("b", "y")];
         assert!(determinism(&one, &one).is_none());
-        let changed = [file("a", "x"), file("b", "z")];
+        let changed = [GeneratedFile::new("a", "x"), GeneratedFile::new("b", "z")];
         assert!(determinism(&one, &changed).is_some());
-        let shorter = [file("a", "x")];
+        let shorter = [GeneratedFile::new("a", "x")];
         assert!(determinism(&one, &shorter).is_some());
     }
 
@@ -170,10 +163,10 @@ mod tests {
     #[test]
     fn target_folders_are_counted_once_each() {
         let files = [
-            file(".isoloom/docker/compose.yaml", ""),
-            file(".isoloom/docker/run.json", ""),
-            file(".isoloom/vagrant/Vagrantfile", ""),
-            file(".isoloom/resolved.json", ""),
+            GeneratedFile::new(".isoloom/docker/compose.yaml", ""),
+            GeneratedFile::new(".isoloom/docker/run.json", ""),
+            GeneratedFile::new(".isoloom/vagrant/Vagrantfile", ""),
+            GeneratedFile::new(".isoloom/resolved.json", ""),
         ];
         // docker and vagrant are the two target folders; the resolved snapshot is not one.
         assert_eq!(targets_with_files(&files), 2);

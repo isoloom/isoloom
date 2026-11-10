@@ -24,6 +24,16 @@ fn constrained() -> Outcome<Lab> {
     valid(&format!("{text}{CONSTRAINTS}"))
 }
 
+/// The segmented example's spec as written.
+fn segmented_text() -> Outcome<String> {
+    Ok(std::fs::read_to_string(examples().join("segmented/isoloom.yml"))?)
+}
+
+/// The segmented example with `extra` appended to its spec, unchecked.
+fn segmented_with(extra: &str) -> Outcome<Lab> {
+    Ok(Lab::new(parse(&format!("{}{extra}", segmented_text()?))?))
+}
+
 /// Constraints with these registry mirrors only.
 fn mirrors(registries: &[(&str, &str)]) -> Constraints {
     let mut c = Constraints::default();
@@ -168,21 +178,16 @@ fn without_constraints_nothing_changes() {
 }
 
 #[test]
-fn constraints_are_validated() {
-    let dir = crate::testing::examples().join("segmented");
-    let text = std::fs::read_to_string(dir.join("isoloom.yml")).unwrap();
-    let lab = Lab::new(
-        parse(&format!(
-            "{text}
+fn constraints_are_validated() -> Outcome {
+    let lab = segmented_with(
+        "
 constraints:
-  proxy: {{ http: proxy.corp:3128, no_proxy: [\"a, b\"] }}
-  registries: {{ \"https://docker.io\": \"https://registry.corp\" }}
-  mirrors: {{ npm: registry.npmjs.org }}
+  proxy: { http: proxy.corp:3128, no_proxy: [\"a, b\"] }
+  registries: { \"https://docker.io\": \"https://registry.corp\" }
+  mirrors: { npm: registry.npmjs.org }
   ntp: [\"\"]
-"
-        ))
-        .unwrap(),
-    );
+",
+    )?;
     let at: Vec<String> = lab.problems().into_iter().map(|p| p.path.to_string()).collect();
     for expected in [
         "constraints.proxy.http",
@@ -193,8 +198,11 @@ constraints:
     ] {
         assert!(at.iter().any(|a| a == expected), "{expected} in {at:?}");
     }
-    let e = parse(&format!("{text}\nconstraints: {{ proxi: {{}} }}\n")).unwrap_err().to_string();
+    let e = parse(&format!("{}\nconstraints: {{ proxi: {{}} }}\n", segmented_text()?))
+        .unwrap_err()
+        .to_string();
     assert!(e.contains("proxi"), "{e}");
+    Ok(())
 }
 
 /// segmented with the site's certificate authority, `certs/corp-ca.pem`.
@@ -390,10 +398,9 @@ fn the_sites_resolvers_replace_the_public_one_everywhere() -> Outcome {
 }
 
 #[test]
-fn a_resolver_is_an_ip_address() {
-    let dir = crate::testing::examples().join("segmented");
-    let text = std::fs::read_to_string(dir.join("isoloom.yml")).unwrap();
-    let lab = Lab::new(parse(&format!("{text}\nconstraints:\n  dns: [10.0.0.53, dns.corp]\n")).unwrap());
+fn a_resolver_is_an_ip_address() -> Outcome {
+    let lab = segmented_with("\nconstraints:\n  dns: [10.0.0.53, dns.corp]\n")?;
     let problems: Vec<String> = lab.problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
     assert_eq!(problems, ["constraints.dns[1]: `dns.corp`: a resolver's IP address, e.g. 10.0.0.53"]);
+    Ok(())
 }

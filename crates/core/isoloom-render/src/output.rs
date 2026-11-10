@@ -10,6 +10,17 @@ pub struct GeneratedFile {
     pub contents: String,
 }
 
+impl GeneratedFile {
+    /// The file `contents` at `path` (relative to the project folder).
+    #[must_use]
+    pub fn new(path: impl Into<String>, contents: impl Into<String>) -> GeneratedFile {
+        GeneratedFile {
+            path: path.into(),
+            contents: contents.into(),
+        }
+    }
+}
+
 /// Where generated files go, relative to the project folder.
 pub const OUTPUT_DIR: &str = ".isoloom";
 
