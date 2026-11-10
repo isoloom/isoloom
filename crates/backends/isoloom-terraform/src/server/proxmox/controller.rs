@@ -8,6 +8,7 @@ use crate::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
 use isoloom_render::inventory::{Access, CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
+use isoloom_spec::model::resolvers;
 use isoloom_spec::validate::Cidr;
 
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
@@ -45,7 +46,11 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         agent: None,
         nics,
         pci: Vec::new(),
-        dns: Some(Block::builder("dns").add_attribute(("servers", list([string("1.1.1.1")]))).build()),
+        dns: Some(
+            Block::builder("dns")
+                .add_attribute(("servers", list(resolvers(env.spec().constraints.as_ref()).into_iter().map(string))))
+                .build(),
+        ),
         ips,
         depends_on,
         data_disks: Vec::new(),

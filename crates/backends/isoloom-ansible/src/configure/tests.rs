@@ -237,7 +237,10 @@ overrides:
         .sha256
         .to_string();
     assert_eq!(posix.len(), 64, "a sha256 is 64 hex chars: {posix}");
-    assert!(reqs.contains(&format!("sha256: \"{posix}\"")), "requirements.yml carries the pinned sha256: {reqs}");
+    assert!(
+        reqs.contains(&format!("sha256: \"{posix}\"")),
+        "requirements.yml carries the pinned sha256: {reqs}"
+    );
 }
 
 #[test]

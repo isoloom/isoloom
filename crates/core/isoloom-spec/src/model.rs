@@ -27,7 +27,7 @@ pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub use checks::{Check, Declared, Expect};
 pub use cloud::{CloudProvider, CloudServices};
 pub use configuration::Configuration;
-pub use constraints::{Constraints, Mirrors, Proxy};
+pub use constraints::{Constraints, Mirrors, PUBLIC_RESOLVER, Proxy, resolvers};
 pub use hardware::{DEFAULT_GPU_DRIVER, Device, DeviceFull, DeviceInput, GpuCount, Gpus, GpusFull, GpusInput};
 pub use host_folder::{HostFolder, HostPath};
 pub use implementation::{

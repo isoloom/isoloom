@@ -121,6 +121,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Added
 
+- `constraints.dns`: the site's resolvers (IP addresses), which the Proxmox and ESXi VMs naming
+  none of their own, Isoloom's controller there and the Proxmox router's resolver ask instead of
+  the public `1.1.1.1`, which a corporate network may block (it was written in four places with no
+  way around it). The rule is one, `isoloom_spec::model::resolvers`.
 - **`constraints.ca_certificates`**: the site's certificate authorities (PEM files in the
   project), trusted by every Linux VM (`update-ca-certificates`, `update-ca-trust`, else the
   OpenSSL bundle) and Windows VM (its root store) once the project is in, by every image

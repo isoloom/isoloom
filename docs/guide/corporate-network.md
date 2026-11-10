@@ -31,6 +31,7 @@ constraints:
     debian: https://mirror.corp.example/debian
     pypi: https://pypi.corp.example/simple
   ntp: [ntp1.corp.example, ntp2.corp.example]
+  dns: [10.0.0.53, 10.0.1.53]
 ```
 
 | Key | Effect |
@@ -40,6 +41,7 @@ constraints:
 | `mirrors.debian`, `mirrors.ubuntu` | Replace the public archives in the VMs' apt sources |
 | `mirrors.pypi`, `mirrors.npm` | `PIP_INDEX_URL` and `/etc/pip.conf`, `NPM_CONFIG_REGISTRY` and `/etc/npmrc` |
 | `ntp` | The time servers Linux VMs synchronise with |
+| `dns` | The resolvers (IP addresses) Isoloom's own machines and every VM naming none of its own ask, where the public `1.1.1.1` is blocked: the Proxmox and ESXi VMs, Isoloom's controller there, and the Proxmox router's resolver, which forwards the containers' queries to them |
 
 The [target matrix](../matrix.md) shows which targets apply each key (every target but UTM and
 `cloud-services` for the proxy and registries). Windows VMs get none of them yet. Field details:

@@ -358,3 +358,42 @@ fn a_certificate_authority_must_be_a_file_of_the_project() -> Outcome {
     );
     Ok(())
 }
+
+/// The example `name` with the site's resolvers.
+fn with_resolvers(name: &str) -> Outcome<Lab> {
+    let text = std::fs::read_to_string(examples().join(name).join("isoloom.yml"))?;
+    valid(&format!("{text}\nconstraints:\n  dns: [10.0.0.53, \"fd00::53\"]\n"))
+}
+
+#[test]
+fn the_sites_resolvers_replace_the_public_one_everywhere() -> Outcome {
+    for (example, target, path) in [
+        ("segmented", Target::Proxmox, "proxmox/main.tf"),
+        ("ansible-pair", Target::Proxmox, "proxmox/main.tf"),
+        ("segmented", Target::Esxi, "esxi/main.tf"),
+        ("ansible-pair", Target::Esxi, "esxi/main.tf"),
+    ] {
+        let tf = file(&with_resolvers(example)?, target, path)?;
+        assert!(!tf.contains("1.1.1.1"), "{example} on {target:?}: {tf}");
+        assert!(tf.contains("10.0.0.53") && tf.contains("fd00::53"), "{example} on {target:?}: {tf}");
+    }
+    // The router's resolver, for the containers on Proxmox, forwards their queries to each.
+    let containers = valid(
+        "version: 1\nname: lxc\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: nginx } }\noverrides: { proxmox: { machines: { web: { lxc: true } } } }\nconstraints:\n  dns: [10.0.0.53, \"fd00::53\"]\n",
+    )?;
+    let lxc = file(&containers, Target::Proxmox, "proxmox/main.tf")?;
+    assert!(lxc.contains("no-resolv\\nserver=10.0.0.53\\nserver=fd00::53\\n"), "{lxc}");
+    // Without them, the public one.
+    let public = file(&crate::testing::example("segmented")?, Target::Proxmox, "proxmox/main.tf")?;
+    assert!(public.contains("\"1.1.1.1\""), "{public}");
+    Ok(())
+}
+
+#[test]
+fn a_resolver_is_an_ip_address() {
+    let dir = crate::testing::examples().join("segmented");
+    let text = std::fs::read_to_string(dir.join("isoloom.yml")).unwrap();
+    let lab = Lab::new(parse(&format!("{text}\nconstraints:\n  dns: [10.0.0.53, dns.corp]\n")).unwrap());
+    let problems: Vec<String> = lab.problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
+    assert_eq!(problems, ["constraints.dns[1]: `dns.corp`: a resolver's IP address, e.g. 10.0.0.53"]);
+}

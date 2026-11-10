@@ -6,6 +6,7 @@ use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, refer
 use isoloom_plan::checks::{Position, Probe, by_position};
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_render::router;
+use isoloom_spec::model::resolvers;
 use isoloom_spec::validate::Cidr;
 
 use super::windows;
@@ -101,13 +102,13 @@ fn needs_project(env: &Environment, (name, mp): (&str, &MachinePlan)) -> bool {
 }
 
 /// The machine's resolver when it sets one (an AD member points at the domain controller),
-/// else a public one so it can still install software. Its search domain is its own, else the
-/// private zone's (`dns.private`), whose names its hosts file carries.
+/// else the site's ([`resolvers`]) so it can still install software. Its search domain is its
+/// own, else the private zone's (`dns.private`), whose names its hosts file carries.
 fn dns(env: &Environment, name: &str) -> Block {
     let d = env.spec().machines.get(name).and_then(|m| m.dns.as_ref());
     let servers: Vec<Expression> = match d.filter(|d| !d.servers.is_empty()) {
         Some(d) => d.servers.iter().map(|s| string(s.as_str())).collect(),
-        None => vec![string("1.1.1.1")],
+        None => resolvers(env.spec().constraints.as_ref()).into_iter().map(string).collect(),
     };
     let mut b = Block::builder("dns").add_attribute(("servers", list(servers)));
     let zone = env.private_dns.as_ref().map(|z| z.domain.as_str());

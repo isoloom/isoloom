@@ -3796,6 +3796,13 @@
           },
           "description": "The time servers (names or addresses) the Linux VMs synchronise their clocks with,\nwhere the place forbids the public pools."
         },
+        "dns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask\nnames of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's\ncontroller, and the router's resolver forwarding the lab's queries. Without it, the\npublic [`PUBLIC_RESOLVER`]."
+        },
         "ca_certificates": {
           "type": "array",
           "items": {
@@ -3804,7 +3811,7 @@
           "description": "Certificate authorities every machine trusts beside the public ones (PEM files in the\nproject, one certificate each): a TLS-inspecting proxy's, an internal registry's. Each\nLinux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`) once\nthe project is in, Isoloom's own too (the containers' Docker host before it installs\nDocker, the controller and the router before their packages), each Windows VM to its root\nstore, each image Isoloom builds at build time, and each container has them at\n`/usr/local/share/ca-certificates/isoloom-<n>.crt`."
         }
       },
-      "description": "What the network an environment runs in imposes, applied on every target: images pulled\nthrough the customer's registry, packages through their mirrors, outbound HTTP through their\nproxy, time from their servers."
+      "description": "What the network an environment runs in imposes, applied on every target: images pulled\nthrough the customer's registry, packages through their mirrors, outbound HTTP through their\nproxy, time and names from their servers."
     },
     "Proxy": {
       "type": "object",

@@ -1,4 +1,5 @@
-//! `constraints`: URLs where URLs go, registry mirrors as a registry and path, time servers.
+//! `constraints`: URLs where URLs go, registry mirrors as a registry and path, time servers,
+//! resolvers' addresses.
 
 use super::Problems;
 use crate::model::{Constraints, Spec};
@@ -10,7 +11,7 @@ fn url(v: &str) -> bool {
         .is_some_and(|rest| !rest.is_empty() && !rest.contains(char::is_whitespace))
 }
 
-/// The environment's constraints: proxy, registry mirrors, package mirrors and NTP.
+/// The environment's constraints: proxy, registry mirrors, package mirrors, NTP and resolvers.
 pub(super) fn check(spec: &Spec, p: &mut Problems) {
     let Some(c) = &spec.constraints else { return };
     proxy(c, p);
@@ -25,6 +26,11 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
     for (i, v) in c.ntp.iter().enumerate() {
         if v.trim().is_empty() || v.contains(char::is_whitespace) {
             p.add(format!("constraints.ntp[{i}]"), format!("`{v}`: a time server's name or address"));
+        }
+    }
+    for (i, v) in c.dns.iter().enumerate() {
+        if v.parse::<std::net::IpAddr>().is_err() {
+            p.add(format!("constraints.dns[{i}]"), format!("`{v}`: a resolver's IP address, e.g. 10.0.0.53"));
         }
     }
 }
