@@ -181,12 +181,18 @@ fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) ->
     docker.args(run_args(&container, update));
     docker.stdin(File::open(work.join("in.tar"))?).stdout(File::create(work.join("out.tar"))?);
     let status = docker.status()?;
-    // What the runner wrote comes back whole or not at all: no summary is the failure `finish`
-    // reports.
-    if let Ok(results) = File::open(work.join("out.tar")) {
-        tar::Archive::new(results).unpack(out).ok();
-    }
-    Ok(status.code().unwrap_or(2))
+    let code = status.code().unwrap_or(2);
+    unpack(&work.join("out.tar"), out, code)?;
+    Ok(code)
+}
+
+/// Unpacks the results the runner wrote (`archive`) into `out`. An empty archive (the runner
+/// wrote nothing) unpacks to nothing, which `finish` reports; one that stops halfway (the runner
+/// cut off, a full disk) is an error naming the runner's exit status `code`.
+fn unpack(archive: &Path, out: &Path, code: i32) -> Res<()> {
+    tar::Archive::new(File::open(archive)?)
+        .unpack(out)
+        .map_err(|e| format!("the results didn't unpack into {} (runner exit status {code}): {e}", out.display()).into())
 }
 
 /// The CPUs the container may use when `ISOLOOM_VERIFY_CPUS` doesn't say: enough for the
@@ -306,6 +312,45 @@ mod tests {
             let e = cpus(Some(wrong)).unwrap_err().to_string();
             assert!(e.contains(&format!("`{wrong}`")), "{e}");
         }
+    }
+
+    /// A fresh folder for one test.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("isoloom-xtask-verify-{}-{name}", std::process::id()));
+        let _gone = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// An archive holding `summary.txt` (`text`).
+    fn results(text: &[u8]) -> Vec<u8> {
+        let mut tar = tar::Builder::new(Vec::new());
+        let mut header = tar::Header::new_gnu();
+        header.set_size(u64::try_from(text.len()).unwrap());
+        header.set_mode(0o644);
+        header.set_cksum();
+        tar.append_data(&mut header, "summary.txt", text).unwrap();
+        tar.into_inner().unwrap()
+    }
+
+    #[test]
+    fn the_results_unpack_and_an_empty_archive_is_no_results() {
+        let dir = scratch("whole");
+        std::fs::write(dir.join("out.tar"), results(b"all clean\n")).unwrap();
+        unpack(&dir.join("out.tar"), &dir.join("out"), 0).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("out/summary.txt")).unwrap(), "all clean\n");
+        std::fs::write(dir.join("empty.tar"), b"").unwrap();
+        unpack(&dir.join("empty.tar"), &dir.join("none"), 2).unwrap();
+        assert!(!dir.join("none/summary.txt").exists());
+    }
+
+    #[test]
+    fn results_cut_off_halfway_are_an_error_with_the_runners_status() {
+        let dir = scratch("cut");
+        let whole = results(&[b'x'; 2048]);
+        std::fs::write(dir.join("out.tar"), &whole[..1024]).unwrap();
+        let e = unpack(&dir.join("out.tar"), &dir.join("out"), 3).unwrap_err().to_string();
+        assert!(e.starts_with("the results didn't unpack into ") && e.contains("(runner exit status 3)"), "{e}");
     }
 
     #[test]
