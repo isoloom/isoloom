@@ -15,8 +15,10 @@
 //! run with no recap (a playbook that doesn't parse). Every wait and run is logged, so the output
 //! explains what happened.
 
+use isoloom_spec::linux::PROJECT_DIR;
 use isoloom_spec::model::{Provision, Spec};
 use isoloom_spec::shell;
+use isoloom_spec::shell::quote;
 
 use crate::inventory::CONTROLLER_INVENTORY;
 
@@ -51,14 +53,17 @@ pub fn provision_script(spec: &Spec, limit: &[String]) -> String {
 /// run through `run_play`.
 fn play(step: &Provision, limit: &str) -> String {
     let (dir, file) = step.ansible.rsplit_once('/').unwrap_or((".", &step.ansible));
-    let extra: String = step.inventory.iter().map(|i| format!(" -i /opt/isoloom/{i}")).collect::<Vec<_>>().concat();
+    let in_project = |p: &str| quote(&format!("{PROJECT_DIR}/{p}"));
+    let extra: String = step.inventory.iter().map(|i| format!(" -i {}", in_project(i))).collect::<Vec<_>>().concat();
     let requirements = match &step.requirements {
-        Some(r) => format!("retry_download ansible-galaxy install -r /opt/isoloom/{r}\n"),
+        Some(r) => format!("retry_download ansible-galaxy install -r {}\n", in_project(r)),
         None => "[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\n".into(),
     };
     format!(
-        "cd /opt/isoloom/{dir}\n{requirements}run_play ansible-playbook -i {CONTROLLER_INVENTORY}{extra}{}{limit} {file}\n",
-        vars(step)
+        "cd {}\n{requirements}run_play ansible-playbook -i {CONTROLLER_INVENTORY}{extra}{}{limit} {}\n",
+        in_project(dir),
+        vars(step),
+        quote(file)
     )
 }
 

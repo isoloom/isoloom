@@ -54,7 +54,6 @@ const RULES: Rules = Rules {
     subnets: None,
     kept: None,
     images: Images {
-        label: "Linode",
         table: &IMAGES,
         own: own_image::linode,
     },
@@ -96,7 +95,7 @@ pub(super) const PLANS: Sizes = Sizes::ordered(&[
 
 /// How Linode takes an instance's user data: its metadata, base64, 65535 bytes of it decoded.
 const CAP: Capped = Capped {
-    limit: Limit::Linode,
+    limit: Limit(Cloud::Linode),
     gzipped: false,
 };
 

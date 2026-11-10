@@ -6,6 +6,7 @@ use isoloom_plan::Environment;
 use isoloom_render::container::{DOCKER_HOST as HOST, HostSize, HybridContainers as Containers, docker_net, host_environment};
 use isoloom_render::router;
 use isoloom_render::stable_hash;
+use isoloom_spec::linux::PROJECT_DIR;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
@@ -77,7 +78,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     let files = host_environment(env);
     let inputs = &env.spec().inputs;
     let decode = values::linux_decode(inputs);
-    let up = format!("{decode}{secrets}cd /opt/isoloom && {files}docker compose -f {COMPOSE_FILE} up -d --build --wait --wait-timeout 900");
+    let up = format!("{decode}{secrets}cd {PROJECT_DIR} && {files}docker compose -f {COMPOSE_FILE} up -d --build --wait --wait-timeout 900");
     let encoded = (!inputs.is_empty()).then(|| values::encoded(inputs));
     r.provision(shell("m", "containers").kw("inline", Value::str(&up)).kw_opt("env", encoded));
 }

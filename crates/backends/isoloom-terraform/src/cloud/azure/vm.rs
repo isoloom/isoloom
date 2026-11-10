@@ -68,7 +68,6 @@ const RULES: Rules = Rules {
     }),
     kept: Some(FIRST_THREE),
     images: Images {
-        label: "Azure",
         table: &IMAGES,
         own: own_image::azure,
     },

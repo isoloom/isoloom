@@ -287,8 +287,6 @@ pub(crate) const FIRST_THREE: Kept = Kept {
 /// A cloud's images for the OSes a machine runs.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Images {
-    /// The cloud, as the refusal names it (`GCP`).
-    pub(crate) label: &'static str,
     /// Its image table: the OSes it has an image for, which the refusal lists.
     pub(crate) table: &'static dyn ImageTable,
     /// The field of `vm.image` naming a machine's own image there, which stands in for its OS's.
@@ -296,10 +294,9 @@ pub(crate) struct Images {
 }
 
 impl Images {
-    /// Why machine `name` has no image here: none for its OS, and none of its own.
-    pub(crate) fn missing(&self, name: &str, os: &str, own: Option<&str>) -> Option<String> {
-        (!self.table.oses().contains(&os) && own.is_none())
-            .then(|| format!("machine `{name}`: no {} image for `{os}` yet ({})", self.label, self.table.listed()))
+    /// Why machine `name` has no image on `cloud`: none for its OS, and none of its own.
+    pub(crate) fn missing(&self, cloud: Cloud, name: &str, os: &str, own: Option<&str>) -> Option<String> {
+        (!self.table.oses().contains(&os) && own.is_none()).then(|| format!("machine `{name}`: no {cloud} image for `{os}` yet ({})", self.table.listed()))
     }
 }
 
@@ -432,7 +429,7 @@ impl Rules {
     /// own.
     pub(crate) fn image(&self, name: &str, m: &Machine) -> Option<String> {
         let vm = m.vm.as_ref()?;
-        self.images.missing(name, &vm.os, own_image::of_machine(m, self.images.own))
+        self.images.missing(self.cloud, name, &vm.os, own_image::of_machine(m, self.images.own))
     }
 
     /// Why machine `name` can't have its address on one of its networks, if it can't: one the
@@ -545,7 +542,7 @@ impl Rules {
         }
         vms(env).find_map(|(name, mp)| {
             let os = mp.os.as_deref().unwrap_or_default();
-            self.images.missing(name, os, own_image::of(mp, self.images.own))
+            self.images.missing(self.cloud, name, os, own_image::of(mp, self.images.own))
         })
     }
 

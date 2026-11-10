@@ -46,7 +46,6 @@ const RULES: Rules = Rules {
     subnets: None,
     kept: None,
     images: Images {
-        label: "DigitalOcean",
         table: &IMAGES,
         own: own_image::digitalocean,
     },
@@ -97,7 +96,7 @@ pub(super) const DROPLETS: Sizes = Sizes::ordered(&[
 
 /// How DigitalOcean takes a droplet's user data: plain text, 64 KiB of it.
 const CAP: Capped = Capped {
-    limit: Limit::DigitalOcean,
+    limit: Limit(Cloud::DigitalOcean),
     gzipped: false,
 };
 

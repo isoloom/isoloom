@@ -72,7 +72,6 @@ const RULES: Rules = Rules {
         said: "a subnetwork's first address (.1, its gateway)",
     }),
     images: Images {
-        label: "GCP",
         table: &IMAGES,
         own: own_image::gcp,
     },

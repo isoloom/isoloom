@@ -34,11 +34,9 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() -> Outcome {
         tf.find("running: waiting for web").ok_or("web")?,
         tf.find("running: waiting for cache").ok_or("cache")?,
     );
-    let playbook = tf
-        .find("ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini")
-        .ok_or("playbook")?;
+    let playbook = tf.find("ansible-playbook -i /etc/isoloom/inventory.ini -i ").ok_or("playbook")?;
     assert!(web < playbook && cache < playbook, "{tf}");
-    assert!(tf.contains("[webservers]"));
+    assert!(tf.contains("/opt/isoloom/ansible/groups.ini") && tf.contains("[webservers]"), "{tf}");
     Ok(())
 }
 

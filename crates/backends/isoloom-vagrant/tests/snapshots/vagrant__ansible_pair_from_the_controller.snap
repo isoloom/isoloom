@@ -1175,9 +1175,9 @@ Vagrant.configure("2") do |config|
         [ "$_isoloom_rc" -ne 0 ] || rm -f "$_isoloom_retry"
         return "$_isoloom_rc"
       }
-      cd /opt/isoloom/ansible
-      retry_download ansible-galaxy install -r /opt/isoloom/ansible/requirements.yml
-      run_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' site.yml
+      cd '/opt/isoloom/ansible'
+      retry_download ansible-galaxy install -r '/opt/isoloom/ansible/requirements.yml'
+      run_play ansible-playbook -i /etc/isoloom/inventory.ini -i '/opt/isoloom/ansible/groups.ini' -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' 'site.yml'
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
     m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/web-answers.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web-answers.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }

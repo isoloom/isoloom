@@ -73,7 +73,6 @@ const RULES: Rules = Rules {
     }),
     kept: Some(FIRST_THREE),
     images: Images {
-        label: "AWS",
         table: &IMAGES,
         own: own_image::aws,
     },

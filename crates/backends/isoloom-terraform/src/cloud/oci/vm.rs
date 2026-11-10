@@ -70,7 +70,6 @@ const RULES: Rules = Rules {
     subnets: None,
     kept: None,
     images: Images {
-        label: "Oracle Cloud",
         table: &IMAGES,
         own: own_image::oci,
     },
@@ -166,7 +165,7 @@ fn size_refusal(env: &Environment) -> Option<String> {
 /// How Oracle Cloud takes an instance's user data: a metadata value, base64, within the
 /// 32000 bytes of all its metadata.
 const CAP: Capped = Capped {
-    limit: Limit::Oci,
+    limit: Limit(Cloud::Oci),
     gzipped: false,
 };
 

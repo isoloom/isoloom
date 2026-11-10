@@ -2,6 +2,7 @@
 //! controller that runs the environment's playbooks and the checks standing on every network.
 //! Their set-up goes through the same step renderings and transport as the lab's machines.
 
+use isoloom_spec::linux::CONFIG_DIR;
 use std::net::Ipv4Addr;
 
 use crate::boxes::HyperVBox;
@@ -232,7 +233,7 @@ fn controller_box_line(r: &mut Ruby, bx: &str, version: Option<&str>) {
 fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     let spec = env.spec();
     let setup = format!(
-        "set -e\n{CONTROLLER_PACKAGES}[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p /etc/isoloom\ncat > {CONTROLLER_INVENTORY} <<'INV'\n{}INV\n",
+        "set -e\n{CONTROLLER_PACKAGES}[ -x /opt/ansible/bin/ansible-playbook ] || {{ python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }}\nmkdir -p {CONFIG_DIR}\ncat > {CONTROLLER_INVENTORY} <<'INV'\n{}INV\n",
         inventory::render(env, &Access::vagrant())
     );
     shell(r, "controller", &setup);

@@ -1,8 +1,8 @@
-//! The top level of the spec: `version`, `name`, the declared `inputs` and the `message`.
+//! The top level of the spec: `version`, `name`, the declared `inputs` and the `tags` (the
+//! `message`'s placeholders are the placeholder grammar's, [`crate::syntax::placeholder`]).
 
 use super::{Problems, kebab, variable_name};
 use crate::model::Spec;
-use crate::placeholders::{self, Piece};
 use crate::tags;
 
 /// The format version this isoloom reads, and a name every target can carry.
@@ -49,23 +49,6 @@ pub(super) fn inputs(spec: &Spec, p: &mut Problems) {
     }
 }
 
-/// The message: balanced placeholders with a path inside.
-pub(super) fn message(spec: &Spec, p: &mut Problems) {
-    let Some(m) = &spec.message else { return };
-    for piece in placeholders::pieces(m) {
-        match piece {
-            Piece::Text(_) => {}
-            Piece::Placeholder(inner) => {
-                let path = inner.trim();
-                if path.is_empty() || path.split('.').any(str::is_empty) {
-                    p.add("message", format!("`{{{{ {path} }}}}` isn't a path like machines.web.addresses.front"));
-                }
-            }
-            Piece::Unclosed(_) => p.add("message", "a `{{` without its `}}`"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::testing::{lab, problems};
@@ -76,11 +59,6 @@ mod tests {
     /// The problems of a sound environment named `name`.
     fn named(name: &str) -> Vec<String> {
         problems(&format!("version: 1\nname: {name}\nnetworks: {{ lan: {{ cidr: 10.0.0.0/24 }} }}\n{WEB}"))
-    }
-
-    /// The problems of a sound environment whose message is `message`.
-    fn message(message: &str) -> Vec<String> {
-        problems(&lab(&format!("{WEB}message: '{message}'\n")))
     }
 
     #[test]
@@ -118,19 +96,5 @@ mod tests {
             format!("inputs[{i}]: `{input}`: inputs are environment variable names (letters, digits and `_`, not starting with a digit)")
         };
         assert_eq!(found, [why(2, "1A"), why(3, "A-B")]);
-    }
-
-    #[test]
-    fn a_messages_placeholders_are_closed_paths() {
-        assert_eq!(message("Open {{ machines.web.addresses.lan }}"), Vec::<String>::new());
-        for (bad, path) in [
-            ("{{ }}", ""),
-            ("{{ machines..web }}", "machines..web"),
-            ("{{ machines.web. }}", "machines.web."),
-        ] {
-            let why = format!("message: `{{{{ {path} }}}}` isn't a path like machines.web.addresses.front");
-            assert_eq!(message(&format!("Open {bad}")), [why], "{bad}");
-        }
-        assert_eq!(message("Open {{ machines.web"), ["message: a `{{` without its `}}`"]);
     }
 }

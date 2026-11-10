@@ -20,7 +20,7 @@ use crate::module::{ident, resource};
 
 /// How AWS takes a Linux instance's user data: gzipped ([`user_data()`]), 16 KB of it.
 const CAP: Capped = Capped {
-    limit: Limit::Aws,
+    limit: Limit(crate::cloud::Cloud::Aws),
     gzipped: true,
 };
 

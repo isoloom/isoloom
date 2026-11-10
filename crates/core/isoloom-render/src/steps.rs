@@ -20,7 +20,7 @@ mod shared_volume;
 mod wait;
 
 /// Where the project is unpacked on a VM.
-pub const PROJECT_DIR: &str = "/opt/isoloom";
+pub const PROJECT_DIR: &str = isoloom_spec::linux::PROJECT_DIR;
 /// Isoloom's own folder on a Linux VM: its marks, and what it keeps between boots.
 pub(crate) const STATE_DIR: &str = isoloom_spec::linux::STATE_DIR;
 /// Makes `STATE_DIR`: the command before a mark is written there.

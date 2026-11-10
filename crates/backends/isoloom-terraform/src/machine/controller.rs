@@ -11,6 +11,7 @@ use isoloom_plan::addressing::{address, names_of};
 use isoloom_plan::{Controller, Environment, Step};
 use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_KEY, WinrmAuth};
 use isoloom_render::{controller, steps};
+use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::validate::Cidr;
 
 use super::provisioner::{Connection, Provisioner, Upload};
@@ -178,7 +179,7 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     cmds.extend(root(steps::trust_authorities(env)));
     cmds.extend(root(hosts(env)));
     let install = format!(
-        "mkdir -p /etc/isoloom && install -m {OWNER_ONLY} {KEY_UPLOAD} {CONTROLLER_KEY} && install -m {OWNER_ONLY} {INVENTORY_UPLOAD} {CONTROLLER_INVENTORY} && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"
+        "mkdir -p {CONFIG_DIR} && install -m {OWNER_ONLY} {KEY_UPLOAD} {CONTROLLER_KEY} && install -m {OWNER_ONLY} {INVENTORY_UPLOAD} {CONTROLLER_INVENTORY} && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"
     );
     let packages = install_packages();
     for script in [install.as_str(), packages.as_str(), ANSIBLE] {

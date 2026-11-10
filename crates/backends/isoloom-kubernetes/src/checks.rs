@@ -6,7 +6,7 @@
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
-use isoloom_render::container::{CHECK_IMAGE, exec_runner};
+use isoloom_render::container::{CHECK_IMAGE, check_runner, exec_runner};
 
 use crate::error::Result;
 use crate::kustomize::{CHECK_SCRIPTS, Kustomization, key};
@@ -36,11 +36,7 @@ pub(crate) fn plan(env: &Environment) -> Checks {
     let mut out = Checks::default();
     let default = checks::default_position(env.spec());
     for (pos, group) in checks::by_position(env.spec(), &env.checks) {
-        let job = if pos == default {
-            "isoloom-check".to_owned()
-        } else {
-            format!("isoloom-check-{}", pos.id())
-        };
+        let job = check_runner(&pos, &default);
         position(env, &pos, &job, group, &mut out);
     }
     out

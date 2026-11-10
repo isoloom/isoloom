@@ -41,10 +41,10 @@ use isoloom_spec::model::{Target, Winrm};
 pub type Vars = Vec<(String, String)>;
 
 /// The controller's own private key, which every Linux VM it provisions trusts.
-pub const CONTROLLER_KEY: &str = "/etc/isoloom/id_ed25519";
+pub const CONTROLLER_KEY: &str = isoloom_spec::linux_config_path!("/id_ed25519");
 
 /// The controller's inventory, which its playbooks and checks read (as root).
-pub const CONTROLLER_INVENTORY: &str = "/etc/isoloom/inventory.ini";
+pub const CONTROLLER_INVENTORY: &str = isoloom_spec::linux_config_path!("/inventory.ini");
 
 /// One host of the inventory: a machine Ansible reaches on this target.
 #[derive(Debug, Clone)]

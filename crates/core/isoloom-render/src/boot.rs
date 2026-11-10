@@ -4,6 +4,7 @@
 //! applied now and again at every boot. A machine's own command and `before` steps run the same
 //! way, as a `service`.
 
+use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::shell::quote;
 
 /// When a script kept with [`at_boot`] runs again.
@@ -30,7 +31,7 @@ pub enum Trigger {
 /// next boot or link change.
 #[must_use]
 pub fn at_boot(name: &str, what: &str, script: &str, trigger: Trigger, after: &[&str]) -> String {
-    let path = format!("/etc/isoloom/{name}.sh");
+    let path = format!("{CONFIG_DIR}/{name}.sh");
     let hooks = match trigger {
         Trigger::BootAndLinkUp => format!(
             "for d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do\n  if [ -d \"$d\" ]; then ln -sf {path} \"$d/zz-isoloom-{name}\"; fi\ndone\n"
@@ -58,7 +59,7 @@ pub fn at_boot(name: &str, what: &str, script: &str, trigger: Trigger, after: &[
 /// output in `/var/log/isoloom-<name>.log`, and now.
 #[must_use]
 pub(crate) fn service(name: &str, what: &str, script: &str, after: &[&str]) -> String {
-    let path = format!("/etc/isoloom/{name}.sh");
+    let path = format!("{CONFIG_DIR}/{name}.sh");
     let service = format!("Type=simple\nExecStart={path}\nRestart=on-failure\nRestartSec=2");
     let now = format!("nohup {path} >/var/log/isoloom-{name}.log 2>&1 &");
     let start = format!("/etc/local.d/isoloom-{name}.start");
@@ -101,7 +102,7 @@ struct Unit<'a> {
 /// The script written, then its systemd unit enabled and started, or OpenRC's way without
 /// systemd.
 fn install(u: &Unit) -> String {
-    let (name, what, path) = (u.name, u.what, format!("/etc/isoloom/{}.sh", u.name));
+    let (name, what, path) = (u.name, u.what, format!("{CONFIG_DIR}/{}.sh", u.name));
     let unit = format!("isoloom-{name}.service");
     let marker = name.to_uppercase();
     let after: String = u.after.iter().map(|a| format!(" isoloom-{a}.service")).collect::<Vec<_>>().concat();
@@ -111,7 +112,7 @@ fn install(u: &Unit) -> String {
         String::new()
     };
     format!(
-        "mkdir -p /etc/isoloom\ncat > {path} <<'{marker}'\n#!/bin/sh\n# {what}\n{script}{marker}\nchmod +x {path}\n{hooks}\
+        "mkdir -p {CONFIG_DIR}\ncat > {path} <<'{marker}'\n#!/bin/sh\n# {what}\n{script}{marker}\nchmod +x {path}\n{hooks}\
          if command -v systemctl >/dev/null; then\n\
          cat > /etc/systemd/system/{unit} <<'UNIT'\n[Unit]\nDescription={what}\nAfter=network-online.target{after}\nWants=network-online.target{requires}\n\n\
          [Service]\n{service}\n\n[Install]\nWantedBy=multi-user.target\nUNIT\n\

@@ -1435,15 +1435,15 @@ Vagrant.configure("2") do |config|
         [ "$_isoloom_rc" -ne 0 ] || rm -f "$_isoloom_retry"
         return "$_isoloom_rc"
       }
-      cd /opt/isoloom/provision
+      cd '/opt/isoloom/provision'
       [ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml
-      run_play ansible-playbook -i /etc/isoloom/inventory.ini ad-domain.yml
-      cd /opt/isoloom/provision
+      run_play ansible-playbook -i /etc/isoloom/inventory.ini 'ad-domain.yml'
+      cd '/opt/isoloom/provision'
       [ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml
-      run_play ansible-playbook -i /etc/isoloom/inventory.ini ad-join.yml
-      cd /opt/isoloom/provision
+      run_play ansible-playbook -i /etc/isoloom/inventory.ini 'ad-join.yml'
+      cd '/opt/isoloom/provision'
       [ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml
-      run_play ansible-playbook -i /etc/isoloom/inventory.ini ws.yml
+      run_play ansible-playbook -i /etc/isoloom/inventory.ini 'ws.yml'
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
     m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/domain-up.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/domain-up.sh'"], ["checks/web01-reaches-dc01.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web01-reaches-dc01.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }

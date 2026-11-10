@@ -149,7 +149,6 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     networks::tc(spec, &mut p);
     links::check(spec, &mut p);
     ipv6::check(spec, &mut p);
-    top::message(spec, &mut p);
     groups::check(spec, &mut p);
     checks::check(spec, &mut p);
     targets::check(spec, &mut p);

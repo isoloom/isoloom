@@ -24,7 +24,7 @@ use crate::module::variable::Variable;
 use crate::server::slotted;
 
 /// Where a VM finds each volume's tag, a file per volume.
-pub(super) const TAG_DIR: &str = "/etc/isoloom/virtiofs";
+pub(super) const TAG_DIR: &str = isoloom_spec::linux_config_path!("/virtiofs");
 
 /// The volumes shared as folders of the server, with their settings.
 fn volumes(env: &Environment) -> impl Iterator<Item = (&String, &Virtiofs)> {

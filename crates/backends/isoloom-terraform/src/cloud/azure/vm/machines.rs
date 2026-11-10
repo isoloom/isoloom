@@ -21,7 +21,7 @@ use crate::module::ident;
 
 /// How Azure takes a Linux VM's user data: its custom data, base64 only, 65535 bytes of it.
 const CAP: Capped = Capped {
-    limit: Limit::Azure,
+    limit: Limit(crate::cloud::Cloud::Azure),
     gzipped: false,
 };
 

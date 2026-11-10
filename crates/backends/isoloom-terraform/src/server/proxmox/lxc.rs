@@ -215,8 +215,12 @@ fn initialization(env: &Environment, c: Container) -> Block {
     b.build()
 }
 
+/// The router's hosts file, which its resolver answers the lab's names from.
+const ROUTER_HOSTS: &str = isoloom_spec::linux_config_path!("/hosts");
+
 /// The router's name server for the containers: dnsmasq on its network addresses, answering
-/// the environment's names from a hosts file, the rest from a public resolver. The package, its
+/// the environment's names from a hosts file, the rest from the site's resolvers
+/// ([`resolvers`]). The package, its
 /// files and the command that starts it.
 pub(super) fn router_dns(env: &Environment) -> Option<(Vec<Expression>, &'static str)> {
     if !needed(env) {
@@ -234,17 +238,14 @@ pub(super) fn router_dns(env: &Environment) -> Option<(Vec<Expression>, &'static
         .map(|r| format!("server={r}\n"))
         .collect::<Vec<_>>()
         .concat();
-    let conf = format!("bind-dynamic\nno-resolv\n{upstream}localise-queries\naddn-hosts=/etc/isoloom/hosts\n{listen}");
+    let conf = format!("bind-dynamic\nno-resolv\n{upstream}localise-queries\naddn-hosts={ROUTER_HOSTS}\n{listen}");
     let hosts = env
         .machines
         .values()
         .flat_map(|mp| mp.addresses.values().map(|addr| format!("{addr} {}\n", mp.names.join(" "))))
         .collect::<Vec<_>>()
         .concat();
-    let files = vec![
-        file("/etc/dnsmasq.d/isoloom.conf", None, string(conf)),
-        file("/etc/isoloom/hosts", None, string(hosts)),
-    ];
+    let files = vec![file("/etc/dnsmasq.d/isoloom.conf", None, string(conf)), file(ROUTER_HOSTS, None, string(hosts))];
     Some((files, "systemctl restart dnsmasq"))
 }
 

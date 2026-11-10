@@ -6,6 +6,7 @@ use crate::hcl_builder::{
     BinaryOperator, Block, Expression, Module, Template, binary, boolean, call, conditional, for_list, list, null, number, object, reference, string,
 };
 use isoloom_plan::Environment;
+use isoloom_spec::linux::PROJECT_DIR;
 
 use super::pinned;
 use crate::machine::credentials;
@@ -217,7 +218,7 @@ pub(super) fn provider() -> Block {
 fn locals(env: &Environment) -> Block {
     let f = || reference("f");
     let file = object([
-        ("path", Template::text("/opt/isoloom/").with_expr(f()).into_expression()),
+        ("path", Template::text(format!("{PROJECT_DIR}/")).with_expr(f()).into_expression()),
         ("encoding", string("b64")),
         (
             "content",

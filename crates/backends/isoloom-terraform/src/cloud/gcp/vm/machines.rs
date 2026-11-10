@@ -21,7 +21,7 @@ use crate::module::{ident, resource};
 /// How Google Cloud takes a machine's user data: its startup script, a metadata value of 256 KB
 /// at most.
 const CAP: Capped = Capped {
-    limit: Limit::Gcp,
+    limit: Limit(crate::cloud::Cloud::Gcp),
     gzipped: false,
 };
 

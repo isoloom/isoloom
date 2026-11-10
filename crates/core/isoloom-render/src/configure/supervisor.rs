@@ -13,6 +13,7 @@
 //! The machine's command reaches it as its arguments (Compose's `command:`, a pod's `args:`).
 
 use isoloom_plan::configure::{ContainerProcess, Daemon, Resource, RunPlan, ServiceSource, Stream};
+use isoloom_spec::linux::PROJECT_DIR;
 use isoloom_spec::shell::quote;
 use isoloom_spec::syntax::{AbsPath, UserName};
 
@@ -164,12 +165,12 @@ fn start(c: &Configured<'_>) -> String {
     } else {
         ""
     };
-    format!("{library}cd /opt/isoloom\n{calls}")
+    format!("{library}cd {PROJECT_DIR}\n{calls}")
 }
 
 /// A project script of the `start` phase, behind its `creates` (the Dockerfile copies it in).
 fn start_script(run: &RunPlan) -> String {
-    let line = format!("sh {}", quote(&format!("/opt/isoloom/{}", run.script)));
+    let line = format!("sh {}", quote(&format!("{PROJECT_DIR}/{}", run.script)));
     match &run.creates {
         Some(done) => format!("[ -e {} ] || {line}\n", quote(done.as_str())),
         None => format!("{line}\n"),
