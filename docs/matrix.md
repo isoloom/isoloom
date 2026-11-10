@@ -305,7 +305,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.rate_limit`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `hybrid`, `vagrant/*`, `esxi`, `cloud-vm/*`, `external`: capability `rate-limit`: machine `m` sets a `rate_limit`, which this target doesn't apply yet (the proxmox target does, on its network devices)
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `hybrid`, `vagrant/*`, `esxi`, `cloud-vm/*`, `external`: capability `rate-limit`: machine `m` sets a `rate_limit`, which this target doesn't apply yet (`isoloom matrix` lists the targets that do)
 
 ### `machines.*.hardware.arch = arm64`
 
@@ -533,7 +533,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `networks.*.mtu`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `hybrid`, `vagrant/*`, `external`: capability `network-mtu`: network `lan` sets its `mtu`, which this target doesn't carry yet (the proxmox target does)
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `hybrid`, `vagrant/*`, `external`: capability `network-mtu`: network `lan` sets its `mtu`, which this target doesn't carry yet (`isoloom matrix` lists the targets that do)
 - `cloud-vm/aws`: cloud: network `lan` sets its `mtu`: AWS has no setting for a network's MTU
 - `cloud-vm/azure`: cloud: network `lan` sets its `mtu`: Azure has no setting for a network's MTU
 - `cloud-vm/digitalocean`: cloud: network `lan` sets its `mtu`: DigitalOcean has no setting for a network's MTU

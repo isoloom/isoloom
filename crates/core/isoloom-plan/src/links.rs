@@ -1,5 +1,6 @@
 //! A network's `mtu` and a machine's `rate_limit`: what they ask of a backend, and why one
-//! without them refuses. Only the proxmox target sets them (on its network devices) for now.
+//! without them refuses. Which targets carry them is theirs to say, in their capabilities
+//! (`isoloom matrix`).
 
 use std::fmt;
 
@@ -22,7 +23,7 @@ pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
 pub(crate) fn no_mtu(f: &mut fmt::Formatter<'_>, network: &str) -> fmt::Result {
     write!(
         f,
-        "network `{network}` sets its `mtu`, which this target doesn't carry yet (the proxmox target does)"
+        "network `{network}` sets its `mtu`, which this target doesn't carry yet (`isoloom matrix` lists the targets that do)"
     )
 }
 
@@ -30,7 +31,7 @@ pub(crate) fn no_mtu(f: &mut fmt::Formatter<'_>, network: &str) -> fmt::Result {
 pub(crate) fn no_rate_limit(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` sets a `rate_limit`, which this target doesn't apply yet (the proxmox target does, on its network devices)"
+        "machine `{machine}` sets a `rate_limit`, which this target doesn't apply yet (`isoloom matrix` lists the targets that do)"
     )
 }
 
@@ -86,6 +87,18 @@ mod tests {
             ]
         );
         assert_eq!(super::requirements(&crate::testing::spec("version: 1\nname: t\nmachines: {}\n")), []);
+    }
+
+    /// The refusals name no target: which ones carry the field is the targets' to say.
+    #[test]
+    fn a_refusal_names_no_other_target() {
+        let mtu = crate::Requirement::NetworkMtu { network: "lan".into() }.to_string();
+        assert_eq!(
+            mtu,
+            "network `lan` sets its `mtu`, which this target doesn't carry yet (`isoloom matrix` lists the targets that do)"
+        );
+        let rate = crate::Requirement::RateLimit { machine: "m".into() }.to_string();
+        assert!(!rate.contains("proxmox") && rate.contains("`isoloom matrix`"), "{rate}");
     }
 
     proptest! {
