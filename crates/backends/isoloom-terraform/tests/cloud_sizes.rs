@@ -70,7 +70,7 @@ fn more_cpus_than_a_clouds_largest_size_is_refused() -> Outcome {
         (Cloud::Aws, "`m7i-flex.xlarge`, has 4 vCPUs"),
         (Cloud::Gcp, "`e2-standard-8`, has 8 vCPUs"),
         (Cloud::Azure, "`Standard_D32as_v5`, has 32 vCPUs"),
-        (Cloud::DigitalOcean, "`s-4vcpu-8gb`, has 4 vCPUs"),
+        (Cloud::DigitalOcean, "`s-8vcpu-16gb`, has 8 vCPUs"),
         (Cloud::Linode, "`g6-standard-6`, has 6 vCPUs"),
     ] {
         let why = why(cloud);
@@ -92,7 +92,7 @@ fn a_disk_picks_the_size_that_comes_with_as_much_or_is_refused() -> Outcome {
     let why = |cloud: Cloud| got.iter().find(|(c, _)| *c == cloud).and_then(|(_, w)| w.clone()).unwrap_or_default();
     assert_eq!(
         why(Cloud::DigitalOcean),
-        "machine `db` asks for a 400 GB disk: the largest DigitalOcean size here, `s-4vcpu-8gb`, has 160 GB"
+        "machine `db` asks for a 400 GB disk: the largest DigitalOcean size here, `s-8vcpu-16gb`, has 320 GB"
     );
     assert!(why(Cloud::Linode).ends_with("`g6-standard-6`, has 320 GB"), "{}", why(Cloud::Linode));
     assert_eq!(why(Cloud::Aws), "", "an AWS disk is the machine's own");
@@ -181,7 +181,7 @@ fn more_memory_than_a_clouds_largest_size_is_refused() -> Outcome {
     let why = |cloud: Cloud| got.iter().find(|(c, _)| *c == cloud).and_then(|(_, w)| w.clone());
     assert_eq!(
         why(Cloud::DigitalOcean).as_deref(),
-        Some("machine `db` asks for 32 GB of memory: the largest DigitalOcean size here, `s-4vcpu-8gb`, has 8 GB")
+        Some("machine `db` asks for 32 GB of memory: the largest DigitalOcean size here, `s-8vcpu-16gb`, has 16 GB")
     );
     for (cloud, size) in [(Cloud::Aws, "`m7i-flex.xlarge`, has 16 GB"), (Cloud::Linode, "`g6-standard-6`, has 16 GB")] {
         let why = why(cloud).unwrap_or_default();

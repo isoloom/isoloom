@@ -7,7 +7,11 @@
 //! - Each cloud brings its resources (`crate::cloud::<cloud>::docker`): its own network, a
 //!   firewall letting `allowed_cidr` in for SSH and the published ports, and one VM of
 //!   [`HOST_OS`] from the cloud's image table (Ubuntu on Oracle, which has no Debian), sized for
-//!   every container at once (`HostSize`).
+//!   every container at once (`HostSize`): by their memory where the disk is a size of its own,
+//!   else the smallest of the cloud's sizes with their CPUs, memory and disk (DigitalOcean's
+//!   droplets, Linode's plans, as on `cloud-vm`). A cloud whose largest host lacks the memory or
+//!   the disk they need is refused, its module left out ([`refusals`]); the target, when every
+//!   cloud is.
 //! - What the module shares with the cloud's `cloud-vm` module is one source, the cloud's
 //!   [`Base`]: how to start it, its variables, its provider, the user its image signs in as.
 //! - Terraform makes the host and nothing else: the runner installs Docker and runs the Compose
@@ -27,6 +31,7 @@ use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::model::Target;
 
+use super::vm::rules::{Need, Sizes};
 use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
 use crate::module::providers::{self, Provider};
 use crate::module::variable::Variable;
@@ -63,24 +68,48 @@ impl Driver {
     /// The cloud's variables, then its size variable sized for `env`'s containers.
     pub(crate) fn variables(&self, env: &Environment) -> Vec<Variable> {
         let mut variables = self.base.variables(env);
-        if let Some(SizeVariable { name, default }) = self.size {
-            variables.push(Variable::new(name, "string").default(string(default(HostSize::of(env)))));
+        if let Some(size) = self.size {
+            variables.push(Variable::new(size.name, "string").default(string(size.sizes.fit(HostSize::of(env)))));
         }
         variables
+    }
+
+    /// Why the cloud's largest Docker host can't hold `env`'s containers, if it can't.
+    fn short(&self, cloud: Cloud, env: &Environment) -> Option<String> {
+        match self.size.map(|s| s.sizes) {
+            Some(HostSizes::Table(table)) => {
+                let s = HostSize::of(env);
+                // The containers share the CPUs: a host with fewer than they count still runs them.
+                table.short(cloud, "the containers' host", &Need::new(1, s.memory_mb, s.disk_gb))
+            }
+            Some(HostSizes::ByMemory(_)) | None => too_big(env),
+        }
     }
 }
 
 /// Why the clouds can't host the environment's containers, if they can't: arm64 (their images
-/// and VM sizes are x86-64), or more memory than their largest Docker host has.
+/// and VM sizes are x86-64), or no cloud's largest Docker host holds them ([`refusals`], [`super::none_takes`]).
 #[must_use]
 pub fn refusal(env: &Environment) -> Option<String> {
     crate::limits::arm64_machine(env.spec())
         .map(|name| format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"))
-        .or_else(|| too_big(env))
+        .or_else(|| super::none_takes(refusals(env)))
 }
 
-/// Why the containers don't fit the clouds' largest Docker host, if they don't: their memory and
-/// Docker's own gigabyte, naming the container that asks for the most.
+/// Each cloud, AWS first, with why its largest Docker host can't hold `env`'s containers
+/// (`None`: its module is written).
+#[must_use]
+pub fn refusals(env: &Environment) -> Vec<(Cloud, Option<String>)> {
+    Cloud::ALL.into_iter().map(|cloud| (cloud, driver(cloud).short(cloud, env))).collect()
+}
+
+/// The clouds that host `env`'s containers, AWS first.
+fn hosting(env: &Environment) -> impl Iterator<Item = Cloud> {
+    refusals(env).into_iter().filter(|(_, why)| why.is_none()).map(|(cloud, _)| cloud)
+}
+
+/// Why the containers don't fit a cloud's largest Docker host chosen by memory, if they don't:
+/// their memory and Docker's own gigabyte, naming the container that asks for the most.
 fn too_big(env: &Environment) -> Option<String> {
     let needed = HostSize::of(env).memory_mb;
     if needed <= HostSize::LARGEST_MEMORY_MB {
@@ -110,8 +139,8 @@ fn hosted(env: &Environment) -> Result<()> {
     }
 }
 
-/// A Terraform module per cloud, in [`Cloud::ALL`]'s order: the Terraform side of the
-/// `cloud-docker` target, after its Compose file.
+/// A Terraform module per cloud that hosts the containers, in [`Cloud::ALL`]'s order: the
+/// Terraform side of the `cloud-docker` target, after its Compose file.
 ///
 /// # Errors
 ///
@@ -119,7 +148,7 @@ fn hosted(env: &Environment) -> Result<()> {
 /// [`Error::Module`] when a module can't be written.
 pub fn modules(env: &Environment) -> Result<Files> {
     hosted(env)?;
-    Cloud::ALL.into_iter().map(|cloud| module(cloud, env)).collect()
+    hosting(env).map(|cloud| module(cloud, env)).collect()
 }
 
 /// The Docker host's network on every cloud that makes one: its block, outside the lab's own
@@ -134,8 +163,28 @@ pub(crate) const HOST_SUBNET: &str = "10.42.1.0/24";
 pub(crate) struct SizeVariable {
     /// Its name (`instance_type`).
     pub(crate) name: &'static str,
-    /// Its default, for the containers' sizing.
-    pub(crate) default: fn(HostSize) -> &'static str,
+    /// The sizes its default is chosen from, for the containers.
+    pub(crate) sizes: HostSizes,
+}
+
+/// How a cloud's Docker host is sized for the containers.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum HostSizes {
+    /// By their memory alone ([`HostSize::pick`]): the disk is a size of its own.
+    ByMemory(fn(HostSize) -> &'static str),
+    /// The cloud's size table, a size bundling its CPUs, memory and disk: the smallest that takes
+    /// them all, as on `cloud-vm`.
+    Table(Sizes),
+}
+
+impl HostSizes {
+    /// The size for a host of `s`.
+    fn fit(self, s: HostSize) -> &'static str {
+        match self {
+            HostSizes::ByMemory(pick) => pick(s),
+            HostSizes::Table(table) => table.fit(&Need::new(s.cpus, s.memory_mb, s.disk_gb)),
+        }
+    }
 }
 
 /// `cloud`'s own part.
@@ -167,8 +216,7 @@ pub(crate) fn module(cloud: Cloud, env: &Environment) -> Result<GeneratedFile> {
 /// The host's set-up script `.isoloom/cloud-docker/<cloud>/setup.sh` (the same on every cloud):
 /// the runner pipes it into `sudo sh -s` to install Docker in the VM.
 fn setup_files(env: &Environment) -> Vec<GeneratedFile> {
-    Cloud::ALL
-        .iter()
+    hosting(env)
         .map(|cloud| GeneratedFile {
             path: format!("{OUTPUT_DIR}/{}/{}/setup.sh", Target::CloudDocker.id(), cloud.id()),
             contents: isoloom_render::run_manifest::guest::setup_script(env),
@@ -194,8 +242,7 @@ pub fn setup(env: &Environment) -> Result<Files> {
 /// [`Error::Refused`] with the [`refusal`], or [`Error::Manifest`] when a manifest can't be built.
 pub fn manifests(env: &Environment, guest: &GuestCompose) -> Result<Vec<Placed>> {
     hosted(env)?;
-    Cloud::ALL
-        .into_iter()
+    hosting(env)
         .map(|cloud| {
             let m = manifest::manifest(env, cloud, &driver(cloud), guest).map_err(|source| Error::Manifest {
                 target: Target::CloudDocker,

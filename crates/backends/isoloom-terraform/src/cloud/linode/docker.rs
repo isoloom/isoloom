@@ -6,7 +6,7 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Protocol;
 
 use super::{Action, Way, rule, vm};
-use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
+use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::tag_list;
 use crate::docker_host::{published, tcp_ports};
 use crate::module::providers;
@@ -17,7 +17,7 @@ pub(crate) const DRIVER: Driver = Driver {
     requires: providers::LINODE,
     size: Some(SizeVariable {
         name: "type",
-        default: |s| s.pick(["g6-standard-2", "g6-standard-4", "g6-standard-6"]),
+        sizes: HostSizes::Table(super::vm::PLANS),
     }),
     resources,
 };

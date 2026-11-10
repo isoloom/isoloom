@@ -26,7 +26,7 @@ variable "region" {
 
 variable "size" {
   type    = string
-  default = "s-2vcpu-4gb"
+  default = "s-2vcpu-2gb"
 }
 
 variable "allowed_cidr" {

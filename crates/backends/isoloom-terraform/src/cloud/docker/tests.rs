@@ -125,3 +125,49 @@ fn a_module_per_cloud() {
         assert!(paths.contains(&format!(".isoloom/cloud-docker/{}/main.tf", cloud.id()).as_str()), "{paths:?}");
     }
 }
+
+/// One container asking for `disk_gb` of disk and `memory_mb` of memory.
+fn one_container(memory_mb: u32, disk_gb: u32) -> Environment {
+    env(&format!(
+        "version: 1\nname: big\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n  w:\n    networks: {{ lab: 10 }}\n    resources: {{ cpus: 1, memory_mb: {memory_mb}, disk_gb: {disk_gb} }}\n    app: {{ image: nginx }}\n"
+    ))
+}
+
+#[test]
+fn a_cloud_whose_size_is_its_disk_too_sizes_the_host_by_its_table() {
+    // 100 GB of containers (and Docker's own): past the 80 GB of the 4 GB droplet and plan.
+    let tf = |cloud| cloud_module(cloud, &one_container(1024, 100)).unwrap().contents;
+    assert!(tf(Cloud::DigitalOcean).contains("default = \"s-4vcpu-8gb\""), "{}", tf(Cloud::DigitalOcean));
+    assert!(tf(Cloud::Linode).contains("default = \"g6-standard-4\""), "{}", tf(Cloud::Linode));
+}
+
+#[test]
+fn a_cloud_whose_largest_host_lacks_the_disk_is_left_out_and_the_others_kept() {
+    let e = one_container(1024, 400);
+    let refused: Vec<(Cloud, String)> = super::refusals(&e).into_iter().filter_map(|(c, why)| Some((c, why?))).collect();
+    assert_eq!(refused.iter().map(|(c, _)| *c).collect::<Vec<_>>(), [Cloud::DigitalOcean, Cloud::Linode]);
+    assert!(
+        refused[0]
+            .1
+            .contains("the containers' host asks for a 400 GB disk: the largest DigitalOcean size here, `s-8vcpu-16gb`, has 320 GB"),
+        "{}",
+        refused[0].1
+    );
+    assert_eq!(refusal(&e), None, "the other clouds host them");
+    let paths: Vec<String> = modules(&e).unwrap().into_iter().map(|f| f.path).collect();
+    assert!(
+        paths.iter().any(|p| p.contains("/aws/")) && !paths.iter().any(|p| p.contains("/digitalocean/") || p.contains("/linode/")),
+        "{paths:?}"
+    );
+}
+
+#[test]
+fn no_cloud_hosting_the_containers_refuses_the_target() {
+    let e = one_container(20480, 40);
+    let why = refusal(&e).unwrap_or_default();
+    assert!(
+        why.starts_with("no cloud can run it (aws, azure, gcp, oci: the containers' host needs 21504 MB of memory"),
+        "{why}"
+    );
+    assert!(why.contains("; digitalocean: the containers' host asks for 21 GB of memory"), "{why}");
+}

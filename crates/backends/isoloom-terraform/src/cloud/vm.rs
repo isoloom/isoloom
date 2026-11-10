@@ -266,19 +266,9 @@ impl CloudVmBackend {
         Cloud::ALL.into_iter().map(|cloud| (cloud, CloudVmModule(cloud).refusal(env))).collect()
     }
 
-    /// Why no cloud can run `env`, when none can: each cloud's own reason, the clouds sharing
-    /// one named together. `None` as soon as one cloud accepts it.
+    /// Why no cloud can run `env`, when none can ([`super::none_takes`]).
     fn own_refusal(self, env: &Environment) -> Option<String> {
-        let mut reasons: Vec<(Vec<&str>, String)> = Vec::new();
-        for (cloud, why) in self.refusals(env) {
-            let why = why?;
-            match reasons.iter_mut().find(|(_, r)| *r == why) {
-                Some((clouds, _)) => clouds.push(cloud.id()),
-                None => reasons.push((vec![cloud.id()], why)),
-            }
-        }
-        let parts: Vec<String> = reasons.into_iter().map(|(clouds, why)| format!("{}: {why}", clouds.join(", "))).collect();
-        Some(format!("no cloud can run it ({})", parts.join("; ")))
+        super::none_takes(self.refusals(env))
     }
 
     /// The module of each cloud that takes `env`, then the check runners.

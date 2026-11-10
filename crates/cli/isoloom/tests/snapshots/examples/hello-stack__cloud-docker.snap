@@ -1951,7 +1951,7 @@ variable "region" {
 
 variable "size" {
   type    = string
-  default = "s-2vcpu-4gb"
+  default = "s-2vcpu-2gb"
 }
 
 variable "allowed_cidr" {
@@ -2105,7 +2105,7 @@ output "ssh_user" {
     {
       "name": "size",
       "description": "The module's `size`.",
-      "default": "s-2vcpu-4gb",
+      "default": "s-2vcpu-2gb",
       "set_by": "embedder",
       "deliver": [
         {

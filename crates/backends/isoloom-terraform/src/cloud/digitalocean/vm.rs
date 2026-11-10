@@ -87,11 +87,12 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
 
 /// The droplet sizes, smallest first, each with its vCPUs, memory and disk (a droplet joins one
 /// VPC: one interface).
-const DROPLETS: Sizes = Sizes::ordered(&[
+pub(super) const DROPLETS: Sizes = Sizes::ordered(&[
     Size::new("s-1vcpu-1gb", 1, 1024, 1).with_disk(25),
     Size::new("s-2vcpu-2gb", 2, 2048, 1).with_disk(60),
     Size::new("s-2vcpu-4gb", 2, 4096, 1).with_disk(80),
     Size::new("s-4vcpu-8gb", 4, 8192, 1).with_disk(160),
+    Size::new("s-8vcpu-16gb", 8, 16384, 1).with_disk(320),
 ]);
 
 /// How DigitalOcean takes a droplet's user data: plain text, 64 KiB of it.

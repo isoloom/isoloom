@@ -415,6 +415,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   knows it. Library: `isoloom_targets::Error::Placeholder` says `why` (was `hint`), `fill` takes
   the message's paths only, `isoloom_spec::placeholders` (the `{{ }}` scanner) is public, and
   `isoloom_spec::syntax::placeholder::Part` is exhaustive.
+- **`cloud-docker` sizes a DigitalOcean or Linode host for its disk, and leaves out a cloud too
+  small.** Their host was chosen by the containers' memory alone, though a droplet's or a plan's
+  disk comes with its size: 200 GB of containers got an 80 GB droplet. Those two now take the
+  smallest of their sizes (`cloud-vm`'s table, which gains DigitalOcean's `s-8vcpu-16gb`) with the
+  CPUs, memory and disk the containers count, and a cloud whose largest host lacks the memory or
+  disk is refused on its own, its module and run manifest left out (`resolved.json`'s
+  `targets.clouds` lists `cloud-docker`'s clouds too, and `isoloom_targets::cloud_refusals`
+  answers for it); the target is refused when every cloud is, naming each cloud's reason.
 - **A template filled in for two places generates.** Two `template:` steps of one machine
   reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
   file is written once per source.

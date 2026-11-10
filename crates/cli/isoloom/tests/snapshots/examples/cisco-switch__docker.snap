@@ -1455,7 +1455,19 @@ volumes:
       "external": "overrides.external.machines.sw1: the external target reaches machines that exist already, and `sw1` names no host",
       "cloud-services": "left out by `targets:`"
     },
-    "clouds": {}
+    "clouds": {
+      "cloud-docker": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp",
+          "digitalocean",
+          "linode",
+          "oci"
+        ],
+        "refused": {}
+      }
+    }
   },
   "checks": {
     "default_position": "isoloom-networks",

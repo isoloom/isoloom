@@ -86,18 +86,23 @@ pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<S
     })
 }
 
-/// The clouds of a target that writes one module per cloud (`cloud-vm`), when the target is
-/// generated. A cloud refusing drops only its module, so the target is generated as long as one
-/// cloud accepts the environment. `None` for every other target, and for a `cloud-vm` that isn't
-/// generated (its refusal says why).
+/// The clouds of a target that writes one module per cloud (`cloud-vm`, `cloud-docker`), when the
+/// target is generated. A cloud refusing drops only its module, so the target is generated as
+/// long as one cloud accepts the environment. `None` for every other target, and for one that
+/// isn't generated (its refusal says why).
 #[must_use]
 pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<Clouds> {
-    if target != Target::CloudVm || !lab.possible().contains(&target) || refusal(lab, target).is_some() {
+    if !matches!(target, Target::CloudVm | Target::CloudDocker) || !lab.possible().contains(&target) || refusal(lab, target).is_some() {
         return None;
     }
     let env = Environment::build(&lab.for_target(target), target, None);
+    let each = if target == Target::CloudVm {
+        isoloom_terraform::CloudVmBackend.refusals(&env)
+    } else {
+        isoloom_terraform::cloud_docker_refusals(&env)
+    };
     let mut clouds = Clouds::default();
-    for (cloud, why) in isoloom_terraform::CloudVmBackend.refusals(&env) {
+    for (cloud, why) in each {
         match why {
             None => clouds.generated.push(cloud.id()),
             Some(reason) => clouds.refused.push(CloudRefusal { cloud: cloud.id(), reason }),

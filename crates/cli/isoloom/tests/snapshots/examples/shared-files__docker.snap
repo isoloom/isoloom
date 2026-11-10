@@ -1212,6 +1212,17 @@ volumes:
       "cloud-services": "left out by `targets:`"
     },
     "clouds": {
+      "cloud-docker": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp",
+          "digitalocean",
+          "linode",
+          "oci"
+        ],
+        "refused": {}
+      },
       "cloud-vm": {
         "generated": [
           "aws",

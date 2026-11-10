@@ -1097,7 +1097,19 @@ volumes:
       "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "left out by `targets:`"
     },
-    "clouds": {}
+    "clouds": {
+      "cloud-docker": {
+        "generated": [
+          "aws",
+          "azure",
+          "gcp",
+          "digitalocean",
+          "linode",
+          "oci"
+        ],
+        "refused": {}
+      }
+    }
   },
   "checks": {
     "default_position": "user",

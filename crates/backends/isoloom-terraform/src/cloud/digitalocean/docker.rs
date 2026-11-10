@@ -6,7 +6,7 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Protocol;
 
 use super::{Way, rule, ssh_key, vm, vpc};
-use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
+use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::{self, tag_list};
 use crate::docker_host::published;
 use crate::module::providers;
@@ -17,7 +17,7 @@ pub(crate) const DRIVER: Driver = Driver {
     requires: providers::DIGITALOCEAN,
     size: Some(SizeVariable {
         name: "size",
-        default: |s| s.pick(["s-2vcpu-4gb", "s-4vcpu-8gb", "s-8vcpu-16gb"]),
+        sizes: HostSizes::Table(super::vm::DROPLETS),
     }),
     resources,
 };

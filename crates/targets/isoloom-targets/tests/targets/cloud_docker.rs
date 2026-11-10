@@ -64,9 +64,11 @@ fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
     assert_eq!(CloudDockerBackend.refusal(&env(14336)), None);
     // 512 MB + 16 GB + 1 GB was given the 16 GB host all the same.
     let why = CloudDockerBackend.refusal(&env(16384)).unwrap();
-    assert_eq!(
-        why,
-        "the containers' host needs 17920 MB of memory (Docker's 1024 MB and the containers', machine `db` asking for the most, 16384 MB): the largest Docker host here has 16384 MB"
+    assert!(
+        why.starts_with(
+            "no cloud can run it (aws, azure, gcp, oci: the containers' host needs 17920 MB of memory (Docker's 1024 MB and the containers', machine `db` asking for the most, 16384 MB): the largest Docker host here has 16384 MB; digitalocean: "
+        ),
+        "{why}"
     );
     assert!(CloudDockerBackend.render(&env(16384)).unwrap_err().to_string().ends_with(&why));
 }

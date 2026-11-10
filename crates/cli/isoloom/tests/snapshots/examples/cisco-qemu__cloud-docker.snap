@@ -1682,7 +1682,7 @@ variable "region" {
 
 variable "size" {
   type    = string
-  default = "s-2vcpu-4gb"
+  default = "s-4vcpu-8gb"
 }
 
 variable "allowed_cidr" {
@@ -1831,7 +1831,7 @@ output "ssh_user" {
     {
       "name": "size",
       "description": "The module's `size`.",
-      "default": "s-2vcpu-4gb",
+      "default": "s-4vcpu-8gb",
       "set_by": "embedder",
       "deliver": [
         {
@@ -3162,7 +3162,7 @@ variable "region" {
 
 variable "type" {
   type    = string
-  default = "g6-standard-2"
+  default = "g6-standard-4"
 }
 
 variable "allowed_cidr" {
@@ -3292,7 +3292,7 @@ output "ssh_user" {
     {
       "name": "type",
       "description": "The module's `type`.",
-      "default": "g6-standard-2",
+      "default": "g6-standard-4",
       "set_by": "embedder",
       "deliver": [
         {

@@ -121,6 +121,22 @@ pub(crate) struct Base {
     pub(crate) user: fn(&str) -> &'static str,
 }
 
+/// Why no cloud takes an environment, when none does, from each cloud's refusal (`None`: it
+/// takes it): each reason, the clouds sharing one named together. `None` as soon as one cloud
+/// takes it.
+pub(crate) fn none_takes(refusals: Vec<(Cloud, Option<String>)>) -> Option<String> {
+    let mut reasons: Vec<(Vec<&str>, String)> = Vec::new();
+    for (cloud, why) in refusals {
+        let why = why?;
+        match reasons.iter_mut().find(|(_, r)| *r == why) {
+            Some((clouds, _)) => clouds.push(cloud.id()),
+            None => reasons.push((vec![cloud.id()], why)),
+        }
+    }
+    let parts: Vec<String> = reasons.into_iter().map(|(clouds, why)| format!("{}: {why}", clouds.join(", "))).collect();
+    Some(format!("no cloud can run it ({})", parts.join("; ")))
+}
+
 /// A cloud module's `region` variable, defaulting to `region` ([`Cloud::region`]).
 pub(crate) fn region_variable(region: &str) -> Variable {
     Variable::new("region", "string").default(crate::hcl_builder::string(region))

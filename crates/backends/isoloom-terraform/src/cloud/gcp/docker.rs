@@ -7,7 +7,7 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::{public_ip, vm};
-use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
+use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance;
 use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
@@ -18,7 +18,7 @@ pub(crate) const DRIVER: Driver = Driver {
     requires: providers::GOOGLE,
     size: Some(SizeVariable {
         name: "machine_type",
-        default: |s| s.pick(["e2-medium", "e2-standard-2", "e2-standard-4"]),
+        sizes: HostSizes::ByMemory(|s| s.pick(["e2-medium", "e2-standard-2", "e2-standard-4"])),
     }),
     resources,
 };

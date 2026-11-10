@@ -86,7 +86,7 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
 
 /// The plans, smallest first, each with its vCPUs, memory and disk (an instance has one VPC
 /// interface).
-const PLANS: Sizes = Sizes::ordered(&[
+pub(super) const PLANS: Sizes = Sizes::ordered(&[
     Size::new("g6-nanode-1", 1, 1024, 1).with_disk(25),
     Size::new("g6-standard-1", 1, 2048, 1).with_disk(50),
     Size::new("g6-standard-2", 2, 4096, 1).with_disk(80),

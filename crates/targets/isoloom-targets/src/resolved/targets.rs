@@ -34,7 +34,7 @@ pub(super) fn section(lab: &Lab) -> Value {
     })
 }
 
-/// Per generated multi-cloud target (`cloud-vm`), the clouds whose module is written and each
+/// Per generated multi-cloud target (`cloud-vm`, `cloud-docker`), the clouds whose module is written and each
 /// refused cloud with its reason: a cloud's refusal drops its module, not the target.
 fn clouds(lab: &Lab) -> Map<String, Value> {
     Target::ALL

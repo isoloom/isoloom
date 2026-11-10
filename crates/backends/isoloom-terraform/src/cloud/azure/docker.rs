@@ -8,7 +8,7 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::vm::{self, USER};
-use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
+use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::set_up_once;
 use crate::docker_host::{port_strings, published, tcp_ports};
 use crate::module::providers;
@@ -19,7 +19,7 @@ pub(crate) const DRIVER: Driver = Driver {
     requires: providers::AZURERM,
     size: Some(SizeVariable {
         name: "size",
-        default: |s| s.pick(["Standard_D2als_v6", "Standard_D2as_v6", "Standard_D4as_v6"]),
+        sizes: HostSizes::ByMemory(|s| s.pick(["Standard_D2als_v6", "Standard_D2as_v6", "Standard_D4as_v6"])),
     }),
     resources,
 };

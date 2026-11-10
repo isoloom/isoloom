@@ -141,15 +141,16 @@ fn cloud_vm_lists_its_generated_and_refused_clouds() -> Outcome {
 }
 
 #[test]
-fn only_a_generated_cloud_vm_lists_its_clouds() -> Outcome {
+fn only_a_generated_cloud_target_lists_its_clouds() -> Outcome {
     // arm-vm: cloud-vm is refused as a whole (no cloud runs it), so no clouds.
     let p = resolve(&example("arm-vm")?);
     assert!(lookup(&p, "targets.refused.cloud-vm").is_some());
     assert_eq!(lookup(&p, "targets.clouds").unwrap(), &serde_json::json!({}));
-    // segmented: every cloud-vm cloud is listed once, generated or refused; no other target is.
+    // segmented: every cloud of cloud-vm and cloud-docker is listed once, generated or refused; no
+    // other target is.
     let s = resolve(&example("segmented")?);
     let clouds = lookup(&s, "targets.clouds").unwrap().as_object().unwrap();
-    assert_eq!(clouds.keys().collect::<Vec<_>>(), ["cloud-vm"]);
+    assert_eq!(clouds.keys().collect::<Vec<_>>(), ["cloud-docker", "cloud-vm"]);
     let generated = clouds["cloud-vm"]["generated"].as_array().unwrap().len();
     let refused = clouds["cloud-vm"]["refused"].as_object().unwrap().len();
     assert_eq!(generated + refused, 6);

@@ -96,7 +96,7 @@ fn a_droplet_size_fits_the_disk_too_and_a_disk_beyond_the_largest_is_refused() -
     let refused = sized("{ memory_mb: 1024, disk_gb: 400 }")?.err().ok_or("a 400 GB disk isn't refused")?;
     assert_eq!(
         refused,
-        "machine `web` asks for a 400 GB disk: the largest DigitalOcean size here, `s-4vcpu-8gb`, has 160 GB"
+        "machine `web` asks for a 400 GB disk: the largest DigitalOcean size here, `s-8vcpu-16gb`, has 320 GB"
     );
     Ok(())
 }
