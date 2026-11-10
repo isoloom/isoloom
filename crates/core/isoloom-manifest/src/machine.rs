@@ -78,6 +78,19 @@ impl Cidr {
         }
         Ok(Cidr { address, prefix })
     }
+
+    /// The IPv4 block of `prefix` bits holding `address`: its bits past the prefix cleared, a
+    /// prefix past 32 taken as 32. Total, so a block already parsed (the spec's
+    /// `isoloom_spec::net::Cidr`) converts without going through text.
+    #[must_use]
+    pub fn ipv4(address: std::net::Ipv4Addr, prefix: u8) -> Cidr {
+        let prefix = prefix.min(32);
+        let mask = u32::MAX.checked_shl(32 - u32::from(prefix)).unwrap_or(0);
+        Cidr {
+            address: IpAddr::V4(std::net::Ipv4Addr::from(u32::from(address) & mask)),
+            prefix,
+        }
+    }
 }
 
 impl FromStr for Cidr {

@@ -13,8 +13,9 @@ use isoloom_spec::validate::starts_after;
 const UNPARSED: NetworkBlock = NetworkBlock::enclosing(std::net::Ipv4Addr::UNSPECIFIED, 24);
 
 /// A network's block: the one place the plan reads a network's `cidr`; the backends read the
-/// plan's ([`crate::NetworkPlan::cidr`]). Validation rejects a block that doesn't parse or isn't
-/// a /24 to /29, and a network nothing declares, so a validated spec never meets `UNPARSED`; an
+/// plan's ([`crate::NetworkPlan::cidr`], [`crate::Environment::block`],
+/// [`crate::Environment::address_on`]), as a test of the command line holds them to. Validation
+/// rejects a block that doesn't parse or isn't a /24 to /29, and a network nothing declares, so a validated spec never meets `UNPARSED`; an
 /// unvalidated one gets 0.0.0.0 addresses in its output instead of a crash.
 #[must_use]
 pub fn cidr(spec: &Spec, network: &str) -> NetworkBlock {
@@ -28,6 +29,13 @@ impl crate::Environment {
     #[must_use]
     pub fn block(&self, network: &str) -> NetworkBlock {
         self.networks.get(network).map_or_else(|| cidr(self.spec(), network), |n| n.cidr)
+    }
+
+    /// The address octet `octet` has on network `network` on this target: [`Self::block`]'s, with
+    /// that last byte (a machine's own are its plan's `addresses`).
+    #[must_use]
+    pub fn address_on(&self, network: &str, octet: u8) -> Ipv4Addr {
+        self.block(network).with_octet(octet)
     }
 }
 

@@ -66,7 +66,13 @@ fn reach_rules(way: Way, rules: &[Rule<'_>]) -> Vec<Block> {
         let ports = r.ports.iter().map(ToString::to_string).collect::<Vec<_>>().join(",");
         for protocol in ["TCP", "UDP"] {
             let l = format!("{label}-{}", protocol.to_lowercase());
-            out.push(rule((way, Action::Accept), &l, protocol, Some(ports.clone()), list([string(r.cidr.as_str())])));
+            out.push(rule(
+                (way, Action::Accept),
+                &l,
+                protocol,
+                Some(ports.clone()),
+                list([string(r.cidr.as_str())]),
+            ));
         }
     }
     out
@@ -122,6 +128,6 @@ pub(super) fn routes(env: &Environment, net: &str) -> Vec<Template> {
     env.networks
         .iter()
         .filter(|(n, _)| n.as_str() != net)
-        .map(|(_, p)| Template::text(format!("sudo ip route replace {} via {gateway}", p.cidr)))
+        .map(|(_, p)| Template::text(format!("sudo {}", isoloom_render::route_line(p.cidr, gateway))))
         .collect()
 }

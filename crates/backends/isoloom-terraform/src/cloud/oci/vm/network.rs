@@ -71,7 +71,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         let mut subnet = owned(resource("oci_core_subnet", &ident(net)))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
             .add_attribute(("cidr_block", string(p.cidr.to_string())))
-            .add_attributes(p.ipv6.as_ref().map(|v| ("ipv6cidr_block", string(v.cidr.as_str()))))
+            .add_attributes(p.ipv6.as_ref().map(|v| ("ipv6cidr_block", string(v.cidr.to_string()))))
             .add_attribute(("display_name", display(net)))
             .add_attribute(("route_table_id", reference("oci_core_route_table.env.id")))
             .add_attribute(("security_list_ids", list([reference(&format!("oci_core_security_list.{}.id", ident(net)))])));
@@ -90,7 +90,12 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
 /// With dual-stack networks: IPv6 on, their blocks as the VCN's private prefixes, and no
 /// Oracle-allocated public prefix beside them.
 fn ipv6_vcn(env: &Environment, vcn: BlockBuilder) -> BlockBuilder {
-    let blocks: Vec<Expression> = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| string(v.cidr.as_str())).collect();
+    let blocks: Vec<Expression> = env
+        .networks
+        .values()
+        .filter_map(|n| n.ipv6.as_ref())
+        .map(|v| string(v.cidr.to_string()))
+        .collect();
     if blocks.is_empty() {
         return vcn;
     }
@@ -177,12 +182,12 @@ fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
         }
     }
     b = b.add_block(fragmentation(outbound, false));
-    if let Some(v6) = p.ipv6.as_ref().map(|v| v.cidr.as_str()) {
+    if let Some(v6) = p.ipv6.as_ref().map(|v| v.cidr.to_string()) {
         b = b
-            .add_block(rule(inbound, "its own network (IPv6)", string(v6), "all", None))
+            .add_block(rule(inbound, "its own network (IPv6)", string(v6.as_str()), "all", None))
             .add_blocks(reach_rules(inbound, &ipv6(env, reach::into(env, net)), "from"))
             .add_block(fragmentation(inbound, true))
-            .add_block(rule(outbound, "its own network (IPv6)", string(v6), "all", None))
+            .add_block(rule(outbound, "its own network (IPv6)", string(v6.as_str()), "all", None))
             .add_blocks(reach_rules(outbound, &ipv6(env, reach::out_of(env, net)), "to"))
             .add_block(fragmentation(outbound, true));
     }
@@ -212,7 +217,10 @@ fn ipv6<'a>(env: &'a Environment, rules: Vec<Rule<'a>>) -> Vec<Rule<'a>> {
         .into_iter()
         .filter_map(|r| {
             let v6 = env.networks.get(r.network)?.ipv6.as_ref()?;
-            Some(Rule { cidr: v6.cidr.clone(), ..r })
+            Some(Rule {
+                cidr: v6.cidr.to_string(),
+                ..r
+            })
         })
         .collect()
 }

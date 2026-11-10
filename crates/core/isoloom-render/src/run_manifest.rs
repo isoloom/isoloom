@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use std::num::{NonZeroU16, NonZeroU32};
 
 use isoloom_manifest::{
-    Action, Arch, Argv, Check, CheckKind, Cidr, Delivery, EnvName, EnvironmentName, EnvironmentRef, Error as ManifestError, Generator, GeneratorName, HostArgv,
+    Action, Arch, Argv, Check, CheckKind, Delivery, EnvName, EnvironmentName, EnvironmentRef, Error as ManifestError, Generator, GeneratorName, HostArgv,
     HostOs, Machine, Name, Network, NonEmpty, Output, OutputRole, OutputSource, Param, Part, Placeholder, Port, PortKind, PortName, Program, Protocol, Publish,
     PublishMode, Role, Run, SetBy, SnakeName, Step, StepId, StepSelection, Template, Tool, ToolName, Version, When,
 };
@@ -293,7 +293,7 @@ pub fn networks(env: &Environment, native: impl Fn(&str) -> Template) -> Result<
         .map(|(name, n)| {
             Ok(Network {
                 name: Name::parse(name)?,
-                cidr: Cidr::parse(&n.cidr.to_string())?,
+                cidr: n.cidr.cidr().into(),
                 internet: n.internet,
                 native: Some(native(name)),
             })

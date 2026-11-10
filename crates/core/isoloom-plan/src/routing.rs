@@ -6,6 +6,7 @@
 use std::net::Ipv4Addr;
 
 use isoloom_spec::model::{Machine, Spec};
+use isoloom_spec::net::NetworkBlock;
 
 use crate::addressing::{address as machine_address, cidr};
 
@@ -81,7 +82,7 @@ pub fn default_gateway(spec: &Spec, name: &str, m: &Machine) -> Option<Ipv4Addr>
 /// gateway (on a network they share), the others through the router (on the machine's first
 /// network the router is on). Networks with neither route are left to the default route.
 #[must_use]
-pub fn routes(spec: &Spec, name: &str, m: &Machine) -> Vec<(String, Ipv4Addr)> {
+pub fn routes(spec: &Spec, name: &str, m: &Machine) -> Vec<(NetworkBlock, Ipv4Addr)> {
     let via_router = needed(spec)
         .then(|| m.networks.keys().find(|n| plain(spec, n)))
         .flatten()
@@ -89,7 +90,7 @@ pub fn routes(spec: &Spec, name: &str, m: &Machine) -> Vec<(String, Ipv4Addr)> {
     spec.networks
         .iter()
         .filter(|(n, _)| !m.networks.contains_key(*n))
-        .filter_map(|(_, net)| {
+        .filter_map(|(n, net)| {
             let via = match &net.gateway {
                 Some(gw) if gw != name => {
                     let g = spec.machines.get(gw)?;
@@ -100,7 +101,7 @@ pub fn routes(spec: &Spec, name: &str, m: &Machine) -> Vec<(String, Ipv4Addr)> {
                 Some(_) => None,
                 None => via_router,
             }?;
-            Some((net.cidr.clone(), via))
+            Some((cidr(spec, n), via))
         })
         .collect()
 }
@@ -158,13 +159,13 @@ machines:
         assert_eq!(
             routes(&spec, "web", &spec.machines["web"]),
             [
-                ("10.2.0.0/24".to_owned(), Ipv4Addr::new(10, 1, 0, 254)),
-                ("10.3.0.0/24".to_owned(), Ipv4Addr::new(10, 1, 0, 1))
+                (NetworkBlock::parse("10.2.0.0/24").unwrap(), Ipv4Addr::new(10, 1, 0, 254)),
+                (NetworkBlock::parse("10.3.0.0/24").unwrap(), Ipv4Addr::new(10, 1, 0, 1))
             ]
         );
         assert_eq!(
             routes(&spec, "fw", &spec.machines["fw"]),
-            [("10.2.0.0/24".to_owned(), Ipv4Addr::new(10, 1, 0, 254))]
+            [(NetworkBlock::parse("10.2.0.0/24").unwrap(), Ipv4Addr::new(10, 1, 0, 254))]
         );
         assert_eq!(
             routes(&spec, "pc", &spec.machines["pc"]),

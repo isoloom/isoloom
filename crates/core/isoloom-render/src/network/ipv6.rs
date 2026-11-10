@@ -21,7 +21,7 @@ pub fn linux(addresses: &[(Ipv4Addr, Ipv6Addr)], routes: &[Route6]) -> String {
             "dev=$(ip -o -4 addr show | grep -F {find} | awk '{{print $2; exit}}')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace {v6}/{PREFIX} dev \"$dev\" nodad\n"
         )
     });
-    let through_router = routes.iter().map(|r| format!("ip -6 route replace {} via {}\n", r.cidr, r.via));
+    let through_router = routes.iter().map(|r| super::route_line(r.cidr, r.via) + "\n");
     on_interfaces.chain(through_router).collect()
 }
 
@@ -58,7 +58,7 @@ pub fn router_linux(addresses: &[(Ipv4Addr, Ipv6Addr)]) -> Option<String> {
 /// networks): no new connection to an address outside the environment's IPv6 blocks.
 #[must_use]
 pub(crate) fn egress_rule(env: &Environment) -> String {
-    let blocks: Vec<&str> = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| v.cidr.as_str()).collect();
+    let blocks: Vec<String> = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| v.cidr.to_string()).collect();
     if blocks.is_empty() {
         return String::new();
     }
@@ -96,7 +96,7 @@ mod tests {
     /// A route to another IPv6 network, through the router.
     fn routes() -> [Route6; 1] {
         [Route6 {
-            cidr: "fd00:2::/64".into(),
+            cidr: isoloom_spec::net::Cidr6::parse("fd00:2::/64").unwrap(),
             via: "fd00:1::254".parse().unwrap(),
         }]
     }

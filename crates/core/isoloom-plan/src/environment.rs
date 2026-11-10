@@ -227,10 +227,10 @@ impl MachinePlan {
 }
 
 /// A route to a network a machine isn't on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Route {
     /// The network's block.
-    pub cidr: String,
+    pub cidr: NetworkBlock,
     /// The next hop.
     pub via: Ipv4Addr,
 }
@@ -481,6 +481,7 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
 /// Machine `name` (`m`), planned for `target`.
 fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan {
     let shape = shape(target, m);
+    let routing = lifecycle::Routing::of(spec, target, name, m);
     // Lowering reports a configuration that doesn't resolve (an app's steps per target, a
     // service's for the lab), so the validated spec `build` plans has its recipe.
     let recipe = m.configuration.as_ref().and_then(|c| {
@@ -497,13 +498,15 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
         more_addresses: crate::more_addresses::of(spec, m),
         addresses6: ipv6::addresses(spec, m),
-        names: crate::private_dns::with_domain(
-            spec,
-            std::iter::once(name).chain(m.aliases.iter().map(String::as_str)).map(String::from).collect(),
-        ),
-        routes: routing::routes(spec, name, m).into_iter().map(|(cidr, via)| Route { cidr, via }).collect(),
-        routes6: if target == Target::CloudVm { Vec::new() } else { ipv6::routes(spec, m) },
-        default_gateway: routing::default_gateway(spec, name, m),
+        names: names(spec, name, m),
+        lifecycle: if shape == MachineShape::Vm {
+            lifecycle::of(spec, name, m, recipe.as_ref(), &routing)
+        } else {
+            Vec::new()
+        },
+        routes: routing.routes,
+        routes6: routing.routes6,
+        default_gateway: routing.default,
         is_gateway: routing::is_gateway(spec, name),
         offline: routing::offline(spec, name, m),
         seal: m.seal,
@@ -526,11 +529,6 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
         boot: m.vm.as_ref().and_then(|v| v.boot.clone()),
         depends_on: m.depends_on.clone(),
-        lifecycle: if shape == MachineShape::Vm {
-            vm_lifecycle(spec, target, name, m, recipe.as_ref())
-        } else {
-            Vec::new()
-        },
         os: m.vm.as_ref().map(|v| v.os.clone()),
         winrm: m.vm.as_ref().filter(|v| images::is_windows(&v.os) && !windows::winssh(v)).map(images::winrm),
         winssh: m.vm.as_ref().is_some_and(windows::winssh),
@@ -544,13 +542,11 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
     }
 }
 
-/// VM `name`'s set-up steps on `target`, its configuration resolved as `recipe`.
-fn vm_lifecycle(spec: &Spec, target: Target, name: &str, m: &Machine, recipe: Option<&Recipe>) -> MachineLifecycle {
-    let mut steps = lifecycle::of(spec, name, m, recipe);
-    if target == Target::CloudVm {
-        ipv6::cloud_routes(&mut steps);
-    }
-    steps
+/// Machine `name`'s (`m`) names: its own, then its aliases, then (with `dns.private`) each under
+/// the private zone's domain.
+fn names(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
+    let own = std::iter::once(name).chain(m.aliases.iter().map(String::as_str)).map(String::from).collect();
+    crate::private_dns::with_domain(spec, own)
 }
 
 fn published(m: &Machine) -> Vec<PublishedPort> {

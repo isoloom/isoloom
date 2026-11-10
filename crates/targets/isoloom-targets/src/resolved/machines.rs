@@ -27,7 +27,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Map<String, V
     }
     let routes: Vec<Value> = router::routes(spec, name, m)
         .into_iter()
-        .map(|(to, via)| json!({ "to": to, "via": via.to_string() }))
+        .map(|(to, via)| json!({ "to": to.to_string(), "via": via.to_string() }))
         .collect();
     let default_gateway = router::default_gateway(spec, name, m);
     let online = m.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.internet));

@@ -7,7 +7,6 @@ use std::net::IpAddr;
 
 use isoloom_manifest::{Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SnakeName, Template};
 use isoloom_plan::Environment;
-use isoloom_render::router;
 use isoloom_render::run_manifest::outputs_with;
 
 use crate::machine::controller;
@@ -30,7 +29,7 @@ pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError>
         };
         out.push(manifest::environment_machine(name, mp, spec, &at)?);
     }
-    let router_at = |net: &str| IpAddr::V4(router::address(env.spec(), net));
+    let router_at = |net: &str| IpAddr::V4(env.block(net).router());
     out.push(manifest::machine(ROUTER, Role::Infra, by_network(env, router_at)?)?);
     if controller::needed(env) {
         let controller_at = |net: &str| IpAddr::V4(env.block(net).controller());

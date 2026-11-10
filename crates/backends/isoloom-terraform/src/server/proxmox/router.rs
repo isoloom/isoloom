@@ -4,8 +4,6 @@
 
 use crate::hcl_builder::{Block, Expression, Module, Template, call, list, number, reference, string};
 use isoloom_plan::Environment;
-use isoloom_plan::ipv6;
-use isoloom_render::router;
 use isoloom_spec::model::Target;
 use isoloom_spec::net::IPV6_PREFIX;
 
@@ -89,9 +87,9 @@ fn networks(env: &Environment) -> Vec<Expression> {
     let mut out = Vec::new();
     for (i, (net, plan)) in (0..).zip(&env.networks) {
         let len = plan.cidr.prefix();
-        let address = format!("Address={}/{len}", router::address(env.spec(), net));
+        let address = format!("Address={}/{len}", env.block(net).router());
         // An IPv6 network's router address too (the routes6 of the machines go through it).
-        let address6 = ipv6::router_address(env.spec(), net).map(|a| format!("Address={a}/{IPV6_PREFIX}"));
+        let address6 = env.router6_on(net).map(|a| format!("Address={a}/{IPV6_PREFIX}"));
         let mut lines = vec![address.as_str()];
         lines.extend(address6.as_deref());
         lines.push("ConfigureWithoutCarrier=yes");
@@ -102,7 +100,7 @@ fn networks(env: &Environment) -> Vec<Expression> {
 
 /// The router's own addresses on the environment's networks.
 fn own_addresses(env: &Environment) -> Vec<String> {
-    env.networks.keys().map(|n| router::address(env.spec(), n).to_string()).collect()
+    env.networks.keys().map(|n| env.block(n).router().to_string()).collect()
 }
 
 /// The outputs, from `local.router_address`: the router's address that is none of its

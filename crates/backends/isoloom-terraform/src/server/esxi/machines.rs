@@ -5,7 +5,6 @@
 
 use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan, Vm};
-use isoloom_render::router;
 
 use super::SERVICE_OS;
 use super::guest::{Guest, Nic};
@@ -33,7 +32,7 @@ fn len(env: &Environment, net: &str) -> u8 {
 /// router at `gateway`.
 pub(super) fn nic(env: &Environment, net: &str, address: String, gateway: bool) -> Nic {
     let mut nic = Nic::at(reference(&format!("esxi_portgroup.{}.name", ident(net))), Some(address));
-    nic.gateway = gateway.then(|| router::address(env.spec(), net).to_string());
+    nic.gateway = gateway.then(|| env.block(net).router().to_string());
     nic.mtu = env.networks.get(net).and_then(|n| n.mtu);
     nic
 }

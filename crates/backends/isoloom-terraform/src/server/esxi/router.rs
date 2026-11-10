@@ -7,8 +7,7 @@
 //! networks (`crate::server::router`).
 
 use crate::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, list, not, reference, string};
-use isoloom_plan::{Environment, ipv6};
-use isoloom_render::router;
+use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 use isoloom_spec::net::IPV6_PREFIX;
 
@@ -30,10 +29,9 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     let mut nics = vec![Nic::at(reference("var.uplink_port_group"), None)];
     nics.extend(env.networks.iter().map(|(net, plan)| {
         let len = plan.cidr.prefix();
-        let mut nic = machines::nic(env, net, format!("{}/{len}", router::address(env.spec(), net)), false);
+        let mut nic = machines::nic(env, net, format!("{}/{len}", env.block(net).router()), false);
         // An IPv6 network's router address too: the machines' IPv6 routes go through it.
-        nic.addresses
-            .extend(ipv6::router_address(env.spec(), net).map(|a| format!("{a}/{IPV6_PREFIX}")));
+        nic.addresses.extend(env.router6_on(net).map(|a| format!("{a}/{IPV6_PREFIX}")));
         nic
     }));
     let guest = Guest {
@@ -67,7 +65,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
 /// The `lifecycle` block failing the apply when the router reports no uplink address: with no
 /// DHCP on the uplink port group, VMware Tools reports one of its lab addresses instead.
 fn uplink_checked(env: &Environment) -> Block {
-    let own = list(env.networks.keys().map(|n| string(router::address(env.spec(), n).to_string())));
+    let own = list(env.networks.keys().map(|n| string(env.block(n).router().to_string())));
     let ip = || reference("self.ip_address");
     let condition = binary(
         binary(ip(), BinaryOperator::NotEq, string("")),

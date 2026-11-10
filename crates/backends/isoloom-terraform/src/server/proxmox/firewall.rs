@@ -33,7 +33,7 @@ pub(super) fn ipsets(env: &Environment, m: &mut Module) {
             .add_attribute(("comment", string(format!("{}: network {net}", env.name))))
             .add_block(Block::builder("cidr").add_attribute(("name", string(plan.cidr.to_string()))).build());
         if let Some(v6) = &plan.ipv6 {
-            b = b.add_block(Block::builder("cidr").add_attribute(("name", string(v6.cidr.as_str()))).build());
+            b = b.add_block(Block::builder("cidr").add_attribute(("name", string(v6.cidr.to_string()))).build());
         }
         m.commented(&format!("Network `{net}`, for the machines' firewall rules."), b.build());
     }

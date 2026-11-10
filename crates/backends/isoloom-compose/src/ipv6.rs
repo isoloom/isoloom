@@ -24,7 +24,7 @@ pub(crate) fn network(n: &NetworkPlan, v4: Block, internal: bool) -> Network {
             subnets.clear();
         }
         subnets.push(Block {
-            subnet: v6.cidr.clone(),
+            subnet: v6.cidr.to_string(),
             gateway: Some(v6.gateway.to_string()),
             ip_range: Some(dynamic_range(v6.gateway)),
         });
@@ -80,7 +80,7 @@ pub(crate) fn forwarding(env: &Environment) -> IndexMap<String, String> {
 
 /// The sidecar's commands for a machine's IPv6 routes (`ip -6 route replace`, idempotent).
 pub(crate) fn route_commands(mp: &MachinePlan) -> impl Iterator<Item = String> + '_ {
-    mp.routes6.iter().map(|r| format!("ip -6 route replace {} via {}", r.cidr, r.via))
+    mp.routes6.iter().map(|r| isoloom_render::route_line(r.cidr, r.via))
 }
 
 #[cfg(test)]

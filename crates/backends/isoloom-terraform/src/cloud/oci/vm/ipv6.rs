@@ -31,7 +31,7 @@ pub(super) fn vnic(env: &Environment, mp: &MachinePlan, net: &str, b: BlockBuild
     };
     b.add_block(
         Block::builder("ipv6address_ipv6subnet_cidr_pair_details")
-            .add_attribute(("ipv6subnet_cidr", string(v6.cidr.as_str())))
+            .add_attribute(("ipv6subnet_cidr", string(v6.cidr.to_string())))
             .add_attribute(("ipv6address", string(address.to_string())))
             .build(),
     )

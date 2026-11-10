@@ -10,7 +10,7 @@
 
 use std::net::Ipv4Addr;
 
-use isoloom_plan::addressing::cidr;
+use isoloom_plan::Environment;
 pub(crate) use isoloom_render::trunks::Trunk;
 use isoloom_render::trunks::{self, Vlan};
 use isoloom_spec::model::{Machine, Spec};
@@ -18,7 +18,7 @@ use isoloom_spec::model::{Machine, Spec};
 /// The trunks of the machines run as containers: each on two or more VLANs of one LAN.
 #[must_use]
 pub(crate) fn containers(spec: &Spec) -> Vec<Trunk> {
-    trunks::of_machines(spec, |m| m.docker.is_some())
+    trunks::of_machines(spec, |_, m| m.docker.is_some())
 }
 
 /// The trunks of one machine.
@@ -72,13 +72,13 @@ fn find_by_mac(mac: &str) -> String {
 
 /// The switch's address on a VLAN network: the controller's, which Docker leaves free.
 #[must_use]
-pub(crate) fn switch_address(spec: &Spec, network: &str) -> Ipv4Addr {
-    cidr(spec, network).controller()
+pub(crate) fn switch_address(env: &Environment, network: &str) -> Ipv4Addr {
+    env.block(network).controller()
 }
 
 /// The switch's start: a bridge per VLAN joining the VLAN network and every trunk's `.<id>`.
 #[must_use]
-pub(crate) fn switch_script(spec: &Spec, trunks: &[&Trunk]) -> String {
+pub(crate) fn switch_script(env: &Environment, trunks: &[&Trunk]) -> String {
     let mut bridged: Vec<&Vlan> = Vec::new();
     for v in trunks.iter().flat_map(|t| &t.vlans) {
         if !bridged.iter().any(|b| b.id == v.id) {
@@ -88,7 +88,7 @@ pub(crate) fn switch_script(spec: &Spec, trunks: &[&Trunk]) -> String {
     let bridge_lines = bridged.iter().map(|v| {
         format!(
             "{} && ip addr flush dev $IF && ip link add br{id} type bridge && ip link set $IF master br{id} && ip link set br{id} up && ",
-            trunks::find_by_address(switch_address(spec, &v.network)),
+            trunks::find_by_address(switch_address(env, &v.network)),
             id = v.id
         )
     });
@@ -131,7 +131,8 @@ pub(crate) fn switch_ready(trunks: &[&Trunk]) -> String {
 /// its addresses on `<lan>.<id>`. With no other way out, the default route goes through a VLAN
 /// with internet (Docker's gateway on it, reached through the switch).
 #[must_use]
-pub(crate) fn machine_commands(spec: &Spec, m: &Machine, t: &Trunk, address: impl Fn(&str, u8) -> Ipv4Addr, gateway: impl Fn(&str) -> Ipv4Addr) -> Vec<String> {
+pub(crate) fn machine_commands(env: &Environment, m: &Machine, t: &Trunk, gateway: impl Fn(&str) -> Ipv4Addr) -> Vec<String> {
+    let spec = env.spec();
     let name = trunks::interface(&t.lan);
     let mut cmds = vec![format!(
         "{} && ip addr flush dev $IF && ip link set $IF down && ip link set $IF name {name} && ip link set {name} up",
@@ -140,15 +141,15 @@ pub(crate) fn machine_commands(spec: &Spec, m: &Machine, t: &Trunk, address: imp
     for v in &t.vlans {
         cmds.push(format!(
             "ip link add link {name} name {name}.{id} type vlan id {id} && ip addr add {}/{} dev {name}.{id} && ip link set {name}.{id} up",
-            address(&v.network, v.octet),
-            cidr(spec, &v.network).prefix(),
+            env.address_on(&v.network, v.octet),
+            env.block(&v.network).prefix(),
             id = v.id
         ));
     }
     let internet = |n: &str| spec.networks.get(n).is_some_and(|net| net.internet);
     let other_way_out = m.networks.keys().any(|n| !t.vlans.iter().any(|v| &v.network == n) && internet(n));
     if !other_way_out && let Some(v) = t.vlans.iter().find(|v| internet(&v.network)) {
-        cmds.push(format!("ip route replace default via {}", gateway(&v.network)));
+        cmds.push(isoloom_render::route_line("default", gateway(&v.network)));
     }
     cmds
 }

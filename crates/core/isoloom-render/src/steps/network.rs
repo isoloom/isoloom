@@ -4,12 +4,10 @@
 use std::net::Ipv4Addr;
 
 use isoloom_plan::Environment;
-use isoloom_plan::addressing::address;
 use isoloom_plan::environment::Route;
-use isoloom_spec::net::Cidr;
 use isoloom_spec::shell::quote;
 
-use crate::network::{ipv6, router, trunks};
+use crate::network::{ipv6, route_line, router, trunks};
 use crate::{boot, powershell};
 
 /// The other machines by name, appended to `/etc/hosts`, each line once (running the step again
@@ -44,8 +42,8 @@ pub(super) fn windows_hosts(entries: &[(Ipv4Addr, Vec<String>)]) -> Option<Strin
 pub(super) fn routes(routes: &[Route], default: Option<Ipv4Addr>) -> Option<String> {
     let lines: String = routes
         .iter()
-        .map(|r| format!("ip route replace {} via {}\n", r.cidr, r.via))
-        .chain(default.map(|gw| format!("ip route replace default via {gw}\n")))
+        .map(|r| route_line(r.cidr, r.via) + "\n")
+        .chain(default.map(|gw| route_line("default", gw) + "\n"))
         .collect();
     (!lines.is_empty()).then_some(lines)
 }
@@ -54,21 +52,17 @@ pub(super) fn routes(routes: &[Route], default: Option<Ipv4Addr>) -> Option<Stri
 pub(super) fn windows_routes(routes: &[Route]) -> Option<String> {
     let lines: Vec<String> = routes
         .iter()
-        .filter_map(|r| {
-            let block = Cidr::parse(&r.cidr)?;
-            Some(format!("route -p add {} MASK {} {}", block.address(), block.netmask(), r.via))
-        })
+        .map(|r| format!("route -p add {} MASK {} {}", r.cidr.cidr().address(), r.cidr.netmask(), r.via))
         .collect();
     (!lines.is_empty()).then(|| lines.join("; "))
 }
 
 /// The machine's trunks, built inside it.
 pub(super) fn trunks(env: &Environment, machine: &str) -> Option<String> {
-    let spec = env.spec();
-    let lines: String = trunks::vms(spec)
+    let lines: String = trunks::vms(env)
         .iter()
         .filter(|t| t.machine == machine)
-        .flat_map(|t| trunks::vm_commands(spec, t, |n, o| address(spec, n, o)))
+        .flat_map(|t| trunks::vm_commands(env, t))
         .map(|l| l + "\n")
         .collect();
     (!lines.is_empty()).then_some(lines)
@@ -78,7 +72,7 @@ pub(super) fn trunks(env: &Environment, machine: &str) -> Option<String> {
 pub(super) fn tc(env: &Environment, machine: &str) -> Option<String> {
     let spec = env.spec();
     let m = spec.machines.get(machine)?;
-    router::machine_tc_script(spec, m, |n, o| address(spec, n, o))
+    router::machine_tc_script(spec, m, |n, o| env.address_on(n, o))
 }
 
 /// Offline: no new connection leaves the environment's networks (each network's block is

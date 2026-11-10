@@ -292,3 +292,33 @@ fn what_the_code_says_states_facts_not_a_roadmap() -> Outcome {
     assert!(found.is_empty(), "{found:#?}");
     Ok(())
 }
+
+/// The backends and the renderers they share read each network's block, a machine's address and
+/// the router's from the plan (`Environment::block`, `address_on`, `router6_on`, a machine's
+/// `addresses`), as `isoloom_plan::addressing::cidr`'s doc says: none works them out again from
+/// the spec, their tests aside.
+#[test]
+fn the_backends_read_the_blocks_and_the_router_from_the_plan() -> Outcome {
+    let mut files = Vec::new();
+    sources(&root().join("crates/backends"), &mut files)?;
+    sources(&root().join("crates/core/isoloom-render/src"), &mut files)?;
+    let is_test = |p: &Path| p.components().any(|c| c.as_os_str() == "tests") || p.file_name().is_some_and(|n| n == "tests.rs");
+    let from_the_spec = [
+        "addressing::address",
+        "addressing::cidr",
+        "addressing::{",
+        "router::address(",
+        "router_address(",
+    ];
+    let mut found = Vec::new();
+    for file in files.iter().filter(|f| !is_test(f)) {
+        let text = std::fs::read_to_string(file)?;
+        for (n, line) in outside_tests(&text).lines().enumerate() {
+            if let Some(what) = from_the_spec.iter().find(|w| line.contains(**w)) {
+                found.push(format!("{}:{}: `{what}`", file.display(), n + 1));
+            }
+        }
+    }
+    assert!(found.is_empty(), "{found:#?}");
+    Ok(())
+}

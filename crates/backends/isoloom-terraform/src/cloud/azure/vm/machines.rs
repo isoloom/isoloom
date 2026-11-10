@@ -154,7 +154,7 @@ fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> 
     for (n, p) in reach::own(env, m) {
         g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));
         if let Some(v6) = &p.ipv6 {
-            g = g.allow(&format!("net-{n}-ipv6"), "*", "*", string(v6.cidr.as_str()));
+            g = g.allow(&format!("net-{n}-ipv6"), "*", "*", string(v6.cidr.to_string()));
         }
     }
     g = if windows {
@@ -166,11 +166,11 @@ fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> 
         // Each block of the network the rule opens from: its IPv4 one, and its IPv6 one when
         // both ends are IPv6.
         let both6 = from.ipv6.is_some() && env.networks.get(&reach.to).is_some_and(|to| to.ipv6.is_some());
-        let v6 = from.ipv6.as_ref().filter(|_| both6).map(|v| (v.cidr.as_str(), "-ipv6"));
+        let v6 = from.ipv6.as_ref().filter(|_| both6).map(|v| (v.cidr.to_string(), "-ipv6"));
         let v4 = from.cidr.to_string();
-        for (block, suffix) in std::iter::once((v4.as_str(), "")).chain(v6) {
+        for (block, suffix) in std::iter::once((v4, "")).chain(v6) {
             let rule = format!("reach-{i}-{}{suffix}", reach.from);
-            g = reach_rules(g, &rule, &reach.ports, block);
+            g = reach_rules(g, &rule, &reach.ports, &block);
         }
     }
     for p in &mp.ports {

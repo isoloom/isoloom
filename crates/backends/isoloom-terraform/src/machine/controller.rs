@@ -7,7 +7,7 @@ use std::net::Ipv4Addr;
 
 use crate::hcl_builder::{Expression, Module, Template, call, reference, string};
 use indexmap::IndexMap;
-use isoloom_plan::addressing::{address, names_of};
+use isoloom_plan::addressing::names_of;
 use isoloom_plan::{Controller, Environment, Step, Vm};
 use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_KEY, Vars, vars};
 use isoloom_render::{controller, steps};
@@ -113,10 +113,10 @@ pub(crate) fn authorize_as(user: &str) -> Template {
 /// The controller's `/etc/hosts` lines: every machine at its first address.
 pub(crate) fn hosts(env: &Environment) -> Option<String> {
     let spec = env.spec();
-    let lines: Vec<String> = spec
+    let lines: Vec<String> = env
         .machines
         .iter()
-        .filter_map(|(o, om)| om.networks.first().map(|(n, oc)| format!("'{} {}'", address(spec, n, *oc), names_of(spec, o))))
+        .filter_map(|(o, mp)| mp.addresses.values().next().map(|a| format!("'{a} {}'", names_of(spec, o))))
         .collect();
     (!lines.is_empty()).then(|| format!("printf '%s\\n' {} >> /etc/hosts\n", lines.join(" ")))
 }

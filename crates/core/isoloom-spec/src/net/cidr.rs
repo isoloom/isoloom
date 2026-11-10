@@ -124,6 +124,13 @@ pub const PRIVATE: [Cidr; 3] = [
     Cidr { base: 0xc0a8_0000, len: 16 },
 ];
 
+impl From<Cidr> for isoloom_manifest::Cidr {
+    /// The same block, as the run manifest writes it.
+    fn from(c: Cidr) -> isoloom_manifest::Cidr {
+        isoloom_manifest::Cidr::ipv4(c.address(), c.prefix())
+    }
+}
+
 impl fmt::Display for Cidr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}/{}", Ipv4Addr::from(self.base), self.len)
@@ -174,6 +181,23 @@ mod tests {
             host.to_string(),
             "`10.20.0.5/24` isn't an IPv4 block: write the network's own address, `/` and the prefix length (`10.20.0.0/24`)"
         );
+    }
+}
+
+#[cfg(test)]
+mod manifest {
+    use super::Cidr;
+
+    /// A block reaches the run manifest as the same block, without going through text.
+    #[test]
+    fn a_block_is_the_run_manifests_block() {
+        for text in ["10.30.0.0/24", "192.168.1.8/29", "0.0.0.0/0", "10.1.2.3/32"] {
+            let c = Cidr::parse(text).unwrap();
+            assert_eq!(isoloom_manifest::Cidr::from(c), isoloom_manifest::Cidr::parse(text).unwrap(), "{text}");
+        }
+        // The manifest's constructor keeps a block: an address in it gives the block.
+        let inside = isoloom_manifest::Cidr::ipv4("10.30.0.7".parse().unwrap(), 24);
+        assert_eq!(inside.to_string(), "10.30.0.0/24");
     }
 }
 

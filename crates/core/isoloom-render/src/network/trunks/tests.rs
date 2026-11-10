@@ -1,6 +1,7 @@
 use super::{Trunk, Vlan, interface, of_machines, vm_commands, vms};
 use crate::test_support::VLAN_OFFICE;
 use crate::testing;
+use isoloom_spec::model::Target;
 
 fn vlan(network: &str, id: u16, octet: u8) -> Vlan {
     Vlan {
@@ -21,7 +22,7 @@ fn admin() -> Trunk {
 #[test]
 fn a_machine_on_two_vlans_of_one_lan_has_a_trunk_and_one_on_a_single_vlan_none() {
     let spec = testing::spec(VLAN_OFFICE);
-    let ts = of_machines(&spec, |m| m.docker.is_some());
+    let ts = of_machines(&spec, |_, m| m.docker.is_some());
     let machines: Vec<&str> = ts.iter().map(|t| t.machine.as_str()).collect();
     assert_eq!(machines, ["admin", "nas", "ops"], "windows has no container form; staff carries one VLAN");
     assert_eq!(ts[0], admin());
@@ -34,8 +35,8 @@ fn a_machine_on_two_vlans_of_one_lan_has_a_trunk_and_one_on_a_single_vlan_none()
 
 #[test]
 fn only_linux_vms_build_a_trunk_inside() {
-    let spec = testing::spec(VLAN_OFFICE);
-    let machines: Vec<String> = vms(&spec).into_iter().map(|t| t.machine).collect();
+    let env = testing::env(VLAN_OFFICE, Target::Vagrant);
+    let machines: Vec<String> = vms(&env).into_iter().map(|t| t.machine).collect();
     assert_eq!(machines, ["admin", "nas", "ops"]);
 }
 
@@ -47,8 +48,8 @@ fn the_interface_is_named_after_the_lan_within_linux_s_limit() {
 
 #[test]
 fn a_vm_builds_its_trunk_once_per_boot() {
-    let spec = testing::spec(VLAN_OFFICE);
-    let cmds = vm_commands(&spec, &admin(), |n, o| isoloom_plan::addressing::address(&spec, n, o));
+    let env = testing::env(VLAN_OFFICE, Target::Vagrant);
+    let cmds = vm_commands(&env, &admin());
     assert_eq!(cmds.len(), 1);
     let sh = &cmds[0];
     assert!(

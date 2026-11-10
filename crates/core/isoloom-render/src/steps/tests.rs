@@ -2,6 +2,7 @@ use isoloom_plan::Environment;
 use isoloom_plan::environment::Route;
 use isoloom_plan::lifecycle::{RunKind, Step};
 use isoloom_spec::model::Target;
+use isoloom_spec::net::NetworkBlock;
 
 use super::{linux, reboot_check, record_boot, wait_for_mark, windows};
 use crate::testing;
@@ -219,11 +220,11 @@ fn windows_routes_keep_across_restarts() {
     let routes = Step::Routes {
         routes: vec![
             Route {
-                cidr: "10.85.0.0/24".into(),
+                cidr: NetworkBlock::parse("10.85.0.0/24").unwrap(),
                 via: "10.84.0.254".parse().unwrap(),
             },
             Route {
-                cidr: "10.0.0.0/8".into(),
+                cidr: NetworkBlock::parse("10.86.0.0/29").unwrap(),
                 via: "10.84.0.254".parse().unwrap(),
             },
         ],
@@ -231,7 +232,7 @@ fn windows_routes_keep_across_restarts() {
     };
     assert_eq!(
         windows(&env, "web", &routes).as_deref(),
-        Some("route -p add 10.85.0.0 MASK 255.255.255.0 10.84.0.254; route -p add 10.0.0.0 MASK 255.0.0.0 10.84.0.254")
+        Some("route -p add 10.85.0.0 MASK 255.255.255.0 10.84.0.254; route -p add 10.86.0.0 MASK 255.255.255.248 10.84.0.254")
     );
     let none = Step::Routes {
         routes: Vec::new(),

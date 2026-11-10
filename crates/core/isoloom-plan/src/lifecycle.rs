@@ -11,7 +11,6 @@ use crate::addressing::address_for;
 use crate::configure::{Recipe, Resource, Shell};
 use crate::environment::Route;
 use crate::ipv6::{self, Route6};
-use crate::routing;
 use crate::storage::DataDisk;
 
 /// A machine's set-up steps, in order.
@@ -195,9 +194,40 @@ pub fn ca_certificates(constraints: Option<&Constraints>) -> Option<Step> {
     Some(Step::CaCertificates { files })
 }
 
-/// The set-up steps of VM `name`, its configuration resolved as `recipe`.
+/// A machine's routes, worked out once: its plan's (`routes`, `routes6`, `default_gateway`), which
+/// a VM's `Routes` and `Ipv6` steps carry.
+pub(crate) struct Routing {
+    /// Its routes to the networks it isn't on.
+    pub(crate) routes: Vec<Route>,
+    /// Its IPv6 routes (none on a cloud, which routes IPv6 between its subnets itself).
+    pub(crate) routes6: Vec<Route6>,
+    /// Its default route through a gateway machine.
+    pub(crate) default: Option<Ipv4Addr>,
+}
+
+impl Routing {
+    /// Machine `name`'s (`m`) routes on `target`.
+    pub(crate) fn of(spec: &Spec, target: isoloom_spec::model::Target, name: &str, m: &Machine) -> Routing {
+        let routes = crate::routing::routes(spec, name, m)
+            .into_iter()
+            .map(|(cidr, via)| Route { cidr, via })
+            .collect();
+        let routes6 = if target == isoloom_spec::model::Target::CloudVm {
+            Vec::new()
+        } else {
+            ipv6::routes(spec, m)
+        };
+        Routing {
+            routes,
+            routes6,
+            default: crate::routing::default_gateway(spec, name, m),
+        }
+    }
+}
+
+/// The set-up steps of VM `name`, its configuration resolved as `recipe`, its routes `routing`.
 #[must_use]
-pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) -> MachineLifecycle {
+pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>, routing: &Routing) -> MachineLifecycle {
     let mut steps = vec![Step::Prelude];
     if m.resources.and_then(|r| r.disk_gb).is_some() {
         steps.push(Step::DiskGrow);
@@ -215,15 +245,15 @@ pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) 
     steps.push(Step::Trunks);
     steps.extend(crate::more_addresses::step(spec, m));
     steps.push(Step::Routes {
-        routes: routing::routes(spec, name, m).into_iter().map(|(cidr, via)| Route { cidr, via }).collect(),
-        default: routing::default_gateway(spec, name, m),
+        routes: routing.routes.clone(),
+        default: routing.default,
     });
-    if routing::is_gateway(spec, name) {
+    if crate::routing::is_gateway(spec, name) {
         steps.push(Step::Forwarding {
-            sysctls: routing::forwarding(routing::routes_ipv6(spec)),
+            sysctls: crate::routing::forwarding(crate::routing::routes_ipv6(spec)),
         });
     }
-    steps.extend(ipv6_step(spec, m));
+    steps.extend(ipv6_step(spec, m, &routing.routes6));
     let own: Vec<String> = m
         .volumes
         .iter()
@@ -248,7 +278,7 @@ pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) 
     if let Some(vm) = m.vm.as_ref().filter(|vm| !vm.setup.is_empty()) {
         steps.push(Step::Setup { paths: vm.setup.clone() });
     }
-    if routing::offline(spec, name, m) {
+    if crate::routing::offline(spec, name, m) {
         steps.push(Step::Egress);
     }
     if m.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.tc.is_some())) {
@@ -259,14 +289,16 @@ pub(crate) fn of(spec: &Spec, name: &str, m: &Machine, recipe: Option<&Recipe>) 
 }
 
 /// Its IPv6 addresses and routes, when it has any.
-fn ipv6_step(spec: &Spec, m: &Machine) -> Option<Step> {
+fn ipv6_step(spec: &Spec, m: &Machine, routes: &[Route6]) -> Option<Step> {
     let addresses: Vec<(Ipv4Addr, Ipv6Addr)> = m
         .networks
         .iter()
         .filter_map(|(n, o)| Some((crate::addressing::address(spec, n, *o), ipv6::address(spec, n, *o)?)))
         .collect();
-    let routes = ipv6::routes(spec, m);
-    (!addresses.is_empty() || !routes.is_empty()).then_some(Step::Ipv6 { addresses, routes })
+    (!addresses.is_empty() || !routes.is_empty()).then(|| Step::Ipv6 {
+        addresses,
+        routes: routes.to_vec(),
+    })
 }
 
 /// This machine and the others by name (and under the private zone's domain, with `dns.private`),

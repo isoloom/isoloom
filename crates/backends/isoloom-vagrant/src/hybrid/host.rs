@@ -4,7 +4,6 @@
 
 use isoloom_plan::Environment;
 use isoloom_render::container::{DOCKER_HOST as HOST, HostSize, HybridContainers as Containers, docker_net, host_environment};
-use isoloom_render::router;
 use isoloom_render::stable_hash;
 use isoloom_spec::linux::PROJECT_DIR;
 use isoloom_spec::model::Target;
@@ -93,11 +92,7 @@ fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic> {
         target: Target::Hybrid,
         reason: format!("no network `{net}` in the plan"),
     })?;
-    let gateway = if env.router.is_some() {
-        router::address(env.spec(), net)
-    } else {
-        c.gateway()
-    };
+    let gateway = if env.router.is_some() { c.router() } else { c.gateway() };
     Ok(Nic {
         ip: c.controller().to_string(),
         // The index's low byte: the MAC's last octet.

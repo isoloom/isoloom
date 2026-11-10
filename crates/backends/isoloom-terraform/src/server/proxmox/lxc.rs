@@ -13,7 +13,6 @@ use std::borrow::Cow;
 use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, object, reference, string};
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_render::router;
 use isoloom_spec::model::{Arch, Machine};
 
 use super::firewall::{self, Guest};
@@ -190,8 +189,7 @@ fn container(env: &Environment, c: Container) -> Block {
 /// with the router as the gateway, and an idle image kept running.
 fn initialization(env: &Environment, c: Container) -> Block {
     let Container { name, plan: mp, machine: m } = c;
-    let spec = env.spec();
-    let first = mp.addresses.keys().next().map(|n| router::address(spec, n).to_string()).unwrap_or_default();
+    let first = mp.addresses.keys().next().map(|n| env.block(n).router().to_string()).unwrap_or_default();
     let mut dns = Block::builder("dns").add_attribute(("servers", list([string(first.as_str())])));
     if let Some(domain) = m.dns.as_ref().and_then(|d| d.domain.as_deref()) {
         dns = dns.add_attribute(("domain", string(domain)));
@@ -224,11 +222,10 @@ pub(super) fn router_dns(env: &Environment) -> Option<(Vec<Expression>, &'static
     if !needed(env) {
         return None;
     }
-    let spec = env.spec();
     let listen = env
         .networks
         .keys()
-        .map(|net| format!("listen-address={}\n", router::address(spec, net)))
+        .map(|net| format!("listen-address={}\n", env.block(net).router()))
         .collect::<Vec<_>>()
         .concat();
     let upstream = crate::server::resolvers(env, None)

@@ -211,6 +211,16 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `HostSize::MIN_MEMORY_MB` and `windows::COMPUTER_NAME_MAX`.
 - **Breaking (library): `isoloom_spec::model::Spec::inputs` is a list of `Input`** (its `name`
   and whether it is `sensitive`), and `Spec::plain_inputs` is removed.
+- **Breaking (library): the plan's routes and IPv6 blocks are typed, worked out once.**
+  `isoloom_plan::environment::Route::cidr` is a `NetworkBlock` and `Route6::cidr` and
+  `Ipv6Plan::cidr` are `Cidr6` (were text a Windows VM's routes parsed again, dropping one that
+  didn't parse); a VM's `Routes` and `Ipv6` steps carry its plan's `routes` and `routes6`.
+  `Environment::address_on` and `router6_on` give an address on a network and the router's IPv6
+  one from the plan's blocks, which the backends read instead of the spec's
+  (`isoloom_plan::ipv6::router_address` is crate-internal). `isoloom_render::route_line` writes
+  every `ip route replace`, and `isoloom_render::trunks::of_machines` keeps machines by name and
+  spec. `isoloom_manifest::Cidr` converts from `isoloom_spec::net::Cidr` (`From`, through
+  `Cidr::ipv4`) instead of through text.
 - **Breaking (library): the plan carries what the backends read of the spec**: the inputs, the
   secrets, each machine's role, the tools with their addresses and the constraints
   (`Environment::{inputs, secrets, tools, constraints}`, `MachinePlan::role`);

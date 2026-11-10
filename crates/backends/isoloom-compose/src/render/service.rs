@@ -208,7 +208,7 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
     };
     let spec = env.spec();
     let name = m.name;
-    let w = appliances::wiring(spec, name, m.spec, kind, |n, o| isoloom_plan::addressing::address(spec, n, o));
+    let w = appliances::wiring(env, name, m.spec, kind);
     for f in w.files {
         files.push(GeneratedFile {
             path: format!("{OUTPUT_DIR}/{DIR}/appliances/{name}/{}", f.name),
@@ -438,12 +438,14 @@ mod tests {
 
     #[test]
     fn appliance_interfaces_attach_in_order_from_the_highest_priority() {
+        let target = isoloom_spec::model::Target::Docker;
         let spec = isoloom_plan::Lab::parse(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  r: { networks: { a: 1, b: 1 }, app: { image: iol, appliance: cisco-iol } }\n",
         )
         .expect("parses")
-        .for_target(isoloom_spec::model::Target::Docker);
-        let ports = appliances::ports(&spec, "r", &spec.machines["r"], &|n, o| isoloom_plan::addressing::address(&spec, n, o));
+        .for_target(target);
+        let env = Environment::build(&spec, target, None);
+        let ports = appliances::ports(&env, "r", &spec.machines["r"]);
         let nets = appliance_networks(&spec, "r", &ports, Vec::new());
         let order: Vec<(&str, Option<u32>)> = nets.iter().map(|(n, a)| (n.as_str(), a.as_ref().and_then(|a| a.priority))).collect();
         assert_eq!(order, [("isoloom-mgmt", Some(1000)), ("a", Some(999)), ("b", Some(998))]);

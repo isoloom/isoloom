@@ -17,7 +17,7 @@ use crate::routing;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ipv6Plan {
     /// Its /64 block.
-    pub cidr: String,
+    pub cidr: Cidr6,
     /// The host's address on it (Docker's bridge, the hypervisor): `::1`.
     pub gateway: Ipv6Addr,
     /// Whether machines get the address derived from their octet, or the target's.
@@ -27,10 +27,10 @@ pub struct Ipv6Plan {
 }
 
 /// An IPv6 route to a block a machine isn't on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Route6 {
     /// The block.
-    pub cidr: String,
+    pub cidr: Cidr6,
     /// The next hop: the router's IPv6 address on a network the machine is on.
     pub via: Ipv6Addr,
 }
@@ -47,7 +47,7 @@ pub fn network(spec: &Spec, network: &str) -> Option<Ipv6Plan> {
     let v6 = spec.networks.get(network)?.ipv6.as_ref()?;
     let c = Cidr6::parse(&v6.cidr)?;
     Some(Ipv6Plan {
-        cidr: c.to_string(),
+        cidr: c,
         gateway: c.gateway(),
         addresses: v6.addresses,
         only: v6.only,
@@ -80,7 +80,7 @@ pub fn addresses(spec: &Spec, m: &Machine) -> IndexMap<String, Ipv6Addr> {
 /// The router's IPv6 address on a network it routes: the one its IPv4 octet gives (`::254` in
 /// a /24), fixed whatever the network's `addresses`.
 #[must_use]
-pub fn router_address(spec: &Spec, network: &str) -> Option<Ipv6Addr> {
+pub(crate) fn router_address(spec: &Spec, network: &str) -> Option<Ipv6Addr> {
     let octet = cidr(spec, network).router().octets()[3];
     block(spec, network).map(|c| c.host(octet))
 }
@@ -92,6 +92,16 @@ pub(crate) fn router(spec: &Spec) -> IndexMap<String, Ipv6Addr> {
         return IndexMap::new();
     }
     routing::networks(spec).filter_map(|n| Some((n.clone(), router_address(spec, n)?))).collect()
+}
+
+impl crate::Environment {
+    /// Isoloom's router's IPv6 address on network `network`, when the network has an IPv6 block:
+    /// the one the router's IPv4 octet gives (`::254` in a /24).
+    #[must_use]
+    pub fn router6_on(&self, network: &str) -> Option<Ipv6Addr> {
+        let v6 = self.networks.get(network)?.ipv6.as_ref()?;
+        Some(v6.cidr.host(self.block(network).router().octets()[3]))
+    }
 }
 
 /// A machine's IPv6 routes: each IPv6 block it isn't on, through the router's IPv6 address on
@@ -108,21 +118,11 @@ pub(crate) fn routes(spec: &Spec, m: &Machine) -> Vec<Route6> {
         .filter(|n| !m.networks.contains_key(*n))
         .filter_map(|n| {
             Some(Route6 {
-                cidr: block(spec, n)?.to_string(),
+                cidr: block(spec, n)?,
                 via: *via,
             })
         })
         .collect()
-}
-
-/// A cloud's network routes between its subnets, IPv6 included, and has no Isoloom router:
-/// the IPv6 step keeps the addresses and drops the routes.
-pub(crate) fn cloud_routes(steps: &mut [crate::lifecycle::Step]) {
-    for s in steps {
-        if let crate::lifecycle::Step::Ipv6 { routes, .. } = s {
-            routes.clear();
-        }
-    }
 }
 
 /// Why a target without IPv6-only networks refuses network `network`.
@@ -167,7 +167,6 @@ pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lifecycle::Step;
 
     fn spec() -> Spec {
         crate::testing::spec(
@@ -193,8 +192,8 @@ machines:
         assert!(only(&s, "a") && !only(&s, "b") && !only(&s, "nowhere"));
         let plan = network(&s, "a").expect("an IPv6 side");
         assert_eq!(
-            (plan.cidr.as_str(), plan.gateway.to_string(), plan.only),
-            ("fd00:1::/64", "fd00:1::1".to_owned(), true)
+            (plan.cidr.to_string(), plan.gateway.to_string(), plan.only),
+            ("fd00:1::/64".to_owned(), "fd00:1::1".to_owned(), true)
         );
         assert_eq!(network(&spec(), "c"), None);
         let kinds: Vec<Requirement> = requirements(&s);
@@ -203,28 +202,6 @@ machines:
             [Requirement::Ipv6 { network: "a".into() }, Requirement::Ipv6Only { network: "a".into() }]
         );
         assert_eq!(requirements(&spec()).last(), Some(&Requirement::Ipv6Auto { network: "b".into() }));
-    }
-
-    #[test]
-    fn a_cloud_keeps_the_addresses_and_drops_the_routes() {
-        let mut steps = vec![
-            Step::Ipv6 {
-                addresses: Vec::new(),
-                routes: routes(&spec(), &spec().machines["x"]),
-            },
-            Step::Ready,
-        ];
-        cloud_routes(&mut steps);
-        assert_eq!(
-            steps,
-            [
-                Step::Ipv6 {
-                    addresses: Vec::new(),
-                    routes: Vec::new()
-                },
-                Step::Ready
-            ]
-        );
     }
 
     #[test]
@@ -242,10 +219,10 @@ machines:
         assert_eq!(
             r,
             vec![Route6 {
-                cidr: "fd00:2::/64".into(),
+                cidr: Cidr6::parse("fd00:2::/64").unwrap(),
                 via: "fd00:1::254".parse().unwrap()
             }]
         );
-        assert_eq!(routes(&s, &s.machines["y"])[0].cidr, "fd00:1::/64");
+        assert_eq!(routes(&s, &s.machines["y"])[0].cidr.to_string(), "fd00:1::/64");
     }
 }

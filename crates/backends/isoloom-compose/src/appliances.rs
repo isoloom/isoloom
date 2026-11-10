@@ -28,6 +28,7 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
+use isoloom_plan::Environment;
 pub(crate) use isoloom_spec::appliance::MGMT_CIDR;
 use isoloom_spec::appliance::is_switch;
 use isoloom_spec::model::{Appliance, Machine, Spec};
@@ -117,14 +118,15 @@ enum Role {
 
 /// The data interfaces of appliance `name`, in order: its networks; for a LAN's `switch`, an
 /// access port per VLAN of the LAN, then a trunk port per machine on several of them.
-pub(crate) fn ports(spec: &Spec, name: &str, m: &Machine, address: &impl Fn(&str, u8) -> Ipv4Addr) -> Vec<Port> {
+pub(crate) fn ports(env: &Environment, name: &str, m: &Machine) -> Vec<Port> {
+    let spec = env.spec();
     let Some(lan) = vlans::switched_by(spec, name) else {
         return m
             .networks
             .iter()
             .map(|(net, octet)| Port {
                 network: net.clone(),
-                address: Some(address(net, *octet)),
+                address: Some(env.address_on(net, *octet)),
                 role: Role::Network,
             })
             .collect();
@@ -132,7 +134,7 @@ pub(crate) fn ports(spec: &Spec, name: &str, m: &Machine, address: &impl Fn(&str
     let mut out: Vec<Port> = vlans::of_lan(spec, lan)
         .map(|(net, id)| Port {
             network: net.clone(),
-            address: Some(trunks::switch_address(spec, net)),
+            address: Some(trunks::switch_address(env, net)),
             role: Role::Access(id),
         })
         .collect();
@@ -180,7 +182,7 @@ pub(crate) struct Wiring {
 /// management interface, a switch's VLANs, each interface (a router's with its address), the
 /// management route, remote access.
 struct StartupConfig<'a> {
-    spec: &'a Spec,
+    env: &'a Environment,
     name: &'a str,
     kind: Appliance,
     ports: &'a [Port],
@@ -190,7 +192,8 @@ impl StartupConfig<'_> {
     /// The domain the appliance names itself under (IOS needs one for its SSH keys): the private
     /// DNS zone's when `dns.private` is on, else `<environment>.internal`, the zone's default.
     fn domain(&self) -> String {
-        self.spec.private_domain().unwrap_or_else(|| format!("{}.internal", self.spec.name))
+        let spec = self.env.spec();
+        spec.private_domain().unwrap_or_else(|| format!("{}.internal", spec.name))
     }
 
     /// Whether the kind is IOL, whose management port lives in a VRF of its own.
@@ -204,7 +207,7 @@ impl StartupConfig<'_> {
             f,
             "no aaa new-model\nip cef\n!\nvrf definition isoloom-mgmt\n description Isoloom management\n address-family ipv4\n exit-address-family\n!\ninterface Ethernet0/0\n{}vrf forwarding isoloom-mgmt\n description Isoloom management\n ip address {} {}\n no shutdown\n!\n",
             if is_switch(self.kind) { " no switchport\n " } else { " " },
-            mgmt_address(self.spec, self.name),
+            mgmt_address(self.env.spec(), self.name),
             MGMT.netmask(),
         )
     }
@@ -237,7 +240,7 @@ impl StartupConfig<'_> {
             Role::Network => {
                 writeln!(f, " description {}", port.network)?;
                 if let (false, Some(addr)) = (is_switch(self.kind), port.address) {
-                    let block = isoloom_plan::addressing::cidr(self.spec, &port.network);
+                    let block = self.env.block(&port.network);
                     writeln!(f, " ip address {addr} {}", block.netmask())?;
                 }
             }
@@ -277,10 +280,11 @@ impl fmt::Display for StartupConfig<'_> {
 }
 
 /// How the container of appliance `name` is wired.
-pub(crate) fn wiring(spec: &Spec, name: &str, m: &Machine, kind: Appliance, address: impl Fn(&str, u8) -> Ipv4Addr) -> Wiring {
-    let ports = ports(spec, name, m, &address);
+pub(crate) fn wiring(env: &Environment, name: &str, m: &Machine, kind: Appliance) -> Wiring {
+    let spec = env.spec();
+    let ports = ports(env, name, m);
     let cfg = StartupConfig {
-        spec,
+        env,
         name,
         kind,
         ports: &ports,
@@ -423,9 +427,10 @@ mod tests {
     /// The startup configuration of appliance `r` of `yaml`.
     fn config(yaml: &str) -> String {
         let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).unwrap());
-        let spec = lab.for_target(isoloom_spec::model::Target::Docker);
+        let target = isoloom_spec::model::Target::Docker;
+        let env = Environment::build(&lab.for_target(target), target, None);
         StartupConfig {
-            spec: &spec,
+            env: &env,
             name: "r",
             kind: Appliance::CiscoIol,
             ports: &[],

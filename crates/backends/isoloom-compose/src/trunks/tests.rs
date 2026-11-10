@@ -1,13 +1,19 @@
 use std::net::Ipv4Addr;
 
-use isoloom_plan::Lab;
+use isoloom_plan::{Environment, Lab};
 use isoloom_render::test_support::VLAN_OFFICE;
-use isoloom_spec::model::Spec;
+use isoloom_spec::model::{Spec, Target};
 
 use super::{End, carried, containers, link_network, mac, machine_commands, machine_ready, of, switch_address, switch_name, switch_ready, switch_script};
 
 fn spec() -> Spec {
     Lab::parse(VLAN_OFFICE).expect("the test's spec parses").spec()
+}
+
+/// The plan of the example on the `docker` target, whose blocks the trunks take.
+fn env() -> Environment {
+    let lab = Lab::parse(VLAN_OFFICE).expect("the test's spec parses");
+    Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)
 }
 
 #[test]
@@ -40,14 +46,14 @@ fn each_end_has_a_stable_local_mac_of_its_own() {
 
 #[test]
 fn the_switch_bridges_each_vlan_once_and_tags_every_trunk() {
-    let spec = spec();
-    let ts = containers(&spec);
+    let env = env();
+    let ts = containers(env.spec());
     let refs: Vec<&super::Trunk> = ts.iter().take(2).collect();
-    let script = switch_script(&spec, &refs);
+    let script = switch_script(&env, &refs);
     assert_eq!(script.matches("ip link add br10 type bridge").count(), 1, "{script}");
     assert_eq!(script.matches("ip link add br20 type bridge").count(), 1, "{script}");
     assert_eq!(script.matches("type vlan id").count(), 4, "{script}");
-    let switch = switch_address(&spec, "office-vlan10");
+    let switch = switch_address(&env, "office-vlan10");
     assert!(
         script.starts_with(&format!("IF=$(ip -o -4 addr show | awk '$4 ~ /^{}\\//", switch.to_string().replace('.', "\\."))),
         "{script}"
@@ -62,11 +68,11 @@ fn the_switch_bridges_each_vlan_once_and_tags_every_trunk() {
 
 #[test]
 fn the_machine_end_routes_out_through_a_vlan_with_internet_when_nothing_else_does() {
-    let spec = spec();
-    let ts = containers(&spec);
-    let at = |n: &str, o: u8| isoloom_plan::addressing::address(&spec, n, o);
+    let env = env();
+    let spec = env.spec();
+    let ts = containers(spec);
     let gateway = |_: &str| Ipv4Addr::new(10, 70, 20, 1);
-    let cmds = machine_commands(&spec, &spec.machines["admin"], &ts[0], at, gateway);
+    let cmds = machine_commands(&env, &spec.machines["admin"], &ts[0], gateway);
     assert_eq!(cmds.len(), 4, "{cmds:?}");
     assert!(cmds[0].contains("02:1e:1d:38:30:38") && cmds[0].ends_with("ip link set $IF name office && ip link set office up"));
     assert_eq!(
@@ -75,7 +81,7 @@ fn the_machine_end_routes_out_through_a_vlan_with_internet_when_nothing_else_doe
     );
     assert_eq!(cmds[3], "ip route replace default via 10.70.20.1");
     // `ops` has its own way out (`servers`, online): no default route through the trunk.
-    let other_way_out = machine_commands(&spec, &spec.machines["ops"], &ts[2], at, gateway);
+    let other_way_out = machine_commands(&env, &spec.machines["ops"], &ts[2], gateway);
     assert!(!other_way_out.iter().any(|c| c.contains("default")), "{other_way_out:?}");
     assert_eq!(
         machine_ready(&ts[0]),

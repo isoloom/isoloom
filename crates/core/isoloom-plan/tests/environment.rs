@@ -51,7 +51,7 @@ fn machines_have_their_addresses_names_and_ports() -> Outcome {
     assert_eq!(web.shape, MachineShape::Vm);
     // web isn't on back: it routes there through the router, at front's last address.
     assert_eq!(web.routes.len(), 1);
-    assert_eq!(web.routes[0].cidr, "10.31.0.0/24");
+    assert_eq!(web.routes[0].cidr.to_string(), "10.31.0.0/24");
     assert_eq!(env.router.as_ref().map(|r| r["front"]), Some(web.routes[0].via));
     assert_eq!(env.address_for("web", "db"), Ipv4Addr::new(10, 30, 0, 20));
     Ok(())
@@ -188,4 +188,35 @@ fn secrets_come_before_what_reads_them_on_linux_and_windows() -> Outcome {
     assert!(env.machines["win"].lifecycle.contains(&Step::Secrets));
     assert!(refusal(&env.requirements, &Capabilities::of([Feature::Secrets, Feature::MachineProcess])).is_none());
     Ok(())
+}
+
+/// A VM's `Routes` and `Ipv6` steps carry the routes its plan holds, worked out once: they were
+/// worked out a second time for the steps.
+#[test]
+fn a_vms_route_steps_are_its_plans_routes() {
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
+    let mut seen = 0;
+    for entry in std::fs::read_dir(examples).unwrap() {
+        let dir = entry.unwrap().path();
+        if !dir.join("isoloom.yml").is_file() {
+            continue;
+        }
+        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).unwrap());
+        for target in [Target::Vagrant, Target::Proxmox, Target::CloudVm] {
+            let env = Environment::build(&lab.for_target(target), target, None);
+            for (name, mp) in &env.machines {
+                for step in &mp.lifecycle {
+                    match step {
+                        Step::Routes { routes, default } => {
+                            assert_eq!((routes, *default), (&mp.routes, mp.default_gateway), "{}: {name}", dir.display());
+                            seen += 1;
+                        }
+                        Step::Ipv6 { routes, .. } => assert_eq!(routes, &mp.routes6, "{}: {name}", dir.display()),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    assert!(seen > 0);
 }

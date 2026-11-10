@@ -6,6 +6,7 @@ use std::net::Ipv4Addr;
 
 use isoloom_plan::Environment;
 use isoloom_render::container::UTILITY_IMAGE;
+use isoloom_render::route_line;
 use isoloom_render::router;
 use isoloom_spec::{validate, vlans};
 
@@ -99,27 +100,26 @@ fn on_tc(env: &Environment, m: Machine<'_>) -> bool {
 /// (or a gateway's own way out), no default route when offline, then `tc` on its interfaces.
 fn commands(env: &Environment, m: Machine<'_>) -> Vec<String> {
     let spec = env.spec();
-    let address = |n: &str, o: u8| isoloom_plan::addressing::address(spec, n, o);
     // An appliance routes itself (IOS): its sidecar only hands the data addresses over to it.
     if m.is_appliance() {
-        return appliances::sidecar_commands(appliances::ports(spec, m.name, m.spec, &address).len());
+        return appliances::sidecar_commands(appliances::ports(env, m.name, m.spec).len());
     }
     let ts = trunks::containers(spec);
     let mut cmds: Vec<String> = trunks::of(&ts, m.name)
-        .flat_map(|t| trunks::machine_commands(spec, m.spec, t, address, |n| networks::docker_address(env, n)))
+        .flat_map(|t| trunks::machine_commands(env, m.spec, t, |n| networks::docker_address(env, n)))
         .map(|c| literal(&c))
         .collect();
-    cmds.extend(m.plan.routes.iter().map(|r| format!("ip route replace {} via {}", r.cidr, r.via)));
+    cmds.extend(m.plan.routes.iter().map(|r| route_line(r.cidr, r.via)));
     cmds.extend(ipv6::route_commands(m.plan));
     if let Some(gw) = m.plan.default_gateway.or_else(|| own_default(env, m)) {
-        cmds.push(format!("ip route replace default via {gw}"));
+        cmds.push(route_line("default", gw));
     }
     if drops_default(env, m) {
         cmds.push("(ip route del default 2>/dev/null || true)".into());
         cmds.extend(ipv6::on_ipv6(env, m.plan).then(|| "(ip -6 route del default 2>/dev/null || true)".into()));
     }
     // `tc` on its own interfaces, one subshell per line (`$$`: not Compose's interpolation).
-    if let Some(script) = router::machine_tc_script(spec, m.spec, address) {
+    if let Some(script) = router::machine_tc_script(spec, m.spec, |n, o| env.address_on(n, o)) {
         cmds.extend(script.lines().map(|l| format!("({})", literal(l))));
     }
     cmds

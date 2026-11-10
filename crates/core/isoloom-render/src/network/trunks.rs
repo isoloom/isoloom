@@ -14,8 +14,7 @@
 
 use std::net::Ipv4Addr;
 
-use isoloom_plan::addressing::cidr;
-use isoloom_spec::images::is_windows;
+use isoloom_plan::Environment;
 use isoloom_spec::model::{Machine, Spec};
 
 /// One VLAN a trunk carries.
@@ -42,17 +41,18 @@ pub struct Trunk {
     pub vlans: Vec<Vlan>,
 }
 
-/// The trunks of the machines run as Linux VMs: each on two or more VLANs of one LAN.
+/// The trunks of the machines the plan runs as Linux VMs: each on two or more VLANs of one LAN.
 #[must_use]
-pub(crate) fn vms(spec: &Spec) -> Vec<Trunk> {
-    of_machines(spec, |m| m.vm.as_ref().is_some_and(|vm| !is_windows(&vm.os)))
+pub(crate) fn vms(env: &Environment) -> Vec<Trunk> {
+    of_machines(env.spec(), |name, _| env.vm(name).is_some_and(|vm| !vm.plan.is_windows()))
 }
 
-/// The trunks of the machines `kept` keeps: a trunk per machine and LAN with two VLANs or more.
+/// The trunks of the machines `kept` keeps (by name and spec): a trunk per machine and LAN with
+/// two VLANs or more.
 #[must_use]
-pub fn of_machines(spec: &Spec, kept: impl Fn(&Machine) -> bool) -> Vec<Trunk> {
+pub fn of_machines(spec: &Spec, kept: impl Fn(&str, &Machine) -> bool) -> Vec<Trunk> {
     let mut out: Vec<Trunk> = Vec::new();
-    for (name, m) in spec.machines.iter().filter(|(_, m)| kept(m)) {
+    for (name, m) in spec.machines.iter().filter(|(n, m)| kept(n, m)) {
         for (net, octet) in &m.networks {
             let Some((lan, id)) = spec.networks.get(net).and_then(|n| n.vlan.as_ref()) else {
                 continue;
@@ -99,7 +99,7 @@ fn vm_peer(lan: &str) -> String {
 
 /// Commands that build a VM's trunk (once per boot: they do nothing when it's there).
 #[must_use]
-pub(crate) fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> Ipv4Addr) -> Vec<String> {
+pub(crate) fn vm_commands(env: &Environment, t: &Trunk) -> Vec<String> {
     let name = interface(&t.lan);
     let peer = vm_peer(&t.lan);
     let mut steps = vec![
@@ -108,8 +108,8 @@ pub(crate) fn vm_commands(spec: &Spec, t: &Trunk, address: impl Fn(&str, u8) -> 
         format!("ip link set {peer} up"),
     ];
     for v in &t.vlans {
-        let (id, addr) = (v.id, address(&v.network, v.octet));
-        let len = cidr(spec, &v.network).prefix();
+        let (id, addr) = (v.id, env.address_on(&v.network, v.octet));
+        let len = env.block(&v.network).prefix();
         // The NIC keeps a local MAC; `<lan>.<id>` takes the one the hypervisor gave it.
         let local = format!("02:1f:{}", addr.octets().map(|o| format!("{o:02x}")).join(":"));
         steps.push(format!(

@@ -62,11 +62,10 @@ fn router_service(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>) -> 
 
 /// A LAN's switch: on each of its VLAN networks and on each trunk to it, bridging them per VLAN.
 fn switch_service(env: &Environment, ts: &[&trunks::Trunk]) -> Service {
-    let spec = env.spec();
     let mut networks = IndexMap::new();
     for t in ts {
         for v in &t.vlans {
-            networks.insert(v.network.clone(), Some(Attachment::at(trunks::switch_address(spec, &v.network))));
+            networks.insert(v.network.clone(), Some(Attachment::at(trunks::switch_address(env, &v.network))));
         }
         networks.insert(trunks::link_network(t), Some(Attachment::with_mac(trunks::mac(t, trunks::End::Switch))));
     }
@@ -75,7 +74,7 @@ fn switch_service(env: &Environment, ts: &[&trunks::Trunk]) -> Service {
         cap_add: vec!["NET_ADMIN".into()],
         networks,
         init: true,
-        entrypoint: vec!["/bin/sh".into(), "-c".into(), literal(&trunks::switch_script(spec, ts))],
+        entrypoint: vec!["/bin/sh".into(), "-c".into(), literal(&trunks::switch_script(env, ts))],
         healthcheck: Some(Healthcheck::shell(trunks::switch_ready(ts), Seconds(2), 30)),
         restart: Some(Restart::UnlessStopped),
         ..Service::default()
