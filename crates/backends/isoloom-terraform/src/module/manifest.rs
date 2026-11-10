@@ -152,8 +152,10 @@ pub(crate) fn param(v: &Variable, required: bool) -> Result<Param, ManifestError
 }
 
 /// The seal's run-manifest param (`crate::cloud::vm::seal`): the runner sets it `true` once the
-/// machines are set up (its default is `false`), delivered to the module's `isoloom_sealed`
-/// Terraform variable. `closed_at` names where the internet is closed for the description (the
+/// machines are set up (its default is `false`) and records it with the run. It is delivered as
+/// the `isoloom_sealed` Terraform variable: a cloud module's rules switch on it; the Proxmox
+/// module has no such variable (its router is sealed by the seal's SSH step), so Terraform
+/// ignores it there. `closed_at` names where the internet is closed for the description (the
 /// clouds' "network", a server's "router").
 pub(crate) fn seal_param(name: &str, closed_at: &str) -> Result<Param, ManifestError> {
     Ok(Param {

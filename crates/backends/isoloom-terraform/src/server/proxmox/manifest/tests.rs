@@ -48,17 +48,15 @@ fn an_unsealed_run_has_no_seal_step_and_no_sealed_param() {
 fn the_seal_applies_the_sealed_ruleset_live_on_the_router() {
     let m = manifest(&env(SEALED_LAB)).unwrap();
     m.validate().unwrap();
-    // The runner sets the seal param once the machines are ready; it reaches the module's
-    // `isoloom_sealed` variable (later boots are sealed through its conditional snippet).
+    // The runner sets the seal param once the machines are ready and records it.
     let seal = m.lifecycle.seal.as_ref().expect("a run with an internet:false network seals");
     assert_eq!(seal.param.as_str(), "isoloom_sealed");
     assert!(m.params.iter().any(|p| p.name.as_str() == "isoloom_sealed" && p.set_by == SetBy::Runner));
-    // Two steps: the second apply (keeps the snippet in sync for later boots), then an ssh.run
-    // that applies the sealed ruleset live to the already-booted router (the snippet change
-    // alone never reaches a running guest).
+    // One step, no second apply (the module never changes for the seal): an ssh.run that
+    // applies the sealed ruleset live to the already-booted router and keeps it for later boots.
     let ids: Vec<&str> = seal.steps.iter().map(|s| s.id.as_str()).collect();
-    assert_eq!(ids, ["seal", "seal-reload"]);
-    let reload = &seal.steps.as_slice()[1];
+    assert_eq!(ids, ["seal-reload"]);
+    let reload = &seal.steps.as_slice()[0];
     let Run::Action { action: Action::SshRun, with } = &reload.run else {
         panic!("{:?}", reload.run)
     };

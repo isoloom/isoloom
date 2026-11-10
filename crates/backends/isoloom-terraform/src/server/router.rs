@@ -32,9 +32,9 @@ pub(crate) fn forwarding(env: &Environment) -> String {
 
 /// The `/etc/nftables.conf` content: always the unsealed ruleset (the `reach` rules, the
 /// published ports forwarded from the uplink address, and the internet for every network). It
-/// never depends on `isoloom_sealed`, so the seal's second apply leaves the router's cloud-init
-/// snippet untouched (a changed snippet forces the VM to be recreated). The seal is applied live
-/// instead, from [`SEALED_NFT`], by the runner's seal-reload step ([`sealed_reload`]).
+/// never depends on the seal, so a later apply leaves the router's cloud-init snippet untouched
+/// (a changed snippet forces the VM to be recreated). The seal is applied live instead, from
+/// [`SEALED_NFT`], by the runner's seal-reload step ([`sealed_reload`]).
 pub(crate) fn ruleset_content(env: &Environment) -> Expression {
     string(rules(env, false))
 }
@@ -45,8 +45,8 @@ pub(crate) fn ruleset_content(env: &Environment) -> Expression {
 pub(crate) const SEALED_NFT: &str = "/etc/nftables.sealed.nft";
 
 /// The sealed ruleset as the router's `SEALED_NFT` file, when the run has something to seal (left
-/// out otherwise, so an unsealed lab's router is unchanged). Written unconditionally so the seal's
-/// second apply never changes it (and so never recreates the router).
+/// out otherwise, so an unsealed environment's router is unchanged). Written from the first boot,
+/// so sealing never changes the snippet (and so never recreates the router).
 pub(crate) fn sealed_file(env: &Environment) -> Option<Expression> {
     seal::any(env).then(|| crate::machine::cloud_init::file(SEALED_NFT, None, string(rules(env, true))))
 }

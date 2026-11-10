@@ -1622,26 +1622,6 @@ locals {
       "param": "isoloom_sealed",
       "steps": [
         {
-          "id": "seal",
-          "note": "Closing the internet to the networks without it…",
-          "argv": [
-            "terraform",
-            "apply",
-            "-auto-approve",
-            "-input=false",
-            "-no-color"
-          ],
-          "env": {
-            "TF_DATA_DIR": "${run.state_dir}/.terraform",
-            "TF_INPUT": "0",
-            "TF_IN_AUTOMATION": "1",
-            "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
-            "TF_VAR_slot": "${run.slot}",
-            "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
-          },
-          "timeout_s": 3600
-        },
-        {
           "id": "seal-reload",
           "action": "ssh.run",
           "with": {

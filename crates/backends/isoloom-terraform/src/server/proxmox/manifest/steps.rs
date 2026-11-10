@@ -27,11 +27,11 @@ const VARS: &[(&str, RunVar)] = &[
     ("TF_VAR_proxmox_ssh_private_key_file", RunVar::SshKey),
 ];
 
-/// The seal reload over SSH: once the second apply has put the sealed snippet in place (for
-/// later boots), the runner reloads nftables on the already-booted router from its `SEALED_NFT`
-/// file, so the seal takes effect live — the host-side snippet change alone never reaches a
-/// running guest (`crate::server::router::sealed_reload`). Reached directly at the router's
-/// uplink address (`${outputs.ip}`), the lab's way in, as `isoloom`.
+/// The seal, over SSH: the runner applies the router's sealed ruleset (its `SEALED_NFT` file,
+/// written at boot) live and keeps it as `/etc/nftables.conf`, so later boots stay sealed
+/// (`crate::server::router::sealed_reload`). The module itself never changes for the seal, so no
+/// apply is needed. Reached directly at the router's uplink address (`${outputs.ip}`), the
+/// environment's way in, as `isoloom`.
 fn seal_reload() -> Result<Step, ManifestError> {
     let with = [
         ("host", output("ip")?),
@@ -45,9 +45,9 @@ fn seal_reload() -> Result<Step, ManifestError> {
 }
 
 /// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`); when the run
-/// has an `internet: false` network to seal (`sealed`), the seal: a second apply with
-/// `isoloom_sealed` on (so later boots are sealed), then an `ssh.run` reload applying the sealed
-/// ruleset live to the running router, once the machines are ready (`crate::server::router`).
+/// has an `internet: false` network to seal (`sealed`), the seal: one `ssh.run` applying the
+/// sealed ruleset to the running router once the machines are ready, and keeping it for later
+/// boots ([`seal_reload`]).
 pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
     let (lock, init) = (manifest::clear_lock, || manifest::init(VARS));
     let apply = |step, note| manifest::apply(step, note, VARS);
@@ -64,10 +64,7 @@ pub(super) fn lifecycle(sealed: bool) -> Result<Lifecycle, ManifestError> {
         .then(|| {
             Ok::<Seal, ManifestError>(Seal {
                 param: EnvName::parse(SEALED)?,
-                steps: NonEmpty::new(
-                    vec![apply("seal", "Closing the internet to the networks without it…")?, seal_reload()?],
-                    "lifecycle.seal.steps",
-                )?,
+                steps: NonEmpty::one(seal_reload()?),
             })
         })
         .transpose()?;

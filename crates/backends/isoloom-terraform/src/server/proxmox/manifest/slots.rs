@@ -14,8 +14,8 @@ use isoloom_render::run_manifest::derived_switch;
 use crate::module::variable::Variable;
 
 /// The run's seal switch, the runner's recorded `sealed` flag (`crate::server::router`). The
-/// router has no `isoloom_sealed` Terraform variable (its snippet is inert), so the second apply
-/// ignores it; the live seal is the seal-reload step.
+/// module has no `isoloom_sealed` Terraform variable (the router's snippet never changes), so
+/// Terraform ignores it; the seal is the seal-reload step.
 pub(super) const SEALED: &str = crate::cloud::vm::seal::SEALED;
 
 /// The module's variables the runner sets itself (`steps`): never params an embedder gives.
