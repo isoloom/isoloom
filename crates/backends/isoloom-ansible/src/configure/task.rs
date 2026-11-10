@@ -222,27 +222,15 @@ fn scalar(s: &str) -> String {
     if plain(s) { s.to_owned() } else { quoted(s) }
 }
 
-/// `s` double-quoted: a backslash, a quote and every control character escaped.
+/// `s` double-quoted, every control character escaped: as a JSON string, which a YAML
+/// double-quoted scalar reads the same, with DEL and the C1 controls (which JSON leaves as they
+/// are and a YAML file mustn't hold) escaped too.
 fn quoted(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            '\n' => out.push_str("\\n"),
-            '\t' => out.push_str("\\t"),
-            // Every control character is below U+00A0, so two hex digits name it.
-            c if c.is_control() => {
-                let n = u32::from(c);
-                out.push_str("\\x");
-                out.extend([n >> 4, n & 0xf].into_iter().filter_map(|d| char::from_digit(d, 16)));
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
+    Value::String(s.to_owned())
+        .to_string()
+        .chars()
+        .map(|c| if c.is_control() { format!("\\u{:04x}", u32::from(c)) } else { c.to_string() })
+        .collect()
 }
 
 /// Whether `s` is safe as a plain scalar: a path, a name, a package spec or an FQCN, never empty,
@@ -382,7 +370,7 @@ mod tests {
 
     proptest::proptest! {
         #[test]
-        fn any_text_reads_back_as_itself(s in "[ a-z{}#:\\-\"'\t\n\r\u{1b}é]{0,40}") {
+        fn any_text_reads_back_as_itself(s in "[ a-z{}#:\\-\"'\t\n\r\u{1b}\u{7f}\u{85}é]{0,40}") {
             let (value, text) = content(&s);
             proptest::prop_assert_eq!(read_back(&text), value, "{}", text);
         }

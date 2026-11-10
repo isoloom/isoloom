@@ -379,7 +379,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   ([migrating to 2.0](docs/guide/migrating-to-2.0.md)).
 - **The Ansible renderer's multi-line strings read back as written.** A block scalar had no
   indentation indicator and its lines were trimmed: a command or file whose first line starts
-  with spaces made unparseable YAML, and trailing spaces and extra final newlines were lost (the
+  with spaces made YAML that doesn't parse, and trailing spaces and extra final newlines were lost (the
   shell renderer kept them). A block scalar now carries its indentation (`|2`) and keeps every
   final newline (`|2+`); text a block can't hold exactly (a line ending in a space, a control
   character) is double-quoted with escapes.
