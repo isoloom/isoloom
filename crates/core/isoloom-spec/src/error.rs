@@ -191,7 +191,9 @@ pub enum Error {
     #[error("{0}")]
     Images(#[source] serde_yaml_ng::Error),
     /// A profile's name that isn't kebab-case.
-    #[error("profile `{0}`: a profile name is kebab-case (lowercase letters, digits, dashes)")]
+    #[error(
+        "profile `{0}`: a profile name is kebab-case, as a spec's name (lowercase letters and digits in words joined by single dashes, at most 63 characters)"
+    )]
     ProfileName(String),
     /// No profile by that name.
     #[error("no profile `{name}` ({})", Known { folder, known })]

@@ -160,7 +160,10 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     p.0
 }
 
-fn kebab(s: &str) -> bool {
+/// Kebab case, as an environment's name (`my-env`, `shop-2`): lowercase letters and digits in
+/// words joined by single dashes, at most 63 characters.
+#[must_use]
+pub fn kebab(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 63
         && s.split('-')
@@ -174,9 +177,10 @@ pub fn dns_label(s: &str) -> bool {
     kebab(s) && !s.starts_with(|c: char| c.is_ascii_digit())
 }
 
-/// An environment variable's (or Ansible variable's) name: letters, digits and `_`, not
-/// starting with a digit.
-fn variable_name(s: &str) -> bool {
+/// Whether `s` is an environment variable's (or Ansible variable's) name: letters, digits and
+/// `_`, not starting with a digit.
+#[must_use]
+pub fn is_variable(s: &str) -> bool {
     s.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 

@@ -151,6 +151,11 @@ fn profiles_are_listed_and_found_by_name() -> Outcome {
     let missing = profile::load(&dir, "c-site").unwrap_err().to_string();
     assert!(missing.contains("no profile `c-site`") && missing.contains("a-site, b-site"), "{missing}");
     assert!(profile::load(&dir, "../etc").unwrap_err().to_string().contains("kebab-case"));
+    for wrong in ["a--b", "-a", "a-", "A-site", &"a".repeat(64)] {
+        let e = profile::load(&dir, wrong).unwrap_err().to_string();
+        assert!(e.contains("kebab-case"), "{wrong}: {e}");
+    }
+    assert!(profile::load(&dir, &"a".repeat(63)).unwrap_err().to_string().contains("no profile"));
     std::fs::write(dir.join(profile::DIR).join("a-site.yaml"), "{}\n")?;
     assert!(profile::load(&dir, "a-site").unwrap_err().to_string().contains("keep one"));
     assert_eq!(profile::list(Path::new("/nonexistent")), Vec::<String>::new());

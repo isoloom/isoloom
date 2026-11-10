@@ -1,7 +1,7 @@
 //! The top level of the spec: `version`, `name`, the declared `inputs` and the `tags` (the
 //! `message`'s placeholders are the placeholder grammar's, [`crate::syntax::placeholder`]).
 
-use super::{Problems, kebab, variable_name};
+use super::{Problems, is_variable, kebab};
 use crate::model::Spec;
 use crate::tags;
 
@@ -40,7 +40,7 @@ pub(super) fn tags(spec: &Spec, p: &mut Problems) {
 /// Inputs are environment variables: their names must be ones a shell accepts.
 pub(super) fn inputs(spec: &Spec, p: &mut Problems) {
     for (i, input) in spec.inputs.iter().enumerate() {
-        if !variable_name(input) {
+        if !is_variable(input) {
             p.add(
                 format!("inputs[{i}]"),
                 format!("`{input}`: inputs are environment variable names (letters, digits and `_`, not starting with a digit)"),

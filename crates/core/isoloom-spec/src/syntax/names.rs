@@ -11,6 +11,7 @@ use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::Error;
+use crate::validate::is_variable;
 
 /// A newtype over `String` holding only values `$check` accepts; `$pattern` is the same rule as
 /// a JSON Schema pattern, `$rule` how an author fixes a value that breaks it.
@@ -164,13 +165,6 @@ impl Visitor<'_> for Text {
     fn visit_i64<E: de::Error>(self, v: i64) -> Result<String, E> {
         Ok(v.to_string())
     }
-}
-
-/// Whether `s` is an environment variable's name: letters, digits and `_`, not starting with a
-/// digit.
-#[must_use]
-pub(crate) fn is_variable(s: &str) -> bool {
-    s.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// The format version, `1`: the only one.

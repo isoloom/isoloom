@@ -1,7 +1,7 @@
 //! A machine's `environment`, `sysctls` and `ulimits`: names each can take, values that fit,
 //! and what its implementations can do with them.
 
-use super::{Problems, variable_name};
+use super::{Problems, is_variable};
 use crate::model::Machine;
 
 /// The sysctls a container can set: those the kernel keeps per network or IPC namespace.
@@ -19,7 +19,7 @@ pub(crate) const CONTAINER_SYSCTLS: &[&str] = &[
 pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
     let at = |field: &str, key: &str| format!("machines.{name}.{field}.{key}");
     for k in m.environment.keys() {
-        if !variable_name(k) {
+        if !is_variable(k) {
             p.add(at("environment", k), "a variable name: letters, digits and _, not starting with a digit");
         }
     }

@@ -76,7 +76,7 @@ struct File {
 /// A profile name: kebab-case, as a spec's name.
 #[must_use]
 fn valid_name(name: &str) -> bool {
-    !name.is_empty() && !name.starts_with('-') && !name.ends_with('-') && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    crate::validate::kebab(name)
 }
 
 /// The profile file for `name` in `project`: `profiles/<name>.yml` or `.yaml`, never both.

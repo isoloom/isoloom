@@ -1,6 +1,6 @@
 //! Environment-level provisioning (`provision:`) and the controller VM that runs it.
 
-use super::{Problems, variable_name};
+use super::{Problems, is_variable};
 use crate::model::{Provision, Spec};
 
 /// The controller is a Linux VM Isoloom drives over SSH, big enough for Ansible.
@@ -47,7 +47,7 @@ fn host_vars(spec: &Spec, i: usize, step: &Provision, p: &mut Problems) {
             p.unknown(format!("provision[{i}].host_vars.{machine}"), format!("no machine named `{machine}`"));
         }
         for k in vars.keys() {
-            if !variable_name(k) {
+            if !is_variable(k) {
                 p.add(
                     format!("provision[{i}].host_vars.{machine}.{k}"),
                     "a variable name: letters, digits and `_`, not starting with a digit",

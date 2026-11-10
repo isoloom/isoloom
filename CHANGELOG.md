@@ -415,6 +415,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   run, took the host port the runner chose (`ISOLOOM_HOSTPORTS`): the run's URL didn't answer.
   The relay, and its removal with the VM, now take the forward's own host number, written once
   for both, the `publish` number still the fallback when the runner chose none.
+- **A profile's name follows a spec's name rule.** `-p a--b` and a name longer than 63
+  characters were taken; they are refused as not kebab-case, and `isoloom profiles` leaves such
+  files out.
 - **A template `isoloom validate` can't read says why.** Any failure to read it (a folder at
   its path, no permission) was reported as "isn't a text file"; that is said now only of a file
   that isn't UTF-8 text, and any other failure gives the error.

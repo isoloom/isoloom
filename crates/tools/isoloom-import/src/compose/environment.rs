@@ -29,8 +29,7 @@ pub(super) fn variables(text: &str) -> Vec<String> {
 
 /// An input name from an environment variable name, as written (the shell reads it by that name).
 pub(super) fn input_name(s: &str) -> Option<String> {
-    let ok = !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !s.starts_with(|c: char| c.is_ascii_digit());
-    ok.then(|| s.to_owned())
+    isoloom_spec::validate::is_variable(s).then(|| s.to_owned())
 }
 
 /// The `environment` entries, mapping or list, as (name, value); `- NAME` alone has no value.

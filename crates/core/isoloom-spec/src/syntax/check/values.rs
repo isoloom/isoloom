@@ -8,9 +8,9 @@ use std::net::IpAddr;
 use super::super::Spec;
 use super::super::files::FileSource;
 use super::super::machine::Machine;
-use super::super::names::is_variable;
 use super::super::problem::{Code, FieldPath, Problem, Problems, closest};
 use super::super::process::EnvValue;
+use crate::validate::is_variable;
 
 /// A machine's environment, files and DNS servers.
 pub(super) fn machine(spec: &Spec, at: &FieldPath, m: &Machine, out: &mut Problems) {

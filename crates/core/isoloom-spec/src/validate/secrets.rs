@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use super::{Problems, kebab, variable_name};
+use super::{Problems, is_variable, kebab};
 use crate::model::{MachineSecret, SecretSource, Spec, after_drive};
 
 /// The declared secrets, then every machine's.
@@ -42,7 +42,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
 fn source_problem(source: &SecretSource) -> Option<String> {
     let r = source.reference();
     match source {
-        SecretSource::Env { env: v } if !variable_name(v) => Some(format!(
+        SecretSource::Env { env: v } if !is_variable(v) => Some(format!(
             "`{v}` isn't an environment variable name (letters, digits and `_`, not starting with a digit)"
         )),
         SecretSource::File { file: f } if f.trim().is_empty() => Some("the file's path: absolute, `~/...`, or relative to the project".into()),
