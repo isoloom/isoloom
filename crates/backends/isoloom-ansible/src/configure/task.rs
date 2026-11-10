@@ -173,9 +173,8 @@ fn seq_item(out: &mut String, value: &Value, indent: usize) {
 /// holding Jinja.
 fn block(out: &mut String, prefix: &str, key: &str, s: &str, child: usize) {
     let body = s.trim_end_matches('\n');
-    let blockable = !body.is_empty()
-        && body.split('\n').all(|line| !line.ends_with([' ', '\t']))
-        && !s.chars().any(|c| c.is_control() && c != '\n' && c != '\t');
+    let blockable =
+        !body.is_empty() && body.split('\n').all(|line| !line.ends_with([' ', '\t'])) && !s.chars().any(|c| c.is_control() && c != '\n' && c != '\t');
     if !blockable {
         push(out, &format!("{prefix}{key}: {}{}", unsafe_tag(s), quoted(s)));
         return;
@@ -234,7 +233,11 @@ fn quoted(s: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\t' => out.push_str("\\t"),
             // Every control character is below U+00A0, so two hex digits name it.
-            c if c.is_control() => out.push_str(&format!("\\x{:02x}", u32::from(c))),
+            c if c.is_control() => {
+                let n = u32::from(c);
+                out.push_str("\\x");
+                out.extend([n >> 4, n & 0xf].into_iter().filter_map(|d| char::from_digit(d, 16)));
+            }
             c => out.push(c),
         }
     }
@@ -317,7 +320,10 @@ mod tests {
         assert!(text.contains("- !unsafe \"{# c #}\"\n"), "{text}");
         assert!(text.contains("- \"a}b{\"\n"), "a lone brace is no Jinja: {text}");
         assert!(text.contains("content: !unsafe |2\n"), "a block scalar is tagged too: {text}");
-        assert!(text.contains("own: \"{{ isoloom_project }}\"\n"), "Isoloom's own Jinja stays a template: {text}");
+        assert!(
+            text.contains("own: \"{{ isoloom_project }}\"\n"),
+            "Isoloom's own Jinja stays a template: {text}"
+        );
     }
 
     #[test]
@@ -335,9 +341,7 @@ mod tests {
             match v {
                 serde_yaml_ng::Value::Tagged(t) => untag(t.value),
                 serde_yaml_ng::Value::Sequence(items) => serde_yaml_ng::Value::Sequence(items.into_iter().map(untag).collect()),
-                serde_yaml_ng::Value::Mapping(m) => {
-                    serde_yaml_ng::Value::Mapping(m.into_iter().map(|(k, v)| (k, untag(v))).collect())
-                }
+                serde_yaml_ng::Value::Mapping(m) => serde_yaml_ng::Value::Mapping(m.into_iter().map(|(k, item)| (k, untag(item))).collect()),
                 other => other,
             }
         }
@@ -347,7 +351,9 @@ mod tests {
 
     /// A task whose `content` is `s`, as YAML.
     fn content(s: &str) -> (Value, String) {
-        let task = Task::new("x").module("ansible.builtin.copy", json!({ "content": s, "dest": "/f" })).into_value();
+        let task = Task::new("x")
+            .module("ansible.builtin.copy", json!({ "content": s, "dest": "/f" }))
+            .into_value();
         let text = yaml(vec![task.clone()]);
         (Value::Array(vec![task]), text)
     }

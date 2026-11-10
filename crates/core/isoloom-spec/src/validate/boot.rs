@@ -278,9 +278,16 @@ mod tests {
     #[test]
     fn a_box_is_a_box_name() {
         let p = alone(r#"{ os: debian@12, image: { vagrant: "corp/deb#{`id`}", hyperv: "a b" } }"#);
-        assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.vagrant: `corp/deb#{`id`}` isn't a Vagrant box name")), "{p:?}");
+        assert!(
+            p.iter()
+                .any(|p| p.starts_with("machines.a.vm.image.vagrant: `corp/deb#{`id`}` isn't a Vagrant box name")),
+            "{p:?}"
+        );
         assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.hyperv:")), "{p:?}");
-        assert!(alone("{ os: debian@12, image: { vagrant: bento/debian-12, qemu: generic/debian12 } }").is_empty());
+        assert_eq!(
+            alone("{ os: debian@12, image: { vagrant: bento/debian-12, qemu: generic/debian12 } }"),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

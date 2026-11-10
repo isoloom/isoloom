@@ -8,8 +8,8 @@ use isoloom_plan::{Environment, MachinePlan, Step};
 use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
 
-use crate::machine::user_data::{SetUp, Tracked, expiry_shutdown, project_wait};
 use crate::machine::controller::OWNER_ONLY;
+use crate::machine::user_data::{SetUp, Tracked, expiry_shutdown, project_wait};
 use crate::machine::{Shell, controller};
 
 /// `content` written owner-only at `path`, base64 on its way (the key, the inventory).

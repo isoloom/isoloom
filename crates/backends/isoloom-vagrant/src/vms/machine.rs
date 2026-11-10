@@ -194,9 +194,6 @@ mod tests {
         };
         let mut r = Ruby::new();
         boxed(&mut r, &image, Arch::Amd64, true);
-        assert_eq!(
-            r.finish(),
-            "m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"corp/deb\\#{`id`}\\\"\")\n"
-        );
+        assert_eq!(r.finish(), "m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"corp/deb\\#{`id`}\\\"\")\n");
     }
 }

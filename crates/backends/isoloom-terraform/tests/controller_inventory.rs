@@ -34,7 +34,7 @@ fn proxmoxs_controller_writes_its_inventory_owner_only() -> Outcome {
     let env = plan(LAB, Target::Proxmox)?;
     let tf = file(&ProxmoxBackend.render(&env)?, "proxmox/main.tf")?.to_owned();
     let at = tf.find("/etc/isoloom/inventory.ini").ok_or("no inventory in the module")?;
-    let entry = &tf[at.saturating_sub(200)..(at + 200).min(tf.len())];
+    let entry = tf.get(at.saturating_sub(200)..(at + 200).min(tf.len())).unwrap_or_default();
     assert!(entry.contains("\"0600\""), "the inventory is owner-only: {entry}");
     assert!(!entry.contains("\"0644\""), "{entry}");
     Ok(())

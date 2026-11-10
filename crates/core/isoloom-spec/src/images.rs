@@ -78,11 +78,7 @@ pub(crate) fn bad_boxes(image: &VmImage) -> impl Iterator<Item = (&'static str, 
 /// Whether `s` is a box name: `<name>` or `<org>/<name>`, each part letters, digits, `.`, `_`
 /// and `-`, not starting with `.` or `-`.
 fn is_box_name(s: &str) -> bool {
-    let part = |p: &str| {
-        !p.is_empty()
-            && !p.starts_with(['.', '-'])
-            && p.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
-    };
+    let part = |p: &str| !p.is_empty() && !p.starts_with(['.', '-']) && p.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
     match s.split_once('/') {
         Some((org, name)) => part(org) && part(name),
         None => part(s),
@@ -190,7 +186,10 @@ mod tests {
         for bad in ["corp/deb#{`id`}", "a b", "\"x\"", "/abs", "a/b/c", ".hidden", "org/"] {
             let yaml = format!("os:\n  debian@12: {{ vagrant: {} }}\n", serde_json::Value::String(bad.to_owned()));
             let err = Table::parse(&yaml).expect_err(bad).to_string();
-            assert!(err.contains("os.debian@12.vagrant:") && err.contains("isn't a Vagrant box name"), "{bad}: {err}");
+            assert!(
+                err.contains("os.debian@12.vagrant:") && err.contains("isn't a Vagrant box name"),
+                "{bad}: {err}"
+            );
         }
         let qemu = Table::parse("os:\n  debian@12: { qemu: \"q;rm\" }\n").unwrap_err().to_string();
         assert!(qemu.contains("os.debian@12.qemu:"), "{qemu}");

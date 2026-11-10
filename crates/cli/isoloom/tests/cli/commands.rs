@@ -449,7 +449,13 @@ fn check_compares_the_list_of_generated_files_like_any_generated_file() -> Outco
     let missing = isoloom(&home, &[&"check", &dir, &"--quiet"])?;
     assert_eq!(missing.code, Some(1), "{missing:?}");
     assert!(missing.stdout.contains("✗ .isoloom/.generated is missing"), "{}", missing.stdout);
-    std::fs::write(&list, text.lines().filter(|l| *l != ".isoloom/.gitignore").map(|l| format!("{l}\n")).collect::<String>())?;
+    std::fs::write(
+        &list,
+        text.lines()
+            .filter(|l| *l != ".isoloom/.gitignore")
+            .flat_map(|l| [l, "\n"])
+            .collect::<String>(),
+    )?;
     let short = isoloom(&home, &[&"check", &dir, &"--quiet"])?;
     assert!(short.stdout.contains("✗ .isoloom/.generated is out of date"), "{}", short.stdout);
     assert_eq!(isoloom(&home, &[&"generate", &dir])?.code, Some(0));

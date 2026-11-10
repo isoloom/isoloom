@@ -168,7 +168,11 @@ pub(super) fn run(r: &RunPlan, notify: &[String], vars: &str) -> Value {
         .set("vars", project_var(vars, r.script.as_str()));
     // No `creates`: it runs every apply (the shell renderer runs it too), so it always reports
     // `changed` (`ansible-lint`'s `no-changed-when`).
-    let task = if r.creates.is_none() { task.set("changed_when", Value::Bool(true)) } else { task };
+    let task = if r.creates.is_none() {
+        task.set("changed_when", Value::Bool(true))
+    } else {
+        task
+    };
     task.notify(notify).into_value()
 }
 
