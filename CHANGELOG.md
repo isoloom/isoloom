@@ -212,7 +212,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   of its own and Linode's firewalls carry the environment's labels and tags.
 - **The controller is `isoloom-controller` in Proxmox's run manifests and in Proxmox's and ESXi's
   `checks` output** (was `controller`), as on the clouds.
-- **`docker-vm`'s `up` provisions `nat-route` first** (`--provision-with nat-route,docker,...`),
+- **`docker-vm`'s `up` provisions `nat-route` first** (`--provision-with nat-route,...`),
   and every Linux VM of the Vagrant target has that provisioner first: see Fixed.
 - The run manifest's `entry` output role is "the address a user opens first", and a dormant port
   "one nothing listens on until something in the machine starts it" (schemas regenerated).
