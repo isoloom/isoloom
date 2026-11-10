@@ -25,6 +25,11 @@ serde_json.workspace = true
 serde_yaml_ng.workspace = true
 thiserror.workspace = true
 
+[features]
+# Isoloom's own `cargo xtask catalogue` (the conformance harness, what a refresh fetches): not
+# the library's API.
+maintenance = []
+
 [dev-dependencies]
 insta.workspace = true
 jsonschema.workspace = true

@@ -9,7 +9,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-isoloom-catalogue.workspace = true
+isoloom-catalogue = { workspace = true, features = ["maintenance"] }
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true

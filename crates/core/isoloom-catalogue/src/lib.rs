@@ -16,6 +16,8 @@
 //!   [`Family`], and its foreground form for containers.
 //! - **Schemas** ([`schema`]): of `entry.yml`, `contract.yml`, each entry's `with:`, and the
 //!   spec's schema with each entry's `with:` rule.
+//! - **Isoloom's own maintenance**, behind the `maintenance` feature (not the library's API):
+//!   the contracts' conformance harness and what `cargo xtask catalogue refresh` fetches.
 //!
 //! It sits above the spec (`isoloom-spec`) and below the plan, and is a functional core: no
 //! I/O, clock or environment, the embedded files aside.
@@ -44,12 +46,14 @@
 mod catalogue;
 mod check;
 mod collections;
+#[cfg(feature = "maintenance")]
 pub mod conformance;
 mod contract;
 mod embedded;
 mod entry;
 mod error;
 mod family;
+#[cfg(feature = "maintenance")]
 mod fetches;
 mod lock;
 mod names;
@@ -67,6 +71,7 @@ pub use entry::{
 };
 pub use error::{Error, Finding, Result};
 pub use family::{Family, apt_defaults};
+#[cfg(feature = "maintenance")]
 pub use fetches::{Fetches, KeyCheck, RepositoryFetch};
 pub use lock::{Digest, Lock, LockedImage, LockedKey, LockedRelease};
 pub use names::{CaseName, DataName, EntryName, Kind, Name, SettingName, VarName};

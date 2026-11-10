@@ -2,8 +2,10 @@
 //! into Isoloom: how a machine's service resolves, the rules a broken entry breaks, and the
 //! generated schemas.
 
+#[cfg(feature = "maintenance")]
 mod conformance;
 mod embedded;
+#[cfg(feature = "maintenance")]
 mod fetches;
 mod resolve;
 mod rules;

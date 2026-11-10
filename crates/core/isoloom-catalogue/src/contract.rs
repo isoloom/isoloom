@@ -91,6 +91,7 @@ impl ContractCheck {
     }
 
     /// Whether it runs in case `case`.
+    #[cfg(any(test, feature = "maintenance"))]
     #[must_use]
     pub(crate) fn runs_in(&self, case: &CaseName) -> bool {
         self.case.as_ref().is_none_or(|c| c == case)

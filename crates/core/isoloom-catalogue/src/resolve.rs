@@ -8,6 +8,7 @@ mod fill;
 mod recipe;
 mod surface;
 
+#[cfg(feature = "maintenance")]
 pub(crate) use fill::{Text, Values};
 pub use surface::{OfficialImage, ResolvedPort, ValueFile};
 
