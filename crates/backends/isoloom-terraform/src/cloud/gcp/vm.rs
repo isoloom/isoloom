@@ -41,7 +41,7 @@ const RULES: Rules = Rules {
     cloud: Cloud::Gcp,
     networks: Networks::Several,
     limits: Limits {
-        arm64: Some("arm64 on Google Cloud comes later (Arm-based machine types and arm64 images)"),
+        arm64: Some("Isoloom generates no arm64 VM on Google Cloud"),
         // A VPC per network: a route in one VPC to another's range goes through a machine.
         gateways: None,
         playbook_checks: Some(PLAYBOOK_CHECKS),
@@ -133,7 +133,7 @@ fn refusal(env: &Environment) -> Option<String> {
     let machine = spec.machines.iter().find_map(|(name, m)| {
         let vm = m.vm.as_ref()?;
         if is_windows(&vm.os) {
-            return Some(format!("machine `{name}`: Windows on GCP comes later"));
+            return Some(format!("machine `{name}`: Isoloom generates no Windows VM on Google Cloud"));
         }
         gpu_interfaces(env, name).or_else(|| RULES.image(name, m)).or_else(|| RULES.kept(env, name, m))
     });

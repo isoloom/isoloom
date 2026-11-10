@@ -1899,8 +1899,8 @@ volumes:
     ],
     "refused": {
       "kubernetes": "machine `aliases` (dotted DNS names) aren't Kubernetes Service names",
-      "proxmox": "networks with a `gateway` machine on Proxmox come later",
-      "esxi": "networks with a `gateway` machine on ESXi come later"
+      "proxmox": "Isoloom routes no network through a `gateway` machine on Proxmox",
+      "esxi": "Isoloom routes no network through a `gateway` machine on ESXi"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",

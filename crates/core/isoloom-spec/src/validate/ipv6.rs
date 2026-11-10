@@ -25,10 +25,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
             ),
         }
         if net.gateway.is_some() {
-            p.add(
-                &at,
-                "a network routed by a `gateway` machine carries IPv4 only for now: drop `ipv6` or the `gateway`",
-            );
+            p.add(&at, "a network routed by a `gateway` machine carries IPv4 only: drop `ipv6` or the `gateway`");
         }
         if v6.only {
             only(spec, name, net, p);
@@ -88,7 +85,7 @@ mod tests {
         ));
         assert_eq!(
             found,
-            ["networks.v6.ipv6: a network routed by a `gateway` machine carries IPv4 only for now: drop `ipv6` or the `gateway`"]
+            ["networks.v6.ipv6: a network routed by a `gateway` machine carries IPv4 only: drop `ipv6` or the `gateway`"]
         );
     }
 

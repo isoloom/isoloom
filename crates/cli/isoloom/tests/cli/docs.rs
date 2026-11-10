@@ -120,3 +120,13 @@ fn the_changelog_and_the_migration_guide_name_the_published_service_kubernetes_w
     assert!(guide.contains(&format!("Service is {pattern}")), "the migration guide");
     Ok(())
 }
+
+#[test]
+fn the_matrix_states_each_targets_facts_not_a_roadmap() -> Outcome {
+    let matrix = std::fs::read_to_string(root().join("docs/matrix.md"))?;
+    for promise in ["come later", "comes later", "comes next", "for now", "so far", " yet"] {
+        let found: Vec<&str> = matrix.lines().filter(|l| l.contains(promise)).collect();
+        assert!(found.is_empty(), "`{promise}`: {found:#?}");
+    }
+    Ok(())
+}

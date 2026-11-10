@@ -83,7 +83,7 @@ fn check_vlans(spec: &Spec) -> Result<(), Problem> {
             return Err(refused(here, why.to_owned()));
         }
         if net.ipv6.is_some() {
-            let why = "a LAN split into VLANs carries IPv4 only for now (drop `ipv6`, or give it no `vlans`)";
+            let why = "a LAN split into VLANs carries IPv4 only (drop `ipv6`, or give it no `vlans`)";
             return Err(refused(here.key("ipv6"), why.to_owned()));
         }
         let outer = Cidr::parse(&net.cidr);

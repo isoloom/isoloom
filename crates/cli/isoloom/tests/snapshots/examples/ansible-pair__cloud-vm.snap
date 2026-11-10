@@ -4,8 +4,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 # isoloom targets
 ✓ cloud-vm
     ✗ digitalocean (DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address)
-    ✗ linode (Linode cloud-vm has no Ansible controller yet)
-    ✗ oci (Oracle Cloud cloud-vm has no Ansible controller yet)
+    ✗ linode (Linode cloud-vm has no Ansible controller)
+    ✗ oci (Oracle Cloud cloud-vm has no Ansible controller)
 
 # isoloom generate --target cloud-vm (exit 0)
 ✓ .isoloom/cloud-vm/aws/main.tf

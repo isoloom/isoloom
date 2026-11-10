@@ -16,7 +16,7 @@ use crate::limits::Limits;
 use crate::machine::{controller, vms};
 
 /// Why the clouds refuse Ansible checks (`.yml`): no cloud runs them yet.
-pub(crate) const PLAYBOOK_CHECKS: &str = "Ansible checks (.yml) in the cloud come later";
+pub(crate) const PLAYBOOK_CHECKS: &str = "Ansible checks (.yml) don't run in the cloud";
 
 /// Why a cloud whose firewalls stand for the router refuses link impairment (`tc`).
 pub(crate) const FIREWALLS_TC: &str = "link impairment (`tc`) needs a router in the path; the cloud's firewalls have none";
@@ -299,7 +299,7 @@ pub(crate) struct Images {
 impl Images {
     /// Why machine `name` has no image on `cloud`: none for its OS, and none of its own.
     pub(crate) fn missing(&self, cloud: Cloud, name: &str, os: &str, own: Option<&str>) -> Option<String> {
-        (!self.table.oses().contains(&os) && own.is_none()).then(|| format!("machine `{name}`: no {cloud} image for `{os}` yet ({})", self.table.listed()))
+        (!self.table.oses().contains(&os) && own.is_none()).then(|| format!("machine `{name}`: no {cloud} image for `{os}` ({})", self.table.listed()))
     }
 }
 
@@ -530,10 +530,10 @@ impl Rules {
             return Some(why);
         }
         if vms(env).any(|(_, mp)| mp.is_windows()) {
-            return Some(format!("{cloud} cloud-vm is Linux only so far"));
+            return Some(format!("{cloud} cloud-vm is Linux only"));
         }
         if controller::needed(env) {
-            return Some(format!("{cloud} cloud-vm has no Ansible controller yet"));
+            return Some(format!("{cloud} cloud-vm has no Ansible controller"));
         }
         if let Some(why) = self.features(env) {
             return Some(why);

@@ -38,7 +38,7 @@ pub(crate) fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option
             return Some(format!("network `{net}`: Vagrant's bridged networks take no VLAN tag (Proxmox does)"));
         }
         if mp.is_windows() {
-            return Some(format!("machine `{name}`: a bridged network on Windows comes later"));
+            return Some(format!("machine `{name}`: Isoloom bridges no network to a Windows machine on Vagrant"));
         }
         let len = Cidr::parse(&n.cidr).map_or(0, Cidr::prefix);
         if matches!(address, OutsideAddress::Fixed(_)) && len != 24 {
@@ -55,7 +55,7 @@ pub(crate) fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option
 /// and libvirt bridges a device (`dev`) Isoloom doesn't name yet.
 pub(crate) fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     let (net, _) = env.outside.iter().find(|(_, n)| matches!(n.join, Join::Bridged(_)))?;
-    Some(format!("network `{net}`: bridged networks under Vagrant's {provider} provider come later"))
+    Some(format!("network `{net}`: Isoloom bridges no network under Vagrant's {provider} provider"))
 }
 
 #[cfg(test)]

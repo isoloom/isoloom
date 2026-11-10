@@ -77,10 +77,10 @@ mod tests {
     #[test]
     fn a_refusal_in_kubernetes_words_reads_as_the_backend_reports_it() {
         let e = Error::Unsupported {
-            reason: "networks with a `gateway` machine on Kubernetes come later".to_owned(),
+            reason: "a Kubernetes cluster routes no network through a `gateway` machine".to_owned(),
         };
         let reads = e.to_string();
-        assert_eq!(reads, "kubernetes: networks with a `gateway` machine on Kubernetes come later");
+        assert_eq!(reads, "kubernetes: a Kubernetes cluster routes no network through a `gateway` machine");
         assert_eq!(RenderError::from(e).to_string(), reads);
     }
 }

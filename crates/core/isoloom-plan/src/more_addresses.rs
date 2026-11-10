@@ -83,7 +83,7 @@ pub(crate) fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineSh
 pub(crate) fn refused(f: &mut fmt::Formatter<'_>, machine: &str, network: &str, shape: MachineShape) -> fmt::Result {
     let at = format!("machine `{machine}` has several addresses on `{network}`");
     match shape {
-        MachineShape::Vm => write!(f, "{at}, which this target doesn't give a VM yet"),
+        MachineShape::Vm => write!(f, "{at}, which this target doesn't give a VM"),
         MachineShape::Container => write!(
             f,
             "{at}: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)"

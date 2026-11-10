@@ -324,8 +324,8 @@ impl fmt::Display for Requirement {
     /// Why a backend without the capability refuses the environment, in the user's terms.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Requirement::EnvironmentProvisioning => f.write_str("environment-level provisioning (`provision:`) runs on VM targets for now"),
-            Requirement::PlaybookChecks => f.write_str("Ansible checks (.yml) run on VM targets for now"),
+            Requirement::EnvironmentProvisioning => f.write_str("environment-level provisioning (`provision:`) runs on the VM targets only"),
+            Requirement::PlaybookChecks => f.write_str("Ansible checks (.yml) run on the VM targets only"),
             Requirement::ExecWithoutContainer { check } => write!(f, "`exec` check \"{check}\" {IN_A_CONTAINER}"),
             Requirement::NetworkAppliance { machine } => write!(
                 f,
@@ -337,17 +337,16 @@ impl fmt::Display for Requirement {
             ),
             Requirement::VolumeAcrossShapes { volume } => write!(
                 f,
-                "volume `{volume}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now"
+                "volume `{volume}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export"
             ),
-            Requirement::VmDependsOnContainer { vm, container } => write!(
-                f,
-                "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment, for now"
-            ),
+            Requirement::VmDependsOnContainer { vm, container } => {
+                write!(f, "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment")
+            }
             // Only Kubernetes lacks these today: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
             Requirement::Ulimits { machine } => write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits"),
             Requirement::TrafficControl => f.write_str("link impairment (`tc`) needs a router in the path; Kubernetes has none"),
-            Requirement::Ipv6 { network } => write!(f, "network `{network}` is IPv6 (`ipv6`), which this target's networks don't carry yet"),
+            Requirement::Ipv6 { network } => write!(f, "network `{network}` is IPv6 (`ipv6`), which this target's networks don't carry"),
             Requirement::Ipv6Only { network } => crate::ipv6::no_ipv6_only(f, network),
             Requirement::Ipv6Auto { network } => crate::ipv6::no_auto_addresses(f, network),
             Requirement::Secrets { machine } => crate::secrets::no_delivery(f, machine),

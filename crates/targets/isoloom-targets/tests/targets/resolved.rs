@@ -127,7 +127,7 @@ fn cloud_vm_lists_its_generated_and_refused_clouds() -> Outcome {
     assert_eq!(clouds["generated"], serde_json::json!(["aws", "azure"]));
     let refused = clouds["refused"].as_object().unwrap();
     assert_eq!(refused.keys().collect::<Vec<_>>(), ["gcp", "digitalocean", "linode", "oci"]);
-    assert!(refused["gcp"].as_str().unwrap().contains("Windows on GCP"));
+    assert!(refused["gcp"].as_str().unwrap().contains("no Windows VM on Google Cloud"));
     // What the snapshot says is what the generator writes: a module per generated cloud only.
     let files = generate(&spec, Target::CloudVm).unwrap();
     let written = |cloud: &str| files.iter().any(|f| f.path.starts_with(&format!(".isoloom/cloud-vm/{cloud}/")));

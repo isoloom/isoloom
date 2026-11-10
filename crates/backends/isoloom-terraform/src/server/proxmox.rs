@@ -58,7 +58,7 @@ use crate::module::{ProjectCopy, Usage};
 const LIMITS: Limits = Limits {
     // Emulated by QEMU (see `arch`), with an arm64 cloud image.
     arm64: None,
-    gateways: Some("networks with a `gateway` machine on Proxmox come later"),
+    gateways: Some("Isoloom routes no network through a `gateway` machine on Proxmox"),
     playbook_checks: None,
     tc: None,
     ipv6: None,
@@ -126,9 +126,7 @@ fn pinned(os: &str) -> Option<PinnedImage> {
 fn refusal(env: &Environment) -> Option<String> {
     LIMITS.refusal(env).or_else(|| gpus::refusal(env)).or_else(|| {
         super::without_image(env, |os, mp| pinned(os).is_some() || image::has_own(mp))
-            .map(|(name, os)| {
-                format!("machine `{name}`: no Proxmox image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)")
-            })
+            .map(|(name, os)| format!("machine `{name}`: no Proxmox image for `{os}` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)"))
             .or_else(|| cloudbase_init::refusal(env, "Proxmox"))
             .or_else(|| image::refusal(env))
             .or_else(|| boot::refusal(env))

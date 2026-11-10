@@ -126,12 +126,12 @@ const ARM64: &str = "version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 
 
 #[test]
 fn refusals_come_from_the_plan_and_match_rendering() -> Outcome {
-    let why = "no cloud can run it (aws: machine `w`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); \
-         azure: machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images); \
-         gcp: machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); \
+    let why = "no cloud can run it (aws: machine `w`: Isoloom generates no arm64 VM on AWS; \
+         azure: machine `w`: Isoloom generates no arm64 VM on Azure; \
+         gcp: machine `w`: Isoloom generates no arm64 VM on Google Cloud; \
          digitalocean: machine `w`: DigitalOcean has no arm64 droplets; \
          linode: machine `w`: Linode has no arm64 plans; \
-         oci: machine `w`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))";
+         oci: machine `w`: Isoloom generates no arm64 VM on Oracle Cloud)";
     let e = planned(&spec(ARM64)?, CloudVmBackend.target());
     assert_eq!(CloudVmBackend.refusal(&e).as_deref(), Some(why));
     let err = CloudVmBackend.render(&e).expect_err("refused");
@@ -209,7 +209,10 @@ fn each_cloud_refuses_on_its_own() -> Outcome {
     // A Windows machine: Google Cloud only.
     let windows = env("windows-hello", Target::CloudVm)?;
     let on_windows = CloudVmBackend.refusals(&windows);
-    assert_eq!(on_windows[2].1.as_deref(), Some("machine `web01`: Windows on GCP comes later"));
+    assert_eq!(
+        on_windows[2].1.as_deref(),
+        Some("machine `web01`: Isoloom generates no Windows VM on Google Cloud")
+    );
     let files = CloudVmBackend.render(&windows)?;
     assert!(files.iter().any(|f| f.path.ends_with("cloud-vm/azure/main.tf")));
     assert!(!files.iter().any(|f| f.path.ends_with("cloud-vm/gcp/main.tf")));
@@ -220,11 +223,8 @@ fn each_cloud_refuses_on_its_own() -> Outcome {
 fn a_cloud_refuses_from_the_plan_without_rendering() -> Outcome {
     let e = planned(&spec(ARM64)?, Target::CloudVm);
     for (cloud, why) in [
-        (Cloud::Azure, "machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images)"),
-        (
-            Cloud::Gcp,
-            "machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images)",
-        ),
+        (Cloud::Azure, "machine `w`: Isoloom generates no arm64 VM on Azure"),
+        (Cloud::Gcp, "machine `w`: Isoloom generates no arm64 VM on Google Cloud"),
     ] {
         let module = CloudVmModule::new(cloud);
         assert_eq!(module.refusal(&e).as_deref(), Some(why));

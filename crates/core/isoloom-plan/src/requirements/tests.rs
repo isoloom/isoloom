@@ -84,7 +84,7 @@ fn about_machines() -> Vec<(Requirement, &'static str)> {
             "machine `web` asks for GPUs (`gpus`)",
         ),
         (Requirement::RateLimit { machine: web() }, "machine `web` sets a `rate_limit`"),
-        (more(MachineShape::Vm), "which this target doesn't give a VM yet"),
+        (more(MachineShape::Vm), "which this target doesn't give a VM"),
         (more(MachineShape::Container), "a container has one address per network"),
         (more(MachineShape::External), "an existing host keeps the addresses it has"),
     ]

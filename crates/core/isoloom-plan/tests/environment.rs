@@ -118,7 +118,7 @@ fn a_backend_refuses_what_it_lacks_the_capability_for() -> Outcome {
     assert_eq!(env.requirements, [Requirement::EnvironmentProvisioning, Requirement::MachineAliases]);
     let none = Capabilities::default();
     let why = refusal(&env.requirements, &none).expect("refused");
-    assert_eq!(why.to_string(), "environment-level provisioning (`provision:`) runs on VM targets for now");
+    assert_eq!(why.to_string(), "environment-level provisioning (`provision:`) runs on the VM targets only");
     let provisioning = Capabilities::of([Feature::EnvironmentProvisioning]);
     let next = refusal(&env.requirements, &provisioning).expect("refused");
     assert_eq!(next.to_string(), "machine `aliases` (dotted DNS names) aren't Kubernetes Service names");

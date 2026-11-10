@@ -53,7 +53,7 @@ fn environment(spec: &Spec, at: &FieldPath, m: &Machine, out: &mut Problems) {
                     Problem::new(
                         Code::Refused,
                         at,
-                        format!("an input keeps its own name in the environment for now: this variable would be `{name}`, not `{var}`"),
+                        format!("an input keeps its own name in the environment: this variable would be `{name}`, not `{var}`"),
                     )
                     .fix(format!("`{name}: {{ input: {name} }}`, and read `{name}` in the app")),
                 ),

@@ -75,7 +75,7 @@ fn gcp_declines_windows() -> Outcome {
     assert!(files.iter().any(|f| f.path.ends_with("cloud-vm/aws/main.tf")));
     assert!(
         !files.iter().any(|f| f.path.ends_with("cloud-vm/gcp/main.tf")),
-        "Windows on GCP comes later, so no gcp file"
+        "Isoloom generates no Windows VM on Google Cloud, so no gcp file"
     );
     Ok(())
 }

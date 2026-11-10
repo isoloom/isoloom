@@ -44,7 +44,7 @@ const RULES: Rules = Rules {
     cloud: Cloud::Oci,
     networks: Networks::Several,
     limits: Limits {
-        arm64: Some("arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)"),
+        arm64: Some("Isoloom generates no arm64 VM on Oracle Cloud"),
         // The VCN routes a network through its gateway machine (`network`).
         gateways: None,
         playbook_checks: Some(PLAYBOOK_CHECKS),
@@ -55,7 +55,7 @@ const RULES: Rules = Rules {
     gpus: GpuSizes {
         gpu: "",
         sizes: &[],
-        none: "GPUs on Oracle Cloud come later (its GPU shapes are fixed, not the flexible shape every machine has, and take images built for them)",
+        none: "Isoloom gives no GPU on Oracle Cloud (its GPU shapes are fixed, not the flexible shape every machine has, and take images built for them)",
     },
     // The AMD shape exposes its virtualization instructions when asked (`platform_config`).
     nests: true,

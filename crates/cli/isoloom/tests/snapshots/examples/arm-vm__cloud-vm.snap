@@ -2,7 +2,7 @@
 source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
-✗ cloud-vm (no cloud can run it (aws: machine `box`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); azure: machine `box`: arm64 on Azure comes later (Arm-based sizes and arm64 images); gcp: machine `box`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); digitalocean: machine `box`: DigitalOcean has no arm64 droplets; linode: machine `box`: Linode has no arm64 plans; oci: machine `box`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)))
+✗ cloud-vm (no cloud can run it (aws: machine `box`: Isoloom generates no arm64 VM on AWS; azure: machine `box`: Isoloom generates no arm64 VM on Azure; gcp: machine `box`: Isoloom generates no arm64 VM on Google Cloud; digitalocean: machine `box`: DigitalOcean has no arm64 droplets; linode: machine `box`: Linode has no arm64 plans; oci: machine `box`: Isoloom generates no arm64 VM on Oracle Cloud))
 
 # isoloom generate --target cloud-vm (exit 1)
-· cloud-vm: no cloud can run it (aws: machine `box`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); azure: machine `box`: arm64 on Azure comes later (Arm-based sizes and arm64 images); gcp: machine `box`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); digitalocean: machine `box`: DigitalOcean has no arm64 droplets; linode: machine `box`: Linode has no arm64 plans; oci: machine `box`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))
+· cloud-vm: no cloud can run it (aws: machine `box`: Isoloom generates no arm64 VM on AWS; azure: machine `box`: Isoloom generates no arm64 VM on Azure; gcp: machine `box`: Isoloom generates no arm64 VM on Google Cloud; digitalocean: machine `box`: DigitalOcean has no arm64 droplets; linode: machine `box`: Linode has no arm64 plans; oci: machine `box`: Isoloom generates no arm64 VM on Oracle Cloud)

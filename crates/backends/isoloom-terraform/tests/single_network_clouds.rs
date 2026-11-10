@@ -93,8 +93,8 @@ fn refusals_keep_their_messages() -> Outcome {
             "{name}"
         );
     }
-    assert_eq!(refusals("ansible-pair")?[1].1, s("Linode cloud-vm has no Ansible controller yet"));
-    assert_eq!(refusals("windows-hello")?[2].1, s("Oracle Cloud cloud-vm is Linux only so far"));
+    assert_eq!(refusals("ansible-pair")?[1].1, s("Linode cloud-vm has no Ansible controller"));
+    assert_eq!(refusals("windows-hello")?[2].1, s("Oracle Cloud cloud-vm is Linux only"));
     Ok(())
 }
 
@@ -116,12 +116,12 @@ fn an_os_without_an_image_is_refused() -> Outcome {
     let spec = testing::spec("version: 1\nname: r\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    os: rocky@9\n")?;
     let e = testing::planned(&spec, Target::CloudVm);
     let linode = CloudVmModule::new(Cloud::Linode).refusal(&e).expect("refused");
-    assert_eq!(linode, "machine `w`: no Linode image for `rocky-9` yet (Debian 12/13, Ubuntu 22.04/24.04)");
+    assert_eq!(linode, "machine `w`: no Linode image for `rocky-9` (Debian 12/13, Ubuntu 22.04/24.04)");
     // Oracle Cloud runs Debian on Ubuntu, but no other OS: it would no longer be the spec's.
     let oci = CloudVmModule::new(Cloud::Oci).refusal(&e).expect("refused");
     assert_eq!(
         oci,
-        "machine `w`: no Oracle Cloud image for `rocky-9` yet (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)"
+        "machine `w`: no Oracle Cloud image for `rocky-9` (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)"
     );
     assert_eq!(CloudVmBackend.refusal(&e).map(|r| r.starts_with("no cloud can run it (")), Some(true));
     Ok(())

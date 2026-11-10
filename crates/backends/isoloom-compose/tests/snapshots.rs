@@ -117,7 +117,7 @@ fn provisioning_is_refused_without_rendering() -> Outcome {
     assert!(matches!(refused, isoloom_compose::Error::Refused { .. }), "{refused:?}");
     assert_eq!(
         refused.to_string(),
-        "docker: environment-level provisioning (`provision:`) runs on VM targets for now"
+        "docker: environment-level provisioning (`provision:`) runs on the VM targets only"
     );
     Ok(())
 }

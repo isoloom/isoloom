@@ -153,10 +153,10 @@ crash.*.log
           "azure"
         ],
         "refused": {
-          "gcp": "machine `web01`: Windows on GCP comes later",
-          "digitalocean": "DigitalOcean cloud-vm is Linux only so far",
-          "linode": "Linode cloud-vm is Linux only so far",
-          "oci": "Oracle Cloud cloud-vm is Linux only so far"
+          "gcp": "machine `web01`: Isoloom generates no Windows VM on Google Cloud",
+          "digitalocean": "DigitalOcean cloud-vm is Linux only",
+          "linode": "Linode cloud-vm is Linux only",
+          "oci": "Oracle Cloud cloud-vm is Linux only"
         }
       }
     }

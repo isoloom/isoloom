@@ -21,7 +21,9 @@ fn targets_lists_the_refused_clouds_under_cloud_vm() -> Outcome {
     let under: Vec<&str> = after.lines().take_while(|l| l.starts_with("    ")).collect();
     assert_eq!(under.len(), 4, "{}", o.stdout);
     assert!(
-        under.first().is_some_and(|l| l.starts_with("    ✗ gcp (") && l.contains("Windows on GCP")),
+        under
+            .first()
+            .is_some_and(|l| l.starts_with("    ✗ gcp (") && l.contains("no Windows VM on Google Cloud")),
         "{}",
         o.stdout
     );

@@ -2,7 +2,7 @@
 source: crates/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
-✗ proxmox (networks with a `gateway` machine on Proxmox come later)
+✗ proxmox (Isoloom routes no network through a `gateway` machine on Proxmox)
 
 # isoloom generate --target proxmox (exit 1)
-· proxmox: networks with a `gateway` machine on Proxmox come later
+· proxmox: Isoloom routes no network through a `gateway` machine on Proxmox

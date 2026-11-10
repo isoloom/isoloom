@@ -66,7 +66,7 @@ fn from(spec: &Spec, at: &str, d: &Declared, p: &mut Problems) {
                 format!("{at}.from"),
                 format!("`{f}` is a network appliance: checks run from the machines around it"),
             ),
-            Some(m) if !crate::probe::can_run_checks(m) => p.add(format!("{at}.from"), format!("`{f}` runs Windows; checks run from Linux machines for now")),
+            Some(m) if !crate::probe::can_run_checks(m) => p.add(format!("{at}.from"), format!("`{f}` runs Windows; checks run from Linux machines")),
             Some(_) => {}
         },
         None if d.exec.is_some() => p.add(at, "`exec` runs inside a machine: say which with `from`"),
@@ -192,7 +192,7 @@ mod tests {
         );
         assert_eq!(
             of("[{ http: 'http://web/', from: win }]"),
-            ["checks[0].from: `win` runs Windows; checks run from Linux machines for now"]
+            ["checks[0].from: `win` runs Windows; checks run from Linux machines"]
         );
         assert_eq!(of("[{ exec: id }]"), ["checks[0]: `exec` runs inside a machine: say which with `from`"]);
     }

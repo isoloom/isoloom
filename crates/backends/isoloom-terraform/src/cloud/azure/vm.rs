@@ -42,7 +42,7 @@ const RULES: Rules = Rules {
     cloud: Cloud::Azure,
     networks: Networks::Several,
     limits: Limits {
-        arm64: Some("arm64 on Azure comes later (Arm-based sizes and arm64 images)"),
+        arm64: Some("Isoloom generates no arm64 VM on Azure"),
         gateways: None,
         playbook_checks: Some(PLAYBOOK_CHECKS),
         tc: Some(SECURITY_GROUPS_TC),

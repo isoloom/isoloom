@@ -3,10 +3,10 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
 ✓ cloud-vm
-    ✗ gcp (machine `iis`: Windows on GCP comes later)
-    ✗ digitalocean (DigitalOcean cloud-vm is Linux only so far)
-    ✗ linode (Linode cloud-vm is Linux only so far)
-    ✗ oci (Oracle Cloud cloud-vm is Linux only so far)
+    ✗ gcp (machine `iis`: Isoloom generates no Windows VM on Google Cloud)
+    ✗ digitalocean (DigitalOcean cloud-vm is Linux only)
+    ✗ linode (Linode cloud-vm is Linux only)
+    ✗ oci (Oracle Cloud cloud-vm is Linux only)
 
 # isoloom generate --target cloud-vm (exit 0)
 ✓ .isoloom/cloud-vm/aws/main.tf

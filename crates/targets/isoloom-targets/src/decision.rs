@@ -147,7 +147,7 @@ pub(crate) fn decide(lab: &Lab, column: &Column) -> Decision {
         return refused(Code::Invalid, None, format!("the spec is invalid on {}: {p}", target.id()));
     }
     let Some(backend) = backend(target) else {
-        return refused(Code::Target, None, "no generator yet");
+        return refused(Code::Target, None, "no generator");
     };
     let env = Environment::build(&spec, target, None);
     let lacking = isoloom_plan::refusal(&env.requirements, &backend.capabilities());

@@ -18,7 +18,7 @@ pub(super) fn section(lab: &Lab) -> Value {
         if !possible.contains(&t) {
             not_possible.insert(t.id().into(), json!(not_possible_reason(lab, t)));
         } else if backend(t).is_none() {
-            refused.insert(t.id().into(), json!("no generator yet"));
+            refused.insert(t.id().into(), json!("no generator"));
         } else if let Some(why) = refusal(lab, t) {
             refused.insert(t.id().into(), json!(why));
         } else {

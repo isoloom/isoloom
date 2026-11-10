@@ -3,11 +3,11 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
 ✓ cloud-vm
-    ✗ aws (machine `files01`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later)
-    ✗ gcp (machine `files01`: Windows on GCP comes later)
+    ✗ aws (machine `files01`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which Isoloom doesn't use)
+    ✗ gcp (machine `files01`: Isoloom generates no Windows VM on Google Cloud)
     ✗ digitalocean (DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address)
-    ✗ linode (Linode cloud-vm is Linux only so far)
-    ✗ oci (Oracle Cloud cloud-vm is Linux only so far)
+    ✗ linode (Linode cloud-vm is Linux only)
+    ✗ oci (Oracle Cloud cloud-vm is Linux only)
 
 # isoloom generate --target cloud-vm (exit 0)
 ✓ .isoloom/cloud-vm/azure/main.tf

@@ -149,7 +149,7 @@ pub(crate) fn no_tmpfs_modes(f: &mut std::fmt::Formatter<'_>, machine: &str) -> 
 pub(crate) fn no_host_folders(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
     write!(
         f,
-        "machine `{machine}` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them yet"
+        "machine `{machine}` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker, docker-vm (on a local provider) and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them"
     )
 }
 

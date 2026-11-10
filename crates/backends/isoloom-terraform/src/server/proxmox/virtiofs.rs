@@ -80,7 +80,7 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
         let (first, _) = folders.first()?;
         if mp.shape == MachineShape::Container {
             Some(format!(
-                "machine `{name}`: volume `{first}` is a folder of the server (`virtiofs`), which only a VM mounts: an LXC container would take it as a bind mount (a mount point), which comes later"
+                "machine `{name}`: volume `{first}` is a folder of the server (`virtiofs`), which only a VM mounts: an LXC container would take it as a bind mount (a mount point), which Isoloom doesn't make"
             ))
         } else if mp.shape == MachineShape::Vm && mp.is_windows() {
             Some(format!(

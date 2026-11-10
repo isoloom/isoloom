@@ -115,7 +115,7 @@ fn mixed(extra: &str) -> Outcome<Environment> {
 fn hybrid_refuses_a_vm_waiting_for_a_container_from_the_plan() -> Outcome {
     let env = mixed("    depends_on: [web]\n")?;
     let why = HybridBackend.refusal(&env).expect("refused");
-    assert_eq!(why, "VM `db` depends on container `web`: VMs start first in a hybrid environment, for now");
+    assert_eq!(why, "VM `db` depends on container `web`: VMs start first in a hybrid environment");
     assert_eq!(
         HybridBackend.render(&env).unwrap_err().to_string(),
         format!("hybrid: {why}"),
@@ -159,7 +159,7 @@ fn docker_vm_refuses_what_compose_cannot_run() -> Outcome {
     )?;
     assert_eq!(
         DockerVmBackend.render(&env).unwrap_err().to_string(),
-        "docker-vm: environment-level provisioning (`provision:`) runs on VM targets for now"
+        "docker-vm: environment-level provisioning (`provision:`) runs on the VM targets only"
     );
     Ok(())
 }

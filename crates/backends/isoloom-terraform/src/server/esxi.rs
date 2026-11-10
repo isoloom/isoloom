@@ -65,7 +65,7 @@ const MAX_NICS: usize = 10;
 /// What ESXi can't host yet.
 const LIMITS: Limits = Limits {
     arm64: Some("ESXi runs x86-64 VMs only"),
-    gateways: Some("networks with a `gateway` machine on ESXi come later"),
+    gateways: Some("Isoloom routes no network through a `gateway` machine on ESXi"),
     playbook_checks: None,
     tc: None,
     ipv6: None,
@@ -111,7 +111,7 @@ fn refusal(env: &Environment) -> Option<String> {
         .refusal(env)
         .or_else(|| {
             super::without_image(env, |os, _| LINUX.contains(&os)).map(|(name, os)| {
-                format!("machine `{name}`: no ESXi image for `{os}` yet (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)")
+                format!("machine `{name}`: no ESXi image for `{os}` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)")
             })
         })
         .or_else(|| windows::refusal(env))

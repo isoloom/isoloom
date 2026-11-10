@@ -19,9 +19,7 @@ pub(crate) fn wanted(mp: &MachinePlan) -> bool {
 pub(crate) fn refusal(env: &Environment, cloud: Cloud, supported: bool) -> Option<String> {
     let (name, mp) = env.machines.iter().find(|(_, mp)| mp.shape == MachineShape::Vm && wanted(mp))?;
     if !supported {
-        return Some(format!(
-            "machine `{name}`: nested virtualization (`nested_virtualization`) on {cloud} comes later (AWS, Google Cloud and Oracle Cloud have it)"
-        ));
+        return Some(format!("machine `{name}`: {cloud} gives no nested virtualization (`nested_virtualization`)"));
     }
     mp.hardware
         .gpus
@@ -45,7 +43,7 @@ mod tests {
         };
         let nests = env("nested_virtualization: true");
         assert_eq!(refusal(&env("arch: amd64"), Cloud::Linode, false), None);
-        assert!(refusal(&nests, Cloud::Linode, false).is_some_and(|w| w.contains("on Linode comes later")));
+        assert!(refusal(&nests, Cloud::Linode, false).is_some_and(|w| w.contains("Linode gives no nested virtualization")));
         assert_eq!(refusal(&nests, Cloud::Linode, true), None);
         let both = env("nested_virtualization: true, gpus: 1");
         assert!(refusal(&both, Cloud::Linode, true).is_some_and(|w| w.contains("GPUs and nested virtualization together")));

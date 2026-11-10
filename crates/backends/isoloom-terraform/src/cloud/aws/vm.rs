@@ -43,7 +43,7 @@ const RULES: Rules = Rules {
     cloud: Cloud::Aws,
     networks: Networks::Several,
     limits: Limits {
-        arm64: Some("arm64 on AWS comes later (Graviton instances and arm64 AMIs)"),
+        arm64: Some("Isoloom generates no arm64 VM on AWS"),
         gateways: None,
         playbook_checks: Some(PLAYBOOK_CHECKS),
         tc: Some(SECURITY_GROUPS_TC),
@@ -230,8 +230,9 @@ fn machines_refusal(env: &Environment) -> Option<String> {
             .image(name, m)
             .or_else(|| windows::refusal(env, name, m))
             .or_else(|| {
-                (is_windows(&vm.os) && vm.tpm == Some(true))
-                    .then(|| format!("machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later"))
+                (is_windows(&vm.os) && vm.tpm == Some(true)).then(|| {
+                    format!("machine `{name}`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which Isoloom doesn't use")
+                })
             })
             .or_else(|| env.machines.get(name).and_then(|mp| addresses::refusal(name, mp)))
             .or_else(|| RULES.kept(env, name, m))

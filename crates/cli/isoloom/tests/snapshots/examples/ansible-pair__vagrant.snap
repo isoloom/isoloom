@@ -191,11 +191,11 @@ crash.*.log
       "cloud-vm"
     ],
     "refused": {
-      "docker": "environment-level provisioning (`provision:`) runs on VM targets for now",
-      "hosted": "environment-level provisioning (`provision:`) runs on VM targets for now",
-      "docker-vm": "environment-level provisioning (`provision:`) runs on VM targets for now",
-      "cloud-docker": "environment-level provisioning (`provision:`) runs on VM targets for now",
-      "kubernetes": "environment-level provisioning (`provision:`) runs on VM targets for now"
+      "docker": "environment-level provisioning (`provision:`) runs on the VM targets only",
+      "hosted": "environment-level provisioning (`provision:`) runs on the VM targets only",
+      "docker-vm": "environment-level provisioning (`provision:`) runs on the VM targets only",
+      "cloud-docker": "environment-level provisioning (`provision:`) runs on the VM targets only",
+      "kubernetes": "environment-level provisioning (`provision:`) runs on the VM targets only"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",
@@ -211,8 +211,8 @@ crash.*.log
         ],
         "refused": {
           "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
-          "linode": "Linode cloud-vm has no Ansible controller yet",
-          "oci": "Oracle Cloud cloud-vm has no Ansible controller yet"
+          "linode": "Linode cloud-vm has no Ansible controller",
+          "oci": "Oracle Cloud cloud-vm has no Ansible controller"
         }
       }
     }

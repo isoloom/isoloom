@@ -23,7 +23,7 @@ pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
 pub(crate) fn no_mtu(f: &mut fmt::Formatter<'_>, network: &str) -> fmt::Result {
     write!(
         f,
-        "network `{network}` sets its `mtu`, which this target doesn't carry yet (`isoloom matrix` lists the targets that do)"
+        "network `{network}` sets its `mtu`, which this target doesn't carry (`isoloom matrix` lists the targets that do)"
     )
 }
 
@@ -31,7 +31,7 @@ pub(crate) fn no_mtu(f: &mut fmt::Formatter<'_>, network: &str) -> fmt::Result {
 pub(crate) fn no_rate_limit(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` sets a `rate_limit`, which this target doesn't apply yet (`isoloom matrix` lists the targets that do)"
+        "machine `{machine}` sets a `rate_limit`, which this target doesn't apply (`isoloom matrix` lists the targets that do)"
     )
 }
 
@@ -95,7 +95,7 @@ mod tests {
         let mtu = crate::Requirement::NetworkMtu { network: "lan".into() }.to_string();
         assert_eq!(
             mtu,
-            "network `lan` sets its `mtu`, which this target doesn't carry yet (`isoloom matrix` lists the targets that do)"
+            "network `lan` sets its `mtu`, which this target doesn't carry (`isoloom matrix` lists the targets that do)"
         );
         let rate = crate::Requirement::RateLimit { machine: "m".into() }.to_string();
         assert!(!rate.contains("proxmox") && rate.contains("`isoloom matrix`"), "{rate}");

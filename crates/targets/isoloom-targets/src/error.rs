@@ -89,7 +89,7 @@ pub enum GenerateError {
         what: String,
     },
     /// No generator exists for this target yet.
-    #[error("{}: no generator yet", .0.id())]
+    #[error("{}: no generator", .0.id())]
     NoGenerator(Target),
     /// The backend failed, not the lab (a bug: a value the run manifest's types refused, a file
     /// its writer couldn't write), with the error it failed with.
@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn a_refusal_reads_as_the_generator_wrote_it() {
         let e = Error::from(GenerateError::NoGenerator(Target::Docker));
-        assert_eq!(e.to_string(), "docker: no generator yet");
+        assert_eq!(e.to_string(), "docker: no generator");
     }
 
     #[test]

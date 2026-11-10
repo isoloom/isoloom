@@ -63,7 +63,7 @@ impl NoteKind {
         match self {
             NoteKind::Changed => "Changed on the way in: check these",
             NoteKind::InImage => "Belongs in the image",
-            NoteKind::NotYet => "Not expressible yet",
+            NoteKind::NotYet => "Not expressible in the spec",
             NoteKind::Equivalent => "Same effect another way",
             NoteKind::ByDesign => "Left out: not every target can do it",
             NoteKind::Tooling => "Tooling, nothing to carry over",

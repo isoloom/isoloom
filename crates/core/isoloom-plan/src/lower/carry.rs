@@ -37,10 +37,10 @@ pub(super) fn on_vm(s: &Step, host: Host, windows: bool) -> Option<(String, Stri
     }
     Some((
         format!(
-            "a `{}` step on a Windows host that already exists waits for Ansible's Windows modules",
+            "a `{}` step on a Windows host that already exists: Isoloom sets one up with PowerShell scripts only",
             s.kind()
         ),
-        "a `run:` PowerShell script for now, or a VM target".to_owned(),
+        "a `run:` PowerShell script, or a VM target".to_owned(),
     ))
 }
 
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(paths, ["machines.m.app.steps[2]", "machines.m.app.steps[3]"]);
         assert_eq!(
             found[0].reason,
-            "a `packages` step on a Windows host that already exists waits for Ansible's Windows modules"
+            "a `packages` step on a Windows host that already exists: Isoloom sets one up with PowerShell scripts only"
         );
     }
 
