@@ -1306,7 +1306,7 @@
               "type": "null"
             }
           ],
-          "description": "Its CPU architecture, for the lab's own machines."
+          "description": "Its CPU architecture, for the environment's own machines."
         },
         "resources": {
           "anyOf": [
@@ -1376,7 +1376,7 @@
         {
           "type": "string",
           "const": "member",
-          "description": "One of the lab's own machines: a member of the environment the spec describes."
+          "description": "One of the environment's own machines: one the spec describes."
         },
         {
           "type": "string",

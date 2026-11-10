@@ -31,7 +31,7 @@ pub enum Arch {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
-    /// One of the lab's own machines: a member of the environment the spec describes.
+    /// One of the environment's own machines: one the spec describes.
     Member,
     /// A one-shot that must exit 0 (an `init:` script).
     Job,
@@ -276,7 +276,7 @@ pub struct Machine {
     /// It runs Windows.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub windows: bool,
-    /// Its CPU architecture, for the lab's own machines.
+    /// Its CPU architecture, for the environment's own machines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arch: Option<Arch>,
     /// Its size: a lab machine's as it runs on this target, its `resources` each field they leave
