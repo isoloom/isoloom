@@ -625,6 +625,29 @@ fn generate_replaces_each_file_rather_than_writing_into_it() -> Outcome {
 }
 
 #[test]
+fn every_command_reads_the_defaults_tags_and_names_where_a_wrong_one_comes_from() -> Outcome {
+    let home = scratch("default-tags-home")?;
+    let dir = project("default-tags", &format!("{}tags: {{ Team: ops }}\n", one_vm("debian@12")))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    // A tag the defaults add, clashing with the spec's: each command says so, naming its source.
+    for command in ["validate", "targets", "resources", "generate"] {
+        let o = isoloom_with(&home, &[&command, &dir], &[("ISOLOOM_TAGS__TEAM", "dev")])?;
+        assert_eq!(o.code, Some(2), "{command}: {o:?}");
+        assert!(
+            o.stderr
+                .contains("defaults (environment ISOLOOM_TAGS__TEAM): tag `team`: `team` and `Team` are one tag on Azure"),
+            "{command}: {}",
+            o.stderr
+        );
+    }
+    // One no cloud takes is refused where it is loaded, before the spec.
+    let o = isoloom_with(&home, &[&"validate", &dir], &[("ISOLOOM_TAGS__9X", "dev")])?;
+    assert_eq!(o.code, Some(2), "{o:?}");
+    assert!(o.stderr.contains("tag `9x`: a key of at most 63"), "{}", o.stderr);
+    Ok(())
+}
+
+#[test]
 fn schema_prints_the_committed_schema_with_the_catalogues_rules() -> Outcome {
     let home = scratch("schema-home")?;
     let run = isoloom(&home, &[&"schema"])?;

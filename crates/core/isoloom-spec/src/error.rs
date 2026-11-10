@@ -177,6 +177,16 @@ pub enum Error {
         #[source]
         source: serde_yaml_ng::Error,
     },
+    /// A tag of the defaults that not every cloud takes, or that clashes with the spec's.
+    #[error("defaults ({from}): tag `{key}`: {why}")]
+    DefaultTag {
+        /// The tag's key.
+        key: String,
+        /// The layer that set it, as `isoloom defaults` names it.
+        from: String,
+        /// Why it is refused.
+        why: String,
+    },
     /// An image table that isn't one (`--images`, the defaults' `images:`).
     #[error("{0}")]
     Images(#[source] serde_yaml_ng::Error),

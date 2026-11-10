@@ -1,7 +1,8 @@
 //! The spec's `tags` in the forms the places that carry them take: as written (AWS, Azure,
 //! Oracle Cloud), as labels (Google Cloud, Kubernetes: lowercase letters, digits, `_` and `-`,
-//! at most 63), or as `key:value` words (DigitalOcean, Linode); and the keys that would clash in
-//! one of those forms, which validation refuses.
+//! at most 63), or as `key:value` words (DigitalOcean, Linode); the rules a tag follows so every
+//! one of those places takes it; and the keys that would clash in one of those forms. Validation
+//! refuses a spec's tag that breaks them, and the defaults one of theirs.
 
 use indexmap::IndexMap;
 
@@ -10,19 +11,69 @@ use crate::model::Spec;
 /// The longest label key or value Google Cloud and Kubernetes take.
 const LABEL_MAX: usize = 63;
 
-/// The first key of `tags` that clashes with an earlier one where a cloud carries them, with
-/// why: the two equal but for case (Azure's tag names ignore case), or one label (Google Cloud's
-/// and Kubernetes' [`labels`]).
-pub(crate) fn clash(tags: &IndexMap<String, String>) -> Option<(&str, String)> {
+/// The longest and shortest tag Linode takes, as its `key:value` word: the strictest cloud's.
+const WORD: std::ops::RangeInclusive<usize> = 3..=50;
+
+/// Why `key` can't be a tag's key everywhere, if it can't: at most 63 letters, digits and
+/// `_ . : -`, starting with a letter (Google Cloud's labels), and not one Isoloom writes itself in
+/// any case (Azure's tag names ignore case).
+#[must_use]
+pub fn key_refusal(key: &str) -> Option<String> {
+    let allowed = |c: char| c.is_ascii_alphanumeric() || "_.:-".contains(c);
+    let lower = key.to_ascii_lowercase();
+    if key.len() > LABEL_MAX || !key.starts_with(|c: char| c.is_ascii_alphabetic()) || !key.chars().all(allowed) {
+        Some("a key of at most 63 letters, digits and `_ . : -`, starting with a letter, e.g. cost-center".to_owned())
+    } else if lower.starts_with("isoloom") || lower == "managed-by" {
+        Some(format!("`{key}` is Isoloom's own tag: name yours otherwise"))
+    } else {
+        None
+    }
+}
+
+/// Why `value` can't be tag `key`'s value everywhere, if it can't: on one line, and with the key
+/// a `key:value` word of 3 to 50 characters (Linode's tags).
+#[must_use]
+pub fn value_refusal(key: &str, value: &str) -> Option<String> {
+    let word = key.chars().count() + 1 + value.chars().count();
+    if value.chars().any(char::is_control) {
+        Some("a value on one line".to_owned())
+    } else if !WORD.contains(&word) {
+        let most = WORD.end().saturating_sub(key.chars().count() + 1);
+        Some(format!(
+            "`{key}:<value>` is at most {} characters and at least {} (Linode's tags): a value of 1 to {most} characters here",
+            WORD.end(),
+            WORD.start()
+        ))
+    } else {
+        None
+    }
+}
+
+/// Two keys of one set of tags that clash where a cloud carries them, and why.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Clash<'a> {
+    /// The first of the two.
+    pub(crate) earlier: &'a str,
+    /// The one that clashes with it.
+    pub(crate) key: &'a str,
+    /// Why they are one.
+    pub(crate) why: String,
+}
+
+/// The first key of `tags` that clashes with an earlier one where a cloud carries them: the two
+/// equal but for case (Azure's tag names ignore case), or one label (Google Cloud's and
+/// Kubernetes' [`labels`]).
+pub(crate) fn clash(tags: &IndexMap<String, String>) -> Option<Clash<'_>> {
     let keys: Vec<&str> = tags.keys().map(String::as_str).collect();
     keys.iter().enumerate().find_map(|(i, key)| {
         keys.iter().take(i).find_map(|earlier| {
-            if earlier.eq_ignore_ascii_case(key) {
-                Some((*key, format!("`{earlier}` and `{key}` are one tag on Azure, whose tag names ignore case")))
+            let why = if earlier.eq_ignore_ascii_case(key) {
+                format!("`{earlier}` and `{key}` are one tag on Azure, whose tag names ignore case")
             } else {
                 let same = label(earlier).filter(|l| Some(l) == label(key).as_ref())?;
-                Some((*key, format!("`{earlier}` and `{key}` are one label, `{same}`, on Google Cloud and Kubernetes")))
-            }
+                format!("`{earlier}` and `{key}` are one label, `{same}`, on Google Cloud and Kubernetes")
+            };
+            Some(Clash { earlier, key, why })
         })
     })
 }
@@ -101,21 +152,39 @@ mod tests {
     fn keys_equal_but_for_case_or_one_label_clash() {
         let tags = |keys: &[&str]| keys.iter().map(|k| ((*k).to_owned(), String::new())).collect::<IndexMap<_, _>>();
         let labels = tags(&["team", "Cost.Center", "cost_center"]);
-        let (label_key, label_why) = clash(&labels).unwrap();
+        let label = clash(&labels).unwrap();
         assert_eq!(
-            (label_key, label_why.as_str()),
+            (label.earlier, label.key, label.why.as_str()),
             (
+                "Cost.Center",
                 "cost_center",
                 "`Cost.Center` and `cost_center` are one label, `cost_center`, on Google Cloud and Kubernetes"
             )
         );
         let cases = tags(&["Team", "team"]);
-        let (case_key, case_why) = clash(&cases).unwrap();
+        let case = clash(&cases).unwrap();
         assert_eq!(
-            (case_key, case_why.as_str()),
+            (case.key, case.why.as_str()),
             ("team", "`Team` and `team` are one tag on Azure, whose tag names ignore case")
         );
         assert_eq!(clash(&tags(&["team", "cost-center", "cost_centre"])), None);
+    }
+
+    #[test]
+    fn a_tag_is_one_every_cloud_takes() {
+        assert_eq!(key_refusal("cost-center"), None);
+        for key in ["9x", "a b", &"k".repeat(64)] {
+            assert!(key_refusal(key).is_some_and(|w| w.starts_with("a key of at most 63")), "{key}");
+        }
+        assert!(key_refusal("Managed-By").is_some_and(|w| w.contains("Isoloom's own")));
+        assert_eq!(value_refusal("team", "ops"), None);
+        // Linode's `key:value` is 3 to 50 characters, counted as characters.
+        assert_eq!(value_refusal("team", &"é".repeat(45)), None);
+        let long = value_refusal("team", &"é".repeat(46)).unwrap_or_default();
+        assert!(long.contains("a value of 1 to 45 characters here"), "{long}");
+        assert!(value_refusal("x", "").is_some(), "`x:` is two characters");
+        assert_eq!(value_refusal("x", "y"), None);
+        assert_eq!(value_refusal("team", "a\nb").as_deref(), Some("a value on one line"));
     }
 
     #[test]

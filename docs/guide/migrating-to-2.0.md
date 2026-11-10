@@ -26,6 +26,8 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 | A message naming `.published` or `.url` of a port without `publish:` | `unknown-reference` (`isoloom message` refused it already) | the port's `.port`, or publish the port |
 | A machine using the `openssh` entry and signing in as `ctf` without saying so | the login account defaults to `user` | `with: { username: ctf }` to keep the old account |
 | A tag key starting with a digit, two keys equal but for case or lowercasing to one label (`Cost.Center`, `cost_center`), or `Managed-By`/`Isoloom…` in any case | refused at `tags.<key>` | one key per tag, starting with a letter |
+| A tag whose `key:value` is over 50 characters, or under 3 (an empty value of a one-letter key) | refused at `tags.<key>` (Linode's limit, the strictest cloud's) | a shorter value |
+| The same tag rules broken by a tag of the defaults (a defaults file, `ISOLOOM_TAGS__*`, `-s defaults.tags.*`), or a tag of the defaults clashing with the spec's | every command stops, naming the layer (`defaults (environment ISOLOOM_TAGS__TEAM): tag …`) | fix the defaults' tag |
 
 ## Behavior that changed
 
@@ -123,6 +125,9 @@ among others (the CHANGELOG's **Removed** section lists every item):
   `isoloom_spec::windows::esxi_guest_os` (the backends' own now). `Lab::plan`, `Lab::catalogue`
   and `isoloom_targets::{backend, CloudDockerBackend, DockerVmBackend, HybridBackend}` are
   hidden, outside the supported API: generate with `isoloom_targets::generate`.
+- `isoloom_spec::defaults::Defaults::tags_under` is `Resolved::tags_under`, which returns a
+  `Result` (`Error::DefaultTag` for a tag of the defaults clashing with the spec's); `resolve`
+  and `load` refuse a tag of the defaults no cloud takes with `Error::DefaultTag`.
 - `isoloom_targets::Error::Placeholder` has `why: String` (was `hint: &'static str`), and
   `isoloom_targets::resolved::fill` reads the message's placeholder paths only (those
   `isoloom_spec::syntax::placeholder` has), not any path of the snapshot.

@@ -34,12 +34,6 @@ pub(crate) fn file_name(dir: &Path) -> String {
         .unwrap_or_else(|| isoloom_spec::SPEC_FILE.to_owned())
 }
 
-/// The lab in `dir`, with the profile.
-pub(crate) fn lab(profile: &Profile, dir: &Path) -> Result<Lab> {
-    let profile = profile.load(dir)?;
-    Ok(Lab::new(isoloom_spec::load_profiled(dir, profile.as_ref(), &[])?))
-}
-
 /// The target to use: the profile's when none is asked for.
 pub(crate) fn pinned(profile: &Profile, dir: &Path, asked: Option<&str>) -> Result<Option<String>> {
     match profile.load(dir)? {
@@ -69,13 +63,13 @@ pub(crate) fn defaults_of<'a>(
     }
 }
 
-/// The lab with `-s` overrides, the image table and the clouds' regions applied, and the
-/// defaults in effect.
+/// The lab with `-s` overrides, the image table, the clouds' regions and the defaults' tags
+/// applied, and the defaults in effect: the lab every command reads, as `generate` writes it.
 pub(crate) fn with_settings(profile: &Profile, dir: &Path, images: Option<&Path>, sets: &[String]) -> Result<(Lab, Resolved)> {
     let profile = profile.load(dir)?;
     let mut spec = isoloom_spec::load_profiled(dir, profile.as_ref(), sets)?;
     let settings = isoloom_spec::defaults::load(&defaults_of(dir, images, profile.as_ref(), sets)).map_err(CliError::Defaults)?;
-    spec.tags = settings.defaults.tags_under(&spec.tags);
+    spec.tags = settings.tags_under(&spec.tags).map_err(CliError::Defaults)?;
     let lab = Lab::new(spec)
         .with_images(settings.defaults.images.clone())
         .with_regions(settings.defaults.regions());

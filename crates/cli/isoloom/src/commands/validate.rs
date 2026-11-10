@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use super::{Console, Result, Verdict, spec};
+use crate::error::CliError;
 
 #[derive(Debug, clap::Args)]
 pub(crate) struct Args {
@@ -24,16 +25,14 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     // A folder with no spec is an error: there is nothing to give a verdict on.
     isoloom_spec::find(&a.dir)?;
     let file = spec::file_name(&a.dir);
-    let profile = profile.load(&a.dir)?;
-    let (name, problems, warnings) = match isoloom_spec::load_profiled(&a.dir, profile.as_ref(), &[]) {
-        Ok(spec) => {
-            let name = spec.name.clone();
-            let lab = isoloom_targets::Lab::new(spec);
+    // The lab as `generate` reads it, the defaults applied: a tag they add is validated too.
+    let (name, problems, warnings) = match spec::with_settings(profile, &a.dir, None, &[]) {
+        Ok((lab, _)) => {
             let problems = if a.skip_files { lab.problems() } else { lab.problems_with_files(&a.dir) };
-            (name, problems, lab.warnings())
+            (lab.spec().name.clone(), problems, lab.warnings())
         }
-        Err(isoloom_spec::Error::Invalid { problems, .. }) => (String::new(), problems, Vec::new()),
-        Err(e) => return Err(e.into()),
+        Err(CliError::InvalidSpec { problems, .. }) => (String::new(), problems, Vec::new()),
+        Err(e) => return Err(e),
     };
     if a.json {
         console.json(&serde_json::json!({

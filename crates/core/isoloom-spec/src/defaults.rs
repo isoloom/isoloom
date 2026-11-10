@@ -50,21 +50,13 @@ pub struct Defaults {
     #[serde(default)]
     pub cloud: IndexMap<String, Cloud>,
     /// Tags every cloud resource and Kubernetes object carries (a team's cost centre), under the
-    /// spec's own `tags:` ([`Defaults::tags_under`]); a number or `true`/`false` is read as its
-    /// text, as in the spec.
+    /// spec's own `tags:` ([`Resolved::tags_under`]), by the spec's rules; a number or
+    /// `true`/`false` is read as its text, as in the spec.
     #[serde(default, deserialize_with = "crate::syntax::tags::deserialize")]
     pub tags: IndexMap<String, String>,
 }
 
 impl Defaults {
-    /// These defaults' tags with `own` (the spec's) over them: a key both set keeps the spec's.
-    #[must_use]
-    pub fn tags_under(&self, own: &IndexMap<String, String>) -> IndexMap<String, String> {
-        let mut tags = self.tags.clone();
-        tags.extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
-        tags
-    }
-
     /// The region each cloud's modules default to, by the cloud's id (`aws`), where this sets one
     /// (what `Lab::with_regions` takes).
     #[must_use]
@@ -199,11 +191,61 @@ fn read_layer(path: &Path) -> Result<Option<Value>> {
     }
 }
 
+impl Resolved {
+    /// The layer that set the defaults' tag `key`, as `isoloom defaults` names it.
+    fn tag_source(&self, key: &str) -> String {
+        let leaf = format!("tags.{key}");
+        self.sources
+            .iter()
+            .find(|(k, _)| *k == leaf)
+            .map_or_else(|| "defaults".to_owned(), |(_, from)| from.clone())
+    }
+
+    /// The tag `key` of the defaults refused, and why.
+    fn tag_refused(&self, key: &str, why: String) -> Error {
+        Error::DefaultTag {
+            key: key.to_owned(),
+            from: self.tag_source(key),
+            why,
+        }
+    }
+
+    /// The defaults' tags with `own` (the spec's) over them: a key both set keeps the spec's.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::DefaultTag`] when a tag of the defaults clashes with one of the spec where a
+    /// cloud carries them (`team` and the spec's `Team`), naming the layer that set it: the
+    /// spec's own clashes are its validation's.
+    pub fn tags_under(&self, own: &IndexMap<String, String>) -> Result<IndexMap<String, String>> {
+        let mut tags = self.defaults.tags.clone();
+        tags.extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
+        match crate::tags::clash(&tags) {
+            Some(c) if !own.contains_key(c.earlier) => Err(self.tag_refused(c.earlier, format!("{}: name them apart", c.why))),
+            _ => Ok(tags),
+        }
+    }
+
+    /// Each of the defaults' tags by the spec's rules ([`crate::tags`]).
+    fn checked_tags(self) -> Result<Resolved> {
+        for (key, value) in &self.defaults.tags {
+            if let Some(why) = crate::tags::key_refusal(key).or_else(|| crate::tags::value_refusal(key, value)) {
+                return Err(self.tag_refused(key, why));
+            }
+        }
+        if let Some(c) = crate::tags::clash(&self.defaults.tags) {
+            return Err(self.tag_refused(c.key, format!("{}: name them apart", c.why)));
+        }
+        Ok(self)
+    }
+}
+
 /// Merges layers in order; later ones win leaf by leaf.
 ///
 /// # Errors
 ///
-/// [`Error::Defaults`] when the merged layers hold a key or a value the defaults don't have.
+/// [`Error::Defaults`] when the merged layers hold a key or a value the defaults don't have,
+/// [`Error::DefaultTag`] for a tag not every cloud takes.
 pub fn resolve(layers: &[Layer]) -> Result<Resolved> {
     let mut merged = Value::Mapping(Mapping::new());
     let mut sources: Vec<(String, String)> = Vec::new();
@@ -218,7 +260,7 @@ pub fn resolve(layers: &[Layer]) -> Result<Resolved> {
         sources: layers.iter().map(|l| l.source.as_str()).collect::<Vec<_>>().join(", "),
         source,
     })?;
-    Ok(Resolved { defaults, merged, sources })
+    Resolved { defaults, merged, sources }.checked_tags()
 }
 
 /// `ISOLOOM_CLOUD__AWS__REGION=x` -> `("cloud.aws.region", "x")`, `ISOLOOM_TAGS__TEAM=ops` ->
@@ -472,13 +514,46 @@ mod tests {
         assert!(serde_yaml_ng::from_str::<Defaults>("tags: { team: [a, b] }").is_err(), "a list is no tag");
     }
 
+    /// The defaults of one layer from `source` setting each tag of `tags`.
+    fn tagged(source: &str, tags: &[(&str, &str)]) -> Result<Resolved> {
+        let layers: Vec<Layer> = tags
+            .iter()
+            .map(|(k, v)| Layer {
+                source: source.to_owned(),
+                value: at_path(&format!("tags.{k}"), typed("tags", v)),
+            })
+            .collect();
+        resolve(&layers)
+    }
+
     #[test]
-    fn the_specs_tags_go_over_the_defaults() {
-        let defaults: Defaults = serde_yaml_ng::from_str("tags: { cost-center: \"1\", team: ops }").unwrap();
+    fn the_specs_tags_go_over_the_defaults() -> Outcome {
+        let defaults = tagged("project file", &[("cost-center", "1"), ("team", "ops")])?;
         let own: IndexMap<String, String> = [("team".to_owned(), "platform".to_owned())].into_iter().collect();
-        let merged = defaults.tags_under(&own);
+        let merged = defaults.tags_under(&own)?;
         assert_eq!(merged["cost-center"], "1");
         assert_eq!(merged["team"], "platform");
+        Ok(())
+    }
+
+    #[test]
+    fn a_tag_of_the_defaults_follows_the_specs_rules_and_names_its_source() -> Outcome {
+        let wrong = tagged("environment ISOLOOM_TAGS__9X", &[("9x", "a")]).unwrap_err().to_string();
+        assert!(
+            wrong.starts_with("defaults (environment ISOLOOM_TAGS__9X): tag `9x`: a key of at most 63"),
+            "{wrong}"
+        );
+        let own_tag = tagged("user file", &[("managed-by", "me")]).unwrap_err().to_string();
+        assert!(own_tag.contains("Isoloom's own tag"), "{own_tag}");
+        // One that clashes with the spec's is the defaults', named with its source.
+        let team = tagged("environment ISOLOOM_TAGS__TEAM", &[("team", "dev")])?;
+        let spec: IndexMap<String, String> = [("Team".to_owned(), "ops".to_owned())].into_iter().collect();
+        let clash = team.tags_under(&spec).unwrap_err().to_string();
+        assert_eq!(
+            clash,
+            "defaults (environment ISOLOOM_TAGS__TEAM): tag `team`: `team` and `Team` are one tag on Azure, whose tag names ignore case: name them apart"
+        );
+        Ok(())
     }
 
     #[test]

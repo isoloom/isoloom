@@ -11,7 +11,8 @@ use super::{Console, Listing, Result, Verdict, spec};
 /// Lists every target, generated or not, with the reason when not; then the tiers of those
 /// generated.
 pub(crate) fn run(a: &Listing, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
-    let lab = spec::checked(spec::lab(profile, &a.project.dir)?, &a.project.dir)?;
+    let (lab, _) = spec::with_settings(profile, &a.project.dir, None, &[])?;
+    let lab = spec::checked(lab, &a.project.dir)?;
     let entries = tiers::tiers()?;
     let ready = ready(&lab);
     if a.json {

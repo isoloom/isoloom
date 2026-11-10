@@ -118,8 +118,10 @@ pub struct Spec {
     /// `key:value` tags. A key starts with a letter, then letters, digits and `_ . : -` (63 at
     /// most); two keys equal but for case (Azure ignores it), or one label once lowercased
     /// (`Cost.Center` and `cost_center`), are refused, as are Isoloom's own (`isoloom*`,
-    /// `managed-by`) in any case. A value is text; a number or `true`/`false` is read as its text
-    /// (quote one whose form matters: `"007"`). The defaults' `tags:` add theirs under these.
+    /// `managed-by`) in any case. A value is text on one line, at most as long as Linode's tags
+    /// let it be: `key:value` is 3 to 50 characters. A number or `true`/`false` is read as its
+    /// text (quote one whose form matters: `"007"`). The defaults' `tags:` add theirs under these,
+    /// by the same rules.
     #[schemars(default, schema_with = "tags::schema")]
     pub tags: IndexMap<String, String>,
     /// Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `proxmox`,

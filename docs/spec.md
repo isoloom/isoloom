@@ -67,7 +67,7 @@ Shown once the environment is up, in Markdown, with `{{ path }}` placeholders: `
 
 ### `tags`
 
-Tags every cloud resource and Kubernetes object carries, beside Isoloom's own (`cost-center: 1234`, `team: platform`): AWS's default tags, Azure's tags, Oracle Cloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those can't hold lowercased, its other characters `_`), DigitalOcean's and Linode's `key:value` tags. A key starts with a letter, then letters, digits and `_ . : -` (63 at most); two keys equal but for case (Azure ignores it), or one label once lowercased (`Cost.Center` and `cost_center`), are refused, as are Isoloom's own (`isoloom*`, `managed-by`) in any case. A value is text; a number or `true`/`false` is read as its text (quote one whose form matters: `"007"`). The defaults' `tags:` add theirs under these.
+Tags every cloud resource and Kubernetes object carries, beside Isoloom's own (`cost-center: 1234`, `team: platform`): AWS's default tags, Azure's tags, Oracle Cloud's free-form tags, Google Cloud's labels and the Kubernetes labels (a value those can't hold lowercased, its other characters `_`), DigitalOcean's and Linode's `key:value` tags. A key starts with a letter, then letters, digits and `_ . : -` (63 at most); two keys equal but for case (Azure ignores it), or one label once lowercased (`Cost.Center` and `cost_center`), are refused, as are Isoloom's own (`isoloom*`, `managed-by`) in any case. A value is text on one line, at most as long as Linode's tags let it be: `key:value` is 3 to 50 characters. A number or `true`/`false` is read as its text (quote one whose form matters: `"007"`). The defaults' `tags:` add theirs under these, by the same rules.
 
 - **Type:** map of name to value
 

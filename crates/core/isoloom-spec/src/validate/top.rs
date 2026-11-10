@@ -19,29 +19,21 @@ pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
     }
 }
 
-/// The tags every cloud takes, by the strictest cloud's rules: a key of at most 63 letters, digits
-/// and `_ . : -` starting with a letter (Google Cloud's labels), not one Isoloom writes itself in
-/// any case (Azure's tag names ignore case), and none clashing with another where a cloud carries
-/// them ([`tags::clash`]); a value of at most 255 characters on one line.
+/// The tags every cloud takes, by the strictest cloud's rules ([`tags::key_refusal`],
+/// [`tags::value_refusal`]), none clashing with another where a cloud carries them
+/// ([`tags::clash`]).
 pub(super) fn tags(spec: &Spec, p: &mut Problems) {
     for (key, value) in &spec.tags {
         let at = format!("tags.{key}");
-        let allowed = |c: char| c.is_ascii_alphanumeric() || "_.:-".contains(c);
-        let lower = key.to_ascii_lowercase();
-        if key.len() > 63 || !key.starts_with(|c: char| c.is_ascii_alphabetic()) || !key.chars().all(allowed) {
-            p.add(
-                at.clone(),
-                "a key of at most 63 letters, digits and `_ . : -`, starting with a letter, e.g. cost-center",
-            );
-        } else if lower.starts_with("isoloom") || lower == "managed-by" {
-            p.add(at.clone(), format!("`{key}` is Isoloom's own tag: name yours otherwise"));
+        if let Some(why) = tags::key_refusal(key) {
+            p.add(at.clone(), why);
         }
-        if value.len() > 255 || value.chars().any(char::is_control) {
-            p.add(at, "a value of at most 255 characters, on one line");
+        if let Some(why) = tags::value_refusal(key, value) {
+            p.add(at, why);
         }
     }
-    if let Some((key, why)) = tags::clash(&spec.tags) {
-        p.add(format!("tags.{key}"), format!("{why}: name them apart"));
+    if let Some(c) = tags::clash(&spec.tags) {
+        p.add(format!("tags.{}", c.key), format!("{}: name them apart", c.why));
     }
 }
 
@@ -101,6 +93,21 @@ mod tests {
         assert_eq!(
             named("Portal"),
             ["name: use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)"]
+        );
+    }
+
+    #[test]
+    fn each_tag_follows_every_clouds_rules_and_none_clashes() {
+        let tags = "tags: { cost-center: \"1234\", 9x: a, Managed-By: me, team: \"a\\nb\", Team: ops, x: \"\" }\n";
+        assert_eq!(
+            problems(&lab(&format!("{tags}{WEB}"))),
+            [
+                "tags.9x: a key of at most 63 letters, digits and `_ . : -`, starting with a letter, e.g. cost-center",
+                "tags.Managed-By: `Managed-By` is Isoloom's own tag: name yours otherwise",
+                "tags.team: a value on one line",
+                "tags.x: `x:<value>` is at most 50 characters and at least 3 (Linode's tags): a value of 1 to 48 characters here",
+                "tags.Team: `team` and `Team` are one tag on Azure, whose tag names ignore case: name them apart",
+            ]
         );
     }
 
