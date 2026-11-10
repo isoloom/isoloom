@@ -289,3 +289,20 @@ fn the_hyperv_relay_listens_on_the_host_port_the_forward_takes() -> Outcome {
     }
     Ok(())
 }
+
+/// The run manifest names each network as the Vagrantfile makes it: VirtualBox's internal
+/// network and libvirt's network, both `isoloom-<environment>-<network>`.
+#[test]
+fn the_run_manifest_names_each_network_as_the_vagrantfile_makes_it() -> Outcome {
+    let env = plan("segmented")?;
+    let manifest = VagrantBackend.run_manifest(&env)?.ok_or("a run manifest")?;
+    let file = vagrantfile("segmented")?;
+    assert_eq!(manifest.networks.len(), env.networks.len());
+    for n in &manifest.networks {
+        let native = n.native.as_ref().map(ToString::to_string).ok_or("a native name")?;
+        assert!(native.starts_with(isoloom_manifest::contract::RESERVED_PREFIX), "{native}");
+        assert!(file.contains(&format!("virtualbox__intnet: \"{native}\"")), "{native}");
+        assert!(file.contains(&format!("libvirt__network_name: \"{native}\"")), "{native}");
+    }
+    Ok(())
+}

@@ -44,11 +44,13 @@ pub(crate) mod utm;
 pub(crate) mod values;
 mod windows;
 
-/// The name of a network on the host, `isoloom-<environment>-<network>`: its VirtualBox
-/// internal network, its libvirt network and its Hyper-V private switch.
+/// The name of a network on the host, `isoloom-<environment>-<network>` (after the contract's
+/// [`RESERVED_PREFIX`](isoloom_manifest::contract::RESERVED_PREFIX)): its VirtualBox internal
+/// network, its libvirt network and its Hyper-V private switch, as the Vagrantfile makes them and
+/// the run manifest names them.
 #[must_use]
 pub fn network_name(environment: &str, network: &str) -> String {
-    format!("isoloom-{environment}-{network}")
+    format!("{}{environment}-{network}", isoloom_manifest::contract::RESERVED_PREFIX)
 }
 
 use indexmap::IndexMap;
