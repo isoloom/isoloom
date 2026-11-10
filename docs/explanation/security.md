@@ -57,6 +57,19 @@ keys) and the runner's logins (`.isoloom-reach/`). One rule,
   cluster is your cluster's decision ([Kubernetes](../guide/targets/kubernetes.md)).
 - **Clouds**: reachable only from `allowed_cidr` (below).
 
+## Graphical consoles
+
+A VM's graphical console (its screen, [run manifest](../reference/run-manifest.md#graphical-consoles))
+listens only on the loopback of the computer that runs Vagrant: libvirt's and QEMU's VNC, VMware's
+VNC server and VirtualBox's remote display all bind `127.0.0.1`. VMware's takes a password the
+runner makes for each run and keeps until `down` (VMware writes it in the VM's `.vmx`, as it does
+every setting); libvirt's, QEMU's and VirtualBox's take none, so any program of a user of that
+computer can reach them while the VM runs, as it can reach the forwarded ports. Proxmox's console
+goes through its API, with the connection's own credentials and a ticket per session. A cloud
+Windows VM's Remote Desktop is reached only through an SSH tunnel the runner opens from the
+loopback, through a Linux machine of the run: Isoloom opens no port for it at the VM's public
+address.
+
 ## Kubernetes
 
 `reach` and `internet: false` become NetworkPolicies, which only a network plugin that enforces

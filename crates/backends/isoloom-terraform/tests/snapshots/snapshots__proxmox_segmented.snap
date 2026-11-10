@@ -702,6 +702,21 @@ output "checks" {
   ]
 }
 
+# cache's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_cache" {
+  value = proxmox_virtual_environment_vm.cache.vm_id
+}
+
+# web's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_web" {
+  value = proxmox_virtual_environment_vm.web.vm_id
+}
+
+# user's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_user" {
+  value = proxmox_virtual_environment_vm.user.vm_id
+}
+
 # The project's files the machines don't get: what .isoloomignore at the project's root lists
 # (gitignore-style: one pattern per line, `#` comments, `!` brings a path back, a trailing `/`
 # matches folders only, a `/` at the start or in the middle anchors the pattern at the root; `*`,

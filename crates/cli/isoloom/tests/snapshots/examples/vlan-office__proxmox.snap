@@ -1174,6 +1174,26 @@ output "checks" {
   ]
 }
 
+# intranet's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_intranet" {
+  value = proxmox_virtual_environment_vm.intranet.vm_id
+}
+
+# staff's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_staff" {
+  value = proxmox_virtual_environment_vm.staff.vm_id
+}
+
+# guest's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_guest" {
+  value = proxmox_virtual_environment_vm.guest.vm_id
+}
+
+# admin's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_admin" {
+  value = proxmox_virtual_environment_vm.admin.vm_id
+}
+
 # The project's files the machines don't get: what .isoloomignore at the project's root lists
 # (gitignore-style: one pattern per line, `#` comments, `!` brings a path back, a trailing `/`
 # matches folders only, a `/` at the start or in the middle anchors the pattern at the root; `*`,
@@ -1486,6 +1506,21 @@ locals {
           "protocol": "tcp",
           "http": true
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_intranet}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
       ]
     },
     {
@@ -1499,7 +1534,22 @@ locals {
       },
       "addresses": {
         "office-vlan10": "10.70.10.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_staff}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "guest",
@@ -1512,7 +1562,22 @@ locals {
       },
       "addresses": {
         "office-vlan20": "10.70.20.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_guest}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "admin",
@@ -1526,7 +1591,22 @@ locals {
       "addresses": {
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_admin}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "isoloom-router",
@@ -1736,6 +1816,46 @@ locals {
       "from": {
         "kind": "terraform_output",
         "name": "ready_file"
+      }
+    },
+    {
+      "name": "vm_id_intranet",
+      "description": "intranet's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_intranet"
+      }
+    },
+    {
+      "name": "vm_id_staff",
+      "description": "staff's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_staff"
+      }
+    },
+    {
+      "name": "vm_id_guest",
+      "description": "guest's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_guest"
+      }
+    },
+    {
+      "name": "vm_id_admin",
+      "description": "admin's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_admin"
       }
     }
   ],

@@ -806,6 +806,21 @@ output "checks" {
   ]
 }
 
+# web's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_web" {
+  value = proxmox_virtual_environment_vm.web.vm_id
+}
+
+# block's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_block" {
+  value = proxmox_virtual_environment_vm.block.vm_id
+}
+
+# client's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_client" {
+  value = proxmox_virtual_environment_vm.client.vm_id
+}
+
 # The project's files the machines don't get: what .isoloomignore at the project's root lists
 # (gitignore-style: one pattern per line, `#` comments, `!` brings a path back, a trailing `/`
 # matches folders only, a `/` at the start or in the middle anchors the pattern at the root; `*`,
@@ -1088,6 +1103,21 @@ locals {
           "protocol": "tcp",
           "http": true
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_web}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
       ]
     },
     {
@@ -1101,7 +1131,22 @@ locals {
       },
       "addresses": {
         "office": "10.86.0.40"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_block}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "client",
@@ -1114,7 +1159,22 @@ locals {
       },
       "addresses": {
         "office": "10.86.0.20"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_client}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "isoloom-router",
@@ -1295,6 +1355,36 @@ locals {
       "from": {
         "kind": "terraform_output",
         "name": "ready_file"
+      }
+    },
+    {
+      "name": "vm_id_web",
+      "description": "web's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_web"
+      }
+    },
+    {
+      "name": "vm_id_block",
+      "description": "block's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_block"
+      }
+    },
+    {
+      "name": "vm_id_client",
+      "description": "client's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_client"
       }
     }
   ],

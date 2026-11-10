@@ -150,6 +150,9 @@ fn setup_script(w: &Machine) -> String {
     ];
     ps.extend(ports.iter().filter_map(port_proxy));
     ps.extend(ports.iter().flat_map(firewall));
+    if ports.iter().any(|p| p.port == REMOTE_DESKTOP && p.protocol.is_tcp()) {
+        ps.push(remote_desktop());
+    }
     let runs = has_runs(w);
     for step in plan.lifecycle.iter().filter(|s| !(w.skip)(s)) {
         if *step == Step::Project && !runs {
@@ -158,6 +161,15 @@ fn setup_script(w: &Machine) -> String {
         ps.extend(steps::windows(env, name, step).map(|s| s.trim_end().to_owned()));
     }
     ps.join("\n") + "\n"
+}
+
+/// Remote Desktop's port: a spec opening it turns Remote Desktop on.
+const REMOTE_DESKTOP: u16 = 3389;
+
+/// Remote Desktop turned on (a server image may have it off), with Network Level Authentication:
+/// the port the spec opens is its firewall rule.
+fn remote_desktop() -> String {
+    "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name fDenyTSConnections -Value 0\nSet-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name UserAuthentication -Value 1".to_owned()
 }
 
 /// A published TCP port that differs from the service's own, forwarded to it (Windows' port
@@ -222,4 +234,40 @@ pub(crate) fn winrm(auth: WinrmAuth) -> String {
         "New-ItemProperty -Path HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System -Name LocalAccountTokenFilterPolicy -Value 1 -PropertyType DWord -Force | Out-Null\nGet-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\n{basic}Set-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\n{}",
         open_port("winrm", "TCP", 5985)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hcl_builder::string;
+
+    fn script(ports: &str) -> String {
+        let env = crate::testing::environment(
+            &format!(
+                "version: 1\nname: w\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  dc: {{ networks: {{ lab: 10 }}, os: windows-server@2022, ports: {{ {ports} }} }}\n"
+            ),
+            isoloom_spec::model::Target::CloudVm,
+        );
+        setup_script(&Machine {
+            remote: Remote {
+                env: &env,
+                name: "dc",
+                plan: &env.machines["dc"],
+                replace_on: string("id"),
+                host: string("10.9.0.10"),
+            },
+            password: string("pw"),
+            skip: |_| false,
+            platform: Platform::default(),
+        })
+    }
+
+    #[test]
+    fn a_spec_opening_remote_desktops_port_turns_it_on() {
+        let with = script("rdp: { port: 3389 }");
+        assert!(with.contains("-Name fDenyTSConnections -Value 0"), "{with}");
+        assert!(with.contains("'isoloom 3389'"), "its firewall rule: {with}");
+        let without = script("web: { port: 80 }");
+        assert!(!without.contains("fDenyTSConnections"), "{without}");
+    }
 }

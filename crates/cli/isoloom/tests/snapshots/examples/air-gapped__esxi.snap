@@ -823,6 +823,12 @@ resource "local_file" "isoloom_project" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
+        }
       ]
     },
     {
@@ -843,6 +849,12 @@ resource "local_file" "isoloom_project" {
           "port": 80,
           "protocol": "tcp",
           "http": true
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
         }
       ]
     },

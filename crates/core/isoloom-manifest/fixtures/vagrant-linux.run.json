@@ -427,7 +427,7 @@
           "utm": "web-vm - web",
           "vmware_esxi": "web-vm-web"
         },
-        "boot_digest": "sha256:0ab275c603083baf6e9e6b8fcfdc29f58411e25d7bde3fbbfb86d4ead11fa680"
+        "boot_digest": "sha256:4837f8adf1ba0fc9ac6d80e3aceb01479b9a0b44be55c61f696c2009d819fa01"
       },
       "ports": [
         {
@@ -440,6 +440,73 @@
             "preferred": 8086,
             "address": "127.0.0.1"
           }
+        }
+      ],
+      "consoles": [
+        {
+          "providers": [
+            "virtualbox"
+          ],
+          "protocol": "rdp",
+          "source": {
+            "from": "vrde"
+          },
+          "note": "on only when the Oracle VM VirtualBox Extension Pack is installed as the VM boots (VirtualBox has no remote display server without it)"
+        },
+        {
+          "providers": [
+            "vmware_desktop"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "runner"
+          }
+        },
+        {
+          "providers": [
+            "hyperv"
+          ],
+          "protocol": "none",
+          "note": "Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port"
+        },
+        {
+          "providers": [
+            "parallels"
+          ],
+          "protocol": "none",
+          "note": "Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)"
+        },
+        {
+          "providers": [
+            "libvirt"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "libvirt"
+          }
+        },
+        {
+          "providers": [
+            "qemu"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "qemu_monitor"
+          }
+        },
+        {
+          "providers": [
+            "utm"
+          ],
+          "protocol": "none",
+          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
+        },
+        {
+          "providers": [
+            "vmware_esxi"
+          ],
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
         }
       ]
     },

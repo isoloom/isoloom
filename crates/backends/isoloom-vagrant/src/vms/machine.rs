@@ -190,6 +190,7 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         esxi_box: None,
         nested: mp.hardware.nested_virtualization,
         disks: mp.disks.iter().map(|d| (d.name.as_str(), d.size_gb)).collect(),
+        console: Some(name),
     }
 }
 

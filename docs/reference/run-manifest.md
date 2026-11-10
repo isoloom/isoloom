@@ -43,7 +43,8 @@ and `isoloom-manifest` holds the types and fixtures runners can test against.
 
 A few names the generated files and a runner share live outside `run.json`: the output folder
 (`.isoloom`), the controller's machine, the variables a Vagrantfile reads (the ESXi host and
-port, the SSH proxy command, the chosen host ports, `ISOLOOM_PUBLISH_FIXED`), the cloud tags a
+port, the SSH proxy command, the chosen host ports, `ISOLOOM_PUBLISH_FIXED`, the consoles the
+runner chose, `ISOLOOM_CONSOLES`), the cloud tags a
 reaper reads (`isoloom-instance`, `isoloom-expires-at`), and the paths a machine's set-up uses
 (its secrets folder and their delivery mark, the controller's halting mark). They are part of
 the contract too, each defined once in `isoloom_manifest::contract`, which the backends write
@@ -163,6 +164,53 @@ outputs say: at `address_<machine>`, as `ssh_user_<machine>` (the machine's name
 written `_`). The steps that reach the same machine over SSH (its `deliver-<machine>` step, its
 ready file, its check runner) name the same address output, and the same user as a literal: the
 cloud's login for the machine's OS, the one rule that writes `ssh_user_<machine>` too.
+
+## Graphical consoles
+
+A VM's machine lists its **graphical consoles** (`machines[].consoles`): its screen, keyboard and
+mouse as its hypervisor, its server or its own OS serves them, and how a runner finds each one.
+A console listens only on the loopback of the computer that runs the environment, or is reached
+through an SSH tunnel the runner opens there: never on the local network, never at a public
+address. A Vagrant machine lists one console per provider (`providers`); elsewhere a machine
+lists one. A machine says so when it has none, and why (`protocol: none` with a `note`), so a
+runner can tell a user why there is no screen to show. A container lists none.
+
+```json
+"consoles": [
+  { "providers": ["libvirt"], "protocol": "vnc", "source": { "from": "libvirt" } },
+  { "providers": ["utm"], "protocol": "none", "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay" }
+]
+```
+
+| `source.from` | Protocol | Where | How a runner finds it |
+|---|---|---|---|
+| `libvirt` | VNC | `127.0.0.1`, a port libvirt picks at boot | `virsh domdisplay <domain>` (the machine's `native.vm_names.libvirt`), on the connection Vagrant uses |
+| `qemu_monitor` | VNC | `127.0.0.1`, the first free port from 5900 | the VM's QEMU monitor (vagrant-qemu's socket): `info vnc` |
+| `vrde` | RDP | `127.0.0.1`, a free port of 3390 to 3489 | `VBoxManage showvminfo`; on only with the Oracle VM VirtualBox Extension Pack installed when the VM boots |
+| `runner` | VNC | `127.0.0.1`, at a port the runner picks | the runner chooses the port and an 8-character password for the run, keeps them until `down`, and gives them to the run's own Vagrant processes in `ISOLOOM_CONSOLES` (`{"<machine>": {"port": 5901, "password": "…"}}`), never to a command it hands an embedder |
+| `proxmox_api` | VNC | Proxmox VE's API | `vncproxy` then `vncwebsocket` of `vm_id` on `node`, signed in with the `token` slot, else `username` and the `password` slot; the ticket `vncproxy` gives is the VNC password |
+| `ssh_tunnel` | RDP or VNC | the machine's `host:port` | an SSH tunnel from this computer's loopback through `via`, as `user`, with the runner's key |
+
+An RDP console to a Windows machine's own Remote Desktop names its `account`: the user and a
+template naming the output that holds its password (a sensitive one).
+
+What each target gives a Linux and a Windows VM is in the [capability matrix](../matrix.md#graphical-consoles):
+
+- **Vagrant**: libvirt and QEMU give VNC; VMware Workstation and Fusion their VNC server
+  (`RemoteDisplay.vnc.*`, at the runner's port and password); VirtualBox its remote display (RDP),
+  only with the Oracle extension pack, which brings the server (without it, it stays off and a
+  runner says so). Hyper-V has no VNC or remote display server of its own; Parallels' VNC server
+  stays off; UTM shows a VM's screen over SPICE only; an ESXi VM's console goes through ESXi's own
+  API (a WebMKS ticket), which Isoloom doesn't use.
+- **Proxmox**: every VM but an Arm one (whose console is the serial port) has Proxmox's own
+  console, through its API; the module outputs each VM's id (`vm_id_<machine>`).
+- **ESXi**: none, as on Vagrant's ESXi provider.
+- **Clouds**: a Linux VM has none (its way in is SSH). A Windows VM whose spec opens Remote
+  Desktop's port (3389/tcp) has its own Remote Desktop, which its set-up turns on, reached through
+  an SSH tunnel through a Linux machine of the run on one of its networks (as the environment's
+  `reach` rules let that machine reach it), signed in as `isoloom` with the generated password
+  (the module's sensitive `windows_password` output). A Windows VM without the port, or with no
+  Linux machine beside it, has none and says why.
 
 ## The egress seal
 

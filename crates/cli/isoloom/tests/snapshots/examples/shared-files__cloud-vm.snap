@@ -502,7 +502,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "reader",
@@ -515,7 +521,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.11"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {
@@ -1358,7 +1370,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "reader",
@@ -1371,7 +1389,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.11"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {
@@ -2318,7 +2342,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "reader",
@@ -2331,7 +2361,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.11"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {
@@ -3012,7 +3048,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "reader",
@@ -3025,7 +3067,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.11"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {
@@ -3886,7 +3934,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "reader",
@@ -3899,7 +3953,13 @@ output "checks" {
       },
       "addresses": {
         "app": "10.84.0.11"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {

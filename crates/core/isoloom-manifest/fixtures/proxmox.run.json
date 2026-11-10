@@ -262,6 +262,21 @@
             "address": "${outputs.ip}"
           }
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_web}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
       ]
     },
     {
@@ -431,6 +446,16 @@
         "kind": "published_port",
         "machine": "web",
         "port": "web"
+      }
+    },
+    {
+      "name": "vm_id_web",
+      "description": "web's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_web"
       }
     }
   ],

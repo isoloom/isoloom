@@ -706,6 +706,16 @@ output "checks" {
   ]
 }
 
+# writer's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_writer" {
+  value = proxmox_virtual_environment_vm.writer.vm_id
+}
+
+# reader's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_reader" {
+  value = proxmox_virtual_environment_vm.reader.vm_id
+}
+
 # The project's files the machines don't get: what .isoloomignore at the project's root lists
 # (gitignore-style: one pattern per line, `#` comments, `!` brings a path back, a trailing `/`
 # matches folders only, a `/` at the start or in the middle anchors the pattern at the root; `*`,
@@ -980,7 +990,22 @@ locals {
       },
       "addresses": {
         "app": "10.84.0.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_writer}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "reader",
@@ -993,7 +1018,22 @@ locals {
       },
       "addresses": {
         "app": "10.84.0.11"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_reader}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "isoloom-router",
@@ -1162,6 +1202,26 @@ locals {
       "from": {
         "kind": "terraform_output",
         "name": "ready_file"
+      }
+    },
+    {
+      "name": "vm_id_writer",
+      "description": "writer's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_writer"
+      }
+    },
+    {
+      "name": "vm_id_reader",
+      "description": "reader's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_reader"
       }
     }
   ],

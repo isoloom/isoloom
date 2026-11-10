@@ -26,6 +26,7 @@
 mod arch;
 mod base;
 mod boot;
+mod console;
 mod controller;
 pub(crate) mod docker_host;
 mod firewall;
@@ -204,7 +205,10 @@ const PARTS: Parts = Parts {
     base: base::blocks,
     router: router::blocks,
     guests,
-    outputs: router::outputs,
+    outputs: |env, m| {
+        router::outputs(env, m);
+        console::outputs(env, m);
+    },
 };
 
 /// The VMs, the LXC containers, then the controller.

@@ -1277,6 +1277,26 @@ output "checks" {
   ]
 }
 
+# gateway's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_gateway" {
+  value = proxmox_virtual_environment_vm.gateway.vm_id
+}
+
+# app's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_app" {
+  value = proxmox_virtual_environment_vm.app.vm_id
+}
+
+# db's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_db" {
+  value = proxmox_virtual_environment_vm.db.vm_id
+}
+
+# user's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_user" {
+  value = proxmox_virtual_environment_vm.user.vm_id
+}
+
 # The project's files the machines don't get: what .isoloomignore at the project's root lists
 # (gitignore-style: one pattern per line, `#` comments, `!` brings a path back, a trailing `/`
 # matches folders only, a `/` at the start or in the middle anchors the pattern at the root; `*`,
@@ -1596,6 +1616,21 @@ locals {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_gateway}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
       ]
     },
     {
@@ -1616,6 +1651,21 @@ locals {
           "port": 8080,
           "protocol": "tcp",
           "http": false
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_app}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
         }
       ]
     },
@@ -1638,6 +1688,21 @@ locals {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_db}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
       ]
     },
     {
@@ -1651,7 +1716,22 @@ locals {
       },
       "addresses": {
         "access": "10.30.99.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "vnc",
+          "source": {
+            "from": "proxmox_api",
+            "endpoint": "${params.proxmox_endpoint}",
+            "node": "${params.node}",
+            "vm_id": "${outputs.vm_id_user}",
+            "insecure": "${params.proxmox_insecure}",
+            "username": "${params.proxmox_username}",
+            "token": "proxmox_api_token",
+            "password": "proxmox_password"
+          }
+        }
+      ]
     },
     {
       "name": "isoloom-router",
@@ -1861,6 +1941,46 @@ locals {
       "from": {
         "kind": "terraform_output",
         "name": "ready_file"
+      }
+    },
+    {
+      "name": "vm_id_gateway",
+      "description": "gateway's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_gateway"
+      }
+    },
+    {
+      "name": "vm_id_app",
+      "description": "app's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_app"
+      }
+    },
+    {
+      "name": "vm_id_db",
+      "description": "db's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_db"
+      }
+    },
+    {
+      "name": "vm_id_user",
+      "description": "user's VM id on the node: its console (Proxmox's vncproxy) is asked for by it.",
+      "role": "info",
+      "sensitive": false,
+      "from": {
+        "kind": "terraform_output",
+        "name": "vm_id_user"
       }
     }
   ],

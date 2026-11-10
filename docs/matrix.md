@@ -162,6 +162,29 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.os = windows-server@2022` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = windows-server@2025` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 
+## Graphical consoles
+
+Graphical consoles: what each VM target gives a VM's screen, from the run manifest it writes (`machines[].consoles`). Every one listens on the loopback of the computer that runs the environment, or is reached through an SSH tunnel the runner opens there; `–`: the target takes no such VM.
+
+| Target | A Linux VM | A Windows VM opening Remote Desktop's port (3389/tcp) |
+|---|---|---|
+| `vagrant/virtualbox` | RDP, VirtualBox's remote display (with the Oracle extension pack) | RDP, VirtualBox's remote display (with the Oracle extension pack) |
+| `vagrant/vmware_desktop` | VNC, the hypervisor's server (its port and password the runner's, per run) | VNC, the hypervisor's server (its port and password the runner's, per run) |
+| `vagrant/hyperv` | none: Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port | none: Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port |
+| `vagrant/parallels` | none: Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off) | none: Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off) |
+| `vagrant/libvirt` | VNC, libvirt's display | VNC, libvirt's display |
+| `vagrant/qemu` | VNC, QEMU's display | VNC, QEMU's display |
+| `vagrant/utm` | none: UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay | none: UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay |
+| `vagrant/vmware_esxi` | none: an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use | none: an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use |
+| `proxmox` | VNC, Proxmox's console through its API | VNC, Proxmox's console through its API |
+| `esxi` | none: an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use | none: an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use |
+| `cloud-vm/aws` | none: a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH | RDP, its own Remote Desktop through an SSH tunnel |
+| `cloud-vm/azure` | none: a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH | RDP, its own Remote Desktop through an SSH tunnel |
+| `cloud-vm/gcp` | none: a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH | – |
+| `cloud-vm/digitalocean` | none: a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH | – |
+| `cloud-vm/linode` | none: a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH | – |
+| `cloud-vm/oci` | none: a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH | – |
+
 ## Why a target refuses
 
 ### `machines.*.app.image`

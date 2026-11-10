@@ -772,6 +772,12 @@ output "checks" {
           "protocol": "tcp",
           "http": true
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -785,7 +791,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan10": "10.70.10.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "guest",
@@ -798,7 +810,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan20": "10.70.20.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "admin",
@@ -812,7 +830,13 @@ output "checks" {
       "addresses": {
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {
@@ -2186,6 +2210,12 @@ output "checks" {
           "protocol": "tcp",
           "http": true
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -2199,7 +2229,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan10": "10.70.10.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "guest",
@@ -2212,7 +2248,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan20": "10.70.20.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "admin",
@@ -2226,7 +2268,13 @@ output "checks" {
       "addresses": {
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {
@@ -3895,6 +3943,12 @@ output "checks" {
           "protocol": "tcp",
           "http": true
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -3908,7 +3962,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan10": "10.70.10.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "guest",
@@ -3921,7 +3981,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan20": "10.70.20.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "admin",
@@ -3935,7 +4001,13 @@ output "checks" {
       "addresses": {
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {
@@ -5281,6 +5353,12 @@ output "checks" {
           "protocol": "tcp",
           "http": true
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -5294,7 +5372,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan10": "10.70.10.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "guest",
@@ -5307,7 +5391,13 @@ output "checks" {
       },
       "addresses": {
         "office-vlan20": "10.70.20.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     },
     {
       "name": "admin",
@@ -5321,7 +5411,13 @@ output "checks" {
       "addresses": {
         "office-vlan10": "10.70.10.50",
         "office-vlan20": "10.70.20.50"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
+      ]
     }
   ],
   "lifecycle": {

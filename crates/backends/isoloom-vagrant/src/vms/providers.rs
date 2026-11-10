@@ -4,6 +4,7 @@
 use std::net::Ipv4Addr;
 
 use crate::boxes;
+use crate::console;
 use isoloom_spec::model::{Arch, Boot};
 use isoloom_spec::windows::Tpm;
 
@@ -118,6 +119,9 @@ pub(crate) struct Guest<'a> {
     pub(crate) nested: bool,
     /// Its data disks, `(name, GB)`, in order.
     pub(crate) disks: Vec<(&'a str, u32)>,
+    /// Its machine's name, when it is one of the environment's: it gets a graphical console
+    /// ([`crate::console`]) where the provider gives one. Isoloom's own VMs get none.
+    pub(crate) console: Option<&'a str>,
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
@@ -149,6 +153,9 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
         if g.tpm.is_some() {
             windows::virtualbox_tpm(r);
         }
+        if g.console.is_some() {
+            console::virtualbox(r);
+        }
     });
     vmware(r, g);
     desktop(r, Provider::Parallels, g, true, |_| {});
@@ -160,6 +167,9 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::Qemu), "v, o", |r| {
         qemu(r, g.size, &g.qemu);
         g.boot.into_iter().for_each(|b| boot::qemu(r, b));
+        if g.console.is_some() {
+            console::qemu(r, g.qemu.arch);
+        }
     });
     if let Link::Hub(h) = g.qemu.link {
         hub_triggers(r, h);
@@ -206,6 +216,9 @@ fn vmware(r: &mut Ruby, g: &Guest) {
         if g.nested {
             nested::switch(r, Provider::VmwareDesktop);
         }
+        if let Some(machine) = g.console {
+            console::vmware(r, machine);
+        }
     });
 }
 
@@ -248,6 +261,9 @@ fn libvirt(r: &mut Ruby, g: &Guest) {
         }
         for (_, gb) in &g.disks {
             r.call(Call::new("v.storage").arg(Value::sym("file")).kw("size", Value::str(&format!("{gb}G"))));
+        }
+        if g.console.is_some() {
+            console::libvirt(r);
         }
     });
 }

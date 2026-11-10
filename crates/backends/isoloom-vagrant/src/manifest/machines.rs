@@ -77,6 +77,7 @@ fn environment_machine(env: &Environment, name: &str, out: &mut Machine) -> Resu
     out.arch = Some(arch(mp.arch));
     out.resources = Some(isoloom_render::run_manifest::resources(mp));
     out.addresses = addresses(mp)?;
+    out.consoles = crate::console::consoles();
     let loopback = Template::text(LOOPBACK);
     for p in &m.ports {
         // The host port is the runner's to choose (ephemeral), unless the spec fixed it: the

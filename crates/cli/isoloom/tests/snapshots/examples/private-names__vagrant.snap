@@ -466,6 +466,44 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# The VMs' graphical consoles, on this computer's loopback only.
+# - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
+#   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
+# - QEMU: a display, a USB tablet, and VNC at the first free display from 5900.
+# - VirtualBox: its remote display only with the Oracle extension pack, which brings the server.
+module IsoloomConsole
+  # The console the runner chose for `machine`, or nil.
+  def self.of(machine)
+    text = ENV["ISOLOOM_CONSOLES"].to_s
+    return nil if text.empty?
+    require "json"
+    console = JSON.parse(text)[machine]
+    console.is_a?(Hash) && console["port"].is_a?(Integer) && console["password"].is_a?(String) ? console : nil
+  rescue JSON::ParserError
+    nil
+  end
+
+  # QEMU's arguments for a VM of CPU `arch`: an Arm VM has no display unless given one.
+  def self.qemu(arch)
+    usb = ["-device", "qemu-xhci,id=isoloom-usb", "-device", "usb-tablet,bus=isoloom-usb.0"]
+    display = arch == "aarch64" ? ["-device", "virtio-gpu-pci", "-device", "usb-kbd,bus=isoloom-usb.0"] : []
+    ["-vnc", "127.0.0.1:0,to=99"] + usb.first(2) + display + usb.last(2)
+  end
+
+  # Whether VirtualBox has a remote display server: an installed, usable extension pack that
+  # brings one. Asked once per Vagrant command, and only of a VirtualBox VM's block.
+  def self.virtualbox_vrde?
+    return @vrde unless @vrde.nil?
+    require "open3"
+    dir = ENV["VBOX_MSI_INSTALL_PATH"] || ENV["VBOX_INSTALL_PATH"]
+    tool = dir && File.exist?(File.join(dir, "VBoxManage.exe")) ? File.join(dir, "VBoxManage.exe") : "VBoxManage"
+    out, status = Open3.capture2e(tool, "list", "extpacks")
+    packs = out.split(/^Pack no\.\s*\d+:/).drop(1)
+    @vrde = status.success? && packs.any? { |p| p =~ /^Usable:\s+true/ && p =~ /^VRDE Module:\s+\S/ }
+  rescue SystemCallError
+    @vrde = false
+  end
+end
 # On UTM, a Linux VM's default route through UTM's shared network, not the plugin's slower emulated one (the `nat-route` provisioners).
 ISOLOOM_NAT_ROUTE = <<~'SH'
 set -eu
@@ -641,11 +679,18 @@ Vagrant.configure("2") do |config|
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
+      v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
       v.vmx["displayName"] = "private-names - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      if (console = IsoloomConsole.of("web"))
+        v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
+        v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
+        v.vmx["RemoteDisplay.vnc.port"] = console.fetch("port").to_s
+        v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
+      end
     end
     m.vm.provider "parallels" do |v|
       v.name = "private-names - web"
@@ -675,6 +720,8 @@ Vagrant.configure("2") do |config|
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
       end
+      v.other_default = %w[-parallel none -monitor none -display none]
+      v.extra_qemu_args = IsoloomConsole.qemu("x86_64")
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("office", QEMU_HUBS["office"].values) }
@@ -700,6 +747,9 @@ Vagrant.configure("2") do |config|
       v.cpus = 1
       v.memory = 1024
       v.machine_arch = "x86_64"
+      v.graphics_type = "vnc"
+      v.graphics_ip = "127.0.0.1"
+      v.graphics_autoport = "yes"
     end
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
@@ -812,11 +862,18 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
+      v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
       v.vmx["displayName"] = "private-names - client"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      if (console = IsoloomConsole.of("client"))
+        v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
+        v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
+        v.vmx["RemoteDisplay.vnc.port"] = console.fetch("port").to_s
+        v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
+      end
     end
     m.vm.provider "parallels" do |v|
       v.name = "private-names - client"
@@ -846,6 +903,8 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
       end
+      v.other_default = %w[-parallel none -monitor none -display none]
+      v.extra_qemu_args = IsoloomConsole.qemu("x86_64")
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
       t.ruby { |_, _| IsoloomQemu.hub("office", QEMU_HUBS["office"].values) }
@@ -871,6 +930,9 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.cpus = 1
       v.memory = 1024
       v.machine_arch = "x86_64"
+      v.graphics_type = "vnc"
+      v.graphics_ip = "127.0.0.1"
+      v.graphics_autoport = "yes"
     end
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
@@ -1539,7 +1601,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "private-names - web",
           "vmware_esxi": "private-names-web"
         },
-        "boot_digest": "sha256:1be774fc17bc9d10ea5884507ab7c00e7333e9e0b92b4f54fe142af8010298b7"
+        "boot_digest": "sha256:81374a08c5d18ec31549d61d8ab10905528799f70ccc560a922cc80b4f63f170"
       },
       "ports": [
         {
@@ -1547,6 +1609,73 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "port": 80,
           "protocol": "tcp",
           "http": true
+        }
+      ],
+      "consoles": [
+        {
+          "providers": [
+            "virtualbox"
+          ],
+          "protocol": "rdp",
+          "source": {
+            "from": "vrde"
+          },
+          "note": "on only when the Oracle VM VirtualBox Extension Pack is installed as the VM boots (VirtualBox has no remote display server without it)"
+        },
+        {
+          "providers": [
+            "vmware_desktop"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "runner"
+          }
+        },
+        {
+          "providers": [
+            "hyperv"
+          ],
+          "protocol": "none",
+          "note": "Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port"
+        },
+        {
+          "providers": [
+            "parallels"
+          ],
+          "protocol": "none",
+          "note": "Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)"
+        },
+        {
+          "providers": [
+            "libvirt"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "libvirt"
+          }
+        },
+        {
+          "providers": [
+            "qemu"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "qemu_monitor"
+          }
+        },
+        {
+          "providers": [
+            "utm"
+          ],
+          "protocol": "none",
+          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
+        },
+        {
+          "providers": [
+            "vmware_esxi"
+          ],
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
         }
       ]
     },
@@ -1573,8 +1702,75 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "private-names - client",
           "vmware_esxi": "private-names-client"
         },
-        "boot_digest": "sha256:8d99035fa55a0f1ca9ec51ac2b823cb4bf843db3e7e1e3e69151a278fbd8ef80"
-      }
+        "boot_digest": "sha256:2ea473c77a88436584304987ccacfda9cb468d1f003371ceb14f6a9940fb62e2"
+      },
+      "consoles": [
+        {
+          "providers": [
+            "virtualbox"
+          ],
+          "protocol": "rdp",
+          "source": {
+            "from": "vrde"
+          },
+          "note": "on only when the Oracle VM VirtualBox Extension Pack is installed as the VM boots (VirtualBox has no remote display server without it)"
+        },
+        {
+          "providers": [
+            "vmware_desktop"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "runner"
+          }
+        },
+        {
+          "providers": [
+            "hyperv"
+          ],
+          "protocol": "none",
+          "note": "Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port"
+        },
+        {
+          "providers": [
+            "parallels"
+          ],
+          "protocol": "none",
+          "note": "Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)"
+        },
+        {
+          "providers": [
+            "libvirt"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "libvirt"
+          }
+        },
+        {
+          "providers": [
+            "qemu"
+          ],
+          "protocol": "vnc",
+          "source": {
+            "from": "qemu_monitor"
+          }
+        },
+        {
+          "providers": [
+            "utm"
+          ],
+          "protocol": "none",
+          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
+        },
+        {
+          "providers": [
+            "vmware_esxi"
+          ],
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
+        }
+      ]
     }
   ],
   "lifecycle": {

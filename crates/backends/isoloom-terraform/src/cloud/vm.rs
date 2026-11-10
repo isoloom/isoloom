@@ -15,6 +15,7 @@
 //! and a module's frame around a cloud's own part (its [`Driver`]: its first lines, its
 //! providers, its credentials).
 
+pub(crate) mod console;
 pub(crate) mod controller_setup;
 pub(crate) mod disks;
 pub(crate) mod gateways;

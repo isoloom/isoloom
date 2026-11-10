@@ -40,6 +40,7 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
         // cloud-init runs the set-up, and writes its output there.
         setup_log: Some("/var/log/cloud-init-output.log"),
         gone,
+        consoles: super::console::add,
     };
     shared::manifest(env, &server)
 }

@@ -7,7 +7,7 @@
 //!   machine that runs Terraform: so Terraform runs from the host, never from an image), and `ssh`.
 //! - **Networks** named after their port group on the host.
 
-use isoloom_manifest::{Error as ManifestError, Manifest, Tool};
+use isoloom_manifest::{Console, Error as ManifestError, Manifest, Tool};
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 
@@ -30,6 +30,13 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
         setup_log: None,
         // None named: no josenk/esxi delete is known to fail on a resource already gone.
         gone: || Ok(Vec::new()),
+        // Each VM's console: none, and why.
+        consoles: |planned, machines, _| {
+            for m in machines.iter_mut().filter(|m| planned.vm(m.name.as_str()).is_some()) {
+                m.consoles = vec![Console::none(std::collections::BTreeSet::new(), isoloom_render::esxi::NO_CONSOLE)];
+            }
+            Ok(())
+        },
     };
     shared::manifest(env, &server)
 }

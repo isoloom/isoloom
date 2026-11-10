@@ -553,6 +553,12 @@ output "published" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -578,6 +584,12 @@ output "published" {
             "preferred": 8080,
             "address": "${outputs.address_web}"
           }
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }
@@ -1565,6 +1577,12 @@ output "published" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -1590,6 +1608,12 @@ output "published" {
             "preferred": 8080,
             "address": "${outputs.address_web}"
           }
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }
@@ -2848,6 +2872,12 @@ output "published" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -2873,6 +2903,12 @@ output "published" {
             "preferred": 8080,
             "address": "${outputs.address_web}"
           }
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }
@@ -3741,6 +3777,12 @@ output "published" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -3766,6 +3808,12 @@ output "published" {
             "preferred": 8080,
             "address": "${outputs.address_web}"
           }
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }
@@ -4641,6 +4689,12 @@ output "published" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     },
     {
@@ -4666,6 +4720,12 @@ output "published" {
             "preferred": 8080,
             "address": "${outputs.address_web}"
           }
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }

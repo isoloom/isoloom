@@ -626,6 +626,12 @@ resource "local_file" "isoloom_project" {
             "address": "${outputs.address_iis}"
           }
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "its spec opens no Remote Desktop port (3389/tcp) for the runner's tunnel to reach"
+        }
       ]
     },
     {
@@ -1524,6 +1530,12 @@ resource "local_file" "isoloom_project" {
             "preferred": 8087,
             "address": "${outputs.address_iis}"
           }
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "its spec opens no Remote Desktop port (3389/tcp) for the runner's tunnel to reach"
         }
       ]
     },

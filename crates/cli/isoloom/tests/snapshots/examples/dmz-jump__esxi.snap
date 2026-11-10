@@ -1264,6 +1264,12 @@ resource "local_file" "isoloom_project" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
+        }
       ]
     },
     {
@@ -1284,6 +1290,12 @@ resource "local_file" "isoloom_project" {
           "port": 8080,
           "protocol": "tcp",
           "http": false
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
         }
       ]
     },
@@ -1306,6 +1318,12 @@ resource "local_file" "isoloom_project" {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
+        }
       ]
     },
     {
@@ -1319,7 +1337,13 @@ resource "local_file" "isoloom_project" {
       },
       "addresses": {
         "access": "10.30.99.10"
-      }
+      },
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
+        }
+      ]
     },
     {
       "name": "isoloom-router",

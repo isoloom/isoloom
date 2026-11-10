@@ -28,6 +28,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - `constraints.ca_certificates` (a corporate CA), a `tags:` map for cost allocation,
   `isoloom check --quiet` and `--json`, and a `.isoloom/.gitignore` for the tools' state.
 - `isoloom generate` removes the files it no longer writes, and `isoloom check` reports them.
+- Graphical consoles: each VM's screen in the run manifest (VNC or RDP on the loopback, or why
+  none), turned on in the Vagrantfile, Proxmox's through its API, a cloud Windows VM's Remote
+  Desktop through an SSH tunnel.
 
 ### Breaking
 
@@ -193,6 +196,21 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `isoloom_manifest::is_kebab` (at most `KEBAB_MAX`, 63, characters).
 
 ### Added
+
+- **Graphical consoles in the run manifest.** A VM's machine lists its consoles
+  (`machines[].consoles`): the protocol (`vnc`, `rdp`, or `none` with why), and where a runner
+  finds each (`source`: libvirt's display, QEMU's monitor, VirtualBox's remote display, a port and
+  password the runner chooses, Proxmox's API, an SSH tunnel), on the loopback only. The
+  Vagrantfile turns them on: libvirt's VNC on `127.0.0.1`, QEMU's VNC on `127.0.0.1` with a
+  display and a USB tablet (vagrant-qemu's defaults have no display), VMware's VNC server at the
+  runner's port and password (`ISOLOOM_CONSOLES`), VirtualBox's remote display when the Oracle
+  extension pack is installed. Proxmox's module outputs each VM's id (`vm_id_<machine>`) for its
+  console; a cloud Windows VM opening 3389/tcp gets Remote Desktop turned on, reached through an
+  SSH tunnel, and the module's sensitive `windows_password` output. Hyper-V, Parallels, UTM, ESXi
+  and cloud Linux VMs say why they have none. `isoloom_manifest::{Console, ConsoleProtocol,
+  ConsoleSource, ConsoleAccount}`, `Machine::console`, `Provider::id`,
+  `contract::CONSOLES`, the errors `console_shape`, `console_twice` and `unknown_slot`, and the
+  matrix's "Graphical consoles" table ([run manifest](docs/reference/run-manifest.md#graphical-consoles)).
 
 - **The run manifest's `identity.terraform.gone`**: the errors a Terraform module's providers
   print for a resource of the state that is already gone, where its delete fails rather than

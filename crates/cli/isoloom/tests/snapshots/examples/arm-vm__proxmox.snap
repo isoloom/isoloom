@@ -818,6 +818,12 @@ locals {
           "protocol": "tcp",
           "http": false
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "an Arm VM on Proxmox has no display: its console is the serial port"
+        }
       ]
     },
     {

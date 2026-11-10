@@ -71,6 +71,7 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
     m.block(output("ssh_users", object(users)));
     m.block(output("ip", stand_at(env, reach)));
     m.block(output("ready_file", string(isoloom_render::steps::READY_FILE)));
+    super::console::outputs(env, m);
     if let Some(checks) = output_block(env, Target::CloudVm.id(), Invocation::Command, &|p| runner(env, reach, p)) {
         m.commented(
             &format!("The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>'), or {RUNNER}."),

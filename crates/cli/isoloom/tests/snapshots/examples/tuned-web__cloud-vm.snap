@@ -443,6 +443,12 @@ output "checks" {
           "protocol": "tcp",
           "http": true
         }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
+        }
       ]
     }
   ],
@@ -1122,6 +1128,12 @@ output "checks" {
           "port": 80,
           "protocol": "tcp",
           "http": true
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }
@@ -1875,6 +1887,12 @@ output "checks" {
           "port": 80,
           "protocol": "tcp",
           "http": true
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }
@@ -2654,6 +2672,12 @@ output "checks" {
           "port": 80,
           "protocol": "tcp",
           "http": true
+        }
+      ],
+      "consoles": [
+        {
+          "protocol": "none",
+          "note": "a Linux cloud VM has no graphical console Isoloom offers: its way in is SSH"
         }
       ]
     }

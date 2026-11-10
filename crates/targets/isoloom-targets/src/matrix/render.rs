@@ -93,8 +93,29 @@ pub(super) fn text(m: &Matrix) -> String {
             });
         }
     }
+    lines.extend([String::new(), CONSOLES.to_owned()]);
+    for r in &m.consoles {
+        lines.push(format!("  {}: a Linux VM {}; a Windows VM {}", r.column.id(), r.linux, r.windows));
+    }
     lines.push(String::new());
     lines.join("\n")
+}
+
+/// What the consoles' section is about.
+const CONSOLES: &str = "Graphical consoles: what each VM target gives a VM's screen, from the run manifest it writes (`machines[].consoles`). Every one listens on the loopback of the computer that runs the environment, or is reached through an SSH tunnel the runner opens there; `–`: the target takes no such VM.";
+
+/// The consoles' table, for `docs/matrix.md`.
+fn consoles_table(m: &Matrix) -> Vec<String> {
+    let mut lines = vec![
+        "| Target | A Linux VM | A Windows VM opening Remote Desktop's port (3389/tcp) |".to_owned(),
+        "|---|---|---|".to_owned(),
+    ];
+    lines.extend(
+        m.consoles
+            .iter()
+            .map(|r| format!("| `{}` | {} | {} |", r.column.id(), md(&r.linux), md(&r.windows))),
+    );
+    lines
 }
 
 /// A Markdown table cell's text, its pipes escaped.
@@ -126,6 +147,14 @@ pub(super) fn markdown(m: &Matrix) -> String {
     }
     lines.extend([String::new(), "## Fields".to_owned(), String::new()]);
     lines.extend(grid(m));
+    lines.extend([
+        String::new(),
+        "## Graphical consoles".to_owned(),
+        String::new(),
+        CONSOLES.to_owned(),
+        String::new(),
+    ]);
+    lines.extend(consoles_table(m));
     lines.extend([String::new(), "## Why a target refuses".to_owned()]);
     for row in m.rows.iter().filter(|r| r.cells.iter().any(|c| matches!(c, Cell::Refused(_)))) {
         lines.extend([String::new(), format!("### `{}`", row.name()), String::new()]);
@@ -201,9 +230,15 @@ pub(super) fn json(m: &Matrix) -> Value {
             })
         })
         .collect();
+    let consoles: Map<String, Value> = m
+        .consoles
+        .iter()
+        .map(|r| (r.column.id(), json!({ "linux": r.linux, "windows": r.windows })))
+        .collect();
     json!({
         "columns": columns,
         "tiers": m.tiers.iter().map(crate::tiers::TierEntry::json).collect::<Vec<_>>(),
         "rows": rows,
+        "consoles": consoles,
     })
 }

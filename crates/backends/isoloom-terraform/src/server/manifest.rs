@@ -20,13 +20,17 @@ mod machines;
 pub(super) mod slots;
 pub(super) mod steps;
 
-use isoloom_manifest::{Error as ManifestError, GoneError, Manifest, Template, Tool, Version};
+use isoloom_manifest::{Error as ManifestError, GoneError, Machine, Manifest, Output, Template, Tool, Version};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{self};
 use isoloom_spec::model::Target;
 
 use crate::Error;
 use crate::module::variable::Variable;
+
+/// What gives a server's machines their graphical consoles (`machines[].consoles`), adding the
+/// outputs they read.
+pub(crate) type Consoles = fn(&Environment, &mut [Machine], &mut Vec<Output>) -> Result<(), ManifestError>;
 
 /// What a server's run manifest takes from its target; the rest is the same on every server.
 pub(crate) struct Server<'a> {
@@ -50,6 +54,8 @@ pub(crate) struct Server<'a> {
     pub(crate) setup_log: Option<&'static str>,
     /// The errors of the server's provider for a resource already gone (`identity.terraform.gone`).
     pub(crate) gone: fn() -> Result<Vec<GoneError>, ManifestError>,
+    /// The machines' graphical consoles, and the outputs they read.
+    pub(crate) consoles: Consoles,
 }
 
 /// The run manifest of `env` on `server`; its message is left to the caller.
@@ -59,7 +65,9 @@ pub(crate) fn manifest(env: &Environment, server: &Server) -> crate::Result<Mani
 
 fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> {
     let runners = steps::runners(env)?;
-    let machines = machines::machines(env)?;
+    let mut machines = machines::machines(env)?;
+    let mut outputs = machines::outputs(&machines)?;
+    (server.consoles)(env, &mut machines, &mut outputs)?;
     let sealed = crate::seal::any(env);
     crate::module::manifest::Body {
         tools: (server.tools)()?,
@@ -67,7 +75,7 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
         params: slots::params(&server.variables, server.private_key, &runners, sealed)?,
         secrets: slots::secrets(env, &server.variables)?,
         networks: run_manifest::networks(env, server.native)?,
-        outputs: machines::outputs(&machines)?,
+        outputs,
         machines,
         lifecycle: steps::lifecycle(server.private_key, sealed)?,
         ready: steps::ready(env, server.applied, server.setup_log)?,

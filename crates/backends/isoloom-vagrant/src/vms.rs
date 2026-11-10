@@ -216,6 +216,9 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(&project_rb());
     r.text(&hyperv::hyperv_rb());
     r.text(vagrantfile::PORT_CHECK_RB);
+    if env.vms().next().is_some() {
+        r.text(crate::console::CONSOLE_RB);
+    }
     utm::constant(r);
     r.blank();
     vagrantfile::inputs(r, &env.input_names(), values::any_secret(env));

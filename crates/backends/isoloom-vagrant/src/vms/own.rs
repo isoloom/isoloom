@@ -85,6 +85,7 @@ fn helper<'a>(env: &'a Environment, define: &str, size: Size, at: Vec<(&'a str, 
         esxi_box: None,
         nested: false,
         disks: Vec::new(),
+        console: None,
     }
 }
 

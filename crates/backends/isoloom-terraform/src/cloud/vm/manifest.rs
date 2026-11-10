@@ -60,14 +60,16 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Resu
             setup_s: manifest::PLAYBOOKS_S,
         });
     }
-    let machines = machines(env)?;
+    let mut machines = machines(env)?;
+    let mut outputs = outputs(env, &machines)?;
+    super::console::add(env, &guests, &mut machines, &mut outputs)?;
     let mut variables = super::own_variables(env, driver);
     variables.extend(operator::host_reaching());
     let frame = Frame {
         target: isoloom_manifest::Target::CloudVm,
         cloud,
         variables,
-        outputs: outputs(env, &machines)?,
+        outputs,
         machines,
         runners: runners(env, &guests)?,
         slots: inputs(env)?,
