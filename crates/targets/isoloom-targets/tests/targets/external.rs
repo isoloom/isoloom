@@ -22,8 +22,7 @@ fn a_spec_with_addresses_on_every_machine_gets_the_external_target() -> Outcome 
         inv.contains("web ansible_host=192.168.1.20 ansible_user=admin ansible_ssh_private_key_file=~/.ssh/id_ed25519"),
         "{inv}"
     );
-    let machines = &files.iter().find(|f| f.path == ".isoloom/external/machines.json").unwrap().contents;
-    assert!(machines.contains("\"port\": 22"), "{machines}");
+    assert!(!files.iter().any(|f| f.path.ends_with("machines.json")), "no file for a runner that reads none");
     // Derived checks run from each machine; probes only.
     let web = &files.iter().find(|f| f.path == ".isoloom/external/checks/web.sh").unwrap().contents;
     assert!(web.contains("_tcp '192.168.1.21' 6379"), "{web}");

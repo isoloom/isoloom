@@ -12,8 +12,6 @@
 //!   collection.
 //! - `checks/<machine>.sh`: the check runner of each machine that has an address (declared and
 //!   derived probes; scripts need the project on the machine and are left out, with a note).
-//! - `machines.json`: name to address, user, port and key, for the runner (its up, check and a
-//!   session on a host).
 //!
 //! Networks and `reach` are expected behaviour there (Isoloom adds no router), which the derived
 //! checks verify.
@@ -43,14 +41,13 @@
 //! let env = Environment::build(&lab.for_target(Target::External), Target::External, None);
 //! let files = ExternalBackend.render(&env)?;
 //! let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
-//! assert_eq!(paths, [".isoloom/external/inventory.ini", ".isoloom/external/machines.json"]);
+//! assert_eq!(paths, [".isoloom/external/inventory.ini"]);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
 mod backend;
 mod checks;
 pub mod configure;
-mod endpoints;
 mod error;
 #[cfg(test)]
 mod testing;

@@ -8,13 +8,13 @@ use isoloom_render::inventory::{self, Access, Vars};
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, header};
 use isoloom_spec::model::Target;
 
+use crate::checks;
 use crate::error::{Error, Result};
-use crate::{checks, endpoints};
 
 /// The target's folder, under `.isoloom/`.
 const DIR: &str = "external";
 
-/// The `external` target's backend: the inventory, the hosts' endpoints and the check runners
+/// The `external` target's backend: the inventory, the playbooks and the check runners
 /// of an environment on hosts that already exist.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct ExternalBackend;
@@ -59,15 +59,15 @@ fn capabilities() -> Capabilities {
     ])
 }
 
-/// The files of `env` (planned for [`Target::External`]): the inventory, the hosts'
-/// endpoints, then a check runner per host with probes to run. Refused, without rendering,
+/// The files of `env` (planned for [`Target::External`]): the inventory, then a check runner per
+/// host with probes to run, then the playbooks. Refused, without rendering,
 /// when `env` needs what existing hosts can't give.
 fn render(env: &Environment) -> Result<Files> {
     if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
         return Err(Error::Refused { refusal });
     }
     let inventory = format!("{}{}", header("#"), inventory::render(env, &access()));
-    let mut files = vec![output("inventory.ini", inventory), output("machines.json", endpoints::json(env))];
+    let mut files = vec![output("inventory.ini", inventory)];
     files.extend(checks::runners(env).into_iter().map(|(path, script)| output(&path, script)));
     // The Ansible CM project (`site.yml`, the machine roles and `requirements.yml`) that
     // provisions the existing hosts: the recipe's steps as native tasks, run over this inventory.
