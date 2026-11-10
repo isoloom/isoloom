@@ -199,7 +199,7 @@ fn an_image_whose_start_the_runner_runs_runs_it_then_its_own_process() {
     let catalogue = started_catalogue();
     let lowered = crate::lower::lower(&source, &catalogue, crate::lower::Scope::Target(Target::Docker));
     assert_eq!(lowered.refusals, [], "the supervisor renders the start steps");
-    let env = crate::Environment::build(&lowered.spec, Target::Docker, None);
+    let env = crate::Environment::build(&lowered.spec, Target::Docker, None).expect("the spec plans");
     let web = &env.machines["web"];
     let Some(Image::Container {
         build: Some(Build::Generated { process, .. }),

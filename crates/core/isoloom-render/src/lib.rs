@@ -35,7 +35,7 @@
 //!     "version: 1\nname: demo\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
 //! )
 //! .expect("the spec parses");
-//! let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+//! let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans");
 //! let ready = isoloom_render::steps::linux(&env, "web", &Step::Ready).expect("every VM gets ready");
 //! assert!(ready.ends_with("echo ready > /var/lib/isoloom/ready\n"));
 //! ```

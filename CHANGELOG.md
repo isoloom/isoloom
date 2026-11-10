@@ -72,6 +72,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Breaking (library): `ComposeBackend` is `ComposeBackend::DOCKER` or `HOSTED`**, its target
   private; `isoloom_compose::guest` takes how the VM's way in gets root (`AsRoot`), and
   `isoloom_terraform::cloud_docker_manifests` a guest per `AsRoot`.
+- **Breaking (library): `isoloom_plan::Environment::build` and `Lab::plan` return a
+  `Result`**, whose error, `isoloom_plan::PlanError`, says why a spec can't be planned: a
+  machine whose configuration has steps its OS's family can't carry (lowering refuses those
+  first).
 - **Breaking: the `external` target writes no `machines.json`**: no runner read it.
 - **Breaking: Isoloom's own router and controller take Isoloom's names on Proxmox, ESXi and the
   clouds.** A lab machine named `router` or `controller` wrote a second
@@ -588,6 +592,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `isoloom_manifest::ReadyLine::FAILED_PREFIX`, beside `READY` and `RUNNING_PREFIX`), not any
   line starting `failed:`; the shell's `case` patterns and the lines the set-up writes come from
   the same constants.
+- **A machine whose configuration doesn't resolve fails the generation** (a bug of lowering,
+  which refuses such steps first), instead of a release build planning its VM with no
+  configuration at all.
 - **Proxmox's `slot` is checked**: the `proxmox` module and `docker-vm`'s Proxmox module refuse a
   slot outside 1 to 99 at plan time, as ESXi's does outside 1 to 63, instead of making SDN ids
   and MACs the server refused at apply time.

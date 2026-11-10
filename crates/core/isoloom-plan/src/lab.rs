@@ -116,12 +116,15 @@ impl Lab {
     /// The lab planned for `target` (as instance `instance` of `spec`, the lab as that target runs
     /// it): the plan with the lab's regions. Hidden: it returns a building-block crate's type,
     /// outside the supported API `isoloom-targets` re-exports [`Lab`] in.
+    ///
+    /// # Errors
+    ///
+    /// As [`Environment::build`](crate::Environment::build).
     #[doc(hidden)]
-    #[must_use]
-    pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> crate::Environment {
-        let mut env = crate::Environment::build(spec, target, instance);
+    pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> Result<crate::Environment, crate::environment::PlanError> {
+        let mut env = crate::Environment::build(spec, target, instance)?;
         env.regions.clone_from(&self.regions);
-        env
+        Ok(env)
     }
 
     /// The lab with the texts of its project's templates (read by the caller that generates,

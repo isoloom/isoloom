@@ -12,7 +12,7 @@ use testing::{Outcome, example, file};
 
 /// Example `name`'s plan on ESXi.
 fn env(name: &str) -> Outcome<Environment> {
-    Ok(testing::planned(&example(name)?, Target::Esxi))
+    testing::planned(&example(name)?, Target::Esxi)
 }
 
 /// The module of `env`.
@@ -108,10 +108,10 @@ fn esxi_shared_files() -> Outcome {
 #[test]
 fn virtiofs_is_ignored() -> Outcome {
     let mut spec = example("shared-files")?.for_target(Target::Esxi);
-    let plain = Environment::build(&spec, Target::Esxi, None);
+    let plain = Environment::build(&spec, Target::Esxi, None).expect("the spec plans");
     spec.volumes.get_mut("shared").unwrap().virtiofs = Some(isoloom_spec::model::Virtiofs::default());
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
-    let with = Environment::build(&spec, Target::Esxi, None);
+    let with = Environment::build(&spec, Target::Esxi, None).expect("the spec plans");
     assert_eq!(EsxiBackend.refusal(&with), None);
     assert_eq!(EsxiBackend.render(&with), EsxiBackend.render(&plain));
     Ok(())

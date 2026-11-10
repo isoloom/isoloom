@@ -140,7 +140,11 @@ const VAGRANT: Layout<'static> = Layout { dir: DIR, extra: &|_| {} };
 
 /// The VMs of `spec` (the `vagrant` target's plan of it) into `layout`: the `hybrid` target's.
 pub(crate) fn render_spec_in(spec: &Spec, layout: &Layout) -> Result<Files> {
-    Ok(render_in(&Environment::build(spec, Target::Vagrant, None), layout)?.0)
+    let env = Environment::build(spec, Target::Vagrant, None).map_err(|source| Error::Unplanned {
+        target: Target::Vagrant,
+        source,
+    })?;
+    Ok(render_in(&env, layout)?.0)
 }
 
 /// [`render`], into `layout`, with what its Vagrantfile applies at boot.

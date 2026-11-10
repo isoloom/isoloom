@@ -103,7 +103,7 @@ impl Row {
         match &self.uses {
             Uses::Written(w) => uses::written_in(w, &written.0),
             Uses::Features => {
-                let env = isoloom_plan::Environment::build(&lab.for_target(target), target, None);
+                let env = isoloom_plan::Environment::build(&lab.for_target(target), target, None).expect("the spec plans");
                 env.requirements.iter().any(|r| self.features.contains(&r.feature()))
             }
             Uses::Refusal => lab.refusal(target).is_some_and(|p| uses::path_matches(&self.field, p.path.as_str())),

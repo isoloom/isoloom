@@ -114,7 +114,7 @@ fn oracle_cloud_refuses_what_its_prefixes_cannot_hold() -> Outcome {
     assert!(why.contains("first four IPv6 addresses") && why.contains("fd00:67:10::3"), "{why}");
     let only = SPEC.replace("ipv6: { cidr: \"fd00:67:10::/64\" }", "ipv6: { cidr: \"fd00:67:10::/64\", only: true }");
     // Not a valid spec (an IPv6-only network has no way out): the cloud refuses it all the same.
-    let unchecked = testing::planned(&isoloom_plan::Lab::parse(&only).map_err(|p| format!("{p:?}"))?, Target::CloudVm);
+    let unchecked = testing::planned(&isoloom_plan::Lab::parse(&only).map_err(|p| format!("{p:?}"))?, Target::CloudVm)?;
     let ipv6_only = CloudVmModule::new(Cloud::Oci).refusal(&unchecked).unwrap();
     assert!(ipv6_only.contains("IPv6-only"), "{ipv6_only}");
     Ok(())

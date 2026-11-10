@@ -11,7 +11,7 @@ use testing::{Outcome, example, file, planned, resource_body};
 /// Each network's native name in `backend`'s run manifest for example `name`, with the module's
 /// slot (`${var.slot}`) in place of the run's.
 fn natives(backend: &dyn Backend, name: &str) -> Outcome<(String, Vec<(String, String)>)> {
-    let env = planned(&example(name)?, backend.target());
+    let env = planned(&example(name)?, backend.target())?;
     let module = file(&backend.render(&env)?, &format!("{}/main.tf", backend.target().id()))?.to_owned();
     let manifest = backend.run_manifest(&env)?.ok_or("a run manifest")?;
     assert_eq!(manifest.networks.len(), env.networks.len(), "every network named");
@@ -59,7 +59,7 @@ fn router_vnet(module: &str, index: usize) -> Option<&str> {
 #[test]
 fn every_proxmox_network_is_named_after_the_vnet_it_is_on() -> Outcome {
     for name in ["hello-stack", "segmented", "vlan-office"] {
-        let env = planned(&example(name)?, ProxmoxBackend.target());
+        let env = planned(&example(name)?, ProxmoxBackend.target())?;
         let (module, names) = natives(&ProxmoxBackend, name)?;
         for (net, native) in names {
             assert!(

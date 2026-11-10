@@ -18,7 +18,7 @@ pub(crate) fn spec(yaml: &str) -> Spec {
 
 /// The environment `target` plans for the lab of `yaml`.
 pub(crate) fn env(yaml: &str, target: Target) -> Environment {
-    Environment::build(&lab(yaml).for_target(target), target, None)
+    Environment::build(&lab(yaml).for_target(target), target, None).expect("the spec plans")
 }
 
 /// The environment `target` plans for a lab of one machine `m` (its YAML, without networks),
@@ -30,7 +30,7 @@ pub(crate) fn machine(m: &str, target: Target, templates: &[(&str, &str)]) -> En
         .filter_map(|(path, text)| Some((path.parse().ok()?, (*text).to_owned())))
         .collect();
     let lab = lab(&yaml).with_templates(texts);
-    Environment::build(&lab.for_target(target), target, None)
+    Environment::build(&lab.for_target(target), target, None).expect("the spec plans")
 }
 
 /// Each recipe step of machine `m` (as [`machine`] writes it) on `target`, as `render` renders it.

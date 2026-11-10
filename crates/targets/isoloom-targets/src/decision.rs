@@ -159,7 +159,11 @@ pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Decisi
         return refused(Code::Invalid, None, format!("the spec is invalid on {}: {p}", target.id()));
     }
     let backend = backend(target);
-    let env = Environment::build(&spec, target, None);
+    // A lab that doesn't plan is a bug of lowering, which the generation reports as a failure
+    // ([`crate::GenerateError::Internal`]), not a refusal that would leave the target out.
+    let Ok(env) = Environment::build(&spec, target, None) else {
+        return Decision::Generated;
+    };
     let lacking = isoloom_plan::refusal(&env.requirements, &backend.capabilities());
     let own = match (target, variant.and_then(cloud)) {
         (Target::CloudVm, Some(c)) => CloudVmModule::new(c).refusal(&env).map(|r| (Code::Cloud, r)),

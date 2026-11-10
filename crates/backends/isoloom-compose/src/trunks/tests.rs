@@ -13,7 +13,7 @@ fn spec() -> Spec {
 /// The plan of the example on the `docker` target, whose blocks the trunks take.
 fn env() -> Environment {
     let lab = Lab::parse(VLAN_OFFICE).expect("the test's spec parses");
-    Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)
+    Environment::build(&lab.for_target(Target::Docker), Target::Docker, None).expect("the spec plans")
 }
 
 #[test]

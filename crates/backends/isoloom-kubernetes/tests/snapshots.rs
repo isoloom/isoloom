@@ -21,7 +21,7 @@ fn planned(spec: isoloom_spec::Spec) -> Outcome<Environment> {
     if !problems.is_empty() {
         return Err(format!("the spec isn't valid: {problems:?}").into());
     }
-    Ok(Environment::build(&lab.for_target(Target::Kubernetes), Target::Kubernetes, None))
+    Ok(Environment::build(&lab.for_target(Target::Kubernetes), Target::Kubernetes, None)?)
 }
 
 /// An example of the project, as written.

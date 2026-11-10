@@ -21,22 +21,24 @@ use isoloom_render::steps::AsRoot;
 use isoloom_spec::model::Target;
 use isoloom_vagrant::{docker_vm, hybrid};
 
-/// `env` planned for the `docker` target: what a Docker host runs.
-fn on_docker(env: &Environment) -> Environment {
+/// `env` planned for the `docker` target: what a Docker host runs. It plans, since `env` did; a
+/// failure is `env`'s target's.
+fn on_docker(env: &Environment) -> Result<Environment, RenderError> {
     Environment::build(env.spec(), Target::Docker, env.instance)
+        .map_err(|e| RenderError::internal(env.target, "the containers couldn't be planned for Docker", e))
 }
 
 /// The `docker` target's files for `env`: what a Docker host runs. A refusal or failure is
 /// `env`'s target's.
 fn docker_files(env: &Environment) -> Result<Files, RenderError> {
-    ComposeBackend::DOCKER.render(&on_docker(env)).map_err(|e| e.on(env.target))
+    ComposeBackend::DOCKER.render(&on_docker(env)?).map_err(|e| e.on(env.target))
 }
 
 /// What runs inside the VM for `env`: the `docker` target's Compose file, and the commands that
 /// start, check and read it there, as root as `as_root` says. A refusal or failure is `env`'s
 /// target's.
 fn guest(env: &Environment, as_root: AsRoot) -> Result<GuestCompose, RenderError> {
-    isoloom_compose::guest(&on_docker(env), as_root).map_err(|e| RenderError::from(e).on(env.target))
+    isoloom_compose::guest(&on_docker(env)?, as_root).map_err(|e| RenderError::from(e).on(env.target))
 }
 
 /// How `docker-vm`'s VM is entered: as a user with `sudo` (Vagrant's `vagrant`, the Proxmox

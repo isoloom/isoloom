@@ -11,7 +11,7 @@ use testing::{Outcome, example, file, planned, spec};
 
 /// Example `name`'s plan for `target`.
 fn env(name: &str, target: Target) -> Outcome<Environment> {
-    Ok(planned(&example(name)?, target))
+    planned(&example(name)?, target)
 }
 
 /// The module at `suffix` that `backend` renders for example `name`.
@@ -132,7 +132,7 @@ fn refusals_come_from_the_plan_and_match_rendering() -> Outcome {
          digitalocean: machine `w`: DigitalOcean has no arm64 droplets; \
          linode: machine `w`: Linode has no arm64 plans; \
          oci: machine `w`: Isoloom generates no arm64 VM on Oracle Cloud)";
-    let e = planned(&spec(ARM64)?, CloudVmBackend.target());
+    let e = planned(&spec(ARM64)?, CloudVmBackend.target())?;
     assert_eq!(CloudVmBackend.refusal(&e).as_deref(), Some(why));
     let err = CloudVmBackend.render(&e).expect_err("refused");
     assert!(err.to_string().ends_with(why), "{err}");
@@ -156,10 +156,10 @@ fn one_vm(fields: &str) -> Outcome<isoloom_plan::Lab> {
 #[test]
 fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outcome {
     let tpm = one_vm("os: debian@12, app: { steps: [{ run: a.sh }] }, hardware: { tpm: required }")?;
-    let proxmox = ProxmoxBackend.render(&planned(&tpm, Target::Proxmox))?;
+    let proxmox = ProxmoxBackend.render(&planned(&tpm, Target::Proxmox)?)?;
     let proxmox = file(&proxmox, "proxmox/main.tf")?;
     assert!(proxmox.contains("tpm_state {"), "{proxmox}");
-    let cloud = planned(&tpm, Target::CloudVm);
+    let cloud = planned(&tpm, Target::CloudVm)?;
     let clouds = CloudVmBackend.render(&cloud)?;
     assert!(file(&clouds, "cloud-vm/aws/main.tf")?.contains("tpm_support == \"v2.0\""));
     assert!(file(&clouds, "cloud-vm/azure/main.tf")?.contains("vtpm_enabled"));
@@ -175,7 +175,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outco
     let windows = planned(
         &one_vm("os: windows-server@2022, app: { steps: [{ run: a.ps1 }] }, hardware: { tpm: required }")?,
         Target::CloudVm,
-    );
+    )?;
     let aws = CloudVmModule::new(Cloud::Aws).refusal(&windows).expect("refused");
     assert!(aws.contains("NitroTPM"), "{aws}");
     assert_eq!(CloudVmBackend.refusal(&windows), None);
@@ -184,7 +184,7 @@ fn a_tpm_is_given_on_proxmox_and_the_clouds_and_refused_where_none_is() -> Outco
     let azure = file(&rendered, "cloud-vm/azure/main.tf")?;
     assert!(azure.contains("vtpm_enabled"), "{azure}");
     // Windows 11 merely expects one: the clouds leave it out instead of refusing.
-    let wanted = planned(&one_vm("os: windows@11, app: { steps: [{ run: a.ps1 }] }")?, Target::CloudVm);
+    let wanted = planned(&one_vm("os: windows@11, app: { steps: [{ run: a.ps1 }] }")?, Target::CloudVm)?;
     assert_eq!(wanted.machines["w"].tpm, Some(isoloom_spec::windows::Tpm::Wanted));
     assert!(isoloom_plan::refusal(&wanted.requirements, &CloudVmBackend.capabilities()).is_none());
     Ok(())
@@ -221,7 +221,7 @@ fn each_cloud_refuses_on_its_own() -> Outcome {
 
 #[test]
 fn a_cloud_refuses_from_the_plan_without_rendering() -> Outcome {
-    let e = planned(&spec(ARM64)?, Target::CloudVm);
+    let e = planned(&spec(ARM64)?, Target::CloudVm)?;
     for (cloud, why) in [
         (Cloud::Azure, "machine `w`: Isoloom generates no arm64 VM on Azure"),
         (Cloud::Gcp, "machine `w`: Isoloom generates no arm64 VM on Google Cloud"),

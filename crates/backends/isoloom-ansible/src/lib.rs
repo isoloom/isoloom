@@ -39,7 +39,7 @@
 //!   external: { machines: { web: { ssh: { address: 192.168.1.20 } } } }
 //! ",
 //! )?);
-//! let env = Environment::build(&lab.for_target(Target::External), Target::External, None);
+//! let env = Environment::build(&lab.for_target(Target::External), Target::External, None)?;
 //! let files = ExternalBackend.render(&env)?;
 //! let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
 //! assert_eq!(paths, [".isoloom/external/inventory.ini"]);

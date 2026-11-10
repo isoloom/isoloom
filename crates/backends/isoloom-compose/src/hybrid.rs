@@ -32,7 +32,10 @@ const START_TIMEOUT: u32 = 900;
 /// [`Error::Unwritable`](crate::Error::Unwritable) when their file can't be written as YAML;
 /// both as the `hybrid` target's.
 pub fn render(env: &Environment) -> Result<HybridContainers> {
-    let alone = Environment::build(&containers_only(env.spec()), Target::Hybrid, env.instance);
+    let alone = Environment::build(&containers_only(env.spec()), Target::Hybrid, env.instance).map_err(|source| crate::Error::Unplanned {
+        target: Target::Hybrid,
+        source,
+    })?;
     let mut compose = compose_file(ComposeTarget::Hybrid, &alone)?.file;
     compose.services.shift_remove(router::NAME);
     let names: Vec<String> = compose.services.keys().cloned().collect();

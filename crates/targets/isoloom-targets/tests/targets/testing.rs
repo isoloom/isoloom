@@ -50,7 +50,7 @@ pub(crate) fn problems(lab: &Lab) -> Vec<String> {
 pub(crate) fn plan(name: &str, target: Target) -> Outcome<Environment> {
     let lab = example(name)?;
     match problems(&lab) {
-        found if found.is_empty() => Ok(Environment::build(&lab.for_target(target), target, None)),
+        found if found.is_empty() => Ok(Environment::build(&lab.for_target(target), target, None)?),
         found => Err(format!("example `{name}` isn't valid: {found:?}").into()),
     }
 }

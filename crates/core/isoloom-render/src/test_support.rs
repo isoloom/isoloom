@@ -108,7 +108,7 @@ pub fn section<'a>(inv: &'a str, name: &str) -> &'a str {
 ///
 /// # Errors
 ///
-/// Why it doesn't load, or its problems.
+/// Why it doesn't load, its problems, or why it can't be planned.
 pub fn example(name: &str, target: isoloom_spec::model::Target) -> Result<isoloom_plan::Environment, String> {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
     let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).map_err(|e| e.to_string())?);
@@ -116,17 +116,17 @@ pub fn example(name: &str, target: isoloom_spec::model::Target) -> Result<isoloo
     if !problems.is_empty() {
         return Err(format!("{name} isn't valid: {problems:?}"));
     }
-    Ok(isoloom_plan::Environment::build(&lab.for_target(target), target, None))
+    isoloom_plan::Environment::build(&lab.for_target(target), target, None).map_err(|e| e.to_string())
 }
 
 /// The plan of `yaml` for `target`.
 ///
 /// # Errors
 ///
-/// Why the spec doesn't parse.
+/// Why the spec doesn't parse, or can't be planned.
 pub fn planned(yaml: &str, target: isoloom_spec::model::Target) -> Result<isoloom_plan::Environment, String> {
     let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).map_err(|e| e.to_string())?);
-    Ok(isoloom_plan::Environment::build(&lab.for_target(target), target, None))
+    isoloom_plan::Environment::build(&lab.for_target(target), target, None).map_err(|e| e.to_string())
 }
 
 /// A sensitive input slot `name` delivered to every step as the environment variable `var`.

@@ -166,6 +166,8 @@ impl<'a> Provider<'a> {
 /// only libvirt (and QEMU, for UEFI's format) boots, then a machine's host folders, which Hyper-V
 /// and ESXi don't share (nor QEMU read-only), then a machine of another architecture than ESXi's
 /// on ESXi, then a machine's data disks, which QEMU's and Parallels' plugins don't attach.
+/// A spec that can't be planned at all (a machine's configuration that doesn't resolve) is
+/// refused with why.
 #[must_use]
 pub fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     let provider = Provider::from(provider);

@@ -20,7 +20,7 @@ fn render(spec: isoloom_spec::Spec) -> Outcome<Vec<GeneratedFile>> {
         return Err(format!("the spec isn't valid: {problems:?}").into());
     }
     let docker = lab.for_target(Target::Docker);
-    Ok(ComposeBackend::DOCKER.render(&Environment::build(&docker, Target::Docker, None))?)
+    Ok(ComposeBackend::DOCKER.render(&Environment::build(&docker, Target::Docker, None)?)?)
 }
 
 /// An example of the project, as written.
@@ -114,7 +114,7 @@ fn provisioning_is_refused_without_rendering() -> Outcome {
         "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    os: debian@12\n    app: { image: alpine }\nprovision:\n  - ansible: site.yml\n",
     )
     .map_err(|problems| format!("{problems:?}"))?;
-    let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None);
+    let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)?;
     let refused = ComposeBackend::DOCKER.render(&env).err().ok_or("rendered")?;
     assert!(matches!(refused, isoloom_render::Error::Refused { .. }), "{refused:?}");
     assert_eq!(

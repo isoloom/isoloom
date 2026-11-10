@@ -343,11 +343,15 @@ impl Controller {
 
 impl Environment {
     /// Plans a validated `spec` for `target` (`instance`: the copy it is, when several run).
-    #[must_use]
-    pub fn build(spec: &Spec, target: Target, instance: Option<u8>) -> Environment {
+    ///
+    /// # Errors
+    ///
+    /// [`PlanError::UnresolvedRecipe`] for a machine whose configuration has steps its OS's
+    /// family can't carry, which lowering refuses for the target first.
+    pub fn build(spec: &Spec, target: Target, instance: Option<u8>) -> Result<Environment, PlanError> {
         // Laid out with the outside networks (so a moved block avoids them), then without them.
         let laid_out = outside::without(&lay_out(spec, target));
-        let machines = machines(spec, &laid_out, target);
+        let machines = machines(spec, &laid_out, target)?;
         let requirements = all_requirements(spec, &laid_out, &machines);
         let networks = laid_out
             .networks
@@ -357,7 +361,7 @@ impl Environment {
                 (name.clone(), network(&laid_out, name, n, cidr(declared, name)))
             })
             .collect();
-        Environment {
+        Ok(Environment {
             name: laid_out.name.clone(),
             target,
             instance,
@@ -379,7 +383,7 @@ impl Environment {
             private_dns: crate::private_dns::plan(&laid_out),
             spec: laid_out,
             regions: BTreeMap::new(),
-        }
+        })
     }
 
     /// The spec as laid out for the target: for what a backend only writes out as the author gave
@@ -418,6 +422,27 @@ impl Environment {
     }
 }
 
+/// Why a spec can't be planned: what lowering and validation refuse first, so a bug of either
+/// when it happens. [`Environment::build`] says so rather than plan around it (a machine with no
+/// configuration at all).
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum PlanError {
+    /// A machine's configuration has steps its OS's family can't carry ([`Recipe::of`]).
+    #[error("machine `{machine}`: its configuration doesn't resolve on its OS: {}", reasons(.unportable))]
+    UnresolvedRecipe {
+        /// The machine.
+        machine: String,
+        /// Each step its family can't carry, in step order.
+        unportable: Vec<crate::configure::Unportable>,
+    },
+}
+
+/// The reasons of `unportable`, joined.
+fn reasons(unportable: &[crate::configure::Unportable]) -> String {
+    unportable.iter().map(|u| u.reason.as_str()).collect::<Vec<_>>().join("; ")
+}
+
 /// Whether the target runs the environment on Docker's networks (their Docker blocks).
 #[must_use]
 pub(crate) fn on_docker(target: Target) -> bool {
@@ -454,14 +479,14 @@ fn network(spec: &Spec, name: &str, n: &Network, declared: NetworkBlock) -> Netw
 }
 
 /// The machines of `laid_out`, each with its place on the outside networks of `spec`.
-fn machines(spec: &Spec, laid_out: &Spec, target: Target) -> IndexMap<String, MachinePlan> {
+fn machines(spec: &Spec, laid_out: &Spec, target: Target) -> Result<IndexMap<String, MachinePlan>, PlanError> {
     laid_out
         .machines
         .iter()
         .map(|(name, m)| {
-            let mut mp = machine(laid_out, target, name, m);
+            let mut mp = machine(laid_out, target, name, m)?;
             mp.outside = spec.machines.get(name).map(|om| outside::addresses(spec, om)).unwrap_or_default();
-            (name.clone(), mp)
+            Ok((name.clone(), mp))
         })
         .collect()
 }
@@ -482,21 +507,26 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
     out
 }
 
-/// Machine `name` (`m`), planned for `target`.
-fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan {
+/// Machine `name`'s recipe, when it has a configuration.
+fn recipe(name: &str, m: &Machine) -> Result<Option<Recipe>, PlanError> {
+    m.configuration
+        .as_ref()
+        .map(|c| Recipe::of(c, &m.ports, &DaemonTable::common()))
+        .transpose()
+        .map_err(|unportable| PlanError::UnresolvedRecipe {
+            machine: name.to_owned(),
+            unportable,
+        })
+}
+
+/// Machine `name` (`m`), planned for `target`. Lowering refuses a configuration that doesn't
+/// resolve (an app's steps per target, a service's for the lab), so the lowered spec `build`
+/// plans has its recipe; one that doesn't is an error, not a machine with no configuration.
+fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<MachinePlan, PlanError> {
     let shape = shape(target, m);
     let routing = lifecycle::Routing::of(spec, target, name, m);
-    // Lowering reports a configuration that doesn't resolve (an app's steps per target, a
-    // service's for the lab), so the validated spec `build` plans has its recipe.
-    let recipe = m.configuration.as_ref().and_then(|c| {
-        let resolved = Recipe::of(c, &m.ports, &DaemonTable::common());
-        debug_assert!(
-            resolved.is_ok(),
-            "machine `{name}`: lowering let through a recipe that doesn't resolve: {resolved:?}"
-        );
-        resolved.ok()
-    });
-    MachinePlan {
+    let recipe = recipe(name, m)?;
+    Ok(MachinePlan {
         shape,
         role: if m.access { MachineRole::Access } else { MachineRole::Member },
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
@@ -543,7 +573,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> MachinePlan 
         process: Process::of(m),
         hardware: Hardware::of(m),
         recipe,
-    }
+    })
 }
 
 /// Machine `name`'s (`m`) names: its own, then its aliases, then (with `dns.private`) each under
@@ -784,11 +814,28 @@ overrides:
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.sh]\n",
         );
         let spec = lab.for_target(Target::Vagrant);
-        assert!(!Controller::needed(&spec) && Environment::build(&spec, Target::Vagrant, None).controller.is_none());
+        assert!(!Controller::needed(&spec) && Environment::build(&spec, Target::Vagrant, None).expect("the spec plans").controller.is_none());
         let playbook = testing::lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.yml]\n",
         );
         assert!(Controller::needed(&playbook.for_target(Target::Vagrant)));
         assert_eq!(Controller::of(&spec).memory_mb, Controller::MEMORY_MB);
+    }
+
+    #[test]
+    fn a_configuration_that_doesnt_resolve_is_an_error_not_a_vm_without_one() {
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  win: { networks: { lan: 10 }, os: windows-server@2022, app: { steps: [{ run: iis.ps1 }, { copy: { from: a, to: 'C:\\a', owner: admin } }] } }\n",
+        );
+        assert!(lab.refusal(Target::Vagrant).is_some(), "lowering refuses the step first");
+        let unresolved = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect_err("the recipe doesn't resolve");
+        let super::PlanError::UnresolvedRecipe { machine, unportable } = &unresolved;
+        assert_eq!((machine.as_str(), unportable.len()), ("win", 1), "{unresolved:?}");
+        assert!(
+            unresolved
+                .to_string()
+                .starts_with("machine `win`: its configuration doesn't resolve on its OS: "),
+            "{unresolved}"
+        );
     }
 }

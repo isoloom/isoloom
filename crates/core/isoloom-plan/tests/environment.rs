@@ -203,7 +203,7 @@ fn a_vms_route_steps_are_its_plans_routes() {
         }
         let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).unwrap());
         for target in [Target::Vagrant, Target::Proxmox, Target::CloudVm] {
-            let env = Environment::build(&lab.for_target(target), target, None);
+            let env = Environment::build(&lab.for_target(target), target, None).unwrap();
             for (name, mp) in &env.machines {
                 for step in &mp.lifecycle {
                     match step {

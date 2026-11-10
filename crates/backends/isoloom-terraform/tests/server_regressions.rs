@@ -13,7 +13,7 @@ use isoloom_terraform::{EsxiBackend, ProxmoxBackend};
 use testing::{Outcome, example, file, planned};
 
 fn proxmox(name: &str) -> Outcome<String> {
-    let env: Environment = planned(&example(name)?, Target::Proxmox);
+    let env: Environment = planned(&example(name)?, Target::Proxmox)?;
     Ok(file(&ProxmoxBackend.render(&env)?, "proxmox/main.tf")?.to_owned())
 }
 
@@ -43,7 +43,7 @@ fn docker_vm_main_tf(env: &Environment) -> Outcome<String> {
 }
 
 fn esxi(name: &str) -> Outcome<String> {
-    let env: Environment = planned(&example(name)?, Target::Esxi);
+    let env: Environment = planned(&example(name)?, Target::Esxi)?;
     Ok(file(&EsxiBackend.render(&env)?, "esxi/main.tf")?.to_owned())
 }
 
@@ -104,7 +104,7 @@ fn a_router_that_never_reported_an_address_can_still_be_destroyed() -> Outcome {
     assert!(tf.contains("router_address = try(["), "{tf}");
     let lab =
         testing::spec("version: 1\nname: d\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n")?;
-    let env = planned(&lab, Target::DockerVm);
+    let env = planned(&lab, Target::DockerVm)?;
     let host = docker_vm_main_tf(&env)?;
     assert!(host.contains("ip = try(["), "{host}");
     Ok(())

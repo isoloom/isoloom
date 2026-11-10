@@ -27,7 +27,7 @@
 //! ",
 //! )?);
 //! let spec = lab.for_target(Target::Vagrant);
-//! let env = Environment::build(&spec, Target::Vagrant, None);
+//! let env = Environment::build(&spec, Target::Vagrant, None)?;
 //! let files = VagrantBackend.render(&env)?;
 //! let vagrantfile = files.iter().find(|f| f.path == ".isoloom/vagrant/Vagrantfile").ok_or("no Vagrantfile")?;
 //! assert!(vagrantfile.contents.contains("config.vm.define \"web\" do |m|"));

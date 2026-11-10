@@ -52,7 +52,7 @@
 //!   web: { networks: { lan: 10 }, ports: { web: 80 }, app: { image: nginx } }
 //! ",
 //! )?);
-//! let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None);
+//! let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)?;
 //! let files = ComposeBackend::DOCKER.render(&env)?;
 //! let compose = files.iter().find(|f| f.path == ".isoloom/docker/compose.yml").ok_or("no Compose file")?;
 //! assert!(compose.contents.contains("ipv4_address: 10.9.0.10"));

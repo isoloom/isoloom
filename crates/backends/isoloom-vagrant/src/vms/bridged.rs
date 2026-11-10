@@ -68,7 +68,7 @@ mod tests {
             "version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.20.0.0/24 }}\n  home: {home}\nmachines:\n  a: {{ networks: {{ lan: 10, home: 0 }}, os: debian@12 }}\n"
         );
         let lab = isoloom_plan::Lab::new(isoloom_spec::parse(&yaml).unwrap());
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
     }
 
     fn rendered(env: &Environment) -> String {
@@ -97,7 +97,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let fixed = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+        let fixed = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans");
         assert!(rendered(&fixed).contains(r#"ip: "10.0.0.20""#));
         assert!(refusal(&fixed, "a", &fixed.machines["a"]).unwrap().contains("/24"));
     }

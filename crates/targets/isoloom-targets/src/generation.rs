@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use isoloom_manifest::contract::OUTPUT_DIR;
-use isoloom_plan::Lab;
+use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Placed;
 use isoloom_spec::model::{Spec, Target};
@@ -109,8 +109,18 @@ pub fn project_copies(lab: &Lab, files: &[GeneratedFile], dir: &Path) -> Result<
     if !files.iter().any(|f| f.path.starts_with(&folder)) {
         return Ok(Vec::new());
     }
-    let env = lab.plan(&lowered(lab, target, None)?, target, None);
+    let env = planned(lab, &lowered(lab, target, None)?, target, None)?;
     isoloom_kubernetes::project_copies(&env, dir).map_err(Error::ProjectCopies)
+}
+
+/// `spec`, the lab as `target` runs it (as instance `instance`), planned. A lab that lowered
+/// clean always plans: one that doesn't is a failure, not a refusal.
+fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std::result::Result<Environment, GenerateError> {
+    lab.plan(spec, target, instance).map_err(|e| GenerateError::Internal {
+        target,
+        what: "the lab couldn't be planned".to_owned(),
+        source: std::sync::Arc::new(e),
+    })
 }
 
 /// The lab as `target` runs it: lowered for it, as instance `n` when one is asked.
@@ -138,7 +148,7 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     }
     let backend = backend(target);
     let spec = lowered(lab, target, instance)?;
-    let env = lab.plan(&spec, target, instance);
+    let env = planned(lab, &spec, target, instance)?;
     let rendered = backend.render(&env)?;
     let manifests = backend
         .run_manifests(&env)?
@@ -275,5 +285,20 @@ mod tests {
     fn a_path_two_files_share_is_found() {
         assert_eq!(written_twice(&[at("a"), at("b"), at("a")]), Some("a"));
         assert_eq!(written_twice(&[at("a"), at("b")]), None);
+    }
+
+    #[test]
+    fn a_lab_that_doesnt_plan_fails_the_generation_rather_than_being_refused() {
+        let lab = Lab::parse(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  win: { networks: { lan: 10 }, os: windows-server@2022, app: { steps: [{ copy: { from: a, to: 'C:\\a', owner: admin } }] } }\n",
+        )
+        .unwrap();
+        let failed = planned(&lab, &lab.for_target(Target::Vagrant), Target::Vagrant, None).unwrap_err();
+        assert!(matches!(failed, GenerateError::Internal { target: Target::Vagrant, .. }), "{failed:?}");
+        assert!(!failed.is_refusal());
+        assert!(
+            std::error::Error::source(&failed).is_some_and(|e| e.to_string().starts_with("machine `win`")),
+            "{failed}"
+        );
     }
 }

@@ -209,7 +209,7 @@ machines:
     fn env() -> Environment {
         let lab = Lab::parse(SPEC).expect("the test spec parses");
         assert_eq!(lab.problems(), [], "the test spec is valid");
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
     }
 
     fn step(env: &Environment, machine: &str, pick: impl Fn(&Step) -> bool) -> Step {
@@ -309,7 +309,7 @@ machines:
     fn kept() -> Environment {
         let lab = Lab::parse(KEPT).expect("the test spec parses");
         assert_eq!(lab.problems(), [], "the test spec is valid");
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
+        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
     }
 
     #[test]

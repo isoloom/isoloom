@@ -444,7 +444,7 @@ mod tests {
         )
         .expect("parses")
         .for_target(target);
-        let env = Environment::build(&spec, target, None);
+        let env = Environment::build(&spec, target, None).expect("the spec plans");
         let ports = appliances::ports(&env, "r", &spec.machines["r"]);
         let nets = appliance_networks(&spec, "r", &ports, Vec::new());
         let order: Vec<(&str, Option<u32>)> = nets.iter().map(|(n, a)| (n.as_str(), a.as_ref().and_then(|a| a.priority))).collect();

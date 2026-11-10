@@ -42,7 +42,7 @@ fn arm64_is_refused_by_the_clouds() {
         )
         .unwrap(),
     );
-    let e = Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None);
+    let e = Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None).expect("the spec plans");
     let why = backend(Target::CloudDocker).refusal(&e).unwrap();
     assert_eq!(
         why,
@@ -60,7 +60,7 @@ fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
             ))
             .unwrap(),
         );
-        Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None)
+        Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None).expect("the spec plans")
     };
     // 512 MB + 14 GB + Docker's 1 GB: 15.5 GB fits the 16 GB host.
     assert_eq!(backend(Target::CloudDocker).refusal(&env(14336)), None);

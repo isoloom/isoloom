@@ -428,7 +428,7 @@ mod tests {
     fn config(yaml: &str) -> String {
         let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).unwrap());
         let target = isoloom_spec::model::Target::Docker;
-        let env = Environment::build(&lab.for_target(target), target, None);
+        let env = Environment::build(&lab.for_target(target), target, None).expect("the spec plans");
         StartupConfig {
             env: &env,
             name: "r",

@@ -40,13 +40,13 @@ cloud:
 
 /// The variables file written for `yaml`.
 fn vars_file(yaml: &str) -> Outcome<String> {
-    let files = CloudServicesBackend.render(&testing::planned(&spec(yaml)?, Target::CloudServices))?;
+    let files = CloudServicesBackend.render(&testing::planned(&spec(yaml)?, Target::CloudServices)?)?;
     Ok(testing::file(&files, ".isoloom/cloud-services/terraform.tfvars.json")?.to_owned())
 }
 
 /// The run manifests written for `yaml`, as JSON.
 fn manifests(yaml: &str) -> Outcome<Vec<String>> {
-    let placed = CloudServicesBackend.run_manifests(&testing::planned(&spec(yaml)?, Target::CloudServices))?;
+    let placed = CloudServicesBackend.run_manifests(&testing::planned(&spec(yaml)?, Target::CloudServices)?)?;
     Ok(placed.into_iter().map(|p| isoloom_manifest::to_json(&p.manifest)).collect::<Result<_, _>>()?)
 }
 

@@ -134,7 +134,7 @@ pub(super) fn write(dir: &Path, path: &str, text: &str) -> Res<()> {
 /// The shell rendering: the machine's set-up steps that run its recipe on a VM, as one script.
 pub(super) fn vm_script(family: Family) -> Res<String> {
     let lab = lab(family)?;
-    let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+    let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)?;
     let lifecycle = env.machines.get("m").map(|m| m.lifecycle.clone()).unwrap_or_default();
     let script: String = lifecycle
         .iter()
@@ -154,7 +154,7 @@ pub(super) fn vm_script(family: Family) -> Res<String> {
 /// shell script on top and finding nothing changed.
 pub(super) fn cloud_config(family: Family) -> Res<String> {
     let lab = lab(family)?;
-    let env = Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None);
+    let env = Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None)?;
     let c = Configured::of(&env, "m").ok_or_else(|| format!("{}: the machine has no recipe", family.id))?;
     let lifecycle = env.machines.get("m").map(|m| m.lifecycle.clone()).unwrap_or_default();
     let mut files = String::new();
@@ -189,7 +189,7 @@ pub(super) fn cloud_config(family: Family) -> Res<String> {
 /// project, which the harness copies to `/opt/isoloom`.
 pub(super) fn ansible_files(family: Family) -> Res<Vec<GeneratedFile>> {
     let lab = lab(family)?;
-    let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+    let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)?;
     let c = Configured::of(&env, "m").ok_or_else(|| format!("{}: the machine has no recipe", family.id))?;
     let role = isoloom_ansible::configure::role_name("m");
     let mut files = isoloom_ansible::configure::role_files(&c, &format!("roles/{role}"))?;
@@ -206,7 +206,7 @@ pub(super) fn ansible_files(family: Family) -> Res<Vec<GeneratedFile>> {
 /// The Dockerfile rendering: the container's Dockerfile and the files it builds with.
 pub(super) fn container_files(family: Family) -> Res<Vec<GeneratedFile>> {
     let lab = lab(family)?;
-    let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None);
+    let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)?;
     let files = dockerfile::files(&env);
     if files.is_empty() {
         return Err(format!("{}: no Dockerfile was generated", family.id).into());

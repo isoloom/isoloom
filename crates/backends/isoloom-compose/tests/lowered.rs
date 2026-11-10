@@ -23,7 +23,7 @@ fn plan(name: &str) -> Outcome<Environment> {
         .join("isoloom.yml");
     let source = isoloom_spec::syntax::parse(&std::fs::read_to_string(path)?).map_err(|problems| format!("{name} doesn't parse: {problems:?}"))?;
     let lowered = lower(&source, isoloom_plan::Lab::new(source.clone()).catalogue(), Scope::Target(Target::Docker));
-    Ok(Environment::build(&lowered.spec, Target::Docker, None))
+    Ok(Environment::build(&lowered.spec, Target::Docker, None)?)
 }
 
 /// The files Compose renders for a design example.
@@ -35,7 +35,7 @@ fn render(name: &str) -> Outcome<Vec<GeneratedFile>> {
 fn plan_of(source: &str) -> Outcome<Environment> {
     let parsed = isoloom_spec::syntax::parse(source).map_err(|p| format!("doesn't parse: {p:?}"))?;
     let lowered = lower(&parsed, isoloom_plan::Lab::new(parsed.clone()).catalogue(), Scope::Target(Target::Docker));
-    Ok(Environment::build(&lowered.spec, Target::Docker, None))
+    Ok(Environment::build(&lowered.spec, Target::Docker, None)?)
 }
 
 /// The `up` lifecycle of the Docker run manifest, as text. In a host Compose manifest `--build`

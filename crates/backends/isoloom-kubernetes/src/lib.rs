@@ -54,7 +54,7 @@
 //!   web: { networks: { lan: 10 }, ports: { web: 80 }, app: { image: nginx } }
 //! ",
 //! )?);
-//! let env = Environment::build(&lab.for_target(Target::Kubernetes), Target::Kubernetes, None);
+//! let env = Environment::build(&lab.for_target(Target::Kubernetes), Target::Kubernetes, None)?;
 //! let files = KubernetesBackend.render(&env)?;
 //! let manifests = files.iter().find(|f| f.path == ".isoloom/kubernetes/environment.yaml").ok_or("no manifests")?;
 //! assert!(manifests.contents.contains("kind: Deployment"));

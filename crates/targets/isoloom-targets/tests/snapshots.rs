@@ -18,13 +18,13 @@ fn render(backend: &dyn Backend, name: &str) -> Outcome<Vec<GeneratedFile>> {
         return Err(format!("{name} isn't valid: {:?}", lab.problems()).into());
     }
     let target = backend.target();
-    Ok(backend.render(&Environment::build(&lab.for_target(target), target, None))?)
+    Ok(backend.render(&Environment::build(&lab.for_target(target), target, None)?)?)
 }
 
 /// `yaml`, planned for `target` (whether or not validation would accept it).
 fn build(yaml: &str, target: Target) -> Outcome<Environment> {
     let lab = Lab::parse(yaml).map_err(|problems| format!("{problems:?}"))?;
-    Ok(Environment::build(&lab.for_target(target), target, None))
+    Ok(Environment::build(&lab.for_target(target), target, None)?)
 }
 
 /// The text of the file among `files` whose path ends with `path`.
@@ -140,7 +140,7 @@ fn hybrid_refuses_a_volume_shared_by_containers_and_vms() -> Outcome {
         s.machines["db"].volumes.insert("data".into(), "/var/data".into());
         s
     };
-    env = Environment::build(&spec, Target::Hybrid, None);
+    env = Environment::build(&spec, Target::Hybrid, None)?;
     assert!(
         backend(Target::Hybrid)
             .refusal(&env)
@@ -183,7 +183,7 @@ fn hybrid_forwards_a_fixed_published_port() -> Outcome {
     web.publish = Some(8080);
     web.fixed = true;
     let files = backend(Target::Hybrid)
-        .render(&Environment::build(&spec, Target::Hybrid, None))
+        .render(&Environment::build(&spec, Target::Hybrid, None)?)
         .expect("renders");
     assert!(file(&files, "hybrid/compose.yml")?.contains("    - 8080:80\n"));
     let forward = "m.vm.network \"forwarded_port\", guest: 8080, host: 8080, host_ip: \"127.0.0.1\"\n";
@@ -208,7 +208,7 @@ fn hybrid_forwards_a_published_tool() -> Outcome {
     let tools = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    app: { image: alpine }\ntools:\n  web-ui: { image: \"nginx:1\", port: 80, publish: 9090 }\n";
     spec.tools = isoloom_spec::parse(tools).expect("parses").tools;
     let files = backend(Target::Hybrid)
-        .render(&Environment::build(&spec, Target::Hybrid, None))
+        .render(&Environment::build(&spec, Target::Hybrid, None)?)
         .expect("renders");
     let compose = file(&files, "hybrid/compose.yml")?;
     assert!(compose.contains("    - 9090:80\n"), "{compose}");

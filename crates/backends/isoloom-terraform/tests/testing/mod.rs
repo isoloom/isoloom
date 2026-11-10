@@ -48,13 +48,16 @@ pub fn spec(yaml: &str) -> Outcome<Lab> {
 ///
 /// When the spec doesn't parse, or isn't valid.
 pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
-    Ok(planned(&spec(yaml)?, target))
+    planned(&spec(yaml)?, target)
 }
 
 /// The plan of `lab` for `target`: its spec lowered for the target, then planned.
-#[must_use]
-pub fn planned(lab: &Lab, target: Target) -> Environment {
-    Environment::build(&lab.for_target(target), target, None)
+///
+/// # Errors
+///
+/// When it can't be planned.
+pub fn planned(lab: &Lab, target: Target) -> Outcome<Environment> {
+    Ok(Environment::build(&lab.for_target(target), target, None)?)
 }
 
 /// `cloud`'s `cloud-vm` module for `yaml`, a valid spec.
@@ -86,9 +89,9 @@ pub fn resource_body<'a>(tf: &'a str, resource: &str) -> &'a str {
 ///
 /// # Errors
 ///
-/// When the spec doesn't parse.
+/// When the spec doesn't parse, or can't be planned.
 pub fn refusal(backend: &dyn Backend, yaml: &str) -> Outcome<Option<String>> {
-    Ok(backend.refusal(&planned(&parsed(yaml)?, backend.target())))
+    Ok(backend.refusal(&planned(&parsed(yaml)?, backend.target())?))
 }
 
 /// The lab of `yaml`, valid or not.

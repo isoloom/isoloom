@@ -17,7 +17,7 @@ fn render(spec: &Spec) -> Outcome<String> {
     if !problems.is_empty() {
         return Err(format!("the spec isn't valid: {problems:?}").into());
     }
-    Ok(file(&ProxmoxBackend.render(&Environment::build(spec, Target::Proxmox, None))?, "proxmox/main.tf")?.to_owned())
+    Ok(file(&ProxmoxBackend.render(&Environment::build(spec, Target::Proxmox, None)?)?, "proxmox/main.tf")?.to_owned())
 }
 
 /// The problems an author sees in `yaml`, one line each.

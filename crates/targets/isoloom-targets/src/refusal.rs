@@ -70,7 +70,10 @@ pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<Clouds> {
     if !matches!(target, Target::CloudVm | Target::CloudDocker) || !lab.possible().contains(&target) || refusal(lab, target).is_some() {
         return None;
     }
-    let env = Environment::build(&lab.for_target(target), target, None);
+    // A lab that doesn't plan fails the generation (`GenerateError::Internal`): no module is written.
+    let Ok(env) = Environment::build(&lab.for_target(target), target, None) else {
+        return None;
+    };
     let each = if target == Target::CloudVm {
         isoloom_terraform::CloudVmBackend.refusals(&env)
     } else {

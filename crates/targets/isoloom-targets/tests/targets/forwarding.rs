@@ -27,7 +27,7 @@ fn gateway(v6: bool) -> String {
 fn a_gateway_forwards_by_the_plans_step_on_every_vm_target() -> Outcome {
     for v6 in [false, true] {
         let lab = crate::testing::valid(&gateway(v6))?;
-        let env = isoloom_plan::Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+        let env = isoloom_plan::Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans");
         let sysctls = env.machines["fw"]
             .lifecycle
             .iter()

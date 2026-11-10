@@ -26,6 +26,16 @@ pub enum Error {
         #[source]
         source: serde_yaml_ng::Error,
     },
+    /// The containers of a planned environment couldn't be planned again on their own (the
+    /// `hybrid` target's): a bug, since they planned with the rest.
+    #[error("{}: {source}", target.id())]
+    Unplanned {
+        /// The target whose containers they are.
+        target: Target,
+        /// Why the plan failed.
+        #[source]
+        source: isoloom_plan::PlanError,
+    },
     /// A value of the run manifest was refused by the manifest's own types: a bug of this
     /// backend, which builds every one of them.
     #[error("{}: {MANIFEST_REFUSED}", Target::Docker.id())]
@@ -53,6 +63,7 @@ impl From<Error> for RenderError {
         match e {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
             Error::Unwritable { target, source } => RenderError::internal(target, UNWRITABLE, source),
+            Error::Unplanned { target, source } => RenderError::internal(target, "the containers couldn't be planned", source),
             Error::Manifest { source } => RenderError::internal(Target::Docker, MANIFEST_REFUSED, source),
         }
     }

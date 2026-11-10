@@ -10,5 +10,5 @@ use isoloom_spec::model::Target;
 pub(crate) fn environment(machines: &str) -> Environment {
     let yaml = format!("version: 1\nname: t\nnetworks:\n  lab: {{ cidr: 10.9.0.0/24 }}\nmachines:\n{machines}");
     let lab = isoloom_plan::Lab::new(isoloom_spec::parse(&yaml).expect("the test's spec parses"));
-    Environment::build(&lab.for_target(Target::External), Target::External, None)
+    Environment::build(&lab.for_target(Target::External), Target::External, None).expect("the spec plans")
 }

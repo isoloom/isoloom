@@ -24,7 +24,7 @@ pub(crate) fn spec(yaml: &str) -> Spec {
 
 /// The environment of `lab`, planned for `target`.
 pub(crate) fn planned(lab: &Lab, target: Target) -> Environment {
-    Environment::build(&lab.for_target(target), target, None)
+    Environment::build(&lab.for_target(target), target, None).expect("the spec plans")
 }
 
 /// The environment of `yaml`, planned for `target`.

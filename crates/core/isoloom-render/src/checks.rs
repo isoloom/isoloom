@@ -47,7 +47,7 @@ mod tests {
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
         )
         .expect("parses");
-        let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None);
+        let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans");
         let web = Host::Machine {
             name: "web".into(),
             network: "lan".into(),

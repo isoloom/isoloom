@@ -108,7 +108,7 @@ fn every_cloud_vm_keeps_its_user_data() -> Outcome {
     for cloud in Cloud::ALL {
         let mut all = Vec::new();
         for lab in LABS {
-            let env = planned(&example(lab)?, Target::CloudVm);
+            let env = planned(&example(lab)?, Target::CloudVm)?;
             let Ok(module) = CloudVmModule::new(cloud).render(&env) else { continue };
             all.extend(checked(&module.contents, &format!("{} {lab}", cloud.id())));
         }
@@ -126,7 +126,7 @@ fn every_cloud_vm_keeps_its_user_data() -> Outcome {
 
 #[test]
 fn every_cloud_docker_host_keeps_its_expiry() -> Outcome {
-    let files = cloud_docker_modules(&planned(&example("hello-stack")?, Target::CloudDocker))?;
+    let files = cloud_docker_modules(&planned(&example("hello-stack")?, Target::CloudDocker)?)?;
     for cloud in Cloud::ALL {
         let module = file(&files, &format!("cloud-docker/{}/main.tf", cloud.id()))?;
         assert!(module.contains("var.expires_at"), "{}: the host's user data schedules its expiry", cloud.id());

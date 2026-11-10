@@ -24,7 +24,7 @@
 //! let lab = Lab::new(isoloom_spec::parse(
 //!     "version: 1\nname: lab\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, app: { steps: [{ run: web.sh }] } }\n",
 //! )?);
-//! let env = Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None);
+//! let env = Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None)?;
 //! let files = ProxmoxBackend.render(&env)?;
 //! assert!(files.iter().any(|f| f.path == ".isoloom/proxmox/main.tf"));
 //! # Ok::<(), Box<dyn std::error::Error>>(())

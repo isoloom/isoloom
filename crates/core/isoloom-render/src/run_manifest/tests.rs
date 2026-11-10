@@ -53,7 +53,7 @@ fn the_environment_is_named_after_the_spec_and_its_instance() {
     let one = environment(&testing::env(LAB, Target::Docker)).unwrap();
     assert_eq!((one.name.to_string(), one.instance, one.message), ("demo".to_owned(), None, None));
     let spec = testing::lab(LAB).for_target(Target::Docker);
-    let third = environment(&isoloom_plan::Environment::build(&spec, Target::Docker, Some(3))).unwrap();
+    let third = environment(&isoloom_plan::Environment::build(&spec, Target::Docker, Some(3)).expect("the spec plans")).unwrap();
     assert_eq!(third.instance, isoloom_manifest::Instance::new(3).ok());
 }
 

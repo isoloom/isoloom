@@ -7,7 +7,7 @@ use super::*;
 fn env(yaml: &str) -> Environment {
     let lab = Lab::new(isoloom_spec::parse(yaml).unwrap());
     assert!(lab.problems().is_empty(), "{:?}", lab.problems());
-    Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None)
+    Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None).expect("the spec plans")
 }
 
 const LAB: &str = "version: 1

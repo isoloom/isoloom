@@ -35,6 +35,16 @@ pub enum Error {
         /// The VM's define.
         machine: String,
     },
+    /// The VMs of a planned environment couldn't be planned again on their own (the `hybrid`
+    /// target's): a bug, since they planned with the rest.
+    #[error("{}: {source}", target.id())]
+    Unplanned {
+        /// The target whose VMs they are.
+        target: Target,
+        /// Why the plan failed.
+        #[source]
+        source: isoloom_plan::PlanError,
+    },
     /// A value of the run manifest was refused by the manifest's own types: a bug of this
     /// backend, which builds every one of them.
     #[error("{}: {MANIFEST_REFUSED}", target.id())]
@@ -71,6 +81,7 @@ impl Error {
             Error::Refused { refusal, .. } => Error::Refused { target, refusal },
             Error::Unsupported { reason, .. } => Error::Unsupported { target, reason },
             Error::NoBootDigest { machine, .. } => Error::NoBootDigest { target, machine },
+            Error::Unplanned { source, .. } => Error::Unplanned { target, source },
             Error::Manifest { source, .. } => Error::Manifest { target, source },
         }
     }
@@ -84,6 +95,7 @@ impl From<Error> for RenderError {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
             Error::Unsupported { target, reason } => RenderError::Unsupported { target, what: reason },
             e @ Error::NoBootDigest { target, .. } => RenderError::internal(target, "the run manifest has no boot digest for a VM", e),
+            Error::Unplanned { target, source } => RenderError::internal(target, "the VMs couldn't be planned", source),
             Error::Manifest { target, source } => RenderError::internal(target, MANIFEST_REFUSED, source),
         }
     }

@@ -31,6 +31,7 @@ fn labs_of(p: &Probe) -> Vec<(Target, Lab)> {
 /// The features `lab` asks of `target`.
 fn asked(lab: &Lab, target: Target) -> BTreeSet<Feature> {
     Environment::build(&lab.for_target(target), target, None)
+        .expect("the spec plans")
         .requirements
         .iter()
         .map(isoloom_plan::Requirement::feature)

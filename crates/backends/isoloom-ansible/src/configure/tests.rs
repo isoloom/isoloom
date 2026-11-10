@@ -20,7 +20,7 @@ fn env(m: &str, target: Target, templates: &[(&str, &str)]) -> Environment {
     assert_eq!(lab.problems(), [], "the test spec is valid");
     let texts: BTreeMap<_, _> = templates.iter().filter_map(|(p, t)| Some((p.parse().ok()?, (*t).to_owned()))).collect();
     let lab = lab.with_templates(texts);
-    Environment::build(&lab.for_target(target), target, None)
+    Environment::build(&lab.for_target(target), target, None).expect("the spec plans")
 }
 
 /// Machine `m`'s role `tasks/main.yml` text, rendered for `target`.
@@ -167,7 +167,7 @@ fn a_service_gets_a_restart_handler_notified_by_the_earlier_steps() {
 fn external_project(body: &str) -> Vec<GeneratedFile> {
     let yaml = format!("version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\n{body}");
     let lab = Lab::new(isoloom_spec::parse(&yaml).expect("parses"));
-    let e = Environment::build(&lab.for_target(Target::External), Target::External, None);
+    let e = Environment::build(&lab.for_target(Target::External), Target::External, None).expect("the spec plans");
     project(&e, ".isoloom/external").expect("rendered")
 }
 

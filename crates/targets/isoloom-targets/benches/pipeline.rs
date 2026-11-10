@@ -37,7 +37,7 @@ fn example(name: &'static str) -> Result<Example, String> {
     Ok(Example { name, text, lab, targets })
 }
 
-fn measure(c: &mut Criterion, e: &Example) {
+fn measure(c: &mut Criterion, e: &Example) -> Result<(), String> {
     c.bench_function(&format!("parse/{}", e.name), |b| b.iter(|| isoloom_spec::parse(black_box(&e.text))));
     // Lowering the authored spec for the target, then planning it.
     let lower = || {
@@ -47,9 +47,16 @@ fn measure(c: &mut Criterion, e: &Example) {
             .collect::<Vec<_>>()
     };
     c.bench_function(&format!("lower/{}", e.name), |b| b.iter(lower));
-    let plans: Vec<(Target, Environment)> = e.targets.iter().copied().zip(lower()).collect();
+    let plans: Vec<(Target, Environment)> = e
+        .targets
+        .iter()
+        .copied()
+        .zip(lower())
+        .map(|(t, env)| env.map(|env| (t, env)).map_err(|err| format!("{}: {err}", e.name)))
+        .collect::<Result<_, _>>()?;
     let render = || plans.iter().map(|(t, env)| backend(*t).render(black_box(env))).collect::<Vec<_>>();
     c.bench_function(&format!("render/{}", e.name), |b| b.iter(render));
+    Ok(())
 }
 
 /// Every example, read: each one's spec text.
@@ -87,7 +94,7 @@ fn main() -> Result<(), String> {
     let specs = every_example()?;
     let mut c = Criterion::default().configure_from_args();
     for e in &examples {
-        measure(&mut c, e);
+        measure(&mut c, e)?;
     }
     measure_everything(&mut c, &specs);
     c.final_summary();
