@@ -146,65 +146,15 @@ mod tests {
 /// The inventory as the existing hosts are reached.
 #[cfg(test)]
 mod inventory_tests {
-    use isoloom_plan::Environment;
     use isoloom_render::inventory::render;
+    use isoloom_render::test_support::{INVENTORY_SPEC as SPEC, example, planned, section};
     use isoloom_spec::model::Target;
 
     use super::access;
 
-    const SPEC: &str = r"
-    version: 1
-    name: inv
-    networks:
-      lab: { cidr: 10.9.0.0/24 }
-      back: { cidr: 10.8.0.0/24 }
-    groups:
-      servers: { members: [web, dc, box] }
-    machines:
-      web:
-        networks: { back: 10, lab: 10 }
-        os: debian@12
-      dc:
-        networks: { lab: 20 }
-        os: windows-server@2022
-      box:
-        networks: { lab: 30 }
-        app: { image: alpine }
-    provision:
-      - ansible: site.yml
-        groups: { dcs: [dc], boxes: [box] }
-        host_vars:
-          web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
-    overrides:
-      vagrant: { machines: { dc: { box: some/box, winrm: ssl } } }
-      external:
-        machines:
-          web: { ssh: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id } }
-          dc: { ssh: { address: 192.168.1.20 } }
-    ";
-
-    /// The lines of section `[name]`, up to the next section (its blank line kept).
-    fn section<'a>(inv: &'a str, name: &str) -> &'a str {
-        let (_, rest) = inv.split_once(&format!("[{name}]\n")).unwrap_or_else(|| panic!("[{name}] in\n{inv}"));
-        rest.split_inclusive("\n[").next().map_or(rest, |s| s.strip_suffix('[').unwrap_or(s))
-    }
-
-    fn planned(yaml: &str) -> Environment {
-        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).expect("the spec parses"));
-        Environment::build(&lab.for_target(Target::External), Target::External, None)
-    }
-
-    /// Example `name` of the project, which must be valid, planned for `target`.
-    fn example(name: &str, target: Target) -> Environment {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
-        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).expect("the example loads"));
-        assert_eq!(lab.problems(), [], "{name} is valid");
-        Environment::build(&lab.for_target(target), target, None)
-    }
-
     #[test]
     fn external_hosts_carry_their_user_port_and_quoted_key() {
-        let inv = render(&planned(SPEC), &access());
+        let inv = render(&planned(SPEC, Target::External).unwrap(), &access());
         assert!(
             inv.starts_with("[linux]\nweb ansible_host=web.example.org ansible_user=ops ansible_port=2222 ansible_ssh_private_key_file='~/my keys/id' code="),
             "{inv}"
@@ -216,12 +166,12 @@ mod inventory_tests {
 
     #[test]
     fn external_existing_hosts() {
-        insta::assert_snapshot!(render(&example("existing-hosts", Target::External), &access()));
+        insta::assert_snapshot!(render(&example("existing-hosts", Target::External).unwrap(), &access()));
     }
 
     #[test]
     fn rendering_twice_gives_the_same_inventory() {
-        let once = render(&example("existing-hosts", Target::External), &access());
-        assert_eq!(once, render(&example("existing-hosts", Target::External), &access()));
+        let once = render(&example("existing-hosts", Target::External).unwrap(), &access());
+        assert_eq!(once, render(&example("existing-hosts", Target::External).unwrap(), &access()));
     }
 }

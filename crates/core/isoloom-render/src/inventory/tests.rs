@@ -4,36 +4,7 @@ use isoloom_spec::model::Target;
 use super::*;
 use crate::testing;
 
-const SPEC: &str = r"
-version: 1
-name: inv
-networks:
-  lab: { cidr: 10.9.0.0/24 }
-  back: { cidr: 10.8.0.0/24 }
-groups:
-  servers: { members: [web, dc, box] }
-machines:
-  web:
-    networks: { back: 10, lab: 10 }
-    os: debian@12
-  dc:
-    networks: { lab: 20 }
-    os: windows-server@2022
-  box:
-    networks: { lab: 30 }
-    app: { image: alpine }
-provision:
-  - ansible: site.yml
-    groups: { dcs: [dc], boxes: [box] }
-    host_vars:
-      web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
-overrides:
-  vagrant: { machines: { dc: { box: some/box, winrm: ssl } } }
-  external:
-    machines:
-      web: { ssh: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id } }
-      dc: { ssh: { address: 192.168.1.20 } }
-";
+use crate::test_support::{INVENTORY_SPEC as SPEC, section};
 
 /// An access with one Linux group variable and nothing per host.
 fn plain() -> Access<'static> {
@@ -42,12 +13,6 @@ fn plain() -> Access<'static> {
 
 fn env(spec: &str, target: Target) -> Environment {
     testing::env(spec, target)
-}
-
-/// The lines of section `[name]`, up to the next section (its blank line kept).
-fn section<'a>(inv: &'a str, name: &str) -> &'a str {
-    let (_, rest) = inv.split_once(&format!("[{name}]\n")).unwrap_or_else(|| panic!("[{name}] in\n{inv}"));
-    rest.split_inclusive("\n[").next().map_or(rest, |s| s.strip_suffix('[').unwrap_or(s))
 }
 
 #[test]

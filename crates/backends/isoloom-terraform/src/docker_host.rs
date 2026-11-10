@@ -151,31 +151,13 @@ pub(crate) fn setup_script(env: &Environment) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
 
-    use isoloom_manifest::{Delivery, EnvName, Identifier, NonEmpty, SecretSlot, SlotKind, StepSelection};
+    use isoloom_manifest::SecretSlot;
     use isoloom_spec::model::Protocol;
 
     use super::*;
     use crate::cloud::docker::tests::{SPEC, env};
-
-    /// A sensitive input slot delivered to every step as the environment variable `var`.
-    fn slot(name: &str, var: &str) -> SecretSlot {
-        SecretSlot {
-            name: Identifier::parse(name).unwrap(),
-            kind: SlotKind::Input,
-            required: false,
-            sensitive: true,
-            machines: Vec::new(),
-            providers: BTreeSet::new(),
-            source: None,
-            default: None,
-            deliver: NonEmpty::one(Delivery::Env {
-                var: EnvName::parse(var).unwrap(),
-                steps: StepSelection::Every,
-            }),
-        }
-    }
+    use isoloom_render::test_support::slot;
 
     /// A guest compose carrying only `slots`, with a plain `ps` status.
     fn guest(slots: Vec<SecretSlot>) -> GuestCompose {
@@ -276,9 +258,12 @@ mod tests {
     #[test]
     fn accept_env_is_none_without_forwarded_vars_and_lists_them_otherwise() {
         assert_eq!(accept_env(&guest(Vec::new())).unwrap(), None);
-        let cmd = accept_env(&guest(vec![slot("TOKEN", "LAUNCH_TOKEN"), slot("DEMO_SECRET", "DEMO_SECRET")]))
-            .unwrap()
-            .expect("a command when a value is forwarded");
+        let cmd = accept_env(&guest(vec![
+            slot("TOKEN", "LAUNCH_TOKEN").unwrap(),
+            slot("DEMO_SECRET", "DEMO_SECRET").unwrap(),
+        ]))
+        .unwrap()
+        .expect("a command when a value is forwarded");
         let line = cmd.command.to_string();
         assert!(line.contains("AcceptEnv DEMO_SECRET LAUNCH_TOKEN"), "{line}");
         assert!(line.contains("/etc/ssh/sshd_config.d/isoloom-env.conf"), "{line}");

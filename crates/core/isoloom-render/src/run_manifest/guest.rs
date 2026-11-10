@@ -221,7 +221,7 @@ impl GuestCompose {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_manifest::{Argv, EnvName, HostArgv, Identifier, NonEmpty, Program, SlotKind, StepSelection};
+    use isoloom_manifest::{Argv, HostArgv, Program};
 
     use super::*;
 
@@ -240,23 +240,7 @@ mod tests {
         Ok(Run::Argv(HostArgv::Every(Argv::new(Program::parse("vagrant")?, args))))
     }
 
-    /// A sensitive input slot delivered to every step as the environment variable `var`.
-    fn slot(name: &str, var: &str) -> SecretSlot {
-        SecretSlot {
-            name: Identifier::parse(name).unwrap(),
-            kind: SlotKind::Input,
-            required: false,
-            sensitive: true,
-            machines: Vec::new(),
-            providers: BTreeSet::new(),
-            source: None,
-            default: None,
-            deliver: NonEmpty::one(Delivery::Env {
-                var: EnvName::parse(var).unwrap(),
-                steps: StepSelection::Every,
-            }),
-        }
-    }
+    use crate::test_support::slot;
 
     /// A guest compose carrying only `slots`: everything else empty, with a plain `ps` status.
     fn guest(slots: Vec<SecretSlot>) -> GuestCompose {
@@ -278,7 +262,11 @@ mod tests {
 
     #[test]
     fn the_variables_forwarded_are_the_slots_each_once() {
-        let g = guest(vec![slot("TOKEN", "TOKEN"), slot("DEMO_SECRET", "DEMO_SECRET"), slot("again", "TOKEN")]);
+        let g = guest(vec![
+            slot("TOKEN", "TOKEN").unwrap(),
+            slot("DEMO_SECRET", "DEMO_SECRET").unwrap(),
+            slot("again", "TOKEN").unwrap(),
+        ]);
         assert_eq!(g.forwarded(), ["DEMO_SECRET", "TOKEN"]);
     }
 }

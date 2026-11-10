@@ -309,56 +309,11 @@ pub(crate) fn windows_waits(env: &Environment) -> Vec<String> {
 /// The controller's inventory as Isoloom's server and cloud VMs are reached.
 #[cfg(test)]
 mod inventory_tests {
-    use isoloom_plan::Environment;
     use isoloom_render::inventory::render;
+    use isoloom_render::test_support::{INVENTORY_SPEC as SPEC, example, section};
     use isoloom_spec::model::Target;
 
     use super::{Access, WinrmAuth, cloud_access, server_access};
-
-    const SPEC: &str = r"
-    version: 1
-    name: inv
-    networks:
-      lab: { cidr: 10.9.0.0/24 }
-      back: { cidr: 10.8.0.0/24 }
-    groups:
-      servers: { members: [web, dc, box] }
-    machines:
-      web:
-        networks: { back: 10, lab: 10 }
-        os: debian@12
-      dc:
-        networks: { lab: 20 }
-        os: windows-server@2022
-      box:
-        networks: { lab: 30 }
-        app: { image: alpine }
-    provision:
-      - ansible: site.yml
-        groups: { dcs: [dc], boxes: [box] }
-        host_vars:
-          web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
-    overrides:
-      vagrant: { machines: { dc: { box: some/box, winrm: ssl } } }
-      external:
-        machines:
-          web: { ssh: { address: web.example.org, user: ops, port: 2222, key: ~/my keys/id } }
-          dc: { ssh: { address: 192.168.1.20 } }
-    ";
-
-    /// The lines of section `[name]`, up to the next section (its blank line kept).
-    fn section<'a>(inv: &'a str, name: &str) -> &'a str {
-        let (_, rest) = inv.split_once(&format!("[{name}]\n")).unwrap_or_else(|| panic!("[{name}] in\n{inv}"));
-        rest.split_inclusive("\n[").next().map_or(rest, |s| s.strip_suffix('[').unwrap_or(s))
-    }
-
-    /// Example `name` of the project, which must be valid, planned for `target`.
-    fn example(name: &str, target: Target) -> Environment {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(name);
-        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).expect("the example loads"));
-        assert_eq!(lab.problems(), [], "{name} is valid");
-        Environment::build(&lab.for_target(target), target, None)
-    }
 
     /// AWS's image users, as the cloud-vm module names them.
     fn aws() -> Access<'static> {
@@ -394,32 +349,35 @@ mod inventory_tests {
     #[test]
     fn proxmox_ansible_pair_keeps_the_groups() {
         insta::assert_snapshot!(render(
-            &example("ansible-pair", Target::Proxmox),
+            &example("ansible-pair", Target::Proxmox).unwrap(),
             &server_access("${random_password.windows.result}")
         ));
     }
 
     #[test]
     fn aws_ansible_pair() {
-        insta::assert_snapshot!(render(&example("ansible-pair", Target::CloudVm), &aws()));
+        insta::assert_snapshot!(render(&example("ansible-pair", Target::CloudVm).unwrap(), &aws()));
     }
 
     #[test]
     fn aws_corp_ad_basics_windows() {
-        insta::assert_snapshot!(render(&example("corp-ad-basics", Target::CloudVm), &aws()));
+        insta::assert_snapshot!(render(&example("corp-ad-basics", Target::CloudVm).unwrap(), &aws()));
     }
 
     #[test]
     fn azure_windows_hosts_authenticate_with_ntlm() {
         let azure = cloud_access(|_| "isoloom".to_owned(), "${random_password.windows.result}", WinrmAuth::Ntlm);
-        let inv = render(&example("corp-ad-basics", Target::CloudVm), &azure);
+        let inv = render(&example("corp-ad-basics", Target::CloudVm).unwrap(), &azure);
         assert!(inv.contains("ansible_winrm_transport=ntlm\n"), "{inv}");
         assert!(!inv.contains("ansible_winrm_transport=basic"), "{inv}");
     }
 
     #[test]
     fn server_windows_hosts_get_the_isoloom_account_over_winrm() {
-        let inv = render(&example("windows-hello", Target::Proxmox), &server_access("${random_password.windows.result}"));
+        let inv = render(
+            &example("windows-hello", Target::Proxmox).unwrap(),
+            &server_access("${random_password.windows.result}"),
+        );
         for v in [
             "ansible_user=isoloom",
             "ansible_password=${random_password.windows.result}",
@@ -432,8 +390,8 @@ mod inventory_tests {
     #[test]
     fn rendering_twice_gives_the_same_inventory() {
         for (name, target) in [("ansible-pair", Target::Vagrant), ("corp-ad-basics", Target::CloudVm)] {
-            let once = render(&example(name, target), &aws());
-            assert_eq!(once, render(&example(name, target), &aws()), "{name}");
+            let once = render(&example(name, target).unwrap(), &aws());
+            assert_eq!(once, render(&example(name, target).unwrap(), &aws()), "{name}");
         }
     }
 }
