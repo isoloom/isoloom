@@ -101,7 +101,7 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Breaking: images the project builds are tagged `localhost/isoloom/<environment>-<machine>`**
   (was `isoloom/<environment>-<machine>`, a name in someone else's Docker Hub namespace)
   (`isoloom_plan::images::BUILT_IMAGE_PREFIX`).
-- **Breaking: a Kubernetes published port is a cluster-internal Service** (`<machine>-published`),
+- **Breaking: a Kubernetes published port is a cluster-internal Service** (`isoloom-<machine>`),
   reached with the `kubectl port-forward` the manifests' header and the chart's notes give; no
   public `LoadBalancer` is opened. Pods run under the Pod Security Standards' `baseline` level,
   which the namespace enforces (`privileged` when a machine is privileged or sets a sysctl
