@@ -28,9 +28,9 @@ pub(super) fn in_container(s: &Step) -> Option<(String, String)> {
     s.container_refusal().map(|why| (why.to_owned(), "a VM target".to_owned()))
 }
 
-/// Why a VM on `host` can't carry step `s` yet, and what to write meanwhile. The Ansible CM tool
-/// renders every step on a Linux host that already exists (the refusal is lifted); a Windows one
-/// (`windows`) still runs only its scripts, reboots and playbooks until the Ansible Windows leg.
+/// Why a VM on `host` can't carry step `s`, and what to write instead. The Ansible CM tool
+/// renders every step on a Linux host that already exists; a Windows one (`windows`) runs only
+/// its scripts, reboots and playbooks.
 pub(super) fn on_vm(s: &Step, host: Host, windows: bool) -> Option<(String, String)> {
     if host == Host::New || !windows || matches!(s, Step::Run { .. } | Step::Reboot | Step::Playbook(_)) {
         return None;
@@ -44,7 +44,7 @@ pub(super) fn on_vm(s: &Step, host: Host, windows: bool) -> Option<(String, Stri
     ))
 }
 
-/// The steps of machine `name` its VM on `host` (its OS `windows` or not) can't carry yet, as
+/// The steps of machine `name` its VM on `host` (its OS `windows` or not) can't carry, as
 /// `refused` problems at each step.
 pub(super) fn vm_refusals(name: &str, m: &syntax::Machine, host: Host, windows: bool) -> Vec<Problem> {
     let Some(app) = m.app() else { return Vec::new() };

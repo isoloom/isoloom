@@ -36,8 +36,8 @@ pub enum NoteKind {
     Changed,
     /// Belongs in the machine's image or provisioning.
     InImage,
-    /// Not expressible in the format yet.
-    NotYet,
+    /// Not expressible in the spec: it has no field for it.
+    NotInSpec,
     /// The same effect comes another way.
     Equivalent,
     /// Deliberately not expressible.
@@ -51,7 +51,7 @@ impl NoteKind {
     pub const ALL: [NoteKind; 6] = [
         NoteKind::Changed,
         NoteKind::InImage,
-        NoteKind::NotYet,
+        NoteKind::NotInSpec,
         NoteKind::Equivalent,
         NoteKind::ByDesign,
         NoteKind::Tooling,
@@ -63,7 +63,7 @@ impl NoteKind {
         match self {
             NoteKind::Changed => "Changed on the way in: check these",
             NoteKind::InImage => "Belongs in the image",
-            NoteKind::NotYet => "Not expressible in the spec",
+            NoteKind::NotInSpec => "Not expressible in the spec",
             NoteKind::Equivalent => "Same effect another way",
             NoteKind::ByDesign => "Left out: not every target can do it",
             NoteKind::Tooling => "Tooling, nothing to carry over",

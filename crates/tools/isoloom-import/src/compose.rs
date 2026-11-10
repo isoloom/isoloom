@@ -1,6 +1,6 @@
 //! Drafts an `isoloom.yml` from a Compose file. What Compose says that the format can express
 //! goes into the draft; everything else becomes a note (belongs in the image, not expressible
-//! yet, left out...), so nothing is dropped silently.
+//! in the spec, left out...), so nothing is dropped silently.
 
 mod environment;
 mod keys;

@@ -195,12 +195,18 @@ fn more_disks_than_slots_are_refused() -> Outcome {
 
 #[test]
 fn the_default_ova_is_pinned_to_a_dated_release() -> Outcome {
-    // The `images` default must point at a dated OVA, never the floating `current` (C4).
+    // The `images` default points at a dated OVA, never the floating `current`, so a generated
+    // environment keeps booting the same OS build; its SHA-256 is in the variable's description,
+    // since the provider checks none.
     let tf = esxi("hello-stack")?;
     assert!(
         tf.contains("https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova"),
         "{tf}"
     );
     assert!(!tf.contains("/current/"), "the default OVA must be pinned, not `current`: {tf}");
+    assert!(
+        tf.contains("ubuntu-24.04 513a22ebe3982b9387b038f8a2a6dad1af980d4623dca03511312e55ba620b1a"),
+        "{tf}"
+    );
     Ok(())
 }

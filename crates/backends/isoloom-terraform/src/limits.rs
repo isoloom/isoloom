@@ -1,4 +1,4 @@
-//! What a VM target can't host yet, read from the plan without rendering anything: a target
+//! What a VM target can't host, read from the plan without rendering anything: a target
 //! (Proxmox, ESXi, each cloud) declares its limits, each with the reason it gives, and adds the
 //! checks only it has (its images, its address rules) after them.
 

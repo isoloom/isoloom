@@ -1,5 +1,5 @@
-//! What the real smoke tests on a Proxmox VE 9.2 server and an ESXi 8.0U3e host found, each
-//! pinned by the module text that fixes it: the SDN deletions applied on destroy, no default node
+//! What runs on a real Proxmox VE 9.2 server and an ESXi 8.0U3e host once failed on, each pinned
+//! by the module text that makes it work: the SDN deletions applied on destroy, no default node
 //! name, a router that can't report its uplink address failing early and saying why, and the
 //! bootstrap's progress read from each machine's ready file.
 
@@ -148,9 +148,9 @@ fn each_set_up_step_says_it_runs_and_a_failure_stops_the_rest() -> Outcome {
 
 #[test]
 fn an_esxi_machine_reports_its_set_up_progress_in_its_ready_file() -> Outcome {
-    // Regression (finding 5): the ESXi `remote-exec` set-up wrote only `ready` (no
-    // `running:`/`failed:` progress), unlike the other targets, so the runner had no progress to
-    // report. Each step now marks the ready file first, and stops the set-up when it fails.
+    // The ESXi `remote-exec` set-up reports its progress as every target's does: each step marks
+    // the ready file (`running:`) first, and a failed one marks it (`failed:`) and stops the
+    // set-up, so the runner has the progress to report.
     let tf = esxi("hello-stack")?;
     let web = block(&tf, "resource \"terraform_data\" \"web\"");
     assert!(web.contains("running: provision/web.sh"), "{web}");
@@ -162,9 +162,8 @@ fn an_esxi_machine_reports_its_set_up_progress_in_its_ready_file() -> Outcome {
 
 #[test]
 fn a_vms_hosts_file_names_itself_in_the_zone() -> Outcome {
-    // Regression (finding 4): a VM's /etc/hosts left its own names in the private zone out, so on
-    // web `www.corp.internal` (its own alias) did not resolve, unlike the clouds' zones. A machine
-    // now names itself and its aliases in the zone, as it does the others.
+    // A VM's /etc/hosts names the VM itself and its aliases in the private zone, as it names the
+    // others, so on web `www.corp.internal` (its own alias) resolves, as in the clouds' zones.
     let tf = proxmox("private-names")?;
     let web = block(&tf, "resource \"proxmox_virtual_environment_file\" \"web\"");
     assert!(web.contains("10.84.0.10 web www web.corp.internal www.corp.internal"), "{web}");

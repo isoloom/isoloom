@@ -29,7 +29,7 @@ pub(crate) fn networks(r: &mut Ruby, env: &Environment, mp: &MachinePlan) {
 
 /// Why a VM can't have its bridged networks on Vagrant, if it can't: Vagrant's public network
 /// takes no netmask (a fixed address is in a /24) and tags no VLAN, and a Windows guest's
-/// addresses are set by Isoloom's own steps, which don't cover a bridged interface yet.
+/// addresses are set by Isoloom's own steps, which don't cover a bridged interface.
 pub(crate) fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option<String> {
     for (net, address) in &mp.outside {
         let Some(n) = env.outside.get(net) else { continue };
@@ -52,7 +52,7 @@ pub(crate) fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option
 
 /// Why the environment's bridged networks can't run under Vagrant's `provider`, if it has any:
 /// QEMU links VMs through sockets, Hyper-V puts each network on a private switch of Isoloom's,
-/// and libvirt bridges a device (`dev`) Isoloom doesn't name yet.
+/// and libvirt bridges a device (`dev`) Isoloom doesn't name.
 pub(crate) fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     let (net, _) = env.outside.iter().find(|(_, n)| matches!(n.join, Join::Bridged(_)))?;
     Some(format!("network `{net}`: Isoloom bridges no network under Vagrant's {provider} provider"))

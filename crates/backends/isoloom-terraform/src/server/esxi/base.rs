@@ -10,6 +10,7 @@ use crate::machine::credentials;
 use crate::machine::{vms, windows};
 use crate::module::providers;
 use crate::module::variable::{self, Variable};
+use crate::server::PinnedImage;
 use crate::server::{self, user};
 
 /// The highest slot: it is the fourth byte of the VMs' MACs, which VMware keeps under 0x40 for
@@ -76,15 +77,24 @@ fn slot() -> Variable {
         .validated(condition, "slot is 1 to 63.")
 }
 
-/// `images`: an OVA (a path or a URL) per OS. Ubuntu's come with defaults; every other OS the
-/// environment runs must be given, which the validation says.
+/// `images`: an OVA (a path or a URL) per OS. Ubuntu's come with defaults, whose SHA-256 the
+/// description gives (the provider checks none); every other OS the environment runs must be
+/// given, which the validation says.
 fn images(env: &Environment) -> Variable {
     let oses = oses(env);
-    let defaults = oses.iter().filter_map(|o| default_image(o).map(|url| (*o, string(url))));
+    let pinned: Vec<(&str, PinnedImage)> = oses.iter().filter_map(|o| default_image(o).map(|p| (*o, p))).collect();
+    let defaults = pinned.iter().map(|(o, p)| (*o, string(p.url)));
     let needed = list(oses.iter().map(|o| string(*o)));
     let has = call("contains", [call("keys", [reference("var.images")]), reference("os")]);
     let condition = call("alltrue", [for_list("os", needed, has, None)]);
-    let mut description = "An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default; for another OS, an OVA with cloud-init and open-vm-tools".to_owned();
+    let sums: Vec<String> = pinned.iter().map(|(o, p)| format!("{o} {}", p.checksum)).collect();
+    let pins = if sums.is_empty() {
+        String::new()
+    } else {
+        format!(" (the provider checks no hash: their SHA-256, as Ubuntu publishes them, {})", sums.join(", "))
+    };
+    let mut description =
+        format!("An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default{pins}; for another OS, an OVA with cloud-init and open-vm-tools");
     if windows::any(env) {
         description.push_str("; for Windows, an OVA with VMware Tools and cloudbase-init (its VMware guestinfo service), sysprepped");
     }

@@ -1,5 +1,5 @@
 //! The GCP driver for the `cloud-vm` target: it produces a valid-shaped `google` module for the
-//! specs it supports, a VPC network per network, and declines Windows (which comes later).
+//! specs it supports, a VPC network per network, and declines Windows, which it doesn't set up.
 
 use isoloom_spec::Target;
 use isoloom_targets::generate;
@@ -70,7 +70,7 @@ fn gcp_puts_a_machine_on_several_networks_with_an_interface_in_each_vpc() -> Out
 
 #[test]
 fn gcp_declines_windows() -> Outcome {
-    // windows-hello is Windows-only: AWS builds it, the GCP driver declines it for now.
+    // windows-hello is Windows-only: AWS builds it, the GCP driver declines it.
     let files = generate(&example("windows-hello")?, Target::CloudVm)?;
     assert!(files.iter().any(|f| f.path.ends_with("cloud-vm/aws/main.tf")));
     assert!(

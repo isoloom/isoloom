@@ -6,7 +6,7 @@ use isoloom_targets::generate;
 
 use crate::testing::{Outcome, example, file, plan};
 
-/// A gateway between two networks (IPv4 only: a gateway's network carries no IPv6 yet), and the
+/// A gateway between two networks (IPv4 only: a gateway's network carries no IPv6), and the
 /// lab's router routing IPv6 between two others (`v6`) or not.
 fn gateway(v6: bool) -> String {
     let ipv6 = |n: u8| {

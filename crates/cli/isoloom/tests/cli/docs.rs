@@ -121,12 +121,152 @@ fn the_changelog_and_the_migration_guide_name_the_published_service_kubernetes_w
     Ok(())
 }
 
+/// What a roadmap says where a fact belongs: what a target, a check or an import does today.
+const PROMISES: [&str; 7] = ["come later", "comes later", "comes next", "for now", "so far", " yet", "(yet)"];
+
 #[test]
 fn the_matrix_states_each_targets_facts_not_a_roadmap() -> Outcome {
     let matrix = std::fs::read_to_string(root().join("docs/matrix.md"))?;
-    for promise in ["come later", "comes later", "comes next", "for now", "so far", " yet"] {
+    for promise in PROMISES {
         let found: Vec<&str> = matrix.lines().filter(|l| l.contains(promise)).collect();
         assert!(found.is_empty(), "`{promise}`: {found:#?}");
     }
+    Ok(())
+}
+
+/// Rust source `src` up to its inline test module, which the sources keep last.
+fn outside_tests(src: &str) -> &str {
+    src.find("\n#[cfg(test)]\nmod tests {").map_or(src, |at| src.get(..at).unwrap_or(src))
+}
+
+/// A walk over Rust source, collecting its string literals with the line each starts on.
+struct Literals {
+    chars: Vec<char>,
+    at: usize,
+    line: usize,
+    found: Vec<(usize, String)>,
+}
+
+impl Literals {
+    fn peek(&self, ahead: usize) -> Option<char> {
+        self.chars.get(self.at + ahead).copied()
+    }
+
+    /// Moves past `n` characters, counting the lines it crosses.
+    fn skip(&mut self, n: usize) {
+        for _ in 0..n {
+            self.line += usize::from(self.peek(0) == Some('\n'));
+            self.at += 1;
+        }
+    }
+
+    /// Moves to just past `end` (or to the end of the source).
+    fn skip_past(&mut self, end: &str) {
+        let end: Vec<char> = end.chars().collect();
+        while self.at < self.chars.len() && !self.chars.get(self.at..).unwrap_or_default().starts_with(&end) {
+            self.skip(1);
+        }
+        self.skip(end.len());
+    }
+
+    /// A `"…"` string from here, its escapes as written.
+    fn string(&mut self) {
+        let (start, mut text) = (self.line, String::new());
+        self.skip(1);
+        while let Some(c) = self.peek(0) {
+            match c {
+                '"' => break,
+                '\\' => {
+                    text.extend(self.chars.get(self.at..self.at + 2).unwrap_or_default());
+                    self.skip(2);
+                }
+                _ => {
+                    text.push(c);
+                    self.skip(1);
+                }
+            }
+        }
+        self.skip(1);
+        self.found.push((start, text));
+    }
+
+    /// A raw string (`r"…"`, `r#"…"#`) from here, when one starts here.
+    fn raw_string(&mut self) -> bool {
+        let hashes = self.chars.get(self.at + 1..).unwrap_or_default().iter().take_while(|c| **c == '#').count();
+        if self.peek(1 + hashes) != Some('"') {
+            return false;
+        }
+        let start = self.line;
+        self.skip(2 + hashes);
+        let from = self.at;
+        let close: String = std::iter::once('"').chain(std::iter::repeat_n('#', hashes)).collect();
+        self.skip_past(&close);
+        let end = self.at.saturating_sub(close.chars().count()).max(from);
+        self.found.push((start, self.chars.get(from..end).unwrap_or_default().iter().collect()));
+        true
+    }
+
+    /// One step from here: past a comment, a char literal or a string, else one character.
+    fn step(&mut self) {
+        let identifier_before = self.at.checked_sub(1).and_then(|i| self.chars.get(i)).is_some_and(|c| c.is_alphanumeric());
+        match (self.peek(0), self.peek(1), self.peek(2)) {
+            (Some('/'), Some('/'), _) => self.skip_past("\n"),
+            (Some('/'), Some('*'), _) => self.skip_past("*/"),
+            (Some('\''), Some('\\'), _) => {
+                self.skip(2);
+                self.skip_past("'");
+            }
+            (Some('\''), _, Some('\'')) => self.skip(3),
+            (Some('"'), _, _) => self.string(),
+            (Some('r'), Some('"' | '#'), _) if !identifier_before && self.raw_string() => {}
+            _ => self.skip(1),
+        }
+    }
+}
+
+/// The string literals of Rust source `src`, outside comments, char literals and the inline
+/// test module, each with the line it starts on. Enough of Rust's lexing for the repository's
+/// own sources.
+fn string_literals(src: &str) -> Vec<(usize, String)> {
+    let mut walk = Literals {
+        chars: outside_tests(src).chars().collect(),
+        at: 0,
+        line: 1,
+        found: Vec::new(),
+    };
+    while walk.at < walk.chars.len() {
+        walk.step();
+    }
+    walk.found
+}
+
+#[test]
+fn the_string_literals_are_found_outside_comments_and_tests() {
+    let src =
+        "let a = \"one yet\"; // \"not this\"\nlet c = '\"';\nlet r = r#\"raw \"two\"\"#;\n/* \"no\" */\n#[cfg(test)]\nmod tests {\n    \"in a test\"\n}\n";
+    let found: Vec<String> = string_literals(src).into_iter().map(|(_, s)| s).collect();
+    assert_eq!(found, ["one yet", "raw \"two\""]);
+}
+
+/// What the code says to its users (validation and refusal messages, an import's notes and
+/// drafts, the generated files' text) states a fact, not a roadmap, as the matrix does: every
+/// string literal of the crates' and xtask's sources, their tests aside.
+#[test]
+fn what_the_code_says_states_facts_not_a_roadmap() -> Outcome {
+    let mut files = Vec::new();
+    sources(&root().join("crates"), &mut files)?;
+    sources(&root().join("xtask/src"), &mut files)?;
+    let is_test = |p: &Path| {
+        p.components().any(|c| c.as_os_str() == "tests") || p.file_name().is_some_and(|n| n == "tests.rs" || n == "testing.rs" || n == "test_support.rs")
+    };
+    let mut found = Vec::new();
+    for file in files.iter().filter(|f| !is_test(f)) {
+        for (n, text) in string_literals(&std::fs::read_to_string(file)?) {
+            if let Some(promise) = PROMISES.iter().find(|p| text.contains(**p)) {
+                found.push(format!("{}:{n}: `{promise}` in {text:?}", file.display()));
+            }
+        }
+    }
+    assert!(found.is_empty(), "{found:#?}");
     Ok(())
 }

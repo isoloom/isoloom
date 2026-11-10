@@ -113,7 +113,7 @@ fn a_volume_shared_between_services_is_shared_between_machines() -> Outcome {
     assert_eq!(spec.volumes["shared"].owner.as_deref(), Some("a"), "{}", d.yaml);
     let at = |m: &str| spec.machines[m].volumes.get("shared").map(isoloom_spec::model::Mount::path);
     assert_eq!((at("a"), at("b")), (Some("/data"), Some("/in")));
-    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", d.notes);
+    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotInSpec), "{:?}", d.notes);
     assert!(has(&d, NoteKind::InImage, "services.a.volumes", "./conf:/etc/x:ro"));
     Ok(())
 }
@@ -136,7 +136,7 @@ fn a_services_network_aliases_are_its_machines_aliases() -> Outcome {
         "{:?}",
         d.notes
     );
-    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", d.notes);
+    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotInSpec), "{:?}", d.notes);
     Ok(())
 }
 
@@ -251,9 +251,9 @@ fn a_gpu_reservation_becomes_gpus_and_every_other_resource_key_is_noted() -> Out
     assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
     assert!(d.yaml.contains("hardware: { gpus: { count: 2, driver: nvidia } }"), "{}", d.yaml);
     let at = "services.train.deploy";
-    assert!(has(&d, NoteKind::NotYet, &format!("{at}.resources.limits"), "pids"), "{:?}", d.notes);
+    assert!(has(&d, NoteKind::NotInSpec, &format!("{at}.resources.limits"), "pids"), "{:?}", d.notes);
     assert!(
-        has(&d, NoteKind::NotYet, &format!("{at}.resources.reservations"), "cpus, memory"),
+        has(&d, NoteKind::NotInSpec, &format!("{at}.resources.reservations"), "cpus, memory"),
         "{:?}",
         d.notes
     );
@@ -262,7 +262,7 @@ fn a_gpu_reservation_becomes_gpus_and_every_other_resource_key_is_noted() -> Out
         "{:?}",
         d.notes
     );
-    assert!(has(&d, NoteKind::NotYet, at, "replicas"), "{:?}", d.notes);
+    assert!(has(&d, NoteKind::NotInSpec, at, "replicas"), "{:?}", d.notes);
     let all = draft(
         "services:\n  t:\n    image: x\n    deploy: { resources: { reservations: { devices: [{ capabilities: [gpu] }] } } }\n",
         "ml",

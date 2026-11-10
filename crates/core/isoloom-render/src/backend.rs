@@ -35,7 +35,7 @@ pub trait Backend: Sync {
 
     /// The run manifest the runner executes (`.isoloom/<target>/run.json`), for a target
     /// that has one; its `environment.message` is left to the caller, who fills it from the resolved
-    /// snapshot. `None` for the targets that have none yet.
+    /// snapshot. `None` for the targets that have none.
     ///
     /// # Errors
     ///

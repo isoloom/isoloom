@@ -40,7 +40,7 @@ fn env_name(s: &str) -> bool {
 pub(super) fn check(spec: &Spec, p: &mut Problems) {
     let Some(c) = &spec.cloud else { return };
     if !spec.machines.is_empty() {
-        p.add("cloud", "an environment is cloud services or machines, not both (yet): leave `machines` out");
+        p.add("cloud", "an environment is cloud services or machines, not both: leave `machines` out");
     }
     if c.terraform.trim().is_empty() {
         p.add("cloud.terraform", "the Terraform module's folder, in the project");
@@ -122,10 +122,7 @@ mod tests {
         let both = problems(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines: { web: { networks: { lan: 10 }, docker: { image: nginx } } }\ncloud: { provider: aws, terraform: infra }\n",
         );
-        assert_eq!(
-            both,
-            ["cloud: an environment is cloud services or machines, not both (yet): leave `machines` out"]
-        );
+        assert_eq!(both, ["cloud: an environment is cloud services or machines, not both: leave `machines` out"]);
         assert_eq!(
             of("{ provider: aws, terraform: ' ' }"),
             ["cloud.terraform: the Terraform module's folder, in the project"]

@@ -381,7 +381,7 @@ fn a_docker_host_gets_the_engine_and_compose_at_their_pinned_versions() {
     assert!(script.contains("apt-cache madison docker-ce"), "the engine version is resolved from the repo");
     let (apt, rpm) = script.split_once("\nelse\n").expect("an apt branch and an rpm fallback");
     assert!(!apt.contains("get.docker.com"), "the apt family no longer pipes get.docker.com into sh: {apt}");
-    // The RPM family keeps Docker's pinned install script for now.
+    // The RPM family installs with Docker's pinned install script.
     assert!(rpm.contains(&format!("VERSION={DOCKER_VERSION} sh")), "{rpm}");
     assert!(apt.contains("/(^|:)29[.]9[.]0/") && apt.contains("docker-ce 29.9.0 is not"), "{apt}");
 }

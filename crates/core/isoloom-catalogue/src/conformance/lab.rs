@@ -43,7 +43,7 @@ pub enum LabError {
     /// The contract has no such case.
     #[error("the contract has no case `{0}`")]
     NoCase(String),
-    /// A helper machine runs a service the catalogue doesn't have yet.
+    /// A helper machine runs a service the catalogue doesn't have.
     #[error("case `{case}`: its helper `{machine}` runs `{service}`, which the catalogue doesn't have")]
     MissingEntry {
         /// The case.

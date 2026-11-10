@@ -129,7 +129,7 @@ fn utm_refuses_vms_on_a_network() -> Outcome {
     let spec = lab(THREE)?;
     let why = refusal_on(&spec, Target::Vagrant, Some("utm")).expect("UTM has no private networks");
     assert!(why.contains("`a` is on a network, and vagrant_utm gives a VM no private network"), "{why}");
-    // Every machine is on a network (validation asks it), so UTM runs no environment's VMs yet;
+    // Every machine is on a network (validation asks it), so UTM runs no environment's VMs;
     // the other providers do.
     assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
     Ok(())

@@ -222,8 +222,7 @@ fn no_secret_value_reaches_a_windows_machines_file() -> Outcome {
 fn every_issued_input_is_an_optional_sensitive_slot_and_a_file_never_an_environment_value() -> Outcome {
     let generated = generated(ISSUED, "issued")?;
     // The targets whose runner delivers a machine's inputs: Compose's secrets, Vagrant's guest
-    // delivery. (Proxmox's manifest has no input slot yet: its VMs wait for a delivery no step
-    // makes; the clouds have no manifest yet.)
+    // delivery.
     for target in ["docker", "vagrant"] {
         let path = PathBuf::from(target).join("run.json");
         let text = find(&generated, &format!("{target}/run.json"))?;

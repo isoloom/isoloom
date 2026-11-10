@@ -78,7 +78,7 @@ fn level(name: &str, dir: &str) -> Result<Level, String> {
             .iter()
             .find(|(n, _)| *n == name)
             .map(|(_, rank)| Level::Core(*rank))
-            .ok_or_else(|| format!("{name}: a core crate the dependency rule doesn't place yet: add it to the core order (xtask/src/deps.rs)")),
+            .ok_or_else(|| format!("{name}: a core crate the dependency rule doesn't place: add it to the core order (xtask/src/deps.rs)")),
         ["crates", "backends", _] => Ok(Level::Backend),
         ["crates", "tools", _] => Ok(Level::Tool),
         ["crates", "targets", _] => Ok(Level::Targets),

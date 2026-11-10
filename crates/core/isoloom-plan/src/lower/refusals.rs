@@ -1,6 +1,6 @@
 //! What a target can't run, found while lowering: a machine without the form the target needs
 //! (named by the field that rules it out), a step its family can't carry at all (a repository on
-//! Windows), a step an existing host doesn't run yet ([`super::carry`]), a machine with no
+//! Windows), a step an existing host doesn't run ([`super::carry`]), a machine with no
 //! existing host on `external`. Each is a `refused` problem; the spec itself stays valid.
 
 use isoloom_spec::model::{Shape, Target};
@@ -58,7 +58,7 @@ enum Carrier {
     Image,
 }
 
-/// The first step of a service machine's recipe that what renders it can't carry yet, as a
+/// The first step of a service machine's recipe that what renders it can't carry, as a
 /// `refused` problem at its `service` (`windows`: its OS is Windows).
 fn service_steps(name: &str, service: Service<'_>, carrier: Carrier, windows: bool) -> Option<Problem> {
     let Some(Ok(resolved)) = service else { return None };
@@ -135,7 +135,7 @@ fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Servic
 }
 
 /// The steps machine `name`'s VM on `host` can't run: those its family can't carry at all, then
-/// (on hosts that already exist) those the configuration renderers don't reach there yet.
+/// (on hosts that already exist) those the configuration renderers don't reach there.
 fn vm_steps(name: &str, m: &syntax::Machine, host: Host) -> Vec<Problem> {
     let Some(os) = m.os else { return Vec::new() };
     let windows = configure::Family::from(os) == configure::Family::Windows;

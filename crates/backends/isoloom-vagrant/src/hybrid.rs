@@ -11,7 +11,8 @@
 //! - Published ports: macvlan can't publish, so a container with published ports also joins
 //!   Docker's bridge network (its default route stays on its lab network), and the Docker host
 //!   VM forwards each port to this machine's loopback.
-//! - VirtualBox only for now (promiscuous network interfaces are set per provider).
+//! - VirtualBox only: promiscuous network interfaces are set per provider, and this writes
+//!   VirtualBox's.
 //! - Refused, from the plan's requirements: gateways; a shared volume mounted by containers and
 //!   VMs; a VM that depends on a container (VMs start first); network appliances. Containers
 //!   don't reach the internet while running (the Docker host pulls their images).
@@ -29,8 +30,8 @@ use crate::vms::{self, Layout};
 const DIR: &str = "hybrid";
 
 /// What the hybrid target can render. The VM side's controller runs provisioning and every
-/// kind of check. Gateways, volumes shared across containers and VMs, VMs waiting for containers
-/// and network appliances aren't wired yet.
+/// kind of check. It wires no gateway, no volume shared across containers and VMs, no VM waiting
+/// for a container and no network appliance.
 #[must_use]
 pub fn capabilities() -> Capabilities {
     Capabilities::of([

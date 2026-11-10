@@ -11,7 +11,7 @@ use isoloom_plan::Environment;
 
 use crate::machine::cloudbase_init;
 
-/// What ESXi can't give a Windows machine yet: cloudbase-init's limits, as on Proxmox.
+/// What ESXi can't give a Windows machine: cloudbase-init's limits, as on Proxmox.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
     cloudbase_init::refusal(env, "ESXi")
 }

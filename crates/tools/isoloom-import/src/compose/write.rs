@@ -26,7 +26,7 @@ pub(super) fn draft_yaml(env: &Environment, machines: &[Machine]) -> String {
     let mut y = Writer::new(&Header {
         tool: "compose",
         source: env.source,
-        review: "Review it with the notes the\nimport printed: what Compose said that this file doesn't (yet), and why.",
+        review: "Review it with the notes the\nimport printed: what Compose said that this file doesn't, and why.",
         next: "add `os` and `app.steps` to each machine for the VM targets, and `checks` that prove the behavior.",
         name: env.name,
     });

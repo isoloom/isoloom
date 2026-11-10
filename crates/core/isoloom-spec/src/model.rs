@@ -127,7 +127,7 @@ pub struct Spec {
     /// derived checks of its own from `ports` and `reach`.
     #[serde(default)]
     pub checks: Vec<Check>,
-    /// Narrows the targets derived from the implementations (e.g. not tested on Proxmox yet).
+    /// Narrows the targets derived from the implementations (e.g. to the targets the author has tested it on).
     #[serde(default)]
     pub targets: Option<Vec<Target>>,
     /// Shown once the environment is up (the runner, `isoloom message`): how to start, in

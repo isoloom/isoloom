@@ -74,7 +74,7 @@ variable "images" {
   default = {
     "ubuntu-24.04" = "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova"
   }
-  description = "An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default; for another OS, an OVA with cloud-init and open-vm-tools; for Windows, an OVA with VMware Tools and cloudbase-init (its VMware guestinfo service), sysprepped"
+  description = "An OVA per OS, a path or a URL: Ubuntu's cloud OVAs by default (the provider checks no hash: their SHA-256, as Ubuntu publishes them, ubuntu-24.04 513a22ebe3982b9387b038f8a2a6dad1af980d4623dca03511312e55ba620b1a); for another OS, an OVA with cloud-init and open-vm-tools; for Windows, an OVA with VMware Tools and cloudbase-init (its VMware guestinfo service), sysprepped"
   validation {
     condition     = alltrue([for os in ["ubuntu-24.04", "windows-server-2019"] : contains(keys(var.images), os)])
     error_message = "images needs an OVA for each of: ubuntu-24.04, windows-server-2019."

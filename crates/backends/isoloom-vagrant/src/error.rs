@@ -18,7 +18,7 @@ pub enum Error {
         refusal: Refusal,
     },
     /// A machine Vagrant can't build: no box for its OS, a step it can't run, what a Windows
-    /// machine can't have yet.
+    /// machine can't have.
     #[error("{}: {reason}", target.id())]
     Unsupported {
         /// The target that refuses.

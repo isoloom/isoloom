@@ -15,8 +15,8 @@
 //!   since Google Cloud keeps both the first address (the gateway's) and the second to last (the
 //!   router's).
 //!
-//! What Google Cloud can't do the AWS way yet, so its refusal declines it: Windows, whose
-//! first-boot set-up and WinRM differ enough that it comes later.
+//! What Google Cloud doesn't run the AWS way, so its refusal declines it: Windows, whose
+//! first-boot set-up and WinRM this module doesn't write for Google Cloud.
 
 mod machines;
 mod network;

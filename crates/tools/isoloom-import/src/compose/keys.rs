@@ -261,7 +261,7 @@ impl Import<'_> {
             .filter(|k| !read.contains(k))
             .collect();
         if !other.is_empty() {
-            self.notes.add(at.to_owned(), NoteKind::NotYet, format!("{what}: {}", other.join(", ")));
+            self.notes.add(at.to_owned(), NoteKind::NotInSpec, format!("{what}: {}", other.join(", ")));
         }
     }
 

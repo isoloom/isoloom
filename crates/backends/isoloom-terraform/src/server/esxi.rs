@@ -54,6 +54,7 @@ use super::Parts;
 use crate::limits::Limits;
 use crate::machine::vms;
 use crate::module::{ProjectCopy, Usage};
+use crate::server::PinnedImage;
 
 /// The OS of the router and the controller: Ubuntu's OVA has cloud-init and open-vm-tools,
 /// which reports the router's uplink address.
@@ -62,7 +63,7 @@ const SERVICE_OS: &str = "ubuntu-24.04";
 /// A VM's network interfaces, at most: the router needs one per network and the uplink.
 const MAX_NICS: usize = 10;
 
-/// What ESXi can't host yet.
+/// What ESXi can't host.
 const LIMITS: Limits = Limits {
     arm64: Some("ESXi runs x86-64 VMs only"),
     gateways: Some("Isoloom routes no network through a `gateway` machine on ESXi"),
@@ -72,20 +73,25 @@ const LIMITS: Limits = Limits {
 };
 
 /// Ubuntu's own cloud OVAs: the default `images`, pinned to a dated release (never the floating
-/// `current`) so a generated lab keeps booting the same OS build (the C4 security finding).
-///
-/// The `josenk/esxi` provider deploys an OVA from `ovf_source` with no checksum slot, so the
-/// pin here is the dated URL; the OVAs' published SHA-256 sums (resolved 2026-10-17) are
-/// recorded for a future verify step or a refresh tool, and the other ESXi path
-/// (`vagrant/vmware_esxi`) pins its boxes through Vagrant instead:
-///   focal  (20.04): 1d4521b2df38914965064537e31f7fbb1c3fabeaca789e3350b79a0b1a0838fc
-///   jammy  (22.04): ea42c32ec5e7ca343f0a5da30f242364adc75f564cbc8b9e61ab3e9c68337df7
-///   noble  (24.04): 513a22ebe3982b9387b038f8a2a6dad1af980d4623dca03511312e55ba620b1a
-fn default_image(os: &str) -> Option<&'static str> {
+/// `current`) so a generated environment keeps booting the same OS build, each with the SHA-256
+/// Ubuntu publishes for it (resolved 2026-10-17). The `josenk/esxi` provider deploys an OVA from
+/// `ovf_source` with no checksum slot, so the module checks none: the `images` variable's
+/// description names each default's SHA-256 for the user to check the download against. The
+/// other ESXi path (`vagrant/vmware_esxi`) pins its boxes through Vagrant instead.
+fn default_image(os: &str) -> Option<PinnedImage> {
     Some(match os {
-        "ubuntu-20.04" => "https://cloud-images.ubuntu.com/focal/20250624/focal-server-cloudimg-amd64.ova",
-        "ubuntu-22.04" => "https://cloud-images.ubuntu.com/jammy/20261004/jammy-server-cloudimg-amd64.ova",
-        "ubuntu-24.04" => "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova",
+        "ubuntu-20.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/focal/20250624/focal-server-cloudimg-amd64.ova",
+            "1d4521b2df38914965064537e31f7fbb1c3fabeaca789e3350b79a0b1a0838fc",
+        ),
+        "ubuntu-22.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/jammy/20261004/jammy-server-cloudimg-amd64.ova",
+            "ea42c32ec5e7ca343f0a5da30f242364adc75f564cbc8b9e61ab3e9c68337df7",
+        ),
+        "ubuntu-24.04" => PinnedImage::sha256(
+            "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova",
+            "513a22ebe3982b9387b038f8a2a6dad1af980d4623dca03511312e55ba620b1a",
+        ),
         _ => return None,
     })
 }
@@ -104,7 +110,7 @@ const LINUX: [&str; 8] = [
 ];
 
 /// Why ESXi can't run this environment, if it can't: its limits, then a machine whose OS has
-/// no OVA here, then what a Windows machine can't have yet, a boot of its own ESXi has no
+/// no OVA here, then what a Windows machine can't have here, a boot of its own ESXi has no
 /// setting for, more data disks than slots, and more networks than a VM has interfaces for.
 fn refusal(env: &Environment) -> Option<String> {
     LIMITS

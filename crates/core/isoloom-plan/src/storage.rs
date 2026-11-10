@@ -145,7 +145,7 @@ pub(crate) fn no_tmpfs_modes(f: &mut std::fmt::Formatter<'_>, machine: &str) -> 
 }
 
 /// Why a target whose machines don't run on the computer that runs the lab (or that doesn't
-/// share its folders yet) refuses machine `machine`'s host folders.
+/// share its folders) refuses machine `machine`'s host folders.
 pub(crate) fn no_host_folders(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
     write!(
         f,

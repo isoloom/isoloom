@@ -213,7 +213,7 @@ impl Lab {
     }
 
     /// Why `target` can't run the lab, as a `refused` problem at the field: found while
-    /// lowering (the first machine it has no form for, or a VM step it doesn't render yet), else
+    /// lowering (the first machine it has no form for, or a VM step it doesn't render), else
     /// the access machine the spec leaves to the runner, when the image table gives it none of
     /// the form the target runs.
     #[must_use]

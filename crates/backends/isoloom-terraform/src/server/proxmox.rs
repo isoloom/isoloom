@@ -54,7 +54,7 @@ use crate::limits::Limits;
 use crate::machine::{cloudbase_init, controller as core_controller, vms};
 use crate::module::{ProjectCopy, Usage};
 
-/// What Proxmox can't host yet.
+/// What Proxmox can't host.
 const LIMITS: Limits = Limits {
     // Emulated by QEMU (see `arch`), with an arm64 cloud image.
     arm64: None,
@@ -70,7 +70,7 @@ pub(super) const DEBIAN_12_AMD64: PinnedImage = PinnedImage::sha512(
     "56c0bd55b6623f2739f377e983d2872e7b208d0cb9c3ba4e93d3f72929026da03637c598b3bd472b29998c31c8a4c17d8e6ae1c556852a8b83a66a09bf5c2b37",
 );
 
-/// Pinned amd64 cloud images by OS name (Linux for now), each at a dated release with the
+/// Pinned amd64 cloud images by OS name (Linux ones: a Windows image is the user's), each at a dated release with the
 /// checksum its publisher lists (resolved 2026-10-17; see [`PinnedImage`]).
 fn pinned(os: &str) -> Option<PinnedImage> {
     Some(match os {
@@ -122,7 +122,7 @@ fn pinned(os: &str) -> Option<PinnedImage> {
 
 /// Why Proxmox can't run this environment, if it can't: its limits, then a Linux machine with
 /// no cloud image (its own image stands in for its OS's), then what a Windows machine can't
-/// have here yet, then a boot of its own Proxmox has no setting for.
+/// have here, then a boot of its own Proxmox has no setting for.
 fn refusal(env: &Environment) -> Option<String> {
     LIMITS.refusal(env).or_else(|| gpus::refusal(env)).or_else(|| {
         super::without_image(env, |os, mp| pinned(os).is_some() || image::has_own(mp))

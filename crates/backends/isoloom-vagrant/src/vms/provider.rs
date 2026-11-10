@@ -197,8 +197,8 @@ fn disk_refusal(spec: &Spec, provider: Provider<'_>) -> Option<String> {
 /// What `provider` can't give the VMs of their networks and boxes: QEMU links a VM on one
 /// network only, `vagrant_utm` (0.1.6) sets up no private network (it only forwards ports to
 /// the VM's shared network, so a VM on one of the spec's networks would silently have none),
-/// Hyper-V needs a Hyper-V build of each box, and QEMU, Hyper-V and libvirt have no bridged
-/// networks yet.
+/// Hyper-V needs a Hyper-V build of each box, and Isoloom bridges no network on QEMU, Hyper-V
+/// or libvirt.
 fn networks_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
     match provider {
         Provider::Qemu => qemu::refusal(super::qemu_links(env)).or_else(|| bridged::provider_refusal(env, "QEMU")),

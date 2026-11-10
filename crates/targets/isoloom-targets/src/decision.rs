@@ -53,7 +53,7 @@ pub(crate) fn columns() -> Vec<Column> {
 pub(crate) enum Code {
     /// The spec isn't valid, or not once lowered for the target.
     Invalid,
-    /// Lowering: a machine has no form the target runs, or a step the target doesn't run yet,
+    /// Lowering: a machine has no form the target runs, or a step the target doesn't run,
     /// at the field that rules it out.
     Lowering,
     /// The target's backend lacks the capability the lab needs.

@@ -143,7 +143,7 @@ fn a_public_network_is_a_bridged_network() -> Outcome {
         "{:?}",
         by_dhcp.notes
     );
-    assert!(!by_dhcp.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", by_dhcp.notes);
+    assert!(!by_dhcp.notes.iter().any(|n| n.kind == NoteKind::NotInSpec), "{:?}", by_dhcp.notes);
     Ok(())
 }
 

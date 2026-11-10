@@ -1,6 +1,6 @@
 //! A step's checks that need its machine: the kind of file each script is for the OS, what only
 //! apt's repositories have, the names a Linux account may take, and the ports a firewall step
-//! opens. What a target can't run yet is no spec error: the plan refuses it on that target.
+//! opens. What a target can't run is no spec error: the plan refuses it on that target.
 
 use super::super::machine::Machine;
 use super::super::problem::{Code, FieldPath, Problem, Problems};

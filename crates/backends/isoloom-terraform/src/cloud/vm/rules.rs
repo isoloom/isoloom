@@ -15,7 +15,7 @@ use crate::cloud::Cloud;
 use crate::limits::Limits;
 use crate::machine::{controller, vms};
 
-/// Why the clouds refuse Ansible checks (`.yml`): no cloud runs them yet.
+/// Why the clouds refuse Ansible checks (`.yml`): no cloud runs them.
 pub(crate) const PLAYBOOK_CHECKS: &str = "Ansible checks (.yml) don't run in the cloud";
 
 /// Why a cloud whose firewalls stand for the router refuses link impairment (`tc`).
