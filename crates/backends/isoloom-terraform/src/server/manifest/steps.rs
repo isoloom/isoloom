@@ -17,9 +17,6 @@ use crate::ssh::Login;
 
 use crate::machine::USER;
 
-/// Where cloud-init writes the set-up's output: its tail explains a failed step.
-const SETUP_LOG: &str = "/var/log/cloud-init-output.log";
-
 /// The seal, over SSH: the runner applies the router's sealed ruleset (its `SEALED_NFT` file,
 /// written at boot) live and keeps it as `/etc/nftables.conf`, so later boots stay sealed
 /// (`crate::server::router::sealed_reload`). The module itself never changes for the seal, so no
@@ -84,29 +81,30 @@ pub(crate) fn lifecycle(private_key: &str, sealed: bool) -> Result<Lifecycle, Ma
 
 /// The apply succeeded (`applied` says how far the machines' set-up then is), then each Linux
 /// VM's set-up and the controller's playbooks are done (on ESXi, Terraform's own set-up wrote
-/// each ready file during the apply).
-pub(super) fn ready(env: &Environment, applied: &str) -> Result<Vec<Condition>, ManifestError> {
+/// each ready file during the apply). Each ready file names `log`, the file on the machine whose
+/// tail explains a failed step, when the server's set-up writes one.
+pub(super) fn ready(env: &Environment, applied: &str, log: Option<&str>) -> Result<Vec<Condition>, ManifestError> {
     let mut out = vec![Condition::StepOk {
         step: id("apply")?,
         means: Some(applied.into()),
     }];
     for (_, mp) in vms(env).filter(|(_, mp)| !mp.is_windows()) {
         if let Some(a) = mp.addresses.values().next() {
-            out.push(ready_file(&a.to_string(), SETUP_S)?);
+            out.push(ready_file(&a.to_string(), log, SETUP_S)?);
         }
     }
     if controller::needed(env) {
         let first = env.networks.values().next().and_then(|n| isoloom_spec::net::Cidr::parse(&n.cidr));
         if let Some(c) = first {
-            out.push(ready_file(&c.controller().to_string(), PLAYBOOKS_S)?);
+            out.push(ready_file(&c.controller().to_string(), log, PLAYBOOKS_S)?);
         }
     }
     Ok(out)
 }
 
-/// The ready file of the machine at `host`, read through the router.
-fn ready_file(host: &str, within: u32) -> Result<Condition, ManifestError> {
-    manifest::ready_file(Template::text(host), USER, SETUP_LOG, Some(through_router()?), within)
+/// The ready file of the machine at `host`, read through the router, with the set-up's `log`.
+fn ready_file(host: &str, log: Option<&str>, within: u32) -> Result<Condition, ManifestError> {
+    manifest::ready_file(Template::text(host), USER, log, Some(through_router()?), within)
 }
 
 /// `isoloom@${outputs.ip}`: the router, the machines' jump host.

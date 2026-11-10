@@ -24,6 +24,9 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
         tools,
         native: &native,
         applied: "the VMs exist, and Terraform set each Linux one up over SSH through the router",
+        // Terraform's `remote-exec` runs the set-up: its output is the apply's own, in no file on
+        // the machine (cloud-init there runs the router's set-up alone).
+        setup_log: None,
         // None named: no josenk/esxi delete is known to fail on a resource already gone.
         gone: || Ok(Vec::new()),
     };

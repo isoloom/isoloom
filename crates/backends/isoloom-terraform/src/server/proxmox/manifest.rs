@@ -39,6 +39,8 @@ pub(super) fn manifest(env: &Environment) -> crate::Result<Manifest> {
         tools,
         native: &native,
         applied: "the VMs exist and booted; each sets itself up from its cloud-init",
+        // cloud-init runs the set-up, and writes its output there.
+        setup_log: Some("/var/log/cloud-init-output.log"),
         gone,
     };
     shared::manifest(env, &server)

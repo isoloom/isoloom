@@ -233,9 +233,15 @@ pub(crate) fn check_runners(
 
 /// The ready file (`isoloom-ready/1`) of the machine `user@host`, through `via` when it is
 /// behind one, read every 10 s until `within` seconds: its path the module's `ready_file`
-/// output, `log` the set-up's output whose tail explains a failed step. The one condition every
-/// Terraform target's machines are ready by.
-pub(crate) fn ready_file(host: Template, user: &str, log: &str, via: Option<Template>, within: u32) -> Result<isoloom_manifest::Condition, ManifestError> {
+/// output, `log` the file of the set-up's output whose tail explains a failed step, when the
+/// set-up writes one. The one condition every Terraform target's machines are ready by.
+pub(crate) fn ready_file(
+    host: Template,
+    user: &str,
+    log: Option<&str>,
+    via: Option<Template>,
+    within: u32,
+) -> Result<isoloom_manifest::Condition, ManifestError> {
     let unset = || ManifestError::OutOfRange {
         what: "a timeout",
         value: 0,
@@ -246,7 +252,7 @@ pub(crate) fn ready_file(host: Template, user: &str, log: &str, via: Option<Temp
         host,
         user: Template::text(user),
         path: output("ready_file")?,
-        log: Some(Template::text(log)),
+        log: log.map(Template::text),
         grammar: isoloom_manifest::ReadyGrammar::V1,
         via,
         timeout_s: secs(within).ok_or_else(unset)?,

@@ -835,7 +835,6 @@ resource "local_file" "isoloom_project" {
       "host": "10.67.0.253",
       "user": "isoloom",
       "path": "${outputs.ready_file}",
-      "log": "/var/log/cloud-init-output.log",
       "grammar": "isoloom-ready/1",
       "via": "isoloom@${outputs.ip}",
       "timeout_s": 7200,

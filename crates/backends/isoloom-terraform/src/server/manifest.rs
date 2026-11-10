@@ -47,6 +47,9 @@ pub(crate) struct Server<'a> {
     pub(crate) native: &'a dyn Fn(&str) -> Template,
     /// What a successful apply means of the machines: how far their set-up is then.
     pub(crate) applied: &'static str,
+    /// The file on each Linux machine its set-up writes its output to, whose tail explains a
+    /// failed step; `None` when the set-up's output is the apply's own.
+    pub(crate) setup_log: Option<&'static str>,
     /// The errors of the server's provider for a resource already gone (`identity.terraform.gone`).
     pub(crate) gone: fn() -> Result<Vec<GoneError>, ManifestError>,
 }
@@ -77,7 +80,7 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
         outputs: machines::outputs(&machines)?,
         machines,
         lifecycle: steps::lifecycle(server.private_key, sealed)?,
-        ready: steps::ready(env, server.applied)?,
+        ready: steps::ready(env, server.applied, server.setup_log)?,
         checks: Checks {
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup: Vec::new(),

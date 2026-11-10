@@ -147,7 +147,7 @@ pub(crate) fn ready(guests: &[Guest]) -> Result<Vec<Condition>, ManifestError> {
         out.push(crate::module::manifest::ready_file(
             g.login.host.clone(),
             &g.login.user,
-            SETUP_LOG,
+            Some(SETUP_LOG),
             None,
             g.setup_s,
         )?);

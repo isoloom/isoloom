@@ -1,6 +1,6 @@
 //! The servers' run manifests side by side: the seal is one and the same on Proxmox and ESXi.
 
-use isoloom_manifest::{Action, Manifest, Run, SetBy};
+use isoloom_manifest::{Action, Condition, Manifest, Run, SetBy};
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 
@@ -97,5 +97,35 @@ fn esxi_seals_as_proxmox_does() {
     assert_eq!(esxi.lifecycle.seal, pve.lifecycle.seal);
     let sealed = |m: &Manifest| m.params.iter().find(|p| p.name.as_str() == "isoloom_sealed").cloned();
     assert_eq!(sealed(&esxi), sealed(&pve));
-    assert_eq!(esxi.ready[1..], pve.ready[1..], "the seal comes once the same set-ups are done");
+    // The same ready files, but for the log each server's set-up writes.
+    let unlogged = |m: &Manifest| -> Vec<Condition> {
+        let mut ready = m.ready[1..].to_vec();
+        for c in &mut ready {
+            if let Condition::ReadyFile { log, .. } = c {
+                *log = None;
+            }
+        }
+        ready
+    };
+    assert_eq!(unlogged(&esxi), unlogged(&pve), "the seal comes once the same set-ups are done");
+}
+
+/// Each ready file names the log the server's set-up writes: cloud-init's on Proxmox, where
+/// cloud-init runs it; none on ESXi, where Terraform runs it over SSH and its output is the
+/// apply's own (cloud-init there runs only the router's set-up, so its log says nothing of a
+/// machine's step).
+#[test]
+fn a_ready_file_names_the_log_its_servers_set_up_writes() {
+    let logs = |target| -> Vec<Option<String>> {
+        manifest(OPEN, target)
+            .ready
+            .iter()
+            .filter_map(|c| match c {
+                Condition::ReadyFile { log, .. } => Some(log.as_ref().map(ToString::to_string)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(logs(Target::Proxmox), [Some("/var/log/cloud-init-output.log".to_owned())]);
+    assert_eq!(logs(Target::Esxi), [None]);
 }
