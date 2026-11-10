@@ -110,7 +110,7 @@ pub(crate) fn machine(name: &str, role: Role, addresses: BTreeMap<Name, IpAddr>)
 /// port fixed at its own number on `at` (the machine's public address).
 pub(crate) fn target_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::model::Machine, at: &Template) -> Result<Machine, ManifestError> {
     // The access machine keeps its role (where the user works from); every machine is made at `up`.
-    let role = if spec.access { Role::Access } else { Role::Target };
+    let role = if spec.access { Role::Access } else { Role::Member };
     let mut m = machine(name, role, addresses(mp)?)?;
     m.os = mp.os.as_deref().map(OsName::parse).transpose()?;
     m.windows = mp.is_windows();

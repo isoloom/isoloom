@@ -1056,7 +1056,7 @@ locals {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1077,7 +1077,7 @@ locals {
     },
     {
       "name": "block",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1090,7 +1090,7 @@ locals {
     },
     {
       "name": "client",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

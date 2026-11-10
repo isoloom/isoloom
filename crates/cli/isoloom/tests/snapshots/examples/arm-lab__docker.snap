@@ -334,7 +334,7 @@ volumes:
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "arm64",
       "resources": {
         "cpus": 1,
@@ -624,7 +624,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 4,
+  "resolved_version": 5,
   "name": "arm-lab",
   "instance": null,
   "inputs": [],
@@ -647,7 +647,7 @@ volumes:
       "shapes": [
         "docker"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "arm64",
       "os": null,
       "windows": false,

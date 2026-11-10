@@ -1617,7 +1617,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
   "machines": [
     {
       "name": "files01",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
@@ -1652,7 +1652,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

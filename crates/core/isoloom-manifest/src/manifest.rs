@@ -18,7 +18,7 @@ use crate::{Error, Result};
 /// A run manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-#[schemars(title = "Isoloom run manifest, version 0")]
+#[schemars(title = "Isoloom run manifest, version 1")]
 pub struct Manifest {
     /// The schema's URL, for editors.
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
@@ -70,7 +70,8 @@ pub struct Manifest {
     pub guest: Option<Guest>,
 }
 
-/// Reads a manifest: JSON, then version 0, then the types, then [`Manifest::validate`].
+/// Reads a manifest: JSON, then its `manifest_version` (one this crate reads), then the types,
+/// then [`Manifest::validate`].
 ///
 /// # Errors
 ///

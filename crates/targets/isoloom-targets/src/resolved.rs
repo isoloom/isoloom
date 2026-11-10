@@ -26,8 +26,9 @@ pub use message::{fill, lookup, render_message, render_message_on};
 
 /// The format of the snapshot; bumped when a field changes meaning or goes away (3: a machine's
 /// `ports` keyed by name, each with its `protocol`, `published` and `url`; 4: a machine's
-/// `resources` keyed by form, `docker` and `vm`, each its size in that form).
-pub const RESOLVED_VERSION: u32 = 4;
+/// `resources` keyed by form, `docker` and `vm`, each its size in that form; 5: a lab machine's
+/// `role` is `member`, as in the run manifest).
+pub const RESOLVED_VERSION: u32 = 5;
 
 /// Where the snapshot is written, relative to the project folder.
 pub const PATH: &str = ".isoloom/resolved.json";

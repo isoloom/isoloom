@@ -47,7 +47,7 @@
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "addresses": {
         "lab": "10.40.0.10"
       },

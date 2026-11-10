@@ -467,7 +467,7 @@ output "ssh_user" {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -524,7 +524,7 @@ output "ssh_user" {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -548,7 +548,7 @@ output "ssh_user" {
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1479,7 +1479,7 @@ output "ssh_user" {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1536,7 +1536,7 @@ output "ssh_user" {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1560,7 +1560,7 @@ output "ssh_user" {
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2376,7 +2376,7 @@ output "ssh_user" {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2433,7 +2433,7 @@ output "ssh_user" {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2457,7 +2457,7 @@ output "ssh_user" {
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -3383,7 +3383,7 @@ output "ssh_user" {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -3440,7 +3440,7 @@ output "ssh_user" {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -3464,7 +3464,7 @@ output "ssh_user" {
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -4261,7 +4261,7 @@ output "ssh_user" {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -4318,7 +4318,7 @@ output "ssh_user" {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -4342,7 +4342,7 @@ output "ssh_user" {
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -5205,7 +5205,7 @@ output "ssh_user" {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -5262,7 +5262,7 @@ output "ssh_user" {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -5286,7 +5286,7 @@ output "ssh_user" {
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

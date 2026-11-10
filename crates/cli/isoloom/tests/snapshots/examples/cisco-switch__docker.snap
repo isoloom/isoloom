@@ -769,7 +769,7 @@ volumes:
   "machines": [
     {
       "name": "sw1",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -791,7 +791,7 @@ volumes:
     },
     {
       "name": "files",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -824,7 +824,7 @@ volumes:
     },
     {
       "name": "staff",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -839,7 +839,7 @@ volumes:
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1236,7 +1236,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 4,
+  "resolved_version": 5,
   "name": "cisco-switch",
   "instance": null,
   "inputs": [],
@@ -1268,7 +1268,7 @@ volumes:
       "shapes": [
         "docker"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -1296,7 +1296,7 @@ volumes:
       "shapes": [
         "docker"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": null,
       "windows": false,
@@ -1336,7 +1336,7 @@ volumes:
         "docker",
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "alpine-3.19",
       "windows": false,
@@ -1376,7 +1376,7 @@ volumes:
         "docker",
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "alpine-3.19",
       "windows": false,

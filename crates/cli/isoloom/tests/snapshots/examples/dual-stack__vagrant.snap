@@ -1875,7 +1875,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

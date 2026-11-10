@@ -443,7 +443,7 @@ output "ssh_user" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1249,7 +1249,7 @@ output "ssh_user" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1940,7 +1940,7 @@ output "ssh_user" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2741,7 +2741,7 @@ output "ssh_user" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -3413,7 +3413,7 @@ output "ssh_user" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -4151,7 +4151,7 @@ output "ssh_user" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

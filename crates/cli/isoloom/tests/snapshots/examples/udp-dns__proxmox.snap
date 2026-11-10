@@ -1053,7 +1053,7 @@ locals {
   "machines": [
     {
       "name": "dns",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

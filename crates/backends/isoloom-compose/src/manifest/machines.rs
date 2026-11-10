@@ -55,7 +55,7 @@ fn bug_unknown(name: &str) -> Error {
 fn role_of(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, Option<String>)> {
     let spec = env.spec();
     if let Some(m) = spec.machines.get(name) {
-        return Some((if m.access { Role::Access } else { Role::Target }, None));
+        return Some((if m.access { Role::Access } else { Role::Member }, None));
     }
     let owned = spec.machines.iter().find_map(|(m, machine)| {
         if init_names(m, machine).iter().any(|j| j == name) {

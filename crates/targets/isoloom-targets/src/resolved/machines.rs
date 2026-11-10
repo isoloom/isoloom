@@ -35,7 +35,7 @@ fn machine(spec: &Spec, docker: &Spec, name: &str, m: &Machine) -> Map<String, V
     out.insert("access".into(), json!(m.access));
     out.insert("supplied".into(), json!(m.supplied));
     out.insert("shapes".into(), json!(shapes));
-    out.insert("role".into(), json!("target"));
+    out.insert("role".into(), json!("member"));
     out.insert("arch".into(), json!(m.arch.id()));
     out.insert("os".into(), json!(m.vm.as_ref().map(|v| v.os.clone())));
     out.insert("windows".into(), json!(m.vm.as_ref().is_some_and(|v| isoloom_spec::images::is_windows(&v.os))));

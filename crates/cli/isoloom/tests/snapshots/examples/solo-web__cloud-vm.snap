@@ -420,7 +420,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1082,7 +1082,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1689,7 +1689,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2332,7 +2332,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2875,7 +2875,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3652,7 +3652,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

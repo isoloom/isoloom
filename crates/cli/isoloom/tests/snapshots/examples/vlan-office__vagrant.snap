@@ -2389,7 +2389,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2450,7 +2450,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2476,7 +2476,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

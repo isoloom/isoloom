@@ -31,8 +31,8 @@ pub enum Arch {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
-    /// Part of the lab.
-    Target,
+    /// One of the lab's own machines: a member of the environment the spec describes.
+    Member,
     /// A one-shot that must exit 0 (an `init:` script).
     Job,
     /// Isoloom's plumbing (the controller, probes, route keepers): never shown, never counted as down.

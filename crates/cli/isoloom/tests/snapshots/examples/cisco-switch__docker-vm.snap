@@ -1106,7 +1106,7 @@ output "ssh_user" {
     },
     {
       "name": "sw1",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1128,7 +1128,7 @@ output "ssh_user" {
     },
     {
       "name": "files",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1161,7 +1161,7 @@ output "ssh_user" {
     },
     {
       "name": "staff",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1176,7 +1176,7 @@ output "ssh_user" {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1952,7 +1952,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "sw1",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1974,7 +1974,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "files",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2007,7 +2007,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "staff",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2022,7 +2022,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

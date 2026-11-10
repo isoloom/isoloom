@@ -43,7 +43,7 @@ crash.*.log
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 4,
+  "resolved_version": 5,
   "name": "ansible-pair",
   "instance": null,
   "inputs": [],
@@ -67,7 +67,7 @@ crash.*.log
         "docker",
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -112,7 +112,7 @@ crash.*.log
         "docker",
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -2071,7 +2071,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2105,7 +2105,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     },
     {
       "name": "cache",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

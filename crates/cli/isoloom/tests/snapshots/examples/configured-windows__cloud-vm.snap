@@ -600,7 +600,7 @@ resource "local_file" "isoloom_project" {
   "machines": [
     {
       "name": "iis",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2022",
       "windows": true,
       "arch": "amd64",
@@ -1498,7 +1498,7 @@ resource "local_file" "isoloom_project" {
   "machines": [
     {
       "name": "iis",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2022",
       "windows": true,
       "arch": "amd64",

@@ -39,7 +39,7 @@ crash.*.log
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 4,
+  "resolved_version": 5,
   "name": "arm-vm",
   "instance": null,
   "inputs": [],
@@ -62,7 +62,7 @@ crash.*.log
       "shapes": [
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "arm64",
       "os": "ubuntu-24.04",
       "windows": false,
@@ -1354,7 +1354,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
   "machines": [
     {
       "name": "box",
-      "role": "target",
+      "role": "member",
       "os": "ubuntu-24.04",
       "arch": "arm64",
       "resources": {

@@ -32,6 +32,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+- **Breaking: a lab machine's role in the run manifest is `member`** (was `target`, which the
+  manifest's top-level `target` names a target with): `machines[].role: member`,
+  `isoloom_manifest::Role::Member` (was `Role::Target`). `resolved.json` says `member` too, and
+  is `resolved_version: 5`. The schema's title says version 1 (it said 0).
 - **Breaking: Isoloom's own Compose services all start with `isoloom-`**: a machine's route
   sidecar is `isoloom-routes-<machine>` (was `<machine>-routes`) and its `init` jobs
   `isoloom-init-<machine>-<n>` (was `<machine>-init-<n>`; their run-manifest steps
@@ -199,7 +203,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   Every lab machine of a run manifest carries `machines[].resources` as it runs on that target
   (Compose set it only when the spec did, Vagrant always with the VM defaults, Terraform never),
   and `resolved.json` gives a machine's size in each of its forms, `resources.docker` and
-  `resources.vm` (it gave every machine the VM defaults): **`resolved_version` is 4**. The spec's
+  `resources.vm` (it gave every machine the VM defaults): **`resolved_version` is 4** (5 since a
+  lab machine's role is `member`). The spec's
   docs say so.
 - **An input read as a file is the input's own slot on every target**: on `cloud-vm` it was a
   secret slot named `input-<name>`; it is the slot `<INPUT>` of kind `input`, delivered over SSH to

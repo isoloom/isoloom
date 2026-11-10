@@ -1279,7 +1279,7 @@ locals {
   "machines": [
     {
       "name": "cache",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1300,7 +1300,7 @@ locals {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

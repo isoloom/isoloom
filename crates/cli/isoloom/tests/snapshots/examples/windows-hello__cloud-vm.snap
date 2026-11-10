@@ -598,7 +598,7 @@ resource "local_file" "isoloom_project" {
   "machines": [
     {
       "name": "web01",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
@@ -1496,7 +1496,7 @@ resource "local_file" "isoloom_project" {
   "machines": [
     {
       "name": "web01",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",

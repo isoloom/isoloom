@@ -982,7 +982,7 @@ locals {
   "machines": [
     {
       "name": "files01",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
@@ -1004,7 +1004,7 @@ locals {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

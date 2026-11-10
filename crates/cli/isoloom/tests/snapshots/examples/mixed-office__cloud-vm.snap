@@ -641,7 +641,7 @@ resource "local_file" "isoloom_project" {
   "machines": [
     {
       "name": "files01",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
@@ -663,7 +663,7 @@ resource "local_file" "isoloom_project" {
     },
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

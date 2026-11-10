@@ -1098,7 +1098,7 @@ output "ssh_user" {
     },
     {
       "name": "writer",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1134,7 +1134,7 @@ output "ssh_user" {
     },
     {
       "name": "reader",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1906,7 +1906,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "writer",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1942,7 +1942,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "reader",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

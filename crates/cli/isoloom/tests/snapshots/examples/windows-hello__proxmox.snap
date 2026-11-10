@@ -897,7 +897,7 @@ locals {
   "machines": [
     {
       "name": "web01",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",

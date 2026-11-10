@@ -542,7 +542,7 @@ output "published" {
   "machines": [
     {
       "name": "database",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -563,7 +563,7 @@ output "published" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1493,7 +1493,7 @@ output "published" {
   "machines": [
     {
       "name": "database",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1514,7 +1514,7 @@ output "published" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2640,7 +2640,7 @@ output "published" {
   "machines": [
     {
       "name": "database",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2661,7 +2661,7 @@ output "published" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3434,7 +3434,7 @@ output "published" {
   "machines": [
     {
       "name": "database",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3455,7 +3455,7 @@ output "published" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -4424,7 +4424,7 @@ output "published" {
   "machines": [
     {
       "name": "database",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -4445,7 +4445,7 @@ output "published" {
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

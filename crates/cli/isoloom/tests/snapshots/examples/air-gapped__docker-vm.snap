@@ -1090,7 +1090,7 @@ output "ssh_user" {
     },
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1113,7 +1113,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1835,7 +1835,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1858,7 +1858,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

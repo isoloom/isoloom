@@ -564,7 +564,7 @@ output "checks" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -585,7 +585,7 @@ output "checks" {
     },
     {
       "name": "block",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -598,7 +598,7 @@ output "checks" {
     },
     {
       "name": "client",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1741,7 +1741,7 @@ output "checks" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1762,7 +1762,7 @@ output "checks" {
     },
     {
       "name": "block",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1775,7 +1775,7 @@ output "checks" {
     },
     {
       "name": "client",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2941,7 +2941,7 @@ output "checks" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2962,7 +2962,7 @@ output "checks" {
     },
     {
       "name": "block",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2975,7 +2975,7 @@ output "checks" {
     },
     {
       "name": "client",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3836,7 +3836,7 @@ output "checks" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3857,7 +3857,7 @@ output "checks" {
     },
     {
       "name": "block",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3870,7 +3870,7 @@ output "checks" {
     },
     {
       "name": "client",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -4971,7 +4971,7 @@ output "checks" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -4992,7 +4992,7 @@ output "checks" {
     },
     {
       "name": "block",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -5005,7 +5005,7 @@ output "checks" {
     },
     {
       "name": "client",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

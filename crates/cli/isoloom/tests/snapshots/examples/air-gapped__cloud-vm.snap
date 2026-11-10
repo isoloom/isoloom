@@ -522,7 +522,7 @@ output "checks" {
   "machines": [
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -543,7 +543,7 @@ output "checks" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1437,7 +1437,7 @@ output "checks" {
   "machines": [
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1458,7 +1458,7 @@ output "checks" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2522,7 +2522,7 @@ output "checks" {
   "machines": [
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2543,7 +2543,7 @@ output "checks" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3322,7 +3322,7 @@ output "checks" {
   "machines": [
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3343,7 +3343,7 @@ output "checks" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -4112,7 +4112,7 @@ output "checks" {
   "machines": [
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -4133,7 +4133,7 @@ output "checks" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

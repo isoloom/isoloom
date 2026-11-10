@@ -901,7 +901,7 @@ locals {
   "machines": [
     {
       "name": "iis",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2022",
       "windows": true,
       "arch": "amd64",

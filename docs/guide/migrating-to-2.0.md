@@ -47,11 +47,16 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   the VM at `/var/lib/isoloom/secrets/<INPUT>`.
 - **The Vagrantfile no longer carries a hook for a runner's own ad-hoc VM.** A spec that wants an
   access machine declares it (`access: true`).
-- **`resolved.json`** is `resolved_version: 4`: a machine's size in each form (`resources.docker`,
-  `resources.vm`).
+- **`resolved.json`** is `resolved_version: 5`: a machine's size in each form (`resources.docker`,
+  `resources.vm`), and a lab machine's `role` is `member` (was `target`).
 - The example `pivot-dmz` is now `dmz-jump`.
 
 ## Runner authors
+
+- **A lab machine's role is `member`** (was `target`, a word the manifest's top-level `target`
+  uses for something else): `machines[].role` is `member`, `job`, `infra`, `access`, `tool` or
+  `check` (`isoloom_manifest::Role::Member`, was `Role::Target`). A runner matching on `target`
+  matches `member` instead.
 
 - **`manifest_version` is 1**, frozen with a compatibility policy
   ([the run manifest](../reference/run-manifest.md#versions-and-compatibility)). A runner built

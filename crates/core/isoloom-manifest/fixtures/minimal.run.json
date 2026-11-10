@@ -13,7 +13,7 @@
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "addresses": { "lab": "10.40.0.10" },
       "native": { "service": "web" },
       "ports": [{ "name": "site", "port": 80, "protocol": "tcp", "http": true, "publish": { "mode": "ephemeral", "preferred": 8080 } }]

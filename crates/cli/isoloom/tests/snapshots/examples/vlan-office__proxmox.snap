@@ -1454,7 +1454,7 @@ locals {
   "machines": [
     {
       "name": "intranet",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1488,7 +1488,7 @@ locals {
     },
     {
       "name": "guest",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1501,7 +1501,7 @@ locals {
     },
     {
       "name": "admin",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

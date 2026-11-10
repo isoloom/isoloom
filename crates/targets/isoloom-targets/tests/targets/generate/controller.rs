@@ -111,10 +111,10 @@ fn the_controller_halts_after_provisioning_unless_kept_running() -> Outcome {
 }
 
 #[test]
-fn the_resolved_snapshot_tells_infra_from_targets() -> Outcome {
+fn the_resolved_snapshot_tells_infra_from_members() -> Outcome {
     let spec = example("ansible-pair")?;
     let resolved = isoloom_targets::resolved::resolve(&spec);
-    assert_eq!(resolved["machines"]["web"]["role"], "target");
+    assert_eq!(resolved["machines"]["web"]["role"], "member");
     assert_eq!(resolved["controller"]["role"], "infra");
     assert_eq!(resolved["controller"]["keep_running"], false);
     Ok(())

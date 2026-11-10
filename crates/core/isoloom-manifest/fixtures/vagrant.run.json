@@ -385,7 +385,7 @@
   "machines": [
     {
       "name": "dc01",
-      "role": "target",
+      "role": "member",
       "os": "windows-server-2019",
       "windows": true,
       "arch": "amd64",
@@ -426,7 +426,7 @@
     },
     {
       "name": "ws01",
-      "role": "target",
+      "role": "member",
       "os": "windows-10",
       "windows": true,
       "arch": "amd64",

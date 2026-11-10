@@ -459,7 +459,7 @@ output "ssh_user" {
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -498,7 +498,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -530,7 +530,7 @@ output "ssh_user" {
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1533,7 +1533,7 @@ output "ssh_user" {
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1572,7 +1572,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1604,7 +1604,7 @@ output "ssh_user" {
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2492,7 +2492,7 @@ output "ssh_user" {
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2531,7 +2531,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2563,7 +2563,7 @@ output "ssh_user" {
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -3561,7 +3561,7 @@ output "ssh_user" {
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -3600,7 +3600,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -3632,7 +3632,7 @@ output "ssh_user" {
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -4501,7 +4501,7 @@ output "ssh_user" {
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -4540,7 +4540,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -4572,7 +4572,7 @@ output "ssh_user" {
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -5507,7 +5507,7 @@ output "ssh_user" {
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -5546,7 +5546,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -5578,7 +5578,7 @@ output "ssh_user" {
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

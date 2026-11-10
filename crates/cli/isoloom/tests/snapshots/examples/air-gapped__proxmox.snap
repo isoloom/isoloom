@@ -978,7 +978,7 @@ locals {
   "machines": [
     {
       "name": "store",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -999,7 +999,7 @@ locals {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

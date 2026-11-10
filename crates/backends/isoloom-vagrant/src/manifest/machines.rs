@@ -69,7 +69,7 @@ fn lab_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
     let (Some(mp), Some(m)) = (env.machines.get(name), env.spec().machines.get(name)) else {
         return Ok(());
     };
-    out.role = if m.access { Role::Access } else { Role::Target };
+    out.role = if m.access { Role::Access } else { Role::Member };
     out.on_demand = m.access;
     out.os = mp.os.as_deref().map(OsName::parse).transpose()?;
     out.windows = mp.is_windows();
@@ -152,7 +152,7 @@ checks: [{ http: 'http://web/', wait: 30 }]
         assert_eq!(vm_names[&Provider::Hyperv], "shop-web");
         assert_eq!(vm_names[&Provider::Libvirt], "shop_web");
         assert!(!vm_names.contains_key(&Provider::Qemu));
-        assert_eq!(ms[0].role, Role::Target);
+        assert_eq!(ms[0].role, Role::Member);
         let site = &ms[0].ports[0];
         // Not fixed in the spec, so the host port is the runner's to pick (ephemeral); 8086 is the
         // fallback it defaults to when the runner picked none.

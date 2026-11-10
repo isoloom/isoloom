@@ -165,7 +165,7 @@
     "outputs",
     "checks"
   ],
-  "title": "Isoloom run manifest, version 0",
+  "title": "Isoloom run manifest, version 1",
   "$defs": {
     "ManifestVersion": {
       "description": "The contract's version: 1, stable. Within a version, changes are additive: a new optional field comes in a minor release and the version stays. Removing or renaming a field, changing what a field holds or means, making a field required, or adding a value a runner must act on (a step action, a delivery, a condition) bumps the version. A reader is strict: it refuses a field or value it doesn't know, so a manifest that uses a field added in a minor release needs a runner built with that release.",
@@ -1375,8 +1375,8 @@
       "oneOf": [
         {
           "type": "string",
-          "const": "target",
-          "description": "Part of the lab."
+          "const": "member",
+          "description": "One of the lab's own machines: a member of the environment the spec describes."
         },
         {
           "type": "string",

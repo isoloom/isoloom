@@ -786,7 +786,7 @@ locals {
   "machines": [
     {
       "name": "box",
-      "role": "target",
+      "role": "member",
       "os": "ubuntu-24.04",
       "arch": "arm64",
       "resources": {

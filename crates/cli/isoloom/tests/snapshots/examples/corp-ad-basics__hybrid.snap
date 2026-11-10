@@ -1711,7 +1711,7 @@ volumes:
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 4,
+  "resolved_version": 5,
   "name": "corp-ad-basics",
   "instance": null,
   "inputs": [],
@@ -1763,7 +1763,7 @@ volumes:
       "shapes": [
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "windows-server-2022",
       "windows": true,
@@ -1823,7 +1823,7 @@ volumes:
       "shapes": [
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "windows-11",
       "windows": true,
@@ -1868,7 +1868,7 @@ volumes:
       "shapes": [
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "windows-11",
       "windows": true,
@@ -1914,7 +1914,7 @@ volumes:
         "docker",
         "vm"
       ],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": "debian-12",
       "windows": false,
@@ -1963,7 +1963,7 @@ volumes:
       "access": true,
       "supplied": false,
       "shapes": [],
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "os": null,
       "windows": false,

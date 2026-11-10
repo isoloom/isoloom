@@ -41,7 +41,7 @@ machines:
             .map(|m| m["role"].clone())
     };
     assert_eq!(role("workstation"), Some("access".into()));
-    assert_eq!(role("web"), Some("target".into()));
+    assert_eq!(role("web"), Some("member".into()));
     Ok(())
 }
 

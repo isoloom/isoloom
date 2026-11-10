@@ -331,7 +331,7 @@ crash.*.log
 ## .isoloom/resolved.json
 {
   "generated_by_isoloom": "from isoloom.yml; don't edit: change the spec and run `isoloom generate` (`isoloom check` fails when this file is out of date)",
-  "resolved_version": 4,
+  "resolved_version": 5,
   "name": "cloud-bucket",
   "instance": null,
   "inputs": [],

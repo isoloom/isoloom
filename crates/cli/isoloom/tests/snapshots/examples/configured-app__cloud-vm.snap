@@ -516,7 +516,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -542,7 +542,7 @@ output "published" {
     },
     {
       "name": "api",
-      "role": "target",
+      "role": "member",
       "os": "ubuntu-24.04",
       "arch": "amd64",
       "resources": {
@@ -1444,7 +1444,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -1470,7 +1470,7 @@ output "published" {
     },
     {
       "name": "api",
-      "role": "target",
+      "role": "member",
       "os": "ubuntu-24.04",
       "arch": "amd64",
       "resources": {
@@ -2573,7 +2573,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -2599,7 +2599,7 @@ output "published" {
     },
     {
       "name": "api",
-      "role": "target",
+      "role": "member",
       "os": "ubuntu-24.04",
       "arch": "amd64",
       "resources": {
@@ -3344,7 +3344,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -3370,7 +3370,7 @@ output "published" {
     },
     {
       "name": "api",
-      "role": "target",
+      "role": "member",
       "os": "ubuntu-24.04",
       "arch": "amd64",
       "resources": {
@@ -4310,7 +4310,7 @@ output "published" {
   "machines": [
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -4336,7 +4336,7 @@ output "published" {
     },
     {
       "name": "api",
-      "role": "target",
+      "role": "member",
       "os": "ubuntu-24.04",
       "arch": "amd64",
       "resources": {

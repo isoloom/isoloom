@@ -138,7 +138,7 @@
   "machines": [
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -170,7 +170,7 @@
     },
     {
       "name": "web",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

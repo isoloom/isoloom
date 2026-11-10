@@ -956,7 +956,7 @@ locals {
   "machines": [
     {
       "name": "writer",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {
@@ -969,7 +969,7 @@ locals {
     },
     {
       "name": "reader",
-      "role": "target",
+      "role": "member",
       "os": "debian-12",
       "arch": "amd64",
       "resources": {

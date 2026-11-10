@@ -1129,7 +1129,7 @@ output "ssh_user" {
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1168,7 +1168,7 @@ output "ssh_user" {
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -1200,7 +1200,7 @@ output "ssh_user" {
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2171,7 +2171,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "gateway",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2210,7 +2210,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "app",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,
@@ -2242,7 +2242,7 @@ systemctl enable --now isoloom-published.service
     },
     {
       "name": "db",
-      "role": "target",
+      "role": "member",
       "arch": "amd64",
       "resources": {
         "cpus": 1,

@@ -197,7 +197,7 @@ fn lab_port(name: &str, number: u16, kind: PortKind, published: bool) -> Port {
 fn each_published_port_of_a_shown_machine_is_an_output() {
     let web = machine(
         "web",
-        Role::Target,
+        Role::Member,
         vec![
             lab_port("site", 443, PortKind::Https, true),
             lab_port("plain", 80, PortKind::Http, true),
@@ -223,7 +223,7 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
     assert_eq!(out[2].description.as_deref(), Some("web's dns (port 53/udp)."));
     assert_eq!(out[0].description.as_deref(), Some("web's site (port 443)."));
     assert!(matches!(&out[3].from, OutputSource::PublishedPort { machine, port } if machine.to_string() == "client" && port.to_string() == "vnc"));
-    let odd = machine("my-box", Role::Target, vec![lab_port("a-b", 1, PortKind::Tcp, true)]);
+    let odd = machine("my-box", Role::Member, vec![lab_port("a-b", 1, PortKind::Tcp, true)]);
     assert_eq!(outputs(&[odd]).unwrap()[0].name.to_string(), "my_box__a_b");
     assert_eq!(Template::from_parts([Part::Placeholder(Placeholder::Value)]).to_string(), "${value}");
 }
@@ -231,9 +231,9 @@ fn each_published_port_of_a_shown_machine_is_an_output() {
 #[test]
 fn ports_whose_names_join_alike_get_outputs_of_their_own() {
     let shown = [
-        machine("web-admin", Role::Target, vec![lab_port("ui", 80, PortKind::Http, true)]),
-        machine("web", Role::Target, vec![lab_port("admin-ui", 81, PortKind::Http, true)]),
-        machine("ssh", Role::Target, vec![lab_port("user", 22, PortKind::Tcp, true)]),
+        machine("web-admin", Role::Member, vec![lab_port("ui", 80, PortKind::Http, true)]),
+        machine("web", Role::Member, vec![lab_port("admin-ui", 81, PortKind::Http, true)]),
+        machine("ssh", Role::Member, vec![lab_port("user", 22, PortKind::Tcp, true)]),
     ];
     let names: Vec<String> = outputs(&shown).unwrap().iter().map(|o| o.name.to_string()).collect();
     // Not `ssh_user`, a Terraform output of the server labs.
@@ -242,7 +242,7 @@ fn ports_whose_names_join_alike_get_outputs_of_their_own() {
 
 #[test]
 fn a_vm_lab_shows_each_published_port_at_its_machines_host() {
-    let web = machine("web", Role::Target, vec![lab_port("site", 80, PortKind::Http, true)]);
+    let web = machine("web", Role::Member, vec![lab_port("site", 80, PortKind::Http, true)]);
     let client = machine("client", Role::Access, vec![lab_port("vnc", 5900, PortKind::Tcp, true)]);
     let out = outputs_on_their_hosts(&[web, client]).unwrap();
     let formats: Vec<String> = out.iter().map(|o| o.format.as_ref().map(ToString::to_string).unwrap_or_default()).collect();
@@ -253,7 +253,7 @@ fn a_vm_lab_shows_each_published_port_at_its_machines_host() {
 fn a_server_lab_shows_its_published_ports_at_the_host_it_names() {
     let web = machine(
         "web",
-        Role::Target,
+        Role::Member,
         vec![lab_port("site", 80, PortKind::Http, true), lab_port("dns", 53, PortKind::Udp, true)],
     );
     let router: Template = "${outputs.ip}".parse().unwrap();
