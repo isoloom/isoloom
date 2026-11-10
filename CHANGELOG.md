@@ -143,6 +143,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Added
 
+- **`esxi` writes a run manifest** (`.isoloom/esxi/run.json`), Proxmox's own: Terraform makes
+  the environment and sets its machines up (the runner gives it its slot and key, and the host's
+  password as `TF_VAR_esxi_password`), the runner waits for every machine's ready file, seals the
+  `internet: false` networks at the router and runs the checks, over SSH through the router. Its
+  tools are Terraform, `ovftool` and `ssh`, from the host.
 - `constraints.dns`: the site's resolvers (IP addresses), which the Proxmox and ESXi VMs naming
   none of their own, Isoloom's controller there and the Proxmox router's resolver ask instead of
   the public `1.1.1.1`, which a corporate network may block (it was written in four places with no
@@ -358,18 +363,18 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Every Terraform module describes `ssh_public_key` from one definition** ("The SSH public key
   the machines let in: whoever holds its private key signs in, ..."), which ends with who does:
   the runner (run.json), to deliver the project and run the checks, on the clouds and Proxmox;
-  Terraform itself, to set the machines up, on ESXi, which writes no run manifest. The Proxmox
-  and ESXi modules each had their own ("Installed for the user `isoloom`..."). It stays required
-  on the clouds and ESXi and empty by default on Proxmox.
+  Terraform itself, to set the machines up, on ESXi. The Proxmox and ESXi modules each had their
+  own ("Installed for the user `isoloom`..."). It stays required on the clouds and ESXi and empty
+  by default on Proxmox.
 - **`esxi` refuses a secret's or an input's value as a file** (`files: [{ path, secret }]`,
-  `files: [{ path, input }]`): its machine waited for a runner to deliver the value, and ESXi
-  writes no run manifest yet, so the apply failed after half an hour. The capability matrix says
-  ✗ for `files[].secret`, `files[].input` and `files[].uid` on `esxi`.
+  `files: [{ path, input }]`): its machine waited for a runner to deliver the value, and nothing
+  delivers one to an ESXi machine, reached only through the router, so the apply failed after half
+  an hour. The capability matrix says ✗ for `files[].secret`, `files[].input` and `files[].uid`
+  on `esxi`.
 - **The files of a target without a run manifest point at the by-hand way, not the runner.**
   Kubernetes' checks Job and Helm chart say how to pipe an `exec` check into its machine (`kubectl
-  exec -i deploy/<machine> -- sh -s`) and its Secret's usage how to create it; ESXi's
-  `ssh_public_key` says Terraform signs in with it. A check runner's header says what it prints
-  ("each prints a PASS or FAIL line"), not who runs it.
+  exec -i deploy/<machine> -- sh -s`) and its Secret's usage how to create it. A check runner's
+  header says what it prints ("each prints a PASS or FAIL line"), not who runs it.
 - **The `openssh` catalogue entry's login account defaults to `user`** (was `ctf`). A lab that
   relied on the default and signs in as `ctf` sets `with: { username: ctf }`.
 - **Generated text, schemas and the tier list name no particular kind of lab or host.** The run
@@ -465,10 +470,13 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **`isoloom report ports` on Hyper-V says only what isn't there.** Its note said no port is
   forwarded on Hyper-V; the Vagrantfile relays each published TCP port on the host port the run
   reports, so the note names the UDP ones alone.
-- **ESXi says its `internet: false` networks keep the internet.** Its router wrote a sealed
-  ruleset that nothing applied (ESXi has no run manifest, so no seal step), and every network kept
-  the internet without a word. The router no longer writes it; the module's router comment and the
-  [ESXi guide](docs/guide/targets/esxi.md) say that nothing seals those networks there.
+- **ESXi seals its `internet: false` networks, as Proxmox does.** Its router wrote a sealed
+  ruleset that nothing applied (ESXi had no run manifest, so no seal step), and every network kept
+  the internet while the capability matrix said ✓. ESXi's run manifest now seals them once the
+  machines are set up, with Proxmox's own step (`lifecycle.seal`: one `ssh.run` on the router,
+  `isoloom_sealed`), from the same code; the module's router comment and the
+  [ESXi guide](docs/guide/targets/esxi.md) say so, and tests hold the matrix's ✓, the guides and
+  the run manifests to each other.
 - **Proxmox's seal is one SSH step.** Its `terraform apply` with `isoloom_sealed` changed
   nothing (the module has no such variable) and is gone; the router is sealed by the SSH step,
   which also keeps the sealed ruleset for later boots.
