@@ -115,11 +115,11 @@ fn snapshot(lab: &Lab, spec: &Spec, instance: Option<u8>) -> Value {
     if let Some(c) = &spec.cloud {
         out.insert("cloud".into(), cloud::section(c));
     }
-    // The message, with its placeholders filled from everything above (a cloud-services
-    // message keeps its `{{ cloud.outputs.* }}`: they are only known once deployed).
+    // The message, with its placeholders filled from everything above (a cloud output stays as
+    // written: it is known only once the module is applied).
     let mut snapshot = Value::Object(out);
     if let Some(m) = &spec.message {
-        let filled = fill(m, &snapshot).ok().or_else(|| spec.cloud.as_ref().map(|_| m.clone()));
+        let filled = fill(m, &snapshot).ok();
         if let Value::Object(map) = &mut snapshot {
             map.insert("message".into(), filled.map_or(Value::Null, Value::String));
         }

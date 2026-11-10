@@ -123,6 +123,9 @@ among others (the CHANGELOG's **Removed** section lists every item):
   `isoloom_spec::windows::esxi_guest_os` (the backends' own now). `Lab::plan`, `Lab::catalogue`
   and `isoloom_targets::{backend, CloudDockerBackend, DockerVmBackend, HybridBackend}` are
   hidden, outside the supported API: generate with `isoloom_targets::generate`.
+- `isoloom_targets::Error::Placeholder` has `why: String` (was `hint: &'static str`), and
+  `isoloom_targets::resolved::fill` reads the message's placeholder paths only (those
+  `isoloom_spec::syntax::placeholder` has), not any path of the snapshot.
 - `isoloom_manifest::access::{DEFAULT_BOX, DEFAULT_ARM64_BOX, DEFAULT_IMAGE}` and
   `isoloom_manifest::SUPPORTED_VERSION` (now crate-internal).
 - The spec model's growing structs are `#[non_exhaustive]` (`Spec`, `Machine`, `Network`,

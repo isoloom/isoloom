@@ -2,6 +2,7 @@
 //! the cases a conformance lab is built for, the checks both forms must pass, and the facts
 //! whose output must be equal in both. `cargo xtask catalogue check` runs it.
 
+use isoloom_spec::placeholders::{self, Piece};
 use std::borrow::Cow;
 
 use indexmap::IndexMap;
@@ -155,27 +156,28 @@ fn fill_json(v: &serde_json::Value, values: &CheckValues<'_>) -> Result<serde_js
 ///
 /// A placeholder that names anything else, or a setting the case leaves without a value.
 fn fill(text: &str, values: &CheckValues<'_>) -> Result<String, String> {
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some((before, after)) = rest.split_once("{{") {
-        out.push_str(before);
-        let (inner, next) = after.split_once("}}").ok_or_else(|| format!("`{text}`: a `{{{{` without its `}}}}`"))?;
-        let name = inner.trim();
-        let value = match name.split_once('.') {
-            None if name == "machine" => values.machine.to_owned(),
-            None if name == "version" => values.version.to_string(),
-            Some(("with", setting)) => values
-                .with
-                .get(setting)
-                .cloned()
-                .ok_or_else(|| format!("`{{{{ {name} }}}}`: the case gives `{setting}` no value"))?,
-            _ => return Err(format!("`{{{{ {name} }}}}`: a contract names `machine`, `version` and `with.<setting>`")),
-        };
-        out.push_str(&value);
-        rest = next;
+    placeholders::pieces(text)
+        .into_iter()
+        .map(|piece| match piece {
+            Piece::Text(t) => Ok(t.to_owned()),
+            Piece::Placeholder(inner) => value(inner.trim(), values),
+            Piece::Unclosed(_) => Err(format!("`{text}`: a `{{{{` without its `}}}}`")),
+        })
+        .collect()
+}
+
+/// What placeholder `name` of a contract stands for.
+fn value(name: &str, values: &CheckValues<'_>) -> Result<String, String> {
+    match name.split_once('.') {
+        None if name == "machine" => Ok(values.machine.to_owned()),
+        None if name == "version" => Ok(values.version.to_string()),
+        Some(("with", setting)) => values
+            .with
+            .get(setting)
+            .cloned()
+            .ok_or_else(|| format!("`{{{{ {name} }}}}`: the case gives `{setting}` no value")),
+        _ => Err(format!("`{{{{ {name} }}}}`: a contract names `machine`, `version` and `with.<setting>`")),
     }
-    out.push_str(rest);
-    Ok(out)
 }
 
 /// A command run in the service machine, whose output must be the same in both forms.

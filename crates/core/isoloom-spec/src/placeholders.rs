@@ -1,10 +1,11 @@
-//! `{{ path }}` placeholders in a text: the message's (`{{ machines.web.ports.site.published }}`)
-//! and a cloud module's inputs (`{{ inputs.REGION }}`). One reading of the syntax for every
-//! text that holds them.
+//! `{{ path }}` placeholders in a text: the message's (`{{ machines.web.ports.site.published }}`),
+//! a cloud module's inputs (`{{ inputs.REGION }}`) and a catalogue contract's. One reading of the
+//! syntax for every text that holds them; what a path names is each grammar's
+//! ([`crate::syntax::placeholder`] for the spec's).
 
 /// A piece of a text that may hold `{{ path }}` placeholders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Piece<'a> {
+pub enum Piece<'a> {
     /// Text as written.
     Text(&'a str),
     /// A placeholder: what is between its braces, as written (`path` trims it).
@@ -14,7 +15,8 @@ pub(crate) enum Piece<'a> {
 }
 
 /// The pieces of `text`, in order: an unclosed `{{` ends it.
-pub(crate) fn pieces(text: &str) -> Vec<Piece<'_>> {
+#[must_use]
+pub fn pieces(text: &str) -> Vec<Piece<'_>> {
     let mut out = Vec::new();
     let mut rest = text;
     while let Some((before, after)) = rest.split_once("{{") {

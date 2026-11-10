@@ -397,6 +397,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `isoloom_machine_web-front_file`, which Jinja reads as a subtraction, so every task naming a
   project file failed. A role's name, and the variables it registers, now take `_` for `-`
   (`isoloom_machine_web_front`).
+- **A message naming a cloud output reaches the run manifest.** `{{ cloud.outputs.<name> }}`
+  validated, but the run manifest's `message` was `null` and `isoloom message` failed (the
+  `cloud-bucket` example). The message is read by the spec's one placeholder grammar
+  (`isoloom_spec::syntax::placeholder::read`): a cloud output is `${outputs.<name>}` in the run
+  manifest, and stays as written in `isoloom message` and `resolved.json`, since only the runner
+  knows it. Library: `isoloom_targets::Error::Placeholder` says `why` (was `hint`), `fill` takes
+  the message's paths only, `isoloom_spec::placeholders` (the `{{ }}` scanner) is public, and
+  `isoloom_spec::syntax::placeholder::Part` is exhaustive.
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

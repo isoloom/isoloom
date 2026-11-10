@@ -251,9 +251,9 @@ impl fmt::Display for Reference {
     }
 }
 
-/// A piece of a text with placeholders, read.
+/// A piece of a text with placeholders, read: text or a placeholder, nothing else (exhaustive, so a
+/// caller matches both).
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum Part {
     /// Text, as written.
     Text(String),

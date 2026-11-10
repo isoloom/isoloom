@@ -1,9 +1,12 @@
-//! The spec's `message`, its `{{ path }}` placeholders filled from the resolved snapshot, as it
-//! reads on the target the environment runs on, and as the run manifest holds it.
+//! The spec's `message`, its `{{ path }}` placeholders (the spec's one grammar,
+//! [`isoloom_spec::syntax::placeholder`]) filled from the resolved snapshot, as it reads on the
+//! target the environment runs on, and as the run manifest holds it.
 
-use isoloom_manifest::{Name, Part, Placeholder, PortName, Template};
+use isoloom_manifest::{Name, Part, Placeholder, PortName, SnakeName, Template};
 use isoloom_plan::Lab;
+use isoloom_spec::Error as SpecError;
 use isoloom_spec::model::Target;
+use isoloom_spec::syntax::placeholder::{self, Part as SpecPart, Place, PortField, Reference};
 use serde_json::Value;
 
 use super::resolve_with;
@@ -15,8 +18,8 @@ use crate::{Error, Result};
 /// # Errors
 ///
 /// [`Error::Instance`] when the lab can't be made that instance, [`Error::Placeholder`] for a
-/// placeholder that points at nothing in the snapshot, and [`Error::Unclosed`] for a `{{` without
-/// its `}}`.
+/// placeholder the message can't have or that points at nothing in the snapshot, and
+/// [`Error::Unclosed`] for a `{{` without its `}}`.
 pub fn render_message(lab: &Lab, instance: Option<u8>) -> Result<Option<String>> {
     let Some(m) = &lab.source().message else { return Ok(None) };
     fill(m, &resolve_with(lab, instance)?).map(Some)
@@ -55,37 +58,26 @@ pub(crate) fn on_target(mut snapshot: Value, target: Target) -> Value {
     snapshot
 }
 
-/// A message's literal text and `{{ path }}` placeholders, in order.
-enum Piece<'a> {
-    Text(&'a str),
-    Path(&'a str),
+/// The message's text and placeholders, read by the spec's one placeholder grammar; the first
+/// placeholder it doesn't have, or a `{{` without its `}}`, is the error.
+fn parts(text: &str) -> Result<Vec<SpecPart>> {
+    placeholder::read(text, Place::Message).map_err(|wrong| match wrong.into_iter().next() {
+        Some(SpecError::Placeholder { path, why }) => Error::Placeholder { path, why: why.to_owned() },
+        _ => Error::Unclosed,
+    })
 }
 
-/// The pieces of `text`, or [`Error::Unclosed`] for a `{{` without its `}}`.
-fn pieces(text: &str) -> Result<Vec<Piece<'_>>> {
-    let mut out = Vec::new();
-    let mut rest = text;
-    while let Some((before, after)) = rest.split_once("{{") {
-        out.push(Piece::Text(before));
-        let (path, tail) = after.split_once("}}").ok_or(Error::Unclosed)?;
-        out.push(Piece::Path(path.trim()));
-        rest = tail;
+/// What placeholder `r` shows, from the snapshot: its value, scalars plainly, lists and maps as
+/// compact JSON; a cloud output, known only once the module is applied, as written.
+/// [`Error::Placeholder`] for one that points at nothing.
+fn shown(snapshot: &Value, r: &Reference) -> Result<String> {
+    if let Reference::CloudOutput(_) = r {
+        return Ok(format!("{{{{ {r} }}}}"));
     }
-    out.push(Piece::Text(rest));
-    Ok(out)
-}
-
-/// The snapshot's value at `path` as a message shows it: scalars plainly, lists and maps as
-/// compact JSON; [`Error::Placeholder`] for a path that points at nothing.
-fn shown(snapshot: &Value, path: &str) -> Result<String> {
-    let value = lookup(snapshot, path).ok_or_else(|| Error::Placeholder {
-        path: path.to_owned(),
-        // A machine's `services` is `ports` since 1.0, in the snapshot too.
-        hint: if path.contains(".services.") {
-            "; a machine's `services` is now `ports`"
-        } else {
-            ""
-        },
+    let path = r.to_string();
+    let value = lookup(snapshot, &path).ok_or_else(|| Error::Placeholder {
+        path,
+        why: "points at nothing in the snapshot (see `isoloom inspect`)".to_owned(),
     })?;
     Ok(match value {
         Value::String(s) => s.clone(),
@@ -94,61 +86,56 @@ fn shown(snapshot: &Value, path: &str) -> Result<String> {
     })
 }
 
-/// Fills `{{ dotted.path }}` placeholders from a snapshot. Scalars print plainly; lists and
-/// maps as compact JSON.
+/// Fills a message's `{{ path }}` placeholders from a snapshot. Scalars print plainly; lists and
+/// maps as compact JSON; a cloud output stays as written.
 ///
 /// # Errors
 ///
 /// As [`render_message`].
 pub fn fill(text: &str, snapshot: &Value) -> Result<String> {
-    pieces(text)?
-        .into_iter()
-        .map(|p| match p {
-            Piece::Text(t) => Ok(t.to_owned()),
-            Piece::Path(path) => shown(snapshot, path),
-        })
-        .collect()
+    placeholder::join(parts(text)?, |r| shown(snapshot, r))
 }
 
 /// The message as the run manifest holds it on `target`: what is known when the files are
-/// generated filled in, and each published port's host port left to the runner (`{{
-/// machines.web.ports.site.published }}` becomes `${published.web.site}`, and its `.url` the
-/// page at it). `None` without a message, or when a placeholder points at nothing (the
-/// snapshot's message is null then too).
+/// generated filled in, and what only the runner knows left to it: each published port's host
+/// port (`{{ machines.web.ports.site.published }}` becomes `${published.web.site}`, and its `.url`
+/// the page at it) and each cloud output (`{{ cloud.outputs.site }}` becomes `${outputs.site}`).
+/// `None` without a message, or when a placeholder points at nothing (the snapshot's message is
+/// null then too).
 pub(crate) fn manifest_message(lab: &Lab, instance: Option<u8>, target: Target) -> Option<Template> {
     let text = lab.source().message.as_ref()?;
     let snapshot = on_target(resolve_with(lab, instance).ok()?, target);
     let mut parts = Vec::new();
-    for piece in pieces(text).ok()? {
-        match piece {
-            Piece::Text(t) => parts.push(Part::Text(t.to_owned())),
-            Piece::Path(path) => match published(&snapshot, path) {
+    for part in self::parts(text).ok()? {
+        match part {
+            SpecPart::Text(t) => parts.push(Part::Text(t)),
+            SpecPart::Placeholder(r) => match at_run_time(&snapshot, &r) {
                 Some(found) => parts.extend(found),
-                None => parts.push(Part::Text(shown(&snapshot, path).ok()?)),
+                None => parts.push(Part::Text(shown(&snapshot, &r).ok()?)),
             },
         }
     }
     Some(Template::from_parts(parts))
 }
 
-/// What a path to a published port reads as in the manifest: its host port
-/// (`machines.<m>.ports.<name>.published`) or its page (`.url`) with the host port left to the
-/// runner.
-fn published(snapshot: &Value, path: &str) -> Option<Vec<Part>> {
-    let keys: Vec<&str> = path.split('.').filter(|k| !k.is_empty()).collect();
-    let ["machines", m, "ports", name, field @ ("published" | "url")] = keys.as_slice() else {
-        return None;
+/// What a placeholder only the runner knows reads as in the manifest: a cloud output; a published
+/// port's host port, or its page (`.url`) with the host port left to the runner.
+fn at_run_time(snapshot: &Value, r: &Reference) -> Option<Vec<Part>> {
+    let (machine, port, field) = match r {
+        Reference::CloudOutput(name) => return Some(vec![Part::Placeholder(Placeholder::Output(SnakeName::parse(name).ok()?))]),
+        Reference::Port { machine, port, field } if *field != PortField::Port => (machine, port, field),
+        _ => return None,
     };
-    let port = snapshot.pointer(&format!("/machines/{m}/ports/{name}"))?;
-    port.get("published").filter(|p| !p.is_null())?;
+    let found = snapshot.pointer(&format!("/machines/{machine}/ports/{port}"))?;
+    found.get("published").filter(|p| !p.is_null())?;
     let host = Part::Placeholder(Placeholder::Published {
-        machine: Name::parse(m).ok()?,
-        port: PortName::parse(name).ok()?,
+        machine: Name::parse(machine).ok()?,
+        port: PortName::parse(port.as_str()).ok()?,
     });
-    if *field == "published" {
+    if *field == PortField::Published {
         return Some(vec![host]);
     }
-    let scheme = if port.get("protocol").and_then(Value::as_str) == Some("https") {
+    let scheme = if found.get("protocol").and_then(Value::as_str) == Some("https") {
         "https"
     } else {
         "http"
@@ -175,11 +162,12 @@ mod tests {
 
     #[test]
     fn a_placeholder_is_filled_from_its_dotted_path() -> Result<()> {
-        let snapshot = json!({ "machines": { "web": { "ports": { "site": { "port": 80 } }, "tags": ["a"] } } });
+        let snapshot = json!({ "machines": { "web": { "ports": { "site": { "port": 80 } }, "addresses": { "lab": ["a"] } } } });
         assert_eq!(
-            fill("port {{ machines.web.ports.site.port }}, tags {{machines.web.tags}}", &snapshot)?,
-            "port 80, tags [\"a\"]"
+            fill("port {{ machines.web.ports.site.port }}, at {{machines.web.addresses.lab}}", &snapshot)?,
+            "port 80, at [\"a\"]"
         );
+        assert!(matches!(fill("{{ machines.db.addresses.lab }}", &snapshot), Err(Error::Placeholder { .. })));
         assert!(matches!(fill("{{ machines.db }}", &snapshot), Err(Error::Placeholder { .. })));
         Ok(())
     }
@@ -197,8 +185,9 @@ mod tests {
 
         #[test]
         fn a_placeholder_between_any_texts_is_replaced_by_its_value(before in "[^{]*", after in "[^{]*", value in "[a-z0-9 ]{0,12}") {
-            let snapshot = json!({ "a": { "b": value.clone() } });
-            prop_assert_eq!(fill(&format!("{before}{{{{ a.b }}}}{after}"), &snapshot).ok(), Some(format!("{before}{value}{after}")));
+            let snapshot = json!({ "machines": { "a": { "addresses": { "b": value.clone() } } } });
+            let text = format!("{before}{{{{ machines.a.addresses.b }}}}{after}");
+            prop_assert_eq!(fill(&text, &snapshot).ok(), Some(format!("{before}{value}{after}")));
         }
 
         #[test]

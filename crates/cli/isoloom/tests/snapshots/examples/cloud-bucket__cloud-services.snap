@@ -45,7 +45,7 @@ crash.*.log
   "environment": {
     "name": "cloud-bucket",
     "instance": null,
-    "message": null
+    "message": "The website answers at ${outputs.site}.\n"
   },
   "target": "cloud-services",
   "cloud": "aws",

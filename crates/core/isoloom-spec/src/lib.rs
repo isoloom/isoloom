@@ -24,7 +24,7 @@ pub mod linux;
 mod load;
 pub mod model;
 pub mod os;
-mod placeholders;
+pub mod placeholders;
 pub mod probe;
 pub mod profile;
 pub mod reference;

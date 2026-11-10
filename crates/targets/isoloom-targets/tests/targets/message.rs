@@ -39,13 +39,44 @@ fn on_docker_the_message_gives_the_addresses_machines_have_there() -> Outcome {
 
 #[test]
 fn a_placeholder_pointing_at_nothing_is_an_error_and_syntax_is_validated() {
-    let snapshot = serde_json::json!({ "a": { "b": "x", "n": 3, "list": [1, 2] } });
-    assert_eq!(fill("{{ a.b }}-{{a.n}} {{ a.list }}", &snapshot).unwrap(), "x-3 [1,2]");
-    assert!(fill("{{ a.nope }}", &snapshot).unwrap_err().to_string().contains("points at nothing"));
-    assert!(fill("{{ a.b", &snapshot).unwrap_err().to_string().contains("without its"));
+    let snapshot = serde_json::json!({ "machines": { "a": { "addresses": { "lab": "10.9.0.5", "both": [1, 2] }, "ports": { "p": { "port": 3 } } } } });
+    assert_eq!(
+        fill(
+            "{{ machines.a.addresses.lab }}-{{machines.a.ports.p.port}} {{ machines.a.addresses.both }}",
+            &snapshot
+        )
+        .unwrap(),
+        "10.9.0.5-3 [1,2]"
+    );
+    assert!(
+        fill("{{ machines.b.addresses.lab }}", &snapshot)
+            .unwrap_err()
+            .to_string()
+            .contains("points at nothing")
+    );
+    // One grammar for every placeholder: a path the message can't have is said so.
+    let grammar = fill("{{ a.nope }}", &snapshot).unwrap_err().to_string();
+    assert!(grammar.contains("the paths start with `machine.`"), "{grammar}");
+    assert!(fill("{{ machines.a.addresses.lab", &snapshot).unwrap_err().to_string().contains("without its"));
     let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { networks: { lab: 5 }, app: { image: x } }\n";
     let bad = Lab::new(parse(&format!("{base}message: \"see {{{{ }}}} and {{{{ a..b }}}} and {{{{ open\"\n")).unwrap());
     let problems: Vec<String> = bad.problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
     assert_eq!(problems.len(), 3, "{problems:?}");
     assert!(problems.iter().all(|p| p.starts_with("message:")), "{problems:?}");
+}
+
+#[test]
+fn a_cloud_output_is_the_runners_in_the_manifest_and_stays_as_written_until_then() -> Outcome {
+    use isoloom_spec::Target;
+    let lab = example("cloud-bucket")?;
+    let files = isoloom_targets::generate(&lab, Target::CloudServices)?;
+    let manifest = isoloom_manifest::parse(crate::testing::file(&files, "cloud-services/run.json")?)?;
+    assert_eq!(
+        manifest.environment.message.map(|m| m.to_string()).as_deref(),
+        Some("The website answers at ${outputs.site}.\n")
+    );
+    let shown = render_message(&lab, None)?.unwrap_or_default();
+    assert_eq!(shown, "The website answers at {{ cloud.outputs.site }}.\n");
+    assert_eq!(resolve(&lab)["message"].as_str(), Some(shown.as_str()));
+    Ok(())
 }

@@ -23,13 +23,14 @@ pub enum Error {
         #[source]
         source: isoloom_spec::Error,
     },
-    /// A `{{ path }}` of the message points at nothing in the resolved snapshot.
-    #[error("message: `{{{{ {path} }}}}` points at nothing in the snapshot (see `isoloom inspect`){hint}")]
+    /// A `{{ path }}` of the message is one the message can't have, or points at nothing in the
+    /// resolved snapshot.
+    #[error("message: `{{{{ {path} }}}}` {why}")]
     Placeholder {
         /// The placeholder's dotted path.
         path: String,
-        /// What the author may have meant (a machine's `services` that is now `ports`), else empty.
-        hint: &'static str,
+        /// Why it can't be filled.
+        why: String,
     },
     /// The message has a `{{` without its `}}`.
     #[error("message: a `{{{{` without its `}}}}`")]
@@ -138,7 +139,7 @@ mod tests {
     fn a_message_error_names_the_placeholder_as_written() {
         let e = Error::Placeholder {
             path: "machines.web.ports.0".to_owned(),
-            hint: "",
+            why: "points at nothing in the snapshot (see `isoloom inspect`)".to_owned(),
         };
         assert_eq!(
             e.to_string(),
