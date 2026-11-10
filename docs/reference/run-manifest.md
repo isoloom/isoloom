@@ -130,6 +130,12 @@ slot says: an environment variable of some steps, a Terraform variable, a file i
 folder, or a file written into the machine over SSH (guest delivery). Values never land in a generated file, the
 run's state, an event or a log.
 
+A guest delivery over SSH (`transport: ssh`, a cloud VM's) reaches its machine where the module's
+outputs say: at `address_<machine>`, as `ssh_user_<machine>` (the machine's name with `-` and `.`
+written `_`). The steps that reach the same machine over SSH (its `deliver-<machine>` step, its
+ready file, its check runner) name the same address output, and the same user as a literal: the
+cloud's login for the machine's OS, the one rule that writes `ssh_user_<machine>` too.
+
 ## The egress seal
 
 For a cloud target, an `internet: false` network is sealed at the network level **after** the
