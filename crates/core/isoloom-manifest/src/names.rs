@@ -168,6 +168,22 @@ pattern_type!(
     |v| first_then(v, |c| c.is_ascii_lowercase(), |c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 );
 
+impl SnakeName {
+    /// A name of the spec (`web-admin`, `Api.Url`) in snake case: lowercase, each character but
+    /// a letter or a digit as `_` (`web_admin`, `api_url`).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Pattern`] when that isn't a snake-case name (a label starting with a digit).
+    pub fn from_label(label: &str) -> Result<SnakeName> {
+        let snake: String = label
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+            .collect();
+        SnakeName::parse(&snake)
+    }
+}
+
 pattern_type!(
     /// A native tool's or a Vagrant plugin's name (`docker-compose`, `vagrant-libvirt`).
     ToolName,
@@ -334,6 +350,8 @@ mod tests {
         assert!(StepId::parse("Up").is_err());
         assert!(SnakeName::parse("web_portal").is_ok());
         assert!(SnakeName::parse("web-portal").is_err());
+        assert_eq!(SnakeName::from_label("Web-Admin.ui").map(|s| s.as_str().to_owned()).ok().as_deref(), Some("web_admin_ui"));
+        assert!(SnakeName::from_label("9lives").is_err());
         assert!(OsName::parse("alpine-3.19").is_ok());
     }
 

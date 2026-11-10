@@ -290,12 +290,8 @@ fn outputs(cloud: &CloudServices) -> Result<Vec<Output>, ManifestError> {
         .outputs
         .iter()
         .map(|(name, from)| {
-            let snake: String = name
-                .chars()
-                .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
-                .collect();
             Ok(Output {
-                name: SnakeName::parse(&snake)?,
+                name: SnakeName::from_label(name)?,
                 description: Some(format!("The module's `{from}` (the spec's `cloud.outputs.{name}`).")),
                 role: OutputRole::Info,
                 sensitive: false,

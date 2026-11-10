@@ -389,12 +389,7 @@ pub fn outputs_with(machines: &[Machine], host: impl Fn(&Machine) -> Template) -
 /// name has no `--`, so the first `__` ends it: no two ports share a name, and none takes a
 /// Terraform output's (`ip`, `address_web`), which has single `_` only.
 fn output_name(machine: &str, port: &str) -> Result<SnakeName, ManifestError> {
-    let snake = |name: &str| -> String {
-        name.chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
-            .collect()
-    };
-    SnakeName::parse(&format!("{}__{}", snake(machine), snake(port)))
+    SnakeName::parse(&format!("{}__{}", SnakeName::from_label(machine)?, SnakeName::from_label(port)?))
 }
 
 fn output(m: &Machine, p: &Port, host: &Template) -> Result<Output, ManifestError> {
