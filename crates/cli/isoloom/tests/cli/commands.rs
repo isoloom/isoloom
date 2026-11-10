@@ -291,6 +291,23 @@ fn profiles_lists_and_checks_each_profile() -> Outcome {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn a_profile_variable_that_isnt_text_is_an_error_not_no_profile() -> Outcome {
+    use std::os::unix::ffi::OsStrExt;
+    let home = scratch("profile-not-text-home")?;
+    let dir = profiled("profile-not-text", &[("big", "spec:\n  machines: { web: { resources: { cpus: 4 } } }\n")])?;
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_isoloom"))
+        .args([std::ffi::OsStr::new("resources"), dir.as_os_str()])
+        .env("ISOLOOM_HOME", &home)
+        .env("ISOLOOM_PROFILE", std::ffi::OsStr::from_bytes(b"b\xffig"))
+        .output()?;
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(2), "not run without the profile: {stderr}");
+    assert!(stderr.contains("ISOLOOM_PROFILE isn't text"), "{stderr}");
+    Ok(())
+}
+
 #[test]
 fn a_profile_applies_to_every_command_and_pins_its_target() -> Outcome {
     let home = scratch("profile-apply-home")?;

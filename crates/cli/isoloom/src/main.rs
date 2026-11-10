@@ -42,7 +42,14 @@ fn main() -> ExitCode {
 
 /// Runs the command line, prints its error if it has one, and gives its exit code.
 fn run(cli: cli::Cli) -> ExitCode {
-    let profile = spec::Profile::new(cli.profile, std::env::var("ISOLOOM_PROFILE").ok());
+    let from_env = match std::env::var(spec::PROFILE_VARIABLE) {
+        Ok(name) => Some(name),
+        // `--profile` wins over the variable, whatever it holds.
+        Err(std::env::VarError::NotPresent) => None,
+        Err(std::env::VarError::NotUnicode(_)) if cli.profile.is_some() => None,
+        Err(std::env::VarError::NotUnicode(value)) => return finish(&Err(error::CliError::ProfileVariable(value))),
+    };
+    let profile = spec::Profile::new(cli.profile, from_env);
     let outcome = {
         let (mut out, mut err) = (std::io::stdout().lock(), std::io::stderr().lock());
         commands::run(cli.command, &profile, &mut console::Console::new(&mut out, &mut err))

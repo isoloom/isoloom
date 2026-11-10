@@ -28,6 +28,9 @@ pub(crate) struct Settings {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Profile(Option<String>);
 
+/// The environment variable naming the profile when `--profile` doesn't.
+pub(crate) const PROFILE_VARIABLE: &str = "ISOLOOM_PROFILE";
+
 impl Profile {
     /// The profile asked for on the command line, else the one in the environment variable.
     pub(crate) fn new(asked: Option<String>, from_env: Option<String>) -> Self {

@@ -27,6 +27,10 @@ pub(crate) enum CliError {
     /// The defaults in effect can't be read (a defaults file, the image table, a `-s` value).
     #[error(transparent)]
     Defaults(isoloom_spec::Error),
+    /// `ISOLOOM_PROFILE` holds what isn't text, so it names no profile: run without one, it
+    /// would run without the profile the user set.
+    #[error("{} isn't text ({}), so it names no profile: set it to a profile's name, or unset it", crate::spec::PROFILE_VARIABLE, .0.to_string_lossy())]
+    ProfileVariable(std::ffi::OsString),
     /// The instance asked for (`--instance`) can't be made of the spec.
     #[error("instance {number}: {error}")]
     Instance {
