@@ -22,8 +22,10 @@ pub(crate) enum Import {
         #[command(flatten)]
         dest: draft::Dest,
     },
-    /// From a Vagrantfile: it runs against a stand-in `Vagrant` module (nothing is created), and
-    /// the settings it makes become the draft; the rest is listed, with why.
+    /// From a Vagrantfile: Ruby runs it against a stand-in `Vagrant` module, so no VM is made,
+    /// but the rest of its code runs on this computer as it would under Vagrant: import only a
+    /// Vagrantfile you trust. The settings it makes become the draft; the rest is listed, with
+    /// why.
     Vagrant {
         /// The Vagrantfile (default: ./Vagrantfile).
         file: Option<PathBuf>,

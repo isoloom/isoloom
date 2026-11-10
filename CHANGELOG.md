@@ -531,6 +531,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   now take consecutive ports from one base, never the same twice; past 20 000 linked VMs QEMU
   refuses the environment.
 
+- **`isoloom import vagrant`'s help says the Vagrantfile's code runs**: it said nothing is
+  created, but Ruby runs the whole file on this computer (only `Vagrant` is a stand-in), so
+  import only a Vagrantfile you trust.
+
 ### Removed
 
 - **The Ansible renderer's `ansible.windows.win_feature` task**, which no lab reached: the lab
