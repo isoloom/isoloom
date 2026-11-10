@@ -56,7 +56,7 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
     params.extend(steps::derived(&frame.runners)?);
     let mut secrets = connection::slots(frame.cloud, connection::terraform_steps(sealed))?;
     secrets.extend(frame.slots);
-    crate::module::manifest::Body {
+    isoloom_render::run_manifest::Body {
         tools: tools()?, // Terraform and ssh.
         identity: crate::module::manifest::runner_identity(Vec::new())?,
         params,
@@ -71,7 +71,7 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
         expiry: expiry()?,
         guest: None,
     }
-    .manifest(env, frame.target, Some(cloud_of(frame.cloud)))
+    .manifest(env, frame.target, Some(cloud_of(frame.cloud)), isoloom_manifest::Driver::Terraform)
 }
 
 /// A cloud's recovery: one more apply after a failed one, for a cloud's eventual consistency (an

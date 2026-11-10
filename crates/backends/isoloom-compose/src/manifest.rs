@@ -14,8 +14,7 @@ mod stand_ins;
 pub(crate) use guest::guest;
 
 use isoloom_manifest::{
-    Argv, Checks, ComposeIdentity, Driver, HostArgv, Identity, Manifest, ManifestVersion, NonEmpty, PathTemplate, Placeholder, Program, RelPath, RunVar,
-    SCHEMA_URL, Template, Tool, Version,
+    Argv, Checks, ComposeIdentity, Driver, HostArgv, Identity, Manifest, NonEmpty, PathTemplate, Placeholder, Program, RelPath, RunVar, Template, Tool, Version,
 };
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest;
@@ -36,15 +35,7 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
     let plan = StartPlan::of(file);
     let runners = checks::runners(env)?;
     let machines = machines::machines(env, file, &members, &Project::Run)?;
-    Ok(Manifest {
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: run_manifest::generator()?,
-        environment: run_manifest::environment(env)?,
-        target: isoloom_manifest::Target::Docker,
-        cloud: None,
-        driver: Driver::Compose,
-        hosts: run_manifest::every_host(),
+    Ok(run_manifest::Body {
         tools: tools()?,
         identity: identity()?,
         params: slots::params(&machines, &runners.derived)?,
@@ -63,7 +54,8 @@ pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> 
         recovery: Some(lifecycle::recovery()?),
         expiry: None,
         guest: None,
-    })
+    }
+    .manifest(env, isoloom_manifest::Target::Docker, None, Driver::Compose)?)
 }
 
 /// `docker compose` under the run's project, with the Compose file and the pinned ports, then

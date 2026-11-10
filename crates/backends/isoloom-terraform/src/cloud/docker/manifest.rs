@@ -47,7 +47,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
     let mut secrets = connection::slots(cloud, connection::terraform_steps(false))?;
     secrets.extend(guest.slots.iter().cloned());
     let outputs = docker_host_outputs(&guest_machines)?;
-    crate::module::manifest::Body {
+    isoloom_render::run_manifest::Body {
         tools: manifest::tools()?,
         identity: crate::module::manifest::runner_identity(Vec::new())?,
         params,
@@ -64,7 +64,12 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         expiry: manifest::expiry()?,
         guest: Some(host.guest),
     }
-    .manifest(env, isoloom_manifest::Target::CloudDocker, Some(manifest::cloud_of(cloud)))
+    .manifest(
+        env,
+        isoloom_manifest::Target::CloudDocker,
+        Some(manifest::cloud_of(cloud)),
+        isoloom_manifest::Driver::Terraform,
+    )
 }
 
 /// The `up` steps: Terraform's lock, init and apply, then the runner installs Docker and copies

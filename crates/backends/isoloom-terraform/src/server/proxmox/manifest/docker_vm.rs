@@ -50,7 +50,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
     let mut secrets = slots::connection(&vars)?;
     secrets.extend(guest.slots.iter().cloned());
     let lifecycle = lifecycle(guest, &login)?;
-    crate::module::manifest::Body {
+    isoloom_render::run_manifest::Body {
         tools: tools()?,
         identity: runner_identity(super::gone()?)?,
         params,
@@ -65,7 +65,7 @@ fn build(env: &Environment, guest: &GuestCompose) -> Result<Manifest, ManifestEr
         expiry: None,
         guest: Some(host.guest),
     }
-    .manifest(env, isoloom_manifest::Target::DockerVm, None)
+    .manifest(env, isoloom_manifest::Target::DockerVm, None, isoloom_manifest::Driver::Terraform)
 }
 
 /// Terraform makes the VM (`init`, `apply`), then it is readied over SSH ([`into_vm`]) and Compose

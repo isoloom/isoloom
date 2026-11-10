@@ -73,7 +73,7 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
     let on = cloud_of(cloud.provider);
     let mut secrets = connection::slots(on, &STEPS)?;
     secrets.extend(inputs(cloud)?);
-    crate::module::manifest::Body {
+    isoloom_render::run_manifest::Body {
         tools: tools(cloud)?,
         identity: Identity::Terraform(TerraformIdentity {
             module: RelPath::parse(".")?,
@@ -105,7 +105,12 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
         }),
         guest: None,
     }
-    .manifest(env, isoloom_manifest::Target::CloudServices, Some(crate::cloud::manifest::cloud_of(on)))
+    .manifest(
+        env,
+        isoloom_manifest::Target::CloudServices,
+        Some(crate::cloud::manifest::cloud_of(on)),
+        isoloom_manifest::Driver::Terraform,
+    )
 }
 
 /// The profile, then where the module runs (`connection::placement`): a name the spec's `env`

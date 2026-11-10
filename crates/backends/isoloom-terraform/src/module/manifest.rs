@@ -11,95 +11,11 @@ use isoloom_manifest::{
     Action, Argv, Delivery, EnvName, Error as ManifestError, GoneError, HostArgv, Identity, Machine, Name, NonEmpty, OsName, Output, OutputRole, OutputSource,
     Param, Part, Placeholder, Program, PublishMode, RelPath, Role, RunVar, SetBy, SnakeName, StateOwner, Step, StepId, Template, TerraformIdentity, TfVarShape,
 };
-use isoloom_manifest::{
-    CheckProtocol, CheckRunner, Checks, Cloud, Condition, Driver, Expiry, Guest, Lifecycle, Manifest, ManifestVersion, Network, Recovery, SCHEMA_URL,
-    SecretSlot, Tool,
-};
+use isoloom_manifest::{CheckProtocol, CheckRunner, Checks};
 use isoloom_plan::{Environment, MachinePlan, Vm};
-use isoloom_render::run_manifest::{self, addresses, arch, noted, port, run};
+use isoloom_render::run_manifest::{addresses, arch, noted, port, run};
 
 use crate::module::variable::Variable;
-
-/// A Terraform run manifest but its header, which every one has the same way: what each target's
-/// builder fills in, then [`Body::manifest`] completes.
-pub(crate) struct Body {
-    /// [`Manifest::tools`].
-    pub(crate) tools: Vec<Tool>,
-    /// [`Manifest::identity`].
-    pub(crate) identity: Identity,
-    /// [`Manifest::params`].
-    pub(crate) params: Vec<Param>,
-    /// [`Manifest::secrets`].
-    pub(crate) secrets: Vec<SecretSlot>,
-    /// [`Manifest::networks`].
-    pub(crate) networks: Vec<Network>,
-    /// [`Manifest::machines`].
-    pub(crate) machines: Vec<Machine>,
-    /// [`Manifest::lifecycle`].
-    pub(crate) lifecycle: Lifecycle,
-    /// [`Manifest::ready`].
-    pub(crate) ready: Vec<Condition>,
-    /// [`Manifest::outputs`].
-    pub(crate) outputs: Vec<Output>,
-    /// [`Manifest::checks`].
-    pub(crate) checks: Checks,
-    /// [`Manifest::recovery`].
-    pub(crate) recovery: Option<Recovery>,
-    /// [`Manifest::expiry`].
-    pub(crate) expiry: Option<Expiry>,
-    /// [`Manifest::guest`].
-    pub(crate) guest: Option<Guest>,
-}
-
-impl Body {
-    /// The run manifest of `env` on `target` (and `cloud`, for a cloud's): the schema and its
-    /// version, Isoloom as its generator, the environment, Terraform as its driver and every host
-    /// OS, then this body. Its message is left to the caller.
-    ///
-    /// # Errors
-    ///
-    /// A name the manifest refuses.
-    pub(crate) fn manifest(self, env: &Environment, target: isoloom_manifest::Target, cloud: Option<Cloud>) -> Result<Manifest, ManifestError> {
-        let Body {
-            tools,
-            identity,
-            params,
-            secrets,
-            networks,
-            machines,
-            lifecycle,
-            ready,
-            outputs,
-            checks,
-            recovery,
-            expiry,
-            guest,
-        } = self;
-        Ok(Manifest {
-            schema: Some(SCHEMA_URL.to_owned()),
-            manifest_version: ManifestVersion,
-            generator: run_manifest::generator()?,
-            environment: run_manifest::environment(env)?,
-            target,
-            cloud,
-            driver: Driver::Terraform,
-            hosts: run_manifest::every_host(),
-            tools,
-            identity,
-            params,
-            secrets,
-            networks,
-            machines,
-            lifecycle,
-            ready,
-            outputs,
-            checks,
-            recovery,
-            expiry,
-            guest,
-        })
-    }
-}
 
 /// The checks of a run manifest with only `runners`: no set-up, no teardown.
 pub(crate) fn checks(runners: Vec<CheckRunner>) -> Checks {

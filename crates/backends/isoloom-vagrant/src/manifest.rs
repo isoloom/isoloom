@@ -12,7 +12,7 @@ mod machines;
 mod providers;
 mod slots;
 
-use isoloom_manifest::{Argv, Checks, Driver, HostArgv, Manifest, ManifestVersion, Part, PathTemplate, Placeholder, RelPath, RunVar, SCHEMA_URL, Template};
+use isoloom_manifest::{Argv, Checks, Driver, HostArgv, Manifest, Part, PathTemplate, Placeholder, RelPath, RunVar, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest;
 
@@ -28,17 +28,9 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
     let machines = machines::machines(env, &shape, &crate::boot_digest::of(&crate::vms::boot(env)?))?;
     let runners = checks::runners(&shape)?;
     let lifecycle = lifecycle::lifecycle(env, &shape)?;
-    Ok(Manifest {
-        target: isoloom_manifest::Target::Vagrant,
-        driver: Driver::Vagrant,
-        cloud: None,
-        hosts: isoloom_render::run_manifest::every_host(),
+    Ok(run_manifest::Body {
         tools: providers::tools()?,
         identity: providers::identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: run_manifest::generator()?,
-        environment: run_manifest::environment(env)?,
         params: slots::params(&machines, &runners)?,
         secrets: slots::slots(env, &lifecycle)?,
         networks: run_manifest::networks(env, |n| Template::text(&crate::vms::network_name(&env.name, n)))?,
@@ -55,7 +47,8 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
         recovery: Some(lifecycle::recovery()?),
         expiry: None,
         guest: None,
-    })
+    }
+    .manifest(env, isoloom_manifest::Target::Vagrant, None, Driver::Vagrant)?)
 }
 
 /// `vagrant <args>`.

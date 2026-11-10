@@ -69,7 +69,7 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
     let mut outputs = machines::outputs(&machines)?;
     (server.consoles)(env, &mut machines, &mut outputs)?;
     let sealed = crate::seal::any(env);
-    crate::module::manifest::Body {
+    isoloom_render::run_manifest::Body {
         tools: (server.tools)()?,
         identity: crate::module::manifest::runner_identity((server.gone)()?)?,
         params: slots::params(&server.variables, server.private_key, &runners, sealed)?,
@@ -84,7 +84,7 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
         expiry: None,
         guest: None,
     }
-    .manifest(env, server.names, None)
+    .manifest(env, server.names, None, isoloom_manifest::Driver::Terraform)
 }
 
 /// Terraform, at the oldest release every module Isoloom writes takes.

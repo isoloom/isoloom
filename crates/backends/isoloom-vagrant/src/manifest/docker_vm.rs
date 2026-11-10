@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, Driver, Error as ManifestError, HostArgv, Lifecycle, Manifest, ManifestVersion, Name, Native, NonEmpty, Park, PathTemplate, Provider,
-    RelPath, Run, SCHEMA_URL, Step, Template,
+    Action, Argv, Driver, Error as ManifestError, HostArgv, Lifecycle, Manifest, Name, Native, NonEmpty, Park, PathTemplate, Provider, RelPath, Run, Step,
+    Template,
 };
 use isoloom_plan::Environment;
 use isoloom_render::container::DOCKER_HOST as VM;
@@ -44,15 +44,7 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
     params.extend(guest.params.iter().cloned());
     let mut secrets = guest.slots.clone();
     secrets.push(slots::esxi_password()?);
-    Ok(Manifest {
-        schema: Some(SCHEMA_URL.to_owned()),
-        manifest_version: ManifestVersion,
-        generator: run_manifest::generator()?,
-        environment: run_manifest::environment(env)?,
-        target: isoloom_manifest::Target::DockerVm,
-        cloud: None,
-        driver: Driver::Vagrant,
-        hosts: isoloom_render::run_manifest::every_host(),
+    Ok(run_manifest::Body {
         tools: providers::tools()?,
         identity: providers::docker_vm_identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         params,
@@ -66,7 +58,8 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
         recovery: Some(recovery()?),
         expiry: None,
         guest: Some(host.guest),
-    })
+    }
+    .manifest(env, isoloom_manifest::Target::DockerVm, None, Driver::Vagrant)?)
 }
 
 /// The VM up step.

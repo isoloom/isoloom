@@ -4,7 +4,10 @@
 //! its step may take. Pure functions over the plan, shared so each target says them once.
 //! Compose inside a VM is [`guest`]: what both backends of `docker-vm` share.
 
+mod body;
 pub mod guest;
+
+pub use body::Body;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::IpAddr;
