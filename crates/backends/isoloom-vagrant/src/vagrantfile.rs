@@ -18,7 +18,7 @@ pub(crate) const PORT_CHECK_RB: &str = include_str!("vagrant_port_check.rb");
 /// from the host's environment when Vagrant runs (on, `1`, unless the host sets it).
 pub(crate) fn derived_from_host() -> Value {
     let name = isoloom_render::run_manifest::DERIVED;
-    Value::hash([(Value::str(name), Value::raw(format!("ENV.fetch({}, \"1\")", Value::str(name))))])
+    Value::hash([(Value::str(name), Value::raw(format!("ENV.fetch({}, {})", Value::str(name), Value::str("1"))))])
 }
 
 /// `<var>.vm.provision "shell", name: <name>`: a shell provisioner, its script still to add.
@@ -34,7 +34,7 @@ pub(crate) fn shell(var: &str, name: &str) -> Provision {
 pub(crate) fn inputs(r: &mut Ruby, inputs: &[String], secrets: bool) {
     if !inputs.is_empty() {
         r.comment("Values provided at launch (empty when unset).");
-        let fetch = |i: &String| Value::raw(format!("ENV.fetch({}, \"\")", Value::str(i)));
+        let fetch = |i: &String| Value::raw(format!("ENV.fetch({}, {})", Value::str(i), Value::str("")));
         r.hash("INPUTS", inputs.iter().map(|i| (Value::str(i), fetch(i))));
     }
     if secrets || !inputs.is_empty() {
@@ -70,7 +70,7 @@ pub(crate) const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
 pub(crate) fn chosen_ports(r: &mut Ruby) {
     r.text("require \"json\"\n");
     r.comment("The host ports the runner chose for this run; each forward defaults to its own number.");
-    r.assign(HOSTPORTS, Value::raw(format!("(JSON.parse(ENV.fetch(\"{HOSTPORTS}\", \"{{}}\")) rescue {{}})")));
+    r.assign(HOSTPORTS, Value::raw(format!("(JSON.parse(ENV.fetch({}, {})) rescue {{}})", Value::str(HOSTPORTS), Value::str("{}"))));
 }
 
 /// A published port's host number as the Vagrantfile reads it: the runner's choice for this run,

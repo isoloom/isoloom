@@ -110,7 +110,7 @@ pub(crate) fn windows_inputs(r: &mut Ruby, env: &Environment, machine: &str) {
 fn secret_value(f: &SecretFile) -> (String, Value) {
     let read = match &f.source {
         ValueSource::Input(name) => input(name),
-        ValueSource::Secret(name) => Value::raw(format!("isoloom_b64(ENV.fetch({}, \"\"))", Value::str(&secret_variable(name)))),
+        ValueSource::Secret(name) => Value::raw(format!("isoloom_b64(ENV.fetch({}, {}))", Value::str(&secret_variable(name)), Value::str(""))),
     };
     (secret_variable(&f.name), read)
 }
