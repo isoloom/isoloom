@@ -51,7 +51,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                 .add_attribute(("project", reference("local.project")))
                 .add_attribute(("name", name_with(&format!("-{net}"))))
                 .add_attribute(("network", reference(&format!("google_compute_network.{id}.id"))))
-                .add_attribute(("ip_cidr_range", string(p.cidr.as_str())))
+                .add_attribute(("ip_cidr_range", string(p.cidr.to_string())))
                 .add_attribute(("region", reference("var.region")))
                 .build(),
         );
@@ -98,7 +98,7 @@ fn routes(env: &Environment, m: &mut Module) {
     for net in env.networks.keys() {
         for hop in through(env, net) {
             let Some(at) = hop.machine.addresses.get(net) else { continue };
-            let route = route(net, (hop.network, hop.plan.cidr.as_str()), hop.gateway, &at.to_string());
+            let route = route(net, (hop.network, &hop.plan.cidr.to_string()), hop.gateway, &at.to_string());
             if std::mem::take(&mut first) {
                 m.commented("The networks a machine routes: each VPC sends them to the gateway's address in it.", route);
             } else {

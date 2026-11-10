@@ -11,7 +11,7 @@ use isoloom_manifest::{Machine, Name, Native, OsName, Provider, Role, Template};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{addresses, arch, port};
 use isoloom_spec::model::Target;
-use isoloom_spec::net::Cidr;
+use isoloom_spec::net::NetworkBlock;
 
 use super::keeps_controller;
 use crate::error::{Error, Result};
@@ -54,7 +54,7 @@ fn machine(env: &Environment, d: &Define, boot_digest: &str) -> Result<Machine> 
             out.resources = Some(Size::HELPER.resources());
         }
         Kind::Controller => {
-            out.addresses = on_every_network(env, Cidr::controller)?;
+            out.addresses = on_every_network(env, |c| Some(c.controller()))?;
             out.resources = Some(Size::controller(env.spec()).resources());
             out.keep_running = keeps_controller(env);
         }
@@ -86,10 +86,10 @@ fn lab_machine(env: &Environment, name: &str, out: &mut Machine) -> Result<()> {
 }
 
 /// The VM's address on every network, at `at` of each network's block (Isoloom's own VMs).
-fn on_every_network(env: &Environment, at: impl Fn(Cidr) -> std::net::Ipv4Addr) -> Result<BTreeMap<Name, IpAddr>> {
+fn on_every_network(env: &Environment, at: impl Fn(NetworkBlock) -> Option<std::net::Ipv4Addr>) -> Result<BTreeMap<Name, IpAddr>> {
     env.networks
         .iter()
-        .filter_map(|(net, n)| Cidr::parse(&n.cidr).map(|c| (net, at(c))))
+        .filter_map(|(net, n)| Some((net, at(n.cidr)?)))
         .map(|(net, ip)| Ok((Name::parse(net)?, IpAddr::V4(ip))))
         .collect()
 }

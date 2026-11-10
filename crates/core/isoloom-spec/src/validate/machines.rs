@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Appliance, DockerImpl, Machine, Protocol, Spec, VmImpl};
+use crate::net::NetworkBlock;
 
 /// One machine being checked: the spec, its name and definition, and its path.
 pub(super) struct Subject<'a> {
@@ -135,16 +136,19 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
         }
         let network = s.spec.networks.get(net);
         let is_gateway = network.and_then(|n| n.gateway.as_deref()) == Some(name);
+        // A block of another size is refused with the networks: it has no reserved address.
+        let c = NetworkBlock::new(c);
         if is_gateway {
-            if *octet == c.gateway_octet() {
-                taken.insert((net.clone(), *octet), name.to_owned());
-            } else {
-                p.add(
+            match c.map(NetworkBlock::gateway_octet) {
+                Some(gateway) if gateway != *octet => p.add(
                     nat,
-                    format!("`{name}` is this network's gateway, so it takes the gateway address: use {}", c.gateway_octet()),
-                );
+                    format!("`{name}` is this network's gateway, so it takes the gateway address: use {gateway}"),
+                ),
+                _ => {
+                    taken.insert((net.clone(), *octet), name.to_owned());
+                }
             }
-        } else if c.host(*octet).is_none() {
+        } else if c.and_then(|c| c.host(*octet)).is_none() {
             p.add(nat, unusable(*octet, network.map_or("", |n| n.cidr.as_str())));
         } else if let Some(other) = taken.insert((net.clone(), *octet), name.to_owned()) {
             p.add(nat, format!("address .{octet} is already used by `{other}`"));
@@ -177,7 +181,7 @@ fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8)
         for octet in octets {
             if seen.contains(octet) {
                 p.add(&nat, format!("address .{octet} is written twice"));
-            } else if c.host(*octet).is_none() {
+            } else if NetworkBlock::new(c).and_then(|c| c.host(*octet)).is_none() {
                 p.add(&nat, unusable(*octet, s.spec.networks.get(net).map_or("", |n| n.cidr.as_str())));
             } else if let Some(other) = taken.insert((net.clone(), *octet), s.name.to_owned()) {
                 p.add(&nat, format!("address .{octet} is already used by `{other}`"));

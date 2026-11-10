@@ -10,7 +10,6 @@ use crate::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, 
 use isoloom_plan::{Environment, ipv6};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
-use isoloom_spec::net::Cidr;
 use isoloom_spec::net::IPV6_PREFIX;
 
 use super::SERVICE_OS;
@@ -30,7 +29,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     let config = crate::server::router::cloud_config(env, Platform::default());
     let mut nics = vec![Nic::at(reference("var.uplink_port_group"), None)];
     nics.extend(env.networks.iter().map(|(net, plan)| {
-        let len = Cidr::parse(&plan.cidr).map_or(32, Cidr::prefix);
+        let len = plan.cidr.prefix();
         let mut nic = machines::nic(env, net, format!("{}/{len}", router::address(env.spec(), net)), false);
         // An IPv6 network's router address too: the machines' IPv6 routes go through it.
         nic.addresses

@@ -31,7 +31,7 @@ pub(super) fn ipsets(env: &Environment, m: &mut Module) {
             .add_label(ident(net))
             .add_attribute(("name", slotted(&format!("n{i}"))))
             .add_attribute(("comment", string(format!("{}: network {net}", env.name))))
-            .add_block(Block::builder("cidr").add_attribute(("name", string(plan.cidr.as_str()))).build());
+            .add_block(Block::builder("cidr").add_attribute(("name", string(plan.cidr.to_string()))).build());
         if let Some(v6) = &plan.ipv6 {
             b = b.add_block(Block::builder("cidr").add_attribute(("name", string(v6.cidr.as_str()))).build());
         }

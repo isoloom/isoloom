@@ -62,7 +62,7 @@ fn docker_targets_lay_networks_on_their_docker_blocks() -> Outcome {
     let env = env(Target::Docker)?;
     assert_eq!(env.machines["web"].shape, MachineShape::Container);
     for n in env.networks.values() {
-        assert_eq!(n.cidr.rsplit('/').next(), n.declared_cidr.rsplit('/').next());
+        assert_eq!(n.cidr.prefix(), n.declared_cidr.prefix());
     }
     assert!(env.machines["web"].lifecycle.is_empty(), "containers have no VM steps");
     Ok(())

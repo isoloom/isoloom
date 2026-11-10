@@ -31,7 +31,7 @@ pub(crate) fn when_sealed(yes: Expression, no: Expression) -> Expression {
 
 /// The lab's own blocks, every network's: where a sealed machine may still go.
 pub(crate) fn lab_blocks(env: &Environment) -> Expression {
-    list(env.networks.values().map(|p| string(p.cidr.as_str())))
+    list(env.networks.values().map(|p| string(p.cidr.to_string())))
 }
 
 /// `["0.0.0.0/0"]`, or the lab's blocks once sealed: where machine `mp` may go.

@@ -1,9 +1,10 @@
 //! Properties of IPv4 blocks ([`Cidr`]): parsing accepts exactly the network addresses, and
-//! containment, overlap, host and gateway addresses agree with the block's arithmetic.
+//! containment, overlap, and a network block's ([`NetworkBlock`]) host and gateway addresses
+//! agree with the block's arithmetic.
 
 use std::net::Ipv4Addr;
 
-use isoloom_spec::net::Cidr;
+use isoloom_spec::net::{Cidr, NetworkBlock};
 use proptest::prelude::*;
 
 fn mask(len: u8) -> u32 {
@@ -55,7 +56,7 @@ proptest! {
 
     #[test]
     fn hosts_and_the_gateway_stay_inside_the_block((base, len) in (any::<u32>(), 24u8..=29).prop_map(|(ip, len)| (ip & mask(len), len)), octet in any::<u8>()) {
-        let c = parsed(base, len)?;
+        let c = NetworkBlock::new(parsed(base, len)?).ok_or_else(|| TestCaseError::fail("a /24 to /29 is a network's block"))?;
         let gateway = u32::from(c.gateway());
         prop_assert_eq!(gateway & mask(len), base);
         if let Some(host) = c.host(octet) {

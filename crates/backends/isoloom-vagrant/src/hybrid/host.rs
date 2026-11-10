@@ -8,7 +8,6 @@ use isoloom_render::router;
 use isoloom_render::stable_hash;
 use isoloom_spec::linux::PROJECT_DIR;
 use isoloom_spec::model::Target;
-use isoloom_spec::net::Cidr;
 
 use crate::docker_host;
 use crate::error::{Error, Result};
@@ -90,10 +89,9 @@ fn virtualbox(r: &mut Ruby, env: &Environment, nics: usize) {
 
 /// Network `net`, the host's `index`th lab network.
 fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic> {
-    let cidr = env.networks.get(net).map(|n| n.cidr.as_str()).unwrap_or_default();
-    let c = Cidr::parse(cidr).ok_or_else(|| Error::Unsupported {
+    let c = env.networks.get(net).map(|n| n.cidr).ok_or_else(|| Error::Unsupported {
         target: Target::Hybrid,
-        reason: format!("network `{net}`: `{cidr}` isn't a block of addresses"),
+        reason: format!("no network `{net}` in the plan"),
     })?;
     let gateway = if env.router.is_some() {
         router::address(env.spec(), net)
@@ -104,7 +102,7 @@ fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic> {
         ip: c.controller().to_string(),
         // The index's low byte: the MAC's last octet.
         mac: format!("0A15{:06X}{:02X}", stable_hash::of(&env.name) & 0xFF_FFFF, index % 0x100),
-        cidr: cidr.to_owned(),
+        cidr: c.to_string(),
         gateway: gateway.to_string(),
         name: docker_net(env, net),
     })

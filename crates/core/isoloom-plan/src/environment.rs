@@ -16,7 +16,7 @@ use isoloom_spec::images;
 use isoloom_spec::model::{
     Arch, Boot, Constraints, External, HostFolder, Machine, MachineFile, Network, Protocol, Resources, Seal, Spec, Target, Tc, Ulimit, VmImage, Winrm,
 };
-use isoloom_spec::net::docker_cidrs;
+use isoloom_spec::net::{NetworkBlock, docker_cidrs};
 use isoloom_spec::windows::{self, Tpm};
 
 mod image;
@@ -26,7 +26,7 @@ mod vm;
 pub use image::{Build, Image};
 pub use vm::Vm;
 
-use crate::addressing::{address, address_for, host_address, start_order};
+use crate::addressing::{address, address_for, cidr, host_address, start_order};
 use crate::ansible;
 use crate::checks::{self, Resolved};
 use crate::configure::{DaemonTable, Recipe};
@@ -88,10 +88,11 @@ pub struct Environment {
 /// A network, as the target lays it out.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NetworkPlan {
-    /// Its block on this target (the Docker block on the Docker targets).
-    pub cidr: String,
+    /// Its block on this target (the Docker block on the Docker targets), parsed once here: the
+    /// addresses Isoloom reserves on the network are its own.
+    pub cidr: NetworkBlock,
     /// Its block as the author wrote it.
-    pub declared_cidr: String,
+    pub declared_cidr: NetworkBlock,
     /// The host's own address on it (Docker's bridge, the hypervisor).
     pub host: Ipv4Addr,
     /// A machine of the environment that routes it, if any.
@@ -339,8 +340,8 @@ impl Environment {
             .networks
             .iter()
             .map(|(name, n)| {
-                let declared = spec.networks.get(name).map_or(&n.cidr, |o| &o.cidr);
-                (name.clone(), network(&laid_out, name, n, declared))
+                let declared = if spec.networks.contains_key(name) { spec } else { &laid_out };
+                (name.clone(), network(&laid_out, name, n, cidr(declared, name)))
             })
             .collect();
         Environment {
@@ -415,10 +416,10 @@ pub fn lay_out(spec: &Spec, target: Target) -> Spec {
 }
 
 /// Network `name` (`n`) as laid out in `spec`, its block as the author wrote it `declared`.
-fn network(spec: &Spec, name: &str, n: &Network, declared: &str) -> NetworkPlan {
+fn network(spec: &Spec, name: &str, n: &Network, declared: NetworkBlock) -> NetworkPlan {
     NetworkPlan {
-        cidr: n.cidr.clone(),
-        declared_cidr: declared.to_owned(),
+        cidr: cidr(spec, name),
+        declared_cidr: declared,
         host: host_address(spec, name),
         gateway: n.gateway.clone(),
         internet: n.internet,

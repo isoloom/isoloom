@@ -6,7 +6,6 @@ use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, refer
 use isoloom_plan::checks::{Position, Probe, by_position};
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_render::router;
-use isoloom_spec::net::Cidr;
 
 use super::windows;
 use crate::machine::cloud_init::{self, CloudConfig};
@@ -49,7 +48,7 @@ fn vm(env: &Environment, name: &str, mp: &MachinePlan, boot: Boot) -> Vm {
     let routed = lab_router::is_default_gateway(env, mp);
     for (i, (net, addr)) in mp.addresses.iter().enumerate() {
         nics.push(super::links::device(env, net, None, Some(mp)));
-        let len = env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(32, Cidr::prefix);
+        let len = env.block(net).prefix();
         let gateway = (i == 0 && routed).then(|| router::address(env.spec(), net).to_string());
         ips.push(ip_config(&format!("{addr}/{len}"), gateway));
     }

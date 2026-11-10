@@ -47,11 +47,11 @@ fn display(net: &str) -> Expression {
 
 /// The VCN, its internet gateway and route tables, a security list and a subnet per network.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let cidrs: Vec<&str> = env.networks.values().map(|n| n.cidr.as_str()).collect();
+    let cidrs: Vec<String> = env.networks.values().map(|n| n.cidr.to_string()).collect();
     let vcn = owned(resource("oci_core_vcn", "env")).add_attribute(("display_name", reference("local.name")));
     let vcn = match cidrs.as_slice() {
-        [one] => vcn.add_attribute(("cidr_block", string(*one))),
-        many => vcn.add_attribute(("cidr_blocks", list(many.iter().map(|c| string(*c))))),
+        [one] => vcn.add_attribute(("cidr_block", string(one.as_str()))),
+        many => vcn.add_attribute(("cidr_blocks", list(many.iter().map(|c| string(c.as_str()))))),
     };
     m.commented(
         "The environment's networks: a VCN holding each one's block, routed to the internet.",
@@ -70,7 +70,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         );
         let mut subnet = owned(resource("oci_core_subnet", &ident(net)))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
-            .add_attribute(("cidr_block", string(p.cidr.as_str())))
+            .add_attribute(("cidr_block", string(p.cidr.to_string())))
             .add_attributes(p.ipv6.as_ref().map(|v| ("ipv6cidr_block", string(v.cidr.as_str()))))
             .add_attribute(("display_name", display(net)))
             .add_attribute(("route_table_id", reference("oci_core_route_table.env.id")))
@@ -143,7 +143,7 @@ fn fragmentation(kind: &str, v6: bool) -> Block {
 fn reach_rules(kind: &str, rules: &[Rule<'_>], what: &str) -> Vec<Block> {
     let mut out = Vec::new();
     for r in rules {
-        let peer = || string(r.cidr);
+        let peer = || string(r.cidr.as_str());
         let description = format!("reach {what} {}", r.network);
         if r.ports.is_empty() {
             out.push(rule(kind, &description, peer(), "all", None));
@@ -158,7 +158,8 @@ fn reach_rules(kind: &str, rules: &[Rule<'_>], what: &str) -> Vec<Block> {
 
 /// A network's security list: the IPv4 rules, then their IPv6 mirror on a dual-stack network.
 fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
-    let cidr = p.cidr.as_str();
+    let cidr = p.cidr.to_string();
+    let cidr = cidr.as_str();
     let (inbound, outbound) = ("ingress_security_rules", "egress_security_rules");
     let allowed = || reference("var.allowed_cidr");
     let mut b = in_vcn(resource("oci_core_security_list", &ident(net)), display(net))
@@ -211,7 +212,7 @@ fn ipv6<'a>(env: &'a Environment, rules: Vec<Rule<'a>>) -> Vec<Rule<'a>> {
         .into_iter()
         .filter_map(|r| {
             let v6 = env.networks.get(r.network)?.ipv6.as_ref()?;
-            Some(Rule { cidr: &v6.cidr, ..r })
+            Some(Rule { cidr: v6.cidr.clone(), ..r })
         })
         .collect()
 }
@@ -253,7 +254,7 @@ pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
             let ip = attr(index(reference(&format!("data.oci_core_private_ips.{id}.private_ips")), 0), "id");
             table = table.add_block(
                 Block::builder("route_rules")
-                    .add_attribute(("destination", string(hop.plan.cidr.as_str())))
+                    .add_attribute(("destination", string(hop.plan.cidr.to_string())))
                     .add_attribute(("network_entity_id", ip))
                     .build(),
             );

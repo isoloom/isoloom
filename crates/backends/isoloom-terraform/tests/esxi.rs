@@ -51,7 +51,7 @@ fn the_router_holds_the_sealed_ruleset_the_seal_applies() -> Outcome {
     );
     // The `internet: false` networks' traffic from elsewhere dropped, and only the others
     // forwarded out, in the sealed ruleset alone.
-    let closed: Vec<&str> = e.networks.values().filter(|n| !n.internet).map(|n| n.cidr.as_str()).collect();
+    let closed: Vec<String> = e.networks.values().filter(|n| !n.internet).map(|n| n.cidr.to_string()).collect();
     assert!(!closed.is_empty(), "segmented has an internet: false network");
     assert!(sealed.contains(&format!("ip daddr {{ {} }} drop", closed.join(", "))), "{sealed}");
     let manifest = EsxiBackend.run_manifest(&e)?.ok_or("ESXi writes a run manifest")?;

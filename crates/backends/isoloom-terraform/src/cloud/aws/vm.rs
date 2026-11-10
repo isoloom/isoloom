@@ -214,7 +214,7 @@ fn refusal(env: &Environment) -> Option<String> {
 }
 
 fn networks_refusal(env: &Environment) -> Option<String> {
-    let nets: Vec<Cidr> = env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).collect();
+    let nets: Vec<Cidr> = env.networks.values().map(|n| n.cidr.cidr()).collect();
     let family = |c: &Cidr| c.base() >> 24;
     let mixed = || nets.iter().any(|c| family(c) != nets.first().map_or(0, family));
     RULES

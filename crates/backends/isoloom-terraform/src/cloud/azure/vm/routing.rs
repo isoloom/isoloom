@@ -41,7 +41,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                     .add_attribute(("name", string(format!("to-{}", hop.network))))
                     .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
                     .add_attribute(("route_table_name", reference(&format!("azurerm_route_table.{id}.name"))))
-                    .add_attribute(("address_prefix", string(hop.plan.cidr.as_str())))
+                    .add_attribute(("address_prefix", string(hop.plan.cidr.to_string())))
                     .add_attribute(("next_hop_type", string("VirtualAppliance")))
                     .add_attribute(("next_hop_in_ip_address", string(next_hop)))
                     .build(),

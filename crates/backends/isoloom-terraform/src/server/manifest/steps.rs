@@ -93,11 +93,10 @@ pub(super) fn ready(env: &Environment, applied: &str, log: Option<&str>) -> Resu
             out.push(ready_file(&a.to_string(), log, SETUP_S)?);
         }
     }
-    if controller::needed(env) {
-        let first = env.networks.values().next().and_then(|n| isoloom_spec::net::Cidr::parse(&n.cidr));
-        if let Some(c) = first {
-            out.push(ready_file(&c.controller().to_string(), log, PLAYBOOKS_S)?);
-        }
+    if controller::needed(env)
+        && let Some(at) = controller::addresses(env).values().next()
+    {
+        out.push(ready_file(&at.to_string(), log, PLAYBOOKS_S)?);
     }
     Ok(out)
 }

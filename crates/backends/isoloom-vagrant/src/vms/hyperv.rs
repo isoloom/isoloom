@@ -20,10 +20,8 @@
 use std::net::Ipv4Addr;
 
 use crate::boxes::{self, HyperVBox};
-use isoloom_plan::addressing::netmask;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::linux::CONFIG_DIR;
-use isoloom_spec::net::Cidr;
 use isoloom_spec::windows::Tpm;
 
 use super::providers::Size;
@@ -81,11 +79,12 @@ pub(crate) struct Nic<'a> {
 impl<'a> Nic<'a> {
     /// The adapter on `net` at `ip`.
     pub(crate) fn on(env: &Environment, net: &'a str, ip: Ipv4Addr) -> Nic<'a> {
+        let block = env.block(net);
         Nic {
             net,
             ip,
-            len: env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(24, Cidr::prefix),
-            mask: netmask(env.spec(), net),
+            len: block.prefix(),
+            mask: block.netmask(),
         }
     }
 }

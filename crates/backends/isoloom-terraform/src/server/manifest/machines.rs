@@ -9,7 +9,6 @@ use isoloom_manifest::{Error as ManifestError, Machine, Name, Output, OutputRole
 use isoloom_plan::Environment;
 use isoloom_render::router;
 use isoloom_render::run_manifest::outputs_with;
-use isoloom_spec::net::Cidr as SpecCidr;
 
 use crate::machine::controller;
 use crate::module::manifest;
@@ -34,10 +33,7 @@ pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError>
     let router_at = |net: &str| IpAddr::V4(router::address(env.spec(), net));
     out.push(manifest::machine(ROUTER, Role::Infra, by_network(env, router_at)?)?);
     if controller::needed(env) {
-        let controller_at = |net: &str| {
-            let c = env.networks.get(net).and_then(|n| SpecCidr::parse(&n.cidr));
-            c.map_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), |c| IpAddr::V4(c.controller()))
-        };
+        let controller_at = |net: &str| IpAddr::V4(env.block(net).controller());
         out.push(manifest::machine(CONTROLLER, Role::Infra, by_network(env, controller_at)?)?);
     }
     Ok(out)

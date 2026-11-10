@@ -15,7 +15,7 @@ use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY};
 use isoloom_render::router;
 use isoloom_render::{GeneratedFile, controller};
 use isoloom_spec::model::Spec;
-use isoloom_spec::net::Cidr;
+use isoloom_spec::net::NetworkBlock;
 
 use super::hyperv::HyperV;
 use super::machine::{define, private_network};
@@ -88,15 +88,12 @@ fn helper<'a>(env: &'a Environment, define: &str, size: Size, at: Vec<(&'a str, 
 }
 
 /// Each network with the VM's address on it (`at`), in order.
-fn addresses(env: &Environment, at: impl Fn(Cidr) -> Ipv4Addr) -> Vec<(&str, Ipv4Addr)> {
-    env.networks
-        .iter()
-        .filter_map(|(net, n)| Cidr::parse(&n.cidr).map(|c| (net.as_str(), at(c))))
-        .collect()
+fn addresses(env: &Environment, at: impl Fn(NetworkBlock) -> Option<Ipv4Addr>) -> Vec<(&str, Ipv4Addr)> {
+    env.networks.iter().filter_map(|(net, n)| Some((net.as_str(), at(n.cidr)?))).collect()
 }
 
 /// Each network at the VM's address on it (`at`), as private networks.
-fn networks(r: &mut Ruby, env: &Environment, at: impl Fn(Cidr) -> Ipv4Addr) {
+fn networks(r: &mut Ruby, env: &Environment, at: impl Fn(NetworkBlock) -> Option<Ipv4Addr>) {
     for (net, ip) in addresses(env, at) {
         private_network(r, env, net, ip);
     }
@@ -189,7 +186,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let (bx, version) = controller_box(env.spec());
     let size = Size::controller(env.spec());
     let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
-    let mut guest = helper(env, CONTROLLER, size, addresses(env, Cidr::controller), link);
+    let mut guest = helper(env, CONTROLLER, size, addresses(env, |c| Some(c.controller())), link);
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
     // providers gets Debian's instead.
     guest.libvirt_box = (bx == CONTROLLER_BOX).then_some(CONTROLLER_BOX);
@@ -206,7 +203,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     define(r, CONTROLLER, false, |r| {
         controller_box_line(r, bx, version);
         r.assign("m.vm.hostname", Value::str(CONTROLLER));
-        networks(r, env, Cidr::controller);
+        networks(r, env, |c| Some(c.controller()));
         providers::blocks(r, &guest);
         steps_of(r, env, CONTROLLER, &steps);
         controller_steps(r, env, !on_controller.is_empty());

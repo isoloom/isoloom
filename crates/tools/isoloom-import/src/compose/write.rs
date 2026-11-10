@@ -33,7 +33,7 @@ pub(super) fn draft_yaml(env: &Environment, machines: &[Machine]) -> String {
     let nets = env.nets.nets.values();
     let width = nets.clone().map(|n| n.name.len()).max().unwrap_or(0);
     for n in nets {
-        y.network(&n.name, width, n.cidr, n.internet);
+        y.network(&n.name, width, n.cidr.cidr(), n.internet);
     }
     if !env.shared.is_empty() {
         y.line("\nvolumes:");

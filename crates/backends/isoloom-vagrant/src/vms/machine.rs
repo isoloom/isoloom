@@ -5,12 +5,10 @@ use std::net::Ipv4Addr;
 
 use crate::boxes::{self, VagrantBox};
 use isoloom_manifest as manifest;
-use isoloom_plan::addressing::netmask;
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, PublishedPort};
 use isoloom_render::GeneratedFile;
 use isoloom_spec::model::Arch;
-use isoloom_spec::net::Cidr;
 
 use super::hyperv::{HyperV, Nic};
 use super::providers::{self, Guest, Qemu, Size};
@@ -133,7 +131,7 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
     let mut call = Call::new("m.vm.network")
         .arg(Value::str("private_network"))
         .kw("ip", Value::str(&ip.to_string()))
-        .kw("netmask", Value::str(&netmask(env.spec(), net).to_string()))
+        .kw("netmask", Value::str(&env.block(net).netmask().to_string()))
         .kw("virtualbox__intnet", Value::str(&netname))
         .kw("libvirt__network_name", Value::str(&netname));
     // Every VM on the network carries its network boot: libvirt creates the network with the
@@ -153,7 +151,7 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
 fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a VagrantBox, link: &'a Link) -> Guest<'a> {
     let os = Os::of(mp);
     // No cloud-init on Windows: its lab address is set from PowerShell.
-    let prefix = |net: &str| env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(24, Cidr::prefix);
+    let prefix = |net: &str| env.block(net).prefix();
     let windows_address = mp.addresses.first().filter(|_| os == Os::Windows).map(|(net, ip)| (*ip, prefix(net)));
     let hyperv = HyperV {
         env: &env.name,

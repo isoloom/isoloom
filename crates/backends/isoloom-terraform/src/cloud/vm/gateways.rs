@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::net::Ipv4Addr;
 
 use isoloom_plan::{Environment, MachinePlan, NetworkPlan, Step};
-use isoloom_spec::net::Cidr;
+use isoloom_spec::net::{Cidr, NetworkBlock};
 
 /// The networks a machine routes, each with that machine, in spec order.
 pub(crate) fn routed(env: &Environment) -> Vec<(&str, &str)> {
@@ -61,11 +61,11 @@ pub(crate) fn is_gateway_address(env: &Environment, machine: &str, network: &str
 }
 
 /// Each gateway address moved to the address `to` gives on its network (`None`: it stays).
-fn moves(env: &Environment, to: &dyn Fn(&Environment, &str, Cidr) -> Option<Ipv4Addr>) -> Vec<(Ipv4Addr, Ipv4Addr)> {
+fn moves(env: &Environment, to: &dyn Fn(&Environment, &str, NetworkBlock) -> Option<Ipv4Addr>) -> Vec<(Ipv4Addr, Ipv4Addr)> {
     routed(env)
         .into_iter()
         .filter_map(|(n, _)| {
-            let c = Cidr::parse(&env.networks.get(n)?.cidr)?;
+            let c = env.networks.get(n)?.cidr;
             Some((c.gateway(), to(env, n, c)?))
         })
         .collect()
@@ -79,7 +79,7 @@ pub(crate) fn relocated(env: &Environment) -> Cow<'_, Environment> {
 
 /// The same, each gateway machine at the address `to` gives on its network, for a cloud that
 /// keeps the router's address too.
-pub(crate) fn relocated_with<'a>(env: &'a Environment, to: &dyn Fn(&Environment, &str, Cidr) -> Option<Ipv4Addr>) -> Cow<'a, Environment> {
+pub(crate) fn relocated_with<'a>(env: &'a Environment, to: &dyn Fn(&Environment, &str, NetworkBlock) -> Option<Ipv4Addr>) -> Cow<'a, Environment> {
     let moves = moves(env, to);
     if moves.is_empty() {
         return Cow::Borrowed(env);
@@ -108,17 +108,17 @@ pub(crate) fn relocated_with<'a>(env: &'a Environment, to: &dyn Fn(&Environment,
 
 /// The highest address of network `net` no machine, tool or controller takes: where a gateway
 /// machine goes on a cloud that keeps both the gateway's and the router's addresses.
-pub(crate) fn free_address(env: &Environment, net: &str, c: Cidr) -> Option<Ipv4Addr> {
-    let tools = u32::try_from(env.spec().tools.len()).unwrap_or(u32::MAX);
-    let top = u32::from(c.controller()).checked_sub(1)?.checked_sub(tools)?;
+pub(crate) fn free_address(env: &Environment, net: &str, c: NetworkBlock) -> Option<Ipv4Addr> {
+    // Just below the tools: where the tool after the last would go.
+    let top = u32::from(c.tool(env.spec().tools.len())?);
     let taken: Vec<Ipv4Addr> = env.machines.values().filter_map(|m| m.addresses.get(net).copied()).collect();
-    (c.base() + 2..=top).rev().map(Ipv4Addr::from).find(|a| !taken.contains(a))
+    (u32::from(c.gateway()) + 1..=top).rev().map(Ipv4Addr::from).find(|a| !taken.contains(a))
 }
 
 /// The smallest block holding every network, when one of `shortest` bits or longer does: a
 /// cloud whose routes can only be more specific than its network's block puts them all in it.
 pub(crate) fn covering(env: &Environment, shortest: u8) -> Option<Cidr> {
-    let nets: Vec<Cidr> = env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).collect();
+    let nets: Vec<Cidr> = env.networks.values().map(|n| n.cidr.cidr()).collect();
     let first = nets.first()?;
     (shortest..=first.prefix())
         .rev()

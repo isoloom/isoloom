@@ -63,7 +63,9 @@ fn table(env: &Environment, net: &str) -> Block {
         .add_block(if closed { sealed_route_out() } else { route_out() });
     through(env, net)
         .iter()
-        .fold(b, |b, hop| b.add_block(route(&hop.plan.cidr, ("network_interface_id", interface(hop, net)))))
+        .fold(b, |b, hop| {
+            b.add_block(route(&hop.plan.cidr.to_string(), ("network_interface_id", interface(hop, net))))
+        })
         .build()
 }
 

@@ -7,7 +7,6 @@
 
 use crate::hcl_builder::{Block, Expression, Module, number, reference, string};
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
-use isoloom_spec::net::Cidr;
 
 use super::guest::Nic;
 use crate::module::ident;
@@ -71,7 +70,7 @@ pub(super) fn nics(env: &Environment, mp: &MachinePlan) -> Vec<Nic> {
                 Join::Bridged(b) => (reference(&format!("esxi_portgroup.{}.name", ident(net))), b.default_route),
             };
             let address = match address {
-                OutsideAddress::Fixed(ip) => Some(format!("{ip}/{}", Cidr::parse(&n.cidr).map_or(32, Cidr::prefix))),
+                OutsideAddress::Fixed(ip) => Some(format!("{ip}/{}", n.cidr.prefix())),
                 OutsideAddress::Dhcp => None,
             };
             let mut nic = Nic::at(port_group, address);

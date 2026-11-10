@@ -13,7 +13,6 @@ use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_K
 use isoloom_render::{controller, steps};
 use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::model::Winrm;
-use isoloom_spec::net::Cidr;
 
 use super::provisioner::{Connection, Provisioner, Upload};
 use super::{Shell, linux, vms, windows};
@@ -78,10 +77,7 @@ pub(crate) fn write_key(env: &Environment, m: &mut Module) {
 
 /// The controller's address on each network.
 pub(crate) fn addresses(env: &Environment) -> IndexMap<String, Ipv4Addr> {
-    env.networks
-        .iter()
-        .map(|(n, p)| (n.clone(), Cidr::parse(&p.cidr).map_or(Ipv4Addr::UNSPECIFIED, Cidr::controller)))
-        .collect()
+    env.networks.iter().map(|(n, p)| (n.clone(), p.cidr.controller())).collect()
 }
 
 /// Its key's resource ([`write_key`]).

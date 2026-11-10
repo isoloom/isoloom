@@ -3,7 +3,6 @@
 //! guest itself.
 
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
-use isoloom_spec::net::Cidr;
 
 use crate::ruby::{Call, Ruby, Value};
 
@@ -40,7 +39,7 @@ pub(crate) fn refusal(env: &Environment, name: &str, mp: &MachinePlan) -> Option
         if mp.is_windows() {
             return Some(format!("machine `{name}`: Isoloom bridges no network to a Windows machine on Vagrant"));
         }
-        let len = Cidr::parse(&n.cidr).map_or(0, Cidr::prefix);
+        let len = n.cidr.prefix();
         if matches!(address, OutsideAddress::Fixed(_)) && len != 24 {
             return Some(format!(
                 "network `{net}`: a fixed address on a bridged network is in a /24 on Vagrant (its public networks take no netmask); use `dhcp: true`"

@@ -86,7 +86,7 @@ pub(super) fn tc(env: &Environment, machine: &str) -> Option<String> {
 /// ([`boot::at_boot`] loads the rules). Run again, it replaces its table: nftables comes from the
 /// machine's package manager (Alpine's too: the controller's default box).
 pub(super) fn egress(env: &Environment) -> String {
-    let lab = env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", ");
+    let lab = env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", ");
     let lab6 = ipv6::egress_rule(env);
     let load = boot::at_boot(
         "egress",

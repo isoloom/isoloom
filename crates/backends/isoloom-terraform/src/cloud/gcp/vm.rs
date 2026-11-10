@@ -27,7 +27,6 @@ use std::net::Ipv4Addr;
 use crate::hcl_builder::Module;
 use isoloom_plan::{Environment, NetworkPlan};
 use isoloom_spec::images::is_windows;
-use isoloom_spec::net::Cidr;
 
 use super::{own_project, public_ip};
 use crate::cloud::Cloud;
@@ -158,7 +157,7 @@ fn gpu_interfaces(env: &Environment, name: &str) -> Option<String> {
 
 /// Where a gateway machine goes on the network it routes: the highest address nothing else takes.
 fn relocate(env: &Environment, net: &str) -> Option<Ipv4Addr> {
-    gateways::free_address(env, net, Cidr::parse(&env.networks.get(net)?.cidr)?)
+    gateways::free_address(env, net, env.networks.get(net)?.cidr)
 }
 
 /// A network's VPC's MTU: the one it sets, else Ethernet's 1500, as on every other target

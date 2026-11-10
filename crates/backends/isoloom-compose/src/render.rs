@@ -20,7 +20,6 @@ use isoloom_render::backend::Files;
 use isoloom_render::container::PROBE_IMAGE;
 use isoloom_render::{GeneratedFile, header};
 use isoloom_spec::model::Arch;
-use isoloom_spec::net::Cidr;
 
 use crate::backend::ComposeTarget;
 use crate::error::{Error, Result};
@@ -181,13 +180,12 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
         if shell {
             t.cap_add = vec!["NET_ADMIN".into(), "NET_RAW".into()];
         }
-        // The spec is validated: every block parses.
-        for (net, n) in &spec.networks {
+        for (net, n) in &env.networks {
             // On an IPv6-only network, Docker hands the tool its address.
             if ipv6::only(env, net) {
                 t.networks.insert(net.clone(), None);
-            } else if let Some(cidr) = Cidr::parse(&n.cidr) {
-                t.networks.insert(net.clone(), Some(Attachment::at(cidr.tool(i))));
+            } else if let Some(at) = n.cidr.tool(i) {
+                t.networks.insert(net.clone(), Some(Attachment::at(at)));
             }
         }
         if let (Some(port), Some(host)) = (tool.port, tool.publish) {

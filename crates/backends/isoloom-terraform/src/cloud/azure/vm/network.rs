@@ -21,7 +21,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     );
     // A dual-stack network's IPv6 block too: Azure takes unique local blocks.
     let v6 = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| string(v.cidr.as_str()));
-    let spaces = env.networks.values().map(|n| string(n.cidr.as_str())).chain(v6);
+    let spaces = env.networks.values().map(|n| string(n.cidr.to_string())).chain(v6);
     m.commented(
         "The environment's networks: one virtual network, a subnet per network with its exact range.",
         placed("azurerm_virtual_network", "env", reference("local.name"))
@@ -36,7 +36,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                 .add_attribute(("virtual_network_name", reference("azurerm_virtual_network.env.name")))
                 .add_attribute((
                     "address_prefixes",
-                    list(std::iter::once(&p.cidr).chain(p.ipv6.as_ref().map(|v| &v.cidr)).map(|c| string(c.as_str()))),
+                    list(std::iter::once(p.cidr.to_string()).chain(p.ipv6.as_ref().map(|v| v.cidr.clone())).map(string)),
                 ))
                 // An offline network gives an interface without a public address no way out:
                 // the cloud enforces `internet: false` besides the machines' own rules.

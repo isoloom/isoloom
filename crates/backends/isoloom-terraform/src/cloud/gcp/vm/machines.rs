@@ -79,7 +79,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
 fn firewalls(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Vec<Block> {
     let id = ident(name);
     let allowed = || list([reference("var.allowed_cidr")]);
-    let cidrs = |p: &NetworkPlan| list([string(p.cidr.as_str())]);
+    let cidrs = |p: &NetworkPlan| list([string(p.cidr.to_string())]);
     let Some(m) = env.spec().machines.get(name) else { return Vec::new() };
     let Some(first) = m.networks.keys().next() else { return Vec::new() };
     let mut out: Vec<Block> = reach::own(env, m)
@@ -274,7 +274,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let mut rules = env
         .networks
         .iter()
-        .map(|(n, p)| firewall(who, (&format!("net-{n}"), n), list([string(p.cidr.as_str())]), vec![allow("all", &[])]));
+        .map(|(n, p)| firewall(who, (&format!("net-{n}"), n), list([string(p.cidr.to_string())]), vec![allow("all", &[])]));
     if let Some(rule) = rules.next() {
         m.commented("The controller (Ansible): every network may reach it, and SSH from allowed_cidr.", rule);
     }

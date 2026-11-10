@@ -12,8 +12,7 @@ use super::text::str_of;
 use crate::draft::{LEFT_OUT, NoteKind, Notes};
 use crate::naming::{label, unique};
 use crate::{Error, Result};
-use isoloom_spec::net::Cidr;
-use isoloom_spec::net::PRIVATE;
+use isoloom_spec::net::{NetworkBlock, PRIVATE};
 
 /// Where re-addressed networks go: `10.88.<n>.0/24`.
 const READDRESS_BASE: &str = "10.88";
@@ -23,7 +22,7 @@ const READDRESS_BASE: &str = "10.88";
 #[derive(Debug)]
 pub(super) struct Net {
     pub(super) name: String,
-    pub(super) cidr: Cidr,
+    pub(super) cidr: NetworkBlock,
     pub(super) internet: bool,
     taken: BTreeSet<u8>,
 }
@@ -119,7 +118,7 @@ impl Default for Blocks {
 impl Blocks {
     /// The network's block: its subnet when that's a private /24 to /29, else the next
     /// `10.88.<n>.0/24`, with a note.
-    fn of(&mut self, at: &str, def: Option<&Value>, notes: &mut Notes) -> Result<Cidr> {
+    fn of(&mut self, at: &str, def: Option<&Value>, notes: &mut Notes) -> Result<NetworkBlock> {
         let subnet = def
             .and_then(|d| d.get("ipam"))
             .and_then(|i| i.get("config"))
@@ -129,12 +128,12 @@ impl Blocks {
             .and_then(str_of);
         let usable = subnet
             .as_deref()
-            .and_then(Cidr::parse)
-            .filter(|c| c.prefix() >= 24 && c.prefix() <= 29 && PRIVATE.iter().any(|r| r.contains(*c)));
+            .and_then(NetworkBlock::parse)
+            .filter(|c| PRIVATE.iter().any(|r| r.contains(c.cidr())));
         if let Some(c) = usable {
             return Ok(c);
         }
-        let cidr = Cidr::parse(&format!("{READDRESS_BASE}.{}.0/24", self.next)).ok_or_else(|| Error::NoBlockLeft {
+        let cidr = NetworkBlock::parse(&format!("{READDRESS_BASE}.{}.0/24", self.next)).ok_or_else(|| Error::NoBlockLeft {
             at: at.to_owned(),
             base: READDRESS_BASE,
         })?;

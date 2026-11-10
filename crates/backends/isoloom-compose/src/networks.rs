@@ -23,7 +23,7 @@ pub(crate) fn declared(env: &Environment, ts: &[trunks::Trunk]) -> IndexMap<Stri
         .iter()
         .map(|(name, n)| {
             let subnet = Block {
-                subnet: n.cidr.clone(),
+                subnet: n.cidr.to_string(),
                 gateway: Some(n.host.to_string()),
                 ip_range: None,
             };

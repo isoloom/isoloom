@@ -13,7 +13,7 @@ use crate::module::{ident, resource};
 /// is the VPC's, the others are added to it; with a gateway machine, one block holds them all),
 /// a route to the internet, and the key pair.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let nets: Vec<(&String, &String)> = env.networks.iter().map(|(n, p)| (n, &p.cidr)).collect();
+    let nets: Vec<(&String, String)> = env.networks.iter().map(|(n, p)| (n, p.cidr.to_string())).collect();
     let Some((_, first)) = nets.first() else { return };
     let whole = routing::vpc_block(env);
     m.commented(
@@ -110,7 +110,7 @@ pub(super) fn security_group(env: &Environment, (name, mp): (&str, &MachinePlan)
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")));
     let Some(m) = env.spec().machines.get(name) else { return b.build() };
     for (n, p) in reach::own(env, m) {
-        b = b.add_block(ingress(&format!("its network ({n})"), (0, 0), "-1", list([string(p.cidr.as_str())])));
+        b = b.add_block(ingress(&format!("its network ({n})"), (0, 0), "-1", list([string(p.cidr.to_string())])));
     }
     let allowed = || list([reference("var.allowed_cidr")]);
     b = b.add_block(if windows {
@@ -119,7 +119,7 @@ pub(super) fn security_group(env: &Environment, (name, mp): (&str, &MachinePlan)
         ingress("SSH from allowed_cidr", (22, 22), "tcp", allowed())
     });
     for (reach, plan) in reach::opening(env, m) {
-        let from = list([string(plan.cidr.as_str())]);
+        let from = list([string(plan.cidr.to_string())]);
         let what = format!("reach from {}", reach.from);
         if reach.ports.is_empty() {
             b = b.add_block(ingress(&what, (0, 0), "-1", from));
@@ -143,7 +143,7 @@ pub(super) fn controller_group(env: &Environment) -> Block {
         .add_attribute(("name", name_with(&format!("-{}", crate::machine::controller::NAME))))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")));
     for (n, p) in &env.networks {
-        b = b.add_block(ingress(n, (0, 0), "-1", list([string(p.cidr.as_str())])));
+        b = b.add_block(ingress(n, (0, 0), "-1", list([string(p.cidr.to_string())])));
     }
     b.add_block(ingress("SSH from allowed_cidr", (22, 22), "tcp", list([reference("var.allowed_cidr")])))
         .add_block(egress())

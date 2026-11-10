@@ -3,7 +3,7 @@
 
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Network, Spec, Tc};
-use crate::net::{Cidr, DOCKER_BLOCK, PRIVATE};
+use crate::net::{Cidr, DOCKER_BLOCK, NetworkBlock, PRIVATE};
 
 /// At least one network, unless the environment is cloud services.
 pub(super) fn declared(spec: &Spec, p: &mut Problems) {
@@ -64,7 +64,7 @@ pub(super) fn gateways(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
         match spec.machines.get(gw) {
             None => p.unknown(at, format!("no machine named `{gw}`")),
             Some(m) if !m.networks.contains_key(name) => {
-                let octet = block(blocks, name).map_or(1, Cidr::gateway_octet);
+                let octet = block(blocks, name).and_then(NetworkBlock::new).map_or(1, NetworkBlock::gateway_octet);
                 p.add(
                     at,
                     format!("attach `{gw}` to `{name}` at the gateway address: `networks: {{ {name}: {octet} }}`"),

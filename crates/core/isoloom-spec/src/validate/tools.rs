@@ -3,6 +3,7 @@
 
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Spec, TOOL_RECIPES};
+use crate::net::NetworkBlock;
 
 /// Tools take the addresses just below the controller on every network: no machine there.
 pub(super) fn reserved(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
@@ -11,8 +12,8 @@ pub(super) fn reserved(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
     }
     for (mname, m) in &spec.machines {
         for (net, octet) in &m.networks {
-            if let Some(c) = block(blocks, net)
-                && (0..spec.tools.len()).any(|i| c.tool(i).octets()[3] == *octet)
+            if let Some(c) = block(blocks, net).and_then(NetworkBlock::new)
+                && (0..spec.tools.len()).any(|i| c.tool(i).is_some_and(|t| t.octets()[3] == *octet))
             {
                 p.add(
                     format!("machines.{mname}.networks.{net}"),

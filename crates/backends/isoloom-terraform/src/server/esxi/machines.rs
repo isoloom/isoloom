@@ -6,7 +6,6 @@
 use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::router;
-use isoloom_spec::net::Cidr;
 
 use super::SERVICE_OS;
 use super::guest::{Guest, Nic};
@@ -27,7 +26,7 @@ fn bastion() -> Expression {
 
 /// The prefix length of a network's range.
 fn len(env: &Environment, net: &str) -> u8 {
-    env.networks.get(net).and_then(|n| Cidr::parse(&n.cidr)).map_or(32, Cidr::prefix)
+    env.block(net).prefix()
 }
 
 /// An interface on network `net` at `address`: its MTU, and the default route through the
@@ -122,14 +121,10 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut 
 /// through the router once every machine is set up (a Linux one's set-up done, a Windows one
 /// answering WinRM with its ready marker).
 fn controller(env: &Environment, m: &mut Module) {
-    let nics: Vec<Nic> = env
-        .networks
+    let nics: Vec<Nic> = controller::addresses(env)
         .iter()
         .enumerate()
-        .filter_map(|(n, (net, plan))| {
-            let c = Cidr::parse(&plan.cidr)?;
-            Some(nic(env, net, format!("{}/{}", c.controller(), c.prefix()), n == 0))
-        })
+        .map(|(n, (net, at))| nic(env, net, format!("{at}/{}", len(env, net)), n == 0))
         .collect();
     let Some(host) = nics.first().and_then(|n| n.addresses.first()?.split('/').next().map(str::to_owned)) else {
         return;

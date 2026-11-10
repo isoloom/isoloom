@@ -8,7 +8,6 @@ use crate::hcl_builder::{Block, Module, list, reference, string};
 use isoloom_plan::{Environment, Step};
 use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
-use isoloom_spec::net::Cidr;
 
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::machine::cloud_init::{self, CloudConfig, file};
@@ -25,10 +24,9 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     // The uplink (DHCP, its route out) first, then every network at the controller address.
     let mut nics = vec![nic("var.uplink_bridge", None)];
     let mut ips = vec![ip_config("dhcp", None)];
-    for (net, plan) in &env.networks {
-        nics.push(super::links::device(env, net, None, None));
-        let c = Cidr::parse(&plan.cidr);
-        ips.push(ip_config(&c.map(|c| format!("{}/{}", c.controller(), c.prefix())).unwrap_or_default(), None));
+    for (net, at) in controller::addresses(env) {
+        nics.push(super::links::device(env, &net, None, None));
+        ips.push(ip_config(&format!("{at}/{}", env.block(&net).prefix()), None));
     }
     let (cpus, memory, disk) = controller::size(env);
     let mut depends_on = vec![reference("proxmox_virtual_environment_vm.isoloom_router")];

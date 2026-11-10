@@ -158,7 +158,7 @@ fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> 
     let mut g = Nsg::new(&ident(name), name).sealed(crate::seal::sealed(env, mp));
     let Some(m) = env.spec().machines.get(name) else { return g.build() };
     for (n, p) in reach::own(env, m) {
-        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
+        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));
         if let Some(v6) = &p.ipv6 {
             g = g.allow(&format!("net-{n}-ipv6"), "*", "*", string(v6.cidr.as_str()));
         }
@@ -173,7 +173,8 @@ fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> 
         // both ends are IPv6.
         let both6 = from.ipv6.is_some() && env.networks.get(&reach.to).is_some_and(|to| to.ipv6.is_some());
         let v6 = from.ipv6.as_ref().filter(|_| both6).map(|v| (v.cidr.as_str(), "-ipv6"));
-        for (block, suffix) in std::iter::once((from.cidr.as_str(), "")).chain(v6) {
+        let v4 = from.cidr.to_string();
+        for (block, suffix) in std::iter::once((v4.as_str(), "")).chain(v6) {
             let rule = format!("reach-{i}-{}{suffix}", reach.from);
             g = reach_rules(g, &rule, &reach.ports, block);
         }
@@ -268,7 +269,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let id = "isoloom_controller";
     let mut g = Nsg::new(id, controller::NAME);
     for (n, p) in &env.networks {
-        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.as_str()));
+        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));
     }
     m.commented(
         "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",

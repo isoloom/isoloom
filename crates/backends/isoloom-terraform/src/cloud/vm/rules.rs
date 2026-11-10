@@ -6,7 +6,6 @@ use std::ops::RangeInclusive;
 
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_spec::model::{Ipv6Addresses, Machine};
-use isoloom_spec::net::Cidr;
 use isoloom_spec::windows::Tpm;
 
 use super::gpus::{self, GpuSizes};
@@ -424,7 +423,7 @@ impl Rules {
     /// Why the cloud can't make a network's subnet, if it can't: smaller than it makes.
     pub(crate) fn subnets(&self, env: &Environment) -> Option<String> {
         let Subnets { called, longest } = self.subnets?;
-        let small = env.networks.values().filter_map(|n| Cidr::parse(&n.cidr)).any(|c| c.prefix() > longest);
+        let small = env.networks.values().any(|n| n.cidr.prefix() > longest);
         small.then(|| format!("{} {called} are /{longest} or larger", self.cloud))
     }
 

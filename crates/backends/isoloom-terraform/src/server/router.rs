@@ -10,7 +10,6 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
-use isoloom_spec::net::Cidr;
 
 use crate::checks::{Invocation, Runner, output_block};
 use crate::machine::cloud_init::{self, CloudConfig, file};
@@ -102,11 +101,11 @@ pub(crate) fn sealed_reload() -> String {
 /// `sealed`, only those with internet (`internet: false` networks lose their egress and NAT at
 /// the router). `None` leaves the forward and masquerade rules out (every network is offline).
 fn forwarded(env: &Environment, sealed: bool) -> Option<String> {
-    let cidrs: Vec<&str> = env
+    let cidrs: Vec<String> = env
         .networks
         .iter()
         .filter(|(n, _)| !(sealed && seal::closed(env, n)))
-        .map(|(_, p)| p.cidr.as_str())
+        .map(|(_, p)| p.cidr.to_string())
         .collect();
     (!cidrs.is_empty()).then(|| format!("{{ {} }}", cidrs.join(", ")))
 }
@@ -116,7 +115,7 @@ fn forwarded(env: &Environment, sealed: bool) -> Option<String> {
 /// sealed, traffic to an `internet: false` network from elsewhere is dropped (so it keeps only
 /// its `reach` rules), and that network is dropped from the internet forward and masquerade.
 fn rules(env: &Environment, sealed: bool) -> String {
-    let lab = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.as_str()).collect::<Vec<_>>().join(", "));
+    let lab = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", "));
     let mut forward: Vec<String> = router::forward_rules(env.spec());
     let mut dnat = Vec::new();
     for (name, m) in &env.spec().machines {
@@ -130,11 +129,11 @@ fn rules(env: &Environment, sealed: bool) -> String {
         }
     }
     if sealed {
-        let closed: Vec<&str> = env
+        let closed: Vec<String> = env
             .networks
             .iter()
             .filter(|(n, _)| seal::closed(env, n))
-            .map(|(_, p)| p.cidr.as_str())
+            .map(|(_, p)| p.cidr.to_string())
             .collect();
         if !closed.is_empty() {
             forward.push(format!("ip daddr {{ {} }} drop", closed.join(", ")));
@@ -229,8 +228,8 @@ fn first_address(env: &Environment, name: &str) -> Option<String> {
 pub(crate) fn check_host(env: &Environment, p: &Position) -> Option<(String, String)> {
     let machine = crate::machine::check_machine(env, p)?;
     if machine == controller::NAME {
-        let first = env.networks.values().next().and_then(|n| Cidr::parse(&n.cidr))?;
-        return Some((machine.to_owned(), first.controller().to_string()));
+        let first = controller::addresses(env).into_values().next()?;
+        return Some((machine.to_owned(), first.to_string()));
     }
     first_address(env, machine).map(|a| (machine.to_owned(), a))
 }

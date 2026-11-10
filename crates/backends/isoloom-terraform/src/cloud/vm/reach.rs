@@ -29,7 +29,7 @@ pub(crate) struct Rule<'a> {
     /// The other network.
     pub(crate) network: &'a str,
     /// Its block.
-    pub(crate) cidr: &'a str,
+    pub(crate) cidr: String,
     /// The ports, TCP and UDP (empty: everything).
     pub(crate) ports: &'a [u16],
 }
@@ -44,7 +44,7 @@ pub(crate) fn into<'a>(env: &'a Environment, net: &str) -> Vec<Rule<'a>> {
             let (name, p) = env.networks.get_key_value(&r.from)?;
             Some(Rule {
                 network: name,
-                cidr: &p.cidr,
+                cidr: p.cidr.to_string(),
                 ports: &r.ports,
             })
         })
@@ -61,7 +61,7 @@ pub(crate) fn out_of<'a>(env: &'a Environment, net: &str) -> Vec<Rule<'a>> {
             let (name, p) = env.networks.get_key_value(&r.to)?;
             Some(Rule {
                 network: name,
-                cidr: &p.cidr,
+                cidr: p.cidr.to_string(),
                 ports: &r.ports,
             })
         })

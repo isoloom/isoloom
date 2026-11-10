@@ -7,7 +7,6 @@
 
 use crate::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
-use isoloom_spec::net::Cidr;
 
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::linode::{Action, Way, rule};
@@ -30,7 +29,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             resource("linode_vpc_subnet", &ident(net))
                 .add_attribute(("vpc_id", reference("linode_vpc.env.id")))
                 .add_attribute(("label", string(net.as_str())))
-                .add_attribute(("ipv4", string(p.cidr.as_str())))
+                .add_attribute(("ipv4", string(p.cidr.to_string())))
                 .build(),
         );
     }
@@ -40,7 +39,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         };
         m.commented(
             &format!("Machine `{name}` on `{net}`: what may reach it, and where it may not go."),
-            firewall(env, (name, mp), (net, &plan.cidr)),
+            firewall(env, (name, mp), (net, &plan.cidr.to_string())),
         );
     }
 }
@@ -62,13 +61,13 @@ fn reach_rules(way: Way, rules: &[Rule<'_>]) -> Vec<Block> {
     for r in rules {
         let label = format!("reach-{}", r.network);
         if r.ports.is_empty() {
-            out.extend(everything((way, Action::Accept), &label, r.cidr));
+            out.extend(everything((way, Action::Accept), &label, &r.cidr));
             continue;
         }
         let ports = r.ports.iter().map(ToString::to_string).collect::<Vec<_>>().join(",");
         for protocol in ["TCP", "UDP"] {
             let l = format!("{label}-{}", protocol.to_lowercase());
-            out.push(rule((way, Action::Accept), &l, protocol, Some(ports.clone()), list([string(r.cidr)])));
+            out.push(rule((way, Action::Accept), &l, protocol, Some(ports.clone()), list([string(r.cidr.as_str())])));
         }
     }
     out
@@ -109,7 +108,7 @@ fn firewall(env: &Environment, (name, mp): (&str, &MachinePlan), (net, cidr): (&
         b = b.add_blocks(everything((Way::Out, Action::Accept), "vpc-out", cidr));
     }
     for (other, p) in env.networks.iter().filter(|(n, _)| n.as_str() != net) {
-        b = b.add_blocks(everything((Way::Out, Action::Drop), &format!("no-{other}"), &p.cidr));
+        b = b.add_blocks(everything((Way::Out, Action::Drop), &format!("no-{other}"), &p.cidr.to_string()));
     }
     b.add_attribute(("linodes", list([reference(&format!("linode_instance.{}.id", ident(name)))])))
         .build()
@@ -118,7 +117,7 @@ fn firewall(env: &Environment, (name, mp): (&str, &MachinePlan), (net, cidr): (&
 /// A machine's routes to the other networks, through its subnet's gateway (the VPC routes
 /// between subnets; its default route is the public interface's): at every boot.
 pub(super) fn routes(env: &Environment, net: &str) -> Vec<Template> {
-    let Some(gateway) = env.networks.get(net).and_then(|p| Cidr::parse(&p.cidr)).map(Cidr::gateway) else {
+    let Some(gateway) = env.networks.get(net).map(|p| p.cidr.gateway()) else {
         return Vec::new();
     };
     env.networks

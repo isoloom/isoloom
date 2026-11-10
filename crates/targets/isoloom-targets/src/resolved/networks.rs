@@ -3,16 +3,16 @@
 
 use isoloom_render::router;
 use isoloom_spec::model::Spec;
-use isoloom_spec::net::Cidr;
+use isoloom_spec::net::NetworkBlock;
 use isoloom_spec::net::docker_cidrs;
 use serde_json::{Map, Value, json};
 
-/// One address per network of the spec, `at` its block. A network whose block doesn't parse
-/// (a spec that isn't valid) has no address.
-fn per_network(spec: &Spec, at: impl Fn(Cidr) -> String) -> Map<String, Value> {
+/// One address per network of the spec, `at` its block. A network whose block isn't a
+/// network's (a spec that isn't valid) has no address, nor one where `at` gives none.
+fn per_network(spec: &Spec, at: impl Fn(NetworkBlock) -> Option<String>) -> Map<String, Value> {
     spec.networks
         .iter()
-        .filter_map(|(name, n)| Some((name.clone(), json!(at(Cidr::parse(&n.cidr)?)))))
+        .filter_map(|(name, n)| Some((name.clone(), json!(at(NetworkBlock::parse(&n.cidr)?)?))))
         .collect()
 }
 
@@ -22,7 +22,7 @@ pub(super) fn networks(spec: &Spec, routed: bool) -> Map<String, Value> {
     let docker_blocks: Map<String, Value> = docker_cidrs(spec).into_iter().map(|(n, c)| (n, json!(c.to_string()))).collect();
     let mut networks = Map::new();
     for (name, n) in &spec.networks {
-        let Some(c) = Cidr::parse(&n.cidr) else { continue };
+        let Some(c) = NetworkBlock::parse(&n.cidr) else { continue };
         let mut network = Map::new();
         network.insert("cidr".into(), json!(n.cidr));
         network.insert("docker_cidr".into(), docker_blocks.get(name).cloned().unwrap_or(Value::Null));
@@ -51,8 +51,8 @@ pub(super) fn tools(spec: &Spec, docker: &Spec) -> Map<String, Value> {
                     "image": t.image.clone().or_else(|| (n == "shell").then(|| "nicolaka/netshoot".to_owned())),
                     "port": t.port,
                     "publish": t.publish,
-                    "addresses": per_network(spec, |c| c.tool(i).to_string()),
-                    "docker_addresses": per_network(docker, |c| c.tool(i).to_string()),
+                    "addresses": per_network(spec, |c| c.tool(i).map(|a| a.to_string())),
+                    "docker_addresses": per_network(docker, |c| c.tool(i).map(|a| a.to_string())),
                 }),
             )
         })
@@ -75,6 +75,6 @@ pub(super) fn controller(spec: &Spec) -> Value {
     json!({
         "role": "infra",
         "keep_running": spec.controller.as_ref().is_some_and(|c| c.keep_running),
-        "addresses": per_network(spec, |c| c.controller().to_string()),
+        "addresses": per_network(spec, |c| Some(c.controller().to_string())),
     })
 }

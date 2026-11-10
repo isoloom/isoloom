@@ -5,34 +5,38 @@
 use std::net::Ipv4Addr;
 
 use isoloom_spec::model::{Machine, Spec};
-use isoloom_spec::net::Cidr;
+use isoloom_spec::net::NetworkBlock;
 use isoloom_spec::validate::starts_after;
 
 /// A block that stands in for one that doesn't parse: 0.0.0.0/24, whose reserved addresses
 /// (gateway, controller, router, tools) all exist, so nothing computed from it overflows.
-const UNPARSED: Cidr = Cidr::enclosing(std::net::Ipv4Addr::UNSPECIFIED, 24);
+const UNPARSED: NetworkBlock = NetworkBlock::enclosing(std::net::Ipv4Addr::UNSPECIFIED, 24);
 
-/// A network's block: the one place the plan and the backends read a network's `cidr`.
-/// Validation rejects a block that doesn't parse and a network nothing declares, so a validated
-/// spec never meets `UNPARSED`; an unvalidated one gets 0.0.0.0 addresses in its output instead
-/// of a crash.
+/// A network's block: the one place the plan reads a network's `cidr`; the backends read the
+/// plan's ([`crate::NetworkPlan::cidr`]). Validation rejects a block that doesn't parse or isn't
+/// a /24 to /29, and a network nothing declares, so a validated spec never meets `UNPARSED`; an
+/// unvalidated one gets 0.0.0.0 addresses in its output instead of a crash.
 #[must_use]
-pub fn cidr(spec: &Spec, network: &str) -> Cidr {
-    spec.networks.get(network).and_then(|n| Cidr::parse(&n.cidr)).unwrap_or(UNPARSED)
+pub fn cidr(spec: &Spec, network: &str) -> NetworkBlock {
+    spec.networks.get(network).and_then(|n| NetworkBlock::parse(&n.cidr)).unwrap_or(UNPARSED)
+}
+
+impl crate::Environment {
+    /// Network `network`'s block on this target: the plan's [`crate::NetworkPlan::cidr`], read
+    /// the way [`cidr`] reads the spec's, so a network the plan doesn't hold (which nothing of a
+    /// validated spec names) has the same stand-in block.
+    #[must_use]
+    pub fn block(&self, network: &str) -> NetworkBlock {
+        self.networks.get(network).map_or_else(|| cidr(self.spec(), network), |n| n.cidr)
+    }
 }
 
 /// A machine's address on a network (validated specs only): the block's last byte set to the
 /// machine's octet. Validation keeps the octet a host address of the block or its gateway's,
-/// and the block a /24 or smaller, so the address lies in the block.
+/// so the address lies in the block.
 #[must_use]
 pub fn address(spec: &Spec, network: &str, octet: u8) -> Ipv4Addr {
-    Ipv4Addr::from((cidr(spec, network).base() & !0xff) | u32::from(octet))
-}
-
-/// Dotted netmask of a network.
-#[must_use]
-pub fn netmask(spec: &Spec, network: &str) -> Ipv4Addr {
-    cidr(spec, network).netmask()
+    cidr(spec, network).with_octet(octet)
 }
 
 /// The host's own address on a network (Docker's bridge): the gateway address, unless a
@@ -110,7 +114,7 @@ mod tests {
 
     const SPEC: &str = "version: 1
 name: t
-networks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/16 }, c: { cidr: 10.3.0.0/24, gateway: fw } }
+networks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/25 }, c: { cidr: 10.3.0.0/24, gateway: fw } }
 machines:
   web: { networks: { a: 10, b: 20 }, aliases: [www, site], depends_on: [db], app: { image: nginx } }
   db: { networks: { b: 30 }, app: { image: postgres } }
@@ -124,9 +128,10 @@ machines:
         let spec = testing::spec(SPEC);
         assert_eq!(address(&spec, "a", 10), Ipv4Addr::new(10, 1, 0, 10));
         assert_eq!(address(&spec, "b", 30), Ipv4Addr::new(10, 2, 0, 30));
-        assert_eq!(netmask(&spec, "a"), Ipv4Addr::new(255, 255, 255, 0));
-        assert_eq!(netmask(&spec, "b"), Ipv4Addr::new(255, 255, 0, 0));
+        assert_eq!(cidr(&spec, "b").netmask(), Ipv4Addr::new(255, 255, 255, 128));
         assert_eq!(cidr(&spec, "nowhere"), UNPARSED);
+        let wide = testing::spec(&SPEC.replace("10.2.0.0/25", "10.2.0.0/16"));
+        assert_eq!(cidr(&wide, "b"), UNPARSED, "no network's size: validation refuses it");
     }
 
     #[test]

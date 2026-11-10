@@ -89,3 +89,16 @@ fn a_start_order_cycle_is_named_along_its_path() {
     assert_eq!(chain(""), Vec::<String>::new());
     assert_eq!(chain("b"), ["machines: depends_on forms a cycle: b -> c -> b"]);
 }
+
+/// A network block of a size no network has (every address, a single one) is reported, and
+/// the checks of the addresses Isoloom reserves in a block skip it rather than overflow: the
+/// tools', the gateway's and the machines'.
+#[test]
+fn a_block_of_no_networks_size_is_reported_not_overflowed() {
+    for cidr in ["0.0.0.0/0", "255.255.255.255/32"] {
+        let found = problems(&format!(
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: {cidr}, gateway: gw }} }}\ntools: {{ shell: {{}} }}\nmachines:\n  gw: {{ networks: {{ lan: 1 }}, docker: {{ image: router }} }}\n  web: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }} }}\n"
+        ));
+        assert!(found.iter().any(|p| p.starts_with("networks.lan.cidr: ")), "{cidr}: {found:?}");
+    }
+}

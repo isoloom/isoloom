@@ -10,15 +10,16 @@ use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
 use isoloom_spec::model::{Bridged, Machine, Spec};
+use isoloom_spec::net::NetworkBlock;
 
-use crate::addressing::address;
+use crate::addressing::{address, cidr};
 use crate::requirements::Requirement;
 
 /// A network outside the environment, as the plan keeps it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutsideNetwork {
     /// Its block, as the author wrote it (the network's real one).
-    pub cidr: String,
+    pub cidr: NetworkBlock,
     /// How the machines get onto it.
     pub join: Join,
 }
@@ -52,7 +53,7 @@ pub(crate) fn networks(spec: &Spec) -> IndexMap<String, OutsideNetwork> {
                 (None, Some(b)) => Join::Bridged(b.clone()),
                 (None, None) => return None,
             };
-            Some((name.clone(), OutsideNetwork { cidr: n.cidr.clone(), join }))
+            Some((name.clone(), OutsideNetwork { cidr: cidr(spec, name), join }))
         })
         .collect()
 }
@@ -146,7 +147,7 @@ overrides:
         assert_eq!(env.spec().networks.len(), 1);
         assert_eq!(env.outside["corp"].join, Join::Existing("corp-net".into()));
         // The existing network keeps its own block on Docker.
-        assert_eq!(env.outside["corp"].cidr, "192.168.50.0/24");
+        assert_eq!(env.outside["corp"].cidr.to_string(), "192.168.50.0/24");
         let a = &env.machines["a"];
         assert_eq!(a.addresses.keys().collect::<Vec<_>>(), ["lan"]);
         assert_eq!(a.outside["corp"], OutsideAddress::Fixed("192.168.50.20".parse().unwrap()));

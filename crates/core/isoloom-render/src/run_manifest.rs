@@ -224,7 +224,7 @@ pub fn networks(env: &Environment, native: impl Fn(&str) -> Template) -> Result<
         .map(|(name, n)| {
             Ok(Network {
                 name: Name::parse(name)?,
-                cidr: Cidr::parse(&n.cidr)?,
+                cidr: Cidr::parse(&n.cidr.to_string())?,
                 internet: n.internet,
                 native: Some(native(name)),
             })

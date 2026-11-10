@@ -101,7 +101,7 @@ machines:
     fn dual_stack_keeps_both_blocks_and_ipv6_only_drops_ipv4() {
         let env = environment(SPEC);
         let v4 = |n: &str| Block {
-            subnet: env.networks[n].cidr.clone(),
+            subnet: env.networks[n].cidr.to_string(),
             gateway: None,
             ip_range: None,
         };
