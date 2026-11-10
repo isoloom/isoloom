@@ -319,3 +319,28 @@ fn a_secret_with_an_owner_is_copied_into_memory_with_it() -> Outcome {
     );
     Ok(())
 }
+
+#[test]
+fn a_setup_script_with_a_space_is_one_configmap_key_its_job_runs() -> Outcome {
+    let env = parsed(
+        "version: 1
+name: t
+networks: { lan: { cidr: 10.9.0.0/24 } }
+machines:
+  web: { networks: { lan: 10 }, app: { image: nginx:1.27 }, setup: [build/cache/my seed.sh, build/cache/a_b.sh] }
+",
+    )?;
+    let files = KubernetesBackend.render(&env)?;
+    let kustomization = file(&files, "kubernetes/kustomization.yaml")?;
+    assert!(
+        kustomization.contains("build__cache__my_20seed.sh=chart/files/project/build/cache/my seed.sh"),
+        "{kustomization}"
+    );
+    assert!(kustomization.contains("build__cache__a_5fb.sh=chart/files/project/build/cache/a_b.sh"), "{kustomization}");
+    let environment = file(&files, "kubernetes/environment.yaml")?;
+    assert!(
+        environment.contains("sh /isoloom/scripts/build__cache__my_20seed.sh && sh /isoloom/scripts/build__cache__a_5fb.sh"),
+        "{environment}"
+    );
+    Ok(())
+}

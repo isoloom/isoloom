@@ -337,6 +337,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **Kubernetes: a project script's `ConfigMap` key is valid and its own.** A key was the path
+  with `/` as `__`: a space (`setup: [build/cache/my seed.sh]`) gave an invalid key and an
+  unquoted `sh` command, and `a/b__c` and `a__b/c` shared one. Any byte but a letter, digit, `-`
+  or `.` is now `_` and its two hex digits (`/` stays `__`), so every path has its own key, a
+  single word.
 - **`isoloom generate` refuses a bad `.isoloom/.generated` before it writes anything**: it wrote
   every file, then refused the list (a path outside `.isoloom/`, one reached through a link),
   leaving a half-done generation.

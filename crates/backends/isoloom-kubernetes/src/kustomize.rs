@@ -77,9 +77,23 @@ impl Kustomization {
     }
 }
 
-/// A `ConfigMap` key for a project file (keys allow letters, digits, `-`, `_` and `.`).
+/// A `ConfigMap` key for a project file, one per path: keys allow only letters, digits, `-`, `_`
+/// and `.`, so a `/` is written `__` and any other byte, `_` included, `_` and its two hex digits
+/// (`my seed.sh` is `my_20seed.sh`). Every escape starts with `_`, so two paths never share a key,
+/// and the key is a single word a shell command can name unquoted.
 pub(crate) fn key(path: &str) -> String {
-    path.replace('/', "__")
+    let mut out = String::with_capacity(path.len());
+    for b in path.bytes() {
+        match b {
+            b'/' => out.push_str("__"),
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'.' => out.push(char::from(b)),
+            other => {
+                out.push('_');
+                out.extend([other >> 4, other & 0xf].into_iter().filter_map(|d| char::from_digit(d.into(), 16)));
+            }
+        }
+    }
+    out
 }
 
 /// The environment's kustomization: its manifests, and the project's `scripts` (paths from the
@@ -134,7 +148,22 @@ mod tests {
         assert_eq!(project_scripts(&text).unwrap(), Vec::<String>::new());
     }
 
+    #[test]
+    fn a_key_is_a_configmap_key_and_one_per_path() {
+        assert_eq!(key("build/cache/seed.sh"), "build__cache__seed.sh");
+        assert_eq!(key("build/cache/my seed.sh"), "build__cache__my_20seed.sh");
+        assert_ne!(key("a/b__c"), key("a__b/c"));
+        assert_eq!(key("a_b"), "a_5fb");
+    }
+
     proptest! {
+        #[test]
+        fn two_paths_never_share_a_key(a in "[a-z_/ é.-]{1,8}", b in "[a-z_/ é.-]{1,8}") {
+            prop_assume!(a != b);
+            prop_assert_ne!(key(&a), key(&b));
+            prop_assert!(key(&a).chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c)), "{}", key(&a));
+        }
+
         #[test]
         fn any_scripts_read_back_are_those_written(scripts in prop::collection::vec("[a-z0-9_.-]{1,8}(/[a-z0-9_.-]{1,8}){0,2}", 0..4)) {
             let text = serde_yaml_ng::to_string(&environment("isoloom-x", &scripts, &Labels::new())).expect("writes");
