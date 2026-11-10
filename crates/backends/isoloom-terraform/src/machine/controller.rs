@@ -22,7 +22,7 @@ use crate::module::{ident, resource};
 pub(crate) const OS: &str = "debian-12";
 
 /// Its name: its host name, and its machine in a run manifest.
-pub(crate) const NAME: &str = "isoloom-controller";
+pub(crate) const NAME: &str = isoloom_render::controller::NAME;
 /// Where its key is uploaded before its set-up (then moved to `/etc/isoloom`).
 const KEY_UPLOAD: &str = "/tmp/isoloom-controller-key";
 /// Where its inventory is uploaded before its set-up.
@@ -31,10 +31,6 @@ const INVENTORY_UPLOAD: &str = "/tmp/isoloom-inventory.ini";
 /// The mode of its key and its inventory: owner-only (root's), as the inventory holds the Windows
 /// machines' password and only root runs the playbooks and checks that read it.
 pub(crate) const OWNER_ONLY: &str = "0600";
-
-/// Ansible in a virtual environment (pywinrm for the Windows machines), once.
-pub(crate) const ANSIBLE: &str =
-    "[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }";
 
 /// Whether the environment needs a controller: its playbooks, or its checks when no Linux
 /// machine can run them (a Windows-only environment).
@@ -87,9 +83,17 @@ pub(crate) fn addresses(env: &Environment) -> IndexMap<String, Ipv4Addr> {
         .collect()
 }
 
+/// Its key's resource ([`write_key`]).
+const KEY: &str = "tls_private_key.controller";
+
 /// Its public key, as `authorized_keys` takes it.
 pub(crate) fn public_key() -> Expression {
-    call("trimspace", [reference("tls_private_key.controller.public_key_openssh")])
+    call("trimspace", [reference(&format!("{KEY}.public_key_openssh"))])
+}
+
+/// Its private key, OpenSSH's format, as it is written onto the controller.
+pub(crate) fn private_key() -> Expression {
+    reference(&format!("{KEY}.private_key_openssh"))
 }
 
 /// Run by a machine's SSH user: the controller may log in as it.
@@ -182,7 +186,7 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
         "mkdir -p {CONFIG_DIR} && install -m {OWNER_ONLY} {KEY_UPLOAD} {CONTROLLER_KEY} && install -m {OWNER_ONLY} {INVENTORY_UPLOAD} {CONTROLLER_INVENTORY} && rm -f {KEY_UPLOAD} {INVENTORY_UPLOAD}\n"
     );
     let packages = install_packages();
-    for script in [install.as_str(), packages.as_str(), ANSIBLE] {
+    for script in [install.as_str(), packages.as_str(), isoloom_render::controller::INSTALL_ANSIBLE] {
         cmds.push(Shell::Sudo.command(script).into());
     }
     cmds.extend(waits.iter().map(|w| Template::from(Shell::Sudo.command(w))));
@@ -198,7 +202,7 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
                 destination: steps::PROJECT_ARCHIVE,
             },
             Upload::Content {
-                content: reference("tls_private_key.controller.private_key_openssh"),
+                content: private_key(),
                 destination: KEY_UPLOAD.to_owned(),
             },
             Upload::Content {

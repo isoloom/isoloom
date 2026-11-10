@@ -69,7 +69,7 @@ fn cloud_config(env: &Environment) -> CloudConfig {
     config.file_lists.push(reference("local.project_files"));
     let inventory = controller::inventory_template(env, Access::proxmox).into_expression();
     config.files = vec![
-        file(CONTROLLER_KEY, Some(OWNER_ONLY), reference("tls_private_key.controller.private_key_openssh")),
+        file(CONTROLLER_KEY, Some(OWNER_ONLY), crate::machine::controller::private_key()),
         file(CONTROLLER_INVENTORY, Some(OWNER_ONLY), inventory),
     ];
     if let Some(trust) = steps::trust_authorities(env) {
@@ -78,7 +78,7 @@ fn cloud_config(env: &Environment) -> CloudConfig {
     if let Some(hosts) = controller::hosts(env) {
         config.track("hosts file", &Shell::Root.command(&hosts));
     }
-    config.track("installing Ansible", &Shell::Root.command(controller::ANSIBLE));
+    config.track("installing Ansible", &Shell::Root.command(isoloom_render::controller::INSTALL_ANSIBLE));
     for (name, wait) in controller::linux_waits(env, &|_| crate::machine::USER.to_owned()) {
         config.track(&format!("waiting for {name}"), &wait);
     }

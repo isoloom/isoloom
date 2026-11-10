@@ -83,7 +83,8 @@ pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Positi
     let run_playbook = |path: &str| {
         let (folder, playbook) = path.rsplit_once('/').unwrap_or((".", path));
         format!(
-            "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False && cd {} && ansible-playbook -i {CONTROLLER_INVENTORY} {}",
+            "{} && cd {} && ansible-playbook -i {CONTROLLER_INVENTORY} {}",
+            isoloom_render::controller::PLAYBOOK_ENVIRONMENT,
             quote(&format!("{PROJECT_DIR}/{folder}")),
             quote(playbook)
         )

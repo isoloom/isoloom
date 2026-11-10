@@ -3,7 +3,7 @@
 //! data, the site's certificate authorities, the hosts file, Ansible, then a wait for each machine's own set-up (its ready file over
 //! SSH, a Windows machine's marker over WinRM) before the playbooks run.
 
-use crate::hcl_builder::{Expression, Template, call, reference};
+use crate::hcl_builder::{Expression, Template, call};
 use isoloom_plan::{Environment, MachinePlan, Step};
 use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
@@ -28,7 +28,7 @@ pub(crate) fn set_up(env: &Environment, user: &dyn Fn(&MachinePlan) -> String, i
     part.push(project_wait());
     part.push(Tracked::new(
         "the controller's key",
-        written(CONTROLLER_KEY, reference("tls_private_key.controller.private_key_openssh")),
+        written(CONTROLLER_KEY, crate::machine::controller::private_key()),
     ));
     part.push(Tracked::new("the inventory", written(CONTROLLER_INVENTORY, inventory.into_expression())));
     let root = |s: Option<String>| s.map(|s| Shell::Root.command(&s));
@@ -42,7 +42,7 @@ pub(crate) fn set_up(env: &Environment, user: &dyn Fn(&MachinePlan) -> String, i
         part.push(Tracked::new("hosts file", hosts));
     }
     part.push(Tracked::new("packages", Shell::Root.command(&controller::install_packages())));
-    part.push(Tracked::new("installing Ansible", Shell::Root.command(controller::ANSIBLE)));
+    part.push(Tracked::new("installing Ansible", Shell::Root.command(isoloom_render::controller::INSTALL_ANSIBLE)));
     for (name, wait) in controller::linux_waits(env, user) {
         part.push(Tracked::new(format!("waiting for {name}"), wait));
     }

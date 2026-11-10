@@ -22,6 +22,20 @@ use isoloom_spec::shell::quote;
 
 use crate::inventory::CONTROLLER_INVENTORY;
 
+/// The controller's name on every target: its host name, its VM's, and its machine in a run
+/// manifest. Under Isoloom's own prefix, which no machine of the spec takes.
+pub const NAME: &str = "isoloom-controller";
+
+/// Ansible in a virtual environment at `/opt/ansible` (pywinrm for the Windows machines), once:
+/// the one pin of the Ansible every controller runs.
+pub const INSTALL_ANSIBLE: &str =
+    "[ -x /opt/ansible/bin/ansible-playbook ] || { python3 -m venv /opt/ansible && /opt/ansible/bin/pip install -q 'ansible-core>=2.15,<2.17' pywinrm; }";
+
+/// What any playbook the controller runs needs in its environment: the Ansible
+/// [`INSTALL_ANSIBLE`] installs, first on the `PATH`, and no host-key checking (see
+/// [`ENVIRONMENT`]), as one `export`.
+pub const PLAYBOOK_ENVIRONMENT: &str = "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False";
+
 /// Runs of a playbook in all: the first and up to three again.
 const ATTEMPTS: u32 = 4;
 
@@ -42,7 +56,7 @@ pub fn provision_script(spec: &Spec, limit: &[String]) -> String {
         format!(" --limit {}", shell::quote(&limit.join(",")))
     };
     let head = format!(
-        "set -e\nmkdir -p /tmp/isoloom-facts\n{ENVIRONMENT}\nmkdir -p {RETRY_DIR}\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH={RETRY_DIR}\n{}",
+        "set -e\nmkdir -p /tmp/isoloom-facts\n{PLAYBOOK_ENVIRONMENT} {ENVIRONMENT}\nmkdir -p {RETRY_DIR}\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH={RETRY_DIR}\n{}",
         helpers()
     );
     let plays: String = spec.provision.iter().map(|step| play(step, &limit)).collect();
@@ -82,8 +96,7 @@ fn vars(step: &Provision) -> String {
 /// SSH steps pipelined (a no-op over WinRM). `ANSIBLE_HOST_KEY_CHECKING=False` is a deliberate
 /// trade-off: the environment's hosts are freshly created and ephemeral, with no stable
 /// `known_hosts` for the controller to trust, so host-key checking inside its networks is off.
-const ENVIRONMENT: &str = "export PATH=\"/opt/ansible/bin:$PATH\" ANSIBLE_HOST_KEY_CHECKING=False \
-ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
+const ENVIRONMENT: &str = "ANSIBLE_GATHERING=smart ANSIBLE_FORKS=20 ANSIBLE_PIPELINING=True ANSIBLE_CACHE_PLUGIN=jsonfile \
 ANSIBLE_CACHE_PLUGIN_CONNECTION=/tmp/isoloom-facts ANSIBLE_CACHE_PLUGIN_TIMEOUT=7200";
 
 /// Failure messages that are the connection dropping, not the task failing, as extended

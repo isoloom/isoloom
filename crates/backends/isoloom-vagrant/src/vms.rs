@@ -68,7 +68,7 @@ const DIR: &str = "vagrant";
 /// The define names of Isoloom's own VMs (the router's is `router::NAME`), which are also their
 /// display names, step ids and file names: under the prefix a lab machine can't take, so none is
 /// ever a machine's.
-pub(crate) const CONTROLLER: &str = "isoloom-controller";
+pub(crate) const CONTROLLER: &str = isoloom_render::controller::NAME;
 const TOOL_SHELL: &str = "isoloom-tool-shell";
 /// Whether the host is an ARM one, in Ruby.
 const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
