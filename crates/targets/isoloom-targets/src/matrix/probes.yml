@@ -364,9 +364,11 @@ rows:
     patch: { provision: [{ ansible: site.yml }] }
   - field: checks[].http
     about: an HTTP check
+    features: [existing-host-checks-from-no-host]
     patch: { machines: { m: { ports: { web: { port: 80, protocol: http } } } }, checks: [{ http: "http://m/" }] }
   - field: checks[].tcp
     about: a TCP check
+    features: [existing-host-checks-from-no-host]
     patch: { checks: [{ tcp: "m:6379" }] }
   - field: checks[].exec
     about: a command run inside a machine
@@ -387,6 +389,7 @@ rows:
   - field: checks[]
     value: "*.sh"
     about: a check that is a project script
+    features: [existing-host-script-checks]
     patch: { checks: [check.sh] }
   - field: tools
     about: a toolbox beside the environment, on every network

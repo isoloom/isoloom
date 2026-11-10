@@ -92,7 +92,7 @@ pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Positi
     };
     let render = isoloom_render::checks::Render {
         host: &host,
-        script: &isoloom_render::checks::script_command,
+        script: Some(&isoloom_render::checks::script_command),
         playbook: Some(&run_playbook),
     };
     GeneratedFile {

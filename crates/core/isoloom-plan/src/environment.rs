@@ -472,6 +472,7 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
     out.extend(outside::requirements(spec));
     out.extend(requirements::mixed_shapes(laid_out, shape));
     out.extend(crate::machine_files::requirements(laid_out, shape));
+    out.extend(crate::existing_hosts::check_requirement(laid_out, shape));
     out.extend(requirements::tpm(machines));
     out.extend(crate::boot::requirements(machines));
     out.extend(hardware::requirements(laid_out, shape));

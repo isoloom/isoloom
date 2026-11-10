@@ -62,7 +62,7 @@ fn runner(checks: &[Resolved], playbooks: bool) -> String {
     let playbook: &dyn Fn(&str) -> String = &run_playbook;
     let r = Render {
         host: &host,
-        script: &run_script,
+        script: Some(&run_script),
         playbook: playbooks.then_some(playbook),
     };
     script(&Position::Machine("user".into()), &checks.iter().collect::<Vec<_>>(), &r)

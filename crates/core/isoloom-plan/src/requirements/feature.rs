@@ -43,6 +43,8 @@ named! {
     BridgedNetworks => "bridged-networks",
     OwnedProjectFiles => "owned-project-files",
     ExistingHostFiles => "existing-host-files",
+    ExistingHostScriptChecks => "existing-host-script-checks",
+    ExistingHostChecksFromNoHost => "existing-host-checks-from-no-host",
     Tpm => "tpm",
     MachineProcess => "machine-process",
     OwnBoot => "own-boot",

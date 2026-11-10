@@ -123,12 +123,12 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `overrides.*.networks.*.external` | a network that exists already, joined by name | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
 | `dns.private = true` | the machines' names served under a private DNS zone | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `provision` | the environment's own Ansible, run from a controller | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | – |
-| `checks[].http` | an HTTP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `checks[].tcp` | a TCP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `checks[].http` | an HTTP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `checks[].tcp` | a TCP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `checks[].exec` | a command run inside a machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `checks[].exec` | a command run inside an access machine the runner's image table supplies | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `checks[] = *.yml` | a check that is an Ansible playbook | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `checks[] = *.sh` | a check that is a project script | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `checks[] = *.yml` | a check that is an Ansible playbook | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `checks[] = *.sh` | a check that is a project script | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `tools` | a toolbox beside the environment, on every network | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `constraints.proxy` | an HTTP proxy every machine goes through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `constraints.registries` | a registry mirror every image is pulled through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
@@ -596,10 +596,12 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `checks[].http`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
+- `external`: capability `existing-host-checks-from-no-host`: check "http://m/" has no host to run from: an existing host's checks run on one of the hosts, so give it `from:` or make a machine `access: true`
 
 ### `checks[].tcp`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
+- `external`: capability `existing-host-checks-from-no-host`: check "m:6379" has no host to run from: an existing host's checks run on one of the hosts, so give it `from:` or make a machine `access: true`
 
 ### `checks[].exec`
 
@@ -613,7 +615,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `checks[] = *.yml`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: capability `playbook-checks`: Ansible checks (.yml) run on the VM targets only
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`, `external`: capability `playbook-checks`: Ansible checks (.yml) run on the VM targets only
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/aws`, `cloud-vm/azure`, `cloud-vm/gcp`: cloud: Ansible checks (.yml) don't run in the cloud
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm has no Ansible controller
@@ -623,6 +625,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `checks[] = *.sh`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
+- `external`: capability `existing-host-script-checks`: check "check.sh" runs a project script, and an existing host has no copy of the project (Isoloom copies nothing there): probe it with `http`, `tcp` or `exec` instead
 
 ### `tools`
 

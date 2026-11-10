@@ -104,6 +104,14 @@ fn about_storage() -> Vec<(Requirement, &'static str)> {
             "machine `web`'s file `/etc/a` comes from the project with a `uid`, `gid` or `mode`",
         ),
         (Requirement::ExistingHostFiles { machine: web() }, "machine `web` has `files`"),
+        (
+            Requirement::ExistingHostScriptCheck { check: "c1".into() },
+            "check \"c1\" runs a project script, and an existing host has no copy of the project",
+        ),
+        (
+            Requirement::ExistingHostCheckFromNoHost { check: "c1".into() },
+            "check \"c1\" has no host to run from",
+        ),
         (Requirement::PersistentVolume { volume: "data".into() }, "volume `data` is persistent"),
         (
             Requirement::ExternalVolume { volume: "data".into() },

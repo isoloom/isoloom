@@ -37,7 +37,10 @@ ansible-playbook -i .isoloom/external/inventory.ini .isoloom/external/site.yml
 ```
 
 Then run the checks from each machine: `.isoloom/external/checks/<machine>.sh` prints a `PASS` or
-`FAIL` line per check (copy it to the machine and run it there, or over `ssh`).
+`FAIL` line per check (copy it to the machine and run it there, or over `ssh`). The checks are
+probes (`http`, `tcp`, `exec`), each run from one of the hosts: its `from:`, else the access
+machine. The target refuses a check it can't run that way, a project script or an Ansible
+playbook (an existing host has no copy of the project) or a check with no host to run from.
 
 ## Credentials
 

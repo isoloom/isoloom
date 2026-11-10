@@ -13,8 +13,9 @@ const HTTP_MAX_REDIRECTS: u32 = 5;
 pub struct Render<'a> {
     /// A symbolic host as this target reaches it from the position (an address, or a name).
     pub host: &'a dyn Fn(&Host, &Position) -> String,
-    /// The shell command that runs a project script (`cd /opt/isoloom && sh checks/x.sh`).
-    pub script: &'a dyn Fn(&str) -> String,
+    /// The shell command that runs a project script (`cd /opt/isoloom && sh checks/x.sh`), when
+    /// this target can.
+    pub script: Option<&'a dyn Fn(&str) -> String>,
     /// The shell command that runs a playbook, when this target can.
     pub playbook: Option<&'a dyn Fn(&str) -> String>,
 }
@@ -84,7 +85,10 @@ fn check_lines(c: &Resolved, position: &Position, r: &Render) -> String {
             cmd = sq(command),
             want = sq(expect.as_deref().unwrap_or("")),
         ),
-        Probe::Script { path } => project_file_lines(&n, c.wait, path, &(r.script)(path), "exited non-zero"),
+        Probe::Script { path } => match r.script {
+            Some(run) => project_file_lines(&n, c.wait, path, &run(path), "exited non-zero"),
+            None => format!("fail {n} \"project scripts don't run from this position\"\n"),
+        },
         Probe::Playbook { path } => match r.playbook {
             Some(pb) => project_file_lines(&n, c.wait, path, &pb(path), "failed"),
             None => format!("fail {n} \"Ansible checks don't run from this position\"\n"),

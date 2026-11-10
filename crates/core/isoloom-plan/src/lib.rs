@@ -38,6 +38,7 @@ pub mod checks;
 pub mod configure;
 pub mod environment;
 mod error;
+mod existing_hosts;
 pub mod hardware;
 pub mod images;
 pub mod ipv6;

@@ -17,7 +17,7 @@ pub(crate) fn runners(env: &Environment, dir: &str) -> Vec<GeneratedFile> {
     let host = |h: &Host, _: &Position| address_of(env, h);
     let render = Render {
         host: &host,
-        script: &script_command,
+        script: Some(&script_command),
         playbook: None,
     };
     checks::by_position(env.spec(), &env.checks)

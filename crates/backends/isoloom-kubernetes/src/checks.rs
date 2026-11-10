@@ -56,7 +56,7 @@ fn host(h: &Host, _: &Position) -> String {
 fn position(env: &Environment, pos: &Position, job: &str, group: Vec<&Resolved>, out: &mut Checks) {
     let render = Render {
         host: &host,
-        script: &run_script,
+        script: Some(&run_script),
         playbook: None,
     };
     let nets: Vec<&String> = match pos {

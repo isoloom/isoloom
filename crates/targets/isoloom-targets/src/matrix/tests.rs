@@ -228,3 +228,38 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
     }
     assert_eq!(by_the_run, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
 }
+
+/// The matrix's ✓ for a check is what the generators write: every column that takes a row about
+/// `checks[]` writes the check (its runner line, its run manifest entry) in the target's files.
+/// `external` once had a ✓ for script and playbook checks, and for probes with no host to run
+/// from, while its runners left them out.
+#[test]
+fn every_target_the_matrix_says_takes_a_check_writes_it() {
+    let m = built();
+    let probes = probe::probes().unwrap();
+    for p in probes.rows.iter().filter(|p| p.field.starts_with("checks[]")) {
+        let row = m.rows.iter().find(|r| r.field == p.field && r.value == p.value && r.about == p.about).unwrap();
+        let labs = labs_of(p);
+        let mut done = BTreeSet::new();
+        for (column, cell) in m.columns.iter().zip(&row.cells) {
+            if *cell != Cell::Supported || !done.insert(column.target) {
+                continue;
+            }
+            let lab = &labs.iter().find(|(t, _)| *t == column.target).unwrap().1;
+            let spec = lab.for_target(column.target);
+            let written: Vec<String> = isoloom_plan::checks::plan(&spec).into_iter().filter(|c| !c.derived).map(|c| c.name).collect();
+            assert!(!written.is_empty(), "{}: the row's lab has no check", row.name());
+            let files = crate::generate(lab, column.target).unwrap();
+            // The target's own files: not the resolved snapshot, which lists every check.
+            let own = |f: &&isoloom_render::GeneratedFile| f.path != crate::resolved::PATH;
+            for name in &written {
+                assert!(
+                    files.iter().filter(own).any(|f| f.contents.contains(name.as_str())),
+                    "{} on {}: ✓ in the matrix, but no file of the target holds the check `{name}`",
+                    row.name(),
+                    column.id()
+                );
+            }
+        }
+    }
+}

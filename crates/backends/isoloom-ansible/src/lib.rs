@@ -10,8 +10,9 @@
 //! - `site.yml` and `roles/isoloom_machine_<m>/` (`-` in `<m>` as `_`): each configured machine's recipe as a play and
 //!   a role of native tasks ([`configure`]), and `requirements.yml` when a role needs a pinned
 //!   collection.
-//! - `checks/<machine>.sh`: the check runner of each machine that has an address (declared and
-//!   derived probes; scripts need the project on the machine and are left out, with a note).
+//! - `checks/<machine>.sh`: the check runner of each machine with checks to run from it (declared
+//!   and derived probes). A script or playbook check needs the project on the machine, and a check
+//!   with no `from` needs an access machine to run on: the target refuses them.
 //!
 //! Networks and `reach` are expected behaviour there (Isoloom adds no router), which the derived
 //! checks verify.

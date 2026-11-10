@@ -35,13 +35,13 @@ impl Backend for ExternalBackend {
 }
 
 /// What hosts that already exist can run. Provisioning runs from the project with the
-/// inventory; checks are probes from each machine (a playbook or script check is left out of
-/// the runners, not refused). A gateway machine is one of the existing hosts, routing as it
-/// already does. Appliances need Docker's networks, which existing hosts don't have.
+/// inventory; checks are probes from each machine (a playbook check needs a controller, which
+/// Isoloom adds none of, so it is refused). A gateway machine is one of the existing hosts,
+/// routing as it already does. Appliances need Docker's networks, which existing hosts don't
+/// have.
 fn capabilities() -> Capabilities {
     Capabilities::of([
         Feature::EnvironmentProvisioning,
-        Feature::PlaybookChecks,
         Feature::ExecWithoutContainer,
         Feature::Gateways,
         Feature::MachineAliases,
@@ -119,6 +119,22 @@ mod tests {
         let refusal = ExternalBackend.refusal(&env).expect("refused");
         assert!(refusal.contains("network appliance"), "{refusal}");
         assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })));
+    }
+
+    #[test]
+    fn a_check_an_existing_host_cant_run_is_refused_without_rendering() {
+        let hosts = "overrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n";
+        for (checks, why) in [
+            ("[checks/own.sh]", "check \"checks/own.sh\" runs a project script"),
+            ("[{ name: own, from: a, script: checks/own.sh }]", "check \"own\" runs a project script"),
+            ("[checks/own.yml]", "Ansible checks (.yml)"),
+            ("[{ name: web, tcp: 'a:80' }]", "check \"web\" has no host to run from"),
+        ] {
+            let env = environment(&format!("  a: {{ networks: {{ lab: 5 }}, os: debian@12 }}\n{hosts}checks: {checks}\n"));
+            let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
+            assert!(refusal.contains(why), "{checks}: {refusal}");
+            assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })), "{checks}");
+        }
     }
 
     #[test]

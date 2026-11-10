@@ -177,7 +177,7 @@ fn runner(position: &Position, checks: &[&checks::Resolved]) -> String {
     let run = |p: &str| format!("sh {p}");
     let render = isoloom_render::checks::Render {
         host: &host,
-        script: &run,
+        script: Some(&run),
         playbook: None,
     };
     isoloom_render::checks::script(position, checks, &render)

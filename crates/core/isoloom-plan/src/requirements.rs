@@ -55,6 +55,12 @@ pub enum Feature {
     OwnedProjectFiles,
     /// Files written on a host that already exists.
     ExistingHostFiles,
+    /// A check that runs a project script on a host that already exists, which has no copy of
+    /// the project: no backend has it.
+    ExistingHostScriptChecks,
+    /// A check among hosts that already exist with none of them to run from (no `from`, no
+    /// access machine): no backend has it.
+    ExistingHostChecksFromNoHost,
     /// A virtual TPM 2.0 in a VM.
     Tpm,
     /// A process Isoloom starts on the machine: its own `command` (with its `cwd`) or
@@ -192,6 +198,16 @@ pub enum Requirement {
         /// The machine.
         machine: String,
     },
+    /// A check runs a project script on an existing host.
+    ExistingHostScriptCheck {
+        /// The check's name.
+        check: String,
+    },
+    /// A check has no existing host to run from.
+    ExistingHostCheckFromNoHost {
+        /// The check's name.
+        check: String,
+    },
     /// A VM asks for a virtual TPM (`hardware.tpm: required`).
     Tpm {
         /// The first machine that does.
@@ -294,6 +310,8 @@ impl Requirement {
             Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
             Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
             Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
+            Requirement::ExistingHostScriptCheck { .. } => Feature::ExistingHostScriptChecks,
+            Requirement::ExistingHostCheckFromNoHost { .. } => Feature::ExistingHostChecksFromNoHost,
             Requirement::Tpm { .. } => Feature::Tpm,
             Requirement::MachineProcess { .. } => Feature::MachineProcess,
             Requirement::OwnBoot { .. } => Feature::OwnBoot,
@@ -355,6 +373,8 @@ impl fmt::Display for Requirement {
             Requirement::BridgedNetwork { network } => crate::outside::no_bridge(f, network),
             Requirement::OwnedProjectFile { machine, path } => crate::machine_files::no_owned_project_file(f, machine, path),
             Requirement::ExistingHostFiles { machine } => crate::machine_files::no_existing_host_files(f, machine),
+            Requirement::ExistingHostScriptCheck { check } => crate::existing_hosts::no_script_check(f, check),
+            Requirement::ExistingHostCheckFromNoHost { check } => crate::existing_hosts::no_host_to_run_from(f, check),
             Requirement::Tpm { machine } => no_tpm(f, machine),
             Requirement::MachineProcess { machine } => write!(f, "machine `{machine}` {OWN_PROCESS}"),
             Requirement::OwnBoot { machine } => crate::boot::no_own_boot(f, machine),

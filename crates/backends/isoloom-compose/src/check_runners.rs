@@ -28,7 +28,7 @@ pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Servic
     let run_script = |path: &str| isoloom_render::checks::script_command_in("/isoloom/project", path);
     let render = Render {
         host: &host,
-        script: &run_script,
+        script: Some(&run_script),
         playbook: None,
     };
     let mut files = Vec::new();
