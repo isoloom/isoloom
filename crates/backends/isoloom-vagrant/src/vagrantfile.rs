@@ -73,23 +73,18 @@ pub(crate) fn chosen_ports(r: &mut Ruby) {
     r.assign(HOSTPORTS, Value::raw(format!("(JSON.parse(ENV.fetch(\"{HOSTPORTS}\", \"{{}}\")) rescue {{}})")));
 }
 
-/// A port forwarded from the host's loopback: `guest` in the VM to `host` on this machine. UDP
-/// says so (vagrant-libvirt skips those, with a warning; the runner repeats it).
-pub(crate) fn forwarded_port(var: &str, guest: u16, host: u16, protocol: Protocol) -> Call {
-    forwarded_port_with(var, guest, host, protocol)
+/// A published port's host number as the Vagrantfile reads it: the runner's choice for this run,
+/// looked up in [`HOSTPORTS`] by `key` (`"<machine>/<port>"`), else `publish` (a fixed port, or an
+/// older runner that forwards at the published number). Whatever takes the port from the host
+/// (its forward, Hyper-V's relay) takes this one expression, so none can disagree with another.
+pub(crate) fn chosen_host(key: &str, publish: u16) -> Value {
+    Value::raw(format!("{HOSTPORTS}.fetch({}, {publish})", Value::str(key)))
 }
 
-/// A forwarded port whose host number the runner chooses at launch: the Vagrantfile reads it from
-/// [`HOSTPORTS`] by `key` (`"<machine>/<port>"`), defaulting to `publish` when the runner set none
-/// (a fixed port, or an older runner that forwards at the published number).
-pub(crate) fn forwarded_port_chosen(var: &str, guest: u16, key: &str, publish: u16, protocol: Protocol) -> Call {
-    // `key` is `<machine>/<port>` of validated names (no quote can appear in it).
-    let host = Value::raw(format!("{HOSTPORTS}.fetch(\"{key}\", {publish})"));
-    forwarded_port_with(var, guest, host, protocol)
-}
-
-/// A forwarded port with any `host` expression (a literal number, or a lookup).
-fn forwarded_port_with(var: &str, guest: u16, host: impl Into<Value>, protocol: Protocol) -> Call {
+/// A port forwarded from the host's loopback: `guest` in the VM to `host` on this machine (a
+/// number, or [`chosen_host`]'s lookup). UDP says so (vagrant-libvirt skips those, with a
+/// warning; the runner repeats it).
+pub(crate) fn forwarded_port(var: &str, guest: u16, host: impl Into<Value>, protocol: Protocol) -> Call {
     let call = Call::new(format!("{var}.vm.network"))
         .arg(Value::str("forwarded_port"))
         .kw("guest", guest)
@@ -141,11 +136,11 @@ mod tests {
     #[test]
     fn udp_forwards_say_libvirt_skips_them() {
         assert_eq!(
-            forwarded_port("m", 53, 5353, Protocol::Udp).to_string(),
+            forwarded_port("m", 53, 5353u16, Protocol::Udp).to_string(),
             "m.vm.network \"forwarded_port\", guest: 53, host: 5353, host_ip: \"127.0.0.1\", protocol: \"udp\" # not on libvirt: vagrant-libvirt skips UDP forwards"
         );
         assert_eq!(
-            forwarded_port("config", 80, 8080, Protocol::Tcp).to_string(),
+            forwarded_port("config", 80, 8080u16, Protocol::Tcp).to_string(),
             "config.vm.network \"forwarded_port\", guest: 80, host: 8080, host_ip: \"127.0.0.1\""
         );
     }

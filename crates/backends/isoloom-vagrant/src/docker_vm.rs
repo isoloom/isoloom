@@ -178,13 +178,8 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
     // it from a host port the runner picks (looked up by `<machine>/<port>`, defaulting to publish).
     for (name, m) in env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container) {
         for p in &m.ports {
-            r.call(vagrantfile::forwarded_port_chosen(
-                "config",
-                p.publish,
-                &format!("{name}/{}", p.name),
-                p.publish,
-                p.protocol,
-            ));
+            let host = vagrantfile::chosen_host(&format!("{name}/{}", p.name), p.publish);
+            r.call(vagrantfile::forwarded_port("config", p.publish, host, p.protocol));
         }
     }
     let size = host_size(env);
@@ -278,7 +273,7 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
         // auto-correct, so two local docker-vm labs — or a half-created VM left by a failed start —
         // collide on it. Take the free host port the runner chose for this VM (the way published
         // ports do), defaulting to 50022 when it set none; auto-correct stays on as a last resort.
-        r.assign("v.ssh_port", Value::raw(format!("{}.fetch(\"{VM}/ssh\", 50022)", vagrantfile::HOSTPORTS)));
+        r.assign("v.ssh_port", vagrantfile::chosen_host(&format!("{VM}/ssh"), 50022));
         r.assign("v.ssh_auto_correct", true);
     });
     r.block(provider("libvirt"), "v", |r| {

@@ -659,7 +659,8 @@ module IsoloomHyperV
 
   # Hyper-V forwards no ports: each published one (guest => host) relayed from this host's
   # 127.0.0.1 to the VM's address by Windows' port proxy (TCP; the IP Helper service), set again
-  # at every start since the address may change.
+  # at every start since the address may change. `host` is the number the port's forward takes
+  # (the runner's choice in ISOLOOM_HOSTPORTS, else the published one).
   def self.ports(machine, ports)
     ip = (machine.ssh_info || {})[:host]
     fail!("#{machine.name} has no address to relay its ports to") unless ip

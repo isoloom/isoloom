@@ -11,7 +11,8 @@
 //! - after `WaitForIPAddress`: the machine's addresses set in the guest, found by MAC (a
 //!   boot-time script on Linux, a static address through WMI on Windows), and its published
 //!   ports relayed from this host's 127.0.0.1 to its address (Hyper-V forwards none; Windows'
-//!   port proxy does, set again at every start since the address may change);
+//!   port proxy does, set again at every start since the address may change), each from the
+//!   host port its `forwarded_port` line names;
 //! - after `DeleteVM`: those relays removed, and the networks' switches no VM uses any more.
 //!
 //! The Ruby doing the work is `IsoloomHyperV` ([`HYPERV_RB`]), in every Vagrantfile's preamble.
@@ -46,8 +47,9 @@ pub(crate) struct HyperV<'a> {
     pub(crate) windows: bool,
     /// Nested virtualization (`nested_virtualization`): the VM runs VMs of its own.
     pub(crate) nested: bool,
-    /// Its published ports (guest, host): relayed from this host's 127.0.0.1 to the VM.
-    pub(crate) published: Vec<(u16, u16)>,
+    /// Its published ports (guest, host): relayed from this host's 127.0.0.1 to the VM, from the
+    /// host number its forward takes ([`crate::vagrantfile::chosen_host`]).
+    pub(crate) published: Vec<(u16, Value)>,
     /// Its virtual TPM, enabled before it starts.
     pub(crate) tpm: Option<Tpm>,
     /// Whether Vagrant leaves its hostname alone: Alpine's hostname step restarts every interface
@@ -223,7 +225,7 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
 
 /// A VM's published ports, `[[guest, host], …]`.
 fn published(hv: &HyperV) -> Value {
-    Value::array(hv.published.iter().map(|(g, h)| Value::array([Value::from(*g), Value::from(*h)])))
+    Value::array(hv.published.iter().map(|(g, h)| Value::array([Value::from(*g), h.clone()])))
 }
 
 /// Where a Linux VM keeps the script that sets its addresses at boot ([`LAB_NET`]).

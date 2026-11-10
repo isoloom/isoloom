@@ -413,7 +413,8 @@ module IsoloomHyperV
 
   # Hyper-V forwards no ports: each published one (guest => host) relayed from this host's
   # 127.0.0.1 to the VM's address by Windows' port proxy (TCP; the IP Helper service), set again
-  # at every start since the address may change.
+  # at every start since the address may change. `host` is the number the port's forward takes
+  # (the runner's choice in ISOLOOM_HOSTPORTS, else the published one).
   def self.ports(machine, ports)
     ip = (machine.ssh_info || {})[:host]
     fail!("#{machine.name} has no address to relay its ports to") unless ip
@@ -768,11 +769,11 @@ Vagrant.configure("2") do |config|
           fi
           /etc/isoloom/lab-net.sh
         SH
-        IsoloomHyperV.ports(machine, [[80, 8080]])
+        IsoloomHyperV.ports(machine, [[80, ISOLOOM_HOSTPORTS.fetch("web/web", 8080)]])
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[80, 8080]]); IsoloomHyperV.prune(["isoloom-solo-web-app"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web/web", 8080)]]); IsoloomHyperV.prune(["isoloom-solo-web-app"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.80.0.10 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
@@ -1420,7 +1421,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "solo-web - web",
           "vmware_esxi": "solo-web-web"
         },
-        "boot_digest": "sha256:426ccbfbcdb5ba0e86fe906fc9edf46226c8ac84cc9aef350f76ec2841442a51"
+        "boot_digest": "sha256:55e6e267b71d3f3a054eb7d33db7f967cada2e6dd52d7f1d97ef8c22fa7e18f2"
       },
       "ports": [
         {

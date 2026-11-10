@@ -408,6 +408,12 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **On Hyper-V, a VM's published port answers on the host port the run reports.** Hyper-V
+  ignores `forwarded_port`, so the Vagrantfile relays each published TCP port itself (Windows'
+  port proxy), but the relay listened on the spec's `publish` number while the forward, and the
+  run, took the host port the runner chose (`ISOLOOM_HOSTPORTS`): the run's URL didn't answer.
+  The relay, and its removal with the VM, now take the forward's own host number, written once
+  for both, the `publish` number still the fallback when the runner chose none.
 - **`isoloom generate` never writes through a symbolic link.** A clone holding
   `.isoloom/docker/run.json` (or `.isoloom/docker`) as a link elsewhere had the generated file
   written where the link led, outside the project. A generated file whose path goes through a

@@ -406,7 +406,7 @@
           "utm": "web-vm - web",
           "vmware_esxi": "web-vm-web"
         },
-        "boot_digest": "sha256:cbcef1056555f88003fc3c5011eb22e6911bd2d4635f36c1704f138eb68ec7c5"
+        "boot_digest": "sha256:b162da8dbc43dafc214bdb2f11a4da169d72f4659a4b60d298d745ef83d03ea8"
       },
       "ports": [
         {

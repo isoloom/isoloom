@@ -3,6 +3,7 @@
 
 use std::error::Error;
 use std::path::Path;
+use std::process::Command;
 
 use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
@@ -157,15 +158,134 @@ fn libvirts_own_boxes_are_pinned_to_an_architecture() -> Outcome {
 }
 
 /// Hyper-V forwards no ports: each published TCP port is relayed from 127.0.0.1 to the VM at every
-/// start, and the relay goes with the VM. Alpine's controller keeps its hostname there: setting
-/// one restarts every interface, which closed the SSH session setting it.
+/// start, from the host port its `forwarded_port` line names (the runner's choice, else the
+/// published one), and the relay goes with the VM. Alpine's controller keeps its hostname there:
+/// setting one restarts every interface, which closed the SSH session setting it.
 #[test]
 fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     let file = vagrantfile("solo-web")?;
-    assert!(file.contains("IsoloomHyperV.ports(machine, [[80, "), "the relay at start");
-    assert!(file.contains("IsoloomHyperV.unports([[80, "), "the relay gone with the VM");
+    let host = "ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)";
+    assert!(file.contains(&format!("forwarded_port\", guest: 80, host: {host},")), "the forward");
+    assert!(file.contains(&format!("IsoloomHyperV.ports(machine, [[80, {host}]])")), "the relay at start");
+    assert!(file.contains(&format!("IsoloomHyperV.unports([[80, {host}]])")), "the relay gone with the VM");
     let controller = file.split("config.vm.define \"isoloom-controller\"").nth(1).ok_or("no controller")?;
     let hyperv = controller.split("provider \"hyperv\" do |v, o|").nth(1).ok_or("no hyperv block")?;
     assert!(hyperv.split("\n    end").next().unwrap_or_default().contains("o.vm.hostname = nil"));
+    Ok(())
+}
+
+/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant that records what it says,
+/// then fires machine `ARGV[1]`'s Hyper-V triggers after `WaitForIPAddress` and `DeleteVM` on a
+/// VM at 192.0.2.10, Hyper-V's PowerShell recorded instead of run. Prints each forwarded port
+/// (`forward <guest> <host>`) and each PowerShell script (`ps <script>`). Vagrant's own Ruby is
+/// 3.x; macOS's `ruby` is 2.6, which lacks `filter_map`, so it gets one.
+const HYPERV_TRIGGERS_RB: &str = r#"
+Enumerable.module_eval { def filter_map; each_with_object([]) { |x, out| v = yield(x); out << v if v }; end } unless Enumerable.method_defined?(:filter_map)
+$forwards = []
+$triggers = {}
+$ps = []
+class Rec
+  def initialize(path = []); @path = path; end
+  def respond_to_missing?(*); true; end
+  def method_missing(name, *args, &blk)
+    $machine = args[0] if name == :define
+    if name == :network && args[0] == "forwarded_port"
+      $forwards << [$machine, args[1][:guest], args[1][:host]]
+    end
+    if @path.last == :trigger
+      t = Trigger.new
+      blk.call(t)
+      $triggers[[$machine, args[0].to_s.split("::").last, name]] = t.code
+      return nil
+    end
+    blk.call(*Array.new([blk.arity, 1].max) { Rec.new }) if blk
+    Rec.new(@path + [name])
+  end
+end
+class Trigger
+  attr_reader :code
+  def ruby(&blk); @code = blk; end
+end
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); yield Rec.new; end
+  def self.user_data_path; "/nonexistent"; end
+end
+load ARGV[0]
+IsoloomHyperV.define_singleton_method(:ps) { |script| $ps << script; "" }
+IsoloomHyperV.define_singleton_method(:address) { |*_| nil }
+ui = Object.new
+def ui.info(*_); end
+machine = Struct.new(:name, :ssh_info, :ui).new(ARGV[1].to_sym, { host: "192.0.2.10" }, ui)
+[["WaitForIPAddress", :after], ["DeleteVM", :after]].each do |action, at|
+  code = $triggers[[ARGV[1], action, at]] or abort("no #{at} #{action} trigger for #{ARGV[1]}")
+  code.call(nil, machine)
+end
+$forwards.each { |m, guest, host| puts "forward #{guest} #{host}" if m == ARGV[1] }
+$ps.each { |s| puts "ps #{s}" }
+"#;
+
+/// What [`HYPERV_TRIGGERS_RB`] prints for machine `machine` of `example`'s Vagrantfile, with
+/// `ISOLOOM_HOSTPORTS` set to `hostports` (unset when `None`). The Vagrantfile loads from its
+/// rendered outputs, the example's folder its project.
+fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Outcome<String> {
+    let dir = std::env::temp_dir().join(format!("isoloom-hyperv-ports-{}", std::process::id()));
+    let mut vagrantfile = None;
+    for f in render(example)? {
+        let path = dir.join(&f.path);
+        std::fs::create_dir_all(path.parent().ok_or("a file at the root")?)?;
+        // The project's root: the example's own folder (the outputs are written elsewhere).
+        let contents = f
+            .contents
+            .replace("\nROOT = File.expand_path(\"../..\", __dir__)\n", "\nROOT = ENV.fetch(\"ISOLOOM_TEST_ROOT\")\n");
+        std::fs::write(&path, contents)?;
+        if f.path.ends_with("/Vagrantfile") {
+            vagrantfile = Some(path);
+        }
+    }
+    // `vagrant/util/is_port_open`, which the Vagrantfile requires on a Mac: Vagrant's own, empty.
+    std::fs::create_dir_all(dir.join("vagrant/util"))?;
+    std::fs::write(dir.join("vagrant/util/is_port_open.rb"), "")?;
+    let mut ruby = Command::new("ruby");
+    ruby.arg("-I").arg(&dir).arg("-e").arg(HYPERV_TRIGGERS_RB);
+    ruby.arg(vagrantfile.ok_or("no Vagrantfile")?).arg(machine);
+    ruby.env(
+        "ISOLOOM_TEST_ROOT",
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example),
+    );
+    match hostports {
+        Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),
+        None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
+    };
+    let out = ruby.output()?;
+    std::fs::remove_dir_all(&dir)?;
+    if !out.status.success() {
+        return Err(format!("ruby failed: {}", String::from_utf8_lossy(&out.stderr)).into());
+    }
+    Ok(String::from_utf8(out.stdout)?)
+}
+
+/// On Hyper-V the run's URL is the port the runner chose: Hyper-V ignores `forwarded_port`, so
+/// Isoloom relays the port itself, and the relay must listen on the host port the forward names
+/// (`ISOLOOM_HOSTPORTS`), not on the spec's preferred one, which the run never reports. Without
+/// the runner's choice both take the preferred one. The Ruby itself runs here when `ruby` is on
+/// the PATH (CI has it).
+#[test]
+fn the_hyperv_relay_listens_on_the_host_port_the_forward_takes() -> Outcome {
+    if !Command::new("ruby").arg("-v").output().is_ok_and(|o| o.status.success()) {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let relay = |port: u16| format!("listenaddress=127.0.0.1 listenport={port} connectaddress=192.0.2.10 connectport=80");
+    let gone = |port: u16| format!("netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport={port} | Out-Null; $global:LASTEXITCODE = 0");
+    for (hostports, port) in [(Some(r#"{"web/web":53544}"#), 53544), (None, 8080)] {
+        let out = hyperv_triggers("solo-web", "web", hostports)?;
+        assert!(out.contains(&format!("forward 80 {port}\n")), "the forward: {out}");
+        assert!(out.contains(&relay(port)), "the relay at start: {out}");
+        assert!(out.contains(&gone(port)), "the relay gone with the VM: {out}");
+        let other = if port == 8080 { 53544 } else { 8080 };
+        assert!(!out.contains(&format!("listenport={other}")), "a relay on another port: {out}");
+    }
     Ok(())
 }

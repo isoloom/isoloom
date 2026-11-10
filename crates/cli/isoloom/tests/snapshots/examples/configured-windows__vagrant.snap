@@ -860,7 +860,8 @@ module IsoloomHyperV
 
   # Hyper-V forwards no ports: each published one (guest => host) relayed from this host's
   # 127.0.0.1 to the VM's address by Windows' port proxy (TCP; the IP Helper service), set again
-  # at every start since the address may change.
+  # at every start since the address may change. `host` is the number the port's forward takes
+  # (the runner's choice in ISOLOOM_HOSTPORTS, else the published one).
   def self.ports(machine, ports)
     ip = (machine.ssh_info || {})[:host]
     fail!("#{machine.name} has no address to relay its ports to") unless ip
@@ -1181,11 +1182,11 @@ Vagrant.configure("2") do |config|
             'lab network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
-        IsoloomHyperV.ports(machine, [[80, 8087]])
+        IsoloomHyperV.ports(machine, [[80, ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)]])
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[80, 8087]]); IsoloomHyperV.prune(["isoloom-configured-windows-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)]]); IsoloomHyperV.prune(["isoloom-configured-windows-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.67.0.10 iis')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
@@ -2081,7 +2082,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "configured-windows - iis",
           "vmware_esxi": "configured-windows-iis"
         },
-        "boot_digest": "sha256:6dbeff7ce8bb5100c81533996428145491d76070d13d5a77bd3e7b215ff92789"
+        "boot_digest": "sha256:0e67b33a7fc7da34bf7c41333fae589790548b2d5d5676b8b3738812f520283f"
       },
       "ports": [
         {

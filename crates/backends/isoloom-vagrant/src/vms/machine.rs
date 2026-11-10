@@ -7,7 +7,7 @@ use crate::boxes::{self, VagrantBox};
 use isoloom_manifest as manifest;
 use isoloom_plan::addressing::netmask;
 use isoloom_plan::checks::Position;
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, PublishedPort};
 use isoloom_render::GeneratedFile;
 use isoloom_spec::model::Arch;
 use isoloom_spec::validate::Cidr;
@@ -52,17 +52,13 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
             private_network(r, env, net, *ip);
         }
         super::bridged::networks(r, env, mp);
-        for p in &mp.ports {
-            // The runner looks its chosen host port up by `<machine>/<port>`, defaulting to publish.
-            r.call(vagrantfile::forwarded_port_chosen(
-                "m",
-                p.port,
-                &format!("{name}/{}", p.name),
-                p.publish,
-                p.protocol,
-            ));
+        let published = published(name, mp);
+        for (p, host) in &published {
+            r.call(vagrantfile::forwarded_port("m", p.port, host.clone(), p.protocol));
         }
-        providers::blocks(r, &guest(env, name, mp, &image, link));
+        let mut guest = guest(env, name, mp, &image, link);
+        guest.hyperv.published = relays(&published);
+        providers::blocks(r, &guest);
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
         crate::host_folders::render(r, "m", &shares);
         transport::provisioners(r, env, name, os);
@@ -71,6 +67,25 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         }
     });
     group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_owned()), g))
+}
+
+/// Machine `name`'s published ports, each with its host number ([`vagrantfile::chosen_host`]),
+/// written once here: its forward and Hyper-V's relay of it both take that one.
+fn published<'a>(name: &str, mp: &'a MachinePlan) -> Vec<(&'a PublishedPort, Value)> {
+    mp.ports
+        .iter()
+        .map(|p| (p, vagrantfile::chosen_host(&format!("{name}/{}", p.name), p.publish)))
+        .collect()
+}
+
+/// What Hyper-V relays of the `published` ports (it forwards none): each TCP one, from the host
+/// number its forward takes. Windows' port proxy relays TCP only.
+fn relays(published: &[(&PublishedPort, Value)]) -> Vec<(u16, Value)> {
+    published
+        .iter()
+        .filter(|(p, _)| p.protocol != isoloom_spec::model::Protocol::Udp)
+        .map(|(p, host)| (p.port, host.clone()))
+        .collect()
 }
 
 /// `config.vm.define "<name>" do |m| ... end`, after a blank line. An `on_demand` machine (the
@@ -133,7 +148,8 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
     r.call(call);
 }
 
-/// The machine as its providers see it.
+/// The machine as its providers see it, but for Hyper-V's relays of its published ports
+/// ([`relays`]), which take the host numbers of its forwards.
 fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a VagrantBox, link: &'a Link) -> Guest<'a> {
     let os = Os::of(mp);
     // No cloud-init on Windows: its lab address is set from PowerShell.
@@ -145,13 +161,7 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
         windows: os == Os::Windows,
         nested: mp.hardware.nested_virtualization,
-        // Windows' port proxy relays TCP only.
-        published: mp
-            .ports
-            .iter()
-            .filter(|p| p.protocol != isoloom_spec::model::Protocol::Udp)
-            .map(|p| (p.port, p.publish))
-            .collect(),
+        published: Vec::new(),
         tpm: mp.tpm,
         keeps_hostname: false,
     };
