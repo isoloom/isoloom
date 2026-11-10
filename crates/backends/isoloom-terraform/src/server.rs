@@ -150,6 +150,24 @@ pub(crate) fn without_image(env: &Environment, has: impl Fn(&str, &MachinePlan) 
     })
 }
 
+/// The resolvers machine `name` asks: its own (`dns.servers`; an AD member points at its domain
+/// controller), else the site's (`constraints.dns`, else a public one), so it can still install
+/// software. `None` asks for the site's alone: Isoloom's own VMs' (the router's, the
+/// controller's).
+pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
+    let own = name
+        .and_then(|n| env.spec().machines.get(n))
+        .and_then(|m| m.dns.as_ref())
+        .filter(|d| !d.servers.is_empty());
+    match own {
+        Some(d) => d.servers.clone(),
+        None => isoloom_spec::model::resolvers(env.spec().constraints.as_ref())
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+    }
+}
+
 /// `iso<slot><suffix>`: a name unique per environment on the server (`var.slot`).
 pub(crate) fn slotted(suffix: &str) -> Expression {
     Template::text("iso").with_expr(reference("var.slot")).with_text(suffix).into_expression()

@@ -12,6 +12,7 @@ use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
 use crate::checks::{Invocation, Runner, output_block};
+use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::machine::controller;
 use crate::module::output;
 use crate::seal;
@@ -19,6 +20,48 @@ use crate::seal;
 /// The router's name: its host name, its VM's and snippet's, and its machine in a run manifest.
 /// A lab machine can't take it (`isoloom-` names are Isoloom's own).
 pub(crate) const NAME: &str = "isoloom-router";
+
+/// What a server's platform adds to its router's cloud-config ([`cloud_config`]).
+#[derive(Default)]
+pub(crate) struct Platform {
+    /// Packages beside nftables (the hypervisor's guest agent).
+    pub(crate) packages: &'static [&'static str],
+    /// The uplink's interface file, written first.
+    pub(crate) uplink: Option<Expression>,
+    /// The networks' interface files, written last.
+    pub(crate) networks: Vec<Expression>,
+    /// The commands that bring the interfaces up: once forwarding is on, before the ruleset
+    /// loads.
+    pub(crate) up: &'static [&'static str],
+    /// Whether the platform seals the run: then the router keeps the sealed ruleset beside the
+    /// live one, from its first boot ([`sealed_file`]).
+    pub(crate) seals: bool,
+}
+
+/// The router's cloud-config, the same on every server: nftables with the ruleset
+/// ([`ruleset_content`]), forwarding on ([`forwarding`]), the site's certificate authorities and
+/// the prelude, with what the `platform` adds.
+pub(crate) fn cloud_config(env: &Environment, platform: Platform) -> CloudConfig {
+    let mut config = CloudConfig::new(NAME, reference("local.users"));
+    config.packages = std::iter::once("nftables").chain(platform.packages.iter().copied()).map(String::from).collect();
+    config.ca_certs = cloud_init::site_authorities(env);
+    config.bootcmd.extend(cloud_init::prelude(env));
+    config.files.extend(platform.uplink);
+    config.files.extend([
+        file("/etc/nftables.conf", None, ruleset_content(env)),
+        file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
+    ]);
+    if platform.seals {
+        config.files.extend(sealed_file(env));
+    }
+    config.files.extend(platform.networks);
+    config.runcmd = std::iter::once("sysctl -p /etc/sysctl.d/90-isoloom.conf")
+        .chain(platform.up.iter().copied())
+        .chain(["systemctl enable --now nftables", "nft -f /etc/nftables.conf"])
+        .map(String::from)
+        .collect();
+    config
+}
 
 /// Forwarding on, as a sysctl file: IPv4, and IPv6 when the lab routes IPv6
 /// (`isoloom_plan::routing::forwarding`).
@@ -47,8 +90,8 @@ pub(crate) const SEALED_NFT: &str = "/etc/nftables.sealed.nft";
 /// The sealed ruleset as the router's `SEALED_NFT` file, when the run has something to seal (left
 /// out otherwise, so an unsealed environment's router is unchanged). Written from the first boot,
 /// so sealing never changes the snippet (and so never recreates the router).
-pub(crate) fn sealed_file(env: &Environment) -> Option<Expression> {
-    seal::any(env).then(|| crate::machine::cloud_init::file(SEALED_NFT, None, string(rules(env, true))))
+fn sealed_file(env: &Environment) -> Option<Expression> {
+    seal::any(env).then(|| file(SEALED_NFT, None, string(rules(env, true))))
 }
 
 /// The command the seal step runs on the router over SSH: apply the sealed ruleset (fail-closed —

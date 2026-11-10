@@ -21,6 +21,9 @@ pub(crate) const PLAYBOOK_CHECKS: &str = "Ansible checks (.yml) in the cloud com
 /// Why a cloud whose firewalls stand for the router refuses link impairment (`tc`).
 pub(crate) const FIREWALLS_TC: &str = "link impairment (`tc`) needs a router in the path; the cloud's firewalls have none";
 
+/// Why a cloud whose security groups stand for the router refuses link impairment (`tc`).
+pub(crate) const SECURITY_GROUPS_TC: &str = "link impairment (`tc`) needs a router in the path; the cloud's security groups have none";
+
 /// The networks a cloud can model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Networks {

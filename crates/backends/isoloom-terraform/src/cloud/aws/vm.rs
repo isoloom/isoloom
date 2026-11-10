@@ -31,7 +31,7 @@ use isoloom_spec::validate::Cidr;
 
 use super::{INSTANCE_TYPES, ami, ami_filter, zones};
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::limits::Limits;
 use crate::machine::{controller, vms};
@@ -46,7 +46,7 @@ const RULES: Rules = Rules {
         arm64: Some("arm64 on AWS comes later (Graviton instances and arm64 AMIs)"),
         gateways: None,
         playbook_checks: Some(PLAYBOOK_CHECKS),
-        tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
+        tc: Some(SECURITY_GROUPS_TC),
         ipv6: Some("an AWS VPC takes an Amazon-provided (or your own registered) IPv6 block, never one the spec picks"),
     },
     // NVIDIA T4s (G4dn). New accounts have no quota for them until they ask (Service Quotas,

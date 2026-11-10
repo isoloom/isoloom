@@ -8,7 +8,6 @@
 //! router answers them (dnsmasq, each name at its address on the asking network) and is the
 //! container's resolver.
 
-use isoloom_spec::model::resolvers;
 use std::borrow::Cow;
 
 use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, object, reference, string};
@@ -233,7 +232,7 @@ pub(super) fn router_dns(env: &Environment) -> Option<(Vec<Expression>, &'static
         .map(|net| format!("listen-address={}\n", router::address(spec, net)))
         .collect::<Vec<_>>()
         .concat();
-    let upstream = resolvers(spec.constraints.as_ref())
+    let upstream = crate::server::resolvers(env, None)
         .into_iter()
         .map(|r| format!("server={r}\n"))
         .collect::<Vec<_>>()

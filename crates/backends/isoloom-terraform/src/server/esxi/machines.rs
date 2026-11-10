@@ -6,7 +6,6 @@
 use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::router;
-use isoloom_spec::model::resolvers;
 use isoloom_spec::validate::Cidr;
 
 use super::SERVICE_OS;
@@ -20,12 +19,6 @@ use crate::server::router::is_default_gateway;
 
 /// The controller's place among the VMs (after the router; the machines follow).
 const CONTROLLER_INDEX: u64 = 1;
-
-/// The site's resolvers ([`resolvers`]), for a VM whose spec names none: it still installs
-/// software.
-fn site_resolvers(env: &Environment) -> Vec<String> {
-    resolvers(env.spec().constraints.as_ref()).into_iter().map(str::to_owned).collect()
-}
 
 /// What Terraform's connections go through: the router's uplink address.
 fn bastion() -> Expression {
@@ -74,10 +67,7 @@ pub(super) fn guests(env: &Environment, m: &mut Module) {
 fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut Module) {
     let id = ident(name);
     let dns = env.spec().machines.get(name).and_then(|sm| sm.dns.as_ref());
-    let servers = match dns.filter(|d| !d.servers.is_empty()) {
-        Some(d) => d.servers.iter().map(ToString::to_string).collect(),
-        None => site_resolvers(env),
-    };
+    let servers = crate::server::resolvers(env, Some(name));
     let windows = mp.is_windows();
     let os = mp.os.as_deref().unwrap_or_default();
     let guest = Guest {
@@ -152,7 +142,7 @@ fn controller(env: &Environment, m: &mut Module) {
         os: SERVICE_OS.to_owned(),
         size: (cpus, memory, disk),
         nics,
-        dns: (site_resolvers(env), None),
+        dns: (crate::server::resolvers(env, None), None),
         user_data: CloudConfig::new(controller::NAME, reference("local.users")).document(),
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],

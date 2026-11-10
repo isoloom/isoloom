@@ -14,9 +14,8 @@ use isoloom_spec::validate::{Cidr, IPV6_PREFIX};
 use super::SERVICE_OS;
 use super::guest::{Guest, Nic};
 use super::machines;
-use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::module::ident;
-use crate::server::router::{NAME, forwarding, outputs as lab_outputs, ruleset_content};
+use crate::server::router::{NAME, Platform, outputs as lab_outputs};
 
 /// The router's place among the VMs (the controller is next, then the machines).
 pub(super) const INDEX: u64 = 0;
@@ -26,21 +25,7 @@ const ADDRESS_WAIT_SECS: u64 = 600;
 
 /// The router's VM.
 pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    let mut config = CloudConfig::new(NAME, reference("local.users"));
-    config.packages = vec!["nftables".to_owned()];
-    config.ca_certs = cloud_init::site_authorities(env);
-    config.bootcmd.extend(cloud_init::prelude(env));
-    config.files = vec![
-        file("/etc/nftables.conf", None, ruleset_content(env)),
-        file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
-    ];
-    config.runcmd = [
-        "sysctl -p /etc/sysctl.d/90-isoloom.conf",
-        "systemctl enable --now nftables",
-        "nft -f /etc/nftables.conf",
-    ]
-    .map(String::from)
-    .to_vec();
+    let config = crate::server::router::cloud_config(env, Platform::default());
     let mut nics = vec![Nic::at(reference("var.uplink_port_group"), None)];
     nics.extend(env.networks.iter().map(|(net, plan)| {
         let len = Cidr::parse(&plan.cidr).map_or(32, |c| c.len);

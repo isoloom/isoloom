@@ -29,7 +29,7 @@ use crate::hcl_builder::{Expression, Module, reference};
 use isoloom_plan::Environment;
 
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image, windows};
 use crate::limits::Limits;
 use crate::module::providers;
@@ -45,7 +45,7 @@ const RULES: Rules = Rules {
         arm64: Some("arm64 on Azure comes later (Arm-based sizes and arm64 images)"),
         gateways: None,
         playbook_checks: Some(PLAYBOOK_CHECKS),
-        tc: Some("link impairment (`tc`) needs a router in the path; the cloud's security groups have none"),
+        tc: Some(SECURITY_GROUPS_TC),
         ipv6: None,
     },
     // NVIDIA T4s (NCasT4_v3). Subscriptions get no quota for them until they ask.

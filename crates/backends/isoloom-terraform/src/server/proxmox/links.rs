@@ -24,11 +24,30 @@ fn carries_vlans(env: &Environment, name: &str) -> bool {
     env.networks.values().any(|n| n.vlan.as_ref().is_some_and(|(l, _)| l == name))
 }
 
+/// Each VNet the environment's links travel on, with its id after `i<slot>`, in the order they
+/// are made: one per network that is no VLAN (`n<i>`, `i` its place among every network), then
+/// one per LAN that is only the frame around its VLANs (`l<j>`). The module gives each VNet
+/// its id, and the run manifest names each network's bridge after them.
+pub(super) fn vnet_ids(env: &Environment) -> Vec<(&str, String)> {
+    let mut out: Vec<(&str, String)> = env
+        .networks
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, p))| p.vlan.is_none())
+        .map(|(i, (net, _))| (net.as_str(), format!("n{i}")))
+        .collect();
+    let mut lans: Vec<&str> = env.networks.values().filter_map(|n| n.vlan.as_ref().map(|(l, _)| l.as_str())).collect();
+    lans.dedup();
+    let frames = lans.into_iter().filter(|l| !env.networks.contains_key(*l));
+    out.extend(frames.enumerate().map(|(j, lan)| (lan, format!("l{j}"))));
+    out
+}
+
 /// A VNet per network that is no VLAN, then one per LAN that is only the frame around its
-/// VLANs. Their references, for the applier to wait on.
+/// VLANs ([`vnet_ids`]). Their references, for the applier to wait on.
 pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
     let mut out = Vec::new();
-    let mut add = |module: &mut Module, name: &str, id: String, what: String| {
+    for (name, id) in vnet_ids(env) {
         let mut b = Block::builder("resource")
             .add_label("proxmox_sdn_vnet")
             .add_label(ident(name))
@@ -37,16 +56,12 @@ pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
         if carries_vlans(env, name) {
             b = b.add_attribute(("vlan_aware", boolean(true)));
         }
-        module.commented(&what, b.build());
+        let what = match env.networks.get(name) {
+            Some(plan) => format!("Network `{name}`: {}", plan.cidr),
+            None => format!("LAN `{name}`: its VLANs are tags on one VNet"),
+        };
+        m.commented(&what, b.build());
         out.push(reference(&format!("proxmox_sdn_vnet.{}", ident(name))));
-    };
-    for (i, (net, plan)) in env.networks.iter().enumerate().filter(|(_, (_, p))| p.vlan.is_none()) {
-        add(m, net, format!("n{i}"), format!("Network `{net}`: {}", plan.cidr));
-    }
-    let mut lans: Vec<&str> = env.networks.values().filter_map(|n| n.vlan.as_ref().map(|(l, _)| l.as_str())).collect();
-    lans.dedup();
-    for (i, lan) in lans.into_iter().filter(|l| !env.networks.contains_key(*l)).enumerate() {
-        add(m, lan, format!("l{i}"), format!("LAN `{lan}`: its VLANs are tags on one VNet"));
     }
     out
 }

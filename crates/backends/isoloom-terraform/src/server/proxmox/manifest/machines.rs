@@ -21,17 +21,9 @@ use crate::server::router::NAME as ROUTER;
 const IP: &str = "ip";
 
 /// The lab's networks, each named after the VNet (the node's bridge) it is, or whose VLAN it is:
-/// `i<slot>n<i>`, a LAN's `i<slot>l<j>`, as the module names them.
+/// `i<slot>n<i>`, a LAN's `i<slot>l<j>`, the module's own ids (`links::vnet_ids`).
 pub(super) fn networks(env: &Environment) -> Result<Vec<Network>, ManifestError> {
-    let mut vnets: BTreeMap<&str, String> = BTreeMap::new();
-    for (i, (net, _)) in env.networks.iter().enumerate().filter(|(_, (_, p))| p.vlan.is_none()) {
-        vnets.insert(net, format!("n{i}"));
-    }
-    let mut lans: Vec<&str> = env.networks.values().filter_map(|n| n.vlan.as_ref().map(|(l, _)| l.as_str())).collect();
-    lans.dedup();
-    for (j, lan) in lans.into_iter().filter(|l| !env.networks.contains_key(*l)).enumerate() {
-        vnets.insert(lan, format!("l{j}"));
-    }
+    let vnets: BTreeMap<&str, String> = crate::server::proxmox::links::vnet_ids(env).into_iter().collect();
     let native = |net: &str| {
         let on = env.networks.get(net).and_then(|n| n.vlan.as_ref().map(|(l, _)| l.as_str())).unwrap_or(net);
         let id = vnets.get(on).cloned().unwrap_or_default();

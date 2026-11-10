@@ -41,6 +41,8 @@ mod uplink;
 mod virtiofs;
 mod windows;
 
+use std::borrow::Cow;
+
 use crate::hcl_builder::Module;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
@@ -166,9 +168,7 @@ impl Backend for ProxmoxBackend {
     }
 
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
-        let checked = lxc::checked(env);
-        let mounted = virtiofs::mounted(&checked);
-        PARTS.render(&self.capabilities(), &mounted)
+        PARTS.render(&self.capabilities(), &prepared(env))
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {
@@ -178,9 +178,17 @@ impl Backend for ProxmoxBackend {
     /// The run manifest (`.isoloom/proxmox/run.json`): Terraform applies the infrastructure, the
     /// runner reads each machine's ready file and runs the checks over SSH through the router.
     fn run_manifest(&self, env: &Environment) -> std::result::Result<Option<isoloom_manifest::Manifest>, RenderError> {
-        let checked = lxc::checked(env);
-        let mounted = virtiofs::mounted(&checked);
-        Ok(Some(manifest::manifest(&mounted)?))
+        Ok(Some(manifest::manifest(&prepared(env))?))
+    }
+}
+
+/// `env` as Proxmox runs it, for its module and its run manifest alike: without the derived
+/// checks its LXC containers can't run (`lxc::checked`), its virtiofs volumes host folders
+/// (`virtiofs::mounted`).
+fn prepared(env: &Environment) -> Cow<'_, Environment> {
+    match lxc::checked(env) {
+        Cow::Borrowed(env) => virtiofs::mounted(env),
+        Cow::Owned(checked) => Cow::Owned(virtiofs::mounted(&checked).into_owned()),
     }
 }
 
