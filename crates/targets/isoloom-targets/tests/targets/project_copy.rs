@@ -278,7 +278,7 @@ fn windows_machines_get_the_project_before_their_steps() -> Outcome {
         // script (no longer in C:\isoloom, which the project replaces) before the steps.
         assert!(tf.contains("destination = \"C:\\\\Windows\\\\Temp\\\\isoloom-project.tgz\""), "{path}");
         assert!(!tf.contains("destination = \"C:/isoloom/"), "{path}: a step uploaded on its own");
-        assert!(tf.contains("-File C:/ProgramData/isoloom/setup.ps1"), "{path}");
+        assert!(tf.contains("-File C:\\\\ProgramData\\\\isoloom\\\\setup.ps1"), "{path}");
         let unpack = tf.find("$dest = 'C:\\\\isoloom'; $strip = 1").expect("the project unpacked");
         // The plan's `Run` step, from C:\\isoloom.
         let step = tf.find("-File 'provision/iis.ps1'").expect("the step");

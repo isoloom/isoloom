@@ -236,19 +236,17 @@ pub(super) fn windows(env: &Environment, vm: Vm<'_>, m: &mut Module) {
     }));
 }
 
-/// First boot on Windows: the `isoloom` administrator with the generated password, WinRM over
-/// HTTP with NTLM (Windows' own; Basic, which sends the password with every request, stays off),
-/// and the auto-stop. The service takes unencrypted messages: Terraform's WinRM client (masterzen/
-/// winrm at its 2020 version) doesn't seal NTLM messages, so a service refusing them would refuse
-/// Terraform's set-up; the controller's Ansible (pywinrm) seals its own.
+/// First boot on Windows: the administrator ([`windows::first_boot_admin`]), WinRM with NTLM
+/// (Windows' own; Basic stays off), and the auto-stop. The controller's Ansible (pywinrm) seals
+/// its own messages.
 fn windows_user_data() -> Expression {
     let stop = auto_stop::windows_task();
-    Template::text("<powershell>\n$p = ConvertTo-SecureString '")
-        .with_expr(reference(windows::PASSWORD))
-        .with_text("' -AsPlainText -Force\nNew-LocalUser -Name isoloom -Password $p -PasswordNeverExpires -AccountNeverExpires | Out-Null\nAdd-LocalGroupMember -Group Administrators -Member isoloom\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nNew-NetFirewallRule -DisplayName 'isoloom WinRM' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null\n")
-        .with_expr(auto_stop::if_expires(stop.into_expression(), string("")))
-        .with_text("\n</powershell>\n")
-        .into_expression()
+    let mut t = Template::text("<powershell>\n");
+    t.append(windows::first_boot_admin());
+    t.push_text(format!("{}\n", windows::winrm(WinrmAuth::Ntlm)));
+    t.push_expr(auto_stop::if_expires(stop.into_expression(), string("")));
+    t.push_text("\n</powershell>\n");
+    t.into_expression()
 }
 
 /// The controller: its security group, an interface on every network at the controller

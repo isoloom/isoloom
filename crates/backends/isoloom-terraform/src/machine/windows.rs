@@ -3,11 +3,12 @@
 //! ports. The target's image must start WinRM over HTTP for `isoloom` with the generated
 //! password ([`write_password`]; see each target's user data).
 
-use crate::hcl_builder::{Block, Expression, Module, list, reference, string};
+use crate::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
 use isoloom_plan::{Environment, Step};
 use isoloom_render::steps;
 use isoloom_spec::model::Port;
 
+use super::controller::WinrmAuth;
 use super::provisioner::{Connection, Provisioner, Upload};
 use super::{Remote, linux};
 use crate::module::{self, ident, resource};
@@ -32,7 +33,7 @@ pub(crate) fn write_password(env: &Environment, m: &mut Module) {
 }
 
 /// Where the set-up script goes.
-const SETUP: &str = "C:/ProgramData/isoloom/setup.ps1";
+const SETUP: &str = isoloom_spec::windows_state_path!("\\setup.ps1");
 /// Where the project's archive goes: where the `Project` step unpacks it from.
 const ARCHIVE: &str = isoloom_render::steps::WINDOWS_PROJECT_ARCHIVE;
 
@@ -172,9 +173,53 @@ fn port_proxy(sv: &Port) -> Option<String> {
 /// A service's firewall openings: its port, and the published port when that differs.
 pub(crate) fn firewall(sv: &Port) -> Vec<String> {
     let (proto, suffix) = if sv.protocol.is_tcp() { ("TCP", "") } else { ("UDP", " udp") };
-    let rule =
-        |p: u16| format!("New-NetFirewallRule -DisplayName 'isoloom {p}{suffix}' -Direction Inbound -Protocol {proto} -LocalPort {p} -Action Allow | Out-Null");
+    let rule = |p: u16| open_port(&format!("{p}{suffix}"), proto, p);
     let mut out = vec![rule(sv.port)];
     out.extend(sv.publish.filter(|h| *h != sv.port).map(rule));
     out
+}
+
+/// An inbound firewall rule `isoloom <name>` opening `port` over `proto` (`TCP`, `UDP`), made
+/// once: a set-up run again finds it.
+fn open_port(name: &str, proto: &str, port: u16) -> String {
+    format!(
+        "if (-not (Get-NetFirewallRule -DisplayName 'isoloom {name}' -ErrorAction SilentlyContinue)) {{ New-NetFirewallRule -DisplayName 'isoloom {name}' -Direction Inbound -Protocol {proto} -LocalPort {port} -Action Allow | Out-Null }}"
+    )
+}
+
+/// The administrator Terraform and the controller reach a Windows VM as.
+pub(crate) const ADMIN: &str = "isoloom";
+
+/// The Windows Administrators group's well-known SID: its name differs with the image's
+/// language, its SID doesn't.
+const ADMINISTRATORS_SID: &str = "S-1-5-32-544";
+
+/// First boot, as PowerShell in the platform's user data (cloudbase-init's script, EC2's
+/// `<powershell>`): [`ADMIN`] with the generated password ([`PASSWORD`]), made, or given that
+/// password when the image has the user already, then put in the Administrators group (by its
+/// SID) unless it is in it. Each platform adds only what differs: its WinRM authentication
+/// ([`winrm`]), its own steps.
+pub(crate) fn first_boot_admin() -> Template {
+    Template::text("$password = ConvertTo-SecureString '")
+        .with_expr(reference(PASSWORD))
+        .with_text(format!(
+            "' -AsPlainText -Force\nif (Get-LocalUser -Name {ADMIN} -ErrorAction SilentlyContinue) {{ Set-LocalUser -Name {ADMIN} -Password $password -PasswordNeverExpires $true }} else {{ New-LocalUser -Name {ADMIN} -Password $password -PasswordNeverExpires -AccountNeverExpires | Out-Null }}\nif (-not (Get-LocalGroupMember -SID {ADMINISTRATORS_SID} | Where-Object {{ $_.Name -like '*\\{ADMIN}' }})) {{ Add-LocalGroupMember -SID {ADMINISTRATORS_SID} -Member {ADMIN} }}\n"
+        ))
+}
+
+/// WinRM over plain HTTP for [`ADMIN`], its port (5985) open: the remote token of a local
+/// administrator kept whole (`LocalAccountTokenFilterPolicy`), the networks private, unencrypted
+/// messages taken, and Basic authentication on only for [`WinrmAuth::Basic`] (with NTLM, Basic,
+/// which sends the password with every request, stays off). Terraform's WinRM client
+/// (masterzen/winrm) doesn't seal NTLM messages, so a service refusing unencrypted ones would
+/// refuse Terraform's set-up.
+pub(crate) fn winrm(auth: WinrmAuth) -> String {
+    let basic = match auth {
+        WinrmAuth::Basic => "Set-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\n",
+        WinrmAuth::Ntlm => "",
+    };
+    format!(
+        "New-ItemProperty -Path HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System -Name LocalAccountTokenFilterPolicy -Value 1 -PropertyType DWord -Force | Out-Null\nGet-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\n{basic}Set-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\n{}",
+        open_port("winrm", "TCP", 5985)
+    )
 }

@@ -10,10 +10,11 @@ use crate::hcl_builder::{Expression, Template, call, for_list, reference, string
 use isoloom_plan::{Environment, MachinePlan, Step, Vm};
 use isoloom_render::steps;
 
+use super::controller::WinrmAuth;
 use super::windows;
 
 /// Where the set-up records that it is done (a later boot runs nothing).
-const DONE: &str = "C:\\ProgramData\\isoloom\\done";
+const DONE: &str = isoloom_spec::windows_state_path!("\\done");
 
 /// What a Windows machine set up this way can't have on `platform` (Proxmox, ESXi): what no
 /// Windows VM set up at its own boot has, and inputs. Each reason after "machine `<name>`: ".
@@ -28,11 +29,12 @@ pub(crate) fn refusal(env: &Environment, platform: &str) -> Option<String> {
 pub(crate) fn user_data(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Expression {
     let host = name.to_uppercase();
     let mut t = Template::text(format!(
-        "#ps1_sysnative\n# Isoloom: machine `{name}`, set up by cloudbase-init at its first boot.\n$ErrorActionPreference = 'Stop'\nif (Test-Path '{DONE}') {{ exit 0 }}\nNew-Item -ItemType Directory -Force C:\\ProgramData\\isoloom | Out-Null\n# The administrator the controller's playbooks run as, over WinRM.\n$password = ConvertTo-SecureString '"
+        "#ps1_sysnative\n# Isoloom: machine `{name}`, set up by cloudbase-init at its first boot.\n$ErrorActionPreference = 'Stop'\nif (Test-Path '{DONE}') {{ exit 0 }}\nNew-Item -ItemType Directory -Force {} | Out-Null\n# The administrator the controller's playbooks run as, over WinRM.\n",
+        isoloom_spec::windows::STATE_DIR
     ));
-    t.push_expr(reference(windows::PASSWORD));
+    t.append(windows::first_boot_admin());
     t.push_text(format!(
-        "' -AsPlainText -Force\nif (Get-LocalUser -Name isoloom -ErrorAction SilentlyContinue) {{ Set-LocalUser -Name isoloom -Password $password -PasswordNeverExpires $true }} else {{ New-LocalUser -Name isoloom -Password $password -PasswordNeverExpires | Out-Null }}\nif (-not (Get-LocalGroupMember -SID S-1-5-32-544 | Where-Object {{ $_.Name -like '*\\isoloom' }})) {{ Add-LocalGroupMember -SID S-1-5-32-544 -Member isoloom }}\n# Its name takes a restart: cloudbase-init runs this script again after it (exit code 1003).\nif ($env:COMPUTERNAME -ne '{host}') {{ Rename-Computer -NewName '{name}' -Force; exit 1003 }}\n"
+        "# Its name takes a restart: cloudbase-init runs this script again after it (exit code 1003).\nif ($env:COMPUTERNAME -ne '{host}') {{ Rename-Computer -NewName '{name}' -Force; exit 1003 }}\n"
     ));
     if mp.lifecycle.iter().any(|s| matches!(s, Step::Run { .. }) || copies(s)) {
         t.append(project_files());
@@ -46,7 +48,10 @@ pub(crate) fn user_data(env: &Environment, (name, mp): (&str, &MachinePlan)) -> 
             .filter_map(|s| steps::windows(env, name, s))
             .map(|s| s.trim_end().to_owned()),
     );
-    ps.push(WINRM.to_owned());
+    ps.push(format!(
+        "# WinRM for the controller, last: a machine that answers is set up.\n{}",
+        windows::winrm(WinrmAuth::Basic)
+    ));
     ps.push(format!("New-Item -ItemType File -Force '{DONE}' | Out-Null"));
     t.push_text(ps.join("\n") + "\n");
     t.into_expression()
@@ -80,7 +85,3 @@ fn project_files() -> Template {
         .with_expr(call("join", [string("\n"), for_list("f", reference("local.project_paths"), line, None)]))
         .with_text("\n")
 }
-
-/// WinRM over HTTP with Basic authentication for local administrators, its port open: last, so
-/// a machine that answers is set up.
-const WINRM: &str = "# WinRM for the controller, last: a machine that answers is set up.\nNew-ItemProperty -Path HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System -Name LocalAccountTokenFilterPolicy -Value 1 -PropertyType DWord -Force | Out-Null\nGet-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue\nEnable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic $true\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true\nif (-not (Get-NetFirewallRule -DisplayName 'isoloom winrm' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName 'isoloom winrm' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow | Out-Null }";

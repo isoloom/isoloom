@@ -19,3 +19,20 @@ fn an_aws_windows_machine_answers_winrm_with_ntlm_not_basic() -> Outcome {
     );
     Ok(())
 }
+
+/// The administrator's set-up at first boot is the one cloudbase-init runs on the servers: the
+/// user checked for first, put in the Administrators group by its SID (whose name a localised
+/// Windows changes), and WinRM's port opened by one rule of one name.
+#[test]
+fn an_aws_windows_machine_makes_its_administrator_as_the_servers_do() -> Outcome {
+    let aws = cloud_vm(Cloud::Aws, WINDOWS_PROVISIONED)?;
+    let server = testing::proxmox(WINDOWS_PROVISIONED)?;
+    for (tf, on) in [(&aws, "aws"), (&server, "proxmox")] {
+        assert!(tf.contains("if (Get-LocalUser -Name isoloom -ErrorAction SilentlyContinue)"), "{on}: {tf}");
+        assert!(tf.contains("Add-LocalGroupMember -SID S-1-5-32-544 -Member isoloom"), "{on}: {tf}");
+        assert!(!tf.contains("-Group Administrators"), "{on}: by name");
+        assert!(tf.contains("-DisplayName 'isoloom winrm'"), "{on}: {tf}");
+        assert!(!tf.contains("'isoloom WinRM'"), "{on}: another rule name");
+    }
+    Ok(())
+}

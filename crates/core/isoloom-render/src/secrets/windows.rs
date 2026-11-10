@@ -19,11 +19,11 @@ use isoloom_spec::shell::base64;
 use crate::powershell;
 
 /// Where a Windows machine keeps the secrets delivered to it.
-pub(crate) const KEPT_DIR: &str = "C:\\ProgramData\\isoloom\\secrets";
+pub(crate) const KEPT_DIR: &str = isoloom_spec::windows_state_path!("\\secrets");
 /// The mark delivery leaves once every secret is kept.
-pub const DELIVERED: &str = "C:\\ProgramData\\isoloom\\secrets\\.delivered";
+pub const DELIVERED: &str = isoloom_spec::windows_state_path!("\\secrets\\.delivered");
 /// The script putting the files in place, run by the startup task and before the process.
-const PLACE_SCRIPT: &str = "C:\\ProgramData\\isoloom\\apply-secrets.ps1";
+const PLACE_SCRIPT: &str = isoloom_spec::windows_state_path!("\\apply-secrets.ps1");
 /// The startup task running [`PLACE_SCRIPT`] at every boot.
 const PLACE_TASK: &str = "isoloom-apply-secrets";
 

@@ -20,9 +20,27 @@ macro_rules! windows_isoloom_path {
     };
 }
 
+/// Isoloom's state folder on a Windows machine ([`STATE_DIR`]), or a path under it: `$rest`
+/// appended at compile time. Hidden: the crates of the workspace share it.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! windows_state_path {
+    () => {
+        "C:\\ProgramData\\isoloom"
+    };
+    ($rest:literal) => {
+        concat!($crate::windows_state_path!(), $rest)
+    };
+}
+
 /// Isoloom's folder on a Windows machine: the project unpacked, the machine's own scripts, its
-/// marks, the catalogue's values.
+/// ready mark ([`READY_FILE`]), the catalogue's values.
 pub const ISOLOOM_DIR: &str = windows_isoloom_path!();
+
+/// Isoloom's state folder on a Windows machine, under `ProgramData`: the secrets delivered to it
+/// and their mark, the set-up script Terraform uploads, and the mark of a set-up done at the
+/// machine's first boot.
+pub const STATE_DIR: &str = windows_state_path!();
 
 /// The mark a Windows machine's set-up leaves in [`ISOLOOM_DIR`] once it is ready, which the
 /// controller and the runner wait for.
