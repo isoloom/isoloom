@@ -25,6 +25,7 @@ mod external;
 mod forwarding;
 mod generate;
 mod groups;
+mod guides;
 mod hardware;
 mod host_folders;
 mod instance;

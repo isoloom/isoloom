@@ -2,8 +2,8 @@
 
 The `proxmox` target writes a Terraform module (`.isoloom/proxmox/main.tf`, provider
 `bpg/proxmox ~> 0.115.0`) that makes one VM per machine on a Proxmox VE server, with an SDN zone
-and VNet per network, a resource pool, a router VM where `reach` or `internet: false` need one,
-and Proxmox firewall rules. `docker-vm` can also put its single Docker VM on Proxmox
+and VNet per network, a resource pool, a router VM (between the networks, by the `reach` rules,
+and out to the internet), and Proxmox firewall rules. `docker-vm` can also put its single Docker VM on Proxmox
 (`.isoloom/docker-vm/proxmox/`). Both write a run manifest.
 
 Tier 2: real runs from macOS are recorded; Linux and Windows hosts are pending.
@@ -63,8 +63,9 @@ terraform -chdir=.isoloom/proxmox apply \
   -var node=pve
 ```
 
-Or with a runner, which also delivers the project and the secrets, waits for every set-up, seals
-offline networks and runs the checks:
+Or with a runner, which also gives the module the environment's inputs, waits for every set-up,
+seals offline networks and runs the checks (the machines take the project from their cloud-init;
+secrets are refused on Proxmox):
 
 ```sh
 isothrum up . --target proxmox
