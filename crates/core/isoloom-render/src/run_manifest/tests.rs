@@ -10,7 +10,7 @@ use isoloom_plan::checks::{Host, HttpExpect, HttpRequest, Position, Probe, Resol
 use isoloom_spec::model::{self, Target};
 
 use super::{
-    act, addresses, arch, argv, check, cleanup, environment, generator, networks, noted, outputs, outputs_at, outputs_on_their_hosts, port, program, run,
+    act, addresses, arch, argv, check, cleanup, environment, generator, networks, noted, outputs, outputs_on_their_hosts, outputs_with, port, program, run,
     timeout_s, tolerated, tool,
 };
 use crate::testing;
@@ -250,14 +250,14 @@ fn a_vm_lab_shows_each_published_port_at_its_machines_host() {
 }
 
 #[test]
-fn a_server_lab_shows_its_published_ports_at_the_host_it_names() {
+fn a_server_environment_shows_its_published_ports_at_the_host_it_names() {
     let web = machine(
         "web",
         Role::Member,
         vec![lab_port("site", 80, PortKind::Http, true), lab_port("dns", 53, PortKind::Udp, true)],
     );
     let router: Template = "${outputs.ip}".parse().unwrap();
-    let out = outputs_at(&[web], &router).unwrap();
+    let out = outputs_with(&[web], |_| router.clone()).unwrap();
     let formats: Vec<String> = out.iter().map(|o| o.format.as_ref().map(ToString::to_string).unwrap_or_default()).collect();
     assert_eq!(formats, ["http://${outputs.ip}:${value}/", "${outputs.ip}:${value}"]);
 }

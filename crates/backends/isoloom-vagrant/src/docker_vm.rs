@@ -28,7 +28,7 @@
 
 use crate::boxes;
 use crate::error::Result;
-use isoloom_manifest::{Failure, Manifest};
+use isoloom_manifest::{Error as ManifestError, Failure, Manifest, Part, Placeholder};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container::{self as docker, DOCKER_HOST as VM};
 use isoloom_render::run_manifest::guest::{COMPOSE_OUTPUTS, GuestCommand, GuestCompose};
@@ -267,7 +267,12 @@ fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
 /// `guest`'s start steps (published on every address of the VM, at the fixed host ports Vagrant
 /// forwards), then the ready mark.
 fn environment_script(guest: &GuestCompose) -> Result<String> {
-    Ok(format!("{}{} && echo ready > {}", sequence(&guest.start)?, steps::MAKE_STATE_DIR, steps::READY_FILE))
+    Ok(format!(
+        "{}{} && echo ready > {}",
+        sequence(&guest.start)?,
+        steps::MAKE_STATE_DIR,
+        steps::READY_FILE
+    ))
 }
 
 /// `commands` as script lines, in order, each as its failure policy says: a failed one ends the
@@ -276,11 +281,35 @@ fn sequence(commands: &[GuestCommand]) -> Result<String> {
     commands
         .iter()
         .map(|c| {
-            let line = c.in_vm_shell()?;
+            let line = in_vm_shell(c)?;
             Ok(match c.failure {
                 Failure::Fail => format!("{line} || exit 1\n"),
                 Failure::Tolerate => format!("{line} || echo {} >&2\n", quote(&format!("{}: failed, tolerated", c.id))),
             })
+        })
+        .collect()
+}
+
+/// The command as a shell line in the VM itself, which no runner fills in (a Vagrantfile's
+/// own provisioner): each `${params.<NAME>}` the environment variable `NAME`, which that
+/// provisioner sets.
+///
+/// # Errors
+///
+/// [`ManifestError::PlaceholderOutOfPlace`] for any other placeholder: only a runner fills
+/// those in.
+fn in_vm_shell(c: &GuestCommand) -> std::result::Result<String, ManifestError> {
+    c.command
+        .parts()
+        .iter()
+        .map(|part| match part {
+            Part::Text(text) => Ok(text.clone()),
+            Part::Placeholder(Placeholder::Param(name)) => Ok(format!("\"${name}\"")),
+            Part::Placeholder(other) => Err(ManifestError::PlaceholderOutOfPlace {
+                at: format!("guest command `{}`", c.id),
+                root: other.root(),
+                only: "a runner's steps",
+            }),
         })
         .collect()
 }
@@ -309,7 +338,7 @@ fn checks_script(env: &Environment, guest: &GuestCompose) -> Result<Option<Strin
     let runners: String = guest
         .runners
         .iter()
-        .map(|g| Ok(format!("  {} || failed=1\n", g.command.in_vm_shell()?)))
+        .map(|g| Ok(format!("  {} || failed=1\n", in_vm_shell(&g.command)?)))
         .collect::<Result<_>>()?;
     let setup = sequence(&guest.check_setup)?;
     let checked = if setup.is_empty() {

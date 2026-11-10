@@ -220,7 +220,7 @@ fn setup_files(env: &Environment) -> Vec<GeneratedFile> {
     hosting(env)
         .map(|cloud| GeneratedFile {
             path: format!("{OUTPUT_DIR}/{}/{}/setup.sh", Target::CloudDocker.id(), cloud.id()),
-            contents: isoloom_render::run_manifest::guest::setup_script(env),
+            contents: crate::docker_host::setup_script(env),
         })
         .collect()
 }

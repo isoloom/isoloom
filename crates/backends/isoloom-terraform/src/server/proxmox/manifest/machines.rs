@@ -8,7 +8,7 @@ use std::net::IpAddr;
 use isoloom_manifest::{Error as ManifestError, Machine, Name, Network, Output, OutputRole, Part, Placeholder, Role, RunVar, SnakeName, Template};
 use isoloom_plan::Environment;
 use isoloom_render::router;
-use isoloom_render::run_manifest::outputs_at;
+use isoloom_render::run_manifest::outputs_with;
 use isoloom_spec::validate::Cidr as SpecCidr;
 
 use crate::machine::controller;
@@ -71,7 +71,7 @@ fn by_network(env: &Environment, at: impl Fn(&str) -> IpAddr) -> Result<BTreeMap
 /// The router's address (`ip`), the SSH user, the ready file, then each published port at the
 /// router's address.
 pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
-    let state = isoloom_render::run_manifest::terraform_output;
+    let state = crate::module::manifest::terraform_output;
     let mut out = vec![
         state(
             IP,
@@ -89,6 +89,7 @@ pub(super) fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError
             "Where each Linux machine's set-up says how far it got (isoloom-ready/1).",
         )?,
     ];
-    out.extend(outputs_at(machines, &Template::from(Placeholder::Output(SnakeName::parse(IP)?)))?);
+    let router = Template::from(Placeholder::Output(SnakeName::parse(IP)?));
+    out.extend(outputs_with(machines, |_| router.clone())?);
     Ok(out)
 }

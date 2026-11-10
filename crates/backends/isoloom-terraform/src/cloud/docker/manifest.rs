@@ -15,7 +15,9 @@ use isoloom_manifest::{
     TerraformIdentity,
 };
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::guest::{GuestCompose, docker_host_outputs, into_vm, ssh_run};
+use isoloom_render::run_manifest::guest::GuestCompose;
+
+use crate::docker_host::{accept_env, docker_host_outputs, into_vm, ssh_run};
 use isoloom_render::run_manifest::{environment, generator};
 
 use super::super::Cloud;
@@ -88,7 +90,7 @@ fn up_steps(way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>, guest: &Gu
     // The VM is readied bare over SSH (no cloud-init `AcceptEnv`, unlike docker-vm on Proxmox), so
     // its sshd must be told to accept the launch's values the runner forwards (`SendEnv`) before
     // the start steps run; otherwise the containers' env vars arrive unset.
-    if let Some(accept) = guest.accept_env_command()? {
+    if let Some(accept) = accept_env(guest)? {
         up.push(accept.step(way_in)?);
     }
     for command in &guest.start {

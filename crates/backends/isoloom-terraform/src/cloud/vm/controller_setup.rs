@@ -42,7 +42,10 @@ pub(crate) fn set_up(env: &Environment, user: &dyn Fn(&MachinePlan) -> String, i
         part.push(Tracked::new("hosts file", hosts));
     }
     part.push(Tracked::new("packages", Shell::Root.command(&controller::install_packages())));
-    part.push(Tracked::new("installing Ansible", Shell::Root.command(isoloom_render::controller::INSTALL_ANSIBLE)));
+    part.push(Tracked::new(
+        "installing Ansible",
+        Shell::Root.command(isoloom_render::controller::INSTALL_ANSIBLE),
+    ));
     for (name, wait) in controller::linux_waits(env, user) {
         part.push(Tracked::new(format!("waiting for {name}"), wait));
     }

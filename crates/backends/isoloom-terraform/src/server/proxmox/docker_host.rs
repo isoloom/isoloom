@@ -12,7 +12,7 @@ pub use super::manifest::docker_vm::docker_vm as manifest;
 use crate::hcl_builder::{Block, BlockBuilder, Expression, boolean, list, number, reference, string};
 use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
-use isoloom_render::run_manifest::guest::{self, GuestCompose};
+use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR, steps};
 use isoloom_spec::model::Target;
 
@@ -66,11 +66,11 @@ pub fn module(env: &Environment, guest: &GuestCompose) -> Result<Vec<GeneratedFi
 /// The SSH user the runner's key lets in (it has `sudo`).
 pub(super) use crate::machine::USER;
 
-/// `setup.sh`: the Docker host's set-up ([`guest::setup_script`]).
+/// `setup.sh`: the Docker host's set-up ([`crate::docker_host::setup_script`]).
 fn setup(env: &Environment) -> GeneratedFile {
     GeneratedFile {
         path: format!("{OUTPUT_DIR}/{}/{SETUP}", folder()),
-        contents: guest::setup_script(env),
+        contents: crate::docker_host::setup_script(env),
     }
 }
 

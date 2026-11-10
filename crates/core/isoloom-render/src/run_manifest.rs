@@ -321,25 +321,6 @@ pub fn machine(name: &str, role: Role) -> Result<Machine, ManifestError> {
     })
 }
 
-/// A Terraform state output `name` (role `role`), read by the runner as `${outputs.<name>}`.
-///
-/// # Errors
-///
-/// Fails on a name the manifest refuses.
-pub fn terraform_output(name: &str, role: OutputRole, description: &str) -> Result<Output, ManifestError> {
-    Ok(Output {
-        name: SnakeName::parse(name)?,
-        description: Some(description.to_owned()),
-        role,
-        sensitive: false,
-        format: None,
-        from: OutputSource::TerraformOutput {
-            name: isoloom_manifest::Identifier::parse(name)?,
-            default: None,
-        },
-    })
-}
-
 /// An output per published port of the lab's machines and tools, named `<machine>__<port>`: an
 /// HTTP port is an entry (the address a user opens first), the others information; each shown
 /// at the host's loopback.
@@ -348,16 +329,7 @@ pub fn terraform_output(name: &str, role: OutputRole, description: &str) -> Resu
 ///
 /// Fails on an output name the manifest refuses.
 pub fn outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
-    outputs_at(machines, &Template::text("127.0.0.1"))
-}
-
-/// [`outputs`], each shown at `host` (a server lab's router, `${outputs.ip}`).
-///
-/// # Errors
-///
-/// Fails on an output name the manifest refuses.
-pub fn outputs_at(machines: &[Machine], host: &Template) -> Result<Vec<Output>, ManifestError> {
-    outputs_with(machines, |_| host.clone())
+    outputs_with(machines, |_| Template::text("127.0.0.1"))
 }
 
 /// [`outputs`], each shown at the host the driver reports for its machine (`${host.<machine>}`):

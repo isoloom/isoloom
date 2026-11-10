@@ -8,7 +8,9 @@
 
 use isoloom_manifest::{Driver, Error as ManifestError, Lifecycle, Manifest, ManifestVersion, Placeholder, RelPath, Run, SCHEMA_URL, SnakeName, Template};
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, docker_host_outputs, into_vm, ssh_run};
+use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
+
+use crate::docker_host::{docker_host_outputs, into_vm, ssh_run};
 use isoloom_render::run_manifest::{self, environment, generator};
 use isoloom_spec::model::Target;
 

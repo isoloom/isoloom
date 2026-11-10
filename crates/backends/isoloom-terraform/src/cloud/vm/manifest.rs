@@ -10,7 +10,9 @@ use std::net::IpAddr;
 use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SecretSlot, SnakeName, Template};
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::OUTPUT_DIR;
-use isoloom_render::run_manifest::{outputs_with, terraform_output as state, timeout_s};
+use isoloom_render::run_manifest::{outputs_with, timeout_s};
+
+use crate::module::manifest::terraform_output as state;
 use isoloom_spec::model::Target;
 
 use super::{Driver, vms};

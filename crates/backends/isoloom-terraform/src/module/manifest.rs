@@ -8,8 +8,8 @@ use std::net::IpAddr;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, Delivery, EnvName, Error as ManifestError, HostArgv, Machine, Name, NonEmpty, OsName, Param, Part, Placeholder, Program, PublishMode, Role,
-    RunVar, SetBy, SnakeName, Step, StepId, Template, TfVarShape,
+    Action, Argv, Delivery, EnvName, Error as ManifestError, HostArgv, Machine, Name, NonEmpty, OsName, Output, OutputRole, OutputSource, Param, Part,
+    Placeholder, Program, PublishMode, Role, RunVar, SetBy, SnakeName, Step, StepId, Template, TfVarShape,
 };
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::run_manifest::{addresses, arch, noted, port, run};
@@ -148,6 +148,25 @@ pub(crate) fn param(v: &Variable, required: bool) -> Result<Param, ManifestError
         providers: BTreeSet::new(),
         set_by: SetBy::Embedder,
         deliver: tf_var_string(v.name())?,
+    })
+}
+
+/// A Terraform state output `name` (role `role`), read by the runner as `${outputs.<name>}`.
+///
+/// # Errors
+///
+/// Fails on a name the manifest refuses.
+pub(crate) fn terraform_output(name: &str, role: OutputRole, description: &str) -> Result<Output, ManifestError> {
+    Ok(Output {
+        name: SnakeName::parse(name)?,
+        description: Some(description.to_owned()),
+        role,
+        sensitive: false,
+        format: None,
+        from: OutputSource::TerraformOutput {
+            name: isoloom_manifest::Identifier::parse(name)?,
+            default: None,
+        },
     })
 }
 
