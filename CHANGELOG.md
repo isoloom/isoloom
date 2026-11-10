@@ -433,6 +433,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   network (by DHCP, with a placeholder block to set, when it has no `ip`), and a
   `synced_folder` a `host_folders` entry. A `synced_folder`'s options after its paths
   (`disabled: true` among them) were not read either.
+- **ESXi says its `internet: false` networks keep the internet.** Its router wrote a sealed
+  ruleset that nothing applied (ESXi has no run manifest, so no seal step), and every network kept
+  the internet without a word. The router no longer writes it; the module's router comment and the
+  [ESXi guide](docs/guide/targets/esxi.md) say that nothing seals those networks there.
 - **Proxmox's seal is one SSH step.** Its `terraform apply` with `isoloom_sealed` changed
   nothing (the module has no such variable) and is gone; the router is sealed by the SSH step,
   which also keeps the sealed ruleset for later boots.

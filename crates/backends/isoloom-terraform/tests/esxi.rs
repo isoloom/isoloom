@@ -37,6 +37,18 @@ fn esxi_segmented() -> Outcome {
     Ok(())
 }
 
+/// ESXi has no run manifest, so no seal step: its router writes no sealed ruleset nothing would
+/// apply, and the module says the `internet: false` networks keep the internet.
+#[test]
+fn the_router_holds_no_seal_nothing_applies() -> Outcome {
+    let sealed = esxi("segmented")?;
+    assert!(!sealed.contains("nftables.sealed"), "{sealed}");
+    assert!(sealed.contains("the internet: false ones included: nothing seals them on ESXi"), "{sealed}");
+    let open = esxi("ansible-pair")?;
+    assert!(!open.contains("nothing seals them"), "nothing to seal, nothing said");
+    Ok(())
+}
+
 #[test]
 fn esxi_ansible_pair() -> Outcome {
     insta::assert_snapshot!(esxi("ansible-pair")?);

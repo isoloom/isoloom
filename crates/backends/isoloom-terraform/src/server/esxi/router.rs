@@ -1,7 +1,9 @@
 //! The router, as on Proxmox: an Ubuntu VM on the host's port group (DHCP) and on every network
 //! at its router address, forwarding between networks with the `reach` rules and to the
 //! internet (the same ruleset). VMware Tools reports its uplink address: the published ports
-//! are reached there, and Terraform reaches the machines through it.
+//! are reached there, and Terraform reaches the machines through it. Unlike Proxmox's, it is
+//! never sealed: ESXi has no run manifest, so nothing closes the internet to the `internet:
+//! false` networks once the machines are set up, and the router keeps no sealed ruleset.
 
 use crate::hcl_builder::{BinaryOperator, Block, Module, Template, binary, call, list, not, reference, string};
 use isoloom_plan::{Environment, ipv6};
@@ -32,9 +34,6 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         file("/etc/nftables.conf", None, ruleset_content(env)),
         file("/etc/sysctl.d/90-isoloom.conf", None, string(forwarding(env))),
     ];
-    // The sealed ruleset as a second file (the live reload applies it; owed on ESXi until its
-    // runner integration lands — the Terraform `esxi` target has no run manifest yet).
-    config.files.extend(crate::server::router::sealed_file(env));
     config.runcmd = [
         "sysctl -p /etc/sysctl.d/90-isoloom.conf",
         "systemctl enable --now nftables",
@@ -68,8 +67,13 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         windows: false,
         lifecycle: Some(uplink_checked(env)),
     };
+    let unsealed = if crate::cloud::vm::seal::any(env) {
+        " Every network keeps the internet, the internet: false ones included: nothing seals them on ESXi."
+    } else {
+        ""
+    };
     m.commented(
-        "The router: forwards between networks with the reach rules, and to the internet. VMware Tools reports its uplink address.",
+        &format!("The router: forwards between networks with the reach rules, and to the internet.{unsealed} VMware Tools reports its uplink address."),
         guest.block(&env.name),
     );
 }
@@ -90,7 +94,7 @@ fn uplink_checked(env: &Environment) -> Block {
     crate::server::router::postcondition(condition, message)
 }
 
-/// The outputs: Proxmox's, from the router's uplink address.
+/// The outputs: the server router's, from its uplink address.
 pub(super) fn outputs(env: &Environment, m: &mut Module) {
     m.block(
         Block::builder("locals")

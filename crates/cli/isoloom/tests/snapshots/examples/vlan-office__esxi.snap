@@ -522,7 +522,7 @@ resource "esxi_portgroup" "servers" {
   vlan    = 4095
 }
 
-# The router: forwards between networks with the reach rules, and to the internet. VMware Tools reports its uplink address.
+# The router: forwards between networks with the reach rules, and to the internet. Every network keeps the internet, the internet: false ones included: nothing seals them on ESXi. VMware Tools reports its uplink address.
 resource "esxi_guest" "isoloom_router" {
   guest_name            = "iso${var.slot}-isoloom-router"
   notes                 = "isoloom: vlan-office"
@@ -586,11 +586,7 @@ resource "esxi_guest" "isoloom_router" {
           path    = "/etc/nftables.conf"
           content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.70.10.0/24 ip daddr 10.70.99.0/24 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip saddr 10.70.10.0/24 ip daddr 10.70.99.0/24 icmp type echo-request accept\n    ip saddr { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } ip daddr != { 10.70.10.0/24, 10.70.20.0/24, 10.70.99.0/24 } masquerade\n  }\n}\n"
         },
-        { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
-        {
-          path    = "/etc/nftables.sealed.nft"
-          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip saddr 10.70.10.0/24 ip daddr 10.70.99.0/24 meta l4proto { tcp, udp } th dport { 80 } accept\n    ip saddr 10.70.10.0/24 ip daddr 10.70.99.0/24 icmp type echo-request accept\n    ip daddr { 10.70.10.0/24, 10.70.99.0/24 } drop\n    ip saddr { 10.70.20.0/24 } ip daddr != { 10.70.20.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.70.20.0/24 } ip daddr != { 10.70.20.0/24 } masquerade\n  }\n}\n"
-        }
+        { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" }
       ]
       runcmd = [
         "sysctl -p /etc/sysctl.d/90-isoloom.conf",

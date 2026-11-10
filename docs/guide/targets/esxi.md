@@ -9,6 +9,11 @@ Tier 2, with a partial real run from macOS. There is no run manifest: run the mo
 Terraform. (VMs on a remote ESXi host through Vagrant are the `vagrant` target's `vmware_esxi`
 provider: [Vagrant](vagrant.md).)
 
+An `internet: false` network keeps the internet on ESXi. The router gives every network the
+internet, so the machines can set themselves up. On Proxmox and the clouds, the runner then
+closes it to those networks (the run manifest's seal). ESXi has no run manifest, so nothing
+closes it there: use another target when a network must stay offline.
+
 ## Prerequisites
 
 - A standalone ESXi host with SSH enabled (the provider works over SSH, port 22) and its API on
