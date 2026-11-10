@@ -184,7 +184,7 @@ fn row(r: RowFile) -> Result<Probe> {
 
 /// One row per OS of the spec's table: the machine is that OS alone.
 fn os_rows() -> Vec<Probe> {
-    isoloom_spec::os::FAMILIES
+    isoloom_spec::os::DISTROS
         .iter()
         .flat_map(|family| {
             family.versions.iter().map(move |(version, _)| {
@@ -291,7 +291,7 @@ mod tests {
     fn the_rows_read_and_each_os_of_the_table_has_one() {
         let probes = probes().unwrap();
         let os = probes.rows.iter().filter(|r| r.field == "machines.*.os").count();
-        let versions: usize = isoloom_spec::os::FAMILIES.iter().map(|f| f.versions.len()).sum();
+        let versions: usize = isoloom_spec::os::DISTROS.iter().map(|f| f.versions.len()).sum();
         assert_eq!(os, versions);
         assert!(probes.rows.iter().any(|r| r.value.as_deref() == Some("windows-server@2022")));
     }

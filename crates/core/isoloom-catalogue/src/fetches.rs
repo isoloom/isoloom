@@ -112,17 +112,14 @@ fn repository(r: &Value, os: OsRef) -> Result<RepositoryFetch, String> {
         (None, Some(s)) => KeyCheck::Sha256(s.parse().map_err(|e: isoloom_spec::Error| e.to_string())?),
         _ => return Err(format!("the key `{key_url}` takes exactly one of `fingerprint` and `sha256`")),
     };
-    let family = Family::from(os);
-    let apt = family == Family::Debian;
-    let suite = text("suite").or_else(|| crate::family::codename(os.os()).map(str::to_owned)).filter(|_| apt);
-    let components = match r.get("components").and_then(Value::as_array) {
-        Some(list) => list.iter().filter_map(Value::as_str).map(str::to_owned).collect(),
-        None if apt => vec!["main".to_owned()],
-        None => Vec::new(),
-    };
+    let given = r
+        .get("components")
+        .and_then(Value::as_array)
+        .map(|list| list.iter().filter_map(Value::as_str).map(str::to_owned).collect());
+    let (suite, components) = crate::family::apt_defaults(os.os(), text("suite"), given);
     Ok(RepositoryFetch {
         url,
-        family,
+        family: Family::from(os),
         suite,
         components,
         key_url,

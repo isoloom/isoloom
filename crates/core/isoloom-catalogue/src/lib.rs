@@ -66,7 +66,7 @@ pub use entry::{
     SettingType, Source, When,
 };
 pub use error::{Error, Finding, Result};
-pub use family::{Family, codename};
+pub use family::{Family, apt_defaults};
 pub use fetches::{Fetches, KeyCheck, RepositoryFetch};
 pub use lock::{Digest, Lock, LockedImage, LockedKey, LockedRelease};
 pub use names::{CaseName, DataName, EntryName, Kind, Name, SettingName, VarName};

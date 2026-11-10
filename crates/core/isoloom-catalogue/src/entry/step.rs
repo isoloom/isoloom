@@ -134,7 +134,7 @@ impl OsFamily {
 impl<'de> Deserialize<'de> for OsFamily {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<OsFamily, D::Error> {
         let text = String::deserialize(d)?;
-        let families = isoloom_spec::os::FAMILIES;
+        let families = isoloom_spec::os::DISTROS;
         families.iter().find(|f| f.name == text).map(|f| OsFamily(f.name)).ok_or_else(|| {
             let known: Vec<&str> = families.iter().map(|f| f.name).collect();
             serde::de::Error::custom(format!("`{text}` isn't an OS family; the OS table has: {}", known.join(", ")))
@@ -148,7 +148,7 @@ impl JsonSchema for OsFamily {
     }
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
-        let names: Vec<&str> = isoloom_spec::os::FAMILIES.iter().map(|f| f.name).collect();
+        let names: Vec<&str> = isoloom_spec::os::DISTROS.iter().map(|f| f.name).collect();
         json_schema!({ "type": "string", "enum": names })
     }
 }

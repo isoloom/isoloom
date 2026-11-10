@@ -100,7 +100,7 @@ fn linux_step(at: &FieldPath, m: &Machine, step: &Step, out: &mut Problems) {
 
 /// Whether the machine's OS installs with apt (Debian, Ubuntu, Kali).
 fn apt(m: &Machine) -> bool {
-    m.os.is_some_and(|o| matches!(o.os().family, "debian" | "ubuntu" | "kali"))
+    m.os.is_some_and(|o| o.os().installs_with_apt())
 }
 
 /// A Linux account's name: lowercase letters, digits and `_.-`, from a letter or `_`, as

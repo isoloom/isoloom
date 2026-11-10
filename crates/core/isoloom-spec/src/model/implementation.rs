@@ -326,7 +326,7 @@ pub struct Provision {
 /// The image table's OS names, the ones every target maps to its own images (e.g. Windows from
 /// an evaluation ISO locally, a license-included image in the cloud). A spec writes the OS as
 /// `<family>@<version>` ([`crate::os`]); a parsed spec's `vm.os` holds one of these names. In
-/// the order of [`crate::os::FAMILIES`].
+/// the order of [`crate::os::DISTROS`].
 pub const KNOWN_OS: &[&str] = &[
     "debian-11",
     "debian-12",

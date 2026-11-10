@@ -11,7 +11,7 @@ use isoloom_spec::model::{self, Configuration, Protocol};
 use isoloom_spec::syntax::{self, FileState, FirewallPort, OsRef, PortName, PortProtocol, ProjectPath, Service, Step};
 
 use super::daemons::{Daemon, DaemonTable};
-use super::family::{Family, codename};
+use super::family::{Family, apt_defaults};
 use super::resources::{PortSpec, RepositoryKind, RepositoryPlan, Resource, RunPlan, ServicePlan, ServiceSource, Shell};
 
 /// A recipe resolved for one machine: its phases in order (`install`, `configure`, `start`), the
@@ -204,7 +204,8 @@ fn first_set(fields: &[(&'static str, bool)]) -> Option<&'static str> {
 }
 
 /// Step `step` resolved on `os` (`port`: its machine's ports, for the firewall's names); `None`
-/// for a kind the spec has and this plan doesn't (the two crates ship together, so never).
+/// for a kind the spec has and this plan doesn't (the two crates ship together, so never), or a
+/// step [`unportable`] refuses first (a repository on Windows).
 fn resource(step: &Step, os: OsRef, port: &PortOf<'_>, daemons: &DaemonTable) -> Option<Resource> {
     let family = Family::from(os);
     let r = match step {
@@ -217,7 +218,7 @@ fn resource(step: &Step, os: OsRef, port: &PortOf<'_>, daemons: &DaemonTable) ->
         Step::Packages(p) => Resource::Packages(p.clone()),
         Step::Reboot => Resource::Reboot,
         Step::Playbook(p) => Resource::Playbook(p.clone()),
-        Step::Repository(r) => Resource::Repository(repository(r, os)),
+        Step::Repository(r) => Resource::Repository(repository(r, os)?),
         Step::File(f) => Resource::File(f.clone()),
         Step::Template(t) => Resource::Template(t.clone()),
         Step::User(u) => Resource::User(u.clone()),
@@ -231,20 +232,17 @@ fn resource(step: &Step, os: OsRef, port: &PortOf<'_>, daemons: &DaemonTable) ->
 }
 
 /// A repository on `os`: apt's suite (the OS's codename) and components (`main`) filled in.
-fn repository(r: &syntax::Repository, os: OsRef) -> RepositoryPlan {
+/// `None` on Windows, which has no repository Isoloom drives ([`unportable`] refuses the step before it
+/// is planned).
+fn repository(r: &syntax::Repository, os: OsRef) -> Option<RepositoryPlan> {
     let kind = match Family::from(os) {
+        Family::Debian => RepositoryKind::Apt,
         Family::RedHat => RepositoryKind::Rpm,
         Family::Alpine => RepositoryKind::Apk,
-        Family::Debian | Family::Windows => RepositoryKind::Apt,
+        Family::Windows => return None,
     };
-    let apt = kind == RepositoryKind::Apt;
-    let suite = r.suite.clone().or_else(|| codename(os.os()).and_then(|c| c.parse().ok())).filter(|_| apt);
-    let components = match &r.components {
-        Some(c) => c.clone(),
-        None if apt => "main".parse().ok().into_iter().collect(),
-        None => Vec::new(),
-    };
-    RepositoryPlan {
+    let (suite, components) = apt_defaults(os.os(), r.suite.clone(), r.components.clone());
+    Some(RepositoryPlan {
         name: r.name.clone(),
         kind,
         url: r.url.clone(),
@@ -252,7 +250,7 @@ fn repository(r: &syntax::Repository, os: OsRef) -> RepositoryPlan {
         suite,
         components,
         priority: r.priority,
-    }
+    })
 }
 
 /// A service on `family`: a packaged unit's name as the family has it.

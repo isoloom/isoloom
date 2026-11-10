@@ -54,9 +54,9 @@ fn an_image_table_name_is_its_os_once_parsed_never_a_spelling() {
 
 #[test]
 fn every_version_is_an_image_table_name() {
-    let names: Vec<&str> = FAMILIES.iter().flat_map(|f| f.versions.iter().map(|(_, n)| *n)).collect();
+    let names: Vec<&str> = DISTROS.iter().flat_map(|f| f.versions.iter().map(|(_, n)| *n)).collect();
     assert_eq!(names, KNOWN_OS, "the families cover the image table, in its order");
-    for f in FAMILIES {
+    for f in DISTROS {
         assert!(f.get(f.default).is_some(), "{}'s default {} is one of its versions", f.name, f.default);
     }
 }

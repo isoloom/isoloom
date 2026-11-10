@@ -48,6 +48,22 @@ fn an_apt_repository_gets_the_releases_codename_and_main() {
 }
 
 #[test]
+fn a_repository_is_apts_exactly_on_the_oses_the_spec_says_install_with_apt() {
+    let step: syntax::Repository = serde_yaml_ng::from_str(&format!("{{ name: r, url: \"https://a.test/r\", {} }}", key())).unwrap();
+    for spelling in isoloom_spec::os::spellings() {
+        let os: OsRef = spelling.parse().unwrap();
+        let planned = repository(&step, os).map(|r| r.kind);
+        let expected = match Family::from(os) {
+            Family::Windows => None,
+            _ if os.os().installs_with_apt() => Some(RepositoryKind::Apt),
+            Family::Alpine => Some(RepositoryKind::Apk),
+            _ => Some(RepositoryKind::Rpm),
+        };
+        assert_eq!(planned, expected, "{spelling}");
+    }
+}
+
+#[test]
 fn a_firewall_opens_its_named_ports_by_number_and_transport() {
     let r = resolved("{ os: rocky@9, ports: { dns: { port: 53, protocol: udp }, web: 80 }, app: { steps: [{ firewall: { allow: [dns, web, 8443/udp] } }] } }")
         .unwrap();

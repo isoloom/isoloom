@@ -10,32 +10,49 @@
 //!
 //! Those are the only spellings. Once the spec is lowered, each `vm.os` holds the image table's
 //! name for its OS (`debian@12` is `debian-12`, [`Os::name`]), the name every target reads. A
-//! version left out resolves to the family's pinned default ([`Family::default`]), recorded in
-//! the resolved snapshot.
+//! version left out resolves to the distribution's pinned default ([`Distro::default`]),
+//! recorded in the resolved snapshot.
 
 use crate::{Error, Result};
 
-/// An OS family: the versions Isoloom has images for, each with its image-table name, and the
-/// version an omitted one resolves to.
+/// How a distribution installs its packages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Installer {
+    /// apt (Debian, Ubuntu, Kali).
+    Apt,
+    /// dnf, yum on CentOS 7 (Rocky, AlmaLinux, Fedora, CentOS).
+    Dnf,
+    /// apk (Alpine).
+    Apk,
+    /// Windows features (Windows, Windows Server).
+    Windows,
+}
+
+/// An OS distribution, the `<family>` of `os: <family>@<version>`: the versions Isoloom has
+/// images for, each with its image-table name, the version an omitted one resolves to, and how
+/// it installs packages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Family {
-    /// The family's name, the part before `@` (`debian`, `windows-server`).
+pub struct Distro {
+    /// Its name, the part before `@` (`debian`, `windows-server`).
     pub name: &'static str,
     /// Its versions, oldest first, each with the image-table name it maps to.
     pub versions: &'static [(&'static str, &'static str)],
     /// The version `os: <family>` resolves to: pinned, so an environment never changes under
     /// its author when a newer version is added.
     pub default: &'static str,
+    /// How it installs packages.
+    pub installer: Installer,
 }
 
-/// The OS families, with their versions and pinned defaults.
-pub const FAMILIES: &[Family] = &[
-    Family {
+/// The OS distributions, with their versions and pinned defaults.
+pub const DISTROS: &[Distro] = &[
+    Distro {
         name: "debian",
         versions: &[("11", "debian-11"), ("12", "debian-12"), ("13", "debian-13")],
         default: "12",
+        installer: Installer::Apt,
     },
-    Family {
+    Distro {
         name: "ubuntu",
         versions: &[
             ("14.04", "ubuntu-14.04"),
@@ -46,43 +63,51 @@ pub const FAMILIES: &[Family] = &[
             ("24.04", "ubuntu-24.04"),
         ],
         default: "24.04",
+        installer: Installer::Apt,
     },
-    Family {
+    Distro {
         name: "rocky",
         versions: &[("9", "rocky-9")],
         default: "9",
+        installer: Installer::Dnf,
     },
-    Family {
+    Distro {
         name: "alma",
         versions: &[("9", "almalinux-9")],
         default: "9",
+        installer: Installer::Dnf,
     },
-    Family {
+    Distro {
         name: "alpine",
         versions: &[("3.19", "alpine-3.19"), ("3.24", "alpine-3.24")],
         default: "3.19",
+        installer: Installer::Apk,
     },
-    Family {
+    Distro {
         name: "kali",
         versions: &[("rolling", "kali")],
         default: "rolling",
+        installer: Installer::Apt,
     },
-    Family {
+    Distro {
         name: "fedora",
         versions: &[("42", "fedora-42")],
         default: "42",
+        installer: Installer::Dnf,
     },
-    Family {
+    Distro {
         name: "centos",
         versions: &[("7", "centos-7")],
         default: "7",
+        installer: Installer::Dnf,
     },
-    Family {
+    Distro {
         name: "windows",
         versions: &[("10", "windows-10"), ("11", "windows-11")],
         default: "11",
+        installer: Installer::Windows,
     },
-    Family {
+    Distro {
         name: "windows-server",
         versions: &[
             ("2008r2", "windows-server-2008r2"),
@@ -93,18 +118,22 @@ pub const FAMILIES: &[Family] = &[
             ("2025", "windows-server-2025"),
         ],
         default: "2022",
+        installer: Installer::Windows,
     },
 ];
 
-/// An OS resolved: its family, its version (the default filled in) and its image-table name.
+/// An OS resolved: its distribution, its version (the default filled in), its image-table name
+/// and how it installs packages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Os {
-    /// The family (`debian`).
+    /// The distribution's name, the `<family>` of `<family>@<version>` (`debian`).
     pub family: &'static str,
     /// The version (`12`).
     pub version: &'static str,
     /// The image table's name for it (`debian-12`), what the targets read.
     pub name: &'static str,
+    /// How it installs packages.
+    pub installer: Installer,
 }
 
 impl Os {
@@ -113,15 +142,23 @@ impl Os {
     pub fn id(&self) -> String {
         format!("{}@{}", self.family, self.version)
     }
+
+    /// Whether it installs with apt: the one rule for an apt repository's `suite` and
+    /// `components`.
+    #[must_use]
+    pub fn installs_with_apt(&self) -> bool {
+        self.installer == Installer::Apt
+    }
 }
 
-impl Family {
-    /// The family's version `version`, resolved.
+impl Distro {
+    /// The distribution's version `version`, resolved.
     fn get(&self, version: &str) -> Option<Os> {
         self.versions.iter().find(|(v, _)| *v == version).map(|(v, n)| Os {
             family: self.name,
             version: v,
             name: n,
+            installer: self.installer,
         })
     }
 
@@ -140,10 +177,10 @@ impl Family {
 /// family's versions.
 pub fn resolve(text: &str) -> Result<Os> {
     let (family, version) = text.split_once('@').map_or((text, None), |(f, v)| (f, Some(v)));
-    let Some(f) = FAMILIES.iter().find(|f| f.name == family) else {
+    let Some(f) = DISTROS.iter().find(|f| f.name == family) else {
         return Err(Error::UnknownOs {
             text: text.to_owned(),
-            known: FAMILIES.iter().map(|f| format!("{} ({})", f.name, f.known())).collect::<Vec<_>>().join(", "),
+            known: DISTROS.iter().map(|f| format!("{} ({})", f.name, f.known())).collect::<Vec<_>>().join(", "),
         });
     };
     let version = version.unwrap_or(f.default);
@@ -158,7 +195,7 @@ pub fn resolve(text: &str) -> Result<Os> {
 /// The OS an image-table name (`debian-12`) stands for: how a parsed spec's `vm.os` names it.
 #[must_use]
 pub fn by_name(name: &str) -> Option<Os> {
-    FAMILIES
+    DISTROS
         .iter()
         .find_map(|f| f.versions.iter().find(|(_, n)| *n == name).and_then(|(v, _)| f.get(v)))
 }
@@ -168,7 +205,7 @@ pub fn by_name(name: &str) -> Option<Os> {
 #[must_use]
 pub fn spellings() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    for f in FAMILIES {
+    for f in DISTROS {
         out.push(f.name.to_owned());
         out.extend(f.versions.iter().map(|(v, _)| format!("{}@{v}", f.name)));
     }

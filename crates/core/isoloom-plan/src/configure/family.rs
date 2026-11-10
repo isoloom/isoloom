@@ -3,4 +3,4 @@
 //! of its machine's OS.
 
 pub use isoloom_catalogue::Family;
-pub(crate) use isoloom_catalogue::codename;
+pub(crate) use isoloom_catalogue::apt_defaults;

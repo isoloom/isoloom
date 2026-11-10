@@ -3,7 +3,9 @@
 //! Windows); a recipe is resolved for the family of its machine's OS, and the daemon table names
 //! a daemon's unit and package per family.
 
-use isoloom_spec::os::Os;
+use std::str::FromStr;
+
+use isoloom_spec::os::{Installer, Os};
 use isoloom_spec::syntax::OsRef;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -27,14 +29,14 @@ impl Family {
     /// Every family.
     pub const ALL: [Family; 4] = [Family::Debian, Family::RedHat, Family::Alpine, Family::Windows];
 
-    /// The family of `os`.
+    /// The family of `os`: how it installs packages ([`Os::installer`]) decides it.
     #[must_use]
     pub fn of(os: Os) -> Family {
-        match os.family {
-            "rocky" | "alma" | "fedora" | "centos" => Family::RedHat,
-            "alpine" => Family::Alpine,
-            "windows" | "windows-server" => Family::Windows,
-            _ => Family::Debian,
+        match os.installer {
+            Installer::Apt => Family::Debian,
+            Installer::Dnf => Family::RedHat,
+            Installer::Apk => Family::Alpine,
+            Installer::Windows => Family::Windows,
         }
     }
 
@@ -70,7 +72,7 @@ impl From<OsRef> for Family {
 /// The codename of an apt release (`bookworm` for `debian@12`): an apt repository's default
 /// suite, and `{{ os.codename }}`. `None` for an OS that has none.
 #[must_use]
-pub fn codename(os: Os) -> Option<&'static str> {
+pub(crate) fn codename(os: Os) -> Option<&'static str> {
     let name = match (os.family, os.version) {
         ("debian", "11") => "bullseye",
         ("debian", "12") => "bookworm",
@@ -85,6 +87,19 @@ pub fn codename(os: Os) -> Option<&'static str> {
         _ => return None,
     };
     Some(name)
+}
+
+/// A repository's `suite` and `components` on `os`, as a step gives them or by apt's defaults:
+/// the OS's codename and `main`. They are apt's: off apt, no suite, and the components as given
+/// (which the spec refuses).
+#[must_use]
+pub fn apt_defaults<S: FromStr, C: FromStr>(os: Os, suite: Option<S>, components: Option<Vec<C>>) -> (Option<S>, Vec<C>) {
+    if !os.installs_with_apt() {
+        return (None, components.unwrap_or_default());
+    }
+    let suite = suite.or_else(|| codename(os).and_then(|c| c.parse().ok()));
+    let components = components.unwrap_or_else(|| "main".parse().ok().into_iter().collect());
+    (suite, components)
 }
 
 #[cfg(test)]
@@ -119,6 +134,20 @@ mod tests {
             assert_eq!(codename(o).is_some(), Family::of(o) == Family::Debian, "{spelling}");
         }
         assert_eq!(codename(os("debian@12")), Some("bookworm"));
+    }
+
+    #[test]
+    fn an_apt_repository_defaults_to_the_codename_and_main_and_others_have_neither() {
+        let given = |os_text: &str, suite: Option<&str>, components: Option<Vec<String>>| {
+            apt_defaults::<String, String>(os(os_text), suite.map(str::to_owned), components)
+        };
+        assert_eq!(given("debian@12", None, None), (Some("bookworm".to_owned()), vec!["main".to_owned()]));
+        assert_eq!(given("kali", None, None), (Some("kali-rolling".to_owned()), vec!["main".to_owned()]));
+        let own = given("ubuntu@24.04", Some("stable"), Some(vec!["contrib".to_owned()]));
+        assert_eq!(own, (Some("stable".to_owned()), vec!["contrib".to_owned()]));
+        for other in ["rocky@9", "alpine", "windows-server@2022"] {
+            assert_eq!(given(other, Some("stable"), None), (None, Vec::new()), "{other}");
+        }
     }
 
     #[test]
