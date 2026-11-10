@@ -629,24 +629,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.67.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-back", libvirt__network_name: "isoloom-dual-stack-back", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:20::1", libvirt__ipv6_prefix: "64"
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dual-stack · router"
+      v.name = "dual-stack · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dual-stack · router"
+      v.vmx["displayName"] = "dual-stack · isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dual-stack · router"
+      v.name = "dual-stack · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "dual-stack · router"
+      v.name = "dual-stack · isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -666,7 +666,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "dual-stack-router"
+      v.guest_name = "dual-stack-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -680,7 +680,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dual-stack-router"
+      v.vmname = "dual-stack-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -690,7 +690,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dual-stack-front", "isoloom-dual-stack-back"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-front", "0215C3B71370"], ["isoloom-dual-stack-back", "02154D3B3D1A"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-front", "0215F261A19F"], ["isoloom-dual-stack-back", "021568400B93"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -713,14 +713,14 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:c3:b7:13:70 10.67.10.254/24 || rc=1
-          lab 02:15:4d:3b:3d:1a 10.67.20.254/24 || rc=1
+          lab 02:15:f2:61:a1:9f 10.67.10.254/24 || rc=1
+          lab 02:15:68:40:0b:93 10.67.20.254/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:c3:b7:13:70;mac:02:15:4d:3b:3d:1a\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:f2:61:a1:9f;mac:02:15:68:40:0b:93\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1862,15 +1862,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "dual-stack · router",
-          "vmware_desktop": "dual-stack · router",
-          "hyperv": "dual-stack-router",
-          "parallels": "dual-stack · router",
+          "virtualbox": "dual-stack · isoloom-router",
+          "vmware_desktop": "dual-stack · isoloom-router",
+          "hyperv": "dual-stack-isoloom-router",
+          "parallels": "dual-stack · isoloom-router",
           "libvirt": "dual-stack_isoloom-router",
-          "utm": "dual-stack · router",
-          "vmware_esxi": "dual-stack-router"
+          "utm": "dual-stack · isoloom-router",
+          "vmware_esxi": "dual-stack-isoloom-router"
         },
-        "boot_digest": "sha256:2e364400f18a69874ae04a85eaaa57fc6c92e81bf527725a297197e858ac5145"
+        "boot_digest": "sha256:c66315a6086903404031a7432200c84282782b71ded149f7288332d8491d1697"
       }
     },
     {

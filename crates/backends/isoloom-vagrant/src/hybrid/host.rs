@@ -81,7 +81,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
 fn virtualbox(r: &mut Ruby, env: &Environment, nics: usize) {
     let size = HostSize::of(env);
     r.block(Call::new("m.vm.provider").arg(Value::str("virtualbox")), "v", |r| {
-        r.assign("v.name", Value::str(&format!("{} · containers", env.name)));
+        r.assign("v.name", Value::str(&crate::vms::label(env, HOST)));
         r.assign("v.cpus", size.cpus);
         r.assign("v.memory", size.memory_mb);
         for i in 0..nics {

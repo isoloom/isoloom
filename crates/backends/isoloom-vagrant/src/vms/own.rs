@@ -65,12 +65,12 @@ fn every_machine(env: &Environment) -> Step {
     Step::Hosts { entries }
 }
 
-/// One of Isoloom's own VMs, as its providers see it: on each network of `at`, at its address
-/// there.
-fn helper<'a>(env: &'a Environment, what: &str, size: Size, at: Vec<(&'a str, Ipv4Addr)>, link: &'a Link) -> Guest<'a> {
+/// One of Isoloom's own VMs (`define`, its define name), as its providers see it: on each network
+/// of `at`, at its address there.
+fn helper<'a>(env: &'a Environment, define: &str, size: Size, at: Vec<(&'a str, Ipv4Addr)>, link: &'a Link) -> Guest<'a> {
     Guest {
-        label: super::label(env, what),
-        vm_name: super::vm_name(env, what),
+        label: super::label(env, define),
+        vm_name: super::vm_name(env, define),
         size,
         port_groups: super::port_groups(env, at.iter().map(|(net, _)| *net)),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
@@ -133,7 +133,7 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
             private_network(r, env, net, *ip);
         }
         let at = routed.iter().map(|(net, ip)| (net.as_str(), *ip)).collect();
-        providers::blocks(r, &helper(env, "router", Size::HELPER, at, link));
+        providers::blocks(r, &helper(env, router::NAME, Size::HELPER, at, link));
         steps_of(r, env, router::NAME, &[vec![Step::Prelude], trusting(env)].concat());
         shell(r, "router", &script);
     });
@@ -164,7 +164,7 @@ fn tool_shell(r: &mut Ruby, ctx: &Ctx, index: usize) {
         r.assign("m.vm.hostname", Value::str("shell"));
         networks(r, env, |c| c.tool(index));
         let at = addresses(env, |c| c.tool(index));
-        providers::blocks(r, &helper(env, "tool shell", Size::HELPER, at, link));
+        providers::blocks(r, &helper(env, TOOL_SHELL, Size::HELPER, at, link));
         steps_of(r, env, TOOL_SHELL, &[vec![Step::Prelude, every_machine(env)], trusting(env)].concat());
         shell(
             r,
@@ -187,7 +187,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let (bx, version) = controller_box(env.spec());
     let size = Size::controller(env.spec());
     let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
-    let mut guest = helper(env, "controller", size, addresses(env, Cidr::controller), link);
+    let mut guest = helper(env, CONTROLLER, size, addresses(env, Cidr::controller), link);
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
     // providers gets Debian's instead.
     guest.libvirt_box = (bx == CONTROLLER_BOX).then_some(CONTROLLER_BOX);
@@ -209,10 +209,10 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
         steps_of(r, env, CONTROLLER, &steps);
         controller_steps(r, env, !on_controller.is_empty());
         if !on_controller.is_empty() {
-            checks::provisioner(r, "controller", on_controller);
+            checks::provisioner(r, CONTROLLER, on_controller);
         }
     });
-    (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, "controller", &Position::Networks, on_controller))
+    (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, CONTROLLER, &Position::Networks, on_controller))
 }
 
 /// The default box (Alpine) unless the spec picks one; Debian's on an arm64 host.

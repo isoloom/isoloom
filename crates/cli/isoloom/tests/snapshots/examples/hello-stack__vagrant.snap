@@ -8,7 +8,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/vagrant/Vagrantfile
 ✓ .isoloom/vagrant/checks/cache.sh
 ✓ .isoloom/vagrant/checks/web.sh
-✓ .isoloom/vagrant/checks/controller.sh
+✓ .isoloom/vagrant/checks/isoloom-controller.sh
 ✓ .isoloom/vagrant/run.json
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
@@ -19,7 +19,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/resolved.json
 .isoloom/vagrant/Vagrantfile
 .isoloom/vagrant/checks/cache.sh
-.isoloom/vagrant/checks/controller.sh
+.isoloom/vagrant/checks/isoloom-controller.sh
 .isoloom/vagrant/checks/web.sh
 .isoloom/vagrant/run.json
 
@@ -1016,24 +1016,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.60.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-app", libvirt__network_name: "isoloom-hello-stack-app", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "hello-stack · controller"
+      v.name = "hello-stack · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "hello-stack · controller"
+      v.vmx["displayName"] = "hello-stack · isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "hello-stack · controller"
+      v.name = "hello-stack · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "hello-stack · controller"
+      v.name = "hello-stack · isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1063,7 +1063,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "hello-stack-controller"
+      v.guest_name = "hello-stack-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -1075,7 +1075,7 @@ Vagrant.configure("2") do |config|
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "hello-stack-controller"
+      v.vmname = "hello-stack-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -1087,7 +1087,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-hello-stack-app"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-hello-stack-app", "021521F0AF51"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-hello-stack-app", "02154F28367A"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1110,13 +1110,13 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:21:f0:af:51 10.60.0.253/24 || rc=1
+          lab 02:15:4f:28:36:7a 10.60.0.253/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:21:f0:af:51\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:4f:28:36:7a\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1210,7 +1210,7 @@ Vagrant.configure("2") do |config|
       fi
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/cache-seeded.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/cache-seeded.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
@@ -1306,7 +1306,7 @@ fi
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
 
-## .isoloom/vagrant/checks/controller.sh
+## .isoloom/vagrant/checks/isoloom-controller.sh
 #!/bin/sh
 # Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
@@ -1825,7 +1825,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "steps": [
             "check-cache",
             "check-web",
-            "check-controller"
+            "check-isoloom-controller"
           ]
         }
       ]
@@ -1946,15 +1946,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "hello-stack · controller",
-          "vmware_desktop": "hello-stack · controller",
-          "hyperv": "hello-stack-controller",
-          "parallels": "hello-stack · controller",
+          "virtualbox": "hello-stack · isoloom-controller",
+          "vmware_desktop": "hello-stack · isoloom-controller",
+          "hyperv": "hello-stack-isoloom-controller",
+          "parallels": "hello-stack · isoloom-controller",
           "libvirt": "hello-stack_isoloom-controller",
-          "utm": "hello-stack · controller",
-          "vmware_esxi": "hello-stack-controller"
+          "utm": "hello-stack · isoloom-controller",
+          "vmware_esxi": "hello-stack-isoloom-controller"
         },
-        "boot_digest": "sha256:9a06f6126dd951e667cbb1e4067db34287e59ee8f9c3d8688bd958267b3e3ecb"
+        "boot_digest": "sha256:17418b7161f2a38407d5293a0f81e546a2ce8bd5aea86f40d94d8de8171a135f"
       }
     }
   ],
@@ -2286,7 +2286,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           }
         ],
         "step": {
-          "id": "check-controller",
+          "id": "check-isoloom-controller",
           "argv": [
             "vagrant",
             "provision",

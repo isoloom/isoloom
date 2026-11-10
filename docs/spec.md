@@ -328,7 +328,7 @@ Keep its data when the environment is torn down: taking it down leaves it, and t
 
 ### `machines`
 
-The environment's machines, by name, started in the order written (after their `depends_on`). Names starting with `isoloom-` are Isoloom's own (its controller, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs) and refused.
+The environment's machines, by name, started in the order written (after their `depends_on`). Names starting with `isoloom-` are Isoloom's own (its controller, router and tool VM, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs) and refused.
 
 - **Type:** map of name to mapping
 - **Limits:** names match `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`

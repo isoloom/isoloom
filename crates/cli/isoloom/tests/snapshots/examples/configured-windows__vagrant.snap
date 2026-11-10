@@ -6,7 +6,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target vagrant (exit 0)
 ✓ .isoloom/vagrant/Vagrantfile
-✓ .isoloom/vagrant/checks/controller.sh
+✓ .isoloom/vagrant/checks/isoloom-controller.sh
 ✓ .isoloom/configure/lib/configure.ps1
 ✓ .isoloom/vagrant/run.json
 ✓ .isoloom/resolved.json
@@ -18,7 +18,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/configure/lib/configure.ps1
 .isoloom/resolved.json
 .isoloom/vagrant/Vagrantfile
-.isoloom/vagrant/checks/controller.sh
+.isoloom/vagrant/checks/isoloom-controller.sh
 .isoloom/vagrant/run.json
 
 ## .isoloom/.gitignore
@@ -1427,24 +1427,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.67.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-windows-lab", libvirt__network_name: "isoloom-configured-windows-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-windows · controller"
+      v.name = "configured-windows · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-windows · controller"
+      v.vmx["displayName"] = "configured-windows · isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-windows · controller"
+      v.name = "configured-windows · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "configured-windows · controller"
+      v.name = "configured-windows · isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1474,7 +1474,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "configured-windows-controller"
+      v.guest_name = "configured-windows-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -1486,7 +1486,7 @@ Vagrant.configure("2") do |config|
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "configured-windows-controller"
+      v.vmname = "configured-windows-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -1498,7 +1498,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-configured-windows-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-windows-lab", "0215BE6D77B4"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-windows-lab", "0215219A8A87"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1521,13 +1521,13 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:be:6d:77:b4 10.67.0.253/24 || rc=1
+          lab 02:15:21:9a:8a:87 10.67.0.253/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:be:6d:77:b4\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:21:9a:8a:87\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1592,11 +1592,11 @@ Vagrant.configure("2") do |config|
       INV
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/iis-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/iis-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
-## .isoloom/vagrant/checks/controller.sh
+## .isoloom/vagrant/checks/isoloom-controller.sh
 #!/bin/sh
 # Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
@@ -2015,7 +2015,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-controller"
+            "check-isoloom-controller"
           ]
         }
       ]
@@ -2103,15 +2103,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "configured-windows · controller",
-          "vmware_desktop": "configured-windows · controller",
-          "hyperv": "configured-windows-controller",
-          "parallels": "configured-windows · controller",
+          "virtualbox": "configured-windows · isoloom-controller",
+          "vmware_desktop": "configured-windows · isoloom-controller",
+          "hyperv": "configured-windows-isoloom-controller",
+          "parallels": "configured-windows · isoloom-controller",
           "libvirt": "configured-windows_isoloom-controller",
-          "utm": "configured-windows · controller",
-          "vmware_esxi": "configured-windows-controller"
+          "utm": "configured-windows · isoloom-controller",
+          "vmware_esxi": "configured-windows-isoloom-controller"
         },
-        "boot_digest": "sha256:91fa571f09b440bb6ca1bb8938be7c1b7ebfa02d2ef2142cd809c8d06dea43e1"
+        "boot_digest": "sha256:273328ebb78f18240d802972033757ea91a1762c1d172379559b5d0733883ac0"
       }
     }
   ],
@@ -2344,7 +2344,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           }
         ],
         "step": {
-          "id": "check-controller",
+          "id": "check-isoloom-controller",
           "argv": [
             "vagrant",
             "provision",

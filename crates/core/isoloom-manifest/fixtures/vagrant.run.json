@@ -327,7 +327,7 @@
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-controller"
+            "check-isoloom-controller"
           ]
         }
       ]
@@ -464,15 +464,15 @@
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "mini-ad · controller",
-          "vmware_desktop": "mini-ad · controller",
-          "hyperv": "mini-ad-controller",
-          "parallels": "mini-ad · controller",
+          "virtualbox": "mini-ad · isoloom-controller",
+          "vmware_desktop": "mini-ad · isoloom-controller",
+          "hyperv": "mini-ad-isoloom-controller",
+          "parallels": "mini-ad · isoloom-controller",
           "libvirt": "mini-ad_isoloom-controller",
-          "utm": "mini-ad · controller",
-          "vmware_esxi": "mini-ad-controller"
+          "utm": "mini-ad · isoloom-controller",
+          "vmware_esxi": "mini-ad-isoloom-controller"
         },
-        "boot_digest": "sha256:0a66245ffb2c3803e5161e8ce0a834fdea22a7f34e00756e9799f2ec1f6da732"
+        "boot_digest": "sha256:621f89f0acd86a00ac004c694ee55274b9838656cf46d89477e2e9421af06843"
       }
     }
   ],
@@ -781,7 +781,7 @@
           }
         ],
         "step": {
-          "id": "check-controller",
+          "id": "check-isoloom-controller",
           "argv": [
             "vagrant",
             "provision",

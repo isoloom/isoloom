@@ -531,23 +531,23 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 10053, host: ISOLOOM_HOSTPORTS.fetch("dns/dns-udp", 10053), host_ip: "127.0.0.1", protocol: "udp" # not on libvirt: vagrant-libvirt skips UDP forwards
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "udp-dns · docker"
+    v.name = "udp-dns · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "udp-dns · docker"
+    v.vmx["displayName"] = "udp-dns · isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "udp-dns · docker"
+    v.name = "udp-dns · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "udp-dns · docker"
+    v.name = "udp-dns · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -572,7 +572,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "udp-dns-docker"
+    v.guest_name = "udp-dns-isoloom-docker-host"
     v.guest_numvcpus = 2
     v.guest_memsize = 2048
   end
@@ -1933,14 +1933,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "udp-dns · docker",
-          "vmware_desktop": "udp-dns · docker",
-          "parallels": "udp-dns · docker",
+          "virtualbox": "udp-dns · isoloom-docker-host",
+          "vmware_desktop": "udp-dns · isoloom-docker-host",
+          "parallels": "udp-dns · isoloom-docker-host",
           "libvirt": "udp-dns_default",
-          "utm": "udp-dns · docker",
-          "vmware_esxi": "udp-dns-docker"
+          "utm": "udp-dns · isoloom-docker-host",
+          "vmware_esxi": "udp-dns-isoloom-docker-host"
         },
-        "boot_digest": "sha256:44802238a9974828f4d91c2e01d15c34ca068192f3913141179f3ef4d831ce2d"
+        "boot_digest": "sha256:19724f2dc4729d8f1c5af1b8d1f3b046c60e1684fd13df847bd5ea2d81e7fff6"
       }
     },
     {

@@ -7,7 +7,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 # isoloom generate --target vagrant (exit 0)
 ✓ .isoloom/vagrant/Vagrantfile
 ✓ .isoloom/vagrant/checks/web01.sh
-✓ .isoloom/vagrant/checks/controller.sh
+✓ .isoloom/vagrant/checks/isoloom-controller.sh
 ✓ .isoloom/vagrant/run.json
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
@@ -17,7 +17,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/.gitignore
 .isoloom/resolved.json
 .isoloom/vagrant/Vagrantfile
-.isoloom/vagrant/checks/controller.sh
+.isoloom/vagrant/checks/isoloom-controller.sh
 .isoloom/vagrant/checks/web01.sh
 .isoloom/vagrant/run.json
 
@@ -629,24 +629,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · router"
+      v.name = "corp-ad-basics · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · router"
+      v.vmx["displayName"] = "corp-ad-basics · isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · router"
+      v.name = "corp-ad-basics · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics · router"
+      v.name = "corp-ad-basics · isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -666,7 +666,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "corp-ad-basics-router"
+      v.guest_name = "corp-ad-basics-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -680,7 +680,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "corp-ad-basics-router"
+      v.vmname = "corp-ad-basics-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -690,7 +690,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp", "isoloom-corp-ad-basics-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-dmz", "02152B5A442B"], ["isoloom-corp-ad-basics-corp", "02156B0B10C0"], ["isoloom-corp-ad-basics-access", "02156DA73212"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-dmz", "0215F43C5A08"], ["isoloom-corp-ad-basics-corp", "0215CC3B0C75"], ["isoloom-corp-ad-basics-access", "0215B424B763"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -713,15 +713,15 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:2b:5a:44:2b 10.40.10.254/24 || rc=1
-          lab 02:15:6b:0b:10:c0 10.40.20.254/24 || rc=1
-          lab 02:15:6d:a7:32:12 10.40.99.254/24 || rc=1
+          lab 02:15:f4:3c:5a:08 10.40.10.254/24 || rc=1
+          lab 02:15:cc:3b:0c:75 10.40.20.254/24 || rc=1
+          lab 02:15:b4:24:b7:63 10.40.99.254/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:2b:5a:44:2b;mac:02:15:6b:0b:10:c0;mac:02:15:6d:a7:32:12\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:f4:3c:5a:08;mac:02:15:cc:3b:0c:75;mac:02:15:b4:24:b7:63\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1336,24 +1336,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics · controller"
+      v.name = "corp-ad-basics · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics · controller"
+      v.vmx["displayName"] = "corp-ad-basics · isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics · controller"
+      v.name = "corp-ad-basics · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "corp-ad-basics · controller"
+      v.name = "corp-ad-basics · isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1374,7 +1374,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "corp-ad-basics-controller"
+      v.guest_name = "corp-ad-basics-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -1386,7 +1386,7 @@ Vagrant.configure("2") do |config|
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "corp-ad-basics-controller"
+      v.vmname = "corp-ad-basics-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -1398,7 +1398,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp", "isoloom-corp-ad-basics-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-dmz", "021514F08D36"], ["isoloom-corp-ad-basics-corp", "02154E5D18E7"], ["isoloom-corp-ad-basics-access", "02157658FFE9"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-dmz", "021566CAE359"], ["isoloom-corp-ad-basics-corp", "0215C087380A"], ["isoloom-corp-ad-basics-access", "0215C9E2E838"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1421,15 +1421,15 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:14:f0:8d:36 10.40.10.253/24 || rc=1
-          lab 02:15:4e:5d:18:e7 10.40.20.253/24 || rc=1
-          lab 02:15:76:58:ff:e9 10.40.99.253/24 || rc=1
+          lab 02:15:66:ca:e3:59 10.40.10.253/24 || rc=1
+          lab 02:15:c0:87:38:0a 10.40.20.253/24 || rc=1
+          lab 02:15:c9:e2:e8:38 10.40.99.253/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:14:f0:8d:36;mac:02:15:4e:5d:18:e7;mac:02:15:76:58:ff:e9\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:66:ca:e3:59;mac:02:15:c0:87:38:0a;mac:02:15:c9:e2:e8:38\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1612,11 +1612,11 @@ Vagrant.configure("2") do |config|
       run_play ansible-playbook -i /etc/isoloom/inventory.ini ws.yml
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/domain-up.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/domain-up.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
-## .isoloom/vagrant/checks/controller.sh
+## .isoloom/vagrant/checks/isoloom-controller.sh
 #!/bin/sh
 # Generated by isoloom from isoloom.yml. Don't edit: change isoloom.yml and run
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
@@ -2133,7 +2133,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "var": "ISOLOOM_DERIVED",
           "steps": [
             "check-web01",
-            "check-controller"
+            "check-isoloom-controller"
           ]
         }
       ]
@@ -2195,15 +2195,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · router",
-          "vmware_desktop": "corp-ad-basics · router",
-          "hyperv": "corp-ad-basics-router",
-          "parallels": "corp-ad-basics · router",
+          "virtualbox": "corp-ad-basics · isoloom-router",
+          "vmware_desktop": "corp-ad-basics · isoloom-router",
+          "hyperv": "corp-ad-basics-isoloom-router",
+          "parallels": "corp-ad-basics · isoloom-router",
           "libvirt": "corp-ad-basics_isoloom-router",
-          "utm": "corp-ad-basics · router",
-          "vmware_esxi": "corp-ad-basics-router"
+          "utm": "corp-ad-basics · isoloom-router",
+          "vmware_esxi": "corp-ad-basics-isoloom-router"
         },
-        "boot_digest": "sha256:32eb286f0147436a70564b6b0b0ea0410caf9df227e5ebb320ff9ee06f412422"
+        "boot_digest": "sha256:0c4ac100ec11b40cbd22abf5685c75e43a510be1d62216fbaa639b911dab1109"
       }
     },
     {
@@ -2363,15 +2363,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "corp-ad-basics · controller",
-          "vmware_desktop": "corp-ad-basics · controller",
-          "hyperv": "corp-ad-basics-controller",
-          "parallels": "corp-ad-basics · controller",
+          "virtualbox": "corp-ad-basics · isoloom-controller",
+          "vmware_desktop": "corp-ad-basics · isoloom-controller",
+          "hyperv": "corp-ad-basics-isoloom-controller",
+          "parallels": "corp-ad-basics · isoloom-controller",
           "libvirt": "corp-ad-basics_isoloom-controller",
-          "utm": "corp-ad-basics · controller",
-          "vmware_esxi": "corp-ad-basics-controller"
+          "utm": "corp-ad-basics · isoloom-controller",
+          "vmware_esxi": "corp-ad-basics-isoloom-controller"
         },
-        "boot_digest": "sha256:c2ec8bb9fbc5d3b531d4ee605afb604907cdd4c8396c631e36d348598c1e25e3"
+        "boot_digest": "sha256:7151811b79f5cdb9ebf692b43d3da429724f49876dec7e7bab02c50f5398a317"
       }
     }
   ],
@@ -2723,7 +2723,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           }
         ],
         "step": {
-          "id": "check-controller",
+          "id": "check-isoloom-controller",
           "argv": [
             "vagrant",
             "provision",

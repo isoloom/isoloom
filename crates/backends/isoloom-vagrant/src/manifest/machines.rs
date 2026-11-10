@@ -110,7 +110,7 @@ pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMa
 }
 
 fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
-    let (shown, plain) = (label(env, &d.what), vm_name(env, &d.what));
+    let (shown, plain) = (label(env, &d.name), vm_name(env, &d.name));
     let vm_names = vm_names(shown, plain, format!("{}_{}", env.name, d.name));
     Ok(Native::Vagrant {
         vagrant: Name::parse(&d.name)?,
@@ -165,7 +165,7 @@ checks: [{ http: 'http://web/', wait: 30 }]
         let Some(Native::Vagrant { vm_names: controller, .. }) = &ms[1].native else {
             panic!()
         };
-        assert_eq!(controller[&Provider::VmwareEsxi], "shop-controller");
+        assert_eq!(controller[&Provider::VmwareEsxi], "shop-isoloom-controller");
     }
 
     #[test]

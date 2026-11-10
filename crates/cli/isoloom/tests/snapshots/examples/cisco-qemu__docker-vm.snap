@@ -530,23 +530,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "cisco-qemu · docker"
+    v.name = "cisco-qemu · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "cisco-qemu · docker"
+    v.vmx["displayName"] = "cisco-qemu · isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "cisco-qemu · docker"
+    v.name = "cisco-qemu · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "cisco-qemu · docker"
+    v.name = "cisco-qemu · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -571,7 +571,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "cisco-qemu-docker"
+    v.guest_name = "cisco-qemu-isoloom-docker-host"
     v.guest_numvcpus = 4
     v.guest_memsize = 3072
   end
@@ -1857,14 +1857,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "cisco-qemu · docker",
-          "vmware_desktop": "cisco-qemu · docker",
-          "parallels": "cisco-qemu · docker",
+          "virtualbox": "cisco-qemu · isoloom-docker-host",
+          "vmware_desktop": "cisco-qemu · isoloom-docker-host",
+          "parallels": "cisco-qemu · isoloom-docker-host",
           "libvirt": "cisco-qemu_default",
-          "utm": "cisco-qemu · docker",
-          "vmware_esxi": "cisco-qemu-docker"
+          "utm": "cisco-qemu · isoloom-docker-host",
+          "vmware_esxi": "cisco-qemu-isoloom-docker-host"
         },
-        "boot_digest": "sha256:fa37425c7d83e1f947a05721afcfb1c4b8e0b10d0407c9ee8563d3698eb64e41"
+        "boot_digest": "sha256:0fd048b77d5f0b3a7ea1c4ce6255c76640fb2271901717e5e355a09b04e293f8"
       }
     },
     {

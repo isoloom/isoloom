@@ -527,23 +527,23 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 8085, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8085), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "arm-lab · docker"
+    v.name = "arm-lab · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "arm-lab · docker"
+    v.vmx["displayName"] = "arm-lab · isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "arm-lab · docker"
+    v.name = "arm-lab · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "arm-lab · docker"
+    v.name = "arm-lab · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -568,7 +568,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "arm-lab-docker"
+    v.guest_name = "arm-lab-isoloom-docker-host"
     v.guest_numvcpus = 2
     v.guest_memsize = 2048
   end
@@ -1757,14 +1757,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "arm-lab · docker",
-          "vmware_desktop": "arm-lab · docker",
-          "parallels": "arm-lab · docker",
+          "virtualbox": "arm-lab · isoloom-docker-host",
+          "vmware_desktop": "arm-lab · isoloom-docker-host",
+          "parallels": "arm-lab · isoloom-docker-host",
           "libvirt": "arm-lab_default",
-          "utm": "arm-lab · docker",
-          "vmware_esxi": "arm-lab-docker"
+          "utm": "arm-lab · isoloom-docker-host",
+          "vmware_esxi": "arm-lab-isoloom-docker-host"
         },
-        "boot_digest": "sha256:7ade06f070888086e78fb184e8602cbba048a4061c7908ad79958bf360ec7de3"
+        "boot_digest": "sha256:df9fb78c70e6e92a15c64db4cbdebfe66c0edcd57b000798297efb5fbe3a0126"
       }
     },
     {

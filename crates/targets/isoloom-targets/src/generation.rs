@@ -113,6 +113,13 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     let spec = lowered(lab, target, instance)?;
     let env = lab.plan(&spec, target, instance);
     let mut files = backend.render(&env)?;
+    if let Some(path) = written_twice(&files) {
+        return Err(GenerateError::Internal {
+            target,
+            what: format!("the backend wrote `{path}` twice"),
+            source: std::sync::Arc::new(WrittenTwice),
+        });
+    }
     // The configuration renderers' own files (the libraries a VM's set-up embeds, a container's
     // runner and templates), once each: a backend may have written some already.
     for f in isoloom_render::configure::files(&env) {
@@ -124,6 +131,17 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
         files.push(run_manifest(lab, instance, target, placed)?);
     }
     Ok(files)
+}
+
+/// Two of a backend's files at one path, the second of which would replace the first.
+#[derive(Debug, thiserror::Error)]
+#[error("two generated files at one path")]
+struct WrittenTwice;
+
+/// The first path two of `files` share, if any.
+fn written_twice(files: &[GeneratedFile]) -> Option<&str> {
+    let mut seen = std::collections::HashSet::new();
+    files.iter().map(|f| f.path.as_str()).find(|p| !seen.insert(*p))
 }
 
 /// A backend's run manifest as the file it is written to (`.isoloom/<target>/[<sub>/]run.json`),
@@ -149,4 +167,22 @@ fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, placed: Placed)
 #[must_use]
 pub fn default_regions() -> Vec<(&'static str, &'static str)> {
     isoloom_terraform::Cloud::ALL.iter().map(|c| (c.id(), c.default_region())).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(path: &str) -> GeneratedFile {
+        GeneratedFile {
+            path: path.to_owned(),
+            contents: String::new(),
+        }
+    }
+
+    #[test]
+    fn a_path_two_files_share_is_found() {
+        assert_eq!(written_twice(&[at("a"), at("b"), at("a")]), Some("a"));
+        assert_eq!(written_twice(&[at("a"), at("b")]), None);
+    }
 }

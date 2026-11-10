@@ -6,6 +6,7 @@ mod docker;
 mod hybrid;
 mod images;
 mod kubernetes;
+mod own_names;
 mod ports;
 mod proxmox;
 mod refusals;

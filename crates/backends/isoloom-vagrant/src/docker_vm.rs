@@ -94,10 +94,6 @@ fn host_size(env: &Environment) -> (u32, u32) {
     (size.cpus, size.memory_mb)
 }
 
-/// What the VM is called after its environment: `<env> · docker`, `<env>-docker`
-/// (`crate::vms::label`, `crate::vms::vm_name`).
-pub(crate) const HOST: &str = "docker";
-
 /// `.isoloom/docker-vm/Vagrantfile`: the VM, Docker, then the Compose file up as `guest` starts it,
 /// and its checks.
 ///
@@ -153,8 +149,9 @@ fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
     Ok(r)
 }
 
-/// The VM: its box and name, the published ports, its size on every provider, then Docker, SSH
-/// accepting the values given at launch, the project and the environment.
+/// The VM: its box and name, the published ports, its size on every provider, its host folders,
+/// then its provisioners in order: the system constraints, the project, the certificate
+/// authorities, Docker, SSH accepting the values given at launch, the environment and the checks.
 fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Scripts) {
     // generic/debian12 has a build for the providers here but UTM and QEMU (VirtualBox, VMware,
     // Parallels, libvirt); those two are given their own box below. Hyper-V isn't offered here.
@@ -188,8 +185,8 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
         }
     }
     let size = host_size(env);
-    desktop_providers(r, &crate::vms::label(env, HOST), size, docker::HostSize::of(env).disk_gb);
-    esxi(r, &crate::vms::vm_name(env, HOST), size);
+    desktop_providers(r, &crate::vms::label(env, VM), size, docker::HostSize::of(env).disk_gb);
+    esxi(r, &crate::vms::vm_name(env, VM), size);
     // The containers' host folders, shared read-write where Compose finds them (a read-only one
     // is bound read-only into its container).
     let shares: Vec<Share> = docker::host_folders::of_containers(env)

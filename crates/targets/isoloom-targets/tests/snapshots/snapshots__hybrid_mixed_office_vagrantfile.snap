@@ -732,24 +732,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "192.168.58.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-mixed-office-office", libvirt__network_name: "isoloom-mixed-office-office", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · controller"
+      v.name = "mixed-office · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "mixed-office · controller"
+      v.vmx["displayName"] = "mixed-office · isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "mixed-office · controller"
+      v.name = "mixed-office · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "mixed-office · controller"
+      v.name = "mixed-office · isoloom-controller"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -779,7 +779,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "mixed-office-controller"
+      v.guest_name = "mixed-office-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -791,7 +791,7 @@ Vagrant.configure("2") do |config|
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "mixed-office-controller"
+      v.vmname = "mixed-office-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -803,7 +803,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-mixed-office-office"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-mixed-office-office", "02156BF587FB"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-mixed-office-office", "0215570648A2"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -826,13 +826,13 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:6b:f5:87:fb 192.168.58.253/24 || rc=1
+          lab 02:15:57:06:48:a2 192.168.58.253/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:6b:f5:87:fb\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:57:06:48:a2\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -897,7 +897,7 @@ Vagrant.configure("2") do |config|
       INV
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/both-answer.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/both-answer.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   # The containers' host: on their networks, letting Docker give each its own address there.
@@ -907,7 +907,7 @@ Vagrant.configure("2") do |config|
     m.vm.network "forwarded_port", guest: 8083, host: 8083, host_ip: "127.0.0.1"
     m.vm.network "private_network", ip: "192.168.58.253", auto_config: false, mac: "0A15574BB300", virtualbox__intnet: "isoloom-mixed-office-office"
     m.vm.provider "virtualbox" do |v|
-      v.name = "mixed-office · containers"
+      v.name = "mixed-office · isoloom-docker-host"
       v.cpus = 2
       v.memory = 2048
       v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]

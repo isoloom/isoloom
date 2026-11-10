@@ -327,7 +327,7 @@
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-controller"
+            "check-isoloom-controller"
           ]
         }
       ]
@@ -435,15 +435,15 @@
       "native": {
         "vagrant": "isoloom-controller",
         "vm_names": {
-          "virtualbox": "web-vm · controller",
-          "vmware_desktop": "web-vm · controller",
-          "hyperv": "web-vm-controller",
-          "parallels": "web-vm · controller",
+          "virtualbox": "web-vm · isoloom-controller",
+          "vmware_desktop": "web-vm · isoloom-controller",
+          "hyperv": "web-vm-isoloom-controller",
+          "parallels": "web-vm · isoloom-controller",
           "libvirt": "web-vm_isoloom-controller",
-          "utm": "web-vm · controller",
-          "vmware_esxi": "web-vm-controller"
+          "utm": "web-vm · isoloom-controller",
+          "vmware_esxi": "web-vm-isoloom-controller"
         },
-        "boot_digest": "sha256:af5607ef261ba04cd85ee12713cfbfcaab75cc9b0c138569760f42cc1afbd424"
+        "boot_digest": "sha256:f01db2b1734c4a406caebbb07671e620c6ba43db84f7a7133c1d72feaed548b5"
       }
     }
   ],
@@ -670,7 +670,7 @@
           }
         ],
         "step": {
-          "id": "check-controller",
+          "id": "check-isoloom-controller",
           "argv": [
             "vagrant",
             "provision",

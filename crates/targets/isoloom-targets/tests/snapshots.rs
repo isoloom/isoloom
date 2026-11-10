@@ -87,7 +87,7 @@ fn hybrid_files_are_the_vagrantfile_the_compose_file_then_the_checks() -> Outcom
         [
             ".isoloom/hybrid/Vagrantfile",
             ".isoloom/hybrid/compose.yml",
-            ".isoloom/hybrid/checks/controller.sh"
+            ".isoloom/hybrid/checks/isoloom-controller.sh"
         ]
     );
     Ok(())

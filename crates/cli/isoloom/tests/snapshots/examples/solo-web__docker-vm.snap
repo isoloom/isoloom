@@ -527,23 +527,23 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 8080, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "solo-web · docker"
+    v.name = "solo-web · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "solo-web · docker"
+    v.vmx["displayName"] = "solo-web · isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "solo-web · docker"
+    v.name = "solo-web · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "solo-web · docker"
+    v.name = "solo-web · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -568,7 +568,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "solo-web-docker"
+    v.guest_name = "solo-web-isoloom-docker-host"
     v.guest_numvcpus = 2
     v.guest_memsize = 2048
   end
@@ -1757,14 +1757,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "solo-web · docker",
-          "vmware_desktop": "solo-web · docker",
-          "parallels": "solo-web · docker",
+          "virtualbox": "solo-web · isoloom-docker-host",
+          "vmware_desktop": "solo-web · isoloom-docker-host",
+          "parallels": "solo-web · isoloom-docker-host",
           "libvirt": "solo-web_default",
-          "utm": "solo-web · docker",
-          "vmware_esxi": "solo-web-docker"
+          "utm": "solo-web · isoloom-docker-host",
+          "vmware_esxi": "solo-web-isoloom-docker-host"
         },
-        "boot_digest": "sha256:c09482d888b707f6c791702a614e9d33dc89ea94a6a521128ae69fa5694ba07e"
+        "boot_digest": "sha256:10bcdb1bde8404db046b471497161f7b963ff54f99334ed4500f499c737ee414"
       }
     },
     {

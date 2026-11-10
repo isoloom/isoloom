@@ -532,23 +532,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "vlan-office · docker"
+    v.name = "vlan-office · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "vlan-office · docker"
+    v.vmx["displayName"] = "vlan-office · isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "vlan-office · docker"
+    v.name = "vlan-office · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "vlan-office · docker"
+    v.name = "vlan-office · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -573,7 +573,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "vlan-office-docker"
+    v.guest_name = "vlan-office-isoloom-docker-host"
     v.guest_numvcpus = 4
     v.guest_memsize = 3072
   end
@@ -2085,14 +2085,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "vlan-office · docker",
-          "vmware_desktop": "vlan-office · docker",
-          "parallels": "vlan-office · docker",
+          "virtualbox": "vlan-office · isoloom-docker-host",
+          "vmware_desktop": "vlan-office · isoloom-docker-host",
+          "parallels": "vlan-office · isoloom-docker-host",
           "libvirt": "vlan-office_default",
-          "utm": "vlan-office · docker",
-          "vmware_esxi": "vlan-office-docker"
+          "utm": "vlan-office · isoloom-docker-host",
+          "vmware_esxi": "vlan-office-isoloom-docker-host"
         },
-        "boot_digest": "sha256:870f05a21014ac33a0ea41c5db5be8f139bdde7c53cf3735cd80ba53a32d2c96"
+        "boot_digest": "sha256:376af81c8a7f93ad7c407d464cc4800c9445fd8c69e440acdee07fa621b75158"
       }
     },
     {

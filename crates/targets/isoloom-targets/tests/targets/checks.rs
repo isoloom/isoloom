@@ -123,8 +123,8 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() -> Out
     let vagrant = generate(&spec, Target::Vagrant).unwrap();
     let vf = file(&vagrant, ".isoloom/vagrant/Vagrantfile").unwrap();
     assert!(vf.contains("config.vm.define \"isoloom-controller\""));
-    assert!(vf.contains("checks/controller.sh"));
-    let controller = file(&vagrant, ".isoloom/vagrant/checks/controller.sh").expect("the controller's runner");
+    assert!(vf.contains("checks/isoloom-controller.sh"));
+    let controller = file(&vagrant, ".isoloom/vagrant/checks/isoloom-controller.sh").expect("the controller's runner");
     assert!(controller.contains("_retry 30 _tcp '10.9.1.10' 389"), "{controller}");
     assert!(controller.contains("_http_any 'https://10.9.0.20:443/'"), "{controller}");
 
@@ -154,7 +154,7 @@ fn hybrid_checks_from_the_controller_when_only_containers_could() -> Outcome {
         generate(spec, target)
             .unwrap()
             .into_iter()
-            .find(|f| f.path == format!(".isoloom/{dir}/checks/controller.sh"))
+            .find(|f| f.path == format!(".isoloom/{dir}/checks/isoloom-controller.sh"))
             .map(|f| f.contents)
     };
     // mixed-office: a Windows VM and a Linux container. The container's derived checks don't run

@@ -528,23 +528,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "dual-stack · docker"
+    v.name = "dual-stack · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "dual-stack · docker"
+    v.vmx["displayName"] = "dual-stack · isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "dual-stack · docker"
+    v.name = "dual-stack · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "dual-stack · docker"
+    v.name = "dual-stack · isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -569,7 +569,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "dual-stack-docker"
+    v.guest_name = "dual-stack-isoloom-docker-host"
     v.guest_numvcpus = 2
     v.guest_memsize = 2048
   end
@@ -1901,14 +1901,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "dual-stack · docker",
-          "vmware_desktop": "dual-stack · docker",
-          "parallels": "dual-stack · docker",
+          "virtualbox": "dual-stack · isoloom-docker-host",
+          "vmware_desktop": "dual-stack · isoloom-docker-host",
+          "parallels": "dual-stack · isoloom-docker-host",
           "libvirt": "dual-stack_default",
-          "utm": "dual-stack · docker",
-          "vmware_esxi": "dual-stack-docker"
+          "utm": "dual-stack · isoloom-docker-host",
+          "vmware_esxi": "dual-stack-isoloom-docker-host"
         },
-        "boot_digest": "sha256:e27bb5c3995ac22f12e8b73fe9adcbe4c8bb597a8aa4f43c16f764d6a89197f3"
+        "boot_digest": "sha256:ff453c9cb19fc516cc6debdd08222280c25a4a65b232a554668ca4f4c5ad3ac9"
       }
     },
     {

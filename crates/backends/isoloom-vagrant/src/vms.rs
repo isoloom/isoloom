@@ -65,7 +65,9 @@ use crate::vagrantfile;
 
 /// The folder of the target's files, under [`OUTPUT_DIR`].
 const DIR: &str = "vagrant";
-/// The define names of Isoloom's own VMs (the router's is `router::NAME`).
+/// The define names of Isoloom's own VMs (the router's is `router::NAME`), which are also their
+/// display names, step ids and file names: under the prefix a lab machine can't take, so none is
+/// ever a machine's.
 pub(crate) const CONTROLLER: &str = "isoloom-controller";
 const TOOL_SHELL: &str = "isoloom-tool-shell";
 /// Whether the host is an ARM one, in Ruby.
@@ -264,14 +266,15 @@ fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
     env.controller.is_some() || !checks.controller.is_empty()
 }
 
-/// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> · <what>`.
-pub(crate) fn label(env: &Environment, what: &str) -> String {
-    format!("{} · {what}", env.name)
+/// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> · <define>`,
+/// after its define name (a lab machine's, or one of Isoloom's own under `isoloom-`).
+pub(crate) fn label(env: &Environment, define: &str) -> String {
+    format!("{} · {define}", env.name)
 }
 
-/// A VM's name on ESXi and Hyper-V, which allow no `·`: `<env>-<what>`, spaces as dashes.
-pub(crate) fn vm_name(env: &Environment, what: &str) -> String {
-    format!("{}-{}", env.name, what.replace(' ', "-"))
+/// A VM's name on ESXi and Hyper-V, which allow no `·`: `<env>-<define>`.
+pub(crate) fn vm_name(env: &Environment, define: &str) -> String {
+    format!("{}-{define}", env.name)
 }
 
 /// What one `config.vm.define` of the Vagrantfile is.
@@ -290,12 +293,10 @@ pub(crate) enum Kind {
 /// One `config.vm.define` of the Vagrantfile, in its order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Define {
-    /// Its define name (`vagrant up <name>`).
+    /// Its define name (`vagrant up <name>`), which its VM names say after the environment's.
     pub(crate) name: String,
     /// What it is.
     pub(crate) kind: Kind,
-    /// What its VM names say after the environment's (`web`, `controller`).
-    pub(crate) what: String,
 }
 
 /// The checks one VM's `checks` provisioner runs: the VM, where they stand, and the checks.
@@ -326,16 +327,12 @@ impl Shape {
         let checks = checks::Checks::of(env, &in_their_place);
         let mut defines = Vec::new();
         let mut runners = Vec::new();
-        let define = |name: &str, kind, what: &str| Define {
-            name: name.to_owned(),
-            kind,
-            what: what.to_owned(),
-        };
+        let define = |name: &str, kind| Define { name: name.to_owned(), kind };
         if env.router.is_some() {
-            defines.push(define(router::NAME, Kind::Router, "router"));
+            defines.push(define(router::NAME, Kind::Router));
         }
         for name in env.start_order.iter().filter(|n| machine::has_vm(env, n)) {
-            defines.push(define(name, Kind::Lab, name));
+            defines.push(define(name, Kind::Lab));
             let linux = env.machines.get(name).is_some_and(|mp| transport::Os::of(mp) == transport::Os::Linux);
             if let Some(group) = checks.of_machine(name).filter(|_| linux) {
                 runners.push(Runner {
@@ -346,10 +343,10 @@ impl Shape {
             }
         }
         if env.spec().tools.contains_key("shell") {
-            defines.push(define(TOOL_SHELL, Kind::ToolShell, "tool shell"));
+            defines.push(define(TOOL_SHELL, Kind::ToolShell));
         }
         if with_controller(env, &checks) {
-            defines.push(define(CONTROLLER, Kind::Controller, "controller"));
+            defines.push(define(CONTROLLER, Kind::Controller));
             if !checks.controller.is_empty() {
                 runners.push(Runner {
                     vm: CONTROLLER.to_owned(),

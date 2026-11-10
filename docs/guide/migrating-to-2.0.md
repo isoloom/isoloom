@@ -21,7 +21,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 | 1.x spec | 2.0 | Change it to |
 |---|---|---|
 | `service: dvwa` or `service: juice-shop` | `unknown-reference`: the entries are removed from the catalogue | `app: { image: <the image you used> }` gives the same container |
-| A machine name or alias starting with `isoloom-` | refused: those names are Isoloom's own (its controller, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs) | another name |
+| A machine name or alias starting with `isoloom-` | refused: those names are Isoloom's own (its controller, router and tool VM, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs) | another name |
 | A Vagrant box name with anything but letters, digits, `.`, `_` and `-` after an optional `<org>/` (in `overrides.vagrant` or an image table) | `invalid-value` (an error reading the image table) | the box's name as `vagrant box list` shows it |
 | A machine using the `openssh` entry and signing in as `ctf` without saying so | the login account defaults to `user` | `with: { username: ctf }` to keep the old account |
 
@@ -82,6 +82,12 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   VM's SSH port is `ISOLOOM_HOSTPORTS`' `isoloom-docker-host/ssh` key (was `docker/ssh`). The
   Vagrant define stays `default`.
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.
+- On Vagrant (and `hybrid`), the controller's check runner step is `check-isoloom-controller`
+  (was `check-controller`) and its runner script `checks/isoloom-controller.sh` (was
+  `checks/controller.sh`). Isoloom's own VMs show as `<lab> · isoloom-controller`,
+  `<lab> · isoloom-router` and `<lab> · isoloom-tool-shell` (`<lab>-isoloom-…` on Hyper-V and
+  ESXi; were `controller`, `router`, `tool shell`), the docker-vm and hybrid hosts as
+  `isoloom-docker-host` (were `docker`, `containers`): read them from `machines[].native.vm_names`.
 
 ## Library users
 

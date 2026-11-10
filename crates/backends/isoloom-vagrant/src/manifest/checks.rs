@@ -17,17 +17,11 @@ use crate::vms::{CONTROLLER, Shape};
 /// How long the controller may take to boot (or to finish halting first).
 const WAKE_TIMEOUT_S: u32 = 1800;
 
-/// The id of the step running `vm`'s checks.
+/// The id of the step running `vm`'s checks, after its define name (`check-web`,
+/// `check-isoloom-controller`): a lab machine's or one of Isoloom's own, never both.
 fn step_id(vm: &str) -> String {
-    let safe: String = vm
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
-        .collect();
-    format!("check-{}", safe.trim_start_matches(CONTROLLER_PREFIX))
+    format!("check-{vm}")
 }
-
-/// What the controller's step id leaves out of its define name (`check-controller`).
-const CONTROLLER_PREFIX: &str = "isoloom-";
 
 /// The runners, in the order the Vagrantfile has their provisioners.
 pub(super) fn runners(shape: &Shape) -> Result<Vec<CheckRunner>> {
@@ -83,7 +77,6 @@ mod tests {
     #[test]
     fn a_runner_step_is_named_after_its_vm() {
         assert_eq!(step_id("web"), "check-web");
-        assert_eq!(step_id("isoloom-controller"), "check-controller");
-        assert_eq!(step_id("Web_01"), "check-web-01");
+        assert_eq!(step_id("isoloom-controller"), "check-isoloom-controller");
     }
 }

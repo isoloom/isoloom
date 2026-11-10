@@ -530,23 +530,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "segmented · docker"
+    v.name = "segmented · isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "segmented · docker"
+    v.vmx["displayName"] = "segmented · isoloom-docker-host"
     v.vmx["numvcpus"] = "3"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "segmented · docker"
+    v.name = "segmented · isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "segmented · docker"
+    v.name = "segmented · isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -571,7 +571,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "segmented-docker"
+    v.guest_name = "segmented-isoloom-docker-host"
     v.guest_numvcpus = 3
     v.guest_memsize = 3072
   end
@@ -2031,14 +2031,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "segmented · docker",
-          "vmware_desktop": "segmented · docker",
-          "parallels": "segmented · docker",
+          "virtualbox": "segmented · isoloom-docker-host",
+          "vmware_desktop": "segmented · isoloom-docker-host",
+          "parallels": "segmented · isoloom-docker-host",
           "libvirt": "segmented_default",
-          "utm": "segmented · docker",
-          "vmware_esxi": "segmented-docker"
+          "utm": "segmented · isoloom-docker-host",
+          "vmware_esxi": "segmented-isoloom-docker-host"
         },
-        "boot_digest": "sha256:5979f313f776314607d0b1df82f83af4688b3d1b29382d785d27303f254f0325"
+        "boot_digest": "sha256:ea98965d98b3673afcb956981c54926b19808323c3b430caca9b9233b5e3ec54"
       }
     },
     {

@@ -85,6 +85,15 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   baselines are under `xtask/baselines/`, the validator image under `xtask/src/verify/`, the
   design examples under `crates/core/isoloom-plan/tests/spec-examples/`, the spelling list is
   `.typos.toml`.
+- **Breaking: Isoloom's own Vagrant VMs are named after their define names**, under the
+  `isoloom-` prefix a lab machine can't take: their display names (`<lab> · isoloom-controller`,
+  `isoloom-router`, `isoloom-tool-shell`, `isoloom-docker-host` for the docker-vm and hybrid
+  hosts; were `controller`, `router`, `tool shell`, `docker`, `containers`), the controller's
+  check step (`check-isoloom-controller`, was `check-controller`) and its runner
+  (`checks/isoloom-controller.sh`). A lab machine named `controller` with checks failed `generate`
+  (one step id twice in the Vagrant run manifest), on `hybrid` its runner and the controller's were one file, the
+  second replacing the first, and a machine named `router` or `containers` shared its VM name
+  with Isoloom's. A backend writing two files at one path is now an error of the target.
 
 ### Added
 

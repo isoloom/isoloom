@@ -607,24 +607,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.61.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented · router"
+      v.name = "segmented · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented · router"
+      v.vmx["displayName"] = "segmented · isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented · router"
+      v.name = "segmented · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "segmented · router"
+      v.name = "segmented · isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -644,7 +644,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "segmented-router"
+      v.guest_name = "segmented-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -658,7 +658,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-router"
+      v.vmname = "segmented-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -668,7 +668,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-front", "isoloom-segmented-back", "isoloom-segmented-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-front", "0215492ECC17"], ["isoloom-segmented-back", "02153133FB8B"], ["isoloom-segmented-access", "0215B6208922"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-front", "02155B9982B0"], ["isoloom-segmented-back", "0215581C0E5A"], ["isoloom-segmented-access", "021593D5CF93"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -691,15 +691,15 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:49:2e:cc:17 10.61.10.254/24 || rc=1
-          lab 02:15:31:33:fb:8b 10.61.20.254/24 || rc=1
-          lab 02:15:b6:20:89:22 10.61.99.254/24 || rc=1
+          lab 02:15:5b:99:82:b0 10.61.10.254/24 || rc=1
+          lab 02:15:58:1c:0e:5a 10.61.20.254/24 || rc=1
+          lab 02:15:93:d5:cf:93 10.61.99.254/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:49:2e:cc:17;mac:02:15:31:33:fb:8b;mac:02:15:b6:20:89:22\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:5b:99:82:b0;mac:02:15:58:1c:0e:5a;mac:02:15:93:d5:cf:93\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'

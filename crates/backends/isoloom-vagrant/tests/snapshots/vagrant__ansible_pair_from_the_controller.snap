@@ -901,24 +901,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair · controller"
+      v.name = "ansible-pair · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair · controller"
+      v.vmx["displayName"] = "ansible-pair · isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "768"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair · controller"
+      v.name = "ansible-pair · isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "ansible-pair · controller"
+      v.name = "ansible-pair · isoloom-controller"
       v.cpus = 1
       v.memory = 768
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -948,7 +948,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "ansible-pair-controller"
+      v.guest_name = "ansible-pair-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 768
     end
@@ -960,7 +960,7 @@ Vagrant.configure("2") do |config|
       v.memory = 768
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "ansible-pair-controller"
+      v.vmname = "ansible-pair-isoloom-controller"
       v.cpus = 1
       v.memory = 768
       v.linked_clone = true
@@ -972,7 +972,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "021508FC11D1"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215B7AAD166"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -995,13 +995,13 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:08:fc:11:d1 10.63.0.253/24 || rc=1
+          lab 02:15:b7:aa:d1:66 10.63.0.253/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:08:fc:11:d1\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:b7:aa:d1:66\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1173,6 +1173,6 @@ Vagrant.configure("2") do |config|
       run_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' site.yml
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/web-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/web-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end

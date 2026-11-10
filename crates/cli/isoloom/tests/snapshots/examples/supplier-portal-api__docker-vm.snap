@@ -538,23 +538,23 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 3206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 3206), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "supplier-portal-api · docker"
+    v.name = "supplier-portal-api · isoloom-docker-host"
     v.cpus = 2
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "supplier-portal-api · docker"
+    v.vmx["displayName"] = "supplier-portal-api · isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "supplier-portal-api · docker"
+    v.name = "supplier-portal-api · isoloom-docker-host"
     v.cpus = 2
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "supplier-portal-api · docker"
+    v.name = "supplier-portal-api · isoloom-docker-host"
     v.cpus = 2
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -579,7 +579,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "supplier-portal-api-docker"
+    v.guest_name = "supplier-portal-api-isoloom-docker-host"
     v.guest_numvcpus = 2
     v.guest_memsize = 3072
   end
@@ -1982,14 +1982,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "supplier-portal-api · docker",
-          "vmware_desktop": "supplier-portal-api · docker",
-          "parallels": "supplier-portal-api · docker",
+          "virtualbox": "supplier-portal-api · isoloom-docker-host",
+          "vmware_desktop": "supplier-portal-api · isoloom-docker-host",
+          "parallels": "supplier-portal-api · isoloom-docker-host",
           "libvirt": "supplier-portal-api_default",
-          "utm": "supplier-portal-api · docker",
-          "vmware_esxi": "supplier-portal-api-docker"
+          "utm": "supplier-portal-api · isoloom-docker-host",
+          "vmware_esxi": "supplier-portal-api-isoloom-docker-host"
         },
-        "boot_digest": "sha256:46560634e9474032dd999cb3d8108dbef60d2682e578bc8f9d6fff72efdef362"
+        "boot_digest": "sha256:cc23b4e5d326a53fd387e6eb0f20e680a5236dfe9af0ed9735df8f9221ca7d4c"
       }
     },
     {

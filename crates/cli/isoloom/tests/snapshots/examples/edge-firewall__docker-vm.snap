@@ -532,23 +532,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "edge-firewall · docker"
+    v.name = "edge-firewall · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "edge-firewall · docker"
+    v.vmx["displayName"] = "edge-firewall · isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "edge-firewall · docker"
+    v.name = "edge-firewall · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "edge-firewall · docker"
+    v.name = "edge-firewall · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -573,7 +573,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "edge-firewall-docker"
+    v.guest_name = "edge-firewall-isoloom-docker-host"
     v.guest_numvcpus = 4
     v.guest_memsize = 3072
   end
@@ -2106,14 +2106,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "edge-firewall · docker",
-          "vmware_desktop": "edge-firewall · docker",
-          "parallels": "edge-firewall · docker",
+          "virtualbox": "edge-firewall · isoloom-docker-host",
+          "vmware_desktop": "edge-firewall · isoloom-docker-host",
+          "parallels": "edge-firewall · isoloom-docker-host",
           "libvirt": "edge-firewall_default",
-          "utm": "edge-firewall · docker",
-          "vmware_esxi": "edge-firewall-docker"
+          "utm": "edge-firewall · isoloom-docker-host",
+          "vmware_esxi": "edge-firewall-isoloom-docker-host"
         },
-        "boot_digest": "sha256:8eae201823525d0d2a2a8b88c37ab4bcceb7d1b91dcccf87f632b53d4b2fbbd2"
+        "boot_digest": "sha256:d2c48fa534b21e1ab2e1a952d85a209f41c8fd0359b187d5caff140efefd5829"
       }
     },
     {

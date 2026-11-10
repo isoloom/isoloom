@@ -627,24 +627,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.75.2.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-far", libvirt__network_name: "isoloom-slow-link-far", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "slow-link · router"
+      v.name = "slow-link · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "slow-link · router"
+      v.vmx["displayName"] = "slow-link · isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "slow-link · router"
+      v.name = "slow-link · isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "slow-link · router"
+      v.name = "slow-link · isoloom-router"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -664,7 +664,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "slow-link-router"
+      v.guest_name = "slow-link-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -678,7 +678,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "slow-link-router"
+      v.vmname = "slow-link-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -688,7 +688,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-slow-link-branch", "isoloom-slow-link-far"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-slow-link-branch", "0215D2410764"], ["isoloom-slow-link-far", "0215FC854D5D"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-slow-link-branch", "021543095FA1"], ["isoloom-slow-link-far", "0215CE886F02"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -711,14 +711,14 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:d2:41:07:64 10.75.1.254/24 || rc=1
-          lab 02:15:fc:85:4d:5d 10.75.2.254/24 || rc=1
+          lab 02:15:43:09:5f:a1 10.75.1.254/24 || rc=1
+          lab 02:15:ce:88:6f:02 10.75.2.254/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:d2:41:07:64;mac:02:15:fc:85:4d:5d\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:43:09:5f:a1;mac:02:15:ce:88:6f:02\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1214,24 +1214,24 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.75.2.252", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-slow-link-far", libvirt__network_name: "isoloom-slow-link-far", libvirt__dhcp_enabled: false
     m.vm.provision "nat-route", type: "shell", run: "always", inline: ":"
     m.vm.provider "virtualbox" do |v|
-      v.name = "slow-link · tool shell"
+      v.name = "slow-link · isoloom-tool-shell"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "slow-link · tool shell"
+      v.vmx["displayName"] = "slow-link · isoloom-tool-shell"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "slow-link · tool shell"
+      v.name = "slow-link · isoloom-tool-shell"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "utm" do |v, o|
-      v.name = "slow-link · tool shell"
+      v.name = "slow-link · isoloom-tool-shell"
       v.cpus = 1
       v.memory = 512
       o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -1251,7 +1251,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "slow-link-tool-shell"
+      v.guest_name = "slow-link-isoloom-tool-shell"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -1265,7 +1265,7 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "slow-link-tool-shell"
+      v.vmname = "slow-link-isoloom-tool-shell"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -1275,7 +1275,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-slow-link-branch", "isoloom-slow-link-far"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-slow-link-branch", "0215908B3BE0"], ["isoloom-slow-link-far", "02153E2AF531"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-slow-link-branch", "0215F338B695"], ["isoloom-slow-link-far", "0215544584DE"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1298,14 +1298,14 @@ Vagrant.configure("2") do |config|
             return 1
           }
           rc=0
-          lab 02:15:90:8b:3b:e0 10.75.1.252/24 || rc=1
-          lab 02:15:3e:2a:f5:31 10.75.2.252/24 || rc=1
+          lab 02:15:f3:38:b6:95 10.75.1.252/24 || rc=1
+          lab 02:15:54:45:84:de 10.75.2.252/24 || rc=1
           exit $rc
           NET
           chmod +x /etc/isoloom/lab-net.sh
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
-            printf '[keyfile]\nunmanaged-devices=mac:02:15:90:8b:3b:e0;mac:02:15:3e:2a:f5:31\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:f3:38:b6:95;mac:02:15:54:45:84:de\n' > /etc/NetworkManager/conf.d/90-isoloom-lab.conf
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-lab-net.service <<'UNIT'
@@ -1815,15 +1815,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {
-          "virtualbox": "slow-link · router",
-          "vmware_desktop": "slow-link · router",
-          "hyperv": "slow-link-router",
-          "parallels": "slow-link · router",
+          "virtualbox": "slow-link · isoloom-router",
+          "vmware_desktop": "slow-link · isoloom-router",
+          "hyperv": "slow-link-isoloom-router",
+          "parallels": "slow-link · isoloom-router",
           "libvirt": "slow-link_isoloom-router",
-          "utm": "slow-link · router",
-          "vmware_esxi": "slow-link-router"
+          "utm": "slow-link · isoloom-router",
+          "vmware_esxi": "slow-link-isoloom-router"
         },
-        "boot_digest": "sha256:db0b9c9575d00ac8c4c6de5cc3dc7ebcd9b4d2fb786706a227773557e557dcef"
+        "boot_digest": "sha256:7d6cd9dc73f796e8bd9068a4fb7f38e1fc1b3555665b071ba5ab502ac005f264"
       }
     },
     {
@@ -1901,15 +1901,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-tool-shell",
         "vm_names": {
-          "virtualbox": "slow-link · tool shell",
-          "vmware_desktop": "slow-link · tool shell",
-          "hyperv": "slow-link-tool-shell",
-          "parallels": "slow-link · tool shell",
+          "virtualbox": "slow-link · isoloom-tool-shell",
+          "vmware_desktop": "slow-link · isoloom-tool-shell",
+          "hyperv": "slow-link-isoloom-tool-shell",
+          "parallels": "slow-link · isoloom-tool-shell",
           "libvirt": "slow-link_isoloom-tool-shell",
-          "utm": "slow-link · tool shell",
-          "vmware_esxi": "slow-link-tool-shell"
+          "utm": "slow-link · isoloom-tool-shell",
+          "vmware_esxi": "slow-link-isoloom-tool-shell"
         },
-        "boot_digest": "sha256:a3eb027f393fe6c30f6dc969c99fcfaa9710f813e8917edfc37dc88234d8d94b"
+        "boot_digest": "sha256:9f036b0f1fb5801edf8ea462ef8af0716dfb740cec5ec6686d1ff551f9f2b299"
       }
     }
   ],

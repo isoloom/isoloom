@@ -538,23 +538,23 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
-    v.name = "cisco-iol · docker"
+    v.name = "cisco-iol · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "cisco-iol · docker"
+    v.vmx["displayName"] = "cisco-iol · isoloom-docker-host"
     v.vmx["numvcpus"] = "4"
     v.vmx["memsize"] = "3072"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "cisco-iol · docker"
+    v.name = "cisco-iol · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
-    v.name = "cisco-iol · docker"
+    v.name = "cisco-iol · isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -579,7 +579,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "cisco-iol-docker"
+    v.guest_name = "cisco-iol-isoloom-docker-host"
     v.guest_numvcpus = 4
     v.guest_memsize = 3072
   end
@@ -1865,14 +1865,14 @@ systemctl enable --now isoloom-published.service
       "native": {
         "vagrant": "default",
         "vm_names": {
-          "virtualbox": "cisco-iol · docker",
-          "vmware_desktop": "cisco-iol · docker",
-          "parallels": "cisco-iol · docker",
+          "virtualbox": "cisco-iol · isoloom-docker-host",
+          "vmware_desktop": "cisco-iol · isoloom-docker-host",
+          "parallels": "cisco-iol · isoloom-docker-host",
           "libvirt": "cisco-iol_default",
-          "utm": "cisco-iol · docker",
-          "vmware_esxi": "cisco-iol-docker"
+          "utm": "cisco-iol · isoloom-docker-host",
+          "vmware_esxi": "cisco-iol-isoloom-docker-host"
         },
-        "boot_digest": "sha256:0af96138ed90ef5bffb33461bebdd324ad144ad885ea82cb9516c7fe2c348247"
+        "boot_digest": "sha256:eb3a153268135f04999e35967f5886f2f2a2e80f8416cdcc78534238c662d318"
       }
     },
     {
