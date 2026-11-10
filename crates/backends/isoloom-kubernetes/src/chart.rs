@@ -89,7 +89,7 @@ fn chart_file(env: &Environment) -> Result<String> {
 fn values(env: &Environment, inputs: bool) -> Result<String> {
     let values = Values {
         images: Machine::all(env).iter().map(|m| (m.name.to_owned(), m.reference.to_owned())).collect(),
-        inputs: inputs.then(|| env.spec().inputs.iter().map(|i| (i.clone(), String::new())).collect()),
+        inputs: inputs.then(|| env.inputs.iter().map(|i| (i.clone(), String::new())).collect()),
     };
     let usage = "# images: each machine's image (images built from the project must be pushed where the\n# cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).\n";
     Ok(format!("{}{usage}{}", generated(), document(&values)?))

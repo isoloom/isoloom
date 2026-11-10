@@ -105,7 +105,7 @@ impl Starts {
 pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, starts: Starts) -> Result<Vec<SecretSlot>> {
     let containers: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container).collect();
     let mut out = Vec::new();
-    for input in &env.spec().inputs {
+    for input in &env.inputs {
         // A machine reads an input from its environment, or from a file Compose puts in place.
         let readers: Vec<&str> = containers.iter().filter(|(_, m)| m.reads_input(input)).map(|(n, _)| n.as_str()).collect();
         if !readers.is_empty() {

@@ -53,6 +53,13 @@ and the backends render from that plan. Adding a spec feature means teaching the
 lower it; the backends keep working. Parity between a machine's container form and its VM form
 holds by construction, and the catalogue's parity contract checks it for real.
 
+The plan carries what the backends share (machines and their shapes, addresses, VMs with their
+OS, networks, routes, checks, constraints, inputs, requirements). What it doesn't model, a
+backend reads from the spec as laid out for its target (`Environment::spec`): a machine's port
+list, its tools, its provisioning steps, the spec's secrets. Both are the same lowered spec, so
+a backend never sees the authored form; a field that more than one backend reads belongs in the
+plan.
+
 ## Functional core, imperative shell
 
 Parsing, validation, lowering, rendering and manifest building are pure functions over data — no

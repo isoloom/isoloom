@@ -100,7 +100,7 @@ const CA_DIR: &str = "/tmp/isoloom-ca";
 /// before any step downloads: copied from the project, added to the image's trust store, then
 /// removed. Nothing without any.
 fn trusted(env: &Environment) -> String {
-    let files: &[String] = env.spec().constraints.as_ref().map_or(&[], |c| c.ca_certificates.as_slice());
+    let files: &[String] = env.constraints.as_ref().map_or(&[], |c| c.ca_certificates.as_slice());
     if files.is_empty() {
         return String::new();
     }

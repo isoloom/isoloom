@@ -116,7 +116,7 @@ impl CloudConfig {
 /// the project at `local.root`, for [`CloudConfig::ca_certs`]: what one of Isoloom's own VMs that
 /// takes nothing else from the project (the router) trusts before it downloads.
 pub(crate) fn site_authorities(env: &Environment) -> Vec<Expression> {
-    let files = env.spec().constraints.as_ref().map(|c| c.ca_certificates.as_slice()).unwrap_or_default();
+    let files = env.constraints.as_ref().map(|c| c.ca_certificates.as_slice()).unwrap_or_default();
     files
         .iter()
         .map(|f| {

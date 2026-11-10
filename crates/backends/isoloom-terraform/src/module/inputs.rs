@@ -19,7 +19,7 @@ pub(crate) fn variable_of(env: &Environment) -> Option<Variable> {
         .default(object::<&str>([]))
         .sensitive()
         .describe("Values given at launch");
-    (!env.spec().inputs.is_empty()).then_some(variable)
+    (!env.inputs.is_empty()).then_some(variable)
 }
 
 /// A machine's inputs file (`KEY='value'` lines, read with `sh`'s `.`), from `var.inputs`.

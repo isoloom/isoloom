@@ -69,6 +69,8 @@ pub struct Environment {
     pub controller: Option<Controller>,
     /// The spec's constraints (proxy, mirrors, registries, NTP), when it has any.
     pub constraints: Option<Constraints>,
+    /// The launch values it reads (`inputs`), in spec order: names only, never values.
+    pub inputs: Vec<String>,
     /// What the environment asks of the backend rendering it.
     pub requirements: Vec<Requirement>,
     /// The image references to pull, through the registry mirrors.
@@ -354,6 +356,7 @@ impl Environment {
             checks: checks::plan(&laid_out),
             controller: Controller::needed(&laid_out).then(|| Controller::of(&laid_out)),
             constraints: laid_out.constraints.clone(),
+            inputs: laid_out.inputs.clone(),
             requirements,
             images: Images::of(&laid_out),
             inventory_groups: ansible::groups(&laid_out),

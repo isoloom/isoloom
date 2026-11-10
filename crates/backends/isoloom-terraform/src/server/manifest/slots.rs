@@ -64,7 +64,7 @@ pub(crate) fn connection(variables: &[Variable]) -> Result<Vec<SecretSlot>, Mani
 /// The connection's secrets (the module's sensitive `variables`), then each input a machine reads.
 pub(super) fn secrets(env: &Environment, variables: &[Variable]) -> Result<Vec<SecretSlot>, ManifestError> {
     let mut out = connection(variables)?;
-    for input in &env.spec().inputs {
+    for input in &env.inputs {
         let readers = crate::module::manifest::input_readers(env, input)?;
         if readers.is_empty() {
             continue;

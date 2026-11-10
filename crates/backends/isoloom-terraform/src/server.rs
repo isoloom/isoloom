@@ -162,7 +162,7 @@ pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
         .filter(|d| !d.servers.is_empty());
     match own {
         Some(d) => d.servers.clone(),
-        None => isoloom_spec::model::resolvers(env.spec().constraints.as_ref())
+        None => isoloom_spec::model::resolvers(env.constraints.as_ref())
             .into_iter()
             .map(str::to_owned)
             .collect(),
