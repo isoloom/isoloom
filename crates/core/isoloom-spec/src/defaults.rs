@@ -5,16 +5,18 @@
 //!    which the lab writes into its module and run manifest: `Lab::with_regions`),
 //! 2. the user's file, `$ISOLOOM_HOME/defaults.yml` (`~/.isoloom/defaults.yml`),
 //! 3. the project's file, `isoloom.defaults.yml` next to the spec (committed: the team's),
-//! 4. environment variables `ISOLOOM_<KEY>`, `__` standing for a dot (`ISOLOOM_CLOUD__AWS__REGION`),
-//! 5. the command line, `-s defaults.<key>=<value>`.
+//! 4. the profile's `defaults:` (`profiles/<name>.yml`, [`crate::profile`]),
+//! 5. the image table given to `--images`, under `images`,
+//! 6. environment variables `ISOLOOM_<KEY>`, `__` standing for a dot (`ISOLOOM_CLOUD__AWS__REGION`),
+//! 7. the command line, `-s defaults.<key>=<value>`.
 //!
 //! Mappings deep-merge, so a file that sets one region leaves the others alone. The same `-s`
-//! without the `defaults.` prefix overrides the spec itself (`-s machines.web.vm.os=ubuntu@24.04`),
+//! without the `defaults.` prefix overrides the spec itself (`-s machines.web.os=ubuntu@24.04`),
 //! for one run.
 //!
 //! ```yaml
 //! images:                 # the image table (see Images): OS images, the access machine
-//!   os: { debian-12: { vagrant: my-org/debian-12 } }
+//!   os: { "debian@12": { vagrant: my-org/debian-12 } }
 //!   access: { docker: registry.example.com/workstation:1, vm: ubuntu@24.04 }
 //! vagrant:
 //!   provider: libvirt     # a runner passes --provider
@@ -346,7 +348,7 @@ pub fn leaves(v: &Value, prefix: &str) -> Vec<String> {
 }
 
 /// The spec's YAML with `-s key=value` overrides applied (keys without the `defaults.` prefix),
-/// before it is parsed: `machines.web.vm.os=ubuntu@24.04`, `networks.lab.internet=false`.
+/// before it is parsed: `machines.web.os=ubuntu@24.04`, `networks.lan.internet=false`.
 ///
 /// # Errors
 ///

@@ -113,6 +113,8 @@ Arguments:
 | `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
 | `--system` | Only the built-in layer. |
 | `--json` | Machine-readable output. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
 
 ## `isoloom graph`
 

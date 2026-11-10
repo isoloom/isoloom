@@ -224,6 +224,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `contract::CONSOLES`, the errors `console_shape`, `console_twice` and `unknown_slot`, and the
   matrix's "Graphical consoles" table ([run manifest](docs/reference/run-manifest.md#graphical-consoles)).
 
+- **`isoloom defaults` takes `--images` and `-s`**, as the commands that read the lab do, so it
+  shows the image table's and the command line's layers with their sources.
 - **The run manifest's `identity.terraform.gone`**: the errors a Terraform module's providers
   print for a resource of the state that is already gone, where its delete fails rather than
   counting it done, one per resource type, the instance's attributes written `{<attribute>}`

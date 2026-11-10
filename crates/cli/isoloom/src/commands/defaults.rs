@@ -1,7 +1,5 @@
 //! `isoloom defaults`: the defaults in effect here, and where each comes from.
 
-use std::path::Path;
-
 use super::{CliError, Console, Project, Result, Verdict, spec};
 
 #[derive(Debug, clap::Args)]
@@ -14,12 +12,14 @@ pub(crate) struct Args {
     /// Machine-readable output.
     #[arg(long)]
     json: bool,
+    #[command(flatten)]
+    settings: spec::Settings,
 }
 
 /// Prints the built-in defaults, or every layer merged with each value's source.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     if !a.system {
-        return in_effect(profile, &a.project.dir, a.json, console);
+        return in_effect(profile, a, console);
     }
     let value = builtin();
     if a.json {
@@ -30,11 +30,14 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     Ok(Verdict::Pass)
 }
 
-/// Every layer merged, each value with its source.
-fn in_effect(profile: &spec::Profile, dir: &Path, json: bool, console: &mut Console) -> Result<Verdict> {
+/// Every layer merged, each value with its source: the image table given to `--images` and the
+/// `-s defaults.<key>=<value>` overrides among them.
+fn in_effect(profile: &spec::Profile, a: &Args, console: &mut Console) -> Result<Verdict> {
+    let (dir, json) = (a.project.dir.as_path(), a.json);
     let profile = profile.load(dir)?;
     let host = spec::host();
-    let r = isoloom_spec::defaults::load(&spec::defaults_of(dir, None, profile.as_ref(), &[])).map_err(CliError::Defaults)?;
+    let layers = spec::defaults_of(dir, a.settings.images.as_deref(), profile.as_ref(), &a.settings.sets);
+    let r = isoloom_spec::defaults::load(&layers).map_err(CliError::Defaults)?;
     let mut merged = builtin();
     isoloom_spec::defaults::merge(&mut merged, &r.merged);
     let project_file = dir.join(isoloom_spec::defaults::PROJECT_FILE);

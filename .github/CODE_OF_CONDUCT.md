@@ -59,8 +59,10 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-TODO-maintainer@.
+reported privately to the community leaders responsible for enforcement, the maintainers listed
+in [GOVERNANCE.md](GOVERNANCE.md): open a private report through the repository's *Security* tab
+([**Report a vulnerability**](https://github.com/isoloom/isoloom/security/advisories/new)) and
+say it is a conduct report. Only you and the maintainers can read it.
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

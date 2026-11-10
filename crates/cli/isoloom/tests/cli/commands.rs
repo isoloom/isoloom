@@ -350,6 +350,26 @@ fn a_profile_applies_to_every_command_and_pins_its_target() -> Outcome {
     Ok(())
 }
 
+/// `isoloom defaults` shows every layer the configuration reference lists, the image table given
+/// to `--images` and the `-s defaults.<key>=<value>` overrides included, each with its source: it
+/// once refused `--images` and left out `-s`.
+#[test]
+fn defaults_shows_the_image_table_and_the_command_lines_layers() -> Outcome {
+    let home = scratch("defaults-layers-home")?;
+    let dir = scratch("defaults-layers")?;
+    std::fs::copy(example("solo-web").join("isoloom.yml"), dir.join("isoloom.yml"))?;
+    let table = dir.join("table.yml");
+    std::fs::write(&table, "os: { \"debian@12\": { vagrant: my-org/debian-12 } }\n")?;
+    let o = isoloom(&home, &[&"defaults", &dir, &"--images", &table, &"-s", &"defaults.cloud.aws.region=eu-north-1"])?;
+    assert_eq!(o.code, Some(0), "{o:?}");
+    let line = |key: &str| o.stdout.lines().find(|l| l.starts_with(key)).map(str::to_owned).unwrap_or_default();
+    let image = line("images.os.debian@12.vagrant");
+    assert!(image.contains("my-org/debian-12") && image.contains("--images "), "{}", o.stdout);
+    let region = line("cloud.aws.region");
+    assert!(region.contains("eu-north-1") && region.contains("-s defaults.cloud.aws.region"), "{}", o.stdout);
+    Ok(())
+}
+
 #[test]
 fn a_users_default_region_reaches_the_module_and_the_run_manifest() -> Outcome {
     // The region the run manifest's `region` param defaulted to was the built-in one, which a

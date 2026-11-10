@@ -1,9 +1,10 @@
 //! Isoloom's targets: the composition root above the backends. It holds the registry of every
 //! target's backend, puts together the targets made of two backends (`cloud-docker`,
-//! `docker-vm`, `hybrid`), and works out what spans them: a lab's files for a target ([`generate`]), why a target refuses a lab ([`refusal()`], and
-//! typed, at which step: `decision`), the resolved snapshot ([`resolved`]), the tables and
-//! diagram drawn from it ([`report`], [`graph`]), the tiers ([`tiers`]) and the capability matrix
-//! ([`matrix`]). It holds no backend's logic: each backend renders its own files.
+//! `docker-vm`, `hybrid`), and works out what spans them: an environment's files for a target
+//! ([`generate`]), why a target refuses it ([`refusal()`], on one Vagrant provider or cloud
+//! [`refusal_on`], every cloud's at once [`cloud_refusals`] as [`CloudRefusal`]s), the resolved
+//! snapshot ([`resolved`]), the tables and diagram drawn from it ([`report`], [`graph`]), the
+//! tiers ([`tiers`]) and the capability matrix ([`matrix`]). It holds no backend's logic: each backend renders its own files.
 //!
 //! Every function is pure (the project's own files the output copies are read only by
 //! [`project_copies`]), so `isoloom check` can regenerate in memory and compare. Output lives
