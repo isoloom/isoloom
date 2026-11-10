@@ -24,7 +24,7 @@ override_resource {
 }
 
 override_resource {
-  target          = proxmox_virtual_environment_file.router
+  target          = proxmox_virtual_environment_file.isoloom_router
   override_during = plan
   values          = { id = "local:snippets/iso1-router.yaml" }
 }
@@ -57,7 +57,7 @@ run "the_network_is_a_vnet_the_router_stands_on_at_254" {
     error_message = "the router must be on uplink_bridge first, then on app's VNet"
   }
   assert {
-    condition     = sort([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : replace(f.content, "\n", " ") if startswith(f.path, "/etc/systemd/network/")]) == sort(["[Match] MACAddress=02:15:01:00:00:00  [Network] DHCP=yes", "[Match] MACAddress=02:15:01:01:00:00  [Network] Address=10.80.0.254/24 ConfigureWithoutCarrier=yes"])
+    condition     = sort([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.isoloom_router.source_raw[0].data, "#cloud-config\n")).write_files : replace(f.content, "\n", " ") if startswith(f.path, "/etc/systemd/network/")]) == sort(["[Match] MACAddress=02:15:01:00:00:00  [Network] DHCP=yes", "[Match] MACAddress=02:15:01:01:00:00  [Network] Address=10.80.0.254/24 ConfigureWithoutCarrier=yes"])
     error_message = "the router must take its uplink by DHCP and 10.80.0.254 on app"
   }
 }
@@ -66,7 +66,7 @@ run "the_router_forwards_the_published_port_to_web_and_the_network_out" {
   command = plan
 
   assert {
-    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) == tolist([
+    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.isoloom_router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) == tolist([
       "flush ruleset",
       "table inet isoloom {",
       "  chain forward {",

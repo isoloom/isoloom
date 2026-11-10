@@ -3,8 +3,8 @@ name: CI
 # Every push to main and every pull request: formatting, clippy and the tests on Linux, macOS and
 # Windows, the quality ratchet, the API docs, the supply chain (cargo-deny, unused dependencies),
 # spelling, the links between the docs, SemVer against the last release, the declared minimum
-# Rust, deterministic generation, the generated Terraform validated, and the generated Compose and
-# Kubernetes files run for real. The release gate (gate.yml) runs the core of it again on the tag.
+# Rust, deterministic generation, the generated Terraform validated and its modules' tests, and the
+# generated Compose and Kubernetes files run for real. The release gate (gate.yml) runs the core of it again on the tag.
 on:
   push:
     branches: [main]
@@ -264,6 +264,22 @@ jobs:
           for d in examples/*/.isoloom/cloud-services; do
             validate "$d/$(jq -r '.lifecycle.up[] | select(.action == "terraform.copy_module") | .with.from' "$d/run.json")"
           done
+
+  # The cloud and server modules' logic proven without a cloud (`cargo xtask tf-test`): every
+  # provider mocked, every run a plan, in the pinned validator image. Its expectations
+  # (tests/terraform/) break unseen otherwise.
+  tf-test:
+    name: Terraform module tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo run -p xtask --locked -- tf-test
 
   # The binaries the real-run jobs below share: isoloom, and the Isothrum runner built from its
   # repository at ISOTHRUM_REF (a repository variable: a release tag or a commit, never a branch,

@@ -39,7 +39,7 @@ override_resource {
 }
 
 override_resource {
-  target          = proxmox_virtual_environment_file.router
+  target          = proxmox_virtual_environment_file.isoloom_router
   override_during = plan
   values          = { id = "local:snippets/iso1-router.yaml" }
 }
@@ -109,7 +109,7 @@ run "the_router_stands_on_the_uplink_and_on_every_network_at_254" {
     error_message = "the router's first interface must be on uplink_bridge, then one on each VNet, each with its slot's MAC"
   }
   assert {
-    condition = sort([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : replace(f.content, "\n", " ") if startswith(f.path, "/etc/systemd/network/")]) == sort([
+    condition = sort([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.isoloom_router.source_raw[0].data, "#cloud-config\n")).write_files : replace(f.content, "\n", " ") if startswith(f.path, "/etc/systemd/network/")]) == sort([
       "[Match] MACAddress=02:15:01:00:00:00  [Network] DHCP=yes",
       "[Match] MACAddress=02:15:01:01:00:00  [Network] Address=10.61.10.254/24 ConfigureWithoutCarrier=yes",
       "[Match] MACAddress=02:15:01:01:01:00  [Network] Address=10.61.20.254/24 ConfigureWithoutCarrier=yes",
@@ -118,7 +118,7 @@ run "the_router_stands_on_the_uplink_and_on_every_network_at_254" {
     error_message = "the router must take its uplink by DHCP and .254 on each network, each on the interface with its MAC"
   }
   assert {
-    condition     = proxmox_virtual_environment_vm.isoloom_router.initialization[0].user_data_file_id == proxmox_virtual_environment_file.router.id
+    condition     = proxmox_virtual_environment_vm.isoloom_router.initialization[0].user_data_file_id == proxmox_virtual_environment_file.isoloom_router.id
     error_message = "the router must boot with its own cloud-init snippet"
   }
 }
@@ -159,7 +159,7 @@ run "the_router_forwards_the_reach_rules_and_nothing_else_between_networks" {
   command = plan
 
   assert {
-    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) == tolist([
+    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.isoloom_router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) == tolist([
       "flush ruleset",
       "table inet isoloom {",
       "  chain forward {",
@@ -291,11 +291,11 @@ run "another_slot_names_everything_apart" {
     error_message = "slot 42's zone, VNets and pool must be iso42, i42n0..2"
   }
   assert {
-    condition     = [proxmox_virtual_environment_vm.isoloom_router.name, proxmox_virtual_environment_vm.cache.name, proxmox_virtual_environment_vm.web.name, proxmox_virtual_environment_vm.user.name] == ["iso42-router", "iso42-cache", "iso42-web", "iso42-user"]
+    condition     = [proxmox_virtual_environment_vm.isoloom_router.name, proxmox_virtual_environment_vm.cache.name, proxmox_virtual_environment_vm.web.name, proxmox_virtual_environment_vm.user.name] == ["iso42-isoloom-router", "iso42-cache", "iso42-web", "iso42-user"]
     error_message = "slot 42's VMs must be named iso42-<machine>"
   }
   assert {
-    condition     = [proxmox_virtual_environment_file.router.source_raw[0].file_name, proxmox_virtual_environment_file.cache.source_raw[0].file_name, proxmox_download_file.debian_12.file_name] == ["iso42-router.yaml", "iso42-cache.yaml", "iso42-debian-12.img"]
+    condition     = [proxmox_virtual_environment_file.isoloom_router.source_raw[0].file_name, proxmox_virtual_environment_file.cache.source_raw[0].file_name, proxmox_download_file.debian_12.file_name] == ["iso42-isoloom-router.yaml", "iso42-cache.yaml", "iso42-debian-12.img"]
     error_message = "slot 42's snippets and image file must be its own"
   }
   assert {
@@ -330,7 +330,7 @@ run "the_router_carries_the_sealed_ruleset_for_the_live_seal_step" {
   command = plan
 
   assert {
-    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) == tolist([
+    condition = split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.isoloom_router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) == tolist([
       "flush ruleset",
       "table inet isoloom {",
       "  chain forward {",
@@ -355,13 +355,13 @@ run "the_router_carries_the_sealed_ruleset_for_the_live_seal_step" {
     error_message = "the sealed ruleset (/etc/nftables.sealed.nft) must keep the reach rules but drop back (internet: false) from the internet forward and NAT, and drop what crosses into it"
   }
   assert {
-    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0
+    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.isoloom_router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.sealed.nft"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 0
     error_message = "the sealed ruleset must not forward nor masquerade back (internet: false) to the internet"
   }
   # The base /etc/nftables.conf must stay the unsealed ruleset (it forwards back) and carry no
   # `isoloom_sealed` conditional, so flipping the seal never changes the snippet (no VM recreate).
   assert {
-    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 2
+    condition     = length([for l in split("\n", one([for f in yamldecode(trimprefix(proxmox_virtual_environment_file.isoloom_router.source_raw[0].data, "#cloud-config\n")).write_files : f.content if f.path == "/etc/nftables.conf"])) : l if strcontains(l, "daddr != {") && strcontains(l, "10.61.20.0/24")]) == 2
     error_message = "the base /etc/nftables.conf must stay unsealed (back still forwarded and masqueraded), inert under the seal"
   }
 }

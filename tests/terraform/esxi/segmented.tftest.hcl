@@ -165,7 +165,7 @@ run "another_slot_names_everything_apart" {
   }
 
   assert {
-    condition     = [esxi_vswitch.front.name, esxi_portgroup.back.name, esxi_guest.isoloom_router.guest_name, esxi_guest.web.guest_name] == ["iso42-front", "iso42-back", "iso42-router", "iso42-web"]
+    condition     = [esxi_vswitch.front.name, esxi_portgroup.back.name, esxi_guest.isoloom_router.guest_name, esxi_guest.web.guest_name] == ["iso42-front", "iso42-back", "iso42-isoloom-router", "iso42-web"]
     error_message = "slot 42's vSwitches, port groups and VMs must be named iso42-<name>"
   }
   assert {

@@ -71,7 +71,7 @@ run "the_outputs_name_the_host_and_the_ready_file" {
   command = plan
 
   assert {
-    condition     = output.ssh_user == "isoloom"
+    condition     = output.ssh_user == "admin"
     error_message = "`ssh_user` must be the host image's user"
   }
 }
