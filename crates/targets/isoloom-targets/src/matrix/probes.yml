@@ -65,18 +65,22 @@ rows:
     without: [command, app.image, app.build, app.appliance]
     patch: { machines: { m: { ports: { web: 80 }, app: { image: null } } } }
   - field: machines.*.app.steps[].copy
-    about: a step copying a project file into the machine
-    patch: { machines: { m: { app: { steps: [{ copy: { from: files/motd, to: /etc/motd } }] } } } }
+    about: a step copying a project file into the machine, among the steps that are the machine's only recipe
+    without: [app.image, app.build, app.appliance]
+    patch: { machines: { m: { app: { image: null, steps: [{ copy: { from: files/motd, to: /etc/motd } }] } } } }
   - field: machines.*.app.steps[].packages
-    about: a step installing packages with the OS's installer
-    patch: { machines: { m: { app: { steps: [{ packages: [curl] }] } } } }
+    about: a step installing packages with the OS's installer, among the steps that are the machine's only recipe
+    without: [app.image, app.build, app.appliance]
+    patch: { machines: { m: { app: { image: null, steps: [{ packages: [curl] }] } } } }
   - field: machines.*.app.steps[].playbook
-    about: a step running an Ansible playbook in the machine
-    patch: { machines: { m: { app: { steps: [{ playbook: setup.yml }] } } } }
+    about: a step running an Ansible playbook in the machine, the machine's only recipe
+    without: [app.image, app.build, app.appliance]
+    patch: { machines: { m: { app: { image: null, steps: [{ playbook: setup.yml }] } } } }
   - field: machines.*.app.steps[]
     value: reboot
-    about: a step restarting the machine
-    patch: { machines: { m: { app: { steps: [{ run: setup.sh }, reboot] } } } }
+    about: a step restarting the machine, among the steps that are the machine's only recipe
+    without: [app.image, app.build, app.appliance]
+    patch: { machines: { m: { app: { image: null, steps: [{ run: setup.sh }, reboot] } } } }
 
   # How a machine runs.
   - field: machines.*.command

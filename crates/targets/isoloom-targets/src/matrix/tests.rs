@@ -229,6 +229,40 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
     assert_eq!(by_the_run, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
 }
 
+/// A row about a step shows what each target does with the step, the container targets
+/// included: its lab runs the step as the machine's only recipe (no `app.image` the container
+/// targets would run instead, skipping the step), and each column's cell is what the generator
+/// says of that lab. The playbook and reboot rows once kept the image, so the container columns
+/// showed ✓ for steps they refuse.
+#[test]
+fn every_step_row_is_decided_on_the_step_itself() {
+    let m = built();
+    let probes = probe::probes().unwrap();
+    let containers = [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker, Target::Kubernetes];
+    for p in probes.rows.iter().filter(|p| p.field.starts_with("machines.*.app.steps[]")) {
+        let row = m.rows.iter().find(|r| r.field == p.field && r.value == p.value && r.about == p.about).unwrap();
+        for (target, lab) in labs_of(p) {
+            let steps_only = matches!(&lab.source().machines["m"].kind, isoloom_spec::syntax::Kind::App(a) if a.container.is_none() && !a.steps.is_empty());
+            assert!(steps_only, "{}: `m` has a recipe beside its steps", row.name());
+            if !containers.contains(&target) {
+                continue;
+            }
+            let cell = m
+                .columns
+                .iter()
+                .zip(&row.cells)
+                .find(|(c, _)| c.target == target)
+                .map(|(_, cell)| cell)
+                .unwrap();
+            match (crate::refusal(&lab, target), cell) {
+                (None, Cell::Supported) => {}
+                (Some(why), Cell::Refused(r)) => assert!(why.ends_with(&r.reason), "{} on {}: {why} / {}", row.name(), target.id(), r.reason),
+                (theirs, cell) => panic!("{} on {}: the generator says {theirs:?}, the matrix {cell:?}", row.name(), target.id()),
+            }
+        }
+    }
+}
+
 /// The matrix's ✓ for a check is what the generators write: every column that takes a row about
 /// `checks[]` writes the check (its runner line, its run manifest entry) in the target's files.
 /// `external` once had a ✓ for script and playbook checks, and for probes with no host to run
