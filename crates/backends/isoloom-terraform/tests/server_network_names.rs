@@ -46,21 +46,31 @@ fn every_esxi_network_is_named_after_its_port_group() -> Outcome {
     Ok(())
 }
 
+/// The router's NIC on the network at `index` of the plan (its MAC says which), and the VNet
+/// resource its `bridge` points at.
+fn router_vnet(module: &str, index: usize) -> Option<&str> {
+    let mac = format!("format(\"02:15:%02x:01:%02x:00\", var.slot, {index})");
+    let device = module
+        .split("network_device {")
+        .find(|d| d.split('}').next().is_some_and(|d| d.contains(&mac)))?;
+    attribute(device, "bridge")?.strip_prefix("proxmox_sdn_vnet.")?.strip_suffix(".id")
+}
+
 #[test]
 fn every_proxmox_network_is_named_after_the_vnet_it_is_on() -> Outcome {
-    for example in ["hello-stack", "segmented", "vlan-office"] {
-        let (module, names) = natives(&ProxmoxBackend, example)?;
+    for name in ["hello-stack", "segmented", "vlan-office"] {
+        let env = planned(&example(name)?, ProxmoxBackend.target());
+        let (module, names) = natives(&ProxmoxBackend, name)?;
         for (net, native) in names {
             assert!(
                 native.starts_with("i${var.slot}") && native.len() > "i${var.slot}".len(),
-                "{example}: {net} is {native}"
+                "{name}: {net} is {native}"
             );
-            let vnets: Vec<&str> = module
-                .split("resource \"proxmox_sdn_vnet\" ")
-                .skip(1)
-                .filter_map(|b| attribute(b, "id"))
-                .collect();
-            assert!(vnets.contains(&native.as_str()), "{example}: {net} is {native}, which no VNet is: {vnets:?}");
+            // The VNet the router's NIC on this network is bridged to.
+            let index = env.networks.get_index_of(&net).ok_or_else(|| format!("{name}: no network {net}"))?;
+            let vnet = router_vnet(&module, index).ok_or_else(|| format!("{name}: the router has no NIC on {net}"))?;
+            let body = resource_body(&module, &format!("resource \"proxmox_sdn_vnet\" \"{vnet}\""));
+            assert_eq!(attribute(body, "id"), Some(native.as_str()), "{name}: {net} is on VNet {vnet}: {body}");
         }
     }
     Ok(())

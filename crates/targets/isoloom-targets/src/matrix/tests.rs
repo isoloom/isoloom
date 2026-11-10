@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 
 use super::*;
@@ -278,19 +279,21 @@ fn every_step_row_is_decided_on_the_step_itself() {
 }
 
 /// The matrix's ✓ for a check is what the generators write: every column that takes a row about
-/// `checks[]` writes the check (its runner line, its run manifest entry) in the target's files.
+/// `checks[]` writes the check (its run manifest entry, its runner line) in its own files, the
+/// folder of its cloud or provider where it has one (`cloud-vm/aws/`), else its target's.
 /// `external` once had a ✓ for script and playbook checks, and for probes with no host to run
-/// from, while its runners left them out.
+/// from, while its runners left them out; and the test once looked at one column per target, in
+/// any file of the target, so one cloud dropping a check passed on another's.
 #[test]
-fn every_target_the_matrix_says_takes_a_check_writes_it() {
+fn every_column_the_matrix_says_takes_a_check_writes_it() {
     let m = built();
     let probes = probe::probes().unwrap();
+    let mut looked = 0;
     for p in probes.rows.iter().filter(|p| p.field.starts_with("checks[]")) {
         let row = m.rows.iter().find(|r| r.field == p.field && r.value == p.value && r.about == p.about).unwrap();
         let labs = labs_of(p);
-        let mut done = BTreeSet::new();
         for (column, cell) in m.columns.iter().zip(&row.cells) {
-            if *cell != Cell::Supported || !done.insert(column.target) {
+            if *cell != Cell::Supported {
                 continue;
             }
             let lab = &labs.iter().find(|(t, _)| *t == column.target).unwrap().1;
@@ -298,16 +301,24 @@ fn every_target_the_matrix_says_takes_a_check_writes_it() {
             let written: Vec<String> = isoloom_plan::checks::plan(&spec).into_iter().filter(|c| !c.derived).map(|c| c.name).collect();
             assert!(!written.is_empty(), "{}: the row's lab has no check", row.name());
             let files = crate::generate(lab, column.target).unwrap();
-            // The target's own files: not the resolved snapshot, which lists every check.
-            let own = |f: &&isoloom_render::GeneratedFile| f.path != crate::resolved::PATH;
+            // The column's own files: its cloud's or provider's folder, when the target writes
+            // one, else the target's files but the resolved snapshot, which lists every check.
+            let variant_dir = column.variant.map(|v| format!("{OUTPUT_DIR}/{}/{v}/", column.target.id()));
+            let folder = variant_dir.filter(|dir| files.iter().any(|f| f.path.starts_with(dir.as_str())));
+            let own = |f: &&isoloom_render::GeneratedFile| match &folder {
+                Some(dir) => f.path.starts_with(dir.as_str()),
+                None => f.path != crate::resolved::PATH,
+            };
             for name in &written {
                 assert!(
                     files.iter().filter(own).any(|f| f.contents.contains(name.as_str())),
-                    "{} on {}: ✓ in the matrix, but no file of the target holds the check `{name}`",
+                    "{} on {}: ✓ in the matrix, but none of its own files ({folder:?}) holds the check `{name}`",
                     row.name(),
                     column.id()
                 );
             }
+            looked += 1;
         }
     }
+    assert!(looked > m.columns.len(), "{looked} columns looked at");
 }
