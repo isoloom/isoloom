@@ -187,11 +187,13 @@ fn unit() -> String {
 
 /// The user data: the set-up script and its unit written (each through a new file moved in
 /// place, so a set-up reading its script never sees it rewritten), then the unit started without
-/// waiting for it. Without systemd, the set-up runs in the background.
+/// waiting for it. Without systemd, the set-up runs in the background. The script is readable by
+/// root alone (it holds the sensitive inputs in base64, and on the controller its private key and
+/// the inventory): a fresh file, written under umask 077.
 #[must_use]
 pub(crate) fn script(s: &SetUp) -> Template {
     let mut t = Template::text(format!(
-        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The project comes over SSH from {RUNNER}.\nmkdir -p {DIR}\ncat > {DIR}/setup.sh.new <<'ISOLOOM_SETUP'\n"
+        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The project comes over SSH from {RUNNER}.\nmkdir -p {DIR}\nrm -f {DIR}/setup.sh.new\n(umask 077 && cat > {DIR}/setup.sh.new) <<'ISOLOOM_SETUP'\n"
     ));
     t.append(body(s));
     t.push_text(format!(
@@ -349,5 +351,28 @@ mod tests {
         assert!(e.contains("shutdown -h \"+$m\""), "{e}");
         let s = text(&script(&two_parts()));
         assert!(s.find("e=<expr>").unwrap() < s.find("part=$(cat").unwrap(), "{s}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_set_up_script_is_readable_by_root_alone() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("isoloom-setup-mode-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("a temporary folder");
+        // A file left from an earlier write, readable by anyone, isn't reused.
+        std::fs::write(dir.join("setup.sh.new"), "old").expect("a stale file");
+        std::fs::set_permissions(dir.join("setup.sh.new"), std::fs::Permissions::from_mode(0o644)).expect("its mode");
+        let s = text(&script(&SetUp::default()));
+        let (written, _) = s.split_once("mv -f").expect("the script is moved in place");
+        let written = written.replace(DIR, &dir.to_string_lossy());
+        let status = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("umask 022\n{written}"))
+            .status()
+            .expect("sh runs");
+        let mode = std::fs::metadata(dir.join("setup.sh.new")).expect("the script").permissions().mode();
+        std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
+        assert!(status.success());
+        assert_eq!(mode & 0o777, 0o600);
     }
 }

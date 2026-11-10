@@ -370,6 +370,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   they were, and Vagrant writes a provisioner's environment into a double-quoted shell string: a
   `$(...)` or a backquote in a value ran in the VM, as root. The values now travel in base64, as
   the other VMs' always did, and each script decodes them first.
+- **A cloud machine's set-up script is readable by root alone.** `cloud-vm`'s user data wrote
+  `/var/lib/isoloom/setup.sh` under the default umask, readable by every account on the machine,
+  and it holds the sensitive inputs in base64 (and, on the controller, its private key and the
+  inventory with the Windows password). It is now a fresh file written under umask 077.
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,
