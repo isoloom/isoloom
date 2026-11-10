@@ -648,6 +648,26 @@ fn every_command_reads_the_defaults_tags_and_names_where_a_wrong_one_comes_from(
 }
 
 #[test]
+fn when_every_target_refuses_generate_and_check_say_no_and_nothing_is_removed() -> Outcome {
+    let home = scratch("all-refused-home")?;
+    let dir = project("all-refused", &format!("{}targets: [docker]\n", one_vm("debian@12")))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir])?.code, Some(0));
+    let compose = dir.join(".isoloom/docker/compose.yml");
+    assert!(compose.is_file());
+    // Every target left refuses the lab now (cloud-docker: an arm64 machine).
+    let refused = one_vm("debian@12").replace("    os: debian@12\n", "    os: debian@12\n    hardware: { arch: arm64 }\n");
+    std::fs::write(dir.join("isoloom.yml"), format!("{refused}targets: [cloud-docker]\n"))?;
+    for command in ["generate", "check"] {
+        let o = isoloom(&home, &[&command, &dir])?;
+        assert_eq!(o.code, Some(1), "{command}: {o:?}");
+        assert!(o.stdout.contains("arm64"), "{command} says why: {}", o.stdout);
+    }
+    assert!(compose.is_file(), "nothing is removed when nothing is generated");
+    Ok(())
+}
+
+#[test]
 fn schema_prints_the_committed_schema_with_the_catalogues_rules() -> Outcome {
     let home = scratch("schema-home")?;
     let run = isoloom(&home, &[&"schema"])?;

@@ -436,6 +436,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   couldn't start for another reason than not being installed was passed over silently; and a
   `puts` in the Vagrantfile broke the recording. The first Ruby that starts decides now, one that
   can't start is the error, and what the Vagrantfile prints goes to stderr.
+- **`generate` and `check` say no when no target is left.** When every target refused the lab,
+  `generate` removed every file it had written before and exited 0, and `check` then passed with
+  nothing to compare. A generation with no file is now a no (exit 1) that writes and removes
+  nothing, and `check` is a no too.
 - **A template filled in for two places generates.** Two `template:` steps of one machine
   reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
   file is written once per source.

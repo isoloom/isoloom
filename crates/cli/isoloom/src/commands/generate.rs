@@ -28,21 +28,24 @@ pub(crate) struct Args {
 /// folder, or anywhere under `.isoloom/` for every target: `generated`), then says why each
 /// target left out wasn't generated. The list of what Isoloom wrote is read, and refused when it
 /// names a path Isoloom won't remove, and a file that would be written through a symbolic link
-/// is refused, before anything is written. Asking for one target that can't be generated is a no;
-/// skipping some of all of them isn't, unless one was left out for a failure of its backend
-/// rather than a refusal of the lab: then nothing is written or removed.
+/// is refused, before anything is written. A generation with no file (the target asked for, or
+/// every target, refuses the lab) is a no, and writes and removes nothing: the files there stay
+/// as they were. Skipping some of all the targets isn't a no, unless one was left out for a
+/// failure of its backend rather than a refusal of the lab: then nothing is written or removed.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
     let target = spec::pinned(profile, dir, a.target.as_deref())?;
     let (lab, _) = spec::with_settings(profile, dir, a.images.as_deref(), &a.sets)?;
     let lab = spec::checked(lab, dir)?;
     let (files, skipped) = files(&lab, target.as_deref())?;
+    if files.is_empty() {
+        for e in &skipped {
+            console.line(format_args!("· {e}"))?;
+        }
+        return Ok(Verdict::Fail);
+    }
     let files = generated::finish(files, dir)?;
-    let stale = if target.is_none() || !files.is_empty() {
-        generated::stale(dir, &files, &generated::scope(target.as_deref()))?
-    } else {
-        Vec::new()
-    };
+    let stale = generated::stale(dir, &files, &generated::scope(target.as_deref()))?;
     let list = generated::list(dir, &files, &stale)?;
     generated::writable(dir, files.iter().chain(&list))?;
     for f in &files {
@@ -59,7 +62,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     for e in &skipped {
         console.line(format_args!("· {e}"))?;
     }
-    Ok(Verdict::of(target.is_none() || !files.is_empty()))
+    Ok(Verdict::Pass)
 }
 
 /// `target`'s files, or every target's without one, and the refusals of the targets left out. A

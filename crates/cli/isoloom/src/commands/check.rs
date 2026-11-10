@@ -79,19 +79,19 @@ impl FileResult {
 /// profile) in memory and compares each file with the one on disk, the list of what it wrote
 /// (`.isoloom/.generated`) included; a file `generate` wrote there before and would now remove
 /// (`generated::stale`) is out of date too; one `generate` would refuse to write through a
-/// symbolic link is the same error as there. A target left out
-/// because it refuses the lab has no files to compare, unless it is the one asked for: then there
-/// is nothing to vouch for. One left out for any other reason (its backend failed) is an error,
-/// since its committed files can't be vouched for.
+/// symbolic link is the same error as there. A target left out because it refuses the lab has no
+/// files to compare; when no target is left (the one asked for, or every one, refuses), there is
+/// nothing to vouch for: a no. One left out for any other reason (its backend failed) is an
+/// error, since its committed files can't be vouched for.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let target = spec::pinned(profile, &a.project.dir, a.target.as_deref())?;
     let (lab, _) = spec::with_settings(profile, &a.project.dir, a.images.as_deref(), &a.sets)?;
     let lab = spec::checked(lab, &a.project.dir)?;
     let (files, skipped) = super::generate::files(&lab, target.as_deref())?;
-    if target.is_some() && files.is_empty() {
+    if files.is_empty() {
         let refused: Vec<String> = skipped.iter().map(ToString::to_string).collect();
         report(a, console, &[], &refused)?;
-        return Ok(Verdict::of(false));
+        return Ok(Verdict::Fail);
     }
     let files = generated::finish(files, &a.project.dir)?;
     let stale = generated::stale(&a.project.dir, &files, &generated::scope(target.as_deref()))?;
