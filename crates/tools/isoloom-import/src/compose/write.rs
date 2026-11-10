@@ -67,6 +67,9 @@ fn machine(y: &mut Writer, m: &Machine) {
         y.line(format!("    environment: {{ {} }}", each.join(", ")));
     }
     y.resources(m.cpus, m.memory_mb);
+    if let Some(gpus) = &m.gpus {
+        y.line(format!("    hardware: {{ gpus: {gpus} }}"));
+    }
     if !m.aliases.is_empty() {
         let names: Vec<String> = m.aliases.iter().map(|a| scalar(a)).collect();
         y.line(format!("    aliases: [{}]", names.join(", ")));

@@ -39,6 +39,8 @@ struct Machine {
     inputs: BTreeSet<String>,
     cpus: Option<u32>,
     memory_mb: Option<u32>,
+    /// Its `hardware.gpus`, as the draft writes it (`all`, `2`, `{ ids: [...] }`).
+    gpus: Option<String>,
     depends_on: Vec<String>,
     volumes: Vec<(String, String)>,
     /// More names it answers to, on every network.

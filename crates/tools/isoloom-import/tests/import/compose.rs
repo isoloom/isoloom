@@ -227,3 +227,48 @@ fn a_build_with_text_yaml_would_misread_is_quoted() -> Outcome {
     assert!(spec.machines.contains_key("web"));
     Ok(())
 }
+
+#[test]
+fn a_gpu_reservation_becomes_gpus_and_every_other_resource_key_is_noted() -> Outcome {
+    let d = draft(
+        "services:
+  train:
+    image: pytorch/pytorch
+    deploy:
+      replicas: 2
+      resources:
+        limits: { cpus: '2', memory: 4G, pids: 100 }
+        reservations:
+          cpus: '1'
+          memory: 2G
+          devices:
+            - { driver: nvidia, count: 2, capabilities: [gpu] }
+            - { capabilities: [tpu] }
+",
+        "ml",
+        "compose.yml",
+    )?;
+    assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
+    assert!(d.yaml.contains("hardware: { gpus: { count: 2, driver: nvidia } }"), "{}", d.yaml);
+    let at = "services.train.deploy";
+    assert!(has(&d, NoteKind::NotYet, &format!("{at}.resources.limits"), "pids"), "{:?}", d.notes);
+    assert!(
+        has(&d, NoteKind::NotYet, &format!("{at}.resources.reservations"), "cpus, memory"),
+        "{:?}",
+        d.notes
+    );
+    assert!(
+        has(&d, NoteKind::Changed, &format!("{at}.resources.reservations.devices[1]"), ""),
+        "{:?}",
+        d.notes
+    );
+    assert!(has(&d, NoteKind::NotYet, at, "replicas"), "{:?}", d.notes);
+    let all = draft(
+        "services:\n  t:\n    image: x\n    deploy: { resources: { reservations: { devices: [{ capabilities: [gpu] }] } } }\n",
+        "ml",
+        "compose.yml",
+    )?;
+    assert!(all.yaml.contains("hardware: { gpus: all }"), "{}", all.yaml);
+    assert!(all.notes.iter().all(|n| !n.at.contains("deploy")), "{:?}", all.notes);
+    Ok(())
+}

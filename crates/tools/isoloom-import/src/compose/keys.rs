@@ -33,7 +33,7 @@ impl Import<'_> {
             }
             "cpus" => m.cpus = cpus(v),
             "mem_limit" => m.memory_mb = str_of(v).and_then(|s| memory_mb(&s)),
-            "deploy" => self.deploy(kat, v, m),
+            "deploy" => self.deploy(&kat, v, m),
             "command" | "entrypoint" => self
                 .notes
                 .add(kat, NoteKind::InImage, format!("set it in the image (CMD / ENTRYPOINT): {}", flat(v))),
@@ -179,25 +179,72 @@ impl Import<'_> {
         }
     }
 
-    /// Resource limits carry over; the rest of `deploy` is noted.
-    fn deploy(&mut self, kat: String, v: &Value, m: &mut Machine) {
-        let limits = v.get("resources").and_then(|r| r.get("limits"));
+    /// Resource limits (CPUs, memory) and a GPU reservation carry over; every other key under
+    /// `deploy` is noted, each where it is.
+    fn deploy(&mut self, kat: &str, v: &Value, m: &mut Machine) {
+        let resources = v.get("resources");
+        let limits = resources.and_then(|r| r.get("limits"));
         if let Some(c) = limits.and_then(|l| l.get("cpus")).and_then(cpus) {
             m.cpus = Some(c);
         }
         if let Some(mb) = limits.and_then(|l| l.get("memory")).and_then(str_of).and_then(|s| memory_mb(&s)) {
             m.memory_mb = Some(mb);
         }
+        let resources_at = format!("{kat}.resources");
+        let limits_at = format!("{resources_at}.limits");
+        self.unread(
+            &limits_at,
+            limits,
+            &["cpus", "memory"],
+            "a machine's limits are its CPUs and memory (`resources`); not",
+        );
+        if let Some(reservations) = resources.and_then(|r| r.get("reservations")) {
+            self.reservations(&format!("{resources_at}.reservations"), reservations, m);
+        }
+        self.unread(
+            &resources_at,
+            resources,
+            &["limits", "reservations"],
+            "only limits and reservations are read; not",
+        );
+        self.unread(kat, Some(v), &["resources"], "only resource limits are kept; not");
+    }
+
+    /// A GPU reservation becomes the machine's `hardware.gpus`; the rest is noted (Isoloom gives a
+    /// machine its size, not a reservation).
+    fn reservations(&mut self, at: &str, v: &Value, m: &mut Machine) {
+        self.unread(at, Some(v), &["devices"], "a machine has a size (`resources`), not a reservation; not kept");
+        for (i, device) in v.get("devices").and_then(Value::as_sequence).into_iter().flatten().enumerate() {
+            let device_at = format!("{at}.devices[{i}]");
+            let gpu = device
+                .get("capabilities")
+                .and_then(Value::as_sequence)
+                .is_some_and(|c| c.iter().any(|c| c.as_str() == Some("gpu")));
+            if !gpu {
+                self.notes.add(device_at, NoteKind::Changed, LEFT_OUT);
+                continue;
+            }
+            m.gpus = Some(gpus(device));
+            self.unread(
+                &device_at,
+                Some(device),
+                &["capabilities", "count", "device_ids", "driver"],
+                "a GPU is its count, ids and driver (`hardware.gpus`); not",
+            );
+        }
+    }
+
+    /// A note at `at` naming each key of mapping `v` that isn't one of `read`, after `what`.
+    fn unread(&mut self, at: &str, v: Option<&Value>, read: &[&str], what: &str) {
         let other: Vec<&str> = v
-            .as_mapping()
+            .and_then(Value::as_mapping)
             .into_iter()
             .flatten()
             .filter_map(|(k, _)| k.as_str())
-            .filter(|k| *k != "resources")
+            .filter(|k| !read.contains(k))
             .collect();
         if !other.is_empty() {
-            self.notes
-                .add(kat, NoteKind::NotYet, format!("only resource limits are kept; not: {}", other.join(", ")));
+            self.notes.add(at.to_owned(), NoteKind::NotYet, format!("{what}: {}", other.join(", ")));
         }
     }
 
@@ -265,6 +312,29 @@ fn dockerfile(context: &str, b: &Mapping) -> Option<String> {
         }
     }
     Some(parts.join("/"))
+}
+
+/// A GPU device reservation as `hardware.gpus`: its ids (and driver) when it names them, else its
+/// count, `all` when it gives none (Compose's default).
+fn gpus(device: &Value) -> String {
+    let driver = device
+        .get("driver")
+        .and_then(str_of)
+        .map(|d| format!(", driver: {}", crate::draft::quoting::scalar(&d)));
+    if let Some(ids) = device.get("device_ids").and_then(Value::as_sequence) {
+        let ids: Vec<String> = ids.iter().filter_map(str_of).map(|i| crate::draft::quoting::scalar(&i)).collect();
+        return format!("{{ ids: [{}]{} }}", ids.join(", "), driver.unwrap_or_default());
+    }
+    // A count is a number or `all`; anything else reads as every GPU, as Compose's default.
+    let count = device
+        .get("count")
+        .and_then(str_of)
+        .filter(|c| c.parse::<u32>().is_ok())
+        .unwrap_or_else(|| "all".to_owned());
+    match driver {
+        Some(driver) => format!("{{ count: {count}{driver} }}"),
+        None => count,
+    }
 }
 
 #[cfg(test)]
