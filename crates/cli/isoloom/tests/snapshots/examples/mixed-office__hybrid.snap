@@ -1314,11 +1314,11 @@ volumes:
       "esxi": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
     },
     "not_possible": {
-      "docker": "machines.files01.os: Windows has no container form in 1.0",
-      "hosted": "machines.files01.os: Windows has no container form in 1.0",
-      "docker-vm": "machines.files01.os: Windows has no container form in 1.0",
-      "cloud-docker": "machines.files01.os: Windows has no container form in 1.0",
-      "kubernetes": "machines.files01.os: Windows has no container form in 1.0",
+      "docker": "machines.files01.os: Windows has no container form",
+      "hosted": "machines.files01.os: Windows has no container form",
+      "docker-vm": "machines.files01.os: Windows has no container form",
+      "cloud-docker": "machines.files01.os: Windows has no container form",
+      "kubernetes": "machines.files01.os: Windows has no container form",
       "external": "overrides.external.machines.files01: the external target reaches machines that exist already, and `files01` names no host",
       "cloud-services": "left out by `targets:`"
     },

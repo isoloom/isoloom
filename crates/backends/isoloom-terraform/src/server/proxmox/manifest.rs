@@ -31,7 +31,7 @@ use isoloom_spec::model::Target;
 use crate::Error;
 
 /// The Terraform image macOS runs the module from, pinned by the digest of its multi-arch index:
-/// a release new enough for every module Isoloom writes (the clouds' need 1.11).
+/// a release new enough for every module Isoloom writes ([`TERRAFORM_MIN`](crate::module::providers::TERRAFORM_MIN) or later).
 const TERRAFORM_IMAGE: &str = "hashicorp/terraform:1.16.7@sha256:c9c77f5b9820832cbc7b88d16df406ac6e75fee5a9077e5437db0c54e5ff33e3";
 
 /// The run manifest of `env` on Proxmox; its message is left to the caller.

@@ -18,7 +18,7 @@ pub struct Configuration {
     pub install: Vec<Step>,
     /// Configure: an entry's `configure`, run in every form.
     pub configure: Vec<Step>,
-    /// Start: an entry's per-start preparation (an app has none in 1.0).
+    /// Start: an entry's per-start preparation (an app has none).
     pub start: Vec<Step>,
     /// The text of each template its steps fill in, by the template's `from`: an entry's own
     /// (its placeholders filled in, the lab's left for the plan), or a project file read by the

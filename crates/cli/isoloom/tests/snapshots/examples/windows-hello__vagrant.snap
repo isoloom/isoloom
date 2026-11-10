@@ -137,11 +137,11 @@ crash.*.log
     ],
     "refused": {},
     "not_possible": {
-      "docker": "machines.web01.os: Windows has no container form in 1.0",
-      "hosted": "machines.web01.os: Windows has no container form in 1.0",
-      "docker-vm": "machines.web01.os: Windows has no container form in 1.0",
-      "cloud-docker": "machines.web01.os: Windows has no container form in 1.0",
-      "kubernetes": "machines.web01.os: Windows has no container form in 1.0",
+      "docker": "machines.web01.os: Windows has no container form",
+      "hosted": "machines.web01.os: Windows has no container form",
+      "docker-vm": "machines.web01.os: Windows has no container form",
+      "cloud-docker": "machines.web01.os: Windows has no container form",
+      "kubernetes": "machines.web01.os: Windows has no container form",
       "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.web01: the external target reaches machines that exist already, and `web01` names no host",
       "cloud-services": "left out by `targets:`"

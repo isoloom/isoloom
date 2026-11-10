@@ -75,7 +75,7 @@ pub fn container(m: &Machine) -> Result<Form<'_>, NoForm> {
     {
         return Err(NoForm::new(
             "os",
-            "Windows has no container form in 1.0",
+            "Windows has no container form",
             "run it on a VM target (`vagrant`, `proxmox`, `cloud-vm`)",
         ));
     }

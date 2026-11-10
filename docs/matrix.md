@@ -332,7 +332,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.hardware.tpm = required`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, libvirt and Hyper-V do)
 - `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, libvirt and Hyper-V do)
 - `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)
@@ -796,7 +796,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows@10`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-10` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-10` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -807,7 +807,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows@11`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -818,7 +818,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows-server@2008r2`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2008r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2008r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -829,7 +829,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows-server@2012r2`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2012r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2012r2` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -840,7 +840,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows-server@2016`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
@@ -849,7 +849,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows-server@2019`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
@@ -858,7 +858,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows-server@2022`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
@@ -867,7 +867,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = windows-server@2025`
 
-- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form in 1.0
+- `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far

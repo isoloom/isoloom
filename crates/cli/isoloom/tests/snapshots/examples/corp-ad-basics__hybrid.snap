@@ -2072,11 +2072,11 @@ volumes:
       "cloud-vm": "no cloud can run it (aws: machine `ws-01`: no AWS image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali); azure: machine `ws-01`: no Azure image for `windows-11` yet (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025); gcp: machine `dc01`: Windows on GCP comes later; digitalocean: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode: machine `web01` is on several networks: a Linode instance has one VPC interface; oci: Oracle Cloud cloud-vm is Linux only so far)"
     },
     "not_possible": {
-      "docker": "machines.dc01.os: Windows has no container form in 1.0",
-      "hosted": "machines.dc01.os: Windows has no container form in 1.0",
-      "docker-vm": "machines.dc01.os: Windows has no container form in 1.0",
-      "cloud-docker": "machines.dc01.os: Windows has no container form in 1.0",
-      "kubernetes": "machines.dc01.os: Windows has no container form in 1.0",
+      "docker": "machines.dc01.os: Windows has no container form",
+      "hosted": "machines.dc01.os: Windows has no container form",
+      "docker-vm": "machines.dc01.os: Windows has no container form",
+      "cloud-docker": "machines.dc01.os: Windows has no container form",
+      "kubernetes": "machines.dc01.os: Windows has no container form",
       "external": "overrides.external.machines.dc01: the external target reaches machines that exist already, and `dc01` names no host",
       "cloud-services": "left out by `targets:`"
     },

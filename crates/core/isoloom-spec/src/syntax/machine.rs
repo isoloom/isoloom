@@ -115,7 +115,7 @@ pub(crate) struct MachineInput {
     /// The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone
     /// for its pinned default. Required, except for a machine whose only recipe is `app.image`,
     /// `app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has
-    /// no container form in 1.0.
+    /// no container form.
     #[serde(default)]
     os: Option<OsRef>,
     /// A catalogue service, `name[@version]` (`postgres@16`), or a list of them. Not with `app`.

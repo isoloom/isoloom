@@ -2,7 +2,7 @@
 source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
-✗ docker-vm (machines.iis.os: Windows has no container form in 1.0)
+✗ docker-vm (machines.iis.os: Windows has no container form)
 
 # isoloom generate --target docker-vm (exit 1)
-· docker-vm: machines.iis.os: Windows has no container form in 1.0
+· docker-vm: machines.iis.os: Windows has no container form

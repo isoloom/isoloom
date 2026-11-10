@@ -27,7 +27,7 @@ pub struct Recipe {
     pub install: Vec<Resource>,
     /// Configure: a catalogue entry's `configure`, run in every form.
     pub configure: Vec<Resource>,
-    /// Start: a catalogue entry's per-start preparation (an app has none in 1.0).
+    /// Start: a catalogue entry's per-start preparation (an app has none).
     pub start: Vec<Resource>,
     /// The foreground forms of its enabled services, in recipe order: the container's daemons.
     pub daemons: Vec<Daemon>,
@@ -191,7 +191,7 @@ fn unportable(i: usize, step: &Step, family: Family) -> Option<Unportable> {
         Step::Service(Service::Defined { user: Some(_), .. }) => Some(Unportable {
             step: i,
             field: Some("user"),
-            reason: "a Windows service Isoloom defines runs as SYSTEM in 1.0".into(),
+            reason: "a Windows service Isoloom defines runs as SYSTEM".into(),
             fix: "leave `user` out on Windows".into(),
         }),
         _ => None,

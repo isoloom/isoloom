@@ -86,10 +86,10 @@ fn a_build_or_a_step_of_the_wrong_shape_says_what_is_expected() {
 #[test]
 fn a_step_without_a_container_form_says_why() {
     let refusal = |yaml: &str| app(yaml).unwrap().steps[0].container_refusal();
-    assert_eq!(refusal("{ steps: [{ playbook: p.yml }] }"), Some("a playbook step runs in a VM only in 1.0"));
+    assert_eq!(refusal("{ steps: [{ playbook: p.yml }] }"), Some("a playbook step runs in a VM only"));
     assert_eq!(
         refusal("{ steps: [{ run: iis.PS1 }] }"),
-        Some("a PowerShell script means Windows, which has no container form in 1.0")
+        Some("a PowerShell script means Windows, which has no container form")
     );
     assert_eq!(refusal("{ steps: [{ run: web.sh }] }"), None);
     assert_eq!(refusal("{ steps: [{ copy: { from: a, to: /a } }] }"), None);

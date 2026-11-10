@@ -60,7 +60,7 @@ pub enum Step {
     Packages(Vec<Package>),
     /// The machine restarts, and the next step runs once it is back (no container form).
     Reboot,
-    /// An Ansible playbook of the project, run in the machine (no container form in 1.0).
+    /// An Ansible playbook of the project, run in the machine (no container form).
     Playbook(ProjectPath),
     /// A vendor's package repository, its key pinned.
     Repository(Repository),
@@ -106,8 +106,8 @@ impl Step {
     pub fn container_refusal(&self) -> Option<&'static str> {
         match self {
             Step::Reboot => Some("a reboot needs a machine with its own kernel and boot: a container has neither"),
-            Step::Playbook(_) => Some("a playbook step runs in a VM only in 1.0"),
-            Step::Run { script, .. } if has_extension(script.as_str(), "ps1") => Some("a PowerShell script means Windows, which has no container form in 1.0"),
+            Step::Playbook(_) => Some("a playbook step runs in a VM only"),
+            Step::Run { script, .. } if has_extension(script.as_str(), "ps1") => Some("a PowerShell script means Windows, which has no container form"),
             _ => None,
         }
     }

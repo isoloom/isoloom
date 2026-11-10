@@ -1,7 +1,7 @@
 //! Each Linux OS's official container image, pinned by digest: the container form of a machine
 //! that is its OS alone (kept running idle), and the base of the Dockerfile Isoloom generates
 //! from a machine's portable steps. A digest is the image's multi-architecture index, so `amd64`
-//! and `arm64` machines pull the same reference. Windows has none in 1.0.
+//! and `arm64` machines pull the same reference. Windows has none.
 //!
 //! Refreshed by hand: `docker buildx imagetools inspect <image> --format '{{json .Manifest.Digest}}'`.
 

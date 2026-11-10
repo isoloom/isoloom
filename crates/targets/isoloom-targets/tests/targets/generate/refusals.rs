@@ -83,7 +83,7 @@ fn unsupported_features_are_refused_with_the_reason() -> Outcome {
     assert!(matches!(
         generate(&ad, Target::Docker),
         Err(Error::Generate(GenerateError::Unsupported { target: Target::Docker, ref what }))
-            if what == "machines.dc01.os: Windows has no container form in 1.0"
+            if what == "machines.dc01.os: Windows has no container form"
     ));
     // The domain's playbooks run from the controller: the VM targets generate it.
     assert!(generate(&ad, Target::Vagrant).is_ok() && generate(&ad, Target::Proxmox).is_ok());

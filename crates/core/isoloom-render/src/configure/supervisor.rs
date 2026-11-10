@@ -139,7 +139,7 @@ fn started(c: &Configured<'_>, entrypoint: &[String]) -> String {
 
 /// The recipe's `start` steps, run at each start before the services, from the project folder:
 /// scripts behind their `creates`, the other steps through the shell library (an entry's; an app
-/// has none in 1.0).
+/// has none).
 fn start(c: &Configured<'_>) -> String {
     let steps = &c.recipe().start;
     if steps.is_empty() {

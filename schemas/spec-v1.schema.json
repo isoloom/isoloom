@@ -489,7 +489,7 @@
       "properties": {
         "os": {
           "$ref": "#/$defs/Os",
-          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form in 1.0."
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form."
         },
         "service": {
           "$ref": "#/$defs/ServicesInput",
@@ -2767,7 +2767,7 @@
       "properties": {
         "os": {
           "$ref": "#/$defs/Os",
-          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form in 1.0."
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form."
         },
         "service": {
           "$ref": "#/$defs/ServicesInput",
@@ -2908,7 +2908,7 @@
       "properties": {
         "os": {
           "$ref": "#/$defs/Os",
-          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form in 1.0."
+          "description": "The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone\nfor its pinned default. Required, except for a machine whose only recipe is `app.image`,\n`app.build` or `app.appliance`, and an `access` machine the runner supplies. Windows has\nno container form."
         },
         "service": {
           "$ref": "#/$defs/ServicesInput",
