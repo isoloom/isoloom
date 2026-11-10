@@ -2,7 +2,8 @@
 //!
 //! It is the ratchet of the engineering standard: every count of a clean-code rule, per crate,
 //! against a baseline file ([`QualityConfig::baseline`]). A count that goes up fails; one that goes
-//! down is written down with `--update`, which never raises one.
+//! down is written down with `--update`, which never raises one. A missing baseline fails too:
+//! only `--init` writes the first one, so deleting it never lets every count through.
 //!
 //! What is counted, per crate:
 //! - every warning `cargo clippy --workspace --all-targets` gives (`clippy/<lint>`,
@@ -56,6 +57,9 @@ pub struct Args {
     /// Print every count, rule by rule and crate by crate.
     #[arg(long)]
     table: bool,
+    /// Write the first baseline, when there is none.
+    #[arg(long, conflicts_with = "update")]
+    init: bool,
 }
 
 /// What a repository's `xtask` tells the ratchet about itself: what differs between
@@ -108,26 +112,49 @@ pub(crate) fn path_in(root: &Path, dir: &str) -> PathBuf {
 /// # Errors
 ///
 /// Fails when a tool it drives (clippy, jscpd through npx, cargo-machete, cargo-metadata) can't
-/// run, or the baseline file can't be read or written.
+/// run, a source folder can't be read, or the baseline file can't be read or written.
 pub fn run(a: &Args, root: &Path, config: &QualityConfig) -> Res<Outcome> {
+    let counts = measure(root, config)?;
+    against_baseline(a, &path_in(root, config.baseline), &counts, config)
+}
+
+/// Every count of the `root` workspace.
+fn measure(root: &Path, config: &QualityConfig) -> Res<Counts> {
     let crates = sources::crates(root)?;
     let mut counts = Counts::new();
     clippy::measure(root, &crates, &mut counts)?;
     sources::measure(root, &crates, &mut counts)?;
     dup::measure(root, &crates, &mut counts, config.jscpd_slug)?;
     machete::measure(root, &crates, &mut counts)?;
-    let file = path_in(root, config.baseline);
+    Ok(counts)
+}
+
+/// `counts` against the baseline `file`: written there with `--init` when there is none, else a
+/// failure; compared with it, and rewritten with `--update` when no count went up.
+fn against_baseline(a: &Args, file: &Path, counts: &Counts, config: &QualityConfig) -> Res<Outcome> {
     let mut out = String::new();
-    let Some(before) = baseline::read(&file)? else {
-        // The first measure is the baseline.
-        out.push_str(&baseline::table(&counts));
-        baseline::write(&file, &counts)?;
-        writeln!(out, "quality: no baseline yet; {} written", file.display())?;
+    let Some(before) = baseline::read(file)? else {
+        if !a.init {
+            writeln!(
+                out,
+                "quality: no baseline at {}; `{} --init` writes the first one",
+                file.display(),
+                config.update_hint
+            )?;
+            return Ok(Outcome { output: out, success: false });
+        }
+        out.push_str(&baseline::table(counts));
+        baseline::write(file, counts)?;
+        writeln!(out, "quality: {} written", file.display())?;
         return Ok(Outcome { output: out, success: true });
     };
-    let changes = baseline::compare(&before, &counts);
+    if a.init {
+        writeln!(out, "quality: {} is there already; `--update` lowers its counts", file.display())?;
+        return Ok(Outcome { output: out, success: false });
+    }
+    let changes = baseline::compare(&before, counts);
     if a.table || a.update {
-        out.push_str(&baseline::table(&counts));
+        out.push_str(&baseline::table(counts));
     }
     for line in &changes.lines {
         writeln!(out, "{line}")?;
@@ -137,7 +164,7 @@ pub fn run(a: &Args, root: &Path, config: &QualityConfig) -> Res<Outcome> {
         return Ok(Outcome { output: out, success: false });
     }
     if a.update {
-        baseline::write(&file, &counts)?;
+        baseline::write(file, counts)?;
         writeln!(out, "quality: {} written", file.display())?;
     } else if !changes.lowered.is_empty() {
         writeln!(
@@ -148,4 +175,49 @@ pub fn run(a: &Args, root: &Path, config: &QualityConfig) -> Res<Outcome> {
         )?;
     }
     Ok(Outcome { output: out, success: true })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CONFIG: QualityConfig = QualityConfig {
+        jscpd_slug: "test",
+        update_hint: "cargo xtask quality",
+        baseline: "baseline.json",
+    };
+
+    fn args(init: bool, update: bool) -> Args {
+        Args { update, table: false, init }
+    }
+
+    /// A fresh folder for one test.
+    fn folder(name: &str) -> Res<PathBuf> {
+        let dir = std::env::temp_dir().join(format!("xtask-quality-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir)
+    }
+
+    #[test]
+    fn a_missing_baseline_fails_unless_init_writes_it() -> Res<()> {
+        let dir = folder("missing")?;
+        let file = dir.join("baseline.json");
+        let mut counts = Counts::new();
+        add(&mut counts, "clippy/x", "a");
+        let refused = against_baseline(&args(false, false), &file, &counts, &CONFIG)?;
+        assert!(
+            !refused.success && refused.output.contains("--init` writes the first one"),
+            "{}",
+            refused.output
+        );
+        assert!(!file.exists(), "nothing is written without --init");
+        let first = against_baseline(&args(true, false), &file, &counts, &CONFIG)?;
+        assert!(first.success && file.exists(), "{}", first.output);
+        // Once there, --init doesn't rewrite it; the counts are checked against it.
+        add(&mut counts, "clippy/x", "a");
+        assert!(!against_baseline(&args(true, false), &file, &counts, &CONFIG)?.success);
+        assert!(!against_baseline(&args(false, false), &file, &counts, &CONFIG)?.success, "a count went up");
+        std::fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
 }

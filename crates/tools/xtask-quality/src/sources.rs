@@ -35,13 +35,13 @@ pub(crate) fn crates(root: &Path) -> Res<Vec<Crate>> {
 pub(crate) fn measure(root: &Path, crates: &[Crate], counts: &mut Counts) -> Res<()> {
     for c in crates {
         let dir = path_in(root, &c.dir);
-        for file in rust_files(&dir.join("src")) {
+        for file in rust_files(&dir.join("src"))? {
             let text = std::fs::read_to_string(&file)?;
             if file.file_name().is_some_and(|n| n != "tests.rs") && code_lines(&text) > MAX_CODE_LINES {
                 add(counts, "file/over-400-loc", &c.name);
             }
         }
-        for file in rust_files(&dir) {
+        for file in rust_files(&dir)? {
             let text = std::fs::read_to_string(&file)?;
             for _ in 0..expectations(&text) {
                 add(counts, "exception/expect", &c.name);
@@ -51,20 +51,21 @@ pub(crate) fn measure(root: &Path, crates: &[Crate], counts: &mut Counts) -> Res
     Ok(())
 }
 
-/// Every `.rs` file under `dir`, recursively, build folders aside.
-fn rust_files(dir: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+/// Every `.rs` file under `dir`, recursively, build folders aside; a folder that can't be read
+/// is the error, never counted as empty.
+fn rust_files(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     let mut out = Vec::new();
-    for path in entries.flatten().map(|e| e.path()) {
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
         if path.is_dir() {
             if path.file_name().is_some_and(|n| n != "target") {
-                out.extend(rust_files(&path));
+                out.extend(rust_files(&path)?);
             }
         } else if path.extension().is_some_and(|x| x == "rs") {
             out.push(path);
         }
     }
-    out
+    Ok(out)
 }
 
 /// The lines of `src` that count: not blank, not a comment, not inside the inline test module.
@@ -109,5 +110,11 @@ mod tests {
     #[test]
     fn an_expectation_counts_once() {
         assert_eq!(expectations("#[expect(clippy::x, reason = \"y\")]\nfn a() {}\n    #![expect(dead_code)]\n"), 2);
+    }
+
+    #[test]
+    fn a_folder_that_cant_be_read_is_an_error_not_an_empty_crate() {
+        let missing = std::env::temp_dir().join(format!("xtask-quality-none-{}", std::process::id()));
+        assert!(rust_files(&missing).is_err());
     }
 }

@@ -78,7 +78,8 @@ enum Task {
     GenerateAll(generate_all::Args),
     /// The ratchet: every clean-code count per crate against
     /// xtask/baselines/quality-baseline.json; fails when
-    /// one goes up (`--update` writes them when they only went down).
+    /// one goes up, or when the baseline is missing (`--update` writes them when they only went
+    /// down, `--init` the first baseline).
     Quality(quality::Args),
     /// The workspace's tests under cargo-nextest (`.config/nextest.toml`), then the doctests.
     Test(test::Args),

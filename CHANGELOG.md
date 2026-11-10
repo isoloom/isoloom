@@ -454,6 +454,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   now (`running: certificate authorities`, as the controller's does).
 - **`seal: best-effort` on a machine with `count:` warns once, at its line.** Each copy had a
   warning of its own, at a path the spec doesn't have.
+- **The quality ratchet fails without its baseline.** With the baseline deleted, `cargo xtask
+  quality` wrote a new one from today's counts and passed, so any count could go up; a source
+  folder it couldn't read counted as empty. A missing baseline now fails (`--init` writes the
+  first one), and a folder that can't be read is the error.
 - **A template filled in for two places generates.** Two `template:` steps of one machine
   reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
   file is written once per source.
