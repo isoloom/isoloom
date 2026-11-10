@@ -2,8 +2,7 @@
 //! resources refer to it by.
 
 use indexmap::IndexMap;
-use isoloom_spec::net::Cidr;
-use isoloom_spec::net::PRIVATE;
+use isoloom_spec::net::{Cidr, NetworkBlock, PRIVATE};
 
 use super::instance::Instance;
 use crate::draft::{NoteKind, Notes};
@@ -34,8 +33,10 @@ pub(super) fn reads(i: &Instance) -> bool {
     matches!(declared(i), Declared::Subnet(_))
 }
 
-/// Networks: subnets with a private block, by address (`aws_subnet.lab`), with their name.
-pub(super) fn networks(all: &[Instance], notes: &mut Notes) -> IndexMap<String, (Cidr, String)> {
+/// Networks: subnets with a private block, by address (`aws_subnet.lab`), with their name. A
+/// network is a /24 to /29 ([`NetworkBlock`], as Compose's import reads one): a bigger subnet
+/// keeps its first /24 and a smaller one the /29 holding it, each with a note.
+pub(super) fn networks(all: &[Instance], notes: &mut Notes) -> IndexMap<String, (NetworkBlock, String)> {
     let mut nets = IndexMap::new();
     for i in all {
         let Declared::Subnet(block) = declared(i) else {
@@ -44,12 +45,15 @@ pub(super) fn networks(all: &[Instance], notes: &mut Notes) -> IndexMap<String, 
         let at = format!("resource {}", i.address());
         match block.as_deref().and_then(Cidr::parse) {
             Some(c) if PRIVATE.iter().any(|r| r.contains(c)) => {
-                // Isoloom networks are /24 to /29: a bigger subnet keeps its first /24.
-                let kept = if c.prefix() < 24 { Cidr::enclosing(c.address(), 24) } else { c };
+                let kept = NetworkBlock::enclosing(c.address(), c.prefix());
                 nets.insert(i.address(), (kept, label(&i.name_or(None))));
-                if c.prefix() < 24 {
-                    let text = format!("{} is bigger than a /24: kept as {kept}", block.unwrap_or_default());
-                    notes.add(at, NoteKind::Changed, text);
+                if kept.cidr() != c {
+                    let size = if c.prefix() < kept.prefix() {
+                        "bigger than a /24"
+                    } else {
+                        "smaller than a /29"
+                    };
+                    notes.add(at, NoteKind::Changed, format!("{} is {size}: kept as {kept}", block.unwrap_or_default()));
                 }
             }
             _ => notes.add(

@@ -50,3 +50,33 @@ fn not_terraform_is_an_error() {
         "no VM: nothing to draft"
     );
 }
+
+/// A subnet of another size than a network's is read as the network that holds it, with a note:
+/// a /30's /29, a /16's first /24. A /30 was once kept as it is, a network the draft's validation
+/// refused.
+#[test]
+fn a_subnet_of_another_size_is_read_as_the_network_holding_it() -> Outcome {
+    let tf = |cidr: &str| {
+        vec![(
+            "main.tf".to_owned(),
+            format!(
+                "resource \"aws_subnet\" \"lab\" {{\n  cidr_block = \"{cidr}\"\n}}\nresource \"aws_instance\" \"web\" {{\n  ami           = \"ami-1\"\n  instance_type = \"t3.micro\"\n  subnet_id     = aws_subnet.lab.id\n  private_ip    = \"10.40.0.2\"\n}}\n"
+            ),
+        )]
+    };
+    for (cidr, kept, why) in [
+        ("10.40.0.0/30", "10.40.0.0/29", "smaller than a /29"),
+        ("10.40.0.0/16", "10.40.0.0/24", "bigger than a /24"),
+    ] {
+        let d = draft(&tf(cidr), "subnets", "main.tf")?;
+        let spec = spec(&d)?;
+        let block: Vec<&str> = spec.networks.values().map(|n| n.cidr.as_str()).collect();
+        assert_eq!(block, [kept], "{}", d.yaml);
+        assert!(
+            has(&d, NoteKind::Changed, "resource aws_subnet.lab", &format!("{cidr} is {why}: kept as {kept}")),
+            "{:?}",
+            d.notes
+        );
+    }
+    Ok(())
+}

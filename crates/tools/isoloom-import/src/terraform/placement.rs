@@ -3,35 +3,35 @@
 use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
-use isoloom_spec::net::Cidr;
+use isoloom_spec::net::{Cidr, NetworkBlock};
 
 use super::vms::Machine;
 use crate::draft::writer::{Header, Writer};
 use crate::naming::{network_names, unique};
 
 /// The network the draft adds for machines without an address when nothing else is used.
-const FALLBACK_NETWORK: Cidr = Cidr::enclosing(Ipv4Addr::new(10, 88, 1, 0), 24);
+const FALLBACK_NETWORK: NetworkBlock = NetworkBlock::enclosing(Ipv4Addr::new(10, 88, 1, 0), 24);
 
 /// Where the machines sit: the networks used, by block, with the subnet's name (empty when
 /// none), and each machine's networks with its address's last octet.
 #[derive(Debug)]
 pub(super) struct Placement {
-    used: IndexMap<String, (Cidr, String)>,
+    used: IndexMap<String, (NetworkBlock, String)>,
     placed: Vec<Vec<(String, u8)>>,
 }
 
 impl Placement {
     /// Each machine joins the networks its addresses fall in; addresses outside every subnet
     /// make a /24 network of their own.
-    pub(super) fn new(machines: &[Machine], nets: &IndexMap<String, (Cidr, String)>) -> Self {
-        let mut used: IndexMap<String, (Cidr, String)> = IndexMap::new();
+    pub(super) fn new(machines: &[Machine], nets: &IndexMap<String, (NetworkBlock, String)>) -> Self {
+        let mut used: IndexMap<String, (NetworkBlock, String)> = IndexMap::new();
         let mut placed: Vec<Vec<(String, u8)>> = Vec::new();
         for m in machines {
             let mut joins = Vec::new();
             for ip in &m.addresses {
                 let (cidr, named) = nets
                     .values()
-                    .find(|(c, _)| c.contains(host(*ip)))
+                    .find(|(c, _)| c.cidr().contains(host(*ip)))
                     .cloned()
                     .unwrap_or_else(|| (own_block(*ip), String::new()));
                 let key = cidr.to_string();
@@ -83,7 +83,7 @@ impl Placement {
             name,
         });
         for (key, (cidr, _)) in &self.used {
-            y.network(names.get(key).map_or(crate::naming::DRAFT_NETWORK, String::as_str), 0, *cidr, true);
+            y.network(names.get(key).map_or(crate::naming::DRAFT_NETWORK, String::as_str), 0, cidr.cidr(), true);
         }
         y.machines();
         let mut taken: Vec<String> = Vec::new();
@@ -107,8 +107,8 @@ fn host(ip: Ipv4Addr) -> Cidr {
 }
 
 /// The /24 an address outside every subnet makes its own network of.
-fn own_block(ip: Ipv4Addr) -> Cidr {
-    Cidr::enclosing(ip, 24)
+fn own_block(ip: Ipv4Addr) -> NetworkBlock {
+    NetworkBlock::enclosing(ip, 24)
 }
 
 #[cfg(test)]
