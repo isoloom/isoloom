@@ -796,6 +796,18 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   the name into its own messages, and `vagrant reload` failed on the `·` (`incompatible character
   encodings: UTF-8 and ASCII-8BIT`, seen on UTM) after a first `up` had passed.
 
+- **On ESXi, Vagrant takes the boxes' x86-64 builds, from an Apple Silicon Mac too.** Vagrant
+  picks a box's build for the computer it runs on, but `vmware_esxi`'s VMs run on the ESXi host:
+  from an arm64 Mac it downloaded `bento/debian-12`'s arm64 build and uploaded it to an x86-64
+  ESXi, where `ovftool` failed. The run manifest gives every step on `vmware_esxi` Vagrant's own
+  `VAGRANT_HOST_ARCHITECTURE=amd64` (a `runner` param), so Vagrant takes each box's amd64 build,
+  or the one build of a box that names no architecture (`StefanScherer/windows_2019`), as on an
+  x86-64 computer. Setting `box_architecture` in the provider's block wouldn't do: Vagrant looks
+  a machine's box up before it applies a provider's overrides, and an explicit `amd64` refuses a
+  box that names no architecture. Running Vagrant yourself, set it too
+  ([Vagrant](docs/guide/targets/vagrant.md#a-remote-esxi-host)). An `arm64` machine
+  (`hardware.arch`) is refused on `vmware_esxi`, as the `esxi` target refuses it.
+
 ### Removed
 
 - **Library: one home for each rule.** `isoloom_spec::os::{Family, FAMILIES}` are
