@@ -31,6 +31,27 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+
+- **Breaking: `isoloom generate` stops on a template or a copied check script it can't read**, with
+  the read error, instead of writing files that failed later and said to run `isoloom generate`.
+  `isoloom validate` still lists a missing one as a problem.
+- **Breaking: every VM target refuses a Windows machine whose name is over 15 characters**, the
+  clouds included: `cloud-vm` cut it to its first 15 characters, so `windows-server-01` and
+  `windows-server-02` both became `windows-server-`.
+- **Breaking (library): the contract's names are `isoloom_manifest::contract`'s.** The output
+  folder, the reserved prefix, the controller, the cloud tags, the variables a Vagrantfile reads,
+  the secrets folder and its mark are defined there once; `isoloom_render::OUTPUT_DIR`,
+  `isoloom_targets::OUTPUT_DIR`, `isoloom_render::controller::NAME`,
+  `isoloom_render::secrets::DELIVERED` and `isoloom_spec::validate::RESERVED_PREFIX` are removed.
+- **Breaking (library): the address blocks are `isoloom_spec::net`'s** (`Cidr`, `Cidr6`,
+  `PRIVATE`, `IPV6_PREFIX`, `docker_cidrs`), no longer under `validate`, and `Cidr` and `Cidr6`
+  keep their fields private: build one with `Cidr::new`, `parse`, `enclosing` or `ALL` (read it
+  with `base`, `address`, `prefix`, split it with `halves`), a `Cidr6` with `Cidr6::new`.
+- **Breaking (library): `ComposeBackend` is `ComposeBackend::DOCKER` or `HOSTED`**, its target
+  private; `isoloom_compose::guest` takes how the VM's way in gets root (`AsRoot`), and
+  `isoloom_terraform::cloud_docker_manifests` a guest per `AsRoot`.
+- **Breaking: the `external` target writes no `machines.json`**: no runner read it.
+
 - **Breaking: Isoloom's own router and controller take Isoloom's names on Proxmox, ESXi and the
   clouds.** A lab machine named `router` or `controller` wrote a second
   `proxmox_virtual_environment_file` of the same name (invalid Terraform), and on ESXi and the
@@ -151,6 +172,15 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   state holds, drops an instance whose text the destroy printed (`terraform state rm`), and
   destroys again. An optional field of manifest version 1 (`isoloom_manifest::GoneError`,
   `GoneText`).
+- **Library: `isoloom_plan::Vm` and `Environment::vms`/`vm`**: a VM with its OS as a `str`;
+  `Environment::inputs`; `isoloom_render::steps::AsRoot`, `project_unpack` and `Archive`;
+  `isoloom_render::windows`; `isoloom_manifest::PathTemplate::project_archive`;
+  `Capabilities::without`.
+- **`isoloom import compose` maps a GPU reservation** (`deploy.resources.reservations.devices`
+  with the `gpu` capability) to `hardware.gpus`, and notes every key under `resources` it doesn't
+  read (`limits.pids`, the other reservations and devices) where it is.
+- **CI runs the Terraform module tests (`cargo xtask tf-test`) and the fuzz targets' check
+  (`cargo xtask fuzz --check`).**
 - **`esxi` writes a run manifest** (`.isoloom/esxi/run.json`), Proxmox's own: Terraform makes
   the environment and sets its machines up (the runner gives it its slot and key, and the host's
   password as `TF_VAR_esxi_password`), the runner waits for every machine's ready file, seals the
@@ -258,6 +288,15 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   delete finds the VM on whichever node of the cluster it is on before it reads its status, so
   Proxmox's answer that its configuration file doesn't exist means the VM is gone, which the run
   manifest's `identity.terraform.gone` relies on. 0.116.0 and 0.116.1 list no breaking change.
+- **Refusals state the target's fact, never a roadmap**: no "comes later", "so far", "for now" or
+  "yet" (arm64 and Windows on the clouds, the servers' gateways, Vagrant's bridges, the plan's own
+  texts). The GPU, nested-virtualization, TPM and gateway refusals of the plan name no target and
+  point at `isoloom matrix`: they talked about Vagrant on ESXi, and said Oracle Cloud gives GPUs,
+  `vagrant/utm` nests and AWS gives a Windows VM a TPM.
+- **A re-delivered project replaces the old copy on every VM**: a file deleted from the project
+  stayed on a `cloud-vm` machine (and on the Proxmox and ESXi machines Terraform sets up).
+- **An import draft names an unnamed network `net`**, not `lab`; Vagrant's Windows VMs log their
+  "environment network".
 - **The cloud refusals state each cloud's fact.** DigitalOcean and Linode refuse arm64 because
   they have no arm64 droplets or plans, not as something that comes later; `cloud-docker`'s arm64
   refusal says every cloud's Docker host is x86-64 instead of naming AWS's Graviton; the
@@ -438,6 +477,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   IPSet 'iso1n0'`. The `proxmox` and Proxmox `docker-vm` run manifests now name those errors
   (`identity.terraform.gone`, above), and a runner that reads them drops such a resource from the
   state and destroys again. The other resources' deletes already count one that is gone done.
+- **`cloud-docker` on Linode runs its steps without `sudo`**: its host signs in as root and its
+  Debian has none, so every SSH step and Compose command failed with `sudo: not found`.
+- **`isoloom profiles` checks the environment `generate --profile` writes**, the defaults' tags
+  included: a tag clash it passed stopped `generate`.
 - **On Hyper-V, a VM's published port answers on the host port the run reports.** Hyper-V
   ignores `forwarded_port`, so the Vagrantfile relays each published TCP port itself (Windows'
   port proxy), but the relay listened on the spec's `publish` number while the forward, and the
