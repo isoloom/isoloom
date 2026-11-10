@@ -84,7 +84,7 @@ fn refusals(name: &str) -> Outcome<Vec<(Cloud, Option<String>)>> {
 fn refusals_keep_their_messages() -> Outcome {
     let s = |x: &str| Some(x.to_owned());
     let one_vm = s(
-        "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
+        "DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
     );
     for name in ["hello-stack", "segmented"] {
         assert_eq!(

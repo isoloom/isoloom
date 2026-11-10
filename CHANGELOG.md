@@ -241,6 +241,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Changed
 
+- **The cloud refusals state each cloud's fact.** DigitalOcean and Linode refuse arm64 because
+  they have no arm64 droplets or plans, not as something that comes later; `cloud-docker`'s arm64
+  refusal says every cloud's Docker host is x86-64 instead of naming AWS's Graviton; the
+  one-network refusal says "an instance", not DigitalOcean's "droplet".
 - **CI builds the Isothrum runner only at a pinned ref**: `ISOTHRUM_REF` is a release tag or a
   commit SHA, never a branch (`.github/scripts/isothrum-ref.sh`); it no longer falls back to
   `main`. Unset, CI's Compose real runs are skipped (the jobs that need `isoloom` alone still

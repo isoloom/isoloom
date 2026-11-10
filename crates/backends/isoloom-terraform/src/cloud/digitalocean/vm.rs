@@ -23,7 +23,7 @@ const RULES: Rules = Rules {
     cloud: Cloud::DigitalOcean,
     networks: Networks::OneVm,
     limits: Limits {
-        arm64: Some("arm64 on DigitalOcean comes later (it has no arm64 droplets)"),
+        arm64: Some("DigitalOcean has no arm64 droplets"),
         gateways: Some("a DigitalOcean VPC has no route tables, so no traffic can be sent through a machine"),
         playbook_checks: Some(PLAYBOOK_CHECKS),
         tc: Some(FIREWALLS_TC),

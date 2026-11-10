@@ -554,7 +554,7 @@ impl Rules {
         let cloud = self.cloud;
         match self.networks {
             Networks::OneVm if env.networks.len() != 1 || vms(env).count() > 1 => Some(format!(
-                "{cloud} cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address {cloud} picks, so other machines couldn't reach it at its spec address"
+                "{cloud} cloud-vm takes one machine on one network: an instance joins one VPC, at a private address {cloud} picks, so other machines couldn't reach it at its spec address"
             )),
             Networks::OnePerMachine => vms(env)
                 .find(|(_, mp)| mp.addresses.len() > 1)

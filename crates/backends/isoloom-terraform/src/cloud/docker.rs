@@ -93,7 +93,7 @@ impl Driver {
 #[must_use]
 pub fn refusal(env: &Environment) -> Option<String> {
     crate::limits::arm64_machine(env.spec())
-        .map(|name| format!("machine `{name}`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"))
+        .map(|name| format!("machine `{name}`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)"))
         .or_else(|| super::none_takes(refusals(env)))
 }
 

@@ -45,7 +45,10 @@ fn arm64_is_refused_by_the_clouds() {
     );
     let e = Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None);
     let why = CloudDockerBackend.refusal(&e).unwrap();
-    assert_eq!(why, "machine `w`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)");
+    assert_eq!(
+        why,
+        "machine `w`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)"
+    );
     assert!(CloudDockerBackend.render(&e).unwrap_err().to_string().ends_with(&why));
 }
 

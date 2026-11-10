@@ -1,8 +1,8 @@
 ---
-source: crates/isoloom/tests/example_snapshots.rs
+source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
-✗ cloud-docker (machine `web`: arm64 on a cloud VM comes later (Graviton instances and arm64 images))
+✗ cloud-docker (machine `web`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images))
 
 # isoloom generate --target cloud-docker (exit 1)
-· cloud-docker: machine `web`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)
+· cloud-docker: machine `web`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)

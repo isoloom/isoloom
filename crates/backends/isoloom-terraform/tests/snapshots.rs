@@ -129,8 +129,8 @@ fn refusals_come_from_the_plan_and_match_rendering() -> Outcome {
     let why = "no cloud can run it (aws: machine `w`: arm64 on AWS comes later (Graviton instances and arm64 AMIs); \
          azure: machine `w`: arm64 on Azure comes later (Arm-based sizes and arm64 images); \
          gcp: machine `w`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images); \
-         digitalocean: machine `w`: arm64 on DigitalOcean comes later (it has no arm64 droplets); \
-         linode: machine `w`: arm64 on Linode comes later (it has no arm64 plans); \
+         digitalocean: machine `w`: DigitalOcean has no arm64 droplets; \
+         linode: machine `w`: Linode has no arm64 plans; \
          oci: machine `w`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images))";
     let e = planned(&spec(ARM64)?, CloudVmBackend.target());
     assert_eq!(CloudVmBackend.refusal(&e).as_deref(), Some(why));

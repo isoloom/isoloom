@@ -26,7 +26,7 @@ const RULES: Rules = Rules {
     cloud: Cloud::Linode,
     networks: Networks::OnePerMachine,
     limits: Limits {
-        arm64: Some("arm64 on Linode comes later (it has no arm64 plans)"),
+        arm64: Some("Linode has no arm64 plans"),
         gateways: Some("a Linode VPC has no route tables, so no traffic can be sent through a machine"),
         playbook_checks: Some(PLAYBOOK_CHECKS),
         tc: Some(FIREWALLS_TC),

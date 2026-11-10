@@ -257,7 +257,7 @@ crash.*.log
           "oci"
         ],
         "refused": {
-          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address"
+          "digitalocean": "DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address"
         }
       }
     }

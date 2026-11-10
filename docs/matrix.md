@@ -227,7 +227,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.depends_on`
 
 - `vagrant/utm`: provider: `w` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `machines.*.depends_on`
 
@@ -257,23 +257,23 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `machines.*.count`
 
 - `vagrant/utm`: provider: `m-01` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `machines.*.access`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `machines.*.networks`
 
 - `vagrant/qemu`: provider: `m` is on 2 networks, and QEMU gives a VM one
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 - `cloud-vm/linode`: cloud: machine `m` is on several networks: a Linode instance has one VPC interface
 
 ### `machines.*.networks.*`
@@ -309,14 +309,14 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.hardware.arch = arm64`
 
-- `cloud-docker`: target: machine `m`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)
+- `cloud-docker`: target: machine `m`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `esxi`: target: machine `m`: ESXi runs x86-64 VMs only
 - `cloud-vm/aws`: cloud: machine `m`: arm64 on AWS comes later (Graviton instances and arm64 AMIs)
 - `cloud-vm/azure`: cloud: machine `m`: arm64 on Azure comes later (Arm-based sizes and arm64 images)
 - `cloud-vm/gcp`: cloud: machine `m`: arm64 on Google Cloud comes later (Arm-based machine types and arm64 images)
-- `cloud-vm/digitalocean`: cloud: machine `m`: arm64 on DigitalOcean comes later (it has no arm64 droplets)
-- `cloud-vm/linode`: cloud: machine `m`: arm64 on Linode comes later (it has no arm64 plans)
+- `cloud-vm/digitalocean`: cloud: machine `m`: DigitalOcean has no arm64 droplets
+- `cloud-vm/linode`: cloud: machine `m`: Linode has no arm64 plans
 - `cloud-vm/oci`: cloud: machine `m`: arm64 on Oracle Cloud comes later (Ampere shapes and arm64 images)
 
 ### `machines.*.hardware.tpm = required`
@@ -442,7 +442,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `volumes`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `volumes`
 
@@ -504,7 +504,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `vagrant/qemu`: provider: `isoloom-router` is on 2 networks, and QEMU gives a VM one
 - `vagrant/utm`: provider: `isoloom-router` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `networks.*.gateway`
 
@@ -519,7 +519,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `networks.*.vlans`
 
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `networks.*.tc`
 
@@ -528,7 +528,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/utm`: provider: `isoloom-router` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `cloud-vm/aws`, `cloud-vm/azure`: cloud: link impairment (`tc`) needs a router in the path; the cloud's security groups have none
 - `cloud-vm/gcp`: cloud: link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 - `cloud-vm/linode`, `cloud-vm/oci`: cloud: link impairment (`tc`) needs a router in the path; the cloud's firewalls have none
 
 ### `networks.*.mtu`
@@ -577,7 +577,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `docker-vm`, `cloud-docker`: capability `external-networks`: network `shared` is an existing network (`external: probe-net`), and this target makes every network it uses (`docker`, `hosted` and `proxmox` join existing ones)
 - `vagrant/qemu`: provider: `m` is on 2 networks, and QEMU gives a VM one
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 - `cloud-vm/linode`: cloud: machine `m` is on several networks: a Linode instance has one VPC interface
 
 ### `dns.private = true`
@@ -609,7 +609,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: capability `exec-without-container`: `exec` check "true from user" needs `from:` a machine with its own container (it runs inside it)
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+- `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
 ### `checks[] = *.yml`
 

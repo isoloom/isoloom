@@ -3,7 +3,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ---
 # isoloom targets
 ✓ cloud-vm
-    ✗ digitalocean (DigitalOcean cloud-vm takes one machine on one network: a droplet joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address)
+    ✗ digitalocean (DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address)
     ✗ linode (machine `admin` is on several networks: a Linode instance has one VPC interface)
 
 # isoloom generate --target cloud-vm (exit 0)

@@ -720,7 +720,7 @@ volumes:
       "kubernetes"
     ],
     "refused": {
-      "cloud-docker": "machine `web`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)"
+      "cloud-docker": "machine `web`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)"
     },
     "not_possible": {
       "hybrid": "only when some machines are containers and others are VMs",

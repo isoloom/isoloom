@@ -113,7 +113,10 @@ fn arm64_is_refused_from_the_plan() {
         "version: 1\nname: a\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  w:\n    networks: { lab: 10 }\n    hardware: { arch: arm64 }\n    app: { image: nginx }\n",
     );
     let why = refusal(&e).unwrap();
-    assert_eq!(why, "machine `w`: arm64 on a cloud VM comes later (Graviton instances and arm64 images)");
+    assert_eq!(
+        why,
+        "machine `w`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)"
+    );
     assert!(modules(&e).unwrap_err().to_string().ends_with(&why));
 }
 
