@@ -18,7 +18,7 @@ use isoloom_spec::model::{
     Arch, Boot, Constraints, External, HostFolder, Input, Machine, MachineFile, Network, Protocol, Resources, Seal, SecretSource, Spec, Target, Tc, Ulimit,
     VmImage, Winrm,
 };
-use isoloom_spec::net::{NetworkBlock, docker_cidrs};
+use isoloom_spec::net::{NetworkBlock, Rate, RateError, docker_cidrs};
 use isoloom_spec::windows::{self, Tpm};
 
 mod image;
@@ -176,7 +176,7 @@ pub struct MachinePlan {
     /// Its CPU architecture.
     pub arch: Arch,
     /// The bandwidth cap on each of its links (`rate_limit`, a `tc` rate such as `10mbit`).
-    pub rate_limit: Option<String>,
+    pub rate_limit: Option<Rate>,
     /// What it runs from, on this target.
     pub image: Option<Image>,
     /// The VM's own image per target (`vm.image`: a box URL, a Proxmox or cloud image), when
@@ -436,6 +436,16 @@ pub enum PlanError {
         /// Each step its family can't carry, in step order.
         unportable: Vec<crate::configure::Unportable>,
     },
+    /// A machine's `rate_limit` isn't a rate ([`Rate::parse`]).
+    #[error("machine `{machine}`: `rate_limit`: `{rate}` {error}")]
+    RateLimit {
+        /// The machine.
+        machine: String,
+        /// Its `rate_limit`, as written.
+        rate: String,
+        /// Why it isn't a rate.
+        error: RateError,
+    },
 }
 
 /// The reasons of `unportable`, joined.
@@ -519,6 +529,20 @@ fn recipe(name: &str, m: &Machine) -> Result<Option<Recipe>, PlanError> {
         })
 }
 
+/// Machine `name`'s `rate_limit`, read once here (validation refuses one that isn't a rate).
+fn rate_limit(name: &str, m: &Machine) -> Result<Option<Rate>, PlanError> {
+    m.rate_limit
+        .as_deref()
+        .map(|rate| {
+            Rate::parse(rate).map_err(|error| PlanError::RateLimit {
+                machine: name.to_owned(),
+                rate: rate.to_owned(),
+                error,
+            })
+        })
+        .transpose()
+}
+
 /// Machine `name` (`m`), planned for `target`. Lowering refuses a configuration that doesn't
 /// resolve (an app's steps per target, a service's for the lab), so the lowered spec `build`
 /// plans has its recipe; one that doesn't is an error, not a machine with no configuration.
@@ -558,7 +582,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<Machi
         secrets: m.secrets.iter().map(|s| SecretFile::of(spec, s)).collect(),
         resources: m.resources.unwrap_or_default(),
         arch: m.arch,
-        rate_limit: m.rate_limit.clone(),
+        rate_limit: rate_limit(name, m)?,
         image: image::of(spec, shape, name, m, recipe.as_ref()),
         vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
         boot: m.vm.as_ref().and_then(|v| v.boot.clone()),
@@ -829,13 +853,36 @@ overrides:
         );
         assert!(lab.refusal(Target::Vagrant).is_some(), "lowering refuses the step first");
         let unresolved = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect_err("the recipe doesn't resolve");
-        let super::PlanError::UnresolvedRecipe { machine, unportable } = &unresolved;
+        let super::PlanError::UnresolvedRecipe { machine, unportable } = &unresolved else {
+            panic!("not the recipe: {unresolved:?}")
+        };
         assert_eq!((machine.as_str(), unportable.len()), ("win", 1), "{unresolved:?}");
         assert!(
             unresolved
                 .to_string()
                 .starts_with("machine `win`: its configuration doesn't resolve on its OS: "),
             "{unresolved}"
+        );
+    }
+
+    #[test]
+    fn a_rate_limit_is_planned_as_a_rate_and_one_that_isnt_is_an_error() {
+        let plan = |rate: &str| {
+            let lab = testing::lab(&format!(
+                "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12, rate_limit: {rate} }}\n"
+            ));
+            Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None)
+        };
+        let env = plan("512kbit").expect("a rate plans");
+        let rate = env.machines["web"].rate_limit.as_ref().expect("its rate limit");
+        assert_eq!((rate.to_string(), rate.megabytes_per_second()), ("512kbit".to_owned(), 0.064));
+        assert_eq!(
+            plan("fast").expect_err("validation refuses it, and the plan doesn't drop it"),
+            super::PlanError::RateLimit {
+                machine: "web".into(),
+                rate: "fast".into(),
+                error: isoloom_spec::net::RateError::Malformed
+            }
         );
     }
 }

@@ -106,7 +106,7 @@ pub(super) fn on(env: &Environment, net: &str, b: BlockBuilder, guest: Option<&M
 
 /// The machine's rate limit on a device, in MB/s as Proxmox takes it.
 pub(super) fn limited(b: BlockBuilder, mp: &MachinePlan) -> BlockBuilder {
-    let rate = mp.rate_limit.as_deref().and_then(isoloom_plan::links::megabytes_per_second);
+    let rate = mp.rate_limit.as_ref().map(isoloom_spec::net::Rate::megabytes_per_second);
     match rate {
         Some(mbs) => b.add_attribute(("rate_limit", Expression::from(mbs))),
         None => b,

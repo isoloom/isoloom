@@ -76,6 +76,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `Result`**, whose error, `isoloom_plan::PlanError`, says why a spec can't be planned: a
   machine whose configuration has steps its OS's family can't carry (lowering refuses those
   first).
+- **Breaking (library): a rate is `isoloom_spec::net::Rate`**, read once by one grammar
+  (`Rate::parse`, `RateError`) for a machine's `rate_limit` and a network's `tc.rate`:
+  `MachinePlan::rate_limit` is an `Option<Rate>` (its text form is the rate as written, its
+  `megabytes_per_second` what Proxmox takes), and `isoloom_plan::links::megabytes_per_second` is
+  removed. A `rate_limit` that isn't a rate is `PlanError::RateLimit`.
 - **Breaking: the `external` target writes no `machines.json`**: no runner read it.
 - **Breaking: Isoloom's own router and controller take Isoloom's names on Proxmox, ESXi and the
   clouds.** A lab machine named `router` or `controller` wrote a second
@@ -595,6 +600,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **A machine whose configuration doesn't resolve fails the generation** (a bug of lowering,
   which refuses such steps first), instead of a release build planning its VM with no
   configuration at all.
+- **A `rate_limit` that isn't a rate fails the generation** of a lab the library generates
+  without validating it, instead of Proxmox's devices getting no rate limit.
 - **Proxmox's `slot` is checked**: the `proxmox` module and `docker-vm`'s Proxmox module refuse a
   slot outside 1 to 99 at plan time, as ESXi's does outside 1 to 63, instead of making SDN ids
   and MACs the server refused at apply time.

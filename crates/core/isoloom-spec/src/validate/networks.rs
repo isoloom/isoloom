@@ -169,15 +169,21 @@ pub(super) fn tc(spec: &Spec, p: &mut Problems) {
     }
 }
 
-/// A number followed by one of `units`, like `50ms` or `10mbit`.
+/// A number followed by one of `units`, like `50ms` or `1.5s`.
 pub(super) fn measure(v: &str, units: &[&str]) -> bool {
     let digits = v.trim_end_matches(|c: char| c.is_ascii_alphabetic());
     let unit = v.strip_prefix(digits).unwrap_or_default();
     !digits.is_empty() && digits.parse::<f64>().is_ok() && units.contains(&unit)
 }
 
-/// The units of a rate, as `tc` reads them.
-pub(super) const RATES: &[&str] = &["bit", "kbit", "mbit", "gbit", "bps", "kbps", "mbps", "gbps"];
+/// A rate, as [`Rate`](crate::net::Rate) reads it: why it isn't one, at `at`.
+pub(super) fn rate(at: &str, v: &str, p: &mut Problems) {
+    match crate::net::Rate::parse(v) {
+        Ok(_) => {}
+        Err(crate::net::RateError::Negative) => p.add(at, format!("`{v}`: a rate can't be negative")),
+        Err(crate::net::RateError::Malformed) => p.add(at, format!("`{v}` isn't a rate like 10mbit or 512kbit")),
+    }
+}
 
 /// Whether `v` is a measure below zero (`-5ms`), which netem refuses when it runs.
 pub(super) fn negative(v: &str) -> bool {
@@ -187,7 +193,7 @@ pub(super) fn negative(v: &str) -> bool {
 /// Each impairment value: times, a percentage, a rate; none below zero.
 fn tc_values(at: &str, tc: &Tc, p: &mut Problems) {
     const TIMES: &[&str] = &["ms", "s", "us"];
-    for (field, value) in [("delay", &tc.delay), ("jitter", &tc.jitter), ("rate", &tc.rate)] {
+    for (field, value) in [("delay", &tc.delay), ("jitter", &tc.jitter)] {
         if let Some(v) = value
             && negative(v)
         {
@@ -213,11 +219,8 @@ fn tc_values(at: &str, tc: &Tc, p: &mut Problems) {
     {
         p.add(format!("{at}.loss"), "a percentage, 0 to 100");
     }
-    if let Some(r) = &tc.rate
-        && !negative(r)
-        && !measure(r, RATES)
-    {
-        p.add(format!("{at}.rate"), format!("`{r}` isn't a rate like 10mbit or 512kbit"));
+    if let Some(r) = &tc.rate {
+        rate(&format!("{at}.rate"), r, p);
     }
 }
 
