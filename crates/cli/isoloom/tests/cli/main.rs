@@ -4,6 +4,7 @@
 //! `ISOLOOM_HOME`.
 
 mod commands;
+mod docs;
 mod errors;
 mod imports;
 mod secrets;
