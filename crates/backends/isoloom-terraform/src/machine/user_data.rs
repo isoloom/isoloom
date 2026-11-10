@@ -32,14 +32,14 @@ use isoloom_render::steps::READY_FILE;
 pub(crate) const SETUP_LOG: &str = "/var/log/isoloom-setup.log";
 
 /// The mark the runner's delivery leaves once the project is in [`isoloom_render::steps::PROJECT_DIR`].
-pub(crate) const DELIVERED: &str = "/var/lib/isoloom/project-delivered";
+pub(crate) const DELIVERED: &str = isoloom_spec::linux_state_path!("/project-delivered");
 
 /// How long the set-up waits for the project, in seconds: the apply of the other machines, then
 /// the runner's delivery to each machine in turn.
 pub(crate) const DELIVERY_WAIT_S: u32 = 2400;
 
 /// The set-up's own folder: the script, the part it is at.
-const DIR: &str = "/var/lib/isoloom";
+const DIR: &str = isoloom_spec::linux::STATE_DIR;
 
 /// The unit running the set-up at every boot.
 const UNIT: &str = "isoloom-setup.service";
@@ -77,7 +77,7 @@ pub(crate) struct SetUp {
 
 /// Where a host whose user data only schedules its expiry keeps the run's end (Unix seconds, or
 /// nothing), for its boot script to read.
-const EXPIRES_AT: &str = "/var/lib/isoloom/expires-at";
+const EXPIRES_AT: &str = isoloom_spec::linux_state_path!("/expires-at");
 
 /// The shutdown at the run's end, `$e` (Unix seconds, empty without an end): in `$m` minutes,
 /// at least one.

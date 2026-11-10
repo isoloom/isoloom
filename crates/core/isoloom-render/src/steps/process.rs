@@ -48,7 +48,7 @@ pub(super) fn command(env: &Environment, machine: &str) -> Option<String> {
 }
 
 /// Marks a machine's `setup` scripts as run: they run once, not at every provisioning.
-const SETUP_DONE: &str = "/var/lib/isoloom/setup.done";
+const SETUP_DONE: &str = isoloom_spec::linux_state_path!("/setup.done");
 
 /// The `setup` scripts, run once in order with the machine's service up (a failure fails the
 /// set-up), as root, with its inputs and environment.

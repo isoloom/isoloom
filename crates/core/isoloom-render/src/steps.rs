@@ -22,18 +22,18 @@ mod wait;
 /// Where the project is unpacked on a VM.
 pub const PROJECT_DIR: &str = "/opt/isoloom";
 /// Isoloom's own folder on a Linux VM: its marks, and what it keeps between boots.
-pub(crate) const STATE_DIR: &str = "/var/lib/isoloom";
+pub(crate) const STATE_DIR: &str = isoloom_spec::linux::STATE_DIR;
 /// Makes `STATE_DIR`: the command before a mark is written there.
-pub const MAKE_STATE_DIR: &str = "mkdir -p /var/lib/isoloom";
+pub const MAKE_STATE_DIR: &str = concat!("mkdir -p ", isoloom_spec::linux_state_path!());
 /// The project's archive, uploaded before the steps run.
 pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
 /// The inputs, uploaded before the steps run (`KEY=value` lines).
 pub const INPUTS_FILE: &str = "/tmp/isoloom-inputs.env";
 /// Where the inputs are kept when a reboot comes (`/tmp` is emptied at boot).
-pub const KEPT_INPUTS_FILE: &str = "/var/lib/isoloom/inputs.env";
+pub const KEPT_INPUTS_FILE: &str = isoloom_spec::linux_state_path!("/inputs.env");
 /// Where a Linux VM's set-up says how far it got, for the runner to poll (the `isoloom-ready/1`
 /// grammar: `running: <step>`, `failed: <step>`, then `ready`; no file yet: still booting).
-pub const READY_FILE: &str = "/var/lib/isoloom/ready";
+pub const READY_FILE: &str = isoloom_spec::linux_state_path!("/ready");
 /// Waits for cloud-init to be done (its packages in, `apt` free): the first command of a set-up
 /// run over SSH on a VM cloud-init boots. Its failure doesn't stop the set-up.
 pub const CLOUD_INIT_WAIT: &str = "cloud-init status --wait >/dev/null 2>&1 || true";
@@ -311,7 +311,7 @@ pub fn record_boot() -> String {
 /// After a reboot step: fails when the machine didn't actually restart.
 #[must_use]
 pub fn reboot_check() -> String {
-    format!("if [ \"$(cat {BOOT_ID})\" = \"$(cat /var/lib/isoloom/boot-id)\" ]; then echo 'the reboot step: the machine did not restart' >&2; exit 1; fi\n")
+    format!("if [ \"$(cat {BOOT_ID})\" = \"$(cat {STATE_DIR}/boot-id)\" ]; then echo 'the reboot step: the machine did not restart' >&2; exit 1; fi\n")
 }
 
 #[cfg(test)]

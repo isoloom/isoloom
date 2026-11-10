@@ -328,8 +328,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   MTU discovery from the containers (every other cloud lets everything out).
 - **One rule for what several crates wrote each their own way** (library): a check runner's name
   (`isoloom_render::container::check_runner`, `CHECK_RUNNER_PREFIX`), Isoloom's folder on a Linux
-  VM (`isoloom_render::steps::MAKE_STATE_DIR`) and on a Windows one
-  (`isoloom_spec::windows::ISOLOOM_DIR`, `READY_FILE`), the containers' VM in a run manifest
+  VM (`isoloom_spec::linux::STATE_DIR`, every path under it derived from it) and on a Windows
+  one (`isoloom_spec::windows::ISOLOOM_DIR`, `READY_FILE` derived from it), the containers' VM in a run manifest
   (`run_manifest::guest::GuestCompose::docker_host`, `docker_host_outputs`), Proxmox's server
   variables, a name's DNS-label rule (`isoloom_spec::validate::dns_label`, which the catalogue
   shares), and a step file's kind by its extension (`isoloom_spec::syntax::has_extension`;

@@ -19,8 +19,8 @@ use super::{Shell, at_every_boot};
 use crate::module::inputs;
 
 /// Where a machine with `reboot` steps keeps its continuation: `next-boot` (the part to run at the
-/// next boot), `steps.sh` and `boot-<n>.sh`.
-const REBOOT_DIR: &str = "/var/lib/isoloom";
+/// next boot), `steps.sh` and `boot-<n>.sh`; and where its ready file is.
+pub(crate) const STATE_DIR: &str = isoloom_spec::linux::STATE_DIR;
 
 /// A cloud-config document, built up.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,7 +77,7 @@ impl CloudConfig {
     /// Makes the ready file's folder first, once.
     fn ready_dir(&mut self) {
         if !self.tracked {
-            self.runcmd.push(format!("mkdir -p {READY_DIR}"));
+            self.runcmd.push(format!("mkdir -p {STATE_DIR}"));
             self.tracked = true;
         }
     }
@@ -97,16 +97,13 @@ impl CloudConfig {
             let power = object([
                 ("mode", string("reboot")),
                 ("message", string("isoloom: the reboot step")),
-                ("condition", string(format!("test -f {REBOOT_DIR}/next-boot"))),
+                ("condition", string(format!("test -f {STATE_DIR}/next-boot"))),
             ]);
             items.push(("power_state", power));
         }
         call("format", [string("#cloud-config\n%s"), call("yamlencode", [object(items)])])
     }
 }
-
-/// The ready file's folder.
-pub(crate) const READY_DIR: &str = "/var/lib/isoloom";
 
 /// `command` as the set-up step `label`: its name in [`READY_FILE`] first; when it fails,
 /// `failed: <label>` there and the end of the set-up (cloud-init runs `runcmd` as one script
@@ -282,7 +279,7 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
     let later: Vec<Vec<String>> = parts.collect();
     if !later.is_empty() {
         config.runcmd.push(format!(
-            "mkdir -p {REBOOT_DIR} && echo 1 > {REBOOT_DIR}/next-boot && systemctl enable isoloom-steps.service"
+            "mkdir -p {STATE_DIR} && echo 1 > {STATE_DIR}/next-boot && systemctl enable isoloom-steps.service"
         ));
         config.files.extend(reboot_files(&later));
         config.restart = true;
@@ -305,20 +302,22 @@ fn configure_run(env: &Environment, machine: &str, resources: &[Resource], fresh
 /// commands, then either the next reboot or the unit's end. A part stops at its first failing
 /// command: no ready marker then (`journalctl -u isoloom-steps` says why).
 fn reboot_files(parts: &[Vec<String>]) -> Vec<Expression> {
-    let unit = "[Unit]\nDescription=Isoloom: the provisioning steps after a reboot\nWants=network-online.target\nAfter=network-online.target\nConditionPathExists=/var/lib/isoloom/next-boot\n\n[Service]\nType=oneshot\nExecStart=/bin/sh /var/lib/isoloom/steps.sh\nStandardOutput=journal+console\nTimeoutStartSec=0\n\n[Install]\nWantedBy=multi-user.target\n";
-    let steps = format!("#!/bin/sh\nset -e\nn=$(cat {REBOOT_DIR}/next-boot)\nrm -f {REBOOT_DIR}/next-boot\nexec sh -e \"{REBOOT_DIR}/boot-$n.sh\"\n");
+    let unit = format!(
+        "[Unit]\nDescription=Isoloom: the provisioning steps after a reboot\nWants=network-online.target\nAfter=network-online.target\nConditionPathExists={STATE_DIR}/next-boot\n\n[Service]\nType=oneshot\nExecStart=/bin/sh {STATE_DIR}/steps.sh\nStandardOutput=journal+console\nTimeoutStartSec=0\n\n[Install]\nWantedBy=multi-user.target\n"
+    );
+    let steps = format!("#!/bin/sh\nset -e\nn=$(cat {STATE_DIR}/next-boot)\nrm -f {STATE_DIR}/next-boot\nexec sh -e \"{STATE_DIR}/boot-$n.sh\"\n");
     let mut files = vec![
         file("/etc/systemd/system/isoloom-steps.service", Some("0644"), string(unit)),
-        file(&format!("{REBOOT_DIR}/steps.sh"), Some("0700"), string(steps)),
+        file(&format!("{STATE_DIR}/steps.sh"), Some("0700"), string(steps)),
     ];
     for (n, cmds) in (1..).zip(parts) {
         let end = if n < parts.len() {
-            format!("echo {} > {REBOOT_DIR}/next-boot\nsystemctl --no-block reboot\n", n + 1)
+            format!("echo {} > {STATE_DIR}/next-boot\nsystemctl --no-block reboot\n", n + 1)
         } else {
             "systemctl disable isoloom-steps.service\n".to_owned()
         };
         let script = format!("#!/bin/sh\nset -e\n{}{end}", cmds.iter().map(|c| format!("{c}\n")).collect::<Vec<_>>().concat());
-        files.push(file(&format!("{REBOOT_DIR}/boot-{n}.sh"), Some("0700"), string(script)));
+        files.push(file(&format!("{STATE_DIR}/boot-{n}.sh"), Some("0700"), string(script)));
     }
     files
 }

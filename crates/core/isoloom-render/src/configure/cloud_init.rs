@@ -31,7 +31,7 @@ use isoloom_spec::shell::base64;
 use super::{Configured, shell};
 
 /// Where a machine's configure scripts are delivered on it.
-pub const DIR: &str = "/var/lib/isoloom/configure";
+pub const DIR: &str = isoloom_spec::linux_state_path!("/configure");
 
 /// What the ready file calls a configure run (the same label every carrier gives it).
 pub const LABEL: &str = "its configuration";

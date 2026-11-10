@@ -20,6 +20,7 @@ pub mod groups;
 pub mod host;
 pub mod images;
 pub mod instance;
+pub mod linux;
 mod load;
 pub mod model;
 pub mod os;

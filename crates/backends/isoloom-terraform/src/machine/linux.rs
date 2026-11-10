@@ -104,7 +104,7 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
     let Remote { env, name, plan, .. } = &m.remote;
     let mut first: Vec<Template> = vec!["set -e".into(), CLOUD_INIT_WAIT.into()];
     // The ready file's folder, before the first step's progress mark (`tracked_step`).
-    first.push(Shell::Sudo.command(&format!("mkdir -p {}", cloud_init::READY_DIR)).into());
+    first.push(Shell::Sudo.command(&format!("mkdir -p {}", cloud_init::STATE_DIR)).into());
     if controller::needed(env) {
         first.push(controller::authorize());
     }

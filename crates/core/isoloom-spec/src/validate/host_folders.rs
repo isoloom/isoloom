@@ -10,7 +10,7 @@ use crate::model::{HostFolder, HostPath};
 
 /// The folders Isoloom keeps for itself in a machine (the project's copy, its state, its
 /// settings) and the kernel's: a host folder there would hide them.
-const RESERVED: &[&str] = &["/opt/isoloom", "/var/lib/isoloom", "/etc/isoloom", "/proc", "/sys", "/dev"];
+const RESERVED: &[&str] = &["/opt/isoloom", crate::linux::STATE_DIR, "/etc/isoloom", "/proc", "/sys", "/dev"];
 
 /// Each host folder of the machine: a Linux machine, a usable `from`, and a path of its own.
 pub(super) fn of_machine(s: &Subject, p: &mut Problems) {

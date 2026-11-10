@@ -11,6 +11,7 @@ use isoloom_manifest::{
 };
 use isoloom_render::run_manifest::noted;
 use isoloom_render::steps::PROJECT_DIR;
+use isoloom_spec::linux::STATE_DIR;
 
 use super::connection::SEALED;
 use crate::machine::user_data::{DELIVERED, SETUP_LOG};
@@ -82,7 +83,7 @@ fn archive() -> Result<Step, ManifestError> {
 /// while the machine boots (ssh can't connect yet); unpacking again is harmless.
 fn deliver(guest: &Guest) -> Result<Step, ManifestError> {
     let command = format!(
-        "{}sh -c 'mkdir -p {PROJECT_DIR} /var/lib/isoloom && tar -xzf - -C {PROJECT_DIR} && touch {DELIVERED}'",
+        "{}sh -c 'mkdir -p {PROJECT_DIR} {STATE_DIR} && tar -xzf - -C {PROJECT_DIR} && touch {DELIVERED}'",
         guest.sudo()
     );
     let wait = [("wait_s", Template::text(&BOOT_WAIT_S.to_string()))];

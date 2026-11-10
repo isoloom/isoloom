@@ -6,13 +6,27 @@
 use crate::images::is_windows;
 use crate::model::VmImpl;
 
+/// Isoloom's folder on a Windows machine ([`ISOLOOM_DIR`]), or a path under it: `$rest` appended
+/// at compile time, as [`linux_state_path!`](crate::linux_state_path) does on Linux. Hidden: the
+/// crates of the workspace share it.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! windows_isoloom_path {
+    () => {
+        "C:\\isoloom"
+    };
+    ($rest:literal) => {
+        concat!($crate::windows_isoloom_path!(), $rest)
+    };
+}
+
 /// Isoloom's folder on a Windows machine: the project unpacked, the machine's own scripts, its
 /// marks, the catalogue's values.
-pub const ISOLOOM_DIR: &str = "C:\\isoloom";
+pub const ISOLOOM_DIR: &str = windows_isoloom_path!();
 
 /// The mark a Windows machine's set-up leaves in [`ISOLOOM_DIR`] once it is ready, which the
 /// controller and the runner wait for.
-pub const READY_FILE: &str = "C:\\isoloom\\ready";
+pub const READY_FILE: &str = windows_isoloom_path!("\\ready");
 
 /// Why a VM gets a virtual TPM 2.0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

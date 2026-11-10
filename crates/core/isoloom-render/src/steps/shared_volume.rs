@@ -15,7 +15,7 @@ use isoloom_spec::shell::quote;
 use super::PKG;
 
 /// Where a machine taking one folder of a volume mounts the whole of it.
-const STAGING: &str = "/var/lib/isoloom/volumes";
+const STAGING: &str = isoloom_spec::linux_state_path!("/volumes");
 
 /// Machine's part of shared volume `volume`, at `path`.
 pub(super) fn linux(volume: &str, path: &str, role: &SharedRole) -> String {

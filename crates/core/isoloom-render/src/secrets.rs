@@ -19,9 +19,9 @@ use crate::run_manifest::RUNNER;
 pub mod windows;
 
 /// Where a machine keeps the secrets delivered to it: root-only, on disk.
-pub(crate) const KEPT_DIR: &str = "/var/lib/isoloom/secrets";
+pub(crate) const KEPT_DIR: &str = isoloom_spec::linux_state_path!("/secrets");
 /// The mark delivery leaves once every secret is kept.
-pub const DELIVERED: &str = "/var/lib/isoloom/secrets/.delivered";
+pub const DELIVERED: &str = isoloom_spec::linux_state_path!("/secrets/.delivered");
 /// Where a Terraform set-up that waits for its secrets says how to reach its machine, under
 /// its module: one file per machine, `<user>@<address>`. The runner reads it while Terraform
 /// runs (the module's outputs come only once every set-up is done) and delivers there.
