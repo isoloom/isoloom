@@ -15,7 +15,7 @@ take an environment and why the others can't (DigitalOcean takes one machine on 
 
 ## Prerequisites
 
-- Terraform 1.11 or later and an OpenSSH client ([tool versions](../../reference/tool-versions.md)).
+- Terraform 1.6 or later and an OpenSSH client ([tool versions](../../reference/tool-versions.md)).
 - An account on the cloud, and the credentials below in your environment.
 - Your public IP, or the range your connections come from, for `allowed_cidr`.
 - An SSH key pair: the machines let in `ssh_public_key`.

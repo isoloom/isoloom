@@ -41,7 +41,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     aws    = { source = "hashicorp/aws", version = "~> 6.67.0" }
@@ -449,7 +449,7 @@ resource "local_file" "isoloom_project" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -894,7 +894,7 @@ resource "local_file" "isoloom_project" {
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 5.8.0" }
@@ -1351,7 +1351,7 @@ resource "local_file" "isoloom_project" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",

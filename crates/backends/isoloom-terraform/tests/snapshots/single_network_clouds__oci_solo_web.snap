@@ -13,7 +13,7 @@ expression: "module(Cloud::Oci, \"solo-web\")?"
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     oci = { source = "oracle/oci", version = "~> 9.8.0" }

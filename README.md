@@ -163,7 +163,7 @@ needs each target's tools ([tool versions](docs/reference/tool-versions.md)):
 
 - Docker with **Compose 2.17** or later: `docker`, `hosted`, `docker-vm`'s VM;
 - **Vagrant 2.4** or later and a hypervisor (with its Vagrant plugin): `vagrant`, `docker-vm`;
-- **Terraform 1.11** or later for the clouds (1.6 or later for Proxmox and ESXi), with the
+- **Terraform 1.6** or later for the clouds, Proxmox and ESXi, with the
   providers the modules pin (`hashicorp/aws ~> 6.67.0`, `hashicorp/azurerm ~> 5.8.0`,
   `hashicorp/google ~> 8.5.0`, `digitalocean/digitalocean ~> 2.103.0`, `linode/linode ~> 4.7.0`,
   `oracle/oci ~> 9.8.0`, `bpg/proxmox ~> 0.115.0`, `josenk/esxi ~> 1.10.3`);

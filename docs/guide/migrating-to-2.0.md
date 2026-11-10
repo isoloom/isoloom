@@ -32,7 +32,6 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   pods run under the Pod Security Standards' `baseline` level, which their namespace enforces. Expose a port outside the cluster in your own
   overlay ([Kubernetes](targets/kubernetes.md)).
 - **Images built from the project** are named under `localhost/isoloom/` by default.
-- **Terraform**: the generated modules require Terraform 1.11 or later.
 - **Proxmox verifies the API's TLS certificate**: `proxmox_insecure` defaults to `false`. A
   server with a self-signed certificate needs `proxmox_insecure=true` (or a certificate its
   clients trust).

@@ -54,7 +54,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 6.67.0" }
@@ -361,7 +361,7 @@ output "published" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -901,7 +901,7 @@ output "published" {
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 5.8.0" }
@@ -1293,7 +1293,7 @@ output "published" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -2093,7 +2093,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     google = { source = "hashicorp/google", version = "~> 8.5.0" }
@@ -2419,7 +2419,7 @@ output "published" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -2959,7 +2959,7 @@ output "published" {
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     linode = { source = "linode/linode", version = "~> 4.7.0" }
@@ -3247,7 +3247,7 @@ output "published" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -3731,7 +3731,7 @@ output "published" {
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     oci = { source = "oracle/oci", version = "~> 9.8.0" }
@@ -4211,7 +4211,7 @@ output "published" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",

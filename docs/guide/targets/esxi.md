@@ -13,7 +13,7 @@ provider: [Vagrant](vagrant.md).)
 
 - A standalone ESXi host with SSH enabled (the provider works over SSH, port 22) and its API on
   443.
-- Terraform 1.6 or later (1.11 recommended), VMware's `ovftool` and an OpenSSH client on the
+- Terraform 1.6 or later, VMware's `ovftool` and an OpenSSH client on the
   machine that runs Terraform.
 - An OVA per OS, with cloud-init and open-vm-tools: the `images` variable maps each OS
   (`debian-12`, `ubuntu-24.04`) to an OVA's path or URL. The router runs Ubuntu 24.04, whose

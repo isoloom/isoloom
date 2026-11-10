@@ -29,10 +29,6 @@ use crate::module::variable::Variable;
 
 pub(crate) use steps::Guest;
 
-/// The oldest Terraform the cloud modules take: write-only attributes fed by ephemeral variables
-/// (the secrets' values reach the clouds' stores without landing in the state).
-pub(crate) const TERRAFORM_MIN: &str = "1.11.0";
-
 /// One cloud module's run, as its target describes it.
 #[derive(Debug, Clone)]
 pub(crate) struct Frame {
@@ -131,6 +127,6 @@ pub(crate) fn cloud_of(cloud: Cloud) -> isoloom_manifest::Cloud {
 /// Terraform (the host's: a cloud is reached over the internet) and `ssh`.
 pub(crate) fn tools() -> Result<Vec<Tool>, ManifestError> {
     let mut terraform = tool("terraform", argv("terraform", &["version"])?)?;
-    terraform.min_version = Some(Version::parse(TERRAFORM_MIN)?);
+    terraform.min_version = Some(Version::parse(crate::module::providers::TERRAFORM_MIN)?);
     Ok(vec![terraform, tool("ssh", argv("ssh", &["-V"])?)?])
 }

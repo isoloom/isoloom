@@ -21,7 +21,6 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   starting with `isoloom-` are refused.
 - **Breaking:** Kubernetes publishes a port as a ClusterIP Service by default, and its pods run
   under the Pod Security Standards' `baseline` level, which their namespace enforces.
-- **Breaking:** the generated Terraform modules require Terraform 1.11 or later.
 - **Breaking (library):** many items of every crate are removed or crate-internal; the supported
   API is `isoloom-spec`, `isoloom-targets` and `isoloom-manifest`.
 - Signed release binaries for Linux, macOS and Windows, with `SHA256SUMS`, a Sigstore signature,
@@ -73,10 +72,6 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   100m and 128 MiB.
 - **Breaking: `proxmox_insecure` defaults to `false`**: the Proxmox API's certificate is
   verified unless the operator passes `proxmox_insecure=true`.
-- **Breaking: the cloud modules require Terraform 1.11** (`required_version = ">= 1.11.0"`, what
-  their write-only attributes need, and what their run manifests already said); the server
-  modules `>= 1.6.0`. Proxmox on macOS runs Terraform from `hashicorp/terraform:1.16.7`, pinned
-  by digest (was 1.9.8).
 - **Breaking: renamed examples and fixtures, neutral words.** `examples/pivot-dmz` is
   `examples/dmz-jump` (its user machine Debian 12, not Kali); the run-manifest fixtures'
   `flag-portal` and `flag-vm` are `web-portal` and `web-vm`, their `CTF_FLAG_MAIN` input
@@ -349,6 +344,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   variables, a name's DNS-label rule (`isoloom_spec::validate::dns_label`, which the catalogue
   shares), and a step file's kind by its extension (`isoloom_spec::syntax::has_extension`;
   `isoloom_plan::lifecycle::has_extension` is gone). The `docker-vm` Proxmox module's variables read as the `proxmox` module's.
+- **Every Terraform module and its run manifest name Terraform 1.6.0 as the oldest** (one rule,
+  `required_version = ">= 1.6.0"`): the cloud modules' run manifests said 1.11.0, for
+  write-only attributes the modules never used, and Terraform 1.6.6 validates every cloud and
+  server module. Proxmox on macOS runs Terraform from `hashicorp/terraform:1.16.7`, pinned by
+  digest (was 1.9.8).
 
 ### Fixed
 

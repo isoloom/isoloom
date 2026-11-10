@@ -156,7 +156,7 @@ pub(crate) fn module(cloud: Cloud, env: &Environment) -> Result<GeneratedFile> {
     let driver = driver(cloud);
     let folder = format!("{}/{}", Target::CloudDocker.id(), cloud.id());
     let mut m = module::start(&(driver.base.usage)(&folder));
-    m.block(providers::terraform(super::manifest::TERRAFORM_MIN, &[driver.requires]));
+    m.block(providers::terraform(&[driver.requires]));
     super::head(env, &mut m, driver.variables(env), driver.base.provider, ProjectCopy::Runner);
     let address = (driver.resources)(env, &mut m, crate::machine::user_data::expiry_only());
     m.block(output("ip", address));

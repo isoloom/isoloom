@@ -87,7 +87,7 @@ pub(super) fn runner_identity() -> Result<Identity, ManifestError> {
 /// Terraform (from its image on macOS) and `ssh`.
 pub(super) fn tools() -> Result<Vec<Tool>, ManifestError> {
     let mut terraform = tool("terraform", argv("terraform", &["version"])?)?;
-    terraform.min_version = Some(Version::parse(crate::server::TERRAFORM_MIN)?);
+    terraform.min_version = Some(Version::parse(crate::module::providers::TERRAFORM_MIN)?);
     terraform.container = Some(PinnedImage::parse(TERRAFORM_IMAGE)?);
     terraform.container_hosts = BTreeSet::from([HostOs::Macos]);
     Ok(vec![terraform, tool("ssh", argv("ssh", &["-V"])?)?])

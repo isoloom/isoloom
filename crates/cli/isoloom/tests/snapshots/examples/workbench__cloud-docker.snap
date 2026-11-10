@@ -65,7 +65,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 6.67.0" }
@@ -252,7 +252,7 @@ output "ssh_user" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -776,7 +776,7 @@ systemctl enable --now isoloom-published.service
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 5.8.0" }
@@ -969,7 +969,7 @@ output "ssh_user" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -1490,7 +1490,7 @@ systemctl enable --now isoloom-published.service
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     digitalocean = { source = "digitalocean/digitalocean", version = "~> 2.103.0" }
@@ -1621,7 +1621,7 @@ output "ssh_user" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -2087,7 +2087,7 @@ systemctl enable --now isoloom-published.service
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     google = { source = "hashicorp/google", version = "~> 8.5.0" }
@@ -2272,7 +2272,7 @@ output "ssh_user" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -2796,7 +2796,7 @@ systemctl enable --now isoloom-published.service
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     linode = { source = "linode/linode", version = "~> 4.7.0" }
@@ -2908,7 +2908,7 @@ output "ssh_user" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",
@@ -3376,7 +3376,7 @@ systemctl enable --now isoloom-published.service
 #         which delivers the project over SSH, waits for each set-up and runs the checks.
 
 terraform {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.6.0"
   backend "local" {}
   required_providers {
     oci = { source = "oracle/oci", version = "~> 9.8.0" }
@@ -3563,7 +3563,7 @@ output "ssh_user" {
         "terraform",
         "version"
       ],
-      "min_version": "1.11.0"
+      "min_version": "1.6.0"
     },
     {
       "name": "ssh",

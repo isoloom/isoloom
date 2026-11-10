@@ -88,14 +88,18 @@ pub(crate) const TIME: Provider = Provider {
     version: "~> 0.14.2",
 };
 
-/// The `terraform` block: Terraform `oldest` or later (a version, `1.11.0`), a local state, the
-/// providers.
-pub(crate) fn terraform(oldest: &str, providers: &[Provider]) -> Block {
+/// The oldest Terraform every generated module takes: its `required_version`, and its run
+/// manifest's `min_version`. Nothing the modules write is newer than Terraform 1.6 (the newest is
+/// `terraform_data`, 1.4), and Terraform 1.6.6 validates every cloud and server module.
+pub(crate) const TERRAFORM_MIN: &str = "1.6.0";
+
+/// The `terraform` block: Terraform [`TERRAFORM_MIN`] or later, a local state, the providers.
+pub(crate) fn terraform(providers: &[Provider]) -> Block {
     let required = providers.iter().fold(Block::builder("required_providers"), |b, p| {
         b.add_attribute((p.name, object([("source", string(p.source)), ("version", string(p.version))])))
     });
     Block::builder("terraform")
-        .add_attribute(("required_version", string(format!(">= {oldest}"))))
+        .add_attribute(("required_version", string(format!(">= {TERRAFORM_MIN}"))))
         .add_block(Block::builder("backend").add_label("local").build())
         .add_block(required.build())
         .build()

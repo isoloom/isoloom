@@ -12,7 +12,7 @@ Tier 2: real runs from macOS are recorded; Linux and Windows hosts are pending.
 
 - Proxmox VE with SDN available, reachable from where Terraform runs (its API on port 8006, SSH
   to the node).
-- Terraform 1.6 or later (1.11 recommended, [tool versions](../../reference/tool-versions.md)),
+- Terraform 1.6 or later ([tool versions](../../reference/tool-versions.md)),
   and an OpenSSH client.
 - Datastores: `local-lvm` for VM disks, and one with `iso` content and one with `snippets`
   content (`local` by default) for the cloud images and cloud-init files. Each is a variable.
