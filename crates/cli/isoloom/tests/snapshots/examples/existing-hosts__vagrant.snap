@@ -194,7 +194,7 @@ crash.*.log
     }
   },
   "checks": {
-    "default_position": "networks",
+    "default_position": "isoloom-networks",
     "positions": [
       {
         "position": "web",

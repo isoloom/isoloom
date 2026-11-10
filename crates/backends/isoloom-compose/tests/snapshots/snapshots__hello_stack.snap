@@ -162,7 +162,7 @@ services:
     cap_add:
     - NET_ADMIN
     volumes:
-    - ./checks/networks.sh:/isoloom/run.sh:ro
+    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro
     - ../..:/isoloom/project:ro
     depends_on:
       cache:

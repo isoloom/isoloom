@@ -10,7 +10,7 @@ use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Position, Probe, Resolved};
 use isoloom_render::run_manifest::{DERIVED, check, timeout_s};
 
-use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep, exec_runner};
+use isoloom_render::container::{STAND_INS_DOWN, STAND_INS_UP, StandInStep, exec_runner, exec_runner_name};
 
 use super::compose;
 use crate::error::Result;
@@ -49,14 +49,14 @@ impl Planned<'_> {
         format!("rm-{}", self.step_id())
     }
 
-    /// The id of the runner of the machine's own `exec` checks (`exec-<position>`).
+    /// The id of the runner of the machine's own `exec` checks (`isoloom-exec-<position>`).
     pub(super) fn exec_id(&self) -> String {
-        format!("exec-{}", self.pos.id())
+        exec_runner_name(self.pos.id())
     }
 
-    /// The id of the step piping the `exec` checks into the machine.
+    /// The id of the step piping the `exec` checks into the machine (`check-<runner>`).
     pub(super) fn exec_step_id(&self) -> String {
-        format!("check-exec-{}", self.pos.id())
+        format!("check-{}", self.exec_id())
     }
 }
 

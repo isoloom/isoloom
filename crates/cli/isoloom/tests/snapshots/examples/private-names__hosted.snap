@@ -6,7 +6,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target hosted (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/exec-web.sh
+✓ .isoloom/docker/checks/isoloom-exec-web.sh
 ✓ .isoloom/docker/checks/web.sh
 ✓ .isoloom/docker/checks/client.sh
 ✓ .isoloom/docker/build/client/Dockerfile
@@ -18,7 +18,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/.gitignore
 .isoloom/docker/build/client/Dockerfile
 .isoloom/docker/checks/client.sh
-.isoloom/docker/checks/exec-web.sh
+.isoloom/docker/checks/isoloom-exec-web.sh
 .isoloom/docker/checks/web.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
@@ -29,7 +29,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 ## .isoloom/docker/checks/client.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/exec-web.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-web.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/web.sh: identical in the `docker` snapshot
 

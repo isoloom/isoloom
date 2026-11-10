@@ -55,7 +55,7 @@ fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() -> Outcome {
     let files = isoloom_targets::generate(&with_docker, isoloom_spec::Target::Docker).unwrap();
     let exec = files
         .iter()
-        .find(|f| f.path.ends_with("docker/checks/exec-web.sh"))
+        .find(|f| f.path.ends_with("docker/checks/isoloom-exec-web.sh"))
         .expect("an exec runner for web");
     assert!(exec.contents.contains("_exec 'id' 'uid'"));
     let beside = files.iter().find(|f| f.path.ends_with("docker/checks/web.sh")).unwrap();

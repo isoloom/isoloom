@@ -34,7 +34,7 @@ fn a_dockerfile_copies_and_runs_a_spaced_path_as_one_word() -> Outcome {
 #[test]
 fn a_check_script_with_a_space_runs_quoted_everywhere() -> Outcome {
     let lab = valid(SPACED)?;
-    let compose = generated(&lab, Target::Docker, "docker/checks/networks.sh")?;
+    let compose = generated(&lab, Target::Docker, "docker/checks/isoloom-networks.sh")?;
     assert!(compose.contains(r"cd /isoloom/project && sh '\''checks/a b.sh'\''"), "{compose}");
     let vagrant = generated(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
     assert!(

@@ -6,7 +6,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target cloud-docker (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/exec-web.sh
+✓ .isoloom/docker/checks/isoloom-exec-web.sh
 ✓ .isoloom/docker/checks/web.sh
 ✓ .isoloom/docker/checks/client.sh
 ✓ .isoloom/docker/build/client/Dockerfile
@@ -54,7 +54,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/cloud-docker/oci/setup.sh
 .isoloom/docker/build/client/Dockerfile
 .isoloom/docker/checks/client.sh
-.isoloom/docker/checks/exec-web.sh
+.isoloom/docker/checks/isoloom-exec-web.sh
 .isoloom/docker/checks/web.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
@@ -697,7 +697,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-web",
+        "id": "isoloom-exec-web",
         "from": "inside web",
         "checks": [
           {
@@ -708,10 +708,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-web",
+          "id": "check-isoloom-exec-web",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/exec-web.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/isoloom-exec-web.sh",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -1476,7 +1476,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-web",
+        "id": "isoloom-exec-web",
         "from": "inside web",
         "checks": [
           {
@@ -1487,10 +1487,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-web",
+          "id": "check-isoloom-exec-web",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/exec-web.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/isoloom-exec-web.sh",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -2140,7 +2140,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-web",
+        "id": "isoloom-exec-web",
         "from": "inside web",
         "checks": [
           {
@@ -2151,10 +2151,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-web",
+          "id": "check-isoloom-exec-web",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/exec-web.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/isoloom-exec-web.sh",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -2914,7 +2914,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-web",
+        "id": "isoloom-exec-web",
         "from": "inside web",
         "checks": [
           {
@@ -2925,10 +2925,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-web",
+          "id": "check-isoloom-exec-web",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/exec-web.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/isoloom-exec-web.sh",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -3559,7 +3559,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-web",
+        "id": "isoloom-exec-web",
         "from": "inside web",
         "checks": [
           {
@@ -3570,10 +3570,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-web",
+          "id": "check-isoloom-exec-web",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/exec-web.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/isoloom-exec-web.sh",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -4270,7 +4270,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-web",
+        "id": "isoloom-exec-web",
         "from": "inside web",
         "checks": [
           {
@@ -4281,10 +4281,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-web",
+          "id": "check-isoloom-exec-web",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/exec-web.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name private-names --file .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/isoloom-exec-web.sh",
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
@@ -4415,7 +4415,7 @@ systemctl enable --now isoloom-published.service
 
 ## .isoloom/docker/checks/client.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/exec-web.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-web.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/web.sh: identical in the `docker` snapshot
 

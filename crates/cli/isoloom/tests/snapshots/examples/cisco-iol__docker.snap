@@ -1266,7 +1266,7 @@ volumes:
     "clouds": {}
   },
   "checks": {
-    "default_position": "networks",
+    "default_position": "isoloom-networks",
     "positions": [
       {
         "position": "host-a",

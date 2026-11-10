@@ -91,10 +91,15 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
     }
 }
 
-/// What Isoloom's own machines and services are named with (its controller, the check stand-in,
-/// the check runners, the route sidecars, the init jobs): a spec's machine or alias starting so
+/// What Isoloom's own machines, services and files beside a machine's are named with (its
+/// controller, the check stand-in, the check runners and their scripts, the route sidecars, the
+/// init jobs, a machine's published Kubernetes Service): a spec's machine or alias starting so
 /// would collide with them.
-const RESERVED_PREFIX: &str = "isoloom-";
+pub const RESERVED_PREFIX: &str = "isoloom-";
+
+/// The longest machine name: its published ports' Kubernetes Service, `isoloom-<name>`, is a
+/// 63-character DNS label.
+pub const MACHINE_NAME_MAX: usize = 63 - RESERVED_PREFIX.len();
 const RESERVED_NAME: &str = "names starting with `isoloom-` are Isoloom's own (its controller, router and tool VM, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs): choose another";
 
 /// The machine's name (a DNS label short enough for Kubernetes), and a network to be on.
@@ -103,10 +108,11 @@ fn name_and_networks(s: &Subject, p: &mut Problems) {
         p.add(&s.at, "machine names are DNS names: kebab-case, starting with a letter");
     } else if s.name.starts_with(RESERVED_PREFIX) {
         p.add(&s.at, RESERVED_NAME);
-    } else if s.name.len() > 53 {
-        // The machine's published entry point is the Kubernetes Service `<name>-published`,
-        // a 63-character DNS label; 10 characters are the suffix.
-        p.add(&s.at, "at most 53 characters: it becomes the Kubernetes Service `<name>-published`");
+    } else if s.name.len() > MACHINE_NAME_MAX {
+        p.add(
+            &s.at,
+            format!("at most {MACHINE_NAME_MAX} characters: its published ports are the Kubernetes Service `isoloom-<name>`"),
+        );
     }
     // A LAN's switch takes its ports from the LAN (checked with the networks).
     if s.m.networks.is_empty() && crate::vlans::switched_by(s.spec, s.name).is_none() {

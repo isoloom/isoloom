@@ -31,6 +31,16 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Breaking
 
+- **Breaking: what Isoloom names beside a machine is under `isoloom-`, which no machine takes.**
+  The check runner of the networks' position is `isoloom-networks` (its script
+  `checks/isoloom-networks.sh`, its run-manifest step `check-isoloom-networks`, its Compose
+  service `isoloom-check-isoloom-networks`, `resolved.json`'s `checks.positions[].position`; was
+  `networks`), a machine's `exec` checks' runner `isoloom-exec-<machine>` (`checks/isoloom-exec-<machine>.sh`,
+  step `check-isoloom-exec-<machine>`; was `exec-<machine>`), and a machine's published ports'
+  Kubernetes Service `isoloom-<machine>` (was `<machine>-published`). A machine named `networks`,
+  `exec-web` or `web-published` took one of those names: `generate` stopped (`wrote … twice`) or
+  Kubernetes kept one of two Services silently. A machine's name may now be 55 characters (was
+  53), `isoloom_spec::validate::MACHINE_NAME_MAX`.
 - **Breaking (runner): `project.archive` leaves Isoloom's outputs out but `with.outputs`.** The
   action's new optional `with.outputs` names the outputs the guest reads (paths from the project,
   separated by spaces; `.isoloom/docker .isoloom/configure` for a Compose VM); the archive follows

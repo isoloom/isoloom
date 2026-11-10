@@ -6,8 +6,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target hosted (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/networks.sh
-✓ .isoloom/docker/checks/exec-cache.sh
+✓ .isoloom/docker/checks/isoloom-networks.sh
+✓ .isoloom/docker/checks/isoloom-exec-cache.sh
 ✓ .isoloom/docker/checks/cache.sh
 ✓ .isoloom/docker/checks/web.sh
 ✓ .isoloom/resolved.json
@@ -17,8 +17,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
 .isoloom/.gitignore
 .isoloom/docker/checks/cache.sh
-.isoloom/docker/checks/exec-cache.sh
-.isoloom/docker/checks/networks.sh
+.isoloom/docker/checks/isoloom-exec-cache.sh
+.isoloom/docker/checks/isoloom-networks.sh
 .isoloom/docker/checks/web.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
@@ -27,9 +27,9 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 ## .isoloom/docker/checks/cache.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/exec-cache.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-cache.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/networks.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-networks.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/web.sh: identical in the `docker` snapshot
 

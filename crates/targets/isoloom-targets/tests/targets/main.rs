@@ -37,6 +37,7 @@ mod project_copy;
 mod proxmox_controller;
 mod reboot;
 mod report;
+mod reserved_names;
 mod resolved;
 mod run_manifest;
 mod shared_volumes;

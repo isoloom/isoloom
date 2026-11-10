@@ -6,9 +6,9 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target cloud-docker (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/exec-writer.sh
+✓ .isoloom/docker/checks/isoloom-exec-writer.sh
 ✓ .isoloom/docker/checks/writer.sh
-✓ .isoloom/docker/checks/exec-reader.sh
+✓ .isoloom/docker/checks/isoloom-exec-reader.sh
 ✓ .isoloom/docker/checks/reader.sh
 ✓ .isoloom/cloud-docker/aws/main.tf
 ✓ .isoloom/cloud-docker/azure/main.tf
@@ -52,8 +52,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/cloud-docker/oci/main.tf
 .isoloom/cloud-docker/oci/run.json
 .isoloom/cloud-docker/oci/setup.sh
-.isoloom/docker/checks/exec-reader.sh
-.isoloom/docker/checks/exec-writer.sh
+.isoloom/docker/checks/isoloom-exec-reader.sh
+.isoloom/docker/checks/isoloom-exec-writer.sh
 .isoloom/docker/checks/reader.sh
 .isoloom/docker/checks/writer.sh
 .isoloom/docker/compose.yml
@@ -750,7 +750,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-writer",
+        "id": "isoloom-exec-writer",
         "from": "inside writer",
         "checks": [
           {
@@ -761,10 +761,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-writer",
+          "id": "check-isoloom-exec-writer",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/exec-writer.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/isoloom-exec-writer.sh",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -799,7 +799,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-reader",
+        "id": "isoloom-exec-reader",
         "from": "inside reader",
         "checks": [
           {
@@ -810,10 +810,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-reader",
+          "id": "check-isoloom-exec-reader",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/exec-reader.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/isoloom-exec-reader.sh",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -1591,7 +1591,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-writer",
+        "id": "isoloom-exec-writer",
         "from": "inside writer",
         "checks": [
           {
@@ -1602,10 +1602,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-writer",
+          "id": "check-isoloom-exec-writer",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/exec-writer.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/isoloom-exec-writer.sh",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -1640,7 +1640,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-reader",
+        "id": "isoloom-exec-reader",
         "from": "inside reader",
         "checks": [
           {
@@ -1651,10 +1651,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-reader",
+          "id": "check-isoloom-exec-reader",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/exec-reader.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/isoloom-exec-reader.sh",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -2317,7 +2317,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-writer",
+        "id": "isoloom-exec-writer",
         "from": "inside writer",
         "checks": [
           {
@@ -2328,10 +2328,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-writer",
+          "id": "check-isoloom-exec-writer",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/exec-writer.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/isoloom-exec-writer.sh",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -2366,7 +2366,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-reader",
+        "id": "isoloom-exec-reader",
         "from": "inside reader",
         "checks": [
           {
@@ -2377,10 +2377,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-reader",
+          "id": "check-isoloom-exec-reader",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/exec-reader.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/isoloom-exec-reader.sh",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -3153,7 +3153,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-writer",
+        "id": "isoloom-exec-writer",
         "from": "inside writer",
         "checks": [
           {
@@ -3164,10 +3164,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-writer",
+          "id": "check-isoloom-exec-writer",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/exec-writer.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/isoloom-exec-writer.sh",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -3202,7 +3202,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-reader",
+        "id": "isoloom-exec-reader",
         "from": "inside reader",
         "checks": [
           {
@@ -3213,10 +3213,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-reader",
+          "id": "check-isoloom-exec-reader",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/exec-reader.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/isoloom-exec-reader.sh",
             "host": "${outputs.ip}",
             "user": "admin"
           },
@@ -3860,7 +3860,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-writer",
+        "id": "isoloom-exec-writer",
         "from": "inside writer",
         "checks": [
           {
@@ -3871,10 +3871,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-writer",
+          "id": "check-isoloom-exec-writer",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/exec-writer.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/isoloom-exec-writer.sh",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -3909,7 +3909,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-reader",
+        "id": "isoloom-exec-reader",
         "from": "inside reader",
         "checks": [
           {
@@ -3920,10 +3920,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-reader",
+          "id": "check-isoloom-exec-reader",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/exec-reader.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/isoloom-exec-reader.sh",
             "host": "${outputs.ip}",
             "user": "root"
           },
@@ -4633,7 +4633,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-writer",
+        "id": "isoloom-exec-writer",
         "from": "inside writer",
         "checks": [
           {
@@ -4644,10 +4644,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-writer",
+          "id": "check-isoloom-exec-writer",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/exec-writer.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T writer sh -s < .isoloom/docker/checks/isoloom-exec-writer.sh",
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
@@ -4682,7 +4682,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-reader",
+        "id": "isoloom-exec-reader",
         "from": "inside reader",
         "checks": [
           {
@@ -4693,10 +4693,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-reader",
+          "id": "check-isoloom-exec-reader",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/exec-reader.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml exec -T reader sh -s < .isoloom/docker/checks/isoloom-exec-reader.sh",
             "host": "${outputs.ip}",
             "user": "ubuntu"
           },
@@ -4783,9 +4783,9 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now isoloom-published.service
 
-## .isoloom/docker/checks/exec-reader.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-reader.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/exec-writer.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-writer.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/reader.sh: identical in the `docker` snapshot
 

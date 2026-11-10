@@ -120,13 +120,13 @@ fn every_published_port_is_fixed_and_its_address_left_to_the_vm() {
 fn the_runners_pass_the_derived_switch_and_pipe_exec_checks_from_the_copy() {
     let g = guest_of(WITH_SECRET);
     let ids: Vec<&str> = g.runners.iter().map(|r| r.command.id.as_str()).collect();
-    assert!(ids.contains(&"check-cache") && ids.contains(&"check-exec-cache"), "{ids:?}");
-    let exec = g.runners.iter().find(|r| r.command.id.as_str() == "check-exec-cache").unwrap();
+    assert!(ids.contains(&"check-cache") && ids.contains(&"check-isoloom-exec-cache"), "{ids:?}");
+    let exec = g.runners.iter().find(|r| r.command.id.as_str() == "check-isoloom-exec-cache").unwrap();
     assert!(
         exec.command
             .command
             .to_string()
-            .ends_with("exec -T cache sh -s < .isoloom/docker/checks/exec-cache.sh")
+            .ends_with("exec -T cache sh -s < .isoloom/docker/checks/isoloom-exec-cache.sh")
     );
     let compose_run = g.runners.iter().find(|r| r.command.id.as_str() == "check-cache").unwrap();
     assert!(

@@ -131,7 +131,7 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() -> Out
     // AWS and Azure (a Windows machine on one network there): a controller, and the runner on it.
     let one_net = lab(&WINDOWS_ONLY.replace("corp: 10, vault: 10", "vault: 10"))?;
     let files = generate(&one_net, Target::CloudVm).unwrap();
-    let runner = file(&files, ".isoloom/cloud-vm/checks/networks.sh").expect("the networks' runner");
+    let runner = file(&files, ".isoloom/cloud-vm/checks/isoloom-networks.sh").expect("the networks' runner");
     assert!(runner.contains("_retry 30 _tcp '10.9.1.10' 389"), "{runner}");
     for (cloud, host) in [
         ("aws", "aws_eip.isoloom_controller.public_ip"),
@@ -140,7 +140,7 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() -> Out
         let tf = file(&files, &format!(".isoloom/cloud-vm/{cloud}/main.tf")).unwrap();
         assert!(tf.contains("isoloom_controller"), "{cloud}");
         // Each entry one item a line (the HCL builder).
-        let entry = format!("position = \"networks\"\n      machine  = \"isoloom-controller\"\n      host     = {host}");
+        let entry = format!("position = \"isoloom-networks\"\n      machine  = \"isoloom-controller\"\n      host     = {host}");
         assert!(tf.contains(&entry), "{cloud}: {tf}");
     }
     Ok(())

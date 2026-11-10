@@ -6,7 +6,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target docker-vm (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/networks.sh
+✓ .isoloom/docker/checks/isoloom-networks.sh
 ✓ .isoloom/docker/checks/database.sh
 ✓ .isoloom/docker/checks/web.sh
 ✓ .isoloom/docker-vm/Vagrantfile
@@ -26,7 +26,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/docker-vm/proxmox/setup.sh
 .isoloom/docker-vm/run.json
 .isoloom/docker/checks/database.sh
-.isoloom/docker/checks/networks.sh
+.isoloom/docker/checks/isoloom-networks.sh
 .isoloom/docker/checks/web.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
@@ -1085,7 +1085,7 @@ output "ssh_user" {
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-networks",
+            "check-isoloom-networks",
             "check-database",
             "check-web"
           ]
@@ -1477,7 +1477,7 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-networks",
+          "id": "check-isoloom-networks",
           "action": "ssh.run",
           "with": {
             "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
@@ -1488,7 +1488,7 @@ output "ssh_user" {
         },
         "on_timeout": [
           {
-            "id": "rm-check-networks",
+            "id": "rm-check-isoloom-networks",
             "action": "ssh.run",
             "with": {
               "command": "sudo docker ps -aq --filter label=com.docker.compose.project=supplier-portal-api --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
@@ -1922,7 +1922,7 @@ systemctl enable --now isoloom-published.service
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-networks",
+            "check-isoloom-networks",
             "check-database",
             "check-web"
           ]
@@ -2303,7 +2303,7 @@ systemctl enable --now isoloom-published.service
           }
         ],
         "step": {
-          "id": "check-networks",
+          "id": "check-isoloom-networks",
           "argv": [
             "vagrant",
             "ssh",
@@ -2316,7 +2316,7 @@ systemctl enable --now isoloom-published.service
         },
         "on_timeout": [
           {
-            "id": "rm-check-networks",
+            "id": "rm-check-isoloom-networks",
             "argv": [
               "vagrant",
               "ssh",
@@ -2466,7 +2466,7 @@ systemctl enable --now isoloom-published.service
 
 ## .isoloom/docker/checks/database.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/networks.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-networks.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/web.sh: identical in the `docker` snapshot
 

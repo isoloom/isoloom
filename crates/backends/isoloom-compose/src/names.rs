@@ -30,7 +30,7 @@ mod tests {
     fn the_runner_where_a_user_stands_has_the_short_name() {
         let user = Position::Machine("user".into());
         assert_eq!(check_runner_service(&user, &user), "isoloom-check");
-        assert_eq!(check_runner_service(&Position::Networks, &user), "isoloom-check-networks");
+        assert_eq!(check_runner_service(&Position::Networks, &user), "isoloom-check-isoloom-networks");
     }
 
     #[test]

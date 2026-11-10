@@ -198,7 +198,7 @@ fn without_an_access_machine_checks_run_from_the_networks() {
     assert_eq!(planned.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["web:80 from the networks"]);
     assert_eq!(
         (Position::Networks.id(), Position::Networks.label()),
-        ("networks", "from the environment's networks".to_owned())
+        ("isoloom-networks", "from the environment's networks".to_owned())
     );
     let web = Position::Machine("web".into());
     assert_eq!((web.id(), web.label()), ("web", "from web".to_owned()));

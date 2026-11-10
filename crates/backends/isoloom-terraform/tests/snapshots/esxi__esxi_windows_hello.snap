@@ -355,11 +355,11 @@ output "ssh_user" {
 output "checks" {
   value = [
     {
-      position = "networks"
+      position = "isoloom-networks"
       machine  = "isoloom-controller"
       host     = "192.168.57.253"
       user     = "isoloom"
-      script   = ".isoloom/esxi/checks/networks.sh"
+      script   = ".isoloom/esxi/checks/isoloom-networks.sh"
     }
   ]
 }

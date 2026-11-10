@@ -6,9 +6,9 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target hosted (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/exec-writer.sh
+✓ .isoloom/docker/checks/isoloom-exec-writer.sh
 ✓ .isoloom/docker/checks/writer.sh
-✓ .isoloom/docker/checks/exec-reader.sh
+✓ .isoloom/docker/checks/isoloom-exec-reader.sh
 ✓ .isoloom/docker/checks/reader.sh
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
@@ -16,8 +16,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
 .isoloom/.gitignore
-.isoloom/docker/checks/exec-reader.sh
-.isoloom/docker/checks/exec-writer.sh
+.isoloom/docker/checks/isoloom-exec-reader.sh
+.isoloom/docker/checks/isoloom-exec-writer.sh
 .isoloom/docker/checks/reader.sh
 .isoloom/docker/checks/writer.sh
 .isoloom/docker/compose.yml
@@ -25,9 +25,9 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/exec-reader.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-reader.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/exec-writer.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-writer.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/reader.sh: identical in the `docker` snapshot
 

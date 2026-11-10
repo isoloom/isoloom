@@ -183,7 +183,7 @@
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-networks",
+            "check-isoloom-networks",
             "check-db",
             "check-web"
           ]
@@ -609,7 +609,7 @@
           }
         ],
         "step": {
-          "id": "check-networks",
+          "id": "check-isoloom-networks",
           "action": "ssh.run",
           "with": {
             "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
@@ -620,7 +620,7 @@
         },
         "on_timeout": [
           {
-            "id": "rm-check-networks",
+            "id": "rm-check-isoloom-networks",
             "action": "ssh.run",
             "with": {
               "command": "sudo docker ps -aq --filter label=com.docker.compose.project=web-portal --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",

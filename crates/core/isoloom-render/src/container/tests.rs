@@ -49,7 +49,7 @@ fn readiness_is_the_ports_then_the_machine_s_own_healthcheck() {
     );
     assert_eq!(ready_test(&spec.machines["api"], Some(&health)), "( pg_isready || exit 1 )");
     assert_eq!(ready_test(&spec.machines["api"], None), "");
-    assert_eq!(exec_runner("web"), "exec-web.sh");
+    assert_eq!(exec_runner("web"), "isoloom-exec-web.sh");
 }
 
 #[test]

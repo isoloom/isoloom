@@ -373,7 +373,7 @@ crash.*.log
     "clouds": {}
   },
   "checks": {
-    "default_position": "networks",
+    "default_position": "isoloom-networks",
     "positions": []
   },
   "cloud": {

@@ -1338,10 +1338,10 @@ volumes:
     }
   },
   "checks": {
-    "default_position": "networks",
+    "default_position": "isoloom-networks",
     "positions": [
       {
-        "position": "networks",
+        "position": "isoloom-networks",
         "machine": null,
         "runner": "isoloom-check",
         "checks": [

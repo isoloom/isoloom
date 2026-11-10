@@ -168,13 +168,13 @@ fn names_leave_room_for_the_kubernetes_affixes() {
     ));
     assert!(p.iter().any(|m| m.contains("name: at most 55 characters")), "{p:?}");
 
-    // A 54-char machine name overflows `<name>-published`; a machine+volume pair overflows the claim.
-    let m54 = "m".repeat(54);
+    // A 56-char machine name overflows `isoloom-<name>`; a machine+volume pair overflows the claim.
+    let m56 = "m".repeat(56);
     let v60 = "v".repeat(63);
     let overflow = problems(&format!(
-        "{BASE}machines:\n  {m54}: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v60}: /data }}, app: {{ image: x }} }}\n"
+        "{BASE}machines:\n  {m56}: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, volumes: {{ {v60}: /data }}, app: {{ image: x }} }}\n"
     ));
-    assert!(overflow.iter().any(|m| m.contains("at most 53 characters")), "{overflow:?}");
+    assert!(overflow.iter().any(|m| m.contains("at most 55 characters")), "{overflow:?}");
     assert!(overflow.iter().any(|m| m.contains("at most 62 characters")), "{overflow:?}");
     // A volume name that fits the claim but not its seed init container (`seed-<volume>`).
     let v59 = "v".repeat(59);

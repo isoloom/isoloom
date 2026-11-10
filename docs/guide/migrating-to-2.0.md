@@ -35,6 +35,8 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   pods run under the Pod Security Standards' `baseline` level, which their namespace enforces. Expose a port outside the cluster in your own
   overlay ([Kubernetes](targets/kubernetes.md)).
 - **Images built from the project** are named under `localhost/isoloom/` by default.
+- **A machine's published Kubernetes Service is `isoloom-<machine>`** (was `<machine>-published`):
+  `kubectl port-forward svc/isoloom-web …`.
 - **Proxmox verifies the API's TLS certificate**: `proxmox_insecure` defaults to `false`. A
   server with a self-signed certificate needs `proxmox_insecure=true` (or a certificate its
   clients trust).
@@ -95,6 +97,11 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   (`.terraform/`, `*.tfstate*`, `.vagrant/`, `.isoloom-reach/`) at any depth, and an earlier
   archive at the top. `docker-vm/proxmox/run.json` and `cloud-docker`'s manifests name
   `.isoloom/docker .isoloom/configure`; `cloud-vm`'s name none.
+- The networks' check runner is `isoloom-networks` (step `check-isoloom-networks`, script
+  `checks/isoloom-networks.sh`; was `networks`), a machine's `exec` checks' runner
+  `isoloom-exec-<machine>` (step `check-isoloom-exec-<machine>`; was `exec-<machine>`), and
+  `resolved.json`'s `checks.positions[].position` says `isoloom-networks`. A runner that names
+  them reads them from `checks.runners[]`.
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.
 - On Vagrant (and `hybrid`), the controller's check runner step is `check-isoloom-controller`
   (was `check-controller`) and its runner script `checks/isoloom-controller.sh` (was

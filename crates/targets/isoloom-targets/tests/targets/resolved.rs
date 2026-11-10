@@ -113,7 +113,7 @@ fn the_snapshot_is_a_generated_file_of_every_target() -> Outcome {
     }
     let r = resolve(&spec);
     assert_eq!(lookup(&r, "published.0.host_port").unwrap(), 8080);
-    assert_eq!(lookup(&r, "checks.positions.0.position").unwrap(), "networks");
+    assert_eq!(lookup(&r, "checks.positions.0.position").unwrap(), "isoloom-networks");
     assert!(lookup(&r, "checks.positions.0.machine").unwrap().is_null());
     assert!(lookup(&r, "nothing.here").is_none());
     Ok(())

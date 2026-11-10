@@ -6,8 +6,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target docker-vm (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/networks.sh
-✓ .isoloom/docker/checks/exec-cache.sh
+✓ .isoloom/docker/checks/isoloom-networks.sh
+✓ .isoloom/docker/checks/isoloom-exec-cache.sh
 ✓ .isoloom/docker/checks/cache.sh
 ✓ .isoloom/docker/checks/web.sh
 ✓ .isoloom/docker-vm/Vagrantfile
@@ -27,8 +27,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/docker-vm/proxmox/setup.sh
 .isoloom/docker-vm/run.json
 .isoloom/docker/checks/cache.sh
-.isoloom/docker/checks/exec-cache.sh
-.isoloom/docker/checks/networks.sh
+.isoloom/docker/checks/isoloom-exec-cache.sh
+.isoloom/docker/checks/isoloom-networks.sh
 .isoloom/docker/checks/web.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
@@ -649,7 +649,7 @@ mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   config.vm.provision "shell", name: "checks", run: "never", inline: "failed=0
   cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=\"$ISOLOOM_DERIVED\" isoloom-check || failed=1
   cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=\"$ISOLOOM_DERIVED\" isoloom-check-cache || failed=1
-  cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml exec -T cache sh -s < .isoloom/docker/checks/exec-cache.sh || failed=1
+  cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml exec -T cache sh -s < .isoloom/docker/checks/isoloom-exec-cache.sh || failed=1
   cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=\"$ISOLOOM_DERIVED\" isoloom-check-web || failed=1
 exit \"$failed\"", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
 end
@@ -1063,7 +1063,7 @@ output "ssh_user" {
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-networks",
+            "check-isoloom-networks",
             "check-cache",
             "check-web"
           ]
@@ -1476,7 +1476,7 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-networks",
+          "id": "check-isoloom-networks",
           "action": "ssh.run",
           "with": {
             "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=${params.ISOLOOM_DERIVED} isoloom-check",
@@ -1487,7 +1487,7 @@ output "ssh_user" {
         },
         "on_timeout": [
           {
-            "id": "rm-check-networks",
+            "id": "rm-check-isoloom-networks",
             "action": "ssh.run",
             "with": {
               "command": "sudo docker ps -aq --filter label=com.docker.compose.project=hello-stack --filter label=com.docker.compose.service=isoloom-check --filter label=com.docker.compose.oneoff=True | xargs -r sudo docker rm -f",
@@ -1539,7 +1539,7 @@ output "ssh_user" {
         ]
       },
       {
-        "id": "exec-cache",
+        "id": "isoloom-exec-cache",
         "from": "inside cache",
         "checks": [
           {
@@ -1550,10 +1550,10 @@ output "ssh_user" {
           }
         ],
         "step": {
-          "id": "check-exec-cache",
+          "id": "check-isoloom-exec-cache",
           "action": "ssh.run",
           "with": {
-            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml exec -T cache sh -s < .isoloom/docker/checks/exec-cache.sh",
+            "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml exec -T cache sh -s < .isoloom/docker/checks/isoloom-exec-cache.sh",
             "host": "${outputs.ip}",
             "user": "isoloom"
           },
@@ -1955,7 +1955,7 @@ systemctl enable --now isoloom-published.service
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-networks",
+            "check-isoloom-networks",
             "check-cache",
             "check-web"
           ]
@@ -2357,7 +2357,7 @@ systemctl enable --now isoloom-published.service
           }
         ],
         "step": {
-          "id": "check-networks",
+          "id": "check-isoloom-networks",
           "argv": [
             "vagrant",
             "ssh",
@@ -2370,7 +2370,7 @@ systemctl enable --now isoloom-published.service
         },
         "on_timeout": [
           {
-            "id": "rm-check-networks",
+            "id": "rm-check-isoloom-networks",
             "argv": [
               "vagrant",
               "ssh",
@@ -2428,7 +2428,7 @@ systemctl enable --now isoloom-published.service
         ]
       },
       {
-        "id": "exec-cache",
+        "id": "isoloom-exec-cache",
         "from": "inside cache",
         "checks": [
           {
@@ -2439,13 +2439,13 @@ systemctl enable --now isoloom-published.service
           }
         ],
         "step": {
-          "id": "check-exec-cache",
+          "id": "check-isoloom-exec-cache",
           "argv": [
             "vagrant",
             "ssh",
             "--no-tty",
             "--command",
-            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml exec -T cache sh -s < .isoloom/docker/checks/exec-cache.sh",
+            "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name hello-stack --file .isoloom/docker/compose.yml exec -T cache sh -s < .isoloom/docker/checks/isoloom-exec-cache.sh",
             "default"
           ],
           "timeout_s": 75
@@ -2556,9 +2556,9 @@ systemctl enable --now isoloom-published.service
 
 ## .isoloom/docker/checks/cache.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/exec-cache.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-exec-cache.sh: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/networks.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-networks.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/checks/web.sh: identical in the `docker` snapshot
 

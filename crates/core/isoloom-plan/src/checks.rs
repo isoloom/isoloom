@@ -39,12 +39,13 @@ pub enum Position {
 }
 
 impl Position {
-    /// A file-safe id: the machine's name, or `networks`.
+    /// A file-safe id: the machine's name, or `isoloom-networks`, under Isoloom's own prefix,
+    /// which no machine's name takes (a runner's file, service or step never meets a machine's).
     #[must_use]
     pub fn id(&self) -> &str {
         match self {
             Position::Machine(m) => m,
-            Position::Networks => "networks",
+            Position::Networks => "isoloom-networks",
         }
     }
 

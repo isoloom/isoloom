@@ -55,11 +55,20 @@ pub fn ready_test(m: &Machine, health: Option<&Health>) -> String {
     [probe(m)].into_iter().filter(|t| !t.is_empty()).chain(own).collect::<Vec<_>>().join(" && ")
 }
 
-/// The runner of a machine's `exec` checks, in `.isoloom/docker/checks/`: piped into the
-/// machine (`docker compose exec -T <machine> sh -s < exec-<machine>.sh`).
+/// The name of the runner of a machine's `exec` checks, `isoloom-exec-<machine>`: under
+/// Isoloom's own prefix, since a position's runner is named after its machine, which never takes
+/// it.
+#[must_use]
+pub fn exec_runner_name(machine: &str) -> String {
+    format!("isoloom-exec-{machine}")
+}
+
+/// The script of the runner of a machine's `exec` checks ([`exec_runner_name`]), in
+/// `.isoloom/docker/checks/`: piped into the machine (`docker compose exec -T <machine> sh -s <
+/// isoloom-exec-<machine>.sh`).
 #[must_use]
 pub fn exec_runner(machine: &str) -> String {
-    format!("exec-{machine}.sh")
+    format!("{}.sh", exec_runner_name(machine))
 }
 
 /// The service that stands in for an access machine the runner supplies, so checks run from its

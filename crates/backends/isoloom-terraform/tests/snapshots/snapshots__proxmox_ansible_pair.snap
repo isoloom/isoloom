@@ -584,11 +584,11 @@ output "ssh_user" {
 output "checks" {
   value = [
     {
-      position = "networks"
+      position = "isoloom-networks"
       machine  = "isoloom-controller"
       host     = "10.63.0.253"
       user     = "isoloom"
-      script   = ".isoloom/proxmox/checks/networks.sh"
+      script   = ".isoloom/proxmox/checks/isoloom-networks.sh"
     },
     {
       position = "web"

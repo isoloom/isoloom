@@ -83,16 +83,16 @@ fn kubernetes_publishes_and_keeps_offline_machines_inside() -> Outcome {
     // A published port is a cluster-internal Service, reached through `kubectl port-forward`:
     // nothing opens a public load balancer.
     assert!(
-        !env.contains("LoadBalancer") && env.contains("name: web-published") && env.contains("port: 8080"),
+        !env.contains("LoadBalancer") && env.contains("name: isoloom-web\n") && env.contains("port: 8080"),
         "{env}"
     );
     assert!(
-        env.contains("#   kubectl -n isoloom-hello-stack port-forward svc/web-published 8080:8080\n"),
+        env.contains("#   kubectl -n isoloom-hello-stack port-forward svc/isoloom-web 8080:8080\n"),
         "{env}"
     );
     let notes = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/chart/templates/NOTES.txt")?;
     assert!(
-        notes.contains("kubectl -n {{ .Release.Namespace }} port-forward svc/web-published 8080:8080"),
+        notes.contains("kubectl -n {{ .Release.Namespace }} port-forward svc/isoloom-web 8080:8080"),
         "{notes}"
     );
     assert!(env.contains("name: offline-"));

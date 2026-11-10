@@ -60,7 +60,7 @@ isoloom generate --target docker
 
 ```text
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/networks.sh
+✓ .isoloom/docker/checks/isoloom-networks.sh
 ...
 ✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json

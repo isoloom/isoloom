@@ -6,20 +6,20 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 # isoloom generate --target hosted (exit 0)
 ✓ .isoloom/docker/compose.yml
-✓ .isoloom/docker/checks/networks.sh
+✓ .isoloom/docker/checks/isoloom-networks.sh
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
 
 ## .isoloom/.generated
 # The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
 .isoloom/.gitignore
-.isoloom/docker/checks/networks.sh
+.isoloom/docker/checks/isoloom-networks.sh
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
 
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
-## .isoloom/docker/checks/networks.sh: identical in the `docker` snapshot
+## .isoloom/docker/checks/isoloom-networks.sh: identical in the `docker` snapshot
 
 ## .isoloom/docker/compose.yml: identical in the `docker` snapshot
 

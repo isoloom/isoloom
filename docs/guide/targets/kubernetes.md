@@ -52,7 +52,7 @@ helm test env -n isoloom-<name> --logs
 ## Published ports
 
 A port with `publish:` is a ClusterIP Service by default: reach it with
-`kubectl -n isoloom-<name> port-forward svc/<machine>-published <local>:<port>`. Exposing it
+`kubectl -n isoloom-<name> port-forward svc/isoloom-<machine> <local>:<port>`. Exposing it
 outside the cluster (a LoadBalancer Service, an Ingress) is a decision for your cluster's
 operators: add it in a Kustomize overlay or a manifest of your own, with the source ranges your
 policy allows.

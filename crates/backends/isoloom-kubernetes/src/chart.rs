@@ -165,7 +165,7 @@ fn tests(r: &Rendered) -> Result<String> {
             objects.push(Manifest::pod(metadata, j.template.spec.clone()));
         }
     }
-    let about = "# The checks: `helm test <release>` runs a Job per position; an `exec` check runs inside its\n# machine: kubectl -n <namespace> exec -i deploy/<machine> -- sh -s < .isoloom/kubernetes/checks/exec-<machine>.sh\n";
+    let about = "# The checks: `helm test <release>` runs a Job per position; an `exec` check runs inside its\n# machine: kubectl -n <namespace> exec -i deploy/<machine> -- sh -s < .isoloom/kubernetes/checks/isoloom-exec-<machine>.sh\n";
     Ok(format!("{}{about}{}", generated(), helm_documents(&objects, &r.labels)?))
 }
 

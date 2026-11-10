@@ -1,13 +1,12 @@
 //! The names a draft gives: a source's names made into DNS labels the spec accepts, each one
 //! unique where it must be.
 
-/// The longest name a draft gives: the strictest of the spec's limits, a machine's 53 characters
-/// (its Kubernetes Service is `<name>-published`).
-const MAX: usize = 53;
+/// The longest name a draft gives: the strictest of the spec's limits, a machine's.
+const MAX: usize = isoloom_spec::validate::MACHINE_NAME_MAX;
 
 /// A source's name as a DNS label (`My_App 2` -> `my-app-2`): lowercase letters, digits and
-/// dashes, starting with a letter (`9lives` -> `m-9lives`), at most 53 characters, never ending
-/// on a dash; `env` when nothing is left.
+/// dashes, starting with a letter (`9lives` -> `m-9lives`), at most [`MAX`] characters, never
+/// ending on a dash; `env` when nothing is left.
 pub(crate) fn label(source: &str) -> String {
     let mut words = String::new();
     for c in source.chars() {
@@ -30,7 +29,8 @@ fn fit(name: &str, max: usize) -> String {
     name.chars().take(max).collect::<String>().trim_end_matches('-').to_owned()
 }
 
-/// `base`, else `base-2`, `base-3`...: the first that `taken` doesn't hold, at most 53 characters.
+/// `base`, else `base-2`, `base-3`...: the first that `taken` doesn't hold, at most [`MAX`]
+/// characters.
 pub(crate) fn unique(base: &str, taken: impl Fn(&str) -> bool) -> String {
     if !taken(base) {
         return base.to_owned();

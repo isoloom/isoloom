@@ -281,7 +281,7 @@
           "via": "env",
           "var": "ISOLOOM_DERIVED",
           "steps": [
-            "check-networks",
+            "check-isoloom-networks",
             "check-db",
             "check-web"
           ]
@@ -698,7 +698,7 @@
           }
         ],
         "step": {
-          "id": "check-networks",
+          "id": "check-isoloom-networks",
           "argv": [
             "vagrant",
             "ssh",
@@ -711,7 +711,7 @@
         },
         "on_timeout": [
           {
-            "id": "rm-check-networks",
+            "id": "rm-check-isoloom-networks",
             "argv": [
               "vagrant",
               "ssh",
