@@ -9,7 +9,7 @@ use isoloom_spec::syntax::{Guard, Invocation};
 use serde_json::{Value, json};
 
 use super::task::Task;
-use super::tasks::project;
+use super::tasks::{project, project_var};
 
 /// The `service` step: an enabled unit started (a defined one's file written first), or a disabled
 /// one stopped. Restarts come from the recipe's earlier changes notifying the handler and the
@@ -157,21 +157,18 @@ fn detect(cmd: &str, register: &str) -> Value {
 }
 
 /// The `run` step: a project script run behind its `creates`.
-pub(super) fn run(r: &RunPlan, notify: &[String]) -> Value {
+pub(super) fn run(r: &RunPlan, notify: &[String], vars: &str) -> Value {
     let mut args = serde_json::Map::new();
-    args.insert("cmd".to_owned(), Value::String(project(r.script.as_str())));
-    let task = Task::new(format!("run {}", r.script));
-    let task = match &r.creates {
-        Some(path) => {
-            args.insert("creates".to_owned(), Value::String(path.to_string()));
-            task.module("ansible.builtin.script", Value::Object(args))
-        }
-        // No `creates`: it runs every apply (the shell renderer runs it too), so it always
-        // reports `changed` (`ansible-lint`'s `no-changed-when`).
-        None => task
-            .module("ansible.builtin.script", Value::Object(args))
-            .set("changed_when", Value::Bool(true)),
-    };
+    args.insert("cmd".to_owned(), project(vars));
+    if let Some(path) = &r.creates {
+        args.insert("creates".to_owned(), Value::String(path.to_string()));
+    }
+    let task = Task::new(format!("run {}", r.script))
+        .module("ansible.builtin.script", Value::Object(args))
+        .set("vars", project_var(vars, r.script.as_str()));
+    // No `creates`: it runs every apply (the shell renderer runs it too), so it always reports
+    // `changed` (`ansible-lint`'s `no-changed-when`).
+    let task = if r.creates.is_none() { task.set("changed_when", Value::Bool(true)) } else { task };
     task.notify(notify).into_value()
 }
 
@@ -182,12 +179,13 @@ pub(super) fn reboot() -> Value {
 
 /// The `playbook` step: the project's playbook run on the host itself (`-c local`), as the shell
 /// carrier runs it.
-pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String]) -> Value {
+pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String], vars: &str) -> Value {
     Task::new(format!("playbook {p}"))
         .module(
             "ansible.builtin.command",
-            json!({ "argv": ["ansible-playbook", "-c", "local", "-i", "localhost,", project(p.as_str())] }),
+            json!({ "argv": ["ansible-playbook", "-c", "local", "-i", "localhost,", project(vars)] }),
         )
+        .set("vars", project_var(vars, p.as_str()))
         .set("changed_when", Value::Bool(true))
         .notify(notify)
         .into_value()

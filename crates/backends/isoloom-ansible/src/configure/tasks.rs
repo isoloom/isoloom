@@ -14,13 +14,20 @@ use isoloom_spec::syntax::{FileState, Mode};
 use serde_json::{Value, json};
 
 use super::services;
-use super::task::Task;
+use super::task::{Task, jinja};
 use crate::error::{Error, Result};
 
-/// A project path as the role names it on the control node, under the play's `isoloom_project`
-/// (the project folder), so `copy` and `script` find it wherever the playbook is run from.
-pub(super) fn project(path: &str) -> String {
-    format!("{{{{ isoloom_project }}}}/{path}")
+/// A project file as a role's task names it on the control node: the play's `isoloom_project` (the
+/// project folder), so `copy` and `script` find it wherever the playbook is run from, joined to the
+/// task's `<vars>_file` variable, which [`project_var`] sets to the file's path. The path stays a
+/// variable, never part of the template, so Ansible evaluates none of the Jinja it may hold.
+pub(super) fn project(vars: &str) -> Value {
+    jinja(format!("{{{{ isoloom_project }}}}/{{{{ {vars}_file }}}}"))
+}
+
+/// The task's `vars` that [`project`] reads: `<vars>_file` set to `path`.
+pub(super) fn project_var(vars: &str, path: &str) -> Value {
+    json!({ format!("{vars}_file"): path })
 }
 
 /// Where a filled-in template is written under the role (`files/rendered/<from>`), and how a
@@ -43,7 +50,7 @@ pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], se
     Ok(match r {
         Resource::Repository(p) => repository(p, notify),
         Resource::Packages(ps) => packages(c, ps, notify, &vars, seq)?,
-        Resource::Copy(cp) => vec![copy(cp, notify)],
+        Resource::Copy(cp) => vec![copy(cp, notify, &vars)],
         Resource::Template(t) => vec![template(c, t, notify)],
         Resource::File(f) => vec![file(f, notify)],
         Resource::User(u) => vec![user(c, u, notify)],
@@ -51,9 +58,9 @@ pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], se
         Resource::Service(s) => services::service(c, s),
         Resource::Command(cmd) => services::command(cmd, notify, &vars, seq),
         Resource::Firewall(ports) => services::firewall(ports, notify, &vars, seq),
-        Resource::Run(run) => vec![services::run(run, notify)],
+        Resource::Run(run) => vec![services::run(run, notify, &vars)],
         Resource::Reboot => vec![services::reboot()],
-        Resource::Playbook(p) => vec![services::playbook(p, notify)],
+        Resource::Playbook(p) => vec![services::playbook(p, notify, &vars)],
     })
 }
 
@@ -238,9 +245,9 @@ fn apk_argv(specs: &[String]) -> Vec<Value> {
 }
 
 /// The `copy` step: a project file or folder at its destination, with owner and mode.
-fn copy(cp: &CopyPlan, notify: &[String]) -> Value {
+fn copy(cp: &CopyPlan, notify: &[String], vars: &str) -> Value {
     let mut args = serde_json::Map::new();
-    args.insert("src".to_owned(), Value::String(project(cp.from.as_str())));
+    args.insert("src".to_owned(), project(vars));
     args.insert("dest".to_owned(), Value::String(cp.to.to_string()));
     put(&mut args, "owner", cp.owner.as_ref());
     // An explicit mode, or `preserve` (the source's), which `cp` keeps too and `ansible-lint`'s
@@ -248,6 +255,7 @@ fn copy(cp: &CopyPlan, notify: &[String]) -> Value {
     args.insert("mode".to_owned(), mode(cp.mode).unwrap_or_else(|| Value::String("preserve".to_owned())));
     Task::new(format!("copy {} to {}", cp.from, cp.to))
         .module("ansible.builtin.copy", Value::Object(args))
+        .set("vars", project_var(vars, cp.from.as_str()))
         .notify(notify)
         .into_value()
 }

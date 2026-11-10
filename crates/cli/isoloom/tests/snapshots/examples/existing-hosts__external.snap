@@ -236,13 +236,17 @@ ansible_become=true
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
 - name: "Run provision/cache-boot.sh"
   ansible.builtin.script:
-    cmd: "{{ isoloom_project }}/provision/cache-boot.sh"
+    cmd: "{{ isoloom_project }}/{{ isoloom_machine_cache_file }}"
+  vars:
+    isoloom_machine_cache_file: provision/cache-boot.sh
   changed_when: true
 - name: Reboot
   ansible.builtin.reboot: {}
 - name: "Run provision/cache.sh"
   ansible.builtin.script:
-    cmd: "{{ isoloom_project }}/provision/cache.sh"
+    cmd: "{{ isoloom_project }}/{{ isoloom_machine_cache_file }}"
+  vars:
+    isoloom_machine_cache_file: provision/cache.sh
   changed_when: true
 
 ## .isoloom/external/roles/isoloom_machine_web/tasks/main.yml
@@ -250,7 +254,9 @@ ansible_become=true
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
 - name: "Run provision/web.sh"
   ansible.builtin.script:
-    cmd: "{{ isoloom_project }}/provision/web.sh"
+    cmd: "{{ isoloom_project }}/{{ isoloom_machine_web_file }}"
+  vars:
+    isoloom_machine_web_file: provision/web.sh
   changed_when: true
 
 ## .isoloom/external/site.yml

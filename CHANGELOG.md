@@ -332,6 +332,13 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **Security: Ansible never evaluates Jinja in the spec's text.** The Ansible renderer passed a
+  step's command, path, name, unit or file contents to Ansible as plain strings, which Ansible
+  templates: a `{{ lookup('pipe', …) }}` in a `command:` ran on the machine running the play
+  instead of reaching the host as text. Every such string holding `{{`, `{%` or `{#` is now
+  written `!unsafe`, and a project file (`copy`, `run`, `playbook`) is named through a task
+  variable (`isoloom_machine_<m>_file`) beside the play's `isoloom_project`, so the shell renderer
+  and the Ansible one install the same literal text.
 - **A service whose recipe the machine's OS can't carry is a problem of the spec** (`conflict`
   at `machines.<m>.service`), as an app's own steps are a target's refusal: the plan dropped
   such a configuration and set the machine up without it. No entry of the built-in catalogue

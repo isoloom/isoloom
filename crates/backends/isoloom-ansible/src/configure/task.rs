@@ -4,6 +4,11 @@
 //! the emitter below writes the block YAML `ansible-lint` and `yamllint` accept: sequence items
 //! indented under their key, multi-line strings as block scalars, task names capitalized, no
 //! trailing space. Deterministic: the same value renders the same bytes twice.
+//!
+//! Ansible evaluates `{{ }}`, `{% %}` and `{# #}` in every string it reads, so a string holding
+//! one is written `!unsafe` (taken as it is) unless it is Jinja Isoloom wrote itself ([`jinja`]): a
+//! spec's command, path, name or file contents is never run through Jinja, as the shell renderer's
+//! quoting never runs it through the shell.
 
 use serde_json::{Map, Value};
 
@@ -12,6 +17,27 @@ use serde_json::{Map, Value};
 #[must_use]
 pub(super) fn restart(unit: &str) -> String {
     format!("Isoloom restart {unit}")
+}
+
+/// The key of the one-entry object that marks [`jinja`] text. No task key is ever this (a NUL
+/// starts it), so the emitter tells a template from a mapping.
+const JINJA_KEY: &str = "\0jinja";
+
+/// `text` as a Jinja template Ansible evaluates: Isoloom's own text (the project folder, a project
+/// file under it), never the spec's, which the emitter writes `!unsafe`.
+#[must_use]
+pub(super) fn jinja(text: impl Into<String>) -> Value {
+    let mut map = Map::new();
+    map.insert(JINJA_KEY.to_owned(), Value::String(text.into()));
+    Value::Object(map)
+}
+
+/// The text of a [`jinja`] value, `None` for any other value.
+fn as_jinja(value: &Value) -> Option<&str> {
+    match value {
+        Value::Object(map) if map.len() == 1 => map.get(JINJA_KEY).and_then(Value::as_str),
+        _ => None,
+    }
 }
 
 /// One Ansible task, its keys kept in insertion order.
@@ -104,6 +130,7 @@ fn emit_map(out: &mut String, map: &Map<String, Value>, indent: usize) {
 /// item), `child` is the indent of its nested content.
 fn entry(out: &mut String, key: &str, value: &Value, prefix: &str, child: usize) {
     match value {
+        _ if as_jinja(value).is_some() => push(out, &format!("{prefix}{key}: {}", inline(value))),
         Value::String(s) if s.contains('\n') => block(out, prefix, key, s, child),
         Value::Array(items) if items.is_empty() => push(out, &format!("{prefix}{key}: []")),
         Value::Object(map) if map.is_empty() => push(out, &format!("{prefix}{key}: {{}}")),
@@ -125,7 +152,7 @@ fn entry(out: &mut String, key: &str, value: &Value, prefix: &str, child: usize)
 /// aligned under it), or a scalar.
 fn seq_item(out: &mut String, value: &Value, indent: usize) {
     match value {
-        Value::Object(map) if !map.is_empty() => {
+        Value::Object(map) if !map.is_empty() && as_jinja(value).is_none() => {
             let mut first = true;
             for (key, v) in map {
                 let prefix = if first { format!("{}- ", pad(indent)) } else { pad(indent + 2) };
@@ -139,13 +166,13 @@ fn seq_item(out: &mut String, value: &Value, indent: usize) {
 }
 
 /// A multi-line string as a literal block scalar, its content at `child`; `|` keeps the trailing
-/// newline the string ends with, `|-` writes none.
+/// newline the string ends with, `|-` writes none, and `!unsafe` leads one holding Jinja.
 fn block(out: &mut String, prefix: &str, key: &str, s: &str, child: usize) {
     let (chomp, body) = match s.strip_suffix('\n') {
         Some(body) => ("|", body),
         None => ("|-", s),
     };
-    push(out, &format!("{prefix}{key}: {chomp}"));
+    push(out, &format!("{prefix}{key}: {}{chomp}", unsafe_tag(s)));
     for line in body.split('\n') {
         if line.is_empty() {
             out.push('\n');
@@ -155,25 +182,34 @@ fn block(out: &mut String, prefix: &str, key: &str, s: &str, child: usize) {
     }
 }
 
-/// A scalar on the same line as its key or `- `: a number or bool as is, a string plain when it is
-/// safe, else double-quoted.
+/// A scalar on the same line as its key or `- `: a number or bool as is, [`jinja`] text quoted, a
+/// string plain when it is safe, else double-quoted, and `!unsafe` when it holds Jinja.
 fn inline(value: &Value) -> String {
+    if let Some(text) = as_jinja(value) {
+        return quoted(text);
+    }
     match value {
         Value::Bool(b) => b.to_string(),
         Value::Number(n) => n.to_string(),
-        Value::String(s) => scalar(s),
+        Value::String(s) => format!("{}{}", unsafe_tag(s), scalar(s)),
         _ => "null".to_owned(),
     }
 }
 
+/// `!unsafe ` when `s` holds a Jinja delimiter Ansible would evaluate, else nothing.
+fn unsafe_tag(s: &str) -> &'static str {
+    if ["{{", "{%", "{#"].iter().any(|d| s.contains(d)) { "!unsafe " } else { "" }
+}
+
 /// A string scalar: plain when it holds no YAML-special character and reads back as itself, else
-/// double-quoted with the few escapes a double-quoted scalar needs.
+/// double-quoted.
 fn scalar(s: &str) -> String {
-    if plain(s) {
-        s.to_owned()
-    } else {
-        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\t', "\\t"))
-    }
+    if plain(s) { s.to_owned() } else { quoted(s) }
+}
+
+/// `s` double-quoted, with the few escapes a double-quoted scalar needs.
+fn quoted(s: &str) -> String {
+    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\t', "\\t"))
 }
 
 /// Whether `s` is safe as a plain scalar: a path, a name, a package spec or an FQCN, never empty,
@@ -224,13 +260,33 @@ mod tests {
         let task = Task::new("x")
             .module(
                 "ansible.builtin.copy",
-                json!({ "dest": "/etc/app.conf", "mode": "0640", "src": "{{ isoloom_project }}/a" }),
+                json!({ "dest": "/etc/app.conf", "mode": "0640", "src": jinja("{{ isoloom_project }}/a") }),
             )
             .into_value();
         let text = yaml(vec![task]);
         assert!(text.contains("dest: /etc/app.conf\n"), "a path is plain: {text}");
         assert!(text.contains("mode: \"0640\"\n"), "a mode stays a string: {text}");
         assert!(text.contains("src: \"{{ isoloom_project }}/a\"\n"), "a jinja value is quoted: {text}");
+    }
+
+    #[test]
+    fn a_string_holding_jinja_is_unsafe_unless_isoloom_wrote_it() {
+        let task = Task::new("echo {{ x }}")
+            .module(
+                "ansible.builtin.shell",
+                json!({ "cmd": "echo {{ lookup('pipe', 'id') }}", "argv": ["{% if 1 %}", "{# c #}", "a}b{"] }),
+            )
+            .set("vars", json!({ "own": jinja("{{ isoloom_project }}") }))
+            .set("content", json!("a {{ b }}\nc\n"))
+            .into_value();
+        let text = yaml(vec![task]);
+        assert!(text.contains("- name: !unsafe \"Echo {{ x }}\"\n"), "{text}");
+        assert!(text.contains("cmd: !unsafe \"echo {{ lookup('pipe', 'id') }}\"\n"), "{text}");
+        assert!(text.contains("- !unsafe \"{% if 1 %}\"\n"), "{text}");
+        assert!(text.contains("- !unsafe \"{# c #}\"\n"), "{text}");
+        assert!(text.contains("- \"a}b{\"\n"), "a lone brace is no Jinja: {text}");
+        assert!(text.contains("content: !unsafe |\n"), "a block scalar is tagged too: {text}");
+        assert!(text.contains("own: \"{{ isoloom_project }}\"\n"), "Isoloom's own Jinja stays a template: {text}");
     }
 
     #[test]

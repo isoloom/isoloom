@@ -67,7 +67,7 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
                 "name": format!("Configure {name}"),
                 "hosts": name,
                 "become": true,
-                "vars": { "isoloom_project": PROJECT_VAR },
+                "vars": { "isoloom_project": task::jinja(PROJECT_VAR) },
                 "roles": [role_name(name)],
             })
         })

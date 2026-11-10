@@ -230,3 +230,26 @@ fn a_windows_packages_step_is_an_error_not_a_module_outside_the_builtin_ones() {
     let err = role_files(&c, "r").unwrap_err();
     assert_eq!(err.to_string(), "external: machine `m`: a `packages` step on Windows has no Ansible task here");
 }
+
+#[test]
+fn the_specs_text_reaches_ansible_unsafe_so_jinja_in_it_is_never_evaluated() {
+    let t = tasks(
+        r#"os: debian@12, app: { steps: [
+          { command: "echo {{ lookup('pipe', 'id') }}", creates: /x },
+          { copy: { from: "site/{{ x }}.html", to: "/srv/{{ x }}.html" } },
+          { file: { path: "/srv/{% raw %}", state: directory } },
+          { service: { name: app, run: [/usr/bin/app, --greet, "{{ who }}"] } },
+          { run: "setup/{{ y }}.sh" } ] }"#,
+        Target::Vagrant,
+        &[],
+    );
+    assert!(t.contains("cmd: !unsafe \"echo {{ lookup('pipe', 'id') }}\""), "{t}");
+    assert!(t.contains("dest: !unsafe \"/srv/{{ x }}.html\""), "{t}");
+    assert!(t.contains("path: !unsafe \"/srv/{% raw %}\""), "{t}");
+    assert!(t.contains("content: !unsafe |"), "a unit holding Jinja is unsafe: {t}");
+    // A project file is the play's folder joined to a task variable, which holds the spec's path.
+    assert!(t.contains("src: \"{{ isoloom_project }}/{{ isoloom_machine_m_file }}\""), "{t}");
+    assert!(t.contains("isoloom_machine_m_file: !unsafe \"site/{{ x }}.html\""), "{t}");
+    assert!(t.contains("cmd: \"{{ isoloom_project }}/{{ isoloom_machine_m_file }}\""), "{t}");
+    assert!(t.contains("isoloom_machine_m_file: !unsafe \"setup/{{ y }}.sh\""), "{t}");
+}
