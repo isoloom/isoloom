@@ -133,19 +133,22 @@ pub(crate) fn remove(dir: &Path, stale: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// The list after a generation: what it listed but `removed`, and `files`.
-pub(crate) fn write_list(dir: &Path, files: &[GeneratedFile], removed: &[String]) -> Result<()> {
+/// The list a generation of `files` that removes `removed` leaves: what the list under `dir`
+/// named but `removed`, and `files`. `generate` writes it and `check` compares it, as any
+/// generated file; `None` when the generation writes and removes nothing, which leaves the list
+/// as it is.
+pub(crate) fn list(dir: &Path, files: &[GeneratedFile], removed: &[String]) -> Result<Option<GeneratedFile>> {
+    if files.is_empty() && removed.is_empty() {
+        return Ok(None);
+    }
     let mut all = listed(dir)?;
     for r in removed {
         all.remove(r);
     }
     all.extend(files.iter().filter(|f| f.path.starts_with(&format!("{OUTPUT_DIR}/"))).map(|f| f.path.clone()));
     let text: String = std::iter::once(LIST_HEADER.to_owned()).chain(all).map(|l| l + "\n").collect();
-    write_file(
-        dir,
-        &GeneratedFile {
-            path: LIST.to_owned(),
-            contents: text,
-        },
-    )
+    Ok(Some(GeneratedFile {
+        path: LIST.to_owned(),
+        contents: text,
+    }))
 }

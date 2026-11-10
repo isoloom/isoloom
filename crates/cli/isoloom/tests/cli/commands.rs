@@ -174,8 +174,6 @@ fn check_tells_a_missing_file_from_one_it_cant_read() -> Outcome {
     let generated = isoloom(&dir, &[&"generate", &dir])?;
     assert_eq!(generated.code, Some(0), "{generated:?}");
     // A folder where the Compose file was: it exists, but can't be read as a file.
-    let compose = dir.join(".isoloom/docker/compose.yml");
-    std::fs::remove_file(&compose)?;
     std::fs::create_dir(&compose)?;
     std::fs::remove_file(dir.join(".isoloom/docker/run.json"))?;
     let checked = isoloom(&dir, &[&"check", &dir])?;
@@ -431,6 +429,28 @@ fn generate_writes_a_gitignore_for_the_tools_state_and_lists_it() -> Outcome {
     // Isoloom's like every file it writes: listed, so `generate` manages it.
     let list = std::fs::read_to_string(dir.join(".isoloom/.generated"))?;
     assert!(list.lines().any(|l| l == ".isoloom/.gitignore"), "{list}");
+    Ok(())
+}
+
+#[test]
+fn check_compares_the_list_of_generated_files_like_any_generated_file() -> Outcome {
+    let home = scratch("check-list-home")?;
+    let dir = project("check-list", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir])?.code, Some(0));
+    assert_eq!(isoloom(&home, &[&"check", &dir])?.code, Some(0));
+    let list = dir.join(".isoloom/.generated");
+    let text = std::fs::read_to_string(&list)?;
+    std::fs::remove_file(&list)?;
+    let missing = isoloom(&home, &[&"check", &dir, &"--quiet"])?;
+    assert_eq!(missing.code, Some(1), "{missing:?}");
+    assert!(missing.stdout.contains("✗ .isoloom/.generated is missing"), "{}", missing.stdout);
+    std::fs::write(&list, text.lines().filter(|l| *l != ".isoloom/.gitignore").map(|l| format!("{l}\n")).collect::<String>())?;
+    let short = isoloom(&home, &[&"check", &dir, &"--quiet"])?;
+    assert!(short.stdout.contains("✗ .isoloom/.generated is out of date"), "{}", short.stdout);
+    assert_eq!(isoloom(&home, &[&"generate", &dir])?.code, Some(0));
+    assert_eq!(std::fs::read_to_string(&list)?, text, "generate writes the list check expects");
+    assert_eq!(isoloom(&home, &[&"check", &dir])?.code, Some(0));
     Ok(())
 }
 

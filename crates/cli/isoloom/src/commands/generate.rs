@@ -45,12 +45,13 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     } else {
         Vec::new()
     };
+    let list = generated::list(dir, &files, &stale)?;
     generated::remove(dir, &stale)?;
     for p in &stale {
         console.line(format_args!("− {p} (no longer generated)"))?;
     }
-    if !files.is_empty() || !stale.is_empty() {
-        generated::write_list(dir, &files, &stale)?;
+    if let Some(list) = &list {
+        generated::write_file(dir, list)?;
     }
     for e in &skipped {
         console.line(format_args!("· {e}"))?;

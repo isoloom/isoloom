@@ -76,8 +76,9 @@ impl FileResult {
 }
 
 /// Generates the targets `generate` would (every one, or the one asked for or pinned by the
-/// profile) in memory and compares each file with the one on disk; a file `generate` wrote
-/// there before and would now remove (`generated::stale`) is out of date too. A target left out
+/// profile) in memory and compares each file with the one on disk, the list of what it wrote
+/// (`.isoloom/.generated`) included; a file `generate` wrote there before and would now remove
+/// (`generated::stale`) is out of date too. A target left out
 /// because it refuses the lab has no files to compare, unless it is the one asked for: then there
 /// is nothing to vouch for. One left out for any other reason (its backend failed) is an error,
 /// since its committed files can't be vouched for.
@@ -92,16 +93,14 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
         return Ok(Verdict::of(false));
     }
     let files = generated::finish(files, &a.project.dir)?;
-    let mut results: Vec<FileResult> = files.iter().map(|f| compare(&a.project.dir, f)).collect();
-    results.extend(
-        generated::stale(&a.project.dir, &files, &generated::scope(target.as_deref()))?
-            .into_iter()
-            .map(|path| FileResult {
-                path,
-                status: Status::NoLongerGenerated,
-                reason: None,
-            }),
-    );
+    let stale = generated::stale(&a.project.dir, &files, &generated::scope(target.as_deref()))?;
+    let list = generated::list(&a.project.dir, &files, &stale)?;
+    let mut results: Vec<FileResult> = files.iter().chain(&list).map(|f| compare(&a.project.dir, f)).collect();
+    results.extend(stale.into_iter().map(|path| FileResult {
+        path,
+        status: Status::NoLongerGenerated,
+        reason: None,
+    }));
     report(a, console, &results, &[])?;
     Ok(Verdict::of(results.iter().all(FileResult::passed)))
 }

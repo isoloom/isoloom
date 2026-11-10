@@ -9,8 +9,11 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 
 1. Install 2.0 ([install](../../README.md#install)): from 2.0 the releases carry signed binaries.
 2. Run `isoloom validate` on each spec, and fix what it refuses (below).
-3. Run `isoloom generate` and commit the regenerated `.isoloom/` if you commit it. Most generated
-   files change; `isoloom check` fails until you do.
+3. Regenerate from scratch once, `rm -rf .isoloom && isoloom generate`, and commit the
+   regenerated `.isoloom/` if you commit it. Most generated files change, and `isoloom check`
+   fails until you do. From scratch, because 1.x listed none of the files it wrote in
+   `.isoloom/.generated`, so 2.0 never removes those it no longer writes; the tools' state under
+   `.isoloom/` (a `.terraform/` folder, `.vagrant/`) goes with it, so destroy a running lab first.
 4. Upgrade your runner to a release that reads run manifest version 1 (Isothrum 2.0).
 
 ## Specs 2.0 refuses

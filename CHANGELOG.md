@@ -337,6 +337,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`isoloom check` checks `.isoloom/.generated`** like any generated file: a list deleted or
+  edited passed, and `generate` then removed nothing it should. Files a 1.x `generate` wrote are
+  in no list, so they are never removed: regenerate once from scratch
+  ([migrating to 2.0](docs/guide/migrating-to-2.0.md)).
 - **The Ansible renderer's multi-line strings read back as written.** A block scalar had no
   indentation indicator and its lines were trimmed: a command or file whose first line starts
   with spaces made unparseable YAML, and trailing spaces and extra final newlines were lost (the
