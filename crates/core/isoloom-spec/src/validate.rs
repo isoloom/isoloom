@@ -32,7 +32,6 @@ mod reach;
 mod secrets;
 mod settings;
 mod storage;
-mod targets;
 mod tools;
 mod top;
 mod volumes;
@@ -149,7 +148,6 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     ipv6::check(spec, &mut p);
     groups::check(spec, &mut p);
     checks::check(spec, &mut p);
-    targets::check(spec, &mut p);
     // On Docker, the networks (moved or not) mustn't overlap either: only once the blocks are
     // known to be valid.
     if p.is_empty() {

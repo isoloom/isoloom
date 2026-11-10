@@ -310,12 +310,18 @@ fn aliases_on_clones() {
 }
 
 #[test]
-fn a_machine_with_no_form_leaves_no_target() {
+fn machines_no_target_takes_together_leave_no_target() {
+    // A VM-only machine beside a container-only access machine: no container target takes the
+    // VM, no VM target the container, and `hybrid` wants a container among the machines proper.
     let yaml = with_machines(&[
-        "a: { networks: { lab: 5 }, app: { image: nginx } }",
-        "b: { networks: { lab: 6 }, os: debian@12, hardware: { tpm: required, devices: [/dev/fuse] } }",
+        "a: { networks: { lab: 5 }, os: windows-server@2022, app: { steps: [{ run: a.ps1 }] } }",
+        "b: { networks: { lab: 6 }, access: true, app: { image: nginx } }",
     ]);
-    assert_problem(&yaml, "machines", "no target is possible");
+    assert_problem(
+        &yaml,
+        "machines",
+        "no target is possible: machines.a.os: Windows has no container form; machines.b.app.image: ",
+    );
 }
 
 // The container recipe.

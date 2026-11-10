@@ -29,7 +29,7 @@ pub enum MachineRole {
 /// How the target produces machine `m`. Lowering keeps only the forms the target runs and
 /// refuses a machine without one, so a machine with neither form here is the access machine the
 /// spec leaves to the runner, which the target refuses unless the image table gave it its form
-/// (`Lab::missing_form`).
+/// (`Lab::not_possible`).
 pub(super) fn shape(target: Target, m: &Machine) -> MachineShape {
     if target == Target::External {
         return MachineShape::External;

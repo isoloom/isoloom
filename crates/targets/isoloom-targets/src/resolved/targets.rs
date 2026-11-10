@@ -5,7 +5,7 @@ use isoloom_plan::Lab;
 use isoloom_spec::model::Target;
 use serde_json::{Map, Value, json};
 
-use crate::refusal::{cloud_refusals, not_possible_reason, refusal};
+use crate::refusal::{cloud_refusals, refusal};
 
 /// The targets section.
 pub(super) fn section(lab: &Lab) -> Value {
@@ -14,8 +14,8 @@ pub(super) fn section(lab: &Lab) -> Value {
     let mut refused = Map::new();
     let mut not_possible = Map::new();
     for t in Target::ALL {
-        if !possible.contains(&t) {
-            not_possible.insert(t.id().into(), json!(not_possible_reason(lab, t)));
+        if let Some(why) = lab.not_possible(t) {
+            not_possible.insert(t.id().into(), json!(why.to_string()));
         } else if let Some(why) = refusal(lab, t) {
             refused.insert(t.id().into(), json!(why));
         } else {

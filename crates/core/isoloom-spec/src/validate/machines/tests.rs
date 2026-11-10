@@ -53,10 +53,7 @@ fn a_machines_inputs_are_declared() {
 fn a_machine_has_a_form_unless_the_runner_supplies_it() {
     assert_eq!(
         of("  web: { networks: { lan: 10 } }\n"),
-        [
-            "machines.web: give the machine a form: its `os`, plus an `app:` (or nothing more, the OS alone)",
-            "machines: no target is possible: no shape is implemented by every machine (docker missing on: web; vm missing on: web)"
-        ]
+        ["machines.web: give the machine a form: its `os`, plus an `app:` (or nothing more, the OS alone)"]
     );
     assert_eq!(of("  user: { networks: { lan: 10 }, access: true }\n"), Vec::<String>::new());
 }

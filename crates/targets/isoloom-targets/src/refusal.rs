@@ -1,7 +1,8 @@
-//! Why a lab isn't generated for a target: not possible by its machines' forms, refused by the
-//! plan or by the target's backend, or (on `cloud-vm`) a cloud whose module is dropped. These
-//! answer what `isoloom targets` lists and the snapshot's `targets` section holds, from the
-//! decisions the capability matrix shows ([`crate::decision`]).
+//! Why a lab isn't generated for a target: refused by the plan or by the target's backend, or (on
+//! `cloud-vm`) a cloud whose module is dropped. These answer what `isoloom targets` lists and the
+//! snapshot's `targets` section holds, from the decisions the capability matrix shows
+//! ([`crate::decision`]); why a target isn't possible for the lab at all is the lab's own answer
+//! ([`Lab::not_possible`]).
 
 use isoloom_plan::{Environment, Lab};
 use isoloom_spec::model::Target;
@@ -32,7 +33,7 @@ pub struct Clouds {
 /// Why `target`'s generator would refuse this lab, if it would: a field lowering rules out, a
 /// capability its backend lacks, a limit of its own (a Windows machine's name too long on
 /// Proxmox, environment-level provisioning on Docker, ...). `None` when `generate` produces the
-/// target, and when the target isn't possible for the lab at all ([`not_possible_reason`] says
+/// target, and when the target isn't possible for the lab at all ([`Lab::not_possible`] says
 /// why). Lets `isoloom targets` tell the truth: a target can be possible by its machines' forms
 /// and still not be generated.
 ///
@@ -85,30 +86,6 @@ pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<Clouds> {
     Some(clouds)
 }
 
-/// Why a target isn't possible for the lab: cloud services on a machine target, machines on
-/// `cloud-services`, the first machine it has no form for (at the field that rules it out),
-/// `hybrid` without both containers and VMs, or `targets:` leaving it out.
-#[must_use]
-pub fn not_possible_reason(lab: &Lab, t: Target) -> String {
-    let spec = lab.source();
-    if spec.cloud.is_some() && t != Target::CloudServices {
-        "cloud services run on `cloud-services` only".to_owned()
-    } else if spec.cloud.is_none() && t == Target::CloudServices {
-        "needs `cloud:` (cloud services instead of machines)".to_owned()
-    } else if spec.machines.is_empty() {
-        "the spec has no machines".to_owned()
-    } else if let Some(missing) = lab.missing_form(t) {
-        missing.line()
-    } else if t == Target::Hybrid && !isoloom_spec::targets::mixed(&lab.spec()) {
-        "only when some machines are containers and others are VMs".to_owned()
-    } else if spec.targets.as_ref().is_some_and(|wanted| !wanted.contains(&t)) {
-        "left out by `targets:`".to_owned()
-    } else {
-        // `Lab::possible` rules a target out for one of the reasons above only.
-        "not possible for this spec".to_owned()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,27 +95,6 @@ mod tests {
     }
 
     const MACHINES: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lan: 10 }, app: { image: redis, steps: [{ run: a.sh }] } }\n";
-
-    #[test]
-    fn a_target_not_possible_says_why_and_targets_only_when_the_spec_has_targets() {
-        let cloud = lab("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n");
-        assert_eq!(not_possible_reason(&cloud, Target::Docker), "cloud services run on `cloud-services` only");
-        let machines = lab(MACHINES);
-        assert_eq!(
-            not_possible_reason(&machines, Target::CloudServices),
-            "needs `cloud:` (cloud services instead of machines)"
-        );
-        assert_eq!(
-            not_possible_reason(&machines, Target::Hybrid),
-            "only when some machines are containers and others are VMs"
-        );
-        let narrowed = lab(&format!("{MACHINES}targets: [docker]\n"));
-        assert!(!narrowed.possible().contains(&Target::Vagrant));
-        assert_eq!(not_possible_reason(&narrowed, Target::Vagrant), "left out by `targets:`");
-        for t in Target::ALL.into_iter().filter(|t| !machines.possible().contains(t)) {
-            assert_ne!(not_possible_reason(&machines, t), "left out by `targets:`", "{}", t.id());
-        }
-    }
 
     #[test]
     fn a_refusal_reads_as_the_decision_the_matrix_shows() {

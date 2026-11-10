@@ -38,11 +38,10 @@ fn ready(lab: &Lab) -> Vec<Target> {
 /// One line per target, `✓` or `✗` with the reason; under a generated `cloud-vm`, the clouds
 /// whose module is dropped.
 fn listing(lab: &Lab) -> Vec<String> {
-    let possible = lab.possible();
     let mut lines = Vec::new();
     for t in Target::ALL {
-        if !possible.contains(&t) {
-            lines.push(format!("✗ {} ({})", t.id(), isoloom_targets::not_possible_reason(lab, t)));
+        if let Some(why) = lab.not_possible(t) {
+            lines.push(format!("✗ {} ({why})", t.id()));
             continue;
         }
         // A target can be possible by its machines' forms and still be refused by its generator

@@ -5,6 +5,7 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -185,31 +186,45 @@ impl Lab {
         self.finish(&self.raw(Scope::Lab).spec)
     }
 
-    /// The targets every machine has the form for, narrowed by the spec's `targets:`.
+    /// The targets that can run the lab at all: those [`Lab::not_possible`] rules nothing out
+    /// for, in [`Target::ALL`]'s order. A generator may still refuse one of them (`isoloom
+    /// targets` says why); a target left out here isn't generated whatever the generator says.
     #[must_use]
     pub fn possible(&self) -> Vec<Target> {
-        if self.source.cloud.is_some() {
-            return vec![Target::CloudServices];
-        }
-        if self.source.machines.is_empty() {
-            return Vec::new();
-        }
-        Target::ALL
-            .into_iter()
-            .filter(|t| *t != Target::CloudServices)
-            .filter(|t| self.missing_form(*t).is_none())
-            .filter(|t| *t != Target::Hybrid || isoloom_spec::targets::mixed(&self.spec()))
-            .filter(|t| self.source.targets.as_ref().is_none_or(|wanted| wanted.contains(t)))
-            .collect()
+        Target::ALL.into_iter().filter(|t| self.not_possible(*t).is_none()).collect()
     }
 
-    /// The first machine `target` has no form for, as a `refused` problem at the field that rules
-    /// it out, placed: the target can't run the lab at all. The access machine the spec leaves to
-    /// the runner has the forms the image table gives it.
+    /// Why `target` can't run the lab at all, whatever its generator would say, if it can't: the
+    /// one rule [`Lab::possible`] and every caller that explains a target left out read. In this
+    /// order: cloud services run on `cloud-services` only, which runs nothing else; a spec with no
+    /// machines runs nowhere; a machine the target has no form for (the access machine the spec
+    /// leaves to the runner has the forms the image table gives it); `hybrid` takes only an
+    /// environment that mixes containers and VMs; and `targets:` leaves the target out.
     #[must_use]
-    pub fn missing_form(&self, target: Target) -> Option<Problem> {
-        let missing = crate::lower::missing_form(&self.source, self.catalogue, target).or_else(|| self.unsupplied(target));
-        missing.map(|p| self.place(p))
+    pub fn not_possible(&self, target: Target) -> Option<NotPossible> {
+        let spec = &self.source;
+        if spec.cloud.is_some() {
+            return (target != Target::CloudServices).then_some(NotPossible::CloudServicesOnly);
+        }
+        if target == Target::CloudServices {
+            return Some(NotPossible::NoCloud);
+        }
+        if spec.machines.is_empty() {
+            return Some(NotPossible::NoMachines);
+        }
+        if let Some(missing) = crate::lower::missing_form(&self.source, self.catalogue, target) {
+            return Some(NotPossible::MissingForm(self.place(missing)));
+        }
+        if let Some(missing) = self.unsupplied(target) {
+            return Some(NotPossible::Unsupplied(self.place(missing)));
+        }
+        if target == Target::Hybrid && !mixed(&self.spec()) {
+            return Some(NotPossible::NotMixed);
+        }
+        spec.targets
+            .as_ref()
+            .is_some_and(|wanted| !wanted.contains(&target))
+            .then_some(NotPossible::LeftOut)
     }
 
     /// Why `target` can't run the lab, as a `refused` problem at the field: found while
@@ -249,6 +264,8 @@ impl Lab {
             .filter(|p| !follows_from(&out, p, &self.source))
             .collect();
         add(&mut out, model);
+        let targets: Vec<Problem> = self.target_problems().into_iter().filter(|p| !follows_from(&out, p, &self.source)).collect();
+        add(&mut out, targets);
         // What only a target's overrides set (an existing network or volume) is checked once
         // lowered for that target.
         for (key, target) in override_targets(&self.source.overrides) {
@@ -261,6 +278,36 @@ impl Lab {
             add(&mut out, found);
         }
         self.sorted(out)
+    }
+
+    /// The targets `targets:` asks for that the spec itself rules out ([`Lab::not_possible`]),
+    /// each with why; and, when the spec has machines yet rules every target out whatever
+    /// `targets:` says, that, with why the two plain forms can't (a container's, a VM's). The
+    /// access machine the image table doesn't supply isn't the spec's fault: a warning says so
+    /// ([`Lab::warnings`]).
+    fn target_problems(&self) -> Vec<Problem> {
+        let by_spec = |t: Target| self.not_possible(t).filter(|r| !matches!(r, NotPossible::LeftOut | NotPossible::Unsupplied(_)));
+        let mut out = Vec::new();
+        for (i, t) in self.source.targets.iter().flatten().enumerate() {
+            if let Some(why) = by_spec(*t) {
+                let at = FieldPath::new("targets").index(i);
+                out.push(Problem::new(Code::InvalidValue, at, format!("`{}` can't run the environment: {why}", t.id())));
+            }
+        }
+        let none = !self.source.machines.is_empty() && Target::ALL.into_iter().all(|t| by_spec(t).is_some());
+        if none {
+            let why: Vec<String> = [Target::Docker, Target::Vagrant]
+                .into_iter()
+                .filter_map(by_spec)
+                .map(|r| r.to_string())
+                .collect();
+            out.push(Problem::new(
+                Code::InvalidValue,
+                FieldPath::new("machines"),
+                format!("no target is possible: {}", why.join("; ")),
+            ));
+        }
+        out
     }
 
     /// [`Lab::problems`], and the project paths the spec names that don't exist in `dir`.
@@ -309,6 +356,49 @@ impl Lab {
         }
         self.source.spans.place(p)
     }
+}
+
+/// Why a target can't run a lab at all ([`Lab::not_possible`]); `Display` says it as `isoloom
+/// targets` and the resolved snapshot do.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum NotPossible {
+    /// The spec has `cloud:`, which only `cloud-services` runs.
+    CloudServicesOnly,
+    /// The target is `cloud-services`, and the spec has machines instead of `cloud:`.
+    NoCloud,
+    /// The spec has no machines.
+    NoMachines,
+    /// The first machine the target has no form for, at the field that rules it out.
+    MissingForm(Problem),
+    /// The access machine the spec leaves to the runner, at its `os`: the image table gives it
+    /// none of the form the target runs (a fact of this run's table, not of the spec).
+    Unsupplied(Problem),
+    /// The target is `hybrid`, and the machines are all containers or all VMs.
+    NotMixed,
+    /// The spec's `targets:` leaves the target out.
+    LeftOut,
+}
+
+impl fmt::Display for NotPossible {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NotPossible::CloudServicesOnly => f.write_str("cloud services run on `cloud-services` only"),
+            NotPossible::NoCloud => f.write_str("needs `cloud:` (cloud services instead of machines)"),
+            NotPossible::NoMachines => f.write_str("the spec has no machines"),
+            NotPossible::MissingForm(p) | NotPossible::Unsupplied(p) => f.write_str(&p.line()),
+            NotPossible::NotMixed => f.write_str("only when some machines are containers and others are VMs"),
+            NotPossible::LeftOut => f.write_str("left out by `targets:`"),
+        }
+    }
+}
+
+/// Whether the environment mixes both: a machine that can only be a VM (Windows, say) and one
+/// that can be a container, the access machine aside. Only then is `hybrid` worth it; otherwise
+/// Docker or VMs alone run it.
+fn mixed(spec: &model::Spec) -> bool {
+    let own = || spec.machines.values().filter(|m| !m.access);
+    own().any(|m| m.docker.is_some()) && own().any(|m| m.docker.is_none() && m.vm.is_some())
 }
 
 /// `found` added to `out`, unless a problem at the same field is already there (the authored

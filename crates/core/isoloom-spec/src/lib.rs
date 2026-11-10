@@ -34,7 +34,6 @@ pub mod shell;
 mod sizing;
 pub mod syntax;
 pub mod tags;
-pub mod targets;
 #[cfg(test)]
 mod testing;
 pub mod validate;
@@ -46,5 +45,4 @@ pub use load::{SPEC_FILE, SPEC_FILES, find, load, load_profiled, parse};
 pub use model::{Appliance, Arch, Check, CloudServices, Expect, Machine, Target, Tc};
 pub use sizing::{CONTAINER_DISK_GB, CONTAINER_MEMORY_MB, DEFAULT_CPUS, DEFAULT_DISK_GB, DEFAULT_MEMORY_MB, MachineSize, Totals, totals, totals_for};
 pub use syntax::Spec;
-pub use targets::effective;
 pub use validate::{Problem, validate, validate_files};

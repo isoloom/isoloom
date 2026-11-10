@@ -10,11 +10,14 @@ pub mod testing;
 const BASE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n";
 
 #[test]
-fn asking_for_an_impossible_target_names_the_machines() {
+fn asking_for_an_impossible_target_says_why_the_lab_does() {
     let p = problems(&format!(
         "{BASE}targets: [docker]\nmachines:\n  dc: {{ networks: {{ lab: 5 }}, ports: {{ ldap: 389 }}, os: windows-server@2022, app: {{ steps: [{{ run: p.ps1 }}] }} }}\n"
     ));
-    assert_eq!(p, ["targets[0]: `docker` needs a `docker:` implementation on every machine; missing on: dc"]);
+    assert_eq!(
+        p,
+        ["targets[0]: `docker` can't run the environment: machines.dc.os: Windows has no container form"]
+    );
 }
 
 #[test]
