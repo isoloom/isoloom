@@ -74,7 +74,14 @@ module Vagrant
 end
 
 path = File.expand_path(ARGV.fetch(0))
-Dir.chdir(File.dirname(path)) do
-  eval(File.read(path, encoding: "UTF-8"), binding, path) # rubocop:disable Security/Eval
+# What the Vagrantfile prints goes to stderr: stdout carries the recording alone.
+recording = $stdout
+$stdout = $stderr
+begin
+  Dir.chdir(File.dirname(path)) do
+    eval(File.read(path, encoding: "UTF-8"), binding, path) # rubocop:disable Security/Eval
+  end
+ensure
+  $stdout = recording
 end
 puts JSON.generate(Vagrant::CONFIG.to_h)

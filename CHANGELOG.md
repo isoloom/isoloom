@@ -431,6 +431,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   all-digit value was quoted, so `1.10`, `0x10`, `1_000`, `y` or `2024-01-02` reached a module as
   a number, a boolean or a date. A value is plain now only when it starts with a letter, `_` or
   `/` and isn't one of YAML 1.1's booleans or null in any case; any other is quoted.
+- **`isoloom import vagrant` says why a Vagrantfile failed.** A Vagrantfile that failed under
+  Vagrant's own Ruby was run again under the next one, whose error replaced it; a Ruby that
+  couldn't start for another reason than not being installed was passed over silently; and a
+  `puts` in the Vagrantfile broke the recording. The first Ruby that starts decides now, one that
+  can't start is the error, and what the Vagrantfile prints goes to stderr.
 - **A template filled in for two places generates.** Two `template:` steps of one machine
   reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
   file is written once per source.

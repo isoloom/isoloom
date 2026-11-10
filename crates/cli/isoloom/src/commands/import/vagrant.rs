@@ -56,27 +56,117 @@ fn private_dir(prefix: &str) -> Result<PathBuf> {
     Ok(dir)
 }
 
-/// The recording made by the first Ruby found.
+/// The recording made by the first of [`RUBIES`] installed.
 fn run_recorder(script: &Path, file: &Path) -> Result<Recording> {
-    let mut failed = None;
-    for ruby in RUBIES {
+    record_with(&RUBIES, script, file)
+}
+
+/// The recording made by the first of `rubies` that starts: one that isn't installed is passed
+/// over, one that fails to start or to run the Vagrantfile is the error (another Ruby would only
+/// hide it).
+fn record_with(rubies: &[&str], script: &Path, file: &Path) -> Result<Recording> {
+    for ruby in rubies {
         match std::process::Command::new(ruby).arg(script).arg(file).output() {
             Ok(out) if out.status.success() => return Ok(String::from_utf8_lossy(&out.stdout).parse::<Recording>()?),
             Ok(out) => {
-                failed = Some(CliError::ToolFailed {
-                    program: ruby.to_owned(),
+                return Err(CliError::ToolFailed {
+                    program: (*ruby).to_owned(),
                     what: format!(
                         "the Vagrantfile failed to run: {}",
                         String::from_utf8_lossy(&out.stderr).lines().next().unwrap_or("")
                     ),
                 });
             }
-            Err(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => {
+                return Err(CliError::ToolStart {
+                    program: (*ruby).to_owned(),
+                    source,
+                });
+            }
         }
     }
-    Err(failed.unwrap_or(CliError::ToolMissing {
+    Err(CliError::ToolMissing {
         program: "ruby".to_owned(),
         what: "the Vagrantfile can't be run (Vagrant's own Ruby, or `ruby` on the PATH)".to_owned(),
         install: "https://developer.hashicorp.com/vagrant/install",
-    }))
+    })
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+
+    use super::{CliError, RECORDER, Recording, record_with};
+
+    type Outcome = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    /// A fresh folder for one test, with the recorder and `vagrantfile` in it.
+    fn folder(name: &str, vagrantfile: &str) -> std::io::Result<(PathBuf, PathBuf, PathBuf)> {
+        let dir = std::env::temp_dir().join(format!("isoloom-record-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir)?;
+        let (script, file) = (dir.join("record.rb"), dir.join("Vagrantfile"));
+        std::fs::write(&script, RECORDER)?;
+        std::fs::write(&file, vagrantfile)?;
+        Ok((dir, script, file))
+    }
+
+    /// A program at `path` that runs `body` with sh, executable or not.
+    fn program(path: &Path, body: &str, executable: bool) -> std::io::Result<String> {
+        std::fs::write(path, format!("#!/bin/sh\n{body}\n"))?;
+        let mode = if executable { 0o755 } else { 0o644 };
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    /// The error of `recorded`, or a failure saying there was none.
+    fn error(recorded: Result<Recording, CliError>) -> std::result::Result<CliError, Box<dyn std::error::Error>> {
+        match recorded {
+            Err(e) => Ok(e),
+            Ok(_) => Err("recorded, where an error was expected".into()),
+        }
+    }
+
+    #[test]
+    fn the_first_ruby_that_starts_decides_and_a_missing_one_is_passed_over() -> Outcome {
+        let (dir, script, file) = folder("first", "")?;
+        let failing = program(&dir.join("failing-ruby"), "echo 'undefined method' >&2; exit 1", true)?;
+        let working = program(&dir.join("working-ruby"), "echo '{\"settings\":{},\"children\":{},\"calls\":[]}'", true)?;
+        let missing = dir.join("no-such-ruby").to_string_lossy().into_owned();
+        // A failing Vagrantfile is the error: the next Ruby isn't tried.
+        let failed = error(record_with(&[&failing, &working], &script, &file))?;
+        assert!(
+            matches!(&failed, CliError::ToolFailed { what, .. } if what.ends_with("undefined method")),
+            "{failed:?}"
+        );
+        // One that isn't installed is passed over.
+        record_with(&[&missing, &working], &script, &file)?;
+        let none = error(record_with(&[&missing], &script, &file))?;
+        assert!(matches!(none, CliError::ToolMissing { .. }), "{none:?}");
+        std::fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn a_ruby_that_cant_start_is_the_error_not_skipped() -> Outcome {
+        let (dir, script, file) = folder("start", "")?;
+        let unrunnable = program(&dir.join("unrunnable-ruby"), "exit 0", false)?;
+        let e = error(record_with(&[&unrunnable, "ruby"], &script, &file))?;
+        assert!(matches!(&e, CliError::ToolStart { program, .. } if *program == unrunnable), "{e:?}");
+        std::fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn what_a_vagrantfile_prints_never_reaches_the_recording() -> Outcome {
+        let (dir, script, file) = folder("puts", "puts \"hello\"\nVagrant.configure(\"2\") { |c| c.vm.box = \"debian/bookworm64\" }\n")?;
+        let recorded = record_with(&["ruby"], &script, &file);
+        std::fs::remove_dir_all(&dir)?;
+        match recorded {
+            Err(CliError::ToolMissing { .. }) => eprintln!("skipped: needs ruby"),
+            other => assert!(other.is_ok(), "{other:?}"),
+        }
+        Ok(())
+    }
 }

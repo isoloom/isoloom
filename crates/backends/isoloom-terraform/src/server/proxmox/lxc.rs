@@ -229,7 +229,11 @@ pub(super) fn router_dns(env: &Environment) -> Option<(Vec<Expression>, &'static
         .map(|net| format!("listen-address={}\n", router::address(spec, net)))
         .collect::<Vec<_>>()
         .concat();
-    let upstream = resolvers(spec.constraints.as_ref()).into_iter().map(|r| format!("server={r}\n")).collect::<Vec<_>>().concat();
+    let upstream = resolvers(spec.constraints.as_ref())
+        .into_iter()
+        .map(|r| format!("server={r}\n"))
+        .collect::<Vec<_>>()
+        .concat();
     let conf = format!("bind-dynamic\nno-resolv\n{upstream}localise-queries\naddn-hosts=/etc/isoloom/hosts\n{listen}");
     let hosts = env
         .machines
