@@ -769,6 +769,16 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Removed
 
+- **Library: one home for each rule.** `isoloom_spec::os::{Family, FAMILIES}` are
+  `os::{Distro, DISTROS}`, and an `Os` carries its `Installer` (`Os::installs_with_apt` is the
+  one apt rule); `isoloom_catalogue::codename` is crate-internal, and
+  `isoloom_catalogue::apt_defaults` fills in an apt repository's suite and components.
+  `isoloom_plan::checks::{Render, script}` (the sh check runner) are
+  `isoloom_render::checks::{Render, script}`, and `isoloom_manifest::CheckLine` writes the lines
+  too (`Display`, `pass_line`, `fail_line`, `end_line`). `isoloom_spec::validate::{kebab,
+  is_variable}` and `validate::Cidr::{netmask, enclosing}` are public. The catalogue's
+  `conformance` module and `Fetches`, `KeyCheck` and `RepositoryFetch` are behind its
+  `maintenance` feature, which only `cargo xtask` turns on.
 - **The Ansible renderer's `ansible.windows.win_feature` task**, which no lab reached: the lab
   refuses a `packages` step on a Windows host that already exists. The renderer writes
   `ansible.builtin` and `ansible.posix` tasks only, as its docs say; reaching that step is an
