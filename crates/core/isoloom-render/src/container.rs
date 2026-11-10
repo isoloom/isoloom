@@ -71,8 +71,10 @@ pub fn exec_runner(machine: &str) -> String {
     format!("{}.sh", exec_runner_name(machine))
 }
 
-/// The service that stands in for an access machine the runner supplies, so checks run from its
-/// side (only the `check` profile starts it).
+/// The service that stands in for the access machine while the checks run, so checks run from its
+/// seat: the access machine is on demand (the `access` profile), so the checks can't count on it
+/// running, and the stand-in, at its addresses, is never up beside it (only the `check` profile
+/// starts it, and the checks' teardown takes it down).
 pub const STAND_IN: &str = "isoloom-access";
 
 /// The prefix of every check runner's service ([`check_runner`]).

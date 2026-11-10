@@ -140,8 +140,8 @@ fn arg(name: &str) -> Result<SnakeName> {
     Ok(SnakeName::parse(name)?)
 }
 
-/// The stand-in for a supplied access machine, and its routes, when the file has them (only the
-/// check profile starts them).
+/// The stand-in for the access machine, and its routes, when the file has them (only the check
+/// profile starts them).
 pub(super) fn stand_ins(file: &ComposeFile) -> Vec<String> {
     let routes = routes_service(STAND_IN);
     [STAND_IN, routes.as_str()]

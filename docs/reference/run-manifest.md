@@ -108,6 +108,13 @@ before the field existed has none.
    brought up. A teardown step is a clean-up: Isoloom marks it `failure: tolerate`, so its
    failure is logged and fails no check (a step's `failure` is `fail` unless it says so).
 
+The stand-in (`isoloom-access`) is a machine of role `access` at the access machine's addresses,
+in the `check` profile, never `on_demand`: a runner tells the seat from its stand-in by
+`on_demand`. Compose takes both at one address because they are in different profiles, but they
+can't run at once: a runner that runs the checks while it has the access machine up gets a
+failed set-up (Docker: "Address already in use"), so it takes the access machine out first, or
+leaves the checks for later.
+
 Compose in a VM (`docker-vm`, `cloud-docker`) has the same steps, each run in the VM through the
 manifest's way in. The docker-vm Vagrantfile's `checks` provisioner, for running the checks without
 a runner, does the same by itself: the stand-ins up, the runners, then the stand-ins down whatever
