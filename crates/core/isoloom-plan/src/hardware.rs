@@ -84,7 +84,7 @@ impl Need {
             ),
             Need::VmGpus => write!(
                 f,
-                "machine `{machine}` asks for GPUs (`gpus`): Vagrant passes no GPU to a local VM (Proxmox and the cloud targets do)"
+                "machine `{machine}` asks for GPUs (`gpus`), which this target doesn't pass to a VM (`isoloom matrix` lists the targets that do)"
             ),
             Need::VmDevices => write!(
                 f,
@@ -92,7 +92,7 @@ impl Need {
             ),
             Need::VmNested => write!(
                 f,
-                "machine `{machine}` runs VMs inside (`nested_virtualization`): this target's VMs can't nest (Vagrant, Proxmox, AWS, Google Cloud and Oracle Cloud can)"
+                "machine `{machine}` runs VMs inside (`nested_virtualization`), which this target's VMs can't (`isoloom matrix` lists the targets that do)"
             ),
         }
     }

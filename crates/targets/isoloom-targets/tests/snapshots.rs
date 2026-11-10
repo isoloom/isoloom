@@ -143,7 +143,10 @@ fn hybrid_refuses_gateways_and_docker_vm_takes_them() -> Outcome {
     // `fw` has both forms (Debian's image, a Debian VM); a TPM makes `pc` a VM.
     let gateway = "version: 1\nname: g\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    os: debian@12\n    networks: { wan: 2, lan: 1 }\n  pc:\n    os: debian@12\n    networks: { lan: 10 }\n    hardware: { tpm: required }\n";
     let why = HybridBackend.refusal(&build(gateway, Target::Hybrid)?);
-    assert_eq!(why.as_deref(), Some("networks with a `gateway` machine in hybrid environments come later"));
+    assert_eq!(
+        why.as_deref(),
+        Some("network `lan` is routed by a `gateway` machine, which this target doesn't route through (`isoloom matrix` lists the targets that do)")
+    );
     assert!(DockerVmBackend.refusal(&build(gateway, Target::DockerVm)?).is_none());
     Ok(())
 }

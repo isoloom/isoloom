@@ -1,7 +1,7 @@
 //! The `kubernetes` target as a backend: what a cluster can run, why it refuses an environment,
 //! and its files.
 
-use isoloom_plan::{Capabilities, Environment, Feature, Refusal, Requirement};
+use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
@@ -26,11 +26,10 @@ impl Backend for KubernetesBackend {
         Ok(render::render(env)?)
     }
 
-    /// The plan's refusal, in Kubernetes' words (a gateway machine's is its own), then what its
-    /// GPUs can't be.
+    /// The plan's refusal, then what its GPUs can't be.
     fn refusal(&self, env: &Environment) -> Option<String> {
         isoloom_plan::refusal(&env.requirements, &capabilities())
-            .map(|r| reason(&r))
+            .map(|r| r.to_string())
             .or_else(|| gpus::refusal(env))
     }
 }
@@ -61,15 +60,6 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::DataDisks,
         Feature::RawDisks,
     ])
-}
-
-/// Why Kubernetes refuses: the plan's reason, but for gateway machines, which the plan words for
-/// the hybrid target.
-pub(crate) fn reason(refusal: &Refusal) -> String {
-    match refusal.requirement {
-        Requirement::Gateway { .. } => "networks with a `gateway` machine on Kubernetes come later".into(),
-        _ => refusal.to_string(),
-    }
 }
 
 #[cfg(test)]

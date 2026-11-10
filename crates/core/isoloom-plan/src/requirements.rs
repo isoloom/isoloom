@@ -331,7 +331,10 @@ impl fmt::Display for Requirement {
                 f,
                 "machine `{machine}` is a network appliance (`app.appliance`), which runs on the Docker targets"
             ),
-            Requirement::Gateway { .. } => f.write_str("networks with a `gateway` machine in hybrid environments come later"),
+            Requirement::Gateway { network } => write!(
+                f,
+                "network `{network}` is routed by a `gateway` machine, which this target doesn't route through (`isoloom matrix` lists the targets that do)"
+            ),
             Requirement::VolumeAcrossShapes { volume } => write!(
                 f,
                 "volume `{volume}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export, for now"
@@ -380,7 +383,7 @@ impl fmt::Display for Requirement {
 fn no_tpm(f: &mut fmt::Formatter<'_>, machine: &str) -> fmt::Result {
     write!(
         f,
-        "machine `{machine}` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+        "machine `{machine}` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)"
     )
 }
 

@@ -245,3 +245,31 @@ fn a_vm_that_requires_a_tpm_asks_for_one_and_windows_11_merely_expects_it() {
     );
     assert_eq!(tpm("  w: { os: windows@11 }\n"), None);
 }
+
+#[test]
+fn a_refusal_of_a_vm_feature_names_no_target_and_points_at_the_matrix() {
+    let hardware = |need| Requirement::Hardware { machine: web(), need };
+    for r in [
+        hardware(crate::hardware::Need::VmGpus),
+        hardware(crate::hardware::Need::VmNested),
+        Requirement::Tpm { machine: web() },
+        Requirement::Gateway { network: lan() },
+    ] {
+        let text = r.to_string();
+        assert!(text.contains("`isoloom matrix` lists the targets that do"), "{text}");
+        for target in [
+            "Vagrant",
+            "Proxmox",
+            "ESXi",
+            "AWS",
+            "Google",
+            "Oracle",
+            "cloud",
+            "hybrid",
+            "Kubernetes",
+            "later",
+        ] {
+            assert!(!text.contains(target), "{target} in {text}");
+        }
+    }
+}

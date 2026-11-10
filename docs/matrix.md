@@ -328,7 +328,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)
 - `vagrant/utm`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's utm provider gives none (VirtualBox, libvirt and Hyper-V do)
 - `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)
+- `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/digitalocean`: cloud: machine `m` asks for a virtual TPM (`hardware.tpm: required`): DigitalOcean gives none
 - `cloud-vm/linode`: cloud: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Linode gives none
 
@@ -340,7 +340,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)
 - `vagrant/utm`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's utm provider gives none (VirtualBox, libvirt and Hyper-V do)
 - `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)
+- `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/aws`: cloud: machine `m`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which come later
 - `cloud-vm/gcp`: cloud: machine `m`: Windows on GCP comes later
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only so far
@@ -350,7 +350,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.hardware.gpus`
 
 - `docker-vm`, `cloud-docker`, `hybrid`: capability `container-gpus`: machine `m` asks for GPUs (`gpus`): its container runs on a VM Isoloom creates, which has no GPU (the `docker` and `kubernetes` targets give the host's)
-- `vagrant/*`, `esxi`: capability `vm-gpus`: machine `m` asks for GPUs (`gpus`): Vagrant passes no GPU to a local VM (Proxmox and the cloud targets do)
+- `vagrant/*`, `esxi`: capability `vm-gpus`: machine `m` asks for GPUs (`gpus`), which this target doesn't pass to a VM (`isoloom matrix` lists the targets that do)
 - `proxmox`: target: machine `m`: Proxmox passes the server's GPUs by name: list them in `gpus.ids` (PCI addresses such as 0000:01:00.0, or resource mappings)
 - `cloud-vm/oci`: cloud: machine `m`: GPUs on Oracle Cloud come later (its GPU shapes are fixed, not the flexible shape every machine has, and take images built for them)
 
@@ -358,7 +358,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `docker-vm`, `cloud-docker`, `hybrid`: capability `container-gpus`: machine `m` asks for GPUs (`gpus`): its container runs on a VM Isoloom creates, which has no GPU (the `docker` and `kubernetes` targets give the host's)
 - `kubernetes`: target: machine `m`: `gpus.ids`: Kubernetes' scheduler picks the GPUs; give a `count` instead
-- `vagrant/*`, `esxi`: capability `vm-gpus`: machine `m` asks for GPUs (`gpus`): Vagrant passes no GPU to a local VM (Proxmox and the cloud targets do)
+- `vagrant/*`, `esxi`: capability `vm-gpus`: machine `m` asks for GPUs (`gpus`), which this target doesn't pass to a VM (`isoloom matrix` lists the targets that do)
 - `cloud-vm/aws`: cloud: machine `m`: a AWS VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids`
 - `cloud-vm/azure`: cloud: machine `m`: a Azure VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids`
 - `cloud-vm/gcp`: cloud: machine `m`: a Google Cloud VM's GPUs come with its instance type: give `gpus` as a count, not `all` or `ids`
@@ -375,7 +375,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: only a VM gives it: a container has no kernel or firmware of its own
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
-- `esxi`: capability `nested-virtualization`: machine `m` runs VMs inside (`nested_virtualization`): this target's VMs can't nest (Vagrant, Proxmox, AWS, Google Cloud and Oracle Cloud can)
+- `esxi`: capability `nested-virtualization`: machine `m` runs VMs inside (`nested_virtualization`), which this target's VMs can't (`isoloom matrix` lists the targets that do)
 - `cloud-vm/azure`: cloud: machine `m`: nested virtualization (`nested_virtualization`) on Azure comes later (AWS, Google Cloud and Oracle Cloud have it)
 - `cloud-vm/digitalocean`: cloud: machine `m`: nested virtualization (`nested_virtualization`) on DigitalOcean comes later (AWS, Google Cloud and Oracle Cloud have it)
 - `cloud-vm/linode`: cloud: machine `m`: nested virtualization (`nested_virtualization`) on Linode comes later (AWS, Google Cloud and Oracle Cloud have it)
@@ -509,8 +509,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `networks.*.gateway`
 
-- `kubernetes`: capability `gateways`: networks with a `gateway` machine on Kubernetes come later
-- `hybrid`: capability `gateways`: networks with a `gateway` machine in hybrid environments come later
+- `kubernetes`, `hybrid`: capability `gateways`: network `lan` is routed by a `gateway` machine, which this target doesn't route through (`isoloom matrix` lists the targets that do)
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
 - `proxmox`: target: networks with a `gateway` machine on Proxmox come later
 - `esxi`: target: networks with a `gateway` machine on ESXi come later

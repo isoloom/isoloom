@@ -1336,7 +1336,7 @@ volumes:
       "cloud-vm"
     ],
     "refused": {
-      "esxi": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+      "esxi": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)"
     },
     "not_possible": {
       "docker": "machines.files01.os: Windows has no container form",

@@ -99,7 +99,7 @@ fn vms_get_gpus_on_proxmox_and_the_clouds() -> Outcome {
     let tf = file(&pinned, Target::Proxmox, "proxmox/main.tf")?;
     assert!(tf.contains("machine   = \"q35\"") || tf.contains("machine = \"q35\""), "{tf}");
     assert!(tf.contains("id     = \"0000:01:00.0\""), "{tf}");
-    assert!(refusal(&pinned, Target::Vagrant)?.contains("Vagrant passes no GPU"));
+    assert!(refusal(&pinned, Target::Vagrant)?.contains("which this target doesn't pass to a VM"));
     assert!(refusal(&pinned, Target::CloudVm)?.contains("give `gpus` as a count"));
 
     let counted = vm("gpus: 4")?;

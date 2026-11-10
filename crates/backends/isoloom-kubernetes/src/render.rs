@@ -4,12 +4,12 @@
 
 use std::fmt;
 
-use isoloom_plan::{Environment, Refusal, Requirement};
+use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header};
 use serde::Serialize;
 
-use crate::backend::{capabilities, reason};
+use crate::backend::capabilities;
 use crate::checks::{self, Checks};
 use crate::error::{Error, Result};
 use crate::layout::output;
@@ -36,7 +36,7 @@ pub(crate) struct Rendered {
 /// the chart. Refused, without rendering, when `env` needs what Kubernetes can't do.
 pub(crate) fn render(env: &Environment) -> Result<Files> {
     if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
-        return Err(refused(refusal));
+        return Err(Error::Refused { refusal });
     }
     if let Some(reason) = crate::gpus::refusal(env) {
         return Err(Error::Unsupported { reason });
@@ -56,15 +56,6 @@ pub(crate) fn render(env: &Environment) -> Result<Files> {
     files.extend(chart::files(env, &r)?);
     files.extend(isoloom_render::configure::dockerfile::files(env));
     Ok(files)
-}
-
-/// The refusal as the backend reports it: the plan's, but in Kubernetes' own words where they
-/// differ from the plan's (see [`reason`]).
-fn refused(refusal: Refusal) -> Error {
-    match &refusal.requirement {
-        Requirement::Gateway { .. } => Error::Unsupported { reason: reason(&refusal) },
-        _ => Error::Refused { refusal },
-    }
 }
 
 /// The environment's objects, in the order they are written.

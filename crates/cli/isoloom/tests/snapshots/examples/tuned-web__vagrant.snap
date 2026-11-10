@@ -124,7 +124,7 @@ crash.*.log
       "cloud-vm"
     ],
     "refused": {
-      "esxi": "machine `web` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (Vagrant on VirtualBox, libvirt or Hyper-V, Proxmox and the big clouds do)"
+      "esxi": "machine `web` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)"
     },
     "not_possible": {
       "docker": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",

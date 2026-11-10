@@ -260,12 +260,12 @@ fn each_unsupported_feature_is_refused_with_its_reason() -> Outcome {
 }
 
 #[test]
-fn a_gateway_machine_is_refused_in_kubernetes_words() -> Outcome {
-    // The plan words it for hybrid; Kubernetes in its own terms.
+fn a_gateway_machine_is_refused_in_the_plans_words() -> Outcome {
+    // The plan words it for any target that lacks it, so Kubernetes says it as it is.
     let gateway = BASE
         .replace("{ cidr: 10.9.0.0/24 }", "{ cidr: 10.9.0.0/24, gateway: web }")
         .replace("{ lan: 10 }", "{ lan: 1 }");
-    let why = "networks with a `gateway` machine on Kubernetes come later";
+    let why = "network `lan` is routed by a `gateway` machine, which this target doesn't route through (`isoloom matrix` lists the targets that do)";
     assert_eq!(refusal(&gateway)?, format!("kubernetes: {why}"));
     assert_eq!(KubernetesBackend.refusal(&parsed(&gateway)?).as_deref(), Some(why));
     Ok(())
