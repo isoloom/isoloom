@@ -669,7 +669,7 @@ output "checks" {
         "note": "Copying the project into web…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_web}",
           "user": "admin",
           "wait_s": "900"
@@ -682,7 +682,7 @@ output "checks" {
         "note": "Copying the project into cache…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_cache}",
           "user": "admin",
           "wait_s": "900"
@@ -695,7 +695,7 @@ output "checks" {
         "note": "Copying the project into isoloom-controller…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_isoloom_controller}",
           "user": "admin",
           "wait_s": "900"
@@ -1728,7 +1728,7 @@ output "checks" {
         "note": "Copying the project into web…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_web}",
           "user": "isoloom",
           "wait_s": "900"
@@ -1741,7 +1741,7 @@ output "checks" {
         "note": "Copying the project into cache…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_cache}",
           "user": "isoloom",
           "wait_s": "900"
@@ -1754,7 +1754,7 @@ output "checks" {
         "note": "Copying the project into isoloom-controller…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_isoloom_controller}",
           "user": "isoloom",
           "wait_s": "900"
@@ -2932,7 +2932,7 @@ output "checks" {
         "note": "Copying the project into web…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_web}",
           "user": "admin",
           "wait_s": "900"
@@ -2945,7 +2945,7 @@ output "checks" {
         "note": "Copying the project into cache…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_cache}",
           "user": "admin",
           "wait_s": "900"
@@ -2958,7 +2958,7 @@ output "checks" {
         "note": "Copying the project into isoloom-controller…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo sh -c 'mkdir -p /opt/isoloom /var/lib/isoloom && tar -xzf - -C /opt/isoloom && touch /var/lib/isoloom/project-delivered'",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom && mkdir -p /var/lib/isoloom && touch /var/lib/isoloom/project-delivered'",
           "host": "${outputs.address_isoloom_controller}",
           "user": "admin",
           "wait_s": "900"

@@ -276,7 +276,7 @@ fn windows_machines_get_the_project_before_their_steps() -> Outcome {
         let tf = file(&spec, Target::CloudVm, path)?;
         // The host's archive (as a Linux machine's), uploaded once, unpacked by the set-up
         // script (no longer in C:\isoloom, which the project replaces) before the steps.
-        assert!(tf.contains("destination = \"C:/Windows/Temp/isoloom-project.tgz\""), "{path}");
+        assert!(tf.contains("destination = \"C:\\\\Windows\\\\Temp\\\\isoloom-project.tgz\""), "{path}");
         assert!(!tf.contains("destination = \"C:/isoloom/"), "{path}: a step uploaded on its own");
         assert!(tf.contains("-File C:/ProgramData/isoloom/setup.ps1"), "{path}");
         let unpack = tf.find("$dest = 'C:\\\\isoloom'; $strip = 1").expect("the project unpacked");

@@ -77,6 +77,28 @@ impl AsRoot {
     }
 }
 
+/// Where the project's archive is read from when it is unpacked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Archive<'a> {
+    /// A file on the VM (`/tmp/isoloom-project.tgz`, uploaded before).
+    File(&'a str),
+    /// The command's standard input (piped over SSH).
+    Stdin,
+}
+
+/// The project unpacked into [`PROJECT_DIR`] as root, replacing what an earlier copy left, so a
+/// file deleted from the project goes from the VM too: the archive read `from`, its top folder
+/// left out when `strip`. One line, with no single quote, so a caller can wrap it in `sh -c '…'`.
+#[must_use]
+pub fn project_unpack(from: Archive<'_>, strip: bool) -> String {
+    let source = match from {
+        Archive::File(path) => path,
+        Archive::Stdin => "-",
+    };
+    let strip = if strip { " --strip-components=1" } else { "" };
+    format!("rm -rf {PROJECT_DIR} && mkdir -p {PROJECT_DIR} && tar -xzf {source} -C {PROJECT_DIR}{strip}")
+}
+
 /// The line of [`ACCEPT_ENV_FILE`] letting sshd accept `forwarded`, environment variables' names
 /// (upper snake case, so no quoting is needed).
 #[must_use]
@@ -249,9 +271,7 @@ pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
         Step::Trunks => network::trunks(env, machine),
         Step::Volumes { paths } => (!paths.is_empty()).then(|| format!("mkdir -p {}\n", paths.iter().map(|p| quote(p)).collect::<Vec<_>>().join(" "))),
         Step::SharedVolume { volume, path, role } => Some(shared_volume::linux(volume, path, role)),
-        Step::Project => Some(format!(
-            "mkdir -p {PROJECT_DIR} && tar -xzf {PROJECT_ARCHIVE} -C {PROJECT_DIR} --strip-components=1 && rm -f {PROJECT_ARCHIVE}\n"
-        )),
+        Step::Project => Some(format!("{} && rm -f {PROJECT_ARCHIVE}\n", project_unpack(Archive::File(PROJECT_ARCHIVE), true))),
         Step::CaCertificates { files } => Some(constraints::trust_linux(
             &files.iter().map(|f| format!("{PROJECT_DIR}/{f}")).collect::<Vec<_>>(),
         )),

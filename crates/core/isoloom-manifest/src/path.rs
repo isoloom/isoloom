@@ -107,6 +107,9 @@ impl JsonSchema for RelPath {
     }
 }
 
+/// The project's archive a `project.archive` step writes, in the run's state folder.
+const PROJECT_ARCHIVE: &str = "project.tgz";
+
 /// A path that may start at a run folder (`${run.state_dir}/ports.yml`), else relative to the
 /// manifest's folder: a [`Template`] following the rules of a [`RelPath`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -146,6 +149,16 @@ impl PathTemplate {
         PathTemplate(Template::from_parts([
             Part::Placeholder(Placeholder::Run(RunVar::StateDir)),
             Part::Text(format!("/{path}")),
+        ]))
+    }
+
+    /// Where a `project.archive` step leaves the project's archive, for a later step to pipe to
+    /// a guest: `${run.state_dir}/project.tgz`.
+    #[must_use]
+    pub fn project_archive() -> PathTemplate {
+        PathTemplate(Template::from_parts([
+            Part::Placeholder(Placeholder::Run(RunVar::StateDir)),
+            Part::Text(format!("/{PROJECT_ARCHIVE}")),
         ]))
     }
 
@@ -261,6 +274,11 @@ impl JsonSchema for GuestPath {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_projects_archive_is_in_the_runs_state_folder() {
+        assert_eq!(super::PathTemplate::project_archive().to_string(), "${run.state_dir}/project.tgz");
+    }
+
     use super::*;
 
     #[test]

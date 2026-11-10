@@ -33,8 +33,8 @@ pub(crate) fn write_password(env: &Environment, m: &mut Module) {
 
 /// Where the set-up script goes.
 const SETUP: &str = "C:/ProgramData/isoloom/setup.ps1";
-/// Where the project's archive goes (the `Project` step unpacks it from there).
-const ARCHIVE: &str = "C:/Windows/Temp/isoloom-project.tgz";
+/// Where the project's archive goes: where the `Project` step unpacks it from.
+const ARCHIVE: &str = isoloom_render::steps::WINDOWS_PROJECT_ARCHIVE;
 
 /// A Windows machine, as Terraform reaches it over WinRM.
 #[derive(Debug, Clone)]

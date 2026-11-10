@@ -4,11 +4,10 @@
 //! and the param saying whether the derived checks run.
 
 use isoloom_manifest::{
-    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RelPath, RunVar, Seal, Step,
-    Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RunVar, Seal, Step, Template,
 };
 use isoloom_render::run_manifest::noted;
-use isoloom_render::steps::PROJECT_DIR;
+use isoloom_render::steps::{Archive, PROJECT_DIR, project_unpack};
 use isoloom_spec::linux::STATE_DIR;
 
 use super::connection::SEALED;
@@ -51,16 +50,18 @@ fn archive() -> Result<Step, ManifestError> {
     isoloom_render::run_manifest::project_archive("../../..", &[])
 }
 
-/// The archive piped into `guest`'s `/opt/isoloom`, then the mark its set-up waits for. Retried
-/// while the machine boots (ssh can't connect yet); unpacking again is harmless.
+/// The archive piped into `guest`'s `/opt/isoloom`, replacing an earlier copy, then the mark its
+/// set-up waits for. Retried while the machine boots (ssh can't connect yet); unpacking again is
+/// harmless.
 fn deliver(guest: &Guest) -> Result<Step, ManifestError> {
     let command = format!(
-        "{}sh -c 'mkdir -p {PROJECT_DIR} {STATE_DIR} && tar -xzf - -C {PROJECT_DIR} && touch {DELIVERED}'",
-        guest.login.as_root().prefix()
+        "{}sh -c '{} && mkdir -p {STATE_DIR} && touch {DELIVERED}'",
+        guest.login.as_root().prefix(),
+        project_unpack(Archive::Stdin, false)
     );
     let wait = [("wait_s", Template::text(&BOOT_WAIT_S.to_string()))];
     let mut s = guest.login.step(&format!("deliver-{}", guest.id()), &Template::text(&command), &wait)?;
-    s.stdin = Some(PathTemplate::in_state_dir(&RelPath::parse("project.tgz")?));
+    s.stdin = Some(PathTemplate::project_archive());
     s.timeout_s = secs(BOOT_WAIT_S + 600);
     Ok(noted(s, &format!("Copying the project into {}…", guest.machine)))
 }
@@ -206,9 +207,11 @@ mod tests {
         let Run::Action { with, .. } = &web.run else { panic!() };
         let get = |k: &str| with.iter().find(|(n, _)| n.as_str() == k).map(|(_, v)| v.to_string());
         assert_eq!(get("wait_s").as_deref(), Some("900"));
-        assert!(get("command").is_some_and(|c| c.starts_with("sudo sh -c 'mkdir -p /opt/isoloom") && c.contains("touch /var/lib/isoloom/project-delivered")));
+        assert!(get("command").is_some_and(
+            |c| c.starts_with("sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom") && c.contains("touch /var/lib/isoloom/project-delivered")
+        ));
         let Run::Action { with: db, .. } = &l.up.as_slice()[5].run else { panic!() };
-        assert!(db.values().any(|v| v.to_string().starts_with("sh -c 'mkdir")), "root needs no sudo");
+        assert!(db.values().any(|v| v.to_string().starts_with("sh -c 'rm -rf")), "root needs no sudo");
     }
 
     #[test]

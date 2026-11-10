@@ -124,7 +124,9 @@ fn the_project_and_volumes_are_unpacked_and_made() {
     let env = env();
     assert_eq!(
         linux(&env, "web", &Step::Project).as_deref(),
-        Some("mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz\n")
+        Some(
+            "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz\n"
+        )
     );
     let volumes = Step::Volumes {
         paths: vec!["/a b".into(), "/c".into()],
@@ -440,4 +442,14 @@ fn root_runs_a_command_as_it_is_and_another_user_through_sudo() {
     assert_eq!((AsRoot::Root.prefix(), AsRoot::Root.keeping_env()), ("", ""));
     assert_eq!(AsRoot::of("isoloom"), AsRoot::Sudo);
     assert_eq!((AsRoot::Sudo.prefix(), AsRoot::Sudo.keeping_env()), ("sudo ", "sudo -E "));
+}
+
+#[test]
+fn every_project_unpack_replaces_the_old_copy() {
+    use super::{Archive, project_unpack};
+    assert_eq!(
+        project_unpack(Archive::Stdin, false),
+        "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom"
+    );
+    assert!(!project_unpack(Archive::File("/tmp/a b.tgz"), true).contains('\''));
 }

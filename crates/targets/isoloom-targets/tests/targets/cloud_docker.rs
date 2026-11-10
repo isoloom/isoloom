@@ -113,6 +113,6 @@ fn linodes_root_host_runs_every_command_without_sudo_the_others_through_it() -> 
     }
     let aws = of("aws");
     assert!(aws.iter().all(|(user, _)| user != "root"), "{aws:?}");
-    assert!(aws.iter().any(|(_, c)| c.starts_with("sudo rm -rf /opt/isoloom")), "{aws:?}");
+    assert!(aws.iter().any(|(_, c)| c.starts_with("sudo sh -c 'rm -rf /opt/isoloom")), "{aws:?}");
     Ok(())
 }

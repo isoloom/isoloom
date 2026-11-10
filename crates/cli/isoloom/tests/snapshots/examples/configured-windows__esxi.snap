@@ -423,7 +423,7 @@ resource "terraform_data" "isoloom_controller" {
     inline = [
       "set -e",
       "cloud-init status --wait >/dev/null 2>&1 || true",
-      "sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
+      "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz'",
       "sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.67.0.10 iis'\\'' >> /etc/hosts'",
       "sudo sh -c 'mkdir -p /etc/isoloom && install -m 0600 /tmp/isoloom-controller-key /etc/isoloom/id_ed25519 && install -m 0600 /tmp/isoloom-inventory.ini /etc/isoloom/inventory.ini && rm -f /tmp/isoloom-controller-key /tmp/isoloom-inventory.ini'",
       "sudo sh -c 'DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv curl netcat-openbsd openssh-client >/dev/null'",

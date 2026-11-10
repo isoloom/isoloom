@@ -8,7 +8,7 @@
 
 use isoloom_manifest::{Error as ManifestError, Failure, Machine, Output, OutputRole, PathTemplate, RelPath, Step, StepId, Template};
 use isoloom_render::run_manifest::{self, guest::COMPOSE_OUTPUTS, guest::GuestCommand, guest::GuestCompose};
-use isoloom_render::steps::{self, ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, AsRoot, CLOUD_INIT_WAIT, PROJECT_DIR, PUBLISHED_FROM_OUTSIDE, RELOAD_SSHD, install_docker};
+use isoloom_render::steps::{self, ACCEPT_ENV_DIR, ACCEPT_ENV_FILE, AsRoot, CLOUD_INIT_WAIT, PUBLISHED_FROM_OUTSIDE, RELOAD_SSHD, install_docker};
 
 use crate::hcl_builder::{Expression, list, string};
 use crate::ssh::Login;
@@ -121,14 +121,12 @@ pub(crate) fn into_vm(login: &Login, setup: &RelPath, root: &str) -> Result<Vec<
     let copy = GuestCommand {
         id: StepId::parse("project")?,
         note: Some("Copying the project into the VM…".into()),
-        command: Template::text(&format!(
-            "{sudo}rm -rf {PROJECT_DIR} && {sudo}mkdir -p {PROJECT_DIR} && {sudo}tar -xzf - -C {PROJECT_DIR}"
-        )),
+        command: Template::text(&format!("{sudo}sh -c '{}'", steps::project_unpack(steps::Archive::Stdin, false))),
         timeout_s: 600,
         failure: Failure::Fail,
     };
     let mut copy = copy.step(&way_in)?;
-    copy.stdin = Some(PathTemplate::in_state_dir(&RelPath::parse("project.tgz")?));
+    copy.stdin = Some(PathTemplate::project_archive());
     Ok(vec![archive, copy, docker])
 }
 
@@ -201,7 +199,7 @@ mod tests {
             [
                 (
                     "command".into(),
-                    "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom".into()
+                    "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'".into()
                 ),
                 ("host".into(), "10.0.0.9".into()),
                 ("user".into(), "isoloom".into())
@@ -238,7 +236,7 @@ mod tests {
             .collect();
         assert_eq!(
             commands,
-            ["rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom", "sh -s"]
+            ["sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'", "sh -s"]
         );
         let accept = accept_env(&guest(vec![slot("TOKEN", "LAUNCH_TOKEN").unwrap()]), AsRoot::Root).unwrap().unwrap();
         assert!(!accept.command.to_string().contains("sudo"), "{}", accept.command);
@@ -251,9 +249,9 @@ mod tests {
         let Run::Action { with, .. } = &steps[1].run else { panic!() };
         let command = with.iter().find(|(k, _)| k.as_str() == "command").map(|(_, v)| v.to_string()).unwrap();
         // A literal path, nothing a shell expands: no variable can turn it into `rm -rf /`.
-        assert!(command.starts_with("sudo rm -rf /opt/isoloom && "), "{command}");
+        assert!(command.starts_with("sudo sh -c 'rm -rf /opt/isoloom && "), "{command}");
         assert!(!command.contains('$') && !command.contains('*') && !command.contains('`'), "{command}");
-        assert_eq!(PROJECT_DIR, "/opt/isoloom");
+        assert_eq!(steps::PROJECT_DIR, "/opt/isoloom");
     }
 
     #[test]

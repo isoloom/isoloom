@@ -706,7 +706,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -1781,7 +1781,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'",
           "host": "${outputs.ip}",
           "user": "isoloom"
         },
@@ -2741,7 +2741,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom",
+          "command": "sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -3811,7 +3811,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'",
           "host": "${outputs.ip}",
           "user": "admin"
         },
@@ -4752,7 +4752,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom",
+          "command": "sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'",
           "host": "${outputs.ip}",
           "user": "root"
         },
@@ -5759,7 +5759,7 @@ output "ssh_user" {
         "note": "Copying the project into the VM…",
         "action": "ssh.run",
         "with": {
-          "command": "sudo rm -rf /opt/isoloom && sudo mkdir -p /opt/isoloom && sudo tar -xzf - -C /opt/isoloom",
+          "command": "sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom'",
           "host": "${outputs.ip}",
           "user": "ubuntu"
         },

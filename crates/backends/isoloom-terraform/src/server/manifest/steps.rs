@@ -8,7 +8,7 @@ use isoloom_manifest::{
     Step, Template,
 };
 use isoloom_plan::Environment;
-use isoloom_render::run_manifest::{action_with, timeout_s};
+use isoloom_render::run_manifest::timeout_s;
 
 use crate::machine::{controller, vms};
 use crate::module::manifest::{self, PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, secs, terraform, words};
@@ -128,14 +128,8 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
             Part::Placeholder(Placeholder::Param(EnvName::parse(isoloom_render::run_manifest::DERIVED)?)),
             Part::Text(" sh -s".into()),
         ]);
-        let with = [
-            ("host", Template::text(&host)),
-            ("user", Template::text(USER)),
-            ("via", through_router()?),
-            ("command", derived),
-        ];
-        let mut step = Step::action(id(&format!("check-{}", pos.id()))?, Action::SshRun);
-        step.run = action_with(Action::SshRun, with)?;
+        let login = Login::new(Template::text(&host), USER);
+        let mut step = login.step(&format!("check-{}", pos.id()), &derived, &[("via", through_router()?)])?;
         step.stdin = Some(PathTemplate::relative(&RelPath::parse(&format!("checks/{}.sh", pos.id()))?));
         step.timeout_s = secs(timeout_s(group));
         Ok(Some(step))
