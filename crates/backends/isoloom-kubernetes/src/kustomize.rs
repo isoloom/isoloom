@@ -77,21 +77,32 @@ impl Kustomization {
     }
 }
 
+/// The longest `ConfigMap` key.
+const KEY_MAX: usize = 253;
+
 /// A `ConfigMap` key for a project file, one per path: keys allow only letters, digits, `-`, `_`
-/// and `.`, so a `/` is written `__` and any other byte, `_` included, `_` and its two hex digits
-/// (`my seed.sh` is `my_20seed.sh`). Every escape starts with `_`, so two paths never share a key,
-/// and the key is a single word a shell command can name unquoted.
+/// and `.`, never start with `..` and are at most [`KEY_MAX`] characters, so a `/` is written `__`
+/// and any other byte, `_` included, `_` and its two hex digits (`my seed.sh` is
+/// `my_20seed.sh`), a leading `.` too. Every escape starts with `_`, so two paths never share a
+/// key, and the key is a single word a shell command can name unquoted. A key that would be too
+/// long keeps its start and ends with `_` and the path's hash.
 pub(crate) fn key(path: &str) -> String {
     let mut out = String::with_capacity(path.len());
     for b in path.bytes() {
         match b {
             b'/' => out.push_str("__"),
+            b'.' if out.is_empty() => out.push_str("_2e"),
             b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'.' => out.push(char::from(b)),
             other => {
                 out.push('_');
                 out.extend([other >> 4, other & 0xf].into_iter().filter_map(|d| char::from_digit(d.into(), 16)));
             }
         }
+    }
+    if out.len() > KEY_MAX {
+        let hash = format!("_{:08x}", isoloom_render::stable_hash::of(path));
+        out.truncate(KEY_MAX - hash.len());
+        out.push_str(&hash);
     }
     out
 }
@@ -156,12 +167,24 @@ mod tests {
         assert_eq!(key("a_b"), "a_5fb");
     }
 
+    #[test]
+    fn a_key_never_starts_with_a_dot_nor_outgrows_kubernetes() {
+        assert_eq!(key("..config.sh"), "_2e.config.sh");
+        assert_eq!(key(".env.sh"), "_2eenv.sh");
+        assert_ne!(key("..a"), key("_2e.a"));
+        let long = format!("{}/{}.sh", "d".repeat(200), "f".repeat(200));
+        let (k, other) = (key(&long), key(&long.replace(".sh", ".bash")));
+        assert_eq!(k.len(), KEY_MAX);
+        assert_ne!(k, other, "two long paths keep a key each");
+    }
+
     proptest! {
         #[test]
         fn two_paths_never_share_a_key(a in "[a-z_/ é.-]{1,8}", b in "[a-z_/ é.-]{1,8}") {
             prop_assume!(a != b);
             prop_assert_ne!(key(&a), key(&b));
             prop_assert!(key(&a).chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c)), "{}", key(&a));
+            prop_assert!(!key(&a).starts_with('.'), "{}", key(&a));
         }
 
         #[test]

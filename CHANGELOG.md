@@ -496,8 +496,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Kubernetes: a project script's `ConfigMap` key is valid and its own.** A key was the path
   with `/` as `__`: a space (`setup: [build/cache/my seed.sh]`) gave an invalid key and an
   unquoted `sh` command, and `a/b__c` and `a__b/c` shared one. Any byte but a letter, digit, `-`
-  or `.` is now `_` and its two hex digits (`/` stays `__`), so every path has its own key, a
-  single word.
+  or `.` is now `_` and its two hex digits (`/` stays `__`), a leading `.` too (a key can't start
+  with `..`), so every path has its own key, a single word; one past Kubernetes' 253 characters
+  keeps its start and ends with the path's hash.
 - **`isoloom generate` refuses a bad `.isoloom/.generated` before it writes anything**: it wrote
   every file, then refused the list (a path outside `.isoloom/`, one reached through a link),
   leaving a half-done generation.
@@ -1015,8 +1016,8 @@ changes and before/after examples.
 - **`isoloom-external` is now `isoloom-ansible`.** Existing hosts become an Ansible
   inventory plus playbooks.
 - **Run manifest: the top-level `lab:` key is now `environment:`** (`name`, `instance`,
-  `message`; same shape). The manifest is a general-purpose contract, so the CTF/courses
-  term is gone. A manifest still carrying `lab:` is rejected as an unknown field.
+  `message`; same shape). The manifest is a general-purpose contract, so it says environment,
+  as the spec does. A manifest still carrying `lab:` is rejected as an unknown field.
 - **`Version` ordering is semver-correct.** The internal `Version` newtype now compares its
   numbers numerically (so `2.14.0 > 2.9.0`, and a pre-release sorts before its release)
   instead of lexicographically. Generated output is unchanged.
