@@ -113,3 +113,11 @@ fn a_best_effort_seal_is_an_advisory_warning() {
         warnings[0].reason
     );
 }
+
+#[test]
+fn a_best_effort_seal_of_a_machine_with_copies_is_one_warning_at_its_line() {
+    let yaml = "version: 1\nname: t\nnetworks: { sealed: { cidr: 10.9.0.0/24, internet: false } }\nmachines:\n  ws:\n    count: 2\n    networks: { sealed: 10 }\n    app: { image: x }\n    seal: best-effort\n";
+    let warnings = testing::lab(yaml).warnings();
+    assert_eq!(warnings.iter().map(|w| w.path.as_str()).collect::<Vec<_>>(), ["machines.ws.seal"]);
+    assert_eq!(warnings[0].span.map(|s| s.line), Some(9), "the spec's own line");
+}

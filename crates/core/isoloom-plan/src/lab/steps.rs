@@ -21,12 +21,7 @@ impl Lab {
         let mut out: Vec<Warning> = Vec::new();
         for (name, m) in &self.source.machines {
             let Some(os) = m.os else { continue };
-            let base = self
-                .source
-                .clones
-                .iter()
-                .find(|(_, c)| c.contains(name))
-                .map_or(name.as_str(), |(b, _)| b.as_str());
+            let base = self.written_as(name);
             for u in unstarted(os, m, &daemons) {
                 let path = FieldPath::new("machines").key(base).key("app").key("steps").index(u.step);
                 if out.iter().any(|w| w.path == path && w.reason.starts_with(&format!("`{}`", u.package))) {
@@ -45,11 +40,12 @@ impl Lab {
             }
         }
         for (name, m) in &self.source.machines {
-            if m.seal != Seal::BestEffort {
+            let path = FieldPath::new("machines").key(self.written_as(name)).key("seal");
+            if m.seal != Seal::BestEffort || out.iter().any(|w| w.path == path) {
                 continue;
             }
             let mut w = Warning::new(
-                FieldPath::new("machines").key(name).key("seal"),
+                path,
                 "`seal: best-effort` makes this machine's `internet: false` seal advisory: it is applied, but a privileged container can lift it from inside, so treat the machine as able to reach the internet",
             );
             w.span = self.source.spans.find(&w.path);
@@ -57,6 +53,17 @@ impl Lab {
         }
         out.sort_by_key(|w| w.span.map(|s| (s.line, s.column)));
         out
+    }
+
+    /// The machine the spec writes machine `name` as: the base a clone is made of (`ws` for
+    /// `ws-1`, from `count:`), else `name`. A warning about a clone is about its base's lines,
+    /// once.
+    fn written_as<'a>(&'a self, name: &'a str) -> &'a str {
+        self.source
+            .clones
+            .iter()
+            .find(|(_, c)| c.iter().any(|n| n == name))
+            .map_or(name, |(b, _)| b.as_str())
     }
 }
 

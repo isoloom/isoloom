@@ -452,6 +452,8 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **A VM's ready file names each step of its set-up.** Trusting the certificate authorities,
   copying the project, forwarding and restarting all read `running: set-up`; each says what it is
   now (`running: certificate authorities`, as the controller's does).
+- **`seal: best-effort` on a machine with `count:` warns once, at its line.** Each copy had a
+  warning of its own, at a path the spec doesn't have.
 - **A template filled in for two places generates.** Two `template:` steps of one machine
   reading the same file stopped `generate` (`wrote … rendered/conf/site.conf twice`); the filled
   file is written once per source.
