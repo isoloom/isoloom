@@ -1,6 +1,6 @@
 use proptest::prelude::*;
 
-use super::{Rules, Token, copy_rules, tokens};
+use super::{FILE, Rules, Token, copy_rules, tokens};
 
 fn kept<'a>(rules: &str, paths: &[&'a str]) -> Vec<&'a str> {
     let r = Rules::parse(rules);
@@ -161,6 +161,8 @@ fn a_copy_leaves_out_the_outputs_but_those_it_keeps_and_the_tools_state_everywhe
         ]
     );
     assert!(Rules::for_copy("", &[]).ignored(".isoloom/docker/compose.yml"), "no output kept unless named");
+    // `/.isoloom*` takes the file itself, on purpose (`OUTPUTS`), and an instance's outputs.
+    assert!(rules.ignored(FILE) && rules.ignored(".isoloom-2/docker/compose.yml"));
 }
 
 #[test]

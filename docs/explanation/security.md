@@ -42,7 +42,8 @@ Two exceptions are by design, and worth knowing:
 A copy of the project into a machine (Vagrant's project step, Proxmox's cloud-init, ESXi's
 archive, the runner's `project.archive`) leaves out what the project's `.isoloomignore` lists,
 then, whatever that file says: Isoloom's outputs but those the machine reads (a Compose VM, the
-`docker` target's folder and `.isoloom/configure/`), version control, and what the tools write at
+`docker` target's folder and `.isoloom/configure/`), `.isoloomignore` itself (every top-level
+`.isoloom*` entry is left out, and a machine has no use for the file), version control, and what the tools write at
 any depth: Terraform's cache, state, lock and crash logs, Vagrant's machine folders (their private
 keys) and the runner's logins (`.isoloom-reach/`). One rule,
 `isoloom_manifest::ignore::copy_rules`, which `.isoloom/.gitignore` shares.

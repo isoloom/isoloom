@@ -3,8 +3,9 @@
 //! runner's `project.archive`). Part of the contract: a runner archiving the project leaves out
 //! exactly what the generated files do. Every copy also leaves out what [`copy_rules`] says,
 //! whatever the file says: Isoloom's outputs (but those a machine reads, as each copy names
-//! them), version control and what the tools write in a project ([`TERRAFORM_STATE`],
-//! [`VAGRANT_STATE`], [`RUNNER_STATE`]). Gitignore-style, at the project's root:
+//! them) and the file itself ([`OUTPUTS`]), version control and what the tools write in a
+//! project ([`TERRAFORM_STATE`], [`VAGRANT_STATE`], [`RUNNER_STATE`]). Gitignore-style, at the
+//! project's root:
 //!
 //! - one pattern per line; blank lines and `#` comments are skipped, spaces around a pattern
 //!   too;
@@ -35,8 +36,9 @@ use std::collections::BTreeSet;
 /// The file's name, at the project's root.
 pub const FILE: &str = ".isoloomignore";
 
-/// Isoloom's outputs, at the project's top: `.isoloom/` and every other `.isoloom*` entry there
-/// (an earlier copy's archive).
+/// Isoloom's outputs, at the project's top: `.isoloom/`, an instance's `.isoloom-<n>/`, and every
+/// other `.isoloom*` entry there. It takes `.isoloomignore` itself too, on purpose: the copy has
+/// applied it already, and a machine has no use for it.
 pub const OUTPUTS: &str = "/.isoloom*";
 
 /// Version control's folder.
