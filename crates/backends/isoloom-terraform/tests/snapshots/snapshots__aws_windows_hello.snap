@@ -355,7 +355,7 @@ output "checks" {
       machine  = "isoloom-controller"
       host     = aws_eip.isoloom_controller.public_ip
       user     = "admin"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/networks.sh'"
     }
   ]
 }

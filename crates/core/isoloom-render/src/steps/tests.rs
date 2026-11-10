@@ -159,12 +159,12 @@ fn a_provision_step_runs_from_the_project_folder_its_way() {
     };
     assert_eq!(
         run("steps/web.sh", RunKind::Shell).as_deref(),
-        Some("cd /opt/isoloom && sh -c 'sh steps/web.sh'\n")
+        Some(concat!(r"cd /opt/isoloom && sh -c 'sh '\''steps/web.sh'\'''", "\n"))
     );
     let play = run("site.yml", RunKind::Playbook).expect("a playbook runs locally");
     assert!(play.starts_with("pkg() {") && play.contains("|| pkg ansible-core\n"), "{play}");
     assert!(
-        play.ends_with("cd /opt/isoloom && sh -c 'ansible-playbook -c local -i web, site.yml'\n"),
+        play.ends_with(concat!(r"cd /opt/isoloom && sh -c 'ansible-playbook -c local -i web, '\''site.yml'\'''", "\n")),
         "{play}"
     );
     assert_eq!(run("setup.ps1", RunKind::PowerShell), None, "a Windows script is PowerShell's");
@@ -413,4 +413,22 @@ fn the_state_dirs_command_makes_the_state_dir() {
     assert_eq!(super::READY_FILE.rsplit_once('/').map(|(dir, _)| dir), Some(super::STATE_DIR));
     let ready = isoloom_spec::windows::READY_FILE;
     assert_eq!(ready.rsplit_once('\\').map(|(dir, _)| dir), Some(isoloom_spec::windows::ISOLOOM_DIR));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_project_script_with_a_space_in_its_path_runs() {
+    let env = testing::env(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  m: { networks: { lan: 10 }, os: debian@12, app: { steps: [{ run: \"provision/my setup.sh\" }] } }\n",
+        Target::Vagrant,
+    );
+    let line = rendered(&env, "m", |s| matches!(s, Step::Run { .. }));
+    let dir = std::env::temp_dir().join(format!("isoloom-spaced-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("provision")).unwrap();
+    std::fs::write(dir.join("provision/my setup.sh"), "touch ran\n").unwrap();
+    let script = line.replace(super::PROJECT_DIR, &dir.to_string_lossy());
+    let status = std::process::Command::new("sh").arg("-c").arg(&script).status().expect("sh runs");
+    let ran = dir.join("ran").exists();
+    std::fs::remove_dir_all(&dir).ok();
+    assert!(status.success() && ran, "{script}");
 }

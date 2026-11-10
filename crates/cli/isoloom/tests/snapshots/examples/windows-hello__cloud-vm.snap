@@ -383,7 +383,7 @@ output "checks" {
       machine  = "isoloom-controller"
       host     = aws_eip.isoloom_controller.public_ip
       user     = "admin"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/networks.sh'"
     }
   ]
 }
@@ -1286,7 +1286,7 @@ output "checks" {
       machine  = "isoloom-controller"
       host     = azurerm_public_ip.isoloom_controller.ip_address
       user     = "isoloom"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/networks.sh'"
     }
   ]
 }
@@ -1862,7 +1862,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/web01-answers.sh'
-if _retry 60 sh -c 'cd /opt/isoloom && sh checks/web01-answers.sh'; then pass 'checks/web01-answers.sh'; else fail 'checks/web01-answers.sh' "checks/web01-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /opt/isoloom && sh '\''checks/web01-answers.sh'\'''; then pass 'checks/web01-answers.sh'; else fail 'checks/web01-answers.sh' "checks/web01-answers.sh exited non-zero"; fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _http_any 'http://192.168.57.10:80/'; then pass 'web01:80 from the networks'; else fail 'web01:80 from the networks' "nothing answers at http://192.168.57.10:80/"; fi

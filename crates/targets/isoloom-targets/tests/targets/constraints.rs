@@ -325,7 +325,7 @@ fn containers_have_the_certificate_authority_and_built_images_trust_it() -> Outc
     )?;
     let dockerfile = file(&steps, Target::Docker, "docker/build/web/Dockerfile")?;
     let (copy, run) = (
-        dockerfile.find("COPY corp.pem /tmp/isoloom-ca/0.pem").ok_or("no COPY")?,
+        dockerfile.find("COPY [\"corp.pem\", \"/tmp/isoloom-ca/0.pem\"]").ok_or("no COPY")?,
         dockerfile.find("update-ca-certificates").ok_or("no RUN")?,
     );
     let install = dockerfile.find("curl").ok_or("no install")?;

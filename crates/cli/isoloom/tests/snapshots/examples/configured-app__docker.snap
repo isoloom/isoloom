@@ -697,10 +697,10 @@ isoloom_as '' '' 'nginx' '-g' 'daemon off;'
 # The container form of machine `api`: its OS's image and its steps.
 FROM ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
 WORKDIR /opt/isoloom
-COPY .isoloom/configure/lib/configure.sh /usr/local/lib/isoloom/configure.sh
+COPY [".isoloom/configure/lib/configure.sh", "/usr/local/lib/isoloom/configure.sh"]
 RUN . /usr/local/lib/isoloom/configure.sh && isoloom_packages 'python3'
-COPY api/ /srv/api/
-COPY --chmod=0755 .isoloom/configure/api/run /usr/local/bin/isoloom-run
+COPY ["api/", "/srv/api/"]
+COPY --chmod=0755 [".isoloom/configure/api/run", "/usr/local/bin/isoloom-run"]
 ENTRYPOINT ["/usr/local/bin/isoloom-run"]
 CMD []
 
@@ -710,17 +710,17 @@ CMD []
 # The container form of machine `web`: its OS's image and its steps.
 FROM debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 WORKDIR /opt/isoloom
-COPY .isoloom/configure/lib/configure.sh /usr/local/lib/isoloom/configure.sh
+COPY [".isoloom/configure/lib/configure.sh", "/usr/local/lib/isoloom/configure.sh"]
 RUN . /usr/local/lib/isoloom/configure.sh && isoloom_packages 'nginx'
 RUN . /usr/local/lib/isoloom/configure.sh && isoloom_group 'site' '1600' 'no'
 # hadolint ignore=SC2016
 RUN . /usr/local/lib/isoloom/configure.sh && isoloom_user 'editor' '1600' 'site' '' '' '/bin/sh' 'no' '$6$akm4bzmJ7GlLE7UB$iaxzuoGRSRy0UV8V28D56kUKxpiLRxOC7GcBI.g0iz/23oN22qBZZlH1YNPS66l1mSQGgZjLHu0CtZiyATN2/.'
 RUN . /usr/local/lib/isoloom/configure.sh && isoloom_file '/srv/site' 'editor' '' '0755' 'directory'
-COPY --chown=editor site/ /srv/site/
-COPY --chmod=0644 .isoloom/configure/web/rendered/conf/site.conf /etc/nginx/conf.d/site.conf
+COPY --chown=editor ["site/", "/srv/site/"]
+COPY --chmod=0644 [".isoloom/configure/web/rendered/conf/site.conf", "/etc/nginx/conf.d/site.conf"]
 RUN . /usr/local/lib/isoloom/configure.sh && isoloom_file '/etc/nginx/sites-enabled/default' '' '' '' 'absent'
 RUN . /usr/local/lib/isoloom/configure.sh && isoloom_command 'creates' '1' '/srv/site/stamp.txt' 'sh' '-c' 'echo configured > /srv/site/stamp.txt'
-COPY --chmod=0755 .isoloom/configure/web/run /usr/local/bin/isoloom-run
+COPY --chmod=0755 [".isoloom/configure/web/run", "/usr/local/bin/isoloom-run"]
 ENTRYPOINT ["/usr/local/bin/isoloom-run"]
 CMD []
 
@@ -890,10 +890,10 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/web-answers.sh'
-if _retry 60 sh -c 'cd /isoloom/project && sh checks/web-answers.sh'; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /isoloom/project && sh '\''checks/web-answers.sh'\'''; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
 
 echo '== checks/api-answers.sh'
-if _retry 60 sh -c 'cd /isoloom/project && sh checks/api-answers.sh'; then pass 'checks/api-answers.sh'; else fail 'checks/api-answers.sh' "checks/api-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /isoloom/project && sh '\''checks/api-answers.sh'\'''; then pass 'checks/api-answers.sh'; else fail 'checks/api-answers.sh' "checks/api-answers.sh exited non-zero"; fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

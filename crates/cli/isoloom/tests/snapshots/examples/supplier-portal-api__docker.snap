@@ -206,7 +206,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== build/check/check.sh'
-if _retry 0 sh -c 'cd /isoloom/project && sh build/check/check.sh'; then pass 'build/check/check.sh'; else fail 'build/check/check.sh' "build/check/check.sh exited non-zero"; fi
+if _retry 0 sh -c 'cd /isoloom/project && sh '\''build/check/check.sh'\'''; then pass 'build/check/check.sh'; else fail 'build/check/check.sh' "build/check/check.sh exited non-zero"; fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

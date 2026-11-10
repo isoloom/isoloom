@@ -5,8 +5,10 @@
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::inventory::CONTROLLER_INVENTORY;
+use isoloom_render::steps::PROJECT_DIR;
 use isoloom_render::{GeneratedFile, OUTPUT_DIR};
 use isoloom_spec::images;
+use isoloom_spec::shell::quote;
 
 use crate::ruby::{Ruby, Value};
 use crate::vagrantfile;
@@ -113,7 +115,7 @@ pub(crate) fn provisioner(r: &mut Ruby, file: &str, group: &[&Resolved]) {
     let call = if scripts.is_empty() {
         call.kw("path", Value::str(&runner))
     } else {
-        let list = Value::array(scripts.iter().map(|p| Value::str(p)));
+        let list = Value::array(scripts.iter().map(|p| refreshed(p)));
         call.kw(
             "inline",
             Value::raw(format!("{list}{REFRESH} + File.read(File.join(__dir__, {}))", Value::str(&runner))),
@@ -123,5 +125,14 @@ pub(crate) fn provisioner(r: &mut Ruby, file: &str, group: &[&Resolved]) {
     r.provision(call.kw("env", derived));
 }
 
-/// Writes each listed check script (`p`) over the VM's copy, from the project on the host.
-const REFRESH: &str = ".map { |p| \"mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\\n#{File.read(File.join(ROOT, p))}\\nISOLOOM_EOF\\n\" }.join";
+/// Check script `path` as [`REFRESH`] takes it: its path in the project, then its folder and
+/// itself in the VM's copy, each quoted for the shell (a project path may hold a space).
+fn refreshed(path: &str) -> Value {
+    let in_vm = format!("{PROJECT_DIR}/{path}");
+    let folder = std::path::Path::new(&in_vm).parent().map_or(PROJECT_DIR.into(), |f| f.to_string_lossy());
+    Value::array([Value::str(path), Value::str(&quote(&folder)), Value::str(&quote(&in_vm))])
+}
+
+/// Writes each listed check script over the VM's copy, from the project on the host.
+const REFRESH: &str =
+    ".map { |p, folder, file| \"mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\\n#{File.read(File.join(ROOT, p))}\\nISOLOOM_EOF\\n\" }.join";

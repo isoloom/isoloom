@@ -113,7 +113,7 @@ fn portable_steps_build_from_the_os_image() -> Outcome {
     let files = render("legacy-intranet")?;
     let dockerfile = file(&files, ".isoloom/docker/build/portal/Dockerfile")?;
     assert!(dockerfile.contains("FROM debian:12@sha256:"));
-    assert!(dockerfile.contains("COPY --chown=www-data portal/ /var/www/html/\n"));
+    assert!(dockerfile.contains("COPY --chown=www-data [\"portal/\", \"/var/www/html/\"]\n"));
     let c = file(&files, ".isoloom/docker/compose.yml")?;
     assert!(c.contains("context: ../..\n      dockerfile: .isoloom/docker/build/portal/Dockerfile"), "{c}");
     // The clerk is the access box: its OS image is the parameterized default (the runner

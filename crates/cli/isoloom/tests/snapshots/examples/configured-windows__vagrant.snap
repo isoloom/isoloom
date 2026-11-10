@@ -1599,7 +1599,7 @@ Vagrant.configure("2") do |config|
       INV
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/iis-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/iis-answers.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/iis-answers.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
@@ -1683,7 +1683,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/iis-answers.sh'
-if _retry 60 sh -c 'cd /opt/isoloom && sh checks/iis-answers.sh'; then pass 'checks/iis-answers.sh'; else fail 'checks/iis-answers.sh' "checks/iis-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /opt/isoloom && sh '\''checks/iis-answers.sh'\'''; then pass 'checks/iis-answers.sh'; else fail 'checks/iis-answers.sh' "checks/iis-answers.sh exited non-zero"; fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _http_any 'http://10.67.0.10:80/'; then pass 'iis:80 from the networks'; else fail 'iis:80 from the networks' "nothing answers at http://10.67.0.10:80/"; fi

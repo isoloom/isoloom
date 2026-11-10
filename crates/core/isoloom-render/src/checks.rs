@@ -21,7 +21,14 @@ pub fn address_of(env: &Environment, host: &Host) -> String {
 /// [`PROJECT_DIR`], then `sh <path>` (what a backend hands [`isoloom_plan::checks::Render::script`]).
 #[must_use]
 pub fn script_command(path: &str) -> String {
-    format!("cd {PROJECT_DIR} && sh {path}")
+    script_command_in(PROJECT_DIR, path)
+}
+
+/// The shell command running project check script `path` from the project copy at `project`,
+/// the path quoted (a project path may hold a space).
+#[must_use]
+pub fn script_command_in(project: &str, path: &str) -> String {
+    format!("cd {project} && sh {}", isoloom_spec::shell::quote(path))
 }
 
 #[cfg(test)]

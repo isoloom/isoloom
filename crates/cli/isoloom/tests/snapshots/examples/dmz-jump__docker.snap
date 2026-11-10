@@ -408,10 +408,10 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/dmz-reachable.sh'
-if _retry 0 sh -c 'cd /isoloom/project && sh checks/dmz-reachable.sh'; then pass 'checks/dmz-reachable.sh'; else fail 'checks/dmz-reachable.sh' "checks/dmz-reachable.sh exited non-zero"; fi
+if _retry 0 sh -c 'cd /isoloom/project && sh '\''checks/dmz-reachable.sh'\'''; then pass 'checks/dmz-reachable.sh'; else fail 'checks/dmz-reachable.sh' "checks/dmz-reachable.sh exited non-zero"; fi
 
 echo '== checks/internal-not-reachable-from-access.sh'
-if _retry 0 sh -c 'cd /isoloom/project && sh checks/internal-not-reachable-from-access.sh'; then pass 'checks/internal-not-reachable-from-access.sh'; else fail 'checks/internal-not-reachable-from-access.sh' "checks/internal-not-reachable-from-access.sh exited non-zero"; fi
+if _retry 0 sh -c 'cd /isoloom/project && sh '\''checks/internal-not-reachable-from-access.sh'\'''; then pass 'checks/internal-not-reachable-from-access.sh'; else fail 'checks/internal-not-reachable-from-access.sh' "checks/internal-not-reachable-from-access.sh exited non-zero"; fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _tcp '10.30.10.10' 80; then pass 'gateway:80 on dmz from user'; else fail 'gateway:80 on dmz from user' "nothing listens at 10.30.10.10:80"; fi

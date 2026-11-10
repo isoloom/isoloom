@@ -61,10 +61,10 @@ fn vagrant_restarts_the_vm_between_the_steps() -> Outcome {
     let reboot = "m.vm.provision \"shell\", name: \"reboot\", reboot: true\n";
     assert_eq!(v.matches(reboot).count(), 2);
     let first = at(&v, reboot)?;
-    assert!(at(&v, "sh kernel.sh")? < first);
-    assert!(first < at(&v, "sh middle.sh")?);
-    assert!(at(&v, "sh middle.sh")? < v.rfind(reboot).unwrap());
-    assert!(v.rfind(reboot).unwrap() < at(&v, "sh last.sh")?);
+    assert!(at(&v, "kernel.sh")? < first);
+    assert!(first < at(&v, "middle.sh")?);
+    assert!(at(&v, "middle.sh")? < v.rfind(reboot).unwrap());
+    assert!(v.rfind(reboot).unwrap() < at(&v, "last.sh")?);
     Ok(())
 }
 
@@ -76,7 +76,7 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() -> Outcome {
     // cloud-init runs the steps before the first reboot, then restarts the machine.
     let runcmd = from(tf, "runcmd = [")?;
     let runcmd = before(runcmd, "]\n      power_state = {")?;
-    assert!(runcmd.contains("sh kernel.sh"));
+    assert!(runcmd.contains("kernel.sh"));
     assert!(!runcmd.contains("middle.sh") && !runcmd.contains("last.sh") && !runcmd.contains("echo ready > /var/lib/isoloom/ready"));
     // Each step says it runs in the ready file, and a failing one ends the set-up there.
     assert!(runcmd.contains("echo 'running: kernel.sh' > /var/lib/isoloom/ready; "), "{runcmd}");
@@ -88,14 +88,14 @@ fn proxmox_runs_what_follows_a_reboot_at_the_next_boot() -> Outcome {
     assert!(tf.contains("\"/etc/systemd/system/isoloom-steps.service\""));
     let boot1 = from(tf, "boot-1.sh\"")?;
     let boot1 = before(boot1, "\n        }")?;
-    assert!(boot1.contains("sh middle.sh"), "{boot1}");
+    assert!(boot1.contains("middle.sh"), "{boot1}");
     assert!(
         boot1.contains("\\necho 2 > /var/lib/isoloom/next-boot\\nsystemctl --no-block reboot"),
         "{boot1}"
     );
     let boot2 = from(tf, "boot-2.sh\"")?;
     let boot2 = before(boot2, "\n        }")?;
-    assert!(boot2.contains("sh last.sh"), "{boot2}");
+    assert!(boot2.contains("last.sh"), "{boot2}");
     assert!(
         at(boot2, "echo ready > /var/lib/isoloom/ready")? < at(boot2, "systemctl disable isoloom-steps.service")?,
         "{boot2}"
@@ -139,9 +139,9 @@ fn the_clouds_resume_the_set_up_after_each_reboot() -> Outcome {
         assert!(!tf.contains("systemctl disable isoloom-setup.service"), "{cloud}");
         // Steps in order, each after its restart; the ready marker last.
         let reboots: Vec<usize> = tf.match_indices("systemctl reboot").map(|(i, _)| i).collect();
-        let kernel = at(&tf, "sh kernel.sh")?;
-        assert!(kernel < reboots[0] && reboots[0] < at(&tf, "sh middle.sh")? && at(&tf, "sh middle.sh")? < reboots[1]);
-        assert!(reboots[1] < at(&tf, "sh last.sh")? && at(&tf, "sh last.sh")? < at(&tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?);
+        let kernel = at(&tf, "kernel.sh")?;
+        assert!(kernel < reboots[0] && reboots[0] < at(&tf, "middle.sh")? && at(&tf, "middle.sh")? < reboots[1]);
+        assert!(reboots[1] < at(&tf, "last.sh")? && at(&tf, "last.sh")? < at(&tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?);
     }
     Ok(())
 }
@@ -161,8 +161,8 @@ fn every_cloud_driver_splits_the_set_up_at_a_reboot() -> Outcome {
             .contents;
         assert_eq!(tf.matches("systemctl reboot").count(), 1, "{cloud}");
         let reboot = at(tf, "systemctl reboot")?;
-        assert!(at(tf, "sh kernel.sh")? < reboot && reboot < at(tf, "sh last.sh")?, "{cloud}");
-        assert!(at(tf, "sh last.sh")? < at(tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?, "{cloud}");
+        assert!(at(tf, "kernel.sh")? < reboot && reboot < at(tf, "last.sh")?, "{cloud}");
+        assert!(at(tf, "last.sh")? < at(tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?, "{cloud}");
     }
     Ok(())
 }

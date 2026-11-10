@@ -306,7 +306,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/web-through-firewall.sh'
-if _retry 60 sh -c 'cd /isoloom/project && sh checks/web-through-firewall.sh'; then pass 'the web page answers through the firewall'; else fail 'the web page answers through the firewall' "checks/web-through-firewall.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /isoloom/project && sh '\''checks/web-through-firewall.sh'\'''; then pass 'the web page answers through the firewall'; else fail 'the web page answers through the firewall' "checks/web-through-firewall.sh exited non-zero"; fi
 
 if _retry 30 _http_is 'http://www.edge.test/' 200; then pass 'the web server answers by its other name'; else fail 'the web server answers by its other name' "expected HTTP 200 from http://www.edge.test/, got $(_http 'http://www.edge.test/')"; fi
 

@@ -1448,7 +1448,7 @@ Vagrant.configure("2") do |config|
       run_play ansible-playbook -i /etc/isoloom/inventory.ini -i /opt/isoloom/ansible/groups.ini -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' site.yml
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/web-answers.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/web-answers.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web-answers.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
@@ -1618,7 +1618,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/web-answers.sh'
-if _retry 60 sh -c 'cd /opt/isoloom && sh checks/web-answers.sh'; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /opt/isoloom && sh '\''checks/web-answers.sh'\'''; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

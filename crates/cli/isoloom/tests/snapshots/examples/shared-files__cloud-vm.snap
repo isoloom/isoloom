@@ -299,14 +299,14 @@ output "checks" {
       machine  = "writer"
       host     = aws_instance.writer.public_ip
       user     = "admin"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/writer.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/writer.sh'"
     },
     {
       position = "reader"
       machine  = "reader"
       host     = aws_instance.reader.public_ip
       user     = "admin"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/reader.sh'"
     }
   ]
 }
@@ -1159,14 +1159,14 @@ output "checks" {
       machine  = "writer"
       host     = azurerm_public_ip.writer.ip_address
       user     = "isoloom"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/writer.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/writer.sh'"
     },
     {
       position = "reader"
       machine  = "reader"
       host     = azurerm_public_ip.reader.ip_address
       user     = "isoloom"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/reader.sh'"
     }
   ]
 }
@@ -2116,14 +2116,14 @@ output "checks" {
       machine  = "writer"
       host     = google_compute_instance.writer.network_interface[0].access_config[0].nat_ip
       user     = "admin"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/writer.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/writer.sh'"
     },
     {
       position = "reader"
       machine  = "reader"
       host     = google_compute_instance.reader.network_interface[0].access_config[0].nat_ip
       user     = "admin"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/reader.sh'"
     }
   ]
 }
@@ -2867,14 +2867,14 @@ output "checks" {
       machine  = "writer"
       host     = one(linode_instance.writer.ipv4)
       user     = "root"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/writer.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/writer.sh'"
     },
     {
       position = "reader"
       machine  = "reader"
       host     = one(linode_instance.reader.ipv4)
       user     = "root"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/reader.sh'"
     }
   ]
 }
@@ -3739,14 +3739,14 @@ output "checks" {
       machine  = "writer"
       host     = oci_core_instance.writer.public_ip
       user     = "ubuntu"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/writer.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/writer.sh'"
     },
     {
       position = "reader"
       machine  = "reader"
       host     = oci_core_instance.reader.public_ip
       user     = "ubuntu"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/reader.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/reader.sh'"
     }
   ]
 }

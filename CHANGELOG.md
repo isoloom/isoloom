@@ -421,6 +421,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   and the length was counted in bytes against a message saying characters. A tag is now refused
   unless `key:value` is 3 to 50 characters, its value on one line; the rules are
   `isoloom_spec::tags::{key_refusal, value_refusal}`, which the defaults' tags follow too.
+- **A project path with a space works on every target.** A spec takes `provision/my setup.sh`,
+  but the Dockerfiles wrote `COPY provision/my setup.sh provision/my setup.sh` and the set-up and
+  check commands `sh provision/my setup.sh`, two words. Every `COPY` is now in its JSON form
+  (`COPY ["provision/my setup.sh", …]`), and every shell command quotes the project path it runs
+  (a VM's set-up and playbook, a check script on every target, the Vagrant check refresh).
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

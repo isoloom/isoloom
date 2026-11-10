@@ -841,7 +841,7 @@ Vagrant.configure("2") do |config|
       : > /tmp/isoloom-inputs.env
       printf "%s='%s'\n" 'API_URL' "$(printenv 'API_URL' | base64 -d | sed "s/'/'\\\\''/g")" >> /tmp/isoloom-inputs.env
     SH
-    m.vm.provision "shell", name: "provision/database.sh", inline: "cd /opt/isoloom && sh -c 'set -a; . /tmp/isoloom-inputs.env; set +a; sh provision/database.sh'"
+    m.vm.provision "shell", name: "provision/database.sh", inline: "cd /opt/isoloom && sh -c 'set -a; . /tmp/isoloom-inputs.env; set +a; sh '\\''provision/database.sh'\\'''"
     m.vm.provision "shell", name: "setup", inline: <<~'SH'
       [ -f /var/lib/isoloom/setup.done ] || (
       set -e
@@ -1008,7 +1008,7 @@ Vagrant.configure("2") do |config|
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "wait for database", inline: "i=0; until (bash -c '</dev/tcp/database/3207' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\""
-    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/web.sh'"
+    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/web.sh'\\'''"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -1177,7 +1177,7 @@ Vagrant.configure("2") do |config|
       INV
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["build/check/check.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["build/check/check.sh", "'/opt/isoloom/build/check'", "'/opt/isoloom/build/check/check.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
@@ -1347,7 +1347,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== build/check/check.sh'
-if _retry 0 sh -c 'cd /opt/isoloom && sh build/check/check.sh'; then pass 'build/check/check.sh'; else fail 'build/check/check.sh' "build/check/check.sh exited non-zero"; fi
+if _retry 0 sh -c 'cd /opt/isoloom && sh '\''build/check/check.sh'\'''; then pass 'build/check/check.sh'; else fail 'build/check/check.sh' "build/check/check.sh exited non-zero"; fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

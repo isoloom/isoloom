@@ -404,7 +404,7 @@ output "checks" {
       machine  = "isoloom-controller"
       host     = azurerm_public_ip.isoloom_controller.ip_address
       user     = "isoloom"
-      command  = "cd /opt/isoloom && sh .isoloom/cloud-vm/checks/networks.sh"
+      command  = "cd /opt/isoloom && sh '.isoloom/cloud-vm/checks/networks.sh'"
     }
   ]
 }

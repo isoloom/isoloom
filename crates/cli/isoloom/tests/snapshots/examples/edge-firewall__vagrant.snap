@@ -775,7 +775,7 @@ Vagrant.configure("2") do |config|
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.70.0.5 fw' '10.70.10.10 web www.edge.test' '10.70.20.20 cache' '10.70.0.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "forwarding", inline: "printf '%s\\n' 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom-forwarding.conf && sysctl -q -p /etc/sysctl.d/90-isoloom-forwarding.conf"
-    m.vm.provision "shell", name: "provision/fw.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/fw.sh'"
+    m.vm.provision "shell", name: "provision/fw.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/fw.sh'\\'''"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/fw.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -961,7 +961,7 @@ Vagrant.configure("2") do |config|
       /etc/isoloom/routes.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/web.sh'"
+    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/web.sh'\\'''"
     m.vm.provision "shell", name: "default route", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'
@@ -1184,7 +1184,7 @@ Vagrant.configure("2") do |config|
       /etc/isoloom/routes.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/cache.sh'"
+    m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/cache.sh'\\'''"
     m.vm.provision "shell", name: "default route", inline: <<~'SH'
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/routes.sh <<'ROUTES'
@@ -1409,7 +1409,7 @@ Vagrant.configure("2") do |config|
       fi
     SH
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-    m.vm.provision "shell", name: "checks", run: "never", inline: ["checks/web-through-firewall.sh"].map { |p| "mkdir -p /opt/isoloom/#{File.dirname(p)} && cat > /opt/isoloom/#{p} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/user.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/web-through-firewall.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web-through-firewall.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/user.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
@@ -1677,7 +1677,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/web-through-firewall.sh'
-if _retry 60 sh -c 'cd /opt/isoloom && sh checks/web-through-firewall.sh'; then pass 'the web page answers through the firewall'; else fail 'the web page answers through the firewall' "checks/web-through-firewall.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /opt/isoloom && sh '\''checks/web-through-firewall.sh'\'''; then pass 'the web page answers through the firewall'; else fail 'the web page answers through the firewall' "checks/web-through-firewall.sh exited non-zero"; fi
 
 if _retry 30 _http_is 'http://www.edge.test/' 200; then pass 'the web server answers by its other name'; else fail 'the web server answers by its other name' "expected HTTP 200 from http://www.edge.test/, got $(_http 'http://www.edge.test/')"; fi
 

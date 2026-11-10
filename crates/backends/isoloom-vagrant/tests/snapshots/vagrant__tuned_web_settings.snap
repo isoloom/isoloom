@@ -801,7 +801,7 @@ Vagrant.configure("2") do |config|
       ' > /etc/systemd/system.conf.d/90-isoloom-limits.conf
       systemctl daemon-reexec 2>/dev/null || true
     SH
-    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/web.sh'"
+    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/web.sh'\\'''"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end

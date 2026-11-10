@@ -296,7 +296,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/cache-seeded.sh'
-if _retry 0 sh -c 'cd /isoloom/project && sh checks/cache-seeded.sh'; then pass 'checks/cache-seeded.sh'; else fail 'checks/cache-seeded.sh' "checks/cache-seeded.sh exited non-zero"; fi
+if _retry 0 sh -c 'cd /isoloom/project && sh '\''checks/cache-seeded.sh'\'''; then pass 'checks/cache-seeded.sh'; else fail 'checks/cache-seeded.sh' "checks/cache-seeded.sh exited non-zero"; fi
 
 if _retry 30 _http_is 'http://web/' 200; then pass 'the page greets'; else fail 'the page greets' "expected HTTP 200 from http://web/, got $(_http 'http://web/')"; fi
 

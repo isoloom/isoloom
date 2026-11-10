@@ -8,6 +8,7 @@
 
 use isoloom_plan::configure::{ContainerProcess, Resource, RunPlan, TemplatePlan};
 use isoloom_plan::{Build, Environment, Image, MachineShape};
+use isoloom_spec::shell::quote;
 use isoloom_spec::syntax::Mode;
 
 use super::{Configured, rendered_path, shell, supervisor};
@@ -55,7 +56,7 @@ pub fn files(env: &Environment) -> Vec<GeneratedFile> {
 #[must_use]
 pub(crate) fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess) -> String {
     let library = if super::uses_library(c.recipe()) {
-        format!("COPY {} {LIBRARY}\n", shell::LIBRARY_PATH)
+        copy("", shell::LIBRARY_PATH, LIBRARY)
     } else {
         String::new()
     };
@@ -65,13 +66,13 @@ pub(crate) fn render(c: &Configured<'_>, base: &str, process: &ContainerProcess)
     let entrypoint = if process.is_supervisor() {
         // The image's own command stays its arguments, which the supervisor hands its entrypoint.
         let command = match process {
-            ContainerProcess::Started { command, .. } => serde_json::to_string(command).unwrap_or_else(|_| "[]".to_owned()),
+            ContainerProcess::Started { command, .. } => serde_json::Value::from(command.clone()).to_string(),
             _ => "[]".to_owned(),
         };
         format!(
-            "{}COPY --chmod=0755 {} {SUPERVISOR}\nENTRYPOINT [\"{SUPERVISOR}\"]\nCMD {command}\n",
+            "{}{}ENTRYPOINT [\"{SUPERVISOR}\"]\nCMD {command}\n",
             start_files(c),
-            supervisor::path(c.machine())
+            copy("--chmod=0755 ", &supervisor::path(c.machine()), SUPERVISOR)
         )
     } else {
         String::new()
@@ -106,7 +107,7 @@ fn trusted(env: &Environment) -> String {
     let copies = files
         .iter()
         .enumerate()
-        .map(|(n, f)| format!("COPY {f} {CA_DIR}/{n}.pem\n"))
+        .map(|(n, f)| copy("", f, &format!("{CA_DIR}/{n}.pem")))
         .collect::<Vec<_>>()
         .concat();
     let inside: Vec<String> = (0..files.len()).map(|n| format!("{CA_DIR}/{n}.pem")).collect();
@@ -127,9 +128,16 @@ fn start_files(c: &Configured<'_>) -> String {
             Resource::Copy(cp) => Some(cp.from.as_str()),
             _ => None,
         })
-        .map(|path| format!("COPY {path} {path}\n"))
+        .map(|path| copy("", path, path))
         .collect::<Vec<_>>()
         .concat()
+}
+
+/// `COPY` of `from` (in the build's context) to `to` (in the image), after `flags`, in its JSON
+/// form: a path with a space is one path.
+fn copy(flags: &str, from: &str, to: &str) -> String {
+    let word = |s: &str| serde_json::Value::from(s).to_string();
+    format!("COPY {flags}[{}, {}]\n", word(from), word(to))
 }
 
 /// One step's instructions; `None` for a step a container doesn't run at build (a service, which
@@ -140,7 +148,7 @@ fn instructions(c: &Configured<'_>, step: &Resource) -> Option<String> {
         Resource::Copy(cp) => {
             let owner = cp.owner.as_ref().map(|o| format!("--chown={o} ")).unwrap_or_default();
             let mode = cp.mode.map(|m| format!("--chmod={m} ")).unwrap_or_default();
-            format!("COPY {owner}{mode}{} {}\n", cp.from, cp.to)
+            copy(&format!("{owner}{mode}"), cp.from.as_str(), cp.to.as_str())
         }
         Resource::Template(t) => template(c, t),
         Resource::Service(_) | Resource::Firewall(_) | Resource::Reboot | Resource::Playbook(_) => return None,
@@ -155,12 +163,12 @@ fn instructions(c: &Configured<'_>, step: &Resource) -> Option<String> {
 
 /// A project script, copied and run (behind its `creates`).
 fn script(run: &RunPlan) -> String {
-    let script = &run.script;
+    let script = run.script.as_str();
     let line = match &run.creates {
-        Some(path) => format!("[ -e {path} ] || sh {script}"),
-        None => format!("sh {script}"),
+        Some(path) => format!("[ -e {} ] || sh {}", quote(path.as_str()), quote(script)),
+        None => format!("sh {}", quote(script)),
     };
-    format!("COPY {script} {script}\nRUN {line}\n")
+    format!("{}RUN {line}\n", copy("", script, script))
 }
 
 /// A template: the file Isoloom filled in, copied with its owner, group and mode (`0644` when it
@@ -176,7 +184,7 @@ fn template(c: &Configured<'_>, t: &TemplatePlan) -> String {
         (None, None) => String::new(),
     };
     let mode = t.mode.unwrap_or(Mode::CONFIG);
-    format!("COPY {chown}--chmod={mode} {} {}\n", rendered_path(c.machine(), &t.from), t.to)
+    copy(&format!("{chown}--chmod={mode} "), &rendered_path(c.machine(), &t.from), t.to.as_str())
 }
 
 /// The templates machine `c` builds with, filled in: one file each, at

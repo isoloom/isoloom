@@ -970,7 +970,7 @@ Vagrant.configure("2") do |config|
       /etc/isoloom/routes.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/intranet.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/intranet.sh'"
+    m.vm.provision "shell", name: "provision/intranet.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/intranet.sh'\\'''"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
       command -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi

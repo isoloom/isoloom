@@ -46,8 +46,8 @@ crash.*.log
 # The container form of machine `client`: its OS's image and its steps.
 FROM debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 WORKDIR /opt/isoloom
-COPY provision/client.sh provision/client.sh
-RUN sh provision/client.sh
+COPY ["provision/client.sh", "provision/client.sh"]
+RUN sh 'provision/client.sh'
 
 ## .isoloom/docker/checks/client.sh
 #!/bin/sh
@@ -129,7 +129,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/resolve.sh'
-if _retry 0 sh -c 'cd /isoloom/project && sh checks/resolve.sh'; then pass 'checks/resolve.sh'; else fail 'checks/resolve.sh' "checks/resolve.sh exited non-zero"; fi
+if _retry 0 sh -c 'cd /isoloom/project && sh '\''checks/resolve.sh'\'''; then pass 'checks/resolve.sh'; else fail 'checks/resolve.sh' "checks/resolve.sh exited non-zero"; fi
 
 if [ "${ISOLOOM_DERIVED:-1}" != 0 ]; then
 if _retry 30 _tcp '10.66.10.53' 53; then pass 'dns:53 from client'; else fail 'dns:53 from client' "nothing listens at 10.66.10.53:53"; fi

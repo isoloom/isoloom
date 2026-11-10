@@ -29,7 +29,7 @@ fn compose_has_addresses_healthchecks_init_and_checks() -> Outcome {
         "{compose}"
     );
     let runner = file(&files, ".isoloom/docker/checks/networks.sh")?;
-    assert!(runner.contains("cd /isoloom/project && sh checks/cache-seeded.sh"), "{runner}");
+    assert!(runner.contains("cd /isoloom/project && sh '\\''checks/cache-seeded.sh'\\''"), "{runner}");
     assert!(runner.contains("_http_is 'http://web/' 200"), "{runner}");
     Ok(())
 }

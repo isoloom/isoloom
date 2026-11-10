@@ -99,7 +99,7 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 
 echo '== checks/web-answers.sh'
-if _retry 60 sh -c 'cd /opt/isoloom && sh checks/web-answers.sh'; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
+if _retry 60 sh -c 'cd /opt/isoloom && sh '\''checks/web-answers.sh'\'''; then pass 'checks/web-answers.sh'; else fail 'checks/web-answers.sh' "checks/web-answers.sh exited non-zero"; fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
@@ -355,7 +355,7 @@ resource "terraform_data" "web" {
       "sudo sh -c 'mkdir -p /var/lib/isoloom'",
       "sudo sh -c 'echo '\\''running: set-up'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz' || { sudo sh -c 'echo '\\''failed: set-up'\\'' > /var/lib/isoloom/ready'; exit 1; }",
       "sudo sh -c 'echo '\\''running: hosts file'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'printf '\\''%s\\n'\\'' '\\''10.80.0.10 web'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { sudo sh -c 'echo '\\''failed: hosts file'\\'' > /var/lib/isoloom/ready'; exit 1; }",
-      "sudo sh -c 'echo '\\''running: provision/web.sh'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh provision/web.sh'\\''' || { sudo sh -c 'echo '\\''failed: provision/web.sh'\\'' > /var/lib/isoloom/ready'; exit 1; }",
+      "sudo sh -c 'echo '\\''running: provision/web.sh'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'cd /opt/isoloom && sh -c '\\''sh '\\''\\'\\'''\\''provision/web.sh'\\''\\'\\'''\\'''\\''' || { sudo sh -c 'echo '\\''failed: provision/web.sh'\\'' > /var/lib/isoloom/ready'; exit 1; }",
       "sudo sh -c 'echo '\\''running: health check'\\'' > /var/lib/isoloom/ready'; sudo sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { sudo sh -c 'echo '\\''failed: health check'\\'' > /var/lib/isoloom/ready'; exit 1; }"
     ]
   }

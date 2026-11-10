@@ -23,7 +23,7 @@ pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Servic
     let spec = env.spec();
     let default_pos = checks::default_position(spec);
     let host = |h: &Host, _: &Position| isoloom_render::checks::address_of(env, h);
-    let run_script = |path: &str| format!("cd /isoloom/project && sh {path}");
+    let run_script = |path: &str| isoloom_render::checks::script_command_in("/isoloom/project", path);
     let render = Render {
         host: &host,
         script: &run_script,

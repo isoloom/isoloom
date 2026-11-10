@@ -106,7 +106,7 @@ fn an_images_start_steps_run_then_its_own_process() {
     let d = super::super::dockerfile::render(&c, "nginx@sha256:0", &process);
     assert!(!d.contains("RUN"), "start runs at each start, not at build: {d}");
     assert!(
-        d.ends_with("COPY prepare.sh prepare.sh\nCOPY --chmod=0755 .isoloom/configure/m/run /usr/local/bin/isoloom-run\nENTRYPOINT [\"/usr/local/bin/isoloom-run\"]\nCMD [\"nginx\",\"-g\",\"daemon off;\"]\n"),
+        d.ends_with("COPY [\"prepare.sh\", \"prepare.sh\"]\nCOPY --chmod=0755 [\".isoloom/configure/m/run\", \"/usr/local/bin/isoloom-run\"]\nENTRYPOINT [\"/usr/local/bin/isoloom-run\"]\nCMD [\"nginx\",\"-g\",\"daemon off;\"]\n"),
         "{d}"
     );
 }

@@ -275,12 +275,12 @@ fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> Option<St
     let inputs = inputs_file(env, machine).map(|f| format!("set -a; . {f}; set +a; ")).unwrap_or_default();
     match kind {
         RunKind::PowerShell => None,
-        RunKind::Shell => Some(format!("cd {PROJECT_DIR} && sh -c {}\n", quote(&format!("{inputs}sh {path}")))),
+        RunKind::Shell => Some(format!("cd {PROJECT_DIR} && sh -c {}\n", quote(&format!("{inputs}sh {}", quote(path))))),
         // Installed with the machine's own package manager; its inventory is the machine, by
         // its name (a play may name it), run locally.
         RunKind::Playbook => Some(format!(
             "{PKG}\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\ncd {PROJECT_DIR} && sh -c {}\n",
-            quote(&format!("{inputs}ansible-playbook -c local -i {machine}, {path}"))
+            quote(&format!("{inputs}ansible-playbook -c local -i {machine}, {}", quote(path)))
         )),
     }
 }

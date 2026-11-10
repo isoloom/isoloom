@@ -28,19 +28,19 @@ fn steps_become_instructions_from_the_os_image() {
         "{d}"
     );
     assert!(
-        d.contains("\nWORKDIR /opt/isoloom\nCOPY .isoloom/configure/lib/configure.sh /usr/local/lib/isoloom/configure.sh\n"),
+        d.contains("\nWORKDIR /opt/isoloom\nCOPY [\".isoloom/configure/lib/configure.sh\", \"/usr/local/lib/isoloom/configure.sh\"]\n"),
         "{d}"
     );
     assert!(d.contains("RUN . /usr/local/lib/isoloom/configure.sh && isoloom_packages 'nginx'\n"), "{d}");
-    assert!(d.contains("COPY --chown=www-data --chmod=0755 site/ /var/www/\n"));
-    assert!(d.contains("COPY provision/web.sh provision/web.sh\nRUN sh provision/web.sh\n"));
+    assert!(d.contains("COPY --chown=www-data --chmod=0755 [\"site/\", \"/var/www/\"]\n"));
+    assert!(d.contains("COPY [\"provision/web.sh\", \"provision/web.sh\"]\nRUN sh 'provision/web.sh'\n"));
     assert!(!d.contains("ENTRYPOINT"), "nothing to run: the target keeps it idle");
 }
 
 #[test]
 fn scripts_alone_need_no_library() {
     let d = dockerfile("debian@12", "[{ run: a.sh, creates: /done }]");
-    assert!(d.contains("RUN [ -e /done ] || sh a.sh") && !d.contains("configure.sh"), "{d}");
+    assert!(d.contains("RUN [ -e '/done' ] || sh 'a.sh'") && !d.contains("configure.sh"), "{d}");
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn a_template_is_copied_filled_in_with_its_owner_and_mode() {
     assert!(
         found[0]
             .contents
-            .contains("COPY --chown=app:ops --chmod=0644 .isoloom/configure/m/rendered/conf/app.toml /etc/app.toml\n"),
+            .contains("COPY --chown=app:ops --chmod=0644 [\".isoloom/configure/m/rendered/conf/app.toml\", \"/etc/app.toml\"]\n"),
         "{}",
         found[0].contents
     );
@@ -110,9 +110,9 @@ fn a_container_that_runs_services_builds_its_supervisor_in_as_its_entrypoint() {
         ]
     );
     assert!(
-        found[0]
-            .contents
-            .ends_with("COPY --chmod=0755 .isoloom/configure/m/run /usr/local/bin/isoloom-run\nENTRYPOINT [\"/usr/local/bin/isoloom-run\"]\nCMD []\n"),
+        found[0].contents.ends_with(
+            "COPY --chmod=0755 [\".isoloom/configure/m/run\", \"/usr/local/bin/isoloom-run\"]\nENTRYPOINT [\"/usr/local/bin/isoloom-run\"]\nCMD []\n"
+        ),
         "{}",
         found[0].contents
     );

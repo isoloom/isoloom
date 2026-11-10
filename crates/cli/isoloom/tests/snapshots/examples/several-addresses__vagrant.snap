@@ -1141,7 +1141,7 @@ Vagrant.configure("2") do |config|
       /etc/isoloom/addresses.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/web.sh'"
+    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/web.sh'\\'''"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   end
 
@@ -1342,7 +1342,7 @@ Vagrant.configure("2") do |config|
       /etc/isoloom/addresses.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/block.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/block.sh'"
+    m.vm.provision "shell", name: "provision/block.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/block.sh'\\'''"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/block.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
@@ -1492,7 +1492,7 @@ Vagrant.configure("2") do |config|
     end
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.86.0.10 web' '10.86.0.40 block' '10.86.0.20 client' '10.86.0.11 web' '10.86.0.12 web' '10.86.0.48 block' '10.86.0.49 block' '10.86.0.50 block' '10.86.0.51 block' '10.86.0.52 block' '10.86.0.53 block' '10.86.0.54 block' '10.86.0.55 block' '10.86.0.56 block' '10.86.0.57 block' '10.86.0.58 block' '10.86.0.59 block' '10.86.0.60 block' '10.86.0.61 block' '10.86.0.62 block' '10.86.0.63 block' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
-    m.vm.provision "shell", name: "provision/client.sh", inline: "cd /opt/isoloom && sh -c 'sh provision/client.sh'"
+    m.vm.provision "shell", name: "provision/client.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/client.sh'\\'''"
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/client.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end

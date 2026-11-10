@@ -40,6 +40,7 @@ mod report;
 mod resolved;
 mod run_manifest;
 mod shared_volumes;
+mod spaced_paths;
 mod tags;
 mod tc;
 mod testing;
