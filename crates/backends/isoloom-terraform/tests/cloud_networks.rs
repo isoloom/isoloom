@@ -152,7 +152,7 @@ fn google_cloud_refuses_more_interfaces_than_a_vm_takes() -> Outcome {
         on.join(", ")
     );
     let why = refusal(Cloud::Gcp, &env(&spec)?).unwrap();
-    assert!(why.contains("8 interfaces at most"), "{why}");
+    assert!(why.contains("takes 8 network interfaces"), "{why}");
     // Three networks: a machine type with four vCPUs.
     let three = env(&EDGE.replace("dmz: 1 }", "dmz: 1, far: 10 }").replace(
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }",

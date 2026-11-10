@@ -26,13 +26,12 @@ mod routing;
 pub(super) use machines::{os_disk, source_image};
 
 use crate::hcl_builder::{Expression, Module, reference};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::Environment;
 
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image, windows};
 use crate::limits::Limits;
-use crate::machine::controller;
 use crate::module::providers;
 
 /// Azure creates the administrator with the VM: a name it never reserves, on every machine.
@@ -56,15 +55,9 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: false,
-    largest: Some({
-        let [.., (size, memory_mb, _)] = SIZES;
-        Largest {
-            memory_mb,
-            size,
-            disk_gb: None,
-        }
-    }),
-    largest_nesting: None,
+    need: Need::of,
+    sizes: Some(SIZES),
+    nesting_sizes: None,
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 1, most: 2 },
@@ -111,13 +104,8 @@ fn image(os: &str) -> Option<(&'static str, &'static str, &'static str)> {
     IMAGES.of(os)
 }
 
-/// The VM size for a machine: its GPUs' size when it asks for GPUs, else by its memory and its
-/// interfaces (one per network).
-fn machine_size(mp: &MachinePlan, memory_mb: u32) -> &'static str {
-    RULES.gpus.of(mp).unwrap_or(size(memory_mb, mp.addresses.len()))
-}
-
-/// The sizes Isoloom picks, cheapest first: (size, memory in MB, network interfaces at most).
+/// The sizes Isoloom picks, cheapest first, each with its vCPUs, memory and network interfaces
+/// at most.
 ///
 /// Burstable Bsv2, the current series replacing B-series v1 (`Standard_B1s`, `B2s` and the rest:
 /// retiring on 15 November 2028, and since July 2026 not deployable from new subscriptions):
@@ -128,30 +116,16 @@ fn machine_size(mp: &MachinePlan, memory_mb: u32) -> &'static str {
 /// machine on more networks gets a Dasv5 size: 4 interfaces from 8 vCPUs, 8 from 16
 /// (<https://learn.microsoft.com/azure/virtual-machines/sizes/general-purpose/dasv5-series>).
 /// Both series boot generation 1 and 2 images on SCSI disks, as every image Isoloom names does.
-const SIZES: [(&str, u32, usize); 8] = [
-    ("Standard_B2ts_v2", 1024, 2),
-    ("Standard_B2ls_v2", 4096, 2),
-    ("Standard_B2s_v2", 8192, 2),
-    ("Standard_B4s_v2", 16384, 2),
-    ("Standard_B8s_v2", 32768, 2),
-    ("Standard_D8as_v5", 32768, 4),
-    ("Standard_D16as_v5", 65536, 8),
-    ("Standard_D32as_v5", 131_072, 8),
-];
-
-/// The network interfaces an Azure VM of [`SIZES`] takes at most.
-const MOST_INTERFACES: usize = 8;
-
-/// The cheapest size with `memory_mb` and `interfaces`; the largest when none has enough (more
-/// memory than it has is refused: `Rules::memory`; more interfaces: [`interfaces`]).
-fn size(memory_mb: u32, interfaces: usize) -> &'static str {
-    let [.., largest] = SIZES;
-    SIZES
-        .iter()
-        .find(|(_, memory, most)| *memory >= memory_mb && *most >= interfaces)
-        .unwrap_or(&largest)
-        .0
-}
+const SIZES: Sizes = Sizes::ordered(&[
+    Size::new("Standard_B2ts_v2", 2, 1024, 2),
+    Size::new("Standard_B2ls_v2", 2, 4096, 2),
+    Size::new("Standard_B2s_v2", 2, 8192, 2),
+    Size::new("Standard_B4s_v2", 4, 16384, 2),
+    Size::new("Standard_B8s_v2", 8, 32768, 2),
+    Size::new("Standard_D8as_v5", 8, 32768, 4),
+    Size::new("Standard_D16as_v5", 16, 65536, 8),
+    Size::new("Standard_D32as_v5", 32, 131_072, 8),
+]);
 
 /// Why Azure can't run this environment, if it can't: its features, its address rules, its
 /// images, then what no cloud does yet for a Windows machine.
@@ -166,23 +140,8 @@ fn refusal(env: &Environment) -> Option<String> {
     RULES
         .features(env)
         .or_else(|| RULES.subnets(env))
-        .or_else(|| interfaces(env))
         .or_else(machine)
         .or_else(|| windows::udp_redirect(spec))
-}
-
-/// Why a VM can't have an interface on each of its networks, if one can't: a machine, or the
-/// controller (on every network), on more than [`MOST_INTERFACES`].
-fn interfaces(env: &Environment) -> Option<String> {
-    let most = MOST_INTERFACES;
-    let machine = env.machines.iter().find(|(_, mp)| mp.addresses.len() > most);
-    if let Some((name, _)) = machine {
-        return Some(format!(
-            "machine `{name}`: an Azure VM takes {most} network interfaces at most, one per network"
-        ));
-    }
-    (controller::needed(env) && env.networks.len() > most)
-        .then(|| format!("the controller joins every network: an Azure VM takes {most} network interfaces at most"))
 }
 
 /// Its `cloud-vm` driver.
@@ -213,18 +172,24 @@ mod tests {
 
     use super::*;
 
+    /// The size of a machine of `cpus` and `memory_mb` on `networks` networks.
+    fn size(cpus: u32, memory_mb: u32, networks: usize) -> &'static str {
+        SIZES.fit(&Need::new(cpus, memory_mb, 20).on(networks))
+    }
+
     #[test]
-    fn a_machine_gets_the_cheapest_current_size_with_its_memory_and_interfaces() {
-        assert_eq!(size(512, 1), "Standard_B2ts_v2");
-        assert_eq!(size(2048, 2), "Standard_B2ls_v2");
-        assert_eq!(size(8192, 1), "Standard_B2s_v2");
-        assert_eq!(size(1024, 3), "Standard_D8as_v5");
-        assert_eq!(size(40_000, 5), "Standard_D16as_v5");
-        assert_eq!(size(1_000_000, 1), "Standard_D32as_v5");
+    fn a_machine_gets_the_cheapest_current_size_with_its_cpus_memory_and_interfaces() {
+        assert_eq!(size(1, 512, 1), "Standard_B2ts_v2");
+        assert_eq!(size(1, 2048, 2), "Standard_B2ls_v2");
+        assert_eq!(size(1, 8192, 1), "Standard_B2s_v2");
+        assert_eq!(size(1, 1024, 3), "Standard_D8as_v5");
+        assert_eq!(size(1, 40_000, 5), "Standard_D16as_v5");
+        assert_eq!(size(4, 1024, 1), "Standard_B4s_v2");
+        assert_eq!(size(16, 1024, 1), "Standard_D16as_v5");
         assert!(
             SIZES
-                .iter()
-                .all(|(name, _, _)| name.starts_with("Standard_B") && name.ends_with("_v2") || name.ends_with("as_v5"))
+                .names()
+                .all(|name| name.starts_with("Standard_B") && name.ends_with("_v2") || name.ends_with("as_v5"))
         );
     }
 
@@ -238,7 +203,10 @@ mod tests {
             on.join(", ")
         );
         let env = crate::testing::planned(&yaml, Target::CloudVm);
-        let why = interfaces(&env).unwrap_or_default();
-        assert!(why.contains("machine `web`") && why.contains("8 network interfaces"), "{why}");
+        let why = refusal(&env).unwrap_or_default();
+        assert!(
+            why.contains("machine `web` is on 9 networks") && why.contains("takes 8 network interfaces"),
+            "{why}"
+        );
     }
 }

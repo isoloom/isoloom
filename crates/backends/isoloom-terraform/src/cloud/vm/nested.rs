@@ -29,20 +29,12 @@ pub(crate) fn refusal(env: &Environment, cloud: Cloud, supported: bool) -> Optio
         .then(|| format!("machine `{name}`: GPUs and nested virtualization together: no {cloud} instance type here has both"))
 }
 
-/// The size for a machine that nests, by its memory: the smallest of `sizes` (memory in MB,
-/// size) with as much ([`super::rules::fit`]; more than the largest is refused). `None` when it
-/// doesn't nest.
-pub(crate) fn size(mp: &MachinePlan, memory_mb: u32, sizes: &[(u32, &'static str)]) -> Option<&'static str> {
-    wanted(mp).then(|| super::rules::fit(sizes, memory_mb))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn a_nesting_size_has_enough_memory() {
-        let sizes = [(8192, "small"), (16384, "large")];
+    fn nesting_is_refused_where_the_cloud_has_none_or_with_gpus() {
         let env = |extra: &str| {
             crate::testing::planned(
                 &format!(
@@ -52,10 +44,7 @@ mod tests {
             )
         };
         let nests = env("nested_virtualization: true");
-        let mp = &nests.machines["a"];
-        assert_eq!(size(mp, 1024, &sizes), Some("small"));
-        assert_eq!(size(mp, 32768, &sizes), Some("large"));
-        assert_eq!(size(&env("arch: amd64").machines["a"], 1024, &sizes), None);
+        assert_eq!(refusal(&env("arch: amd64"), Cloud::Linode, false), None);
         assert!(refusal(&nests, Cloud::Linode, false).is_some_and(|w| w.contains("on Linode comes later")));
         assert_eq!(refusal(&nests, Cloud::Linode, true), None);
         let both = env("nested_virtualization: true, gpus: 1");

@@ -29,9 +29,9 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_spec::images::is_windows;
 use isoloom_spec::validate::Cidr;
 
-use super::{INSTANCE_TYPES, ami, ami_filter, instance_type, zones};
+use super::{INSTANCE_TYPES, ami, ami_filter, zones};
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{FIRST_THREE, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes};
+use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::limits::Limits;
 use crate::machine::{controller, vms};
@@ -57,8 +57,9 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: true,
-    largest: Some(Largest::of(INSTANCE_TYPES)),
-    largest_nesting: Some(Largest::of(NESTING)),
+    need,
+    sizes: Some(INSTANCE_TYPES),
+    nesting_sizes: Some(NESTING),
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes {
@@ -85,16 +86,23 @@ const MACHINES: vm::Machines = vm::Machines {
     controller: machines::controller,
 };
 
-/// The instance types whose CPUs nest (8th-generation Intel), by memory in MB.
-const NESTING: &[(u32, &str)] = &[(8192, "m8i.large"), (16384, "m8i.xlarge"), (32768, "m8i.2xlarge")];
+/// The instance types whose CPUs nest (8th-generation Intel), smallest first, as
+/// [`INSTANCE_TYPES`].
+const NESTING: Sizes = Sizes::ordered(&[
+    Size::new("m8i.large", 2, 8192, 3).with_addresses(10),
+    Size::new("m8i.xlarge", 4, 16384, 4).with_addresses(15),
+    Size::new("m8i.2xlarge", 8, 32768, 4).with_addresses(15),
+]);
 
-/// A machine's instance type: its GPUs', a nesting one, else by its memory.
-fn machine_type(mp: &MachinePlan, memory_mb: u32) -> &'static str {
-    RULES
-        .gpus
-        .of(mp)
-        .or_else(|| nested::size(mp, memory_mb, NESTING))
-        .unwrap_or_else(|| addresses::sized(instance_type(memory_mb), mp))
+/// What a machine asks of its instance type ([`Need::of`]), and the addresses its busiest
+/// interface holds.
+fn need(mp: &MachinePlan) -> Need {
+    Need::of(mp).with_addresses(addresses::busiest(mp))
+}
+
+/// A machine's instance type: its GPUs', a nesting one, else the smallest that takes it.
+fn machine_type(mp: &MachinePlan) -> &'static str {
+    RULES.size_of(mp)
 }
 
 /// The instance's nested virtualization switch, when the machine runs VMs of its own.

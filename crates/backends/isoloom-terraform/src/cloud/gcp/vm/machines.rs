@@ -10,7 +10,7 @@ use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
 use isoloom_render::inventory::WinrmAuth;
 
 use super::network::vpc;
-use super::{NESTING, RULES, for_nics, image, machine_type, user};
+use super::{RULES, image, user};
 use crate::Result;
 use crate::cloud::instance::{labels, name_with, set_up_once};
 use crate::cloud::vm::{controller_setup, disks, hooks, interfaces, nested, own_image, reach, seal};
@@ -24,14 +24,6 @@ const CAP: Capped = Capped {
     limit: Limit::Gcp,
     gzipped: false,
 };
-
-/// A machine's machine type: its GPUs', else a nesting one, else by its memory, with room for an
-/// interface per network.
-pub(super) fn machine_type_of(mp: &MachinePlan) -> &'static str {
-    let memory = mp.size().memory_mb;
-    let t = RULES.gpus.of(mp).or_else(|| nested::size(mp, memory, NESTING)).unwrap_or(machine_type(memory));
-    for_nics(t, mp.addresses.len())
-}
 
 /// The MAC address Google Cloud gives an interface: `42:01` then its address's four bytes.
 fn mac(a: Ipv4Addr) -> Expression {
@@ -65,7 +57,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         who: name,
         os,
         own: own_image::of(mp, own_image::gcp),
-        machine_type: machine_type_of(mp),
+        machine_type: RULES.size_of(mp),
         gpus: RULES.gpus.of(mp).is_some(),
         nested: nested::wanted(mp),
         disk: Some(mp.size().disk_gb),
@@ -288,7 +280,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     }
     m.blocks(rules);
     m.block(firewall(who, ("ssh", first), list([reference("var.allowed_cidr")]), vec![allow("tcp", &[22])]));
-    let (_, memory, disk) = controller::size(env);
+    let (_, _, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| user(os).to_owned(), WinrmAuth::Basic);
     let who_logs_in = |mp: &MachinePlan| user(mp.os.as_deref().unwrap_or_default()).to_owned();
     let setup = controller_setup::set_up(env, &who_logs_in, inventory, &at_boot(env, &addresses));
@@ -298,7 +290,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
         who: "controller",
         os: controller::OS,
         own: None,
-        machine_type: for_nics(machine_type(memory), addresses.len()),
+        machine_type: RULES.controller_size(env),
         gpus: false,
         nested: false,
         disk: Some(disk),

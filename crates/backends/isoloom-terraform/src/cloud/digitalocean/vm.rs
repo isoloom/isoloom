@@ -10,7 +10,7 @@ use isoloom_plan::{Environment, MachinePlan};
 use super::{Way, rule, ssh_key, vpc};
 use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with, tag_list};
-use crate::cloud::vm::rules::{DiskSize, FIREWALLS_TC, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, fit_disk};
+use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Volumes};
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
 use crate::limits::Limits;
 use crate::machine::vms;
@@ -34,8 +34,9 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: false,
-    largest: Some(Largest::of_disks(SIZES)),
-    largest_nesting: None,
+    need: Need::of,
+    sizes: Some(SIZES),
+    nesting_sizes: None,
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 1, most: 7 },
@@ -82,29 +83,14 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
     IMAGES.of(os)
 }
 
-/// The droplet sizes, smallest first: each one's memory and disk come with it.
-const SIZES: &[DiskSize] = &[
-    DiskSize {
-        memory_mb: 1024,
-        disk_gb: 25,
-        name: "s-1vcpu-1gb",
-    },
-    DiskSize {
-        memory_mb: 2048,
-        disk_gb: 60,
-        name: "s-2vcpu-2gb",
-    },
-    DiskSize {
-        memory_mb: 4096,
-        disk_gb: 80,
-        name: "s-2vcpu-4gb",
-    },
-    DiskSize {
-        memory_mb: 8192,
-        disk_gb: 160,
-        name: "s-4vcpu-8gb",
-    },
-];
+/// The droplet sizes, smallest first, each with its vCPUs, memory and disk (a droplet joins one
+/// VPC: one interface).
+const SIZES: Sizes = Sizes::ordered(&[
+    Size::new("s-1vcpu-1gb", 1, 1024, 1).with_disk(25),
+    Size::new("s-2vcpu-2gb", 2, 2048, 1).with_disk(60),
+    Size::new("s-2vcpu-4gb", 2, 4096, 1).with_disk(80),
+    Size::new("s-4vcpu-8gb", 4, 8192, 1).with_disk(160),
+]);
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
 pub(crate) const DRIVER: Driver = Driver {
@@ -151,7 +137,7 @@ fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) {
     let mut droplet = resource("digitalocean_droplet", &id)
         .add_attribute(("name", name_with(&format!("-{name}"))))
         .add_attribute(("region", reference("var.region")))
-        .add_attribute(("size", string(RULES.gpus.of(mp).unwrap_or_else(|| fit_disk(SIZES, mp)))))
+        .add_attribute(("size", string(RULES.size_of(mp))))
         .add_attribute(("image", string(slug)))
         .add_attribute(("vpc_uuid", reference("digitalocean_vpc.env.id")))
         .add_attribute(("ssh_keys", list([reference("digitalocean_ssh_key.env.id")])))

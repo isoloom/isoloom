@@ -30,7 +30,7 @@ use isoloom_plan::{Environment, MachinePlan};
 use super::{SHAPE, availability_domain, availability_domains, owned, ubuntu_images};
 use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with};
-use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
+use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::vms;
@@ -57,8 +57,9 @@ const RULES: Rules = Rules {
     },
     // The AMD shape exposes its virtualization instructions when asked (`platform_config`).
     nests: true,
-    largest: None,
-    largest_nesting: None,
+    need: Need::of,
+    sizes: None,
+    nesting_sizes: None,
     mtu: Mtu::Fixed,
     // A VNIC on an `auto` network takes the address Oracle Cloud picks (`ipv6`).
     picks_ipv6: true,
@@ -79,7 +80,11 @@ pub(super) const USER: &str = "ubuntu";
 /// Why Oracle Cloud can't run this environment, if it can't: its rules, then what its VCN can't
 /// hold.
 fn refusal(env: &Environment) -> Option<String> {
-    RULES.linux_refusal(env).or_else(|| network::refusal(env)).or_else(|| ipv6::refusal(env))
+    RULES
+        .linux_refusal(env)
+        .or_else(|| size_refusal(env))
+        .or_else(|| network::refusal(env))
+        .or_else(|| ipv6::refusal(env))
 }
 
 /// The Ubuntu version each OS runs on: Oracle Cloud has no Debian image, so Debian labs fall back
@@ -128,10 +133,32 @@ pub(super) fn image_source(version: &str) -> String {
     format!("ubuntu_{}", version.replace('.', ""))
 }
 
-/// The shape's sizing for a machine's memory: whole GB (at least 1), one OCPU per 8 GB.
-fn sizing(memory_mb: u32) -> (u32, u32) {
-    let gb = memory_mb.div_ceil(1024).max(1);
-    ((gb / 8).max(1), gb)
+/// The shape's sizing for a machine: an OCPU per two of its CPUs (an AMD OCPU is two vCPUs) and
+/// one per 8 GB of its memory, the more of the two (one at least); its memory in whole GB, at
+/// least 1 GB an OCPU, as the shape takes.
+fn sizing(need: &Need) -> (u32, u32) {
+    let gb = need.memory_mb.div_ceil(1024).max(1);
+    let ocpus = need.cpus.div_ceil(2).max(gb / 8).max(1);
+    (ocpus, gb.max(ocpus))
+}
+
+/// The most OCPUs and memory (GB) the shape takes
+/// (<https://docs.oracle.com/iaas/Content/Compute/References/computeshapes.htm#flexible>).
+const MOST: (u32, u32) = (64, 1024);
+
+/// Why a machine can't have its size on the shape, if one can't: more OCPUs or memory than it
+/// takes.
+fn size_refusal(env: &Environment) -> Option<String> {
+    vms(env).find_map(|(name, mp)| {
+        let (ocpus, gb) = sizing(&Need::of(mp));
+        let (most_ocpus, most_gb) = MOST;
+        (ocpus > most_ocpus || gb > most_gb).then(|| {
+            format!(
+                "machine `{name}` asks for {ocpus} OCPUs and {gb} GB of memory: a {SHAPE} takes {most_ocpus} OCPUs ({} CPUs) and {most_gb} GB at most",
+                most_ocpus * 2
+            )
+        })
+    })
 }
 
 /// Its `cloud-vm` driver: its module takes the compartment it goes in, and authenticates with
@@ -206,7 +233,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
     // A gateway forwards traffic that isn't its own; a machine on several networks answers from
     // the interface its default route leaves by.
     let forwards = mp.is_gateway || mp.addresses.len() > 1;
-    let (ocpus, memory_gb) = sizing(mp.size().memory_mb);
+    let (ocpus, memory_gb) = sizing(&Need::of(mp));
     let shape = Block::builder("shape_config")
         .add_attribute(("ocpus", number(u64::from(ocpus))))
         .add_attribute(("memory_in_gbs", number(u64::from(memory_gb))))

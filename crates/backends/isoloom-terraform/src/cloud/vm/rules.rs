@@ -1,5 +1,5 @@
 //! What a cloud takes, declared once and read by its refusal ([`Rules`]): the networks it
-//! models, the features it lacks, its GPU types, whether its VMs nest, its largest sizes, its
+//! models, the features it lacks, its GPU types, whether its VMs nest, its sizes, its
 //! networks' MTU, whether it picks IPv6 addresses itself, its volumes, its TPM and its images.
 
 use std::ops::RangeInclusive;
@@ -56,80 +56,207 @@ pub(crate) struct Volumes {
     pub(crate) most: usize,
 }
 
-/// A cloud's largest size for a machine: the most memory its size table gives, and the disk
-/// that comes with it on a cloud whose sizes fix the disk.
+/// One size of a cloud's table, and what a VM of it gets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Largest {
+pub(crate) struct Size {
+    /// The size (`t3.micro`).
+    pub(crate) name: &'static str,
+    /// Its vCPUs.
+    pub(crate) vcpus: u32,
     /// Its memory, in MB.
     pub(crate) memory_mb: u32,
-    /// The size.
-    pub(crate) size: &'static str,
     /// Its disk, in GB, when the size fixes it (DigitalOcean's droplets, Linode's plans); `None`
     /// when a machine's disk is its own setting.
     pub(crate) disk_gb: Option<u32>,
+    /// The network interfaces it takes at most.
+    pub(crate) interfaces: usize,
+    /// The addresses one of its interfaces takes at most, where the cloud's sizes set it (AWS);
+    /// `None` when the size doesn't.
+    pub(crate) addresses: Option<usize>,
 }
 
-impl Largest {
-    /// The last of `table` (memory in MB, size; smallest first; none when it is empty).
-    pub(crate) const fn of(table: &[(u32, &'static str)]) -> Largest {
-        match table {
-            [.., (memory_mb, size)] => Largest {
-                memory_mb: *memory_mb,
-                size,
-                disk_gb: None,
-            },
-            [] => Largest {
-                memory_mb: 0,
-                size: "",
-                disk_gb: None,
-            },
+impl Size {
+    /// A size with `vcpus`, `memory_mb` and room for `interfaces`, its disk a machine's own.
+    pub(crate) const fn new(name: &'static str, vcpus: u32, memory_mb: u32, interfaces: usize) -> Size {
+        Size {
+            name,
+            vcpus,
+            memory_mb,
+            disk_gb: None,
+            interfaces,
+            addresses: None,
         }
     }
 
-    /// The last of `table` (smallest first; none when it is empty), its disk with it.
-    pub(crate) const fn of_disks(table: &[DiskSize]) -> Largest {
-        match table {
-            [.., last] => Largest {
-                memory_mb: last.memory_mb,
-                size: last.name,
-                disk_gb: Some(last.disk_gb),
-            },
-            [] => Largest {
-                memory_mb: 0,
-                size: "",
-                disk_gb: None,
-            },
+    /// The size, its disk fixed at `disk_gb`.
+    pub(crate) const fn with_disk(self, disk_gb: u32) -> Size {
+        Size {
+            disk_gb: Some(disk_gb),
+            ..self
         }
+    }
+
+    /// The size, each interface taking `addresses` at most.
+    pub(crate) const fn with_addresses(self, addresses: usize) -> Size {
+        Size {
+            addresses: Some(addresses),
+            ..self
+        }
+    }
+
+    /// Whether a VM of this size has what `need` asks for.
+    fn takes(&self, need: &Need) -> bool {
+        self.vcpus >= need.cpus
+            && self.memory_mb >= need.memory_mb
+            && self.disk_gb.is_none_or(|gb| gb >= need.disk_gb)
+            && self.interfaces >= need.interfaces
+            && self.addresses.is_none_or(|a| a >= need.addresses)
     }
 }
 
-/// A size that comes with its disk (DigitalOcean's droplets, Linode's plans).
+/// The least memory a Windows VM gets, in MB: Windows wants 2 GB and more.
+const WINDOWS_MEMORY_MB: u32 = 2048;
+
+/// What a VM asks of its size: its CPUs, memory and disk, an interface per network, and the
+/// addresses its busiest interface holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct DiskSize {
-    /// Its memory, in MB.
+pub(crate) struct Need {
+    /// CPUs.
+    pub(crate) cpus: u32,
+    /// Memory, in MB.
     pub(crate) memory_mb: u32,
-    /// Its disk, in GB.
+    /// Disk, in GB.
     pub(crate) disk_gb: u32,
-    /// The size.
-    pub(crate) name: &'static str,
+    /// Network interfaces: one per network.
+    pub(crate) interfaces: usize,
+    /// The addresses of its busiest interface (1: its own).
+    pub(crate) addresses: usize,
 }
 
-/// The smallest of `table` (smallest first) with machine `mp`'s memory and disk or more; the
-/// largest when none has as much, which the cloud's refusal ([`Rules::memory`], [`Rules::disk`])
-/// rules out.
-pub(crate) fn fit_disk(table: &[DiskSize], mp: &MachinePlan) -> &'static str {
-    let size = mp.size();
-    table
-        .iter()
-        .find(|s| s.memory_mb >= size.memory_mb && s.disk_gb >= size.disk_gb)
-        .or(table.last())
-        .map_or("", |s| s.name)
+impl Need {
+    /// `cpus`, `memory_mb` and `disk_gb` on one interface, which holds its own address.
+    pub(crate) fn new(cpus: u32, memory_mb: u32, disk_gb: u32) -> Need {
+        Need {
+            cpus,
+            memory_mb,
+            disk_gb,
+            interfaces: 1,
+            addresses: 1,
+        }
+    }
+
+    /// What machine `mp` asks for: its size (a Windows machine's 2 GB of memory at least), and an
+    /// interface on each of its networks.
+    pub(crate) fn of(mp: &MachinePlan) -> Need {
+        let size = mp.size();
+        let memory_mb = if mp.is_windows() {
+            size.memory_mb.max(WINDOWS_MEMORY_MB)
+        } else {
+            size.memory_mb
+        };
+        Need::new(size.cpus, memory_mb, size.disk_gb).on(mp.addresses.len())
+    }
+
+    /// What the controller asks for: its size, and an interface on every network.
+    pub(crate) fn controller(env: &Environment) -> Need {
+        let (cpus, memory_mb, disk_gb) = controller::size(env);
+        Need::new(cpus, memory_mb, disk_gb).on(env.networks.len())
+    }
+
+    /// The same on `networks` networks, an interface on each (one at least).
+    pub(crate) fn on(self, networks: usize) -> Need {
+        Need {
+            interfaces: networks.max(1),
+            ..self
+        }
+    }
+
+    /// The same, its busiest interface holding `addresses`.
+    pub(crate) fn with_addresses(self, addresses: usize) -> Need {
+        Need { addresses, ..self }
+    }
 }
 
-/// The smallest of `table` (memory in MB, size; smallest first) with `memory_mb` or more; the
-/// largest when none has as much, which the cloud's refusal ([`Rules::memory`]) rules out.
-pub(crate) fn fit(table: &[(u32, &'static str)], memory_mb: u32) -> &'static str {
-    table.iter().find(|(mb, _)| *mb >= memory_mb).or(table.last()).map_or("", |(_, s)| *s)
+/// A cloud's size table, smallest first, each size at least the one before it in every
+/// respect ([`Sizes::ordered`]), so its last takes whatever any of them takes: a VM gets the first
+/// that takes what it asks for, and one the last can't take is refused ([`Sizes::short`]).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Sizes(&'static [Size]);
+
+impl Sizes {
+    /// `table` as a size table.
+    ///
+    /// # Panics
+    ///
+    /// When a size has less of something than the one before it (at compile time, for the
+    /// constant tables).
+    pub(crate) const fn ordered(table: &'static [Size]) -> Sizes {
+        let mut rest = table;
+        while let [a, b, ..] = rest {
+            let disk = match (a.disk_gb, b.disk_gb) {
+                (Some(a), Some(b)) => b >= a,
+                (a, b) => a.is_none() && b.is_none(),
+            };
+            let addresses = match (a.addresses, b.addresses) {
+                (Some(a), Some(b)) => b >= a,
+                (a, b) => a.is_none() && b.is_none(),
+            };
+            assert!(
+                b.vcpus >= a.vcpus && b.memory_mb >= a.memory_mb && b.interfaces >= a.interfaces && disk && addresses,
+                "a size table's sizes grow in every respect"
+            );
+            if let [_, tail @ ..] = rest {
+                rest = tail;
+            }
+        }
+        Sizes(table)
+    }
+
+    /// The sizes' names, smallest first.
+    #[cfg(test)]
+    pub(crate) fn names(self) -> impl Iterator<Item = &'static str> {
+        self.0.iter().map(|s| s.name)
+    }
+
+    /// The smallest size that takes `need`; the largest when none does, which the cloud's
+    /// refusal ([`Sizes::short`]) rules out.
+    pub(crate) fn fit(self, need: &Need) -> &'static str {
+        self.0.iter().find(|s| s.takes(need)).or(self.0.last()).map_or("", |s| s.name)
+    }
+
+    /// What the largest size lacks for `who` (``machine `web` ``, `the controller`), which asks
+    /// for `need` on `cloud`, if it lacks something: CPUs, memory, disk, interfaces, then
+    /// addresses on an interface.
+    pub(crate) fn short(self, cloud: Cloud, who: &str, need: &Need) -> Option<String> {
+        let largest = self.0.last()?;
+        let has = |what: String| format!("the largest {cloud} size here, `{}`, {what}", largest.name);
+        if need.cpus > largest.vcpus {
+            return Some(format!("{who} asks for {} CPUs: {}", need.cpus, has(format!("has {} vCPUs", largest.vcpus))));
+        }
+        if need.memory_mb > largest.memory_mb {
+            return Some(format!(
+                "{who} asks for {} of memory: {}",
+                mb(need.memory_mb),
+                has(format!("has {}", mb(largest.memory_mb)))
+            ));
+        }
+        if let Some(disk) = largest.disk_gb.filter(|gb| need.disk_gb > *gb) {
+            return Some(format!("{who} asks for a {} GB disk: {}", need.disk_gb, has(format!("has {disk} GB"))));
+        }
+        if need.interfaces > largest.interfaces {
+            return Some(format!(
+                "{who} is on {} networks: {}",
+                need.interfaces,
+                has(format!("takes {} network interfaces, one per network", largest.interfaces))
+            ));
+        }
+        let most = largest.addresses.filter(|a| need.addresses > *a)?;
+        Some(format!(
+            "{who} asks for {} addresses on one network interface: {}",
+            need.addresses,
+            has(format!("takes {most}"))
+        ))
+    }
 }
 
 /// The smallest subnets a cloud makes.
@@ -252,11 +379,15 @@ pub(crate) struct Rules {
     pub(crate) gpus: GpuSizes,
     /// Whether its VMs can run VMs of their own (`nested_virtualization`).
     pub(crate) nests: bool,
-    /// Its largest size for a machine by its memory (`None`: its shapes are sized to the
-    /// machine, Oracle Cloud's flexible ones).
-    pub(crate) largest: Option<Largest>,
-    /// The same for a machine that nests.
-    pub(crate) largest_nesting: Option<Largest>,
+    /// What a machine asks of its size ([`Need::of`], or the cloud's own count of what an
+    /// interface holds).
+    pub(crate) need: fn(&MachinePlan) -> Need,
+    /// Its sizes for a machine (`None`: its shapes are sized to the machine, Oracle Cloud's
+    /// flexible ones).
+    pub(crate) sizes: Option<Sizes>,
+    /// Its sizes for a machine that nests (`None`: none nests, or its shapes are sized to the
+    /// machine).
+    pub(crate) nesting_sizes: Option<Sizes>,
     /// Its networks' MTU.
     pub(crate) mtu: Mtu,
     /// Whether it picks a machine's IPv6 address itself (`ipv6.addresses: auto`), or gives each
@@ -277,15 +408,14 @@ pub(crate) struct Rules {
 
 impl Rules {
     /// The first feature the environment asks for and the cloud can't give, in this order: its
-    /// limits, GPUs, nesting, memory, a network's MTU, IPv6 addresses it doesn't pick, data
+    /// limits, GPUs, nesting, a size, a network's MTU, IPv6 addresses it doesn't pick, data
     /// disks.
     pub(crate) fn features(&self, env: &Environment) -> Option<String> {
         self.limits
             .refusal(env)
             .or_else(|| self.gpus(env))
             .or_else(|| self.nesting(env))
-            .or_else(|| self.memory(env))
-            .or_else(|| self.disk(env))
+            .or_else(|| self.size(env))
             .or_else(|| self.mtu(env))
             .or_else(|| self.ipv6_addresses(env))
             .or_else(|| self.volumes(env))
@@ -322,44 +452,36 @@ impl Rules {
         nested::refusal(env, self.cloud, self.nests)
     }
 
-    /// Why a machine can't have its memory here, if one can't: more than the cloud's largest
-    /// size gives (a GPU type's memory is its own).
-    pub(crate) fn memory(&self, env: &Environment) -> Option<String> {
-        vms(env).find_map(|(name, mp)| {
-            if self.gpus.of(mp).is_some() {
-                return None;
-            }
-            let largest = if nested::wanted(mp) { self.largest_nesting } else { self.largest }?;
-            let memory = mp.size().memory_mb;
-            (memory > largest.memory_mb).then(|| {
-                format!(
-                    "machine `{name}` asks for {} of memory: the largest {} size here, `{}`, has {}",
-                    mb(memory),
-                    self.cloud,
-                    largest.size,
-                    mb(largest.memory_mb)
-                )
-            })
-        })
+    /// The sizes for machine `mp`: the nesting ones when it runs VMs of its own.
+    pub(crate) fn sizes_of(&self, mp: &MachinePlan) -> Option<Sizes> {
+        if nested::wanted(mp) { self.nesting_sizes } else { self.sizes }
     }
 
-    /// Why a machine can't have its disk here, if one can't: more than the cloud's largest size
-    /// comes with, where the size fixes the disk (a GPU type's disk is its own).
-    pub(crate) fn disk(&self, env: &Environment) -> Option<String> {
-        let Largest {
-            size, disk_gb: Some(largest), ..
-        } = self.largest?
-        else {
-            return None;
-        };
-        vms(env).filter(|(_, mp)| self.gpus.of(mp).is_none()).find_map(|(name, mp)| {
-            let disk = mp.size().disk_gb;
-            (disk > largest).then(|| {
-                format!(
-                    "machine `{name}` asks for a {disk} GB disk: the largest {} size here, `{size}`, has {largest} GB",
-                    self.cloud
-                )
-            })
+    /// The size of machine `mp`: its GPUs' type when it asks for GPUs, else the smallest of its
+    /// sizes ([`Rules::sizes_of`]) that takes what it asks for.
+    pub(crate) fn size_of(&self, mp: &MachinePlan) -> &'static str {
+        self.gpus
+            .of(mp)
+            .or_else(|| self.sizes_of(mp).map(|s| s.fit(&(self.need)(mp))))
+            .unwrap_or_default()
+    }
+
+    /// The controller's size, on every network.
+    pub(crate) fn controller_size(&self, env: &Environment) -> &'static str {
+        self.sizes.map(|s| s.fit(&Need::controller(env))).unwrap_or_default()
+    }
+
+    /// Why a VM can't have its size here, if one can't: it asks for more than the cloud's largest
+    /// size has ([`Sizes::short`]; a GPU type's size is its own), or the controller, on every
+    /// network, does.
+    pub(crate) fn size(&self, env: &Environment) -> Option<String> {
+        let machine = vms(env)
+            .filter(|(_, mp)| self.gpus.of(mp).is_none())
+            .find_map(|(name, mp)| self.sizes_of(mp)?.short(self.cloud, &format!("machine `{name}`"), &(self.need)(mp)));
+        machine.or_else(|| {
+            controller::needed(env)
+                .then_some(self.sizes?)?
+                .short(self.cloud, "the controller", &Need::controller(env))
         })
     }
 
@@ -459,4 +581,24 @@ fn kept_address<'a>(env: &Environment, name: &str, m: &'a Machine, kept: RangeIn
         .iter()
         .find(|(n, o)| kept.contains(o) && !gateways::is_gateway_address(env, name, n))
         .map(|(n, _)| n.as_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_size_table_that_shrinks_somewhere_is_refused() {
+        static SHRINKS: [Size; 2] = [Size::new("a", 4, 1024, 2), Size::new("b", 2, 2048, 2)];
+        static GROWS: [Size; 2] = [Size::new("a", 2, 1024, 2), Size::new("b", 2, 2048, 3)];
+        assert!(std::panic::catch_unwind(|| Sizes::ordered(&SHRINKS)).is_err());
+        let need = Need::new(1, 1500, 10);
+        assert_eq!(Sizes::ordered(&GROWS).fit(&need), "b");
+        assert_eq!(Sizes::ordered(&GROWS).fit(&need.on(4)), "b", "the largest when none takes it");
+        assert!(
+            Sizes::ordered(&GROWS)
+                .short(Cloud::Aws, "x", &need.on(4))
+                .is_some_and(|w| w.contains("takes 3 network interfaces"))
+        );
+    }
 }

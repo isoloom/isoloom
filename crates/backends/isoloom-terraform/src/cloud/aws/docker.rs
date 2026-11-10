@@ -7,7 +7,7 @@ use isoloom_plan::Environment;
 use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
-use super::{ec2_instance, egress, first_zone, ingress, instance_type, key_pair, root_disk, route_out, vm, zones};
+use super::{ec2_instance, egress, first_zone, host_instance_type, ingress, key_pair, root_disk, route_out, vm, zones};
 use crate::cloud::docker::{Driver, HOST_OS, SizeVariable};
 use crate::cloud::instance;
 use crate::docker_host::published;
@@ -20,7 +20,7 @@ pub(crate) const DRIVER: Driver = Driver {
     // Free Tier eligible sizes where they fit (the AWS Free plan refuses other types).
     size: Some(SizeVariable {
         name: "instance_type",
-        default: |s| instance_type(s.memory_mb),
+        default: |s| host_instance_type(s.memory_mb),
     }),
     resources,
 };

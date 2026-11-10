@@ -540,6 +540,16 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **The access machine keeps its role on the Terraform targets** (`access` in the run manifest,
   not `target`), and **an AWS machine's root disk is at least its image's** (Kali's snapshot is
   25 GB; AWS refuses a smaller root volume), or the spec's when it asks for more.
+- **A cloud machine gets a size with its CPUs and an interface per network.** `cloud-vm` picked
+  a size by memory (and, on DigitalOcean and Linode, disk) alone: `cpus: 8, memory_mb: 1024`
+  got AWS's `t3.micro` (2 vCPUs) while the run manifest said 8 CPUs, and AWS never counted a
+  machine's network interfaces, so a machine on three networks, or the controller on every one,
+  got a type that takes two and the apply failed. Every cloud's size table now lists each size's
+  vCPUs, memory, disk where it fixes it, and interfaces (AWS: and addresses per interface), and
+  one rule picks the smallest that takes all of them, for a machine and for the controller; more
+  than the largest has is refused, naming what is short. Oracle Cloud's shape gets an OCPU per
+  two CPUs or per 8 GB, whichever is more (at most 64 OCPUs and 1024 GB). Google Cloud's sizes
+  carry their real memory (`e2-small` 2 GB, `e2-medium` 4 GB) and go up to `e2-standard-8`.
 
 - **QEMU's hub ports are one block per environment.** Each network had its own hashed base
   port, its VMs the ports after it, so two networks could hand one port to two hubs (`n9` and

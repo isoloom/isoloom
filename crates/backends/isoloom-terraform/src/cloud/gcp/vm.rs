@@ -31,10 +31,9 @@ use isoloom_spec::validate::Cidr;
 
 use super::{own_project, public_ip};
 use crate::cloud::Cloud;
-use crate::cloud::vm::rules::{Images, Kept, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Subnets, Volumes, fit};
+use crate::cloud::vm::rules::{Images, Kept, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image};
 use crate::limits::Limits;
-use crate::machine::controller;
 use crate::module::providers;
 
 /// What Google Cloud takes.
@@ -57,8 +56,9 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: true,
-    largest: Some(Largest::of(MACHINE_TYPES)),
-    largest_nesting: Some(Largest::of(NESTING)),
+    need: Need::of,
+    sizes: Some(MACHINE_TYPES),
+    nesting_sizes: Some(NESTING),
     mtu: Mtu::Between { low: 1300, high: 8896 },
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 10, most: 15 },
@@ -85,8 +85,13 @@ const MACHINES: vm::Machines = vm::Machines {
     controller: machines::controller,
 };
 
-/// The machine types whose CPUs nest (N2: E2 has no nested virtualization), by memory in MB.
-const NESTING: &[(u32, &str)] = &[(8192, "n2-standard-2"), (16384, "n2-standard-4"), (32768, "n2-standard-8")];
+/// The machine types whose CPUs nest (N2: E2 has no nested virtualization), smallest first, as
+/// [`MACHINE_TYPES`].
+const NESTING: Sizes = Sizes::ordered(&[
+    Size::new("n2-standard-2", 2, 8192, 2),
+    Size::new("n2-standard-4", 4, 16384, 4),
+    Size::new("n2-standard-8", 8, 32768, 8),
+]);
 
 /// The image family and SSH user of each OS. The user is created from the `ssh-keys` metadata,
 /// so it is the AWS image's user and the inventory is the same.
@@ -107,16 +112,20 @@ pub(super) fn user(os: &str) -> &'static str {
     image(os).map_or("admin", |(_, user)| user)
 }
 
-/// The machine type for a memory size: E2 shared-core up to 4 GB, then standard.
-fn machine_type(memory_mb: u32) -> &'static str {
-    fit(MACHINE_TYPES, memory_mb)
-}
+/// The machine types Isoloom picks, smallest first: E2 shared-core up to 4 GB, then standard.
+/// Each with its vCPUs, its memory, and the interfaces it takes: one per vCPU, two at least,
+/// eight at most (<https://cloud.google.com/vpc/docs/create-use-multiple-interfaces#max-interfaces>).
+const MACHINE_TYPES: Sizes = Sizes::ordered(&[
+    Size::new("e2-small", 2, 2048, 2),
+    Size::new("e2-medium", 2, 4096, 2),
+    Size::new("e2-standard-2", 2, 8192, 2),
+    Size::new("e2-standard-4", 4, 16384, 4),
+    Size::new("e2-standard-8", 8, 32768, 8),
+]);
 
-/// The machine types, by the memory in MB they are picked for.
-const MACHINE_TYPES: &[(u32, &str)] = &[(1024, "e2-small"), (2048, "e2-medium"), (8192, "e2-standard-2"), (16384, "e2-standard-4")];
-
-/// Why Google Cloud can't run this environment, if it can't: its features, its address rules,
-/// then single-interface Linux machines with images, and the controller on one network.
+/// Why Google Cloud can't run this environment, if it can't: its features (a machine's or the
+/// controller's size among them), its address rules, then Linux machines with images, a GPU
+/// type's interfaces, and a gateway machine's address.
 fn refusal(env: &Environment) -> Option<String> {
     let spec = env.spec();
     if let Some(why) = RULES.features(env).or_else(|| RULES.subnets(env)) {
@@ -127,63 +136,25 @@ fn refusal(env: &Environment) -> Option<String> {
         if is_windows(&vm.os) {
             return Some(format!("machine `{name}`: Windows on GCP comes later"));
         }
-        interfaces_refusal(env, name)
-            .or_else(|| RULES.image(name, m))
-            .or_else(|| RULES.kept(env, name, m))
+        gpu_interfaces(env, name).or_else(|| RULES.image(name, m)).or_else(|| RULES.kept(env, name, m))
     });
     if machine.is_some() {
         return machine;
     }
-    if let Some((net, _)) = gateways::routed(env).into_iter().find(|(n, _)| relocate(env, n).is_none()) {
-        return Some(format!(
-            "network `{net}`: no address left for its gateway machine (Google Cloud keeps the router's)"
-        ));
-    }
-    // The controller sits on every network, an interface on each.
-    (controller::needed(env) && env.networks.len() > MAX_NICS).then(|| {
-        format!(
-            "the Ansible controller spans {} networks: a Google Cloud VM takes {MAX_NICS} interfaces at most",
-            env.networks.len()
-        )
-    })
+    gateways::routed(env)
+        .into_iter()
+        .find(|(n, _)| relocate(env, n).is_none())
+        .map(|(net, _)| format!("network `{net}`: no address left for its gateway machine (Google Cloud keeps the router's)"))
 }
 
-/// The most interfaces a Google Cloud VM takes (one per VPC network).
-const MAX_NICS: usize = 8;
-
-/// Why machine `name`'s networks can't each be an interface, if they can't: more than 8, or more
-/// than its machine type's vCPUs allow (two at least).
-fn interfaces_refusal(env: &Environment, name: &str) -> Option<String> {
+/// Why GPU machine `name`'s networks can't each be an interface, if they can't: a GPU type takes
+/// one per vCPU (its name's last number, `g2-standard-4`: 4), as [`MACHINE_TYPES`] say of theirs.
+fn gpu_interfaces(env: &Environment, name: &str) -> Option<String> {
     let mp = env.machines.get(name)?;
+    let t = RULES.gpus.of(mp)?;
     let nics = mp.addresses.len();
-    if nics > MAX_NICS {
-        return Some(format!(
-            "machine `{name}` is on {nics} networks: a Google Cloud VM takes {MAX_NICS} interfaces at most"
-        ));
-    }
-    let t = machines::machine_type_of(mp);
-    (vcpus(t) < nics).then(|| {
-        format!(
-            "machine `{name}` is on {nics} networks: a {t} takes {} interfaces at most (one per vCPU)",
-            vcpus(t)
-        )
-    })
-}
-
-/// The vCPUs of a machine type (`e2-standard-4`: 4), as many interfaces as it takes; the shared
-/// core types take two.
-fn vcpus(t: &str) -> usize {
-    t.rsplit('-').next().and_then(|n| n.parse().ok()).unwrap_or(2).max(2)
-}
-
-/// A machine type with room for `nics` interfaces: the E2 standard type with enough vCPUs when
-/// the memory's own has too few (a GPU or nested type keeps its own; the refusal checks it).
-fn for_nics(t: &'static str, nics: usize) -> &'static str {
-    match t {
-        _ if vcpus(t) >= nics || !t.starts_with("e2-") => t,
-        _ if nics <= 4 => "e2-standard-4",
-        _ => "e2-standard-8",
-    }
+    let vcpus: usize = t.rsplit('-').next().and_then(|n| n.parse().ok()).unwrap_or(1);
+    (vcpus < nics).then(|| format!("machine `{name}` is on {nics} networks: a {t} takes {vcpus} interfaces at most (one per vCPU)"))
 }
 
 /// Where a gateway machine goes on the network it routes: the highest address nothing else takes.

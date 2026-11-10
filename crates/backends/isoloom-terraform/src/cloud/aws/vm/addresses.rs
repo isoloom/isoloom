@@ -4,7 +4,8 @@
 //! interface, the ordered `private_ip_list` of a network interface), and a whole aligned /28 of
 //! them is one IPv4 prefix (`ipv4_prefixes`), which takes one of the interface's slots. The
 //! instance's own set-up puts them on the interface. An instance type has a number of addresses
-//! per interface: a machine that needs more than its size gives gets a larger type.
+//! per interface (`Size::addresses`): a machine that needs more than its size gives gets a
+//! larger type, and one no type takes is refused.
 
 use std::net::Ipv4Addr;
 
@@ -73,8 +74,10 @@ pub(super) fn on_interface(nic: BlockBuilder, mp: Option<&MachinePlan>, network:
     nic.add_attribute(("ipv4_prefixes", list(s.prefixes.iter().map(|p| string(p.as_str())))))
 }
 
-/// The addresses (prefixes counted once) each interface of `mp` needs: the most of any.
-fn slots(mp: &MachinePlan, prefixes: bool) -> usize {
+/// The addresses (prefixes counted once) the busiest interface of `mp` holds, which its
+/// instance type must take (a Windows instance's single interface takes no prefix).
+pub(super) fn busiest(mp: &MachinePlan) -> usize {
+    let prefixes = !mp.is_windows();
     mp.addresses
         .keys()
         .map(|n| {
@@ -85,32 +88,9 @@ fn slots(mp: &MachinePlan, prefixes: bool) -> usize {
         .unwrap_or(1)
 }
 
-/// The addresses per interface of the instance types Isoloom picks, smallest first: AWS's
-/// "IP addresses per network interface" of each.
-const PER_INTERFACE: &[(&str, usize)] = &[
-    ("t3.micro", 2),
-    ("t3.small", 4),
-    ("c7i-flex.large", 10),
-    ("m7i-flex.large", 10),
-    ("m7i-flex.xlarge", 15),
-];
-
-/// `size`, or the smallest larger type whose interfaces take every address of `mp`.
-pub(super) fn sized(size: &'static str, mp: &MachinePlan) -> &'static str {
-    let need = slots(mp, !mp.is_windows());
-    let from = PER_INTERFACE.iter().position(|(t, _)| *t == size).unwrap_or(0);
-    PER_INTERFACE.iter().skip(from).find(|(_, ips)| *ips >= need).map_or(size, |(t, _)| t)
-}
-
-/// Why AWS can't give machine `name` its addresses: more on one interface than its largest
-/// type takes, or one of the first four of a subnet, which AWS keeps.
+/// Why AWS can't give machine `name` its addresses: one of the first four of a subnet, which AWS
+/// keeps. (An interface holding more than its instance type takes is the size's refusal.)
 pub(super) fn refusal(name: &str, mp: &MachinePlan) -> Option<String> {
-    let most = PER_INTERFACE.last().map_or(0, |(_, ips)| *ips);
-    if slots(mp, !mp.is_windows()) > most {
-        return Some(format!(
-            "machine `{name}`: AWS gives an interface at most {most} addresses here (a whole aligned /28 counts once)"
-        ));
-    }
     let kept = mp.more_addresses.iter().find(|(_, more)| more.iter().any(|a| a.octets()[3] <= 3));
     kept.map(|(net, _)| format!("machine `{name}`: AWS keeps the first addresses of a subnet (.1 to .3) on `{net}`"))
 }
@@ -136,19 +116,16 @@ mod tests {
         assert_eq!(s.single, ["10.0.0.11".parse::<Ipv4Addr>().unwrap()]);
         assert_eq!(s.prefixes, ["10.0.0.16/28"]);
         assert!(needs_interfaces(&mp));
-        assert_eq!(sized("t3.micro", &mp), "t3.small");
+        assert_eq!(busiest(&mp), 3);
         assert_eq!(split(&mp, "lan", false).single.len(), 17);
     }
 
     #[test]
-    fn a_larger_type_when_the_interface_needs_more_addresses() {
+    fn the_first_addresses_of_a_subnet_are_refused() {
         let mp = plan("[10, 11, 12]");
         assert!(!needs_interfaces(&mp));
-        assert_eq!(sized("t3.micro", &mp), "t3.small");
-        assert_eq!(sized("m7i-flex.large", &mp), "m7i-flex.large");
+        assert_eq!(busiest(&mp), 3);
         assert!(refusal("web", &mp).is_none());
         assert!(refusal("web", &plan("[10, 3]")).unwrap().contains("(.1 to .3)"));
-        let many: Vec<String> = (10..30).map(|o| o.to_string()).collect();
-        assert!(refusal("web", &plan(&format!("[{}]", many.join(", ")))).is_some());
     }
 }

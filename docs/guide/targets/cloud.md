@@ -178,10 +178,13 @@ See [security considerations](../../explanation/security.md#public-ip-addresses-
 Isoloom doesn't know your prices and bills nothing. What it gives you to keep costs in check:
 
 - **Sizes** follow each machine's `resources` (1 CPU, 1024 MB and 20 GB by default for a VM):
-  `cloud-vm` picks the smallest instance type that fits (AWS `t3.micro` and up, Azure
+  `cloud-vm` picks the smallest instance type with as many vCPUs as the machine's CPUs, as much
+  memory, the disk where the size fixes it (DigitalOcean, Linode), a network interface per network
+  and, on AWS, room for the addresses of its busiest interface (AWS `t3.micro` and up, Azure
   `Standard_B2ts_v2` and up, Google `e2-small` and up, DigitalOcean `s-1vcpu-1gb` and up, Linode
-  `g6-nanode-1` and up, Oracle `VM.Standard.E4.Flex` sized to fit). A machine bigger than a
-  cloud's largest size is refused, not silently shrunk. `cloud-docker` sizes its one VM from the
+  `g6-nanode-1` and up). The controller, on every network, gets an interface on each. Oracle's
+  `VM.Standard.E4.Flex` is sized to fit: an OCPU per two CPUs or per 8 GB, whichever is more. A
+  machine bigger than a cloud's largest size is refused, not silently shrunk. `cloud-docker` sizes its one VM from the
   containers' total, and the size is a module variable (`instance_type`, `size`, `machine_type`
   or `type`). `isoloom resources` adds up what the machines ask for.
 - **Expiry.** A run manifest carries an expiry (240 minutes by default; `isothrum up --lifetime`

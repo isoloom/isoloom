@@ -7,10 +7,10 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::inventory::WinrmAuth;
 
 use super::network::{controller_group, security_group};
-use super::{addresses, image_user, machine_type, nesting};
+use super::{RULES, addresses, image_user, machine_type, nesting};
 use crate::Result;
 use crate::cloud::auto_stop;
-use crate::cloud::aws::{ec2_instance, instance_type, root_disk};
+use crate::cloud::aws::{ec2_instance, root_disk};
 use crate::cloud::instance::{self, name_with};
 use crate::cloud::vm::controller_setup;
 use crate::cloud::vm::{disks, hooks, interfaces, own_image};
@@ -52,10 +52,9 @@ fn ami(mp: &MachinePlan) -> Expression {
 pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
-    let mem = mp.size().memory_mb;
     let instance = ec2_instance(&id)
         .add_attribute(("ami", ami(mp)))
-        .add_attribute(("instance_type", string(machine_type(mp, mem))))
+        .add_attribute(("instance_type", string(machine_type(mp))))
         .add_blocks(disks::aws(&mp.disks));
     // A looked-up AMI says whether it has NitroTPM; an own AMI is the author's to choose.
     let tpm_ami = (mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none()).then(|| ident(mp.os.as_deref().unwrap_or_default()));
@@ -202,11 +201,9 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
         security_group(env, (name, mp), true),
     );
     let Some((net, addr)) = mp.addresses.first() else { return };
-    // Windows wants 2 GB and more.
-    let mem = mp.size().memory_mb.max(2048);
     let instance = ec2_instance(&id)
         .add_attribute(("ami", ami(mp)))
-        .add_attribute(("instance_type", string(machine_type(mp, mem))))
+        .add_attribute(("instance_type", string(machine_type(mp))))
         .add_attribute(("subnet_id", reference(&format!("aws_subnet.{}.id", ident(net)))))
         .add_attribute(("private_ip", string(addr.to_string())))
         .add_attribute(("associate_public_ip_address", boolean(true)))
@@ -261,7 +258,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
         m.block(interface(&nic(n), n, &at.to_string(), reference("aws_security_group.isoloom_controller.id"), None).build());
     }
     let first = env.networks.keys().next().map(|n| nic(n)).unwrap_or_default();
-    let (_, mem, disk) = controller::size(env);
+    let (_, _, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Basic);
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n))));
     let user = |mp: &MachinePlan| image_user(mp.os.as_deref().unwrap_or_default()).to_owned();
@@ -269,7 +266,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     m.block(
         ec2_instance("isoloom_controller")
             .add_attribute(("ami", reference(&format!("data.aws_ami.{}.id", ident(controller::OS)))))
-            .add_attribute(("instance_type", string(instance_type(mem))))
+            .add_attribute(("instance_type", string(RULES.controller_size(env))))
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
             .add_attribute(user_data(user_data::capped(&setup, "the controller", CAP)?))
             .add_block(lifecycle("user_data_base64", None))

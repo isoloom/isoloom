@@ -14,7 +14,7 @@ use isoloom_plan::{Environment, MachinePlan};
 
 use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
-use crate::cloud::vm::rules::{DiskSize, FIREWALLS_TC, Images, Largest, Mtu, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, fit_disk};
+use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
 use crate::limits::Limits;
 use crate::module::{self, ident, providers, resource};
@@ -42,8 +42,9 @@ const RULES: Rules = Rules {
         none: "",
     },
     nests: false,
-    largest: Some(Largest::of_disks(PLANS)),
-    largest_nesting: None,
+    need: Need::of,
+    sizes: Some(PLANS),
+    nesting_sizes: None,
     mtu: Mtu::Fixed,
     picks_ipv6: false,
     volumes: Volumes { smallest_gb: 10, most: 6 },
@@ -81,34 +82,15 @@ pub(super) fn image(os: &str) -> Option<&'static str> {
     IMAGES.of(os)
 }
 
-/// The plans, smallest first: each one's memory and disk come with it.
-const PLANS: &[DiskSize] = &[
-    DiskSize {
-        memory_mb: 1024,
-        disk_gb: 25,
-        name: "g6-nanode-1",
-    },
-    DiskSize {
-        memory_mb: 2048,
-        disk_gb: 50,
-        name: "g6-standard-1",
-    },
-    DiskSize {
-        memory_mb: 4096,
-        disk_gb: 80,
-        name: "g6-standard-2",
-    },
-    DiskSize {
-        memory_mb: 8192,
-        disk_gb: 160,
-        name: "g6-standard-4",
-    },
-    DiskSize {
-        memory_mb: 16384,
-        disk_gb: 320,
-        name: "g6-standard-6",
-    },
-];
+/// The plans, smallest first, each with its vCPUs, memory and disk (an instance has one VPC
+/// interface).
+const PLANS: Sizes = Sizes::ordered(&[
+    Size::new("g6-nanode-1", 1, 1024, 1).with_disk(25),
+    Size::new("g6-standard-1", 1, 2048, 1).with_disk(50),
+    Size::new("g6-standard-2", 2, 4096, 1).with_disk(80),
+    Size::new("g6-standard-4", 4, 8192, 1).with_disk(160),
+    Size::new("g6-standard-6", 6, 16384, 1).with_disk(320),
+]);
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
 pub(crate) const DRIVER: Driver = Driver {
@@ -157,7 +139,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
         resource("linode_instance", &id)
             .add_attribute(("label", name_with(&format!("-{name}"))))
             .add_attribute(("region", reference("var.region")))
-            .add_attribute(("type", string(RULES.gpus.of(mp).unwrap_or_else(|| fit_disk(PLANS, mp)))))
+            .add_attribute(("type", string(RULES.size_of(mp))))
             .add_attribute((
                 "image",
                 string(own_image::of(mp, own_image::linode).unwrap_or_else(|| image(os).unwrap_or_default())),

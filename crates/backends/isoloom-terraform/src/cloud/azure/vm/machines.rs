@@ -10,7 +10,7 @@ use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::inventory::WinrmAuth;
 
 use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
-use super::{USER, image, machine_size, public_ip as address_of, size};
+use super::{RULES, USER, image, public_ip as address_of};
 use crate::Result;
 use crate::cloud::auto_stop;
 use crate::cloud::instance::{self, name_with};
@@ -31,7 +31,6 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
     m.block(public_ip(&id, name));
     m.blocks(nics(&id, name, mp));
-    let memory = mp.size().memory_mb;
     let disk = mp.size().disk_gb.max(30);
     let ids = mp
         .addresses
@@ -44,7 +43,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         &id,
         name,
         (mp.os.as_deref().unwrap_or_default(), own),
-        (machine_size(mp, memory), disk, mp.tpm.is_some()),
+        (RULES.size_of(mp), disk, mp.tpm.is_some()),
         (list(ids), setup),
     ));
     m.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
@@ -219,8 +218,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
 
 fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
     let id = ident(name);
-    // Windows wants 2 GB and more, and Azure's images a 127 GB disk.
-    let memory = mp.size().memory_mb.max(2048);
+    // Azure's Windows images are a 127 GB disk.
     let disk = mp.size().disk_gb.max(127);
     let ids = mp
         .addresses
@@ -228,7 +226,7 @@ fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
         .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
     let vm = trusted_launch(placed("azurerm_windows_virtual_machine", &id, name_with(&format!("-{name}"))), mp.tpm.is_some())
         .add_attribute(("computer_name", string(windows::computer_name(name))))
-        .add_attribute(("size", string(machine_size(mp, memory))))
+        .add_attribute(("size", string(RULES.size_of(mp))))
         .add_attribute(("admin_username", string(USER)))
         .add_attribute(("admin_password", reference(windows::PASSWORD)))
         .add_attribute(("network_interface_ids", list(ids)))
@@ -280,7 +278,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let addresses = controller::addresses(env);
     m.blocks(controller_nics(id, "controller", (&addresses, &IndexMap::new(), &IndexMap::new()), false));
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
-    let (_, memory, disk) = controller::size(env);
+    let (_, _, disk) = controller::size(env);
     // Azure's Debian image is a 30 GB disk: the least it takes.
     let disk = disk.max(30);
     let inventory = controller::cloud_inventory(env, |_| USER.to_owned(), WinrmAuth::Ntlm);
@@ -290,7 +288,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
         id,
         "controller",
         (controller::OS, None),
-        (size(memory, addresses.len()), disk, false),
+        (RULES.controller_size(env), disk, false),
         (list(ids), user_data::capped(&setup, "the controller", CAP)?),
     ));
     Ok(())

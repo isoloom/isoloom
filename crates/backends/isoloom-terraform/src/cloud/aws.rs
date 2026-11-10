@@ -8,6 +8,7 @@ pub(crate) mod vm;
 use crate::hcl_builder::{Block, BlockBuilder, Expression, boolean, index, list, number, reference, string};
 
 use super::{Base, instance, operator};
+use crate::cloud::vm::rules::{Need, Size, Sizes};
 use crate::module::{Usage, resource};
 
 /// What AWS's modules share: who may reach the machines and their key, the region, the provider
@@ -136,17 +137,20 @@ pub(crate) fn sealed_route_out() -> Block {
         .build()
 }
 
-/// The instance types by their memory in MB: Free Tier eligible up to 8 GB (accounts on the AWS
-/// Free plan can't launch other types), then general purpose.
-pub(crate) const INSTANCE_TYPES: &[(u32, &str)] = &[
-    (1024, "t3.micro"),
-    (2048, "t3.small"),
-    (4096, "c7i-flex.large"),
-    (8192, "m7i-flex.large"),
-    (16384, "m7i-flex.xlarge"),
-];
+/// The instance types Isoloom picks, smallest first: Free Tier eligible up to 8 GB (accounts on
+/// the AWS Free plan can't launch other types), then general purpose. Each with its vCPUs, its
+/// memory, and AWS's "maximum network interfaces" and "IPv4 addresses per interface"
+/// (<https://docs.aws.amazon.com/ec2/latest/instancetypes/gp.html#gp_network>).
+pub(crate) const INSTANCE_TYPES: Sizes = Sizes::ordered(&[
+    Size::new("t3.micro", 2, 1024, 2).with_addresses(2),
+    Size::new("t3.small", 2, 2048, 3).with_addresses(4),
+    Size::new("c7i-flex.large", 2, 4096, 3).with_addresses(10),
+    Size::new("m7i-flex.large", 2, 8192, 3).with_addresses(10),
+    Size::new("m7i-flex.xlarge", 4, 16384, 4).with_addresses(15),
+]);
 
-/// The instance type for an amount of memory ([`INSTANCE_TYPES`]).
-pub(crate) fn instance_type(memory_mb: u32) -> &'static str {
-    crate::cloud::vm::rules::fit(INSTANCE_TYPES, memory_mb)
+/// The `cloud-docker` host's instance type for `memory_mb`: by its memory alone, as every cloud
+/// sizes its containers' host (`HostSize::pick`).
+pub(crate) fn host_instance_type(memory_mb: u32) -> &'static str {
+    INSTANCE_TYPES.fit(&Need::new(1, memory_mb, 0))
 }
