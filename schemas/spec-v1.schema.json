@@ -3375,7 +3375,7 @@
       "properties": {
         "box": {
           "type": "string",
-          "description": "The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS."
+          "description": "The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS. A box name\nis letters, digits, `.`, `_` and `-`, after an optional `<org>/`, as are `boxes`' names."
         },
         "box_version": {
           "type": "string",
@@ -3441,7 +3441,7 @@
       "properties": {
         "box": {
           "type": "string",
-          "description": "The box, instead of Isoloom's (a specific Ansible version, a mirror)."
+          "description": "The box, instead of Isoloom's (a specific Ansible version, a mirror): a box name, as a\nmachine's."
         },
         "box_version": {
           "type": "string",

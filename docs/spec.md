@@ -1698,7 +1698,7 @@ Machines (or groups) by name: the box each boots.
 
 ### `overrides.vagrant.machines.*.box`
 
-The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS.
+The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS. A box name is letters, digits, `.`, `_` and `-`, after an optional `<org>/`, as are `boxes`' names.
 
 - **Type:** string
 
@@ -1762,7 +1762,7 @@ The controller's box.
 
 ### `overrides.vagrant.controller.box`
 
-The box, instead of Isoloom's (a specific Ansible version, a mirror).
+The box, instead of Isoloom's (a specific Ansible version, a mirror): a box name, as a machine's.
 
 - **Type:** string
 

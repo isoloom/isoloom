@@ -45,15 +45,48 @@ pub struct Access {
     pub vm: Option<String>,
 }
 
-/// The table's `os:` keys, each resolved to the image table's name for its OS.
+/// The table's `os:` keys, each resolved to the image table's name for its OS, and each image's
+/// boxes checked to be box names.
 fn os_keys<'de, D: Deserializer<'de>>(d: D) -> Result<IndexMap<String, VmImage>, D::Error> {
     IndexMap::<String, VmImage>::deserialize(d)?
         .into_iter()
-        .map(|(key, image)| match crate::os::resolve(&key) {
-            Ok(os) => Ok((os.name.to_owned(), image)),
-            Err(e) => Err(D::Error::custom(format!("os.{key}: {e}"))),
+        .map(|(key, image)| {
+            if let Some((field, value)) = bad_boxes(&image).next() {
+                return Err(D::Error::custom(format!("os.{key}.{field}: `{value}` isn't {BOX_NAME}")));
+            }
+            match crate::os::resolve(&key) {
+                Ok(os) => Ok((os.name.to_owned(), image)),
+                Err(e) => Err(D::Error::custom(format!("os.{key}: {e}"))),
+            }
         })
         .collect()
+}
+
+/// What a Vagrant box's name is, for the refusal of one that isn't.
+pub(crate) const BOX_NAME: &str = "a Vagrant box name: letters, digits, `.`, `_` and `-`, after an optional `<org>/` (`bento/debian-12`)";
+
+/// The fields of `image` that name a Vagrant box (`vagrant`, `qemu`, `hyperv`) and hold something
+/// else, each with its value: the Vagrantfile reads a box name as Ruby text, so it is only ever
+/// [`BOX_NAME`].
+pub(crate) fn bad_boxes(image: &VmImage) -> impl Iterator<Item = (&'static str, &str)> {
+    [("vagrant", &image.vagrant), ("qemu", &image.qemu), ("hyperv", &image.hyperv)]
+        .into_iter()
+        .filter_map(|(field, value)| Some((field, value.as_deref()?)))
+        .filter(|(_, value)| !is_box_name(value))
+}
+
+/// Whether `s` is a box name: `<name>` or `<org>/<name>`, each part letters, digits, `.`, `_`
+/// and `-`, not starting with `.` or `-`.
+fn is_box_name(s: &str) -> bool {
+    let part = |p: &str| {
+        !p.is_empty()
+            && !p.starts_with(['.', '-'])
+            && p.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+    };
+    match s.split_once('/') {
+        Some((org, name)) => part(org) && part(name),
+        None => part(s),
+    }
 }
 
 /// The access machine's OS, resolved to the image table's name for it.
@@ -151,6 +184,20 @@ mod tests {
 
     /// A table with Debian 12's box and an access machine of each form.
     const TABLE: &str = "os:\n  debian@12: { vagrant: my-org/debian-12 }\naccess: { docker: registry.example.com/workstation:1, vm: debian }\n";
+
+    #[test]
+    fn a_table_refuses_a_box_that_isnt_a_box_name() {
+        for bad in ["corp/deb#{`id`}", "a b", "\"x\"", "/abs", "a/b/c", ".hidden", "org/"] {
+            let yaml = format!("os:\n  debian@12: {{ vagrant: {} }}\n", serde_json::Value::String(bad.to_owned()));
+            let err = Table::parse(&yaml).expect_err(bad).to_string();
+            assert!(err.contains("os.debian@12.vagrant:") && err.contains("isn't a Vagrant box name"), "{bad}: {err}");
+        }
+        let qemu = Table::parse("os:\n  debian@12: { qemu: \"q;rm\" }\n").unwrap_err().to_string();
+        assert!(qemu.contains("os.debian@12.qemu:"), "{qemu}");
+        for good in ["bento/debian-12", "StefanScherer/windows_2019", "ubuntu/trusty64", "local-box", "my.org/box.v2"] {
+            assert!(Table::parse(&format!("os:\n  debian@12: {{ vagrant: {good} }}\n")).is_ok(), "{good}");
+        }
+    }
 
     #[test]
     fn a_table_holds_each_os_by_its_image_table_name() {

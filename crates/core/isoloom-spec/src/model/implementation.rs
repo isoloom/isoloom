@@ -222,7 +222,8 @@ pub struct Dns {
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
 pub struct VmImage {
-    /// A Vagrant box name (e.g. `StefanScherer/windows_2019`).
+    /// A Vagrant box name (e.g. `StefanScherer/windows_2019`): letters, digits, `.`, `_` and `-`,
+    /// after an optional `<org>/`.
     #[serde(default)]
     pub vagrant: Option<String>,
     /// The box version to pin.

@@ -84,7 +84,8 @@ pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnc
 /// `ISOLOOM_ACCESS_BOX` (its resolved box the fallback), so the runner can give another.
 fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, access: bool) {
     if access {
-        r.assign("m.vm.box", Value::raw(format!("ENV.fetch({:?}, {:?})", manifest::access::BOX_ENV, image.name)));
+        let fetch = format!("ENV.fetch({}, {})", Value::str(manifest::access::BOX_ENV), Value::str(&image.name));
+        r.assign("m.vm.box", Value::raw(fetch));
     } else {
         r.assign("m.vm.box", Value::str(&image.name));
     }
@@ -174,5 +175,28 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         esxi_box: None,
         nested: mp.hardware.nested_virtualization,
         disks: mp.disks.iter().map(|d| (d.name.as_str(), d.size_gb)).collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::boxes::HyperVBox;
+
+    #[test]
+    fn the_access_box_is_a_ruby_string_that_interpolates_nothing() {
+        let image = VagrantBox {
+            name: "corp/deb#{`id`}\"".to_owned(),
+            version: None,
+            libvirt: None,
+            qemu: None,
+            hyperv: HyperVBox::Main,
+        };
+        let mut r = Ruby::new();
+        boxed(&mut r, &image, Arch::Amd64, true);
+        assert_eq!(
+            r.finish(),
+            "m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"corp/deb\\#{`id`}\\\"\")\n"
+        );
     }
 }

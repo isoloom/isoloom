@@ -332,6 +332,13 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **Security: a box name never runs as Ruby.** The access machine's box was written into the
+  Vagrantfile with Rust's debug quoting, which leaves Ruby's `#{…}` live: an image table giving
+  `vagrant: 'corp/deb#{`id`}'` ran `id` on the host whenever Vagrant read the file. It is a
+  Ruby string literal like every other now, and a box name (`vagrant`, `qemu`, `hyperv` in the
+  image table or `vm.image`, `box` and `boxes` under `overrides.vagrant`) must be letters,
+  digits, `.`, `_` and `-` after an optional `<org>/`; anything else is refused (`invalid-value`
+  in a spec, an error reading the image table).
 - **Security: Ansible never evaluates Jinja in the spec's text.** The Ansible renderer passed a
   step's command, path, name, unit or file contents to Ansible as plain strings, which Ansible
   templates: a `{{ lookup('pipe', …) }}` in a `command:` ran on the machine running the play

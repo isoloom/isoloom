@@ -120,7 +120,8 @@ pub struct VagrantOverrides {
 #[derive(Debug, Clone, PartialEq, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VagrantMachine {
-    /// The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS.
+    /// The box (`StefanScherer/windows_2019`), instead of the built-in one for its OS. A box name
+    /// is letters, digits, `.`, `_` and `-`, after an optional `<org>/`, as are `boxes`' names.
     #[serde(default, rename = "box")]
     pub box_name: Option<String>,
     /// The box version to pin.
@@ -161,7 +162,8 @@ pub struct ProviderBoxes {
 #[derive(Debug, Clone, PartialEq, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VagrantBox {
-    /// The box, instead of Isoloom's (a specific Ansible version, a mirror).
+    /// The box, instead of Isoloom's (a specific Ansible version, a mirror): a box name, as a
+    /// machine's.
     #[serde(default, rename = "box")]
     pub box_name: Option<String>,
     /// The box version to pin.

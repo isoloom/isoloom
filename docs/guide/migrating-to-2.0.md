@@ -19,6 +19,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 |---|---|---|
 | `service: dvwa` or `service: juice-shop` | `unknown-reference`: the entries are removed from the catalogue | `app: { image: <the image you used> }` gives the same container |
 | A machine name or alias starting with `isoloom-` | refused: those names are Isoloom's own (its controller, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs) | another name |
+| A Vagrant box name with anything but letters, digits, `.`, `_` and `-` after an optional `<org>/` (in `overrides.vagrant` or an image table) | `invalid-value` (an error reading the image table) | the box's name as `vagrant box list` shows it |
 | A machine using the `openssh` entry and signing in as `ctf` without saying so | the login account defaults to `user` | `with: { username: ctf }` to keep the old account |
 
 ## Behavior that changed

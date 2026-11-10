@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::net::Ipv4Addr;
 
 use super::Problems;
+use crate::images::{BOX_NAME, bad_boxes};
 use crate::model::{Boot, BootDevice, Firmware, NetworkBoot, Spec, VmImage};
 
 /// Every machine's `vm.image` and `vm.boot`, then the controller's image, then the network
@@ -33,6 +34,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
 
 /// The references a machine's image gives, each in the form its target takes.
 fn image(at: &str, i: &VmImage, p: &mut Problems) {
+    boxes(at, i, p);
     if (i.box_url.is_some() || i.box_server_url.is_some()) && i.vagrant.is_none() {
         p.add(
             format!("{at}.vagrant"),
@@ -73,6 +75,13 @@ fn image(at: &str, i: &VmImage, p: &mut Problems) {
         if value.as_ref().is_some_and(|v| v.trim().is_empty() || v.contains(char::is_whitespace)) {
             p.add(format!("{at}.{field}"), "an image's slug or id, without spaces");
         }
+    }
+}
+
+/// Each box an image names that isn't a box name.
+fn boxes(at: &str, i: &VmImage, p: &mut Problems) {
+    for (field, value) in bad_boxes(i) {
+        p.add(format!("{at}.{field}"), format!("`{value}` isn't {BOX_NAME}"));
     }
 }
 
@@ -150,6 +159,7 @@ fn controller(spec: &Spec, p: &mut Problems) {
     let Some(i) = spec.controller.as_ref().and_then(|c| c.image.as_ref()) else {
         return;
     };
+    boxes("controller.image", i, p);
     let others = [
         ("box_url", i.box_url.is_some()),
         ("box_server_url", i.box_server_url.is_some()),
@@ -263,6 +273,14 @@ mod tests {
             problems("{ os: debian@12, boot: { order: [network], network: { file: other.0 } } }"),
             Vec::<String>::new()
         );
+    }
+
+    #[test]
+    fn a_box_is_a_box_name() {
+        let p = alone(r#"{ os: debian@12, image: { vagrant: "corp/deb#{`id`}", hyperv: "a b" } }"#);
+        assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.vagrant: `corp/deb#{`id`}` isn't a Vagrant box name")), "{p:?}");
+        assert!(p.iter().any(|p| p.starts_with("machines.a.vm.image.hyperv:")), "{p:?}");
+        assert!(alone("{ os: debian@12, image: { vagrant: bento/debian-12, qemu: generic/debian12 } }").is_empty());
     }
 
     #[test]
