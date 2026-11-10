@@ -1,13 +1,13 @@
 //! The runner scripts the checks become: the lines they print, a machine's own checks run
 //! inside it, and a TLS service probed over HTTPS.
 
-use isoloom_plan::checks::{self, Line};
+use isoloom_plan::checks;
 
 use super::{BASE, runner};
 use crate::testing::{Outcome, example, lab};
 
 #[test]
-fn runner_scripts_print_lines_the_cli_reads_back() -> Outcome {
+fn runner_scripts_come_by_position_and_end_with_their_counts() -> Outcome {
     let spec = example("segmented")?.spec();
     let plan = checks::plan(&spec);
     let groups = checks::by_position(&spec, &plan);
@@ -21,17 +21,6 @@ fn runner_scripts_print_lines_the_cli_reads_back() -> Outcome {
     // Derived checks can be switched off at run time.
     assert!(script.contains("if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then\nif _tcp 'cache' 6379"), "{script}");
     assert!(script.ends_with("echo \"isoloom-check: END $passed passed, $failed failed\"\n[ \"$failed\" -eq 0 ]\n"));
-
-    assert_eq!(
-        checks::parse_line("isoloom-check: PASS web:80 from user"),
-        Some(Line::Pass("web:80 from user".into()))
-    );
-    assert_eq!(
-        checks::parse_line("    web: isoloom-check: FAIL cache:6379 from web: nothing listens at 10.61.20.20:6379"),
-        Some(Line::Fail("cache:6379 from web".into(), "nothing listens at 10.61.20.20:6379".into()))
-    );
-    assert_eq!(checks::parse_line("isoloom-check: END 3 passed, 1 failed"), Some(Line::End(3, 1)));
-    assert_eq!(checks::parse_line("== checks/x.sh"), None);
     Ok(())
 }
 

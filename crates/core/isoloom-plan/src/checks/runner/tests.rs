@@ -2,49 +2,12 @@ use isoloom_spec::probe::Url;
 use proptest::prelude::*;
 
 use super::super::{HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
-use super::{Host, Line, Render, looks_expanded, parse_line, script, single_quoted, with_directives};
-
-/// Text a tool may print before a runner's line: anything without the runner's marker.
-fn prefix() -> impl Strategy<Value = String> {
-    "[ -~]{0,12}".prop_filter("no marker", |p| !p.contains("isoloom-check: "))
-}
-
-/// A check's name: printable, no `: ` (a FAIL line's separator), nothing trailing to trim.
-fn name() -> impl Strategy<Value = String> {
-    "[!-~]([ -~]{0,20}[!-~])?".prop_filter("no separator", |n| !n.contains(": "))
-}
+use super::{Host, Render, looks_expanded, script, single_quoted, with_directives};
 
 proptest! {
     #[test]
-    fn a_pass_line_reads_back_its_name(before in prefix(), n in name()) {
-        prop_assert_eq!(parse_line(&format!("{before}isoloom-check: PASS {n}  ")), Some(Line::Pass(n)));
-    }
-
-    #[test]
-    fn a_fail_line_reads_back_its_name_and_why(before in prefix(), n in name(), why in "[ -~]{0,30}") {
-        let expected = Line::Fail(n.clone(), why.trim_end().to_owned());
-        prop_assert_eq!(parse_line(&format!("{before}isoloom-check: FAIL {n}: {why}")), Some(expected));
-    }
-
-    #[test]
-    fn an_end_line_reads_back_its_counts(before in prefix(), passed in any::<u32>(), failed in any::<u32>()) {
-        let line = format!("{before}isoloom-check: END {passed} passed, {failed} failed");
-        prop_assert_eq!(parse_line(&line), Some(Line::End(passed, failed)));
-    }
-
-    #[test]
-    fn a_line_without_the_marker_is_none(line in prefix()) {
-        prop_assert_eq!(parse_line(&line), None);
-    }
-
-    #[test]
     fn a_quoted_text_is_read_back_whole(text in "\\PC{0,30}") {
         prop_assert_eq!(single_quoted(&isoloom_spec::shell::quote(&text)).join("'"), text);
-    }
-
-    #[test]
-    fn any_line_reads_without_a_panic(line in "\\PC{0,60}") {
-        let _line = parse_line(&line);
     }
 }
 
@@ -76,13 +39,6 @@ fn a_line_quoting_an_expansion_gets_its_directive_and_others_none() {
 
 /// The line before a check that single-quotes what looks like an expansion.
 const DIRECTIVE: &str = "# shellcheck disable=SC2016 # the check's own text, quoted as written\n";
-
-#[test]
-fn a_fail_line_without_a_reason_has_an_empty_one() {
-    assert_eq!(parse_line("isoloom-check: FAIL web"), Some(Line::Fail("web".into(), String::new())));
-    assert_eq!(parse_line("isoloom-check: END 3 passed"), None);
-    assert_eq!(parse_line("isoloom-check: SKIP web"), None);
-}
 
 /// A machine's host as `<name>.<network>`, a literal as written.
 fn host(h: &Host, _: &Position) -> String {

@@ -1,10 +1,24 @@
 //! The runner scripts' probes against real servers on 127.0.0.1, run by the runner's `sh`: a
 //! greeting read, a line sent, a redirect followed. Unix only, as the runner's shell is.
 
-use isoloom_plan::checks::{self, Line, Position, Probe};
+use isoloom_manifest::CheckLine;
+use isoloom_plan::checks::{self, Position, Probe};
 
 use super::{BASE, runner};
 use crate::testing::{Outcome, lab};
+
+/// The runner's line for a check that passed.
+fn pass(name: &str) -> CheckLine {
+    CheckLine::Pass { name: name.into() }
+}
+
+/// The runner's line for a check that failed, and why.
+fn fail(name: &str, reason: &str) -> CheckLine {
+    CheckLine::Fail {
+        name: name.into(),
+        reason: reason.into(),
+    }
+}
 
 /// A server on 127.0.0.1 answering each connection with `answer` (of the line it read, when
 /// `wait_line`) after `delay_ms`, then holding the connection open a while (as a service does).
@@ -53,23 +67,20 @@ fn tcp_checks_read_a_greeting_and_send_a_line() -> Outcome {
     let script = runner(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>());
     assert!(script.contains(&format!("_retry 30 _tcp_read '127.0.0.1' {pong} 'PING' '+PONG'")), "{script}");
     let out = std::process::Command::new("sh").arg("-c").arg(&script).output().expect("sh runs");
-    let lines: Vec<Line> = String::from_utf8_lossy(&out.stdout).lines().filter_map(checks::parse_line).collect();
+    let lines: Vec<CheckLine> = String::from_utf8_lossy(&out.stdout).lines().filter_map(CheckLine::parse).collect();
     let text = String::from_utf8_lossy(&out.stdout).to_string();
     for ok in ["banner", "late", "ping"] {
-        assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+        assert!(lines.contains(&pass(ok)), "{ok}: {text}");
     }
     assert!(
-        lines.contains(&Line::Fail(
-            "wrong".into(),
-            format!("127.0.0.1:{pong} answered \"+PONG \", without the expected text")
-        )),
+        lines.contains(&fail("wrong", &format!("127.0.0.1:{pong} answered \"+PONG \", without the expected text"))),
         "{text}"
     );
     assert!(
-        lines.contains(&Line::Fail("silent".into(), format!("nothing read from 127.0.0.1:{silent} within 5s"))),
+        lines.contains(&fail("silent", &format!("nothing read from 127.0.0.1:{silent} within 5s"))),
         "{text}"
     );
-    assert_eq!(lines.last(), Some(&Line::End(3, 2)), "{text}");
+    assert_eq!(lines.last(), Some(&CheckLine::End { passed: 3, failed: 2 }), "{text}");
     Ok(())
 }
 
@@ -113,18 +124,18 @@ fn redirecting_server() -> Outcome<u16> {
 /// The runner's lines for the redirect checks against `u`, as they must read (`with_body`: the
 /// checks that send a body or look for text ran too).
 fn expect_redirect_lines(text: &str, u: &str, with_body: bool) {
-    let lines: Vec<Line> = text.lines().filter_map(checks::parse_line).collect();
+    let lines: Vec<CheckLine> = text.lines().filter_map(CheckLine::parse).collect();
     for ok in ["first", "followed"] {
-        assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+        assert!(lines.contains(&pass(ok)), "{ok}: {text}");
     }
-    let unfollowed = Line::Fail("unfollowed".into(), format!("expected HTTP 200 from {u}/old, got 302"));
+    let unfollowed = fail("unfollowed", &format!("expected HTTP 200 from {u}/old, got 302"));
     assert!(lines.contains(&unfollowed), "{text}");
-    let looping = Line::Fail("looping".into(), format!("expected HTTP 200 from {u}/loop (after redirects), got 302"));
+    let looping = fail("looping", &format!("expected HTTP 200 from {u}/loop (after redirects), got 302"));
     assert!(lines.contains(&looping), "{text}");
     if with_body {
         // A POST answered with a redirect goes on as a GET, as in a browser.
         for ok in ["followed body", "login", "empty post", "unfollowed post"] {
-            assert!(lines.contains(&Line::Pass(ok.into())), "{ok}: {text}");
+            assert!(lines.contains(&pass(ok)), "{ok}: {text}");
         }
     }
 }

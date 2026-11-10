@@ -13,7 +13,7 @@
 //! network namespace, a provisioner on a VM, a Job with a machine's labels) and how a symbolic
 //! host is written (an address, or a name on Kubernetes). The runners print one line per
 //! check, `isoloom-check: PASS <name>` or `isoloom-check: FAIL <name>: <why>`, which
-//! the runner's `check` reads back.
+//! the runner's `check` reads back (`isoloom_manifest::CheckLine`, the protocol's reader).
 
 pub use isoloom_spec::probe::{Host, Url, can_run_checks};
 
@@ -21,7 +21,7 @@ mod derived;
 mod runner;
 
 pub use derived::{allowed, derived, from_networks};
-pub use runner::{Line, Render, parse_line, script};
+pub use runner::{Render, script};
 
 /// The switch of the checks derived from the spec (`0` skips them): the check runner reads it,
 /// and every target passes it through from the host. Named once, here.

@@ -99,9 +99,9 @@ before the field existed has none.
    from the stand-in's addresses). A failed set-up step fails the checks: no runner runs, but the
    teardown still does.
 2. **`checks.runners`**, in order: each runner's step, under its own time limit, prints its
-   results in the `checks.protocol` line format. A runner cut off by its limit runs its
-   `on_timeout` steps (the one-off container it leaves behind removed); the next runner still
-   runs. A check its runner never reported fails.
+   results in the `checks.protocol` line format (`isoloom_manifest::CheckLine::parse` reads
+   it). A runner cut off by its limit runs its `on_timeout` steps (the one-off container it
+   leaves behind removed); the next runner still runs. A check its runner never reported fails.
 3. **`checks.teardown`**, after the runners **whatever happened** — every check passed, one
    failed, a runner timed out, or the set-up failed. It takes the stand-ins down
    (`stand-ins-down`), so the access machine they stand in for can take its addresses when it is

@@ -299,34 +299,5 @@ _exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep
 _retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
 "#;
 
-/// One line of a runner's output, as the runner's `check` reads it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Line {
-    /// The check of this name passed.
-    Pass(String),
-    /// The check of this name failed, and why.
-    Fail(String, String),
-    /// The runner finished: how many passed and failed.
-    End(u32, u32),
-}
-
-/// Reads a runner's output line (anywhere in the line: tools prefix their output).
-#[must_use]
-pub fn parse_line(line: &str) -> Option<Line> {
-    let (_, rest) = line.split_once("isoloom-check: ")?;
-    if let Some(n) = rest.strip_prefix("PASS ") {
-        return Some(Line::Pass(n.trim_end().to_owned()));
-    }
-    if let Some(r) = rest.strip_prefix("FAIL ") {
-        let (name, why) = r.split_once(": ").unwrap_or((r, ""));
-        return Some(Line::Fail(name.to_owned(), why.trim_end().to_owned()));
-    }
-    if let Some(r) = rest.strip_prefix("END ") {
-        let mut nums = r.split_whitespace().filter_map(|w| w.parse::<u32>().ok());
-        return Some(Line::End(nums.next()?, nums.next()?));
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests;

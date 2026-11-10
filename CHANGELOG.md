@@ -232,6 +232,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **Each `cloud-vm` machine has its `ssh_user_<machine>` output.** The runner signs in to a
   machine as `ssh_user_<machine>` (then `ssh_user`, then root); the modules only gave an
   `ssh_users` map, so on AWS a secret's delivery signed in as root and was refused.
+- **`isoloom_manifest::CheckLine::parse`** reads a line a check runner prints
+  (`isoloom-check/1`): the protocol's one reader, which a runner uses instead of a copy. It
+  replaces `isoloom_plan::checks::{parse_line, Line}`.
 
 ### Changed
 
@@ -814,6 +817,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `network::trunks::vms` (the Linux VMs' set-up reads it)
   are crate-internal; `isoloom_spec::derive`, `isoloom_spec::model::after_drive`,
   `isoloom_catalogue::value_file` and `isoloom_plan::configure::codename` leave their re-exports.
+- **`isoloom_plan::checks::{parse_line, Line}`**, the reader of a runner's lines, which only
+  tests called: `isoloom_manifest::CheckLine::parse` reads them, its `Pass`, `Fail` and `End`
+  with named fields.
 
 ## [1.0.9] — 2026-11-08
 
