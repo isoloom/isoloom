@@ -583,6 +583,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 - **`docker-vm` on libvirt takes a machine with host folders added while it runs**: the host VM's
   memory is shared from the start (memfd), which virtiofs needs and libvirt can't add to a running
   VM; adding one used to fail its reload with "'virtiofs' requires shared memory".
+- **A Terraform set-up and the controller read the ready file as the runner does**: a stopped
+  set-up is a first line starting `failed: ` (the `isoloom-ready/1` grammar's prefix, now
+  `isoloom_manifest::ReadyLine::FAILED_PREFIX`, beside `READY` and `RUNNING_PREFIX`), not any
+  line starting `failed:`; the shell's `case` patterns and the lines the set-up writes come from
+  the same constants.
 - **Proxmox's `slot` is checked**: the `proxmox` module and `docker-vm`'s Proxmox module refuse a
   slot outside 1 to 99 at plan time, as ESXi's does outside 1 to 63, instead of making SDN ids
   and MACs the server refused at apply time.

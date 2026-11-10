@@ -151,6 +151,14 @@ pub fn ready_mark(line: &ReadyLine) -> String {
     }
 }
 
+/// The `case` pattern of a ready file's line that stopped the set-up (`failed: <step>`), for a
+/// shell that reads the file: the grammar's prefix, double-quoted (it holds no `"`, `$`, `` ` ``
+/// or `\`), then anything. A done set-up's line is [`ReadyLine::READY`], one word.
+#[must_use]
+pub fn failed_pattern() -> String {
+    format!("\"{}\"*", ReadyLine::FAILED_PREFIX)
+}
+
 /// `command` as the set-up step `label` of the ready file: `running: <label>` before it, and
 /// `failed: <label>` with the set-up stopped (`exit 1`) when it fails. `as_root` gives each
 /// mark the way the command gets root (the identity when the script runs as root already). The

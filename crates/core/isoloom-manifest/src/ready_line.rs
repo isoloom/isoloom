@@ -3,13 +3,6 @@
 
 use std::fmt;
 
-/// The line of a set-up that is done.
-const READY: &str = "ready";
-/// What starts the line of a step that is running, before its name.
-const RUNNING: &str = "running: ";
-/// What starts the line of a step that failed, before its name.
-const FAILED: &str = "failed: ";
-
 /// The first line of a ready file, as the `isoloom-ready/1` grammar defines it
 /// ([`ReadyGrammar::V1`](crate::ReadyGrammar::V1)): the set-up is done, or at a step, or stopped
 /// at one. Read with [`ReadyLine::parse`], written with `Display`. No file, or any other line,
@@ -31,6 +24,15 @@ pub enum ReadyLine {
 }
 
 impl ReadyLine {
+    /// The line of a set-up that is done: what a shell reading the file compares its first line
+    /// with.
+    pub const READY: &'static str = "ready";
+    /// What starts the line of a step that is running, before its name.
+    pub const RUNNING_PREFIX: &'static str = "running: ";
+    /// What starts the line of a step that failed, before its name: what a shell reading the
+    /// file matches a stopped set-up by.
+    pub const FAILED_PREFIX: &'static str = "failed: ";
+
     /// Reads a ready file's first line; `None` when it is none of the grammar's (still booting).
     ///
     /// # Example
@@ -45,13 +47,14 @@ impl ReadyLine {
     #[must_use]
     pub fn parse(line: &str) -> Option<ReadyLine> {
         let line = line.trim_end();
-        if line == READY {
+        if line == ReadyLine::READY {
             return Some(ReadyLine::Ready);
         }
-        if let Some(step) = line.strip_prefix(RUNNING) {
+        if let Some(step) = line.strip_prefix(ReadyLine::RUNNING_PREFIX) {
             return Some(ReadyLine::Running { step: step.to_owned() });
         }
-        line.strip_prefix(FAILED).map(|step| ReadyLine::Failed { step: step.to_owned() })
+        line.strip_prefix(ReadyLine::FAILED_PREFIX)
+            .map(|step| ReadyLine::Failed { step: step.to_owned() })
     }
 
     /// The step `step` running.
@@ -71,9 +74,9 @@ impl fmt::Display for ReadyLine {
     /// The line as a set-up writes it, which [`ReadyLine::parse`] reads back.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ReadyLine::Ready => f.write_str(READY),
-            ReadyLine::Running { step } => write!(f, "{RUNNING}{step}"),
-            ReadyLine::Failed { step } => write!(f, "{FAILED}{step}"),
+            ReadyLine::Ready => f.write_str(ReadyLine::READY),
+            ReadyLine::Running { step } => write!(f, "{}{step}", ReadyLine::RUNNING_PREFIX),
+            ReadyLine::Failed { step } => write!(f, "{}{step}", ReadyLine::FAILED_PREFIX),
         }
     }
 }

@@ -24,7 +24,7 @@ fn proxmox_runs_environment_playbooks_from_a_controller() -> Outcome {
     // It waits for each machine's ready file to say `ready` (and stops on `failed:`), then runs
     // the playbooks.
     assert!(tf.contains("head -n 1 /var/lib/isoloom/ready"));
-    assert!(tf.contains("failed:*)"));
+    assert!(tf.contains("in \\\"failed: \\\"*)"), "{tf}");
     assert!(tf.contains("ansible-playbook -i /etc/isoloom/inventory.ini"));
     // It starts after every machine exists.
     let vm = from(tf, "resource \"proxmox_virtual_environment_vm\" \"isoloom_controller\"")?;

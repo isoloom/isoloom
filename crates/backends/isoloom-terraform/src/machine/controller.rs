@@ -278,8 +278,9 @@ pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&str) -> String) -> V
             let u = user(os);
             let ready = isoloom_render::steps::READY_FILE;
             // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
+            let (done, failed) = (isoloom_manifest::ReadyLine::READY, isoloom_render::steps::failed_pattern());
             let wait = format!(
-                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i {CONTROLLER_KEY} {u}@{a} head -n 1 {ready} 2>/dev/null) && [ \"$s\" = ready ]; do case \"$s\" in failed:*) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
+                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i {CONTROLLER_KEY} {u}@{a} head -n 1 {ready} 2>/dev/null) && [ \"$s\" = {done} ]; do case \"$s\" in {failed}) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
             );
             Some((name.to_owned(), Shell::Root.command(&wait)))
         })

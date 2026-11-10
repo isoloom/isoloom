@@ -26,7 +26,7 @@ use isoloom_spec::model::Target;
 
 use crate::{Error, Result};
 use isoloom_manifest::ReadyLine;
-use isoloom_render::steps::{READY_FILE, ready_mark};
+use isoloom_render::steps::{READY_FILE, failed_pattern, ready_mark};
 
 /// Where the set-up writes its output: the runner shows its tail when a step failed.
 pub(crate) const SETUP_LOG: &str = "/var/log/isoloom-setup.log";
@@ -149,14 +149,14 @@ fn body(s: &SetUp) -> Template {
         "state=$(head -n1 {READY_FILE} 2>/dev/null)\npart=$(cat {DIR}/part 2>/dev/null || echo 1)\n"
     ));
     if !s.again.is_empty() {
-        t.push_text("if [ \"$state\" = ready ] || [ \"$part\" != 1 ]; then\n");
+        t.push_text(format!("if [ \"$state\" = {} ] || [ \"$part\" != 1 ]; then\n", ReadyLine::READY));
         for c in &s.again {
             t.append(c.clone());
             t.push_text("\n");
         }
         t.push_text("fi\n");
     }
-    t.push_text("case \"$state\" in ready|failed:*) exit 0 ;; esac\n");
+    t.push_text(format!("case \"$state\" in {}|{}) exit 0 ;; esac\n", ReadyLine::READY, failed_pattern()));
     let count = s.parts.len();
     for (n, part) in (1..).zip(&s.parts) {
         t.push_text(format!("if [ \"$part\" = {n} ]; then\n"));
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn every_boot_after_the_set_up_ended_schedules_the_expiry_and_undoes_a_restart() {
         let s = text(&script(&two_parts()));
-        let end = s.find("case \"$state\" in ready|failed:*) exit 0 ;; esac").unwrap();
+        let end = s.find("case \"$state\" in ready|\"failed: \"*) exit 0 ;; esac").unwrap();
         assert!(s.find("e=<expr>").unwrap() < end, "{s}");
         assert!(s.find("ip link set eth1 up").unwrap() < end, "{s}");
         assert!(!s.contains("systemctl disable"), "the unit stays enabled: {s}");
@@ -333,9 +333,32 @@ mod tests {
     }
 
     #[test]
+    fn under_sh_a_set_up_ended_on_exactly_the_lines_the_ready_grammar_reads_as_ended() {
+        use isoloom_render::test_support::posix_sh;
+        if posix_sh().is_none() {
+            return;
+        }
+        let s = text(&script(&SetUp::default()));
+        let case = s.lines().find(|l| l.starts_with("case \"$state\" in")).unwrap();
+        let lines = [
+            ReadyLine::Ready.to_string(),
+            ReadyLine::failed("a: b.sh").to_string(),
+            ReadyLine::running("a: b.sh").to_string(),
+            "failed:a".to_owned(),
+            "readyish".to_owned(),
+        ];
+        for line in lines {
+            let sh = format!("state={}\n{case}\nexit 1", isoloom_spec::shell::quote(&line));
+            let ended = posix_sh().unwrap().arg("-c").arg(&sh).status().unwrap().success();
+            let read = ReadyLine::parse(&line);
+            assert_eq!(ended, matches!(read, Some(ReadyLine::Ready | ReadyLine::Failed { .. })), "{line}: {case}");
+        }
+    }
+
+    #[test]
     fn a_set_up_that_ended_never_runs_again_and_its_script_is_moved_in_place() {
         let s = text(&script(&SetUp::default()));
-        assert!(s.contains("in ready|failed:*) exit 0"), "{s}");
+        assert!(s.contains("in ready|\"failed: \"*) exit 0"), "{s}");
         assert!(!s.contains("= ready ] ||"), "nothing to do again: {s}");
         assert!(s.contains("mv -f /var/lib/isoloom/setup.sh.new /var/lib/isoloom/setup.sh"), "{s}");
         assert!(s.contains("systemctl start --no-block isoloom-setup.service"), "{s}");
