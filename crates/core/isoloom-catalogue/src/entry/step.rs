@@ -101,9 +101,10 @@ impl JsonSchema for EntryStep {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct When {
-    /// The machine's OS family, as `os:` writes it (`debian`, `ubuntu`, `rocky`, `alpine`).
+    /// The machine's distribution, as `os:` names it before the `@` (`debian`, `ubuntu`, `rocky`,
+    /// `alpine`): the step's `family:` key.
     #[serde(default)]
-    pub family: Option<Vec<OsFamily>>,
+    pub family: Option<Vec<DistroName>>,
     /// The machine's OS, in full (`debian@12`).
     #[serde(default)]
     pub os: Option<Vec<OsRef>>,
@@ -118,12 +119,13 @@ pub struct When {
     pub unset: Option<SettingName>,
 }
 
-/// An OS family as a machine's `os:` writes it, before the `@` (`debian`, `rocky`): one of the
-/// OS table's.
+/// A distribution's name as a machine's `os:` writes it, before the `@` (`debian`, `rocky`): one
+/// of the OS table's distributions. Not a package family ([`crate::Family`]: `debian`,
+/// `redhat`...), which several distributions share.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OsFamily(&'static str);
+pub struct DistroName(&'static str);
 
-impl OsFamily {
+impl DistroName {
     /// The family's name.
     #[must_use]
     pub fn as_str(&self) -> &'static str {
@@ -131,20 +133,20 @@ impl OsFamily {
     }
 }
 
-impl<'de> Deserialize<'de> for OsFamily {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<OsFamily, D::Error> {
+impl<'de> Deserialize<'de> for DistroName {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<DistroName, D::Error> {
         let text = String::deserialize(d)?;
         let families = isoloom_spec::os::DISTROS;
-        families.iter().find(|f| f.name == text).map(|f| OsFamily(f.name)).ok_or_else(|| {
+        families.iter().find(|f| f.name == text).map(|f| DistroName(f.name)).ok_or_else(|| {
             let known: Vec<&str> = families.iter().map(|f| f.name).collect();
-            serde::de::Error::custom(format!("`{text}` isn't an OS family; the OS table has: {}", known.join(", ")))
+            serde::de::Error::custom(format!("`{text}` isn't a distribution of the OS table, which has: {}", known.join(", ")))
         })
     }
 }
 
-impl JsonSchema for OsFamily {
+impl JsonSchema for DistroName {
     fn schema_name() -> Cow<'static, str> {
-        "OsFamily".into()
+        "DistroName".into()
     }
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
@@ -192,7 +194,7 @@ mod tests {
         let step: EntryStep = serde_yaml_ng::from_str("{ packages: [nginx], when: { family: [debian, ubuntu], unset: config }, for_each: users }").unwrap();
         assert_eq!(step.body, serde_json::json!({ "packages": ["nginx"] }));
         let when = step.when.unwrap();
-        assert_eq!(when.family.unwrap().iter().map(OsFamily::as_str).collect::<Vec<_>>(), ["debian", "ubuntu"]);
+        assert_eq!(when.family.unwrap().iter().map(DistroName::as_str).collect::<Vec<_>>(), ["debian", "ubuntu"]);
         assert_eq!(when.unset.unwrap().as_str(), "config");
         assert_eq!(step.for_each.unwrap().as_str(), "users");
         let reboot: EntryStep = serde_yaml_ng::from_str("reboot").unwrap();
@@ -206,6 +208,6 @@ mod tests {
         let family = serde_yaml_ng::from_str::<EntryStep>("{ file: x, when: { family: [gentoo] } }")
             .unwrap_err()
             .to_string();
-        assert!(family.contains("`gentoo` isn't an OS family"), "{family}");
+        assert!(family.contains("`gentoo` isn't a distribution of the OS table"), "{family}");
     }
 }

@@ -66,7 +66,7 @@ pub use catalogue::{Catalogue, Entry};
 pub use collections::{Collection, Collections};
 pub use contract::{Case, CheckValues, Contract, ContractCheck, Fact};
 pub use entry::{
-    Daemon, Definition, EntryPort, EntryStep, ImageStart, ImageUse, Licence, LogStream, OsFamily, Pattern, PerFamily, PortNumber, Recipe, Release, Setting,
+    Daemon, Definition, DistroName, EntryPort, EntryStep, ImageStart, ImageUse, Licence, LogStream, Pattern, PerFamily, PortNumber, Recipe, Release, Setting,
     SettingType, Source, When,
 };
 pub use error::{Error, Finding, Result};

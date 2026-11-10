@@ -12,7 +12,7 @@ mod step;
 pub use daemon::{Daemon, LogStream, PerFamily};
 pub use release::{Release, Source};
 pub use setting::{Pattern, Setting, SettingType};
-pub use step::{EntryStep, OsFamily, Recipe, When};
+pub use step::{DistroName, EntryStep, Recipe, When};
 
 use std::num::NonZeroU16;
 

@@ -935,9 +935,9 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/OsFamily"
+            "$ref": "#/$defs/DistroName"
           },
-          "description": "The machine's OS family, as `os:` writes it (`debian`, `ubuntu`, `rocky`, `alpine`)."
+          "description": "The machine's distribution, as `os:` names it before the `@` (`debian`, `ubuntu`, `rocky`,\n`alpine`): the step's `family:` key."
         },
         "os": {
           "type": [
@@ -982,7 +982,7 @@
       },
       "description": "Where an entry's step applies: every condition given holds (a list holds when one of its\nvalues does). Never the form: both forms run the same recipe."
     },
-    "OsFamily": {
+    "DistroName": {
       "type": "string",
       "enum": [
         "debian",
