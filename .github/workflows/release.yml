@@ -5,7 +5,8 @@ name: Release
 # SHA256SUMS (cosign; the identity is this workflow at the tag), a build provenance attestation of
 # every file, and a GitHub release whose notes are the CHANGELOG's section for the version. Then
 # the published release is installed the ways users install it (packaging/install.sh and the
-# GitHub Action) and run, so a broken release is caught at once.
+# GitHub Action) and run, so a broken release is caught at once, and the website is checked to
+# serve the release's schema and the docs the CLI links to.
 #
 # The archives are `isoloom-<target>.tar.gz` (`.zip` on Windows), each holding a folder
 # `isoloom-<target>/` with the binary, LICENSE, NOTICE, README.md and THIRD-PARTY-LICENSES.md.
@@ -320,3 +321,39 @@ jobs:
           set -eu
           isoloom --version | tr -d '\r' | grep -qx "isoloom ${TAG#v}"
           isoloom validate examples/hello-stack
+
+  # The website (its own repository) serves the docs generated from this repository's docs/ and
+  # the committed schema at its `$id`, deployed for the release (docs/dev/releasing.md, "Publish
+  # the website"). Once it is: every www.isoloom.com link the CLI and the schema print answers, and
+  # the served schema is schemas/spec-v1.schema.json. It polls for up to 40 minutes, so a deploy
+  # that follows the tag is waited for; a failure means users follow dead links: fix the website.
+  website:
+    needs: release
+    name: The website serves the schema and the CLI's doc links
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Schema and doc links
+        run: |
+          set -euo pipefail
+          schema_url=$(jq -r '."$id"' schemas/spec-v1.schema.json)
+          links=$(grep -rhoE 'https://www\.isoloom\.com/[^] )"`>\\#]*' crates/cli/isoloom/src crates/core/isoloom-spec/src/schema.rs | sort -u)
+          jq -S . schemas/spec-v1.schema.json > "$RUNNER_TEMP/committed.json"
+          check() {
+            for url in $links; do
+              curl -fsSL -o /dev/null "$url" || { echo "$url doesn't answer"; return 1; }
+            done
+            curl -fsSL "$schema_url" | jq -S . > "$RUNNER_TEMP/served.json" || { echo "$schema_url isn't JSON"; return 1; }
+            diff -q "$RUNNER_TEMP/committed.json" "$RUNNER_TEMP/served.json" >/dev/null \
+              || { echo "$schema_url isn't schemas/spec-v1.schema.json"; return 1; }
+          }
+          for _ in $(seq 40); do
+            if check; then echo "The website answers every link, with this release's schema."; exit 0; fi
+            sleep 60
+          done
+          echo "::error::the website doesn't serve this release's schema or the CLI's doc links (docs/dev/releasing.md)"
+          exit 1

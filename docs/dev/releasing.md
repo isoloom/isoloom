@@ -27,7 +27,12 @@ the tests, the API docs, the quality ratchet). A tag that fails it publishes not
 5. installs the published release with `packaging/install.sh` (Linux x86_64 and arm64, macOS) and
    with the Action (Linux, macOS, Windows), runs it, and checks the signature and the provenance
    as [verify a release](../guide/verify-a-release.md) says. A failure here means the published
-   release is broken: fix it with a patch release.
+   release is broken: fix it with a patch release;
+6. waits (up to 40 minutes) for the website to serve `schemas/spec-v1.schema.json` at its `$id`
+   (`https://www.isoloom.com/schema/v1.json`) and every `www.isoloom.com` page the CLI and the
+   schema link to (`/en/docs/configuration`, `/en/docs/spec`), and fails when one doesn't answer
+   or the served schema differs. A failure here means editors and `--help` point to stale or dead
+   pages: publish the website (below).
 
 The asset names (`isoloom-<target>.tar.gz`, `.zip` on Windows) are read by `install.sh`, the
 Action, cargo-binstall and the verification guide: change them together.
@@ -65,6 +70,24 @@ git tag -f vX vX.Y.Z && git push -f origin vX
 
 Publish Isoloom **before** the crates built on it (a runner, an app): they depend on Isoloom's
 crates from crates.io at this version.
+
+## Publish the website
+
+The website (its own repository) builds its docs from this repository's `docs/` and serves the
+committed schemas at their `$id`. The spec's `$id`, every example's modeline and the CLI's help
+link there, so a release isn't done until the website shows it:
+
+1. Once the tag is pushed, sync the website to the tag's `docs/` and `schemas/`, and deploy it.
+2. Check that the schema URL and the CLI's doc links answer:
+
+   ```sh
+   curl -fsSL https://www.isoloom.com/schema/v1.json | jq -S . | diff - <(jq -S . schemas/spec-v1.schema.json)
+   curl -fsS -o /dev/null https://www.isoloom.com/en/docs/configuration
+   curl -fsS -o /dev/null https://www.isoloom.com/en/docs/spec
+   ```
+
+`release.yml`'s `website` job runs the same check on every `www.isoloom.com` link in the CLI's
+and the schema's source, waiting for the deploy.
 
 ## The crates
 
@@ -112,6 +135,7 @@ To publish the crates without a tag, run **Publish crates** from the Actions tab
 
 - Check the release page: five archives, `isoloom.cdx.json`, `SHA256SUMS`,
   `SHA256SUMS.sigstore.json`, and the notes.
+- Check that `release.yml`'s `website` job passed ([publish the website](#publish-the-website)).
 - Bump the consumers (Isothrum's `isoloom-*` dependencies) when the run manifest or the supported
   API changed.
 - A security fix: publish the GitHub security advisory ([SECURITY.md](../../.github/SECURITY.md)).
