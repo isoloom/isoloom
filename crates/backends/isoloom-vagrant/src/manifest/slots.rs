@@ -1,7 +1,8 @@
 //! What a Vagrant run is given at run time: the params the Vagrantfile reads (the Hyper-V switch,
-//! the SSH proxy, the ESXi host, whether derived checks run), and the slots of the values it must
-//! never hold: the inputs and secrets its VMs get (read from the host's environment when Vagrant
-//! runs, by the steps that run provisioners) and the ESXi password.
+//! the SSH proxy, the ESXi host, whether derived checks run), the architecture Vagrant picks the
+//! boxes' builds for on ESXi, and the slots of the values it must never hold: the inputs and
+//! secrets its VMs get (read from the host's environment when Vagrant runs, by the steps that run
+//! provisioners) and the ESXi password.
 
 use std::collections::BTreeSet;
 
@@ -138,7 +139,32 @@ pub(super) fn remote_params() -> Result<Vec<Param>> {
         };
         out.push(param(&spec, StepSelection::Every)?);
     }
+    out.push(esxi_architecture()?);
     Ok(out)
+}
+
+/// The architecture Vagrant takes for the computer it runs on, which picks each box's build
+/// (`box_architecture`'s default, `:auto`): on ESXi, the ESXi host's, `amd64`. Vagrant itself
+/// runs here, but the VMs run on the ESXi host, which is x86-64: from an Apple Silicon Mac,
+/// Vagrant would otherwise take a box's arm64 build and upload it. Vagrant's own variable, not
+/// `box_architecture` in the provider's block: Vagrant looks a machine's box up before it applies
+/// a provider's overrides, so the box it found for this computer would stay; and the variable
+/// keeps Vagrant's fallback to the one build of a box that names no architecture (one published
+/// before Vagrant 2.4), which an explicit `amd64` refuses. An `arm64` machine is refused on ESXi.
+fn esxi_architecture() -> Result<Param> {
+    const VAR: &str = "VAGRANT_HOST_ARCHITECTURE";
+    let esxi = crate::vms::provider::ESXI_ARCH.id();
+    Ok(Param {
+        name: EnvName::parse(VAR)?,
+        description: "The architecture Vagrant picks each box's build for: the ESXi host's (x86-64), not this computer's.".into(),
+        default: Some(esxi.to_owned()),
+        values: vec![esxi.to_owned()],
+        required: false,
+        hosts: BTreeSet::new(),
+        providers: BTreeSet::from([Provider::VmwareEsxi]),
+        set_by: SetBy::Runner,
+        deliver: env_var(VAR, StepSelection::Every)?,
+    })
 }
 
 /// The steps that run the VMs' provisioners, which read the values given at launch: `up`, and

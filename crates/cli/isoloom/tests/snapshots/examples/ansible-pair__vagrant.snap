@@ -2034,6 +2034,27 @@ echo "isoloom-check: END $passed passed, $failed failed"
       ]
     },
     {
+      "name": "VAGRANT_HOST_ARCHITECTURE",
+      "description": "The architecture Vagrant picks each box's build for: the ESXi host's (x86-64), not this computer's.",
+      "default": "amd64",
+      "values": [
+        "amd64"
+      ],
+      "providers": [
+        "vmware_esxi"
+      ],
+      "set_by": "runner",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "VAGRANT_HOST_ARCHITECTURE",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
       "name": "ISOLOOM_DERIVED",
       "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
       "default": "1",

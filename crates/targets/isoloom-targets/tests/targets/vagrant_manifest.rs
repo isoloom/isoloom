@@ -4,7 +4,7 @@
 //! docker target's time rule, and an input left out is delivered empty. Every example's manifest
 //! is checked in `run_manifest`, with the docker target's.
 
-use isoloom_manifest::{Action, Delivery, Identity, Manifest, Provider, Role, Run};
+use isoloom_manifest::{Action, Delivery, Identity, Manifest, Provider, Role, Run, SetBy, StepSelection};
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
@@ -180,6 +180,35 @@ fn the_message_leaves_the_forwarded_port_to_the_runner() -> Outcome {
         m.environment.message.unwrap().to_string(),
         "The page answers at http://localhost:${published.web.web}/."
     );
+    Ok(())
+}
+
+/// Vagrant picks each box's build for the computer it runs on (`box_architecture`'s `:auto`),
+/// but ESXi's VMs run on the ESXi host, x86-64: from an Apple Silicon Mac, Vagrant took
+/// `bento/debian-12`'s arm64 build and uploaded it to an x86-64 ESXi, which `ovftool` refused.
+/// On ESXi, and there only, the runner gives every step Vagrant's `VAGRANT_HOST_ARCHITECTURE`
+/// as `amd64`: Vagrant then takes a box's amd64 build, or the one build of a box that names no
+/// architecture, as on an x86-64 computer.
+#[test]
+fn on_esxi_vagrant_picks_the_boxes_builds_for_the_esxi_hosts_amd64() -> Outcome {
+    let containers = "version: 1\nname: c\nnetworks:\n  lab: { cidr: 10.62.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: nginx } }\n";
+    let docker_vm = generate(&lab(containers)?, Target::DockerVm)?;
+    let docker_vm = isoloom_manifest::parse(file(&docker_vm, ".isoloom/docker-vm/run.json")?)?;
+    for m in [manifest(WEB_VM)?, manifest(MINI_AD)?, docker_vm] {
+        let arch = m
+            .params
+            .iter()
+            .find(|p| p.name.as_str() == "VAGRANT_HOST_ARCHITECTURE")
+            .ok_or("no VAGRANT_HOST_ARCHITECTURE param")?;
+        assert_eq!(arch.providers.iter().copied().collect::<Vec<_>>(), [Provider::VmwareEsxi]);
+        assert!(arch.hosts.is_empty());
+        assert_eq!((arch.default.as_deref(), arch.values.as_slice()), (Some("amd64"), &["amd64".to_owned()][..]));
+        assert_eq!(arch.set_by, SetBy::Runner);
+        let [Delivery::Env { var, steps }] = arch.deliver.as_slice() else {
+            panic!("one environment variable: {:?}", arch.deliver)
+        };
+        assert_eq!((var.as_str(), steps), ("VAGRANT_HOST_ARCHITECTURE", &StepSelection::Every));
+    }
     Ok(())
 }
 

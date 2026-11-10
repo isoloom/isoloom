@@ -84,7 +84,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.ports.*.publish` | a port reachable from the user's machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.ports.*.protocol = udp` | a UDP port | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.rate_limit` | a bandwidth cap on a machine's links | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `machines.*.hardware.arch = arm64` | a 64-bit ARM machine | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.hardware.arch = arm64` | a 64-bit ARM machine | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.hardware.tpm = required` | a virtual TPM 2.0 it can't run without | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
 | `machines.*.hardware.tpm = required` | a virtual TPM 2.0 a Windows machine can't run without | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.hardware.gpus` | GPUs, by count | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | – |
@@ -311,6 +311,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `cloud-docker`: target: machine `m`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)
 - `vagrant/utm`: provider: `m` is on a network, and vagrant_utm gives a VM no private network (it only forwards ports)
+- `vagrant/vmware_esxi`: provider: machine `m` is arm64 (`hardware.arch`), and ESXi runs x86-64 VMs only
 - `esxi`: target: machine `m`: ESXi runs x86-64 VMs only
 - `cloud-vm/aws`: cloud: machine `m`: arm64 on AWS comes later (Graviton instances and arm64 AMIs)
 - `cloud-vm/azure`: cloud: machine `m`: arm64 on Azure comes later (Arm-based sizes and arm64 images)

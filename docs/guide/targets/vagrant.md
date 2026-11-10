@@ -54,6 +54,25 @@ isothrum down . --target vagrant
 
 `docker-vm` is the same with `.isoloom/docker-vm/`.
 
+### A remote ESXi host
+
+The `vmware_esxi` provider runs the VMs on an ESXi host, which it reads from `ESXI_HOSTNAME` and
+`ESXI_PASSWORD` (and `ESXI_HOSTPORT`, `ESXI_USERNAME`, `ESXI_DATASTORE`, `ESXI_VIRTUAL_NETWORK`).
+Vagrant picks each box's build for the computer it runs on, but these VMs run on the ESXi host,
+which is x86-64. A runner sets Vagrant's `VAGRANT_HOST_ARCHITECTURE=amd64` on ESXi (the run
+manifest's param), so Vagrant takes each box's amd64 build, or the one build of an older box that
+names no architecture. Running Vagrant yourself from an ARM computer (an Apple Silicon Mac), set
+it too:
+
+```sh
+export VAGRANT_HOST_ARCHITECTURE=amd64
+vagrant up --provider=vmware_esxi
+```
+
+Without it, Vagrant downloads the boxes' arm64 builds, and `ovftool` fails to upload them to the
+host ("There was an OVF Tool error"). An arm64 build already in Vagrant's cache isn't used then.
+ESXi-Arm isn't supported: a machine with `hardware.arch: arm64` is refused on `vmware_esxi`.
+
 ## Networking and published ports
 
 Each spec network is a private network of the provider, with the spec's addresses. Forwarded

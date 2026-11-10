@@ -3,8 +3,8 @@
 //! (`refusal_on` with the provider) instead of ignoring it.
 
 use isoloom_manifest::{HostOs, Provider as ManifestProvider};
-use isoloom_plan::Environment;
-use isoloom_spec::model::{Spec, Target};
+use isoloom_plan::{Environment, MachineShape};
+use isoloom_spec::model::{Arch, Spec, Target};
 
 use super::{boot, bridged, hyperv, qemu, windows};
 
@@ -46,6 +46,11 @@ pub(crate) struct Known {
 }
 
 const EVERY_HOST: &[HostOs] = &[HostOs::Linux, HostOs::Macos, HostOs::Windows];
+
+/// The architecture of an ESXi host, which runs the VMs of `vmware_esxi` (not the computer
+/// Vagrant runs on): ESXi is x86-64 (ESXi-Arm is a rare, separate build Isoloom doesn't target).
+/// Vagrant picks the boxes' builds for it ([`crate::manifest`]'s `VAGRANT_HOST_ARCHITECTURE`).
+pub(crate) const ESXI_ARCH: Arch = Arch::Amd64;
 
 impl Provider<'static> {
     /// Every provider the Vagrantfile has a block for, in the order a runner offers them (the
@@ -150,7 +155,8 @@ impl<'a> Provider<'a> {
 /// --provider` names it), if they can't: a machine requiring a TPM the provider doesn't give,
 /// then QEMU's and UTM's networks, Hyper-V's boxes and libvirt's bridged networks, then a
 /// machine's own boot, which only libvirt (and QEMU, for UEFI's format) boots, then a machine's
-/// host folders, which Hyper-V and ESXi don't share (nor QEMU read-only).
+/// host folders, which Hyper-V and ESXi don't share (nor QEMU read-only), then a machine of
+/// another architecture than ESXi's on ESXi.
 #[must_use]
 pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
     let env = Environment::build(spec, Target::Vagrant, None);
@@ -159,6 +165,18 @@ pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
         .or_else(|| networks_refusal(&env, provider))
         .or_else(|| boot::refusal(&env, provider))
         .or_else(|| crate::host_folders::refusal(&env, provider))
+        .or_else(|| arch_refusal(&env, provider))
+}
+
+/// A VM ESXi can't run: one of another architecture than the ESXi host's ([`ESXI_ARCH`]).
+/// Every other provider runs its VMs on the computer Vagrant runs on, whose architecture
+/// Isoloom doesn't know when it writes the Vagrantfile.
+fn arch_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
+    if provider != Provider::VmwareEsxi {
+        return None;
+    }
+    let (name, mp) = env.machines.iter().find(|(_, mp)| mp.shape == MachineShape::Vm && mp.arch != ESXI_ARCH)?;
+    Some(format!("machine `{name}` is {} (`hardware.arch`), and ESXi runs x86-64 VMs only", mp.arch.id()))
 }
 
 /// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,

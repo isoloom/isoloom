@@ -1,5 +1,5 @@
 //! What the Vagrant target writes for one provider beyond the others: QEMU's hubs and disk
-//! sizes, UTM's missing private networks, VMware's nested virtualization.
+//! sizes, UTM's missing private networks, VMware's nested virtualization, ESXi's architecture.
 
 use isoloom_spec::Target;
 use isoloom_targets::{refusal, refusal_on};
@@ -170,5 +170,20 @@ fn on_utm_a_linux_vms_default_route_leaves_the_emulated_network_and_nothing_chan
         .find(|l| l.trim_start().starts_with("config.vm.provision"))
         .ok_or("no provisioner")?;
     assert!(dvm_first.contains("\"nat-route\""), "{dvm_first}");
+    Ok(())
+}
+
+/// An ESXi host is x86-64: an arm64 machine is refused there (a box's arm64 build, uploaded,
+/// never runs), and only there, since every other provider runs on the computer Vagrant runs on.
+#[test]
+fn esxi_refuses_an_arm64_machine() -> Outcome {
+    let arm = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    os: ubuntu@24.04\n    networks: { lab: 10 }\n    hardware: { arch: arm64 }\n    app: { steps: [{ run: p.sh }] }\n";
+    let spec = lab(arm)?;
+    let why = refusal_on(&spec, Target::Vagrant, Some("vmware_esxi")).ok_or("ESXi takes an arm64 machine")?;
+    assert_eq!(why, "machine `box` is arm64 (`hardware.arch`), and ESXi runs x86-64 VMs only");
+    for p in ["virtualbox", "vmware_desktop", "parallels", "libvirt", "qemu"] {
+        assert_eq!(refusal_on(&spec, Target::Vagrant, Some(p)), None, "{p}");
+    }
+    assert_eq!(refusal_on(&lab(THREE)?, Target::Vagrant, Some("vmware_esxi")), None);
     Ok(())
 }
