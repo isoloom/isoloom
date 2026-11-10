@@ -276,8 +276,14 @@ fn profiles_lists_and_checks_each_profile() -> Outcome {
 
     std::fs::remove_file(dir.join("profiles/typo.yml"))?;
     std::fs::remove_file(dir.join("profiles/nowhere.yml"))?;
+    std::fs::write(dir.join("profiles/Bank_FR.yml"), "{}\n")?;
     let json = isoloom(&home, &[&"profiles", &dir, &"--json"])?;
     assert_eq!(json.code, Some(0), "{json:?}");
+    assert!(
+        json.stderr.contains("Bank_FR.yml is skipped: a profile's file name is kebab-case"),
+        "{}",
+        json.stderr
+    );
     let v: serde_json::Value = serde_json::from_str(&json.stdout)?;
     assert_eq!(v[0]["name"], "big");
     assert_eq!(v[0]["target"], "vagrant");

@@ -147,7 +147,9 @@ fn profiles_are_listed_and_found_by_name() -> Outcome {
     let dir = project("list", &[("b-site", "{}\n"), ("a-site", "{}\n")])?;
     std::fs::write(dir.join(profile::DIR).join("Not_A_Name.yml"), "{}\n")?;
     std::fs::write(dir.join(profile::DIR).join("notes.txt"), "")?;
-    assert_eq!(profile::list(&dir), ["a-site", "b-site"]);
+    let listed = profile::list(&dir)?;
+    assert_eq!(listed.names, ["a-site", "b-site"]);
+    assert_eq!(listed.skipped, [dir.join(profile::DIR).join("Not_A_Name.yml")], "said, not dropped");
     let missing = profile::load(&dir, "c-site").unwrap_err().to_string();
     assert!(missing.contains("no profile `c-site`") && missing.contains("a-site, b-site"), "{missing}");
     assert!(profile::load(&dir, "../etc").unwrap_err().to_string().contains("kebab-case"));
@@ -158,6 +160,22 @@ fn profiles_are_listed_and_found_by_name() -> Outcome {
     assert!(profile::load(&dir, &"a".repeat(63)).unwrap_err().to_string().contains("no profile"));
     std::fs::write(dir.join(profile::DIR).join("a-site.yaml"), "{}\n")?;
     assert!(profile::load(&dir, "a-site").unwrap_err().to_string().contains("keep one"));
-    assert_eq!(profile::list(Path::new("/nonexistent")), Vec::<String>::new());
+    assert_eq!(profile::list(Path::new("/nonexistent"))?, profile::Listed::default());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_profiles_folder_that_cant_be_read_is_an_error_not_no_profiles() -> Outcome {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = project("unreadable", &[("a-site", "{}\n")])?;
+    let folder = dir.join(profile::DIR);
+    std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o000))?;
+    let listed = profile::list(&dir);
+    std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755))?;
+    // Root reads any folder: nothing to show there.
+    let Err(e) = listed else { return Ok(()) };
+    let e = e.to_string();
+    assert!(e.starts_with("can't read ") && e.contains("profiles"), "{e}");
     Ok(())
 }

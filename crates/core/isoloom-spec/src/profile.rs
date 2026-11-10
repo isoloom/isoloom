@@ -84,7 +84,8 @@ fn valid_name(name: &str) -> bool {
 /// # Errors
 ///
 /// [`Error::ProfileName`] for a name that isn't kebab-case, [`Error::NoProfile`] (with the
-/// project's profiles) when there is no such file, [`Error::TwoProfiles`] when both exist.
+/// project's profiles) when there is no such file, [`Error::TwoProfiles`] when both exist, and
+/// [`Error::Read`] when the profiles folder can't be listed.
 pub(crate) fn path(project: &Path, name: &str) -> Result<PathBuf> {
     if !valid_name(name) {
         return Err(Error::ProfileName(name.to_owned()));
@@ -99,30 +100,52 @@ pub(crate) fn path(project: &Path, name: &str) -> Result<PathBuf> {
         [] => Err(Error::NoProfile {
             name: name.to_owned(),
             folder: project.join(DIR),
-            known: list(project),
+            known: list(project)?.names,
         }),
         _ => Err(Error::TwoProfiles { name: name.to_owned() }),
     }
 }
 
-/// The profiles of a project, by name, sorted.
-#[must_use]
-pub fn list(project: &Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(project.join(DIR)) else { return vec![] };
-    let mut names: Vec<String> = entries
-        .filter_map(|e| {
-            let p = e.ok()?.path();
-            let ext = p.extension()?.to_str()?;
-            if !p.is_file() || !["yml", "yaml"].contains(&ext) {
-                return None;
-            }
-            let stem = p.file_stem()?.to_str()?.to_owned();
-            valid_name(&stem).then_some(stem)
-        })
-        .collect();
-    names.sort();
-    names.dedup();
-    names
+/// A project's profiles, as [`list`] finds them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Listed {
+    /// The profiles, by name, sorted.
+    pub names: Vec<String>,
+    /// The YAML files of the profiles folder that aren't a profile, their name not kebab-case
+    /// (`profiles/Bank_FR.yml`): `--profile` can't name them, so a listing says they are skipped.
+    pub skipped: Vec<PathBuf>,
+}
+
+/// The profiles of a project: none when it has no profiles folder.
+///
+/// # Errors
+///
+/// [`Error::Read`] when the profiles folder, or an entry of it, can't be read.
+pub fn list(project: &Path) -> Result<Listed> {
+    let folder = project.join(DIR);
+    let unreadable = |source| Error::Read { path: folder.clone(), source };
+    let entries = match std::fs::read_dir(&folder) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Listed::default()),
+        Err(e) => return Err(unreadable(e)),
+    };
+    let mut listed = Listed::default();
+    for entry in entries {
+        let p = entry.map_err(unreadable)?.path();
+        let yaml = p.extension().and_then(|e| e.to_str()).is_some_and(|e| ["yml", "yaml"].contains(&e));
+        if !p.is_file() || !yaml {
+            continue;
+        }
+        match p.file_stem().and_then(|s| s.to_str()).filter(|stem| valid_name(stem)) {
+            Some(stem) => listed.names.push(stem.to_owned()),
+            None => listed.skipped.push(p),
+        }
+    }
+    listed.names.sort();
+    listed.names.dedup();
+    listed.skipped.sort();
+    Ok(listed)
 }
 
 /// Reads `profiles/<name>.yml` in `project`.

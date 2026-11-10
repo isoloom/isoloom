@@ -17,7 +17,14 @@ struct Checked {
 /// Lists each profile with its problems; a no when one has any.
 pub(crate) fn run(a: &Listing, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
-    let out: Vec<Checked> = isoloom_spec::profile::list(dir).iter().map(|name| check(dir, name, &a.settings)).collect();
+    let listed = isoloom_spec::profile::list(dir)?;
+    for file in &listed.skipped {
+        console.note(format_args!(
+            "warning: {} is skipped: a profile's file name is kebab-case, as `--profile` names it\n",
+            file.display()
+        ))?;
+    }
+    let out: Vec<Checked> = listed.names.iter().map(|name| check(dir, name, &a.settings)).collect();
     let failed = out.iter().any(|c| !c.problems.is_empty());
     if a.json {
         let items: Vec<serde_json::Value> = out
