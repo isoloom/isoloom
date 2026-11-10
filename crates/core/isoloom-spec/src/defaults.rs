@@ -15,6 +15,7 @@
 //! for one run.
 //!
 //! ```yaml
+//! # ~/.isoloom/defaults.yml
 //! images:                 # the image table (see Images): OS images, the access machine
 //!   os: { "debian@12": { vagrant: my-org/debian-12 } }
 //!   access: { docker: registry.example.com/workstation:1, vm: ubuntu@24.04 }

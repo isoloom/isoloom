@@ -7,7 +7,7 @@
 //!
 //! ```yaml
 //! # profiles/bank-fr.yml
-//! description: Bank, Paris site: Proxmox, no internet
+//! description: "Bank, Paris site: Proxmox, no internet"
 //! target: proxmox                     # the target this profile runs on
 //! spec:                               # merged into the spec, as -s would
 //!   networks: { lan: { internet: false } }

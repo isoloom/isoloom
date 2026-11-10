@@ -1,6 +1,7 @@
 //! The user documentation stays true: docs/spec.md is what `isoloom docs --spec` prints, every
-//! spec in the docs (a YAML block whose first line is `# isoloom.yml`) validates, and every link
-//! between the docs reaches a file and, with an anchor, a heading in it.
+//! spec in the docs (a YAML block whose first line is `# isoloom.yml`) validates, every
+//! configuration file the docs and the crate's own docs show is read as that file is, and every
+//! link between the docs reaches a file and, with an anchor, a heading in it.
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -88,6 +89,97 @@ fn every_spec_in_the_docs_validates() -> Outcome {
         }
     }
     assert!(seen >= 1, "no spec found: mark a spec's block with `# isoloom.yml` as its first line");
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    Ok(())
+}
+
+/// The configuration file a block's first line names (`# images.yml`, `# isoloom.defaults.yml`,
+/// `# profiles/<name>.yml`), checked as that file is read; `None` for another block.
+fn config_problem(first: &str, body: &str) -> Option<Result<(), String>> {
+    let file = first.trim().strip_prefix("# ")?;
+    let checked = if file.ends_with("defaults.yml") {
+        serde_yaml_ng::from_str(body).map_err(|e| e.to_string()).and_then(|value| {
+            let layer = isoloom_spec::defaults::Layer {
+                source: file.to_owned(),
+                value,
+            };
+            isoloom_spec::defaults::resolve(&[layer]).map(drop).map_err(|e| e.to_string())
+        })
+    } else if file == "images.yml" {
+        isoloom_spec::images::Table::parse(body).map(drop).map_err(|e| e.to_string())
+    } else {
+        let name = file.strip_prefix("profiles/").and_then(|f| f.strip_suffix(".yml"))?;
+        isoloom_spec::profile::parse(name, PathBuf::from(file), body)
+            .map(drop)
+            .map_err(|e| e.to_string())
+    };
+    Some(checked)
+}
+
+/// The YAML blocks of the spec crate's own docs (`//!` and `///` comments), as a page's.
+fn rustdoc_blocks() -> Outcome<Vec<(String, usize, String)>> {
+    let mut out = Vec::new();
+    let mut dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("src")];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let docs: String = std::fs::read_to_string(&path)?
+                    .lines()
+                    .map(|l| {
+                        let l = l.trim_start();
+                        l.strip_prefix("//! ")
+                            .or_else(|| l.strip_prefix("/// "))
+                            .unwrap_or(if l == "//!" || l == "///" { "" } else { "\u{0}" })
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                out.extend(
+                    blocks(&docs)
+                        .into_iter()
+                        .map(|(info, line, body)| (info, line, format!("{}: {body}", shown(&path)))),
+                );
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Every configuration file the docs and the spec crate's own docs show (a YAML block whose first
+/// line names it: `# images.yml`, `# ~/.isoloom/defaults.yml`, `# profiles/<name>.yml`) is read
+/// as that file is: the defaults module's example once had an OS name the image table refuses.
+#[test]
+fn every_configuration_file_in_the_docs_is_read() -> Outcome {
+    let mut found = Vec::new();
+    for page in pages()? {
+        let text = std::fs::read_to_string(&page)?;
+        found.extend(
+            blocks(&text)
+                .into_iter()
+                .map(|(info, line, body)| (info, format!("{}:{line}", shown(&page)), body)),
+        );
+    }
+    for (info, line, labelled) in rustdoc_blocks()? {
+        let (file, body) = labelled.split_once(": ").ok_or("a labelled block")?;
+        found.push((info, format!("{file}:{line}"), body.to_owned()));
+    }
+    let mut problems = Vec::new();
+    let mut seen = 0;
+    for (info, at, body) in found {
+        if !matches!(info.as_str(), "yaml" | "yml") {
+            continue;
+        }
+        let Some(checked) = body.lines().next().and_then(|first| config_problem(first, &body)) else {
+            continue;
+        };
+        seen += 1;
+        if let Err(e) = checked {
+            problems.push(format!("{at}: {e}"));
+        }
+    }
+    assert!(seen >= 6, "{seen} configuration files found");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
     Ok(())
 }

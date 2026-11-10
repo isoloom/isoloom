@@ -14,6 +14,7 @@ use crate::{Error, Result};
 /// machine (under `overrides:`):
 ///
 /// ```yaml
+/// # images.yml
 /// os:                     # an OS's image, instead of the built-in one
 ///   debian@12: { vagrant: my-org/debian-12, vagrant_version: "1.2.0" }
 /// access:                 # the access machine, when the spec leaves it to the runner

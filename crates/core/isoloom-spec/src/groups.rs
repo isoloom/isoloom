@@ -3,20 +3,18 @@
 //!
 //! ```yaml
 //! common:
-//!   vm: { os: debian@12 }
+//!   os: debian@12
 //!   resources: { cpus: 2, memory_mb: 2048 }
 //! groups:
 //!   servers:
 //!     members: [dc01, dc02, srv02]        # machine names, globs (ws*), other groups
-//!     vm: { os: windows-server@2019 }
+//!     os: windows-server@2019
 //! ```
 //!
 //! Any field a group may share deep-merges into its members: a machine's own value wins over
 //! its groups', a group's over `common:`, and between groups the most specific one (a group
-//! that is a member of another) wins; otherwise the later declared. `docker:` and `vm:` only
-//! complete an implementation the machine declares itself (even as `vm: {}`), so a shared
-//! `vm:` never turns a machine into a VM it wasn't. Groups also become Ansible inventory
-//! groups, which a provisioner's playbook can target.
+//! that is a member of another) wins; otherwise the later declared. Groups also become Ansible
+//! inventory groups, which a provisioner's playbook can target.
 //!
 //! Expansion happens on the YAML before the spec is parsed, so every reader of a `Spec` sees
 //! finished machines; the typed `common` and `groups` stay in the spec for validation, the
