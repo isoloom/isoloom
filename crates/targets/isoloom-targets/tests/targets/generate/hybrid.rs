@@ -64,7 +64,10 @@ fn the_containers_host_is_set_up_as_docker_vm_s_vm() -> Outcome {
     let docker_vm = file(&generate(&example("hello-stack")?, Target::DockerVm)?, "docker-vm/Vagrantfile")?.to_owned();
     for (name, kind) in [("project", "isoloom_project"), ("docker", "shell")] {
         assert!(hybrid.contains(&format!("m.vm.provision \"{name}\", type: \"{kind}\"")), "{name}: {hybrid}");
-        assert!(docker_vm.contains(&format!("config.vm.provision \"{name}\", type: \"{kind}\"")), "{name}: {docker_vm}");
+        assert!(
+            docker_vm.contains(&format!("config.vm.provision \"{name}\", type: \"{kind}\"")),
+            "{name}: {docker_vm}"
+        );
     }
     for v in [&hybrid, &docker_vm] {
         assert!(v.contains("isoloom-published.service"), "{v}");

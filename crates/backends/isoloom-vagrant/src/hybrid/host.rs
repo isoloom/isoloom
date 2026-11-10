@@ -10,8 +10,8 @@ use isoloom_spec::linux::PROJECT_DIR;
 use isoloom_spec::model::Target;
 use isoloom_spec::validate::Cidr;
 
-use crate::error::{Error, Result};
 use crate::docker_host;
+use crate::error::{Error, Result};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 

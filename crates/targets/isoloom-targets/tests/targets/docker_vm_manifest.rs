@@ -157,7 +157,9 @@ fn the_flag_reaches_the_start_steps_and_is_accepted_in_the_vm_never_written() ->
     let vagrantfile = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
     assert!(vagrantfile.contains("config.ssh.forward_env = [\"DEMO_SECRET\"]"), "{vagrantfile}");
     assert!(
-        vagrantfile.contains("echo \\\"AcceptEnv DEMO_SECRET\\\" > /etc/ssh/sshd_config.d/isoloom-env.conf && (systemctl reload ssh || systemctl reload sshd || true)"),
+        vagrantfile.contains(
+            "echo \\\"AcceptEnv DEMO_SECRET\\\" > /etc/ssh/sshd_config.d/isoloom-env.conf && (systemctl reload ssh || systemctl reload sshd || true)"
+        ),
         "{vagrantfile}"
     );
     let main = file(&files, ".isoloom/docker-vm/proxmox/main.tf")?;

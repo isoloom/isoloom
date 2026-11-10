@@ -198,9 +198,7 @@ pub(super) fn ansible_files(family: Family) -> Res<Vec<GeneratedFile>> {
     }
     files.push(GeneratedFile {
         path: "site.yml".to_owned(),
-        contents: format!(
-            "- name: Conformance\n  hosts: all\n  gather_facts: false\n  vars:\n    isoloom_project: /opt/isoloom\n  roles:\n    - {role}\n"
-        ),
+        contents: format!("- name: Conformance\n  hosts: all\n  gather_facts: false\n  vars:\n    isoloom_project: /opt/isoloom\n  roles:\n    - {role}\n"),
     });
     Ok(files)
 }
