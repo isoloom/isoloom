@@ -185,8 +185,9 @@ Isoloom doesn't know your prices and bills nothing. What it gives you to keep co
   `g6-nanode-1` and up). The controller, on every network, gets an interface on each. Oracle's
   `VM.Standard.E4.Flex` is sized to fit: an OCPU per two CPUs or per 8 GB, whichever is more. A
   machine bigger than a cloud's largest size is refused, not silently shrunk. `cloud-docker` sizes its one VM from the
-  containers' total, and the size is a module variable (`instance_type`, `size`, `machine_type`
-  or `type`). `isoloom resources` adds up what the machines ask for.
+  containers' total memory, and the size is a module variable (`instance_type`, `size`,
+  `machine_type` or `type`), except on Oracle Cloud, whose shape takes its OCPUs and memory from
+  that total, with no variable. `isoloom resources` adds up what the machines ask for.
 - **Expiry.** A run manifest carries an expiry (240 minutes by default; `isothrum up --lifetime`
   changes it). The runner sets `expires_at`: every resource is tagged `isoloom-expires-at`, and the
   machines shut themselves down at that time (an AWS `cloud-vm` instance that shuts itself down is

@@ -112,8 +112,8 @@ jobs:
           echo "ISOTHRUM_HOME=$RUNNER_TEMP/isothrum-home" >> "$GITHUB_ENV"
 
       # The node's SSH key (cloud-init snippets are uploaded over SSH), a key for this run's VMs,
-      # and the cluster's layout from repository variables; an unset one keeps the module's default
-      # (node `pve`, `local-lvm`, `local`, `vmbr0`).
+      # and the cluster's layout from repository variables: the node (the module has no default),
+      # and the others, an unset one keeping the module's default (`local-lvm`, `local`, `vmbr0`).
       - name: Cluster
         env:
           SSH_KEY: ${{ secrets.PROXMOX_SSH_PRIVATE_KEY }}

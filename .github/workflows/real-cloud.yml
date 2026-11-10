@@ -140,20 +140,15 @@ jobs:
         timeout-minutes: 10
         run: isoloom generate --target "$TARGET" -s "defaults.cloud.aws.region=$AWS_REGION" "examples/$EXAMPLE"
 
-      # The budget guard as Terraform variables: the smallest instance that runs the example
-      # (overridable), the expiry tag the reaper reads, a machine that stops itself, SSH open to this
-      # runner only, and a key for this run only.
+      # The budget guard as Terraform variables: the expiry the reaper reads and the machines shut
+      # themselves down at, SSH open to this runner only, and a key for this run only.
       - name: Budget guard
         if: env.REAP_ONLY != 'true'
-        env:
-          AWS_SIZE: ${{ vars.REAL_AWS_SIZE || 't3.small' }}
         run: |
           ssh-keygen -q -t ed25519 -N '' -C "isoloom-ci-$GITHUB_RUN_ID" -f "$RUNNER_TEMP/id_ed25519"
           {
-            echo "TF_VAR_instance_type=$AWS_SIZE"
             echo "TF_VAR_region=$AWS_REGION"
             echo "TF_VAR_expires_at=$(( $(date +%s) + MAX_HOURS * 3600 ))"
-            echo "TF_VAR_auto_stop_minutes=100"
             echo "TF_VAR_allowed_cidr=$(curl -fsS --retry 3 https://checkip.amazonaws.com)/32"
             echo "TF_VAR_ssh_public_key=$(cat "$RUNNER_TEMP/id_ed25519.pub")"
             echo "TF_VAR_ssh_private_key_file=$RUNNER_TEMP/id_ed25519"

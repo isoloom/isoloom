@@ -63,11 +63,11 @@ The budget guard caps spend and guarantees teardown:
 | Variable | Default | Meaning |
 |---|---|---|
 | `REAL_AWS_REGION` | `eu-west-3` | Region the lab runs in |
-| `REAL_AWS_SIZE` | `t3.small` | Smallest instance that runs the example |
 | `REAL_CLOUD_MAX_HOURS` | `3` | Expiry tag lifetime; also the runner lifetime passed to `isothrum up --lifetime` |
 
-On top of the cap, every instance is tagged to expire, told to stop itself after 100 minutes, and
-opened for SSH only to the runner's own IP with a key made for that run. `down` always runs; if it
+Each machine's size is the module's own (the smallest that takes what the example asks for). On
+top of the cap, every instance is tagged to expire and shuts itself down then, and is opened for
+SSH only to the runner's own IP with a key made for that run. `down` always runs; if it
 fails or is cancelled, `isothrum reap aws --region <r>` destroys the account's expired runs and
 fails loudly if anything untracked is left. The job can also be dispatched with `reap_only: true` to
 sweep leftovers without bringing anything up. The best cost control is a hard AWS Budgets action on
@@ -85,8 +85,9 @@ Secrets are repository secrets; nothing is written into the checkout.
 | `PROXMOX_VE_API_TOKEN` | API token (`user@realm!tokenid=uuid`) |
 | `PROXMOX_SSH_PRIVATE_KEY` | Private key for the node, for uploading cloud-init snippets over SSH |
 
-Cluster layout comes from repository variables, each optional (an unset one keeps the module's
-default — node `pve`, `local-lvm`, `local`, `vmbr0`): `PROXMOX_NODE`, `PROXMOX_DATASTORE`,
+Cluster layout comes from repository variables: `PROXMOX_NODE`, the node the VMs go on (required:
+the module has no default), and these, each optional (an unset one keeps the module's default —
+`local-lvm`, `local`, `vmbr0`): `PROXMOX_DATASTORE`,
 `PROXMOX_IMAGE_DATASTORE`, `PROXMOX_SNIPPETS_DATASTORE`, `PROXMOX_UPLINK_BRIDGE`,
 `PROXMOX_SSH_USERNAME`, `PROXMOX_SSH_ADDRESS`, `PROXMOX_INSECURE`.
 

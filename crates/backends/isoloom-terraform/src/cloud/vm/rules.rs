@@ -408,8 +408,8 @@ pub(crate) struct Rules {
 
 impl Rules {
     /// The first feature the environment asks for and the cloud can't give, in this order: its
-    /// limits, GPUs, nesting, a size, a network's MTU, IPv6 addresses it doesn't pick, data
-    /// disks.
+    /// limits, GPUs, nesting, a size (CPUs, memory, disk, interfaces: [`Rules::size`]), a
+    /// network's MTU, IPv6 addresses it doesn't pick, data disks.
     pub(crate) fn features(&self, env: &Environment) -> Option<String> {
         self.limits
             .refusal(env)
