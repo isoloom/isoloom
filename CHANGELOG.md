@@ -299,11 +299,12 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   crate-internal, below).
 - The tier list's evidence notes (`isoloom targets --json`, `isoloom matrix --json`) name no
   particular runner or build of one: "re-validated end to end through a runner".
-- **Every Terraform module describes `ssh_public_key` the same way** ("The SSH public key the
-  machines let in: whoever holds its private key signs in, as the runner (run.json) does to
-  deliver the project and run the checks"), from one definition: the Proxmox and ESXi modules
-  each had their own ("Installed for the user `isoloom`..."). It stays required on the clouds and
-  ESXi and empty by default on Proxmox.
+- **Every Terraform module describes `ssh_public_key` from one definition** ("The SSH public key
+  the machines let in: whoever holds its private key signs in, ..."), which ends with who does:
+  the runner (run.json), to deliver the project and run the checks, on the clouds and Proxmox;
+  Terraform itself, to set the machines up, on ESXi, which writes no run manifest. The Proxmox
+  and ESXi modules each had their own ("Installed for the user `isoloom`..."). It stays required
+  on the clouds and ESXi and empty by default on Proxmox.
 - **`esxi` refuses a secret's or an input's value as a file** (`files: [{ path, secret }]`,
   `files: [{ path, input }]`): its machine waited for a runner to deliver the value, and ESXi
   writes no run manifest yet, so the apply failed after half an hour. The capability matrix says
@@ -574,8 +575,9 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `isoloom_targets::resolved::{render_message_at, HostPort}`. `isoloom_terraform::hcl_builder`
   (use `hcl_quote`), `isoloom_targets::tiers::os_id` and the `isoloom_render::more_addresses`
   re-export are crate-internal.
-- **Library items nothing outside their crate used** (this round): the HCL builder moved from
-  `isoloom-render` into `isoloom-terraform` (`isoloom_terraform::hcl_builder`), Ruby's quoting
+- **Library items nothing outside their crate used**: the HCL builder moved from
+  `isoloom-render` into `isoloom-terraform`, crate-internal (`isoloom_terraform::hcl_quote`
+  quotes a string), Ruby's quoting
   into `isoloom-vagrant` (`isoloom_vagrant::ruby_quote`); `isoloom_render::configure::{powershell,
   shell}`, `boot::{service, Kind}` and further render, plan, spec, ansible and targets functions
   are crate-internal; `isoloom_plan`'s `lab`, `outside`, `requirements` and `storage` modules
@@ -628,22 +630,21 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   configure::unstarted, checks::HTTP_MAX_REDIRECTS}`, `isoloom_manifest::SUPPORTED_VERSION`,
   `isoloom_render::{configure::{rendered_path, uses_library, cloud_init::gz_b64},
   constraints::linux_prelude, inventory::host_value, ipv6::egress_rule, trunks::vm_commands,
-  secrets::{DELIVERY_TIMEOUT, PLACE_SERVICE, windows::{BOOTSTRAP, place_first}},
-  hcl_builder::WIDTH}`, `isoloom_spec::{Host::text_vars, model::{mapping_id, DEFAULT_FILE_MODE,
+  secrets::{DELIVERY_TIMEOUT, PLACE_SERVICE, windows::{BOOTSTRAP, place_first}}}`, `isoloom_spec::{Host::text_vars, model::{mapping_id, DEFAULT_FILE_MODE,
   SECRETS_DIR, TOOL_RECIPES, ULIMITS}, syntax::placeholder::Reference::is_run_time, validate::{DOCKER_BLOCK,
   CONTAINER_SYSCTLS}}` and `isoloom_targets::{Matrix::column_tiers,
   resolved::with_published}`; `Row::used_by` is the matrix tests' only. The cloud user-data caps
   (`isoloom_render::configure::cloud_init::{Limit, TooBig}`) moved into `isoloom-terraform`,
   crate-internal.
 - **Library items nothing outside their crate used** (no dependent crate either):
-  `Placeholder::root`, `isoloom_spec::syntax::reboots`, `Problem::section` (both the syntax's and
+  `isoloom_spec::syntax::reboots`, `Problem::section` (both the syntax's and
   validation's) are gone; `Lab::lowered`, the runner's side of secret delivery
   (`isoloom_render::secrets::receive`, `secrets::windows::{receive, powershell_args, input}`) and
   the matrix's `Authored` and `Matrix::cell` are test-only; `isoloom_targets::decision`, the
   matrix's `columns`, `rows`, `Row` and `Cell`, `isoloom_render::configure::supervisor`,
   `isoloom_plan::ansible`, `PortKind::tls`, `isoloom_render::secrets::KEPT_DIR` (and Windows'),
   the configure libraries' `LIBRARY`, `LIBRARY_PATH` and `library_file`,
-  `hcl_builder::Template::is_text` and `network::trunks::vms` (the Linux VMs' set-up reads it)
+  `network::trunks::vms` (the Linux VMs' set-up reads it)
   are crate-internal; `isoloom_spec::derive`, `isoloom_spec::model::after_drive`,
   `isoloom_catalogue::value_file` and `isoloom_plan::configure::codename` leave their re-exports.
 
