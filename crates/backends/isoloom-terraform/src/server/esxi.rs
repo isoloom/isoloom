@@ -45,14 +45,13 @@ mod outside;
 mod router;
 mod windows;
 
-use isoloom_plan::{Capabilities, Environment, Feature};
+use isoloom_plan::{Capabilities, Environment, Feature, Vm};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
 
 use super::Parts;
 use crate::limits::Limits;
-use crate::machine::vms;
 use crate::module::{ProjectCopy, Usage};
 use crate::server::PinnedImage;
 
@@ -135,9 +134,9 @@ fn interfaces(env: &Environment) -> Option<String> {
             env.networks.len()
         ));
     }
-    vms(env)
-        .find(|(_, mp)| mp.addresses.len() + mp.outside.len() > MAX_NICS)
-        .map(|(name, _)| format!("machine `{name}`: an ESXi VM has at most {MAX_NICS} network interfaces"))
+    env.vms()
+        .find(|Vm { plan: mp, .. }| mp.addresses.len() + mp.outside.len() > MAX_NICS)
+        .map(|Vm { name, .. }| format!("machine `{name}`: an ESXi VM has at most {MAX_NICS} network interfaces"))
 }
 
 /// The `esxi` backend.

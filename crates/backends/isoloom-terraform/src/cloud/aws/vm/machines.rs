@@ -4,7 +4,7 @@
 use crate::cloud::user_data_limit::Limit;
 use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Module, Template, binary, boolean, call, list, number, object, reference, string};
 use crate::machine::controller::WinrmAuth;
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::network::{controller_group, security_group};
 use super::{RULES, addresses, image_user, machine_type, nesting};
@@ -40,42 +40,40 @@ pub(super) fn public_ip(env: &Environment, name: &str) -> Expression {
     }
 }
 
-/// The machine's AMI: its own (`vm.image.aws`), else the one looked up for its OS.
-fn ami(mp: &MachinePlan) -> Expression {
-    own_image::of(mp, own_image::aws).map_or_else(
-        || reference(&format!("data.aws_ami.{}.id", ident(mp.os.as_deref().unwrap_or_default()))),
-        string,
-    )
+/// The VM's AMI: its own (`vm.image.aws`), else the one looked up for its OS.
+fn ami(vm: Vm<'_>) -> Expression {
+    own_image::of(vm.plan, own_image::aws).map_or_else(|| reference(&format!("data.aws_ami.{}.id", ident(vm.os))), string)
 }
 
 /// A Linux machine: its security group, its instance, set up from its user data.
-pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
+pub(super) fn linux(env: &Environment, vm: Vm<'_>, m: &mut Module) -> Result<()> {
+    let Vm { name, plan: mp, os } = vm;
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
     let instance = ec2_instance(&id)
-        .add_attribute(("ami", ami(mp)))
+        .add_attribute(("ami", ami(vm)))
         .add_attribute(("instance_type", string(machine_type(mp))))
         .add_blocks(disks::aws(&mp.disks));
     // A looked-up AMI says whether it has NitroTPM; an own AMI is the author's to choose.
-    let tpm_ami = (mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none()).then(|| ident(mp.os.as_deref().unwrap_or_default()));
+    let tpm_ami = (mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none()).then(|| ident(os));
     let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
-    let user = image_user(mp.os.as_deref().unwrap_or_default());
+    let user = image_user(os);
     let instance = nesting(instance, mp)
         .add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot, CAP)?))
         .add_block(lifecycle("user_data_base64", tpm_ami.as_deref()));
     if addresses::needs_interfaces(mp) {
-        m.blocks(several_networks((name, mp), instance));
+        m.blocks(several_networks(vm, instance));
     } else {
-        m.block(one_network((name, mp), instance));
+        m.block(one_network(vm, instance));
     }
     Ok(())
 }
 
 /// A Linux machine's root disk: what its spec asks for (the default otherwise), at least what its
 /// image needs (AWS refuses a volume smaller than the image's snapshot).
-fn root_disk_gb(mp: &MachinePlan) -> u32 {
+fn root_disk_gb(Vm { plan: mp, os, .. }: Vm<'_>) -> u32 {
     let wanted = mp.size().disk_gb;
-    let image = own_image::of(mp, own_image::aws).map_or_else(|| super::image_min_disk_gb(mp.os.as_deref().unwrap_or_default()), |_| 0);
+    let image = own_image::of(mp, own_image::aws).map_or_else(|| super::image_min_disk_gb(os), |_| 0);
     wanted.max(image)
 }
 
@@ -100,7 +98,8 @@ fn lifecycle(attribute: &str, tpm_ami: Option<&str>) -> Block {
 }
 
 /// The instance on its network, at its address.
-fn one_network((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Block {
+fn one_network(vm: Vm<'_>, instance: BlockBuilder) -> Block {
+    let Vm { name, plan: mp, .. } = vm;
     let id = ident(name);
     let Some((net, addr)) = mp.addresses.first() else { return instance.build() };
     // A gateway forwards traffic that isn't its own.
@@ -116,7 +115,7 @@ fn one_network((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Bloc
         .add_attribute(("associate_public_ip_address", boolean(true)))
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
         .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
-        .add_block(root_disk(root_disk_gb(mp)))
+        .add_block(root_disk(root_disk_gb(vm)))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
         .build()
 }
@@ -124,7 +123,8 @@ fn one_network((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Bloc
 /// An interface per network at its address (source/destination check off, so a reply can leave
 /// from the interface of the network it's for), the instance on the first, the others attached,
 /// and an Elastic IP on the first.
-fn several_networks((name, mp): (&str, &MachinePlan), instance: BlockBuilder) -> Vec<Block> {
+fn several_networks(vm: Vm<'_>, instance: BlockBuilder) -> Vec<Block> {
+    let Vm { name, plan: mp, .. } = vm;
     let id = ident(name);
     let group = reference(&format!("aws_security_group.{id}.id"));
     let mut out: Vec<Block> = mp
@@ -141,7 +141,7 @@ fn several_networks((name, mp): (&str, &MachinePlan), instance: BlockBuilder) ->
         instance
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
             .add_block(primary(&first))
-            .add_block(root_disk(root_disk_gb(mp)))
+            .add_block(root_disk(root_disk_gb(vm)))
             .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
             .build(),
     );
@@ -194,7 +194,8 @@ fn mac(nic: &str) -> Expression {
 
 /// A Windows machine: its security group, its instance (the administrator and WinRM at first
 /// boot), its set-up over WinRM.
-pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+pub(super) fn windows(env: &Environment, vm: Vm<'_>, m: &mut Module) {
+    let Vm { name, plan: mp, .. } = vm;
     let id = ident(name);
     m.commented(
         &format!("Machine `{name}` (Windows): what may reach it."),
@@ -202,7 +203,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
     );
     let Some((net, addr)) = mp.addresses.first() else { return };
     let instance = ec2_instance(&id)
-        .add_attribute(("ami", ami(mp)))
+        .add_attribute(("ami", ami(vm)))
         .add_attribute(("instance_type", string(machine_type(mp))))
         .add_attribute(("subnet_id", reference(&format!("aws_subnet.{}.id", ident(net)))))
         .add_attribute(("private_ip", string(addr.to_string())))
@@ -267,7 +268,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let (_, _, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Ntlm);
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n))));
-    let user = |mp: &MachinePlan| image_user(mp.os.as_deref().unwrap_or_default()).to_owned();
+    let user = |os: &str| image_user(os).to_owned();
     let setup = controller_setup::set_up(env, &user, inventory, &at_boot);
     m.block(
         ec2_instance("isoloom_controller")

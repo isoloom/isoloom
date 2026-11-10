@@ -8,14 +8,14 @@ use std::net::Ipv4Addr;
 use crate::hcl_builder::{Expression, Module, Template, call, reference, string};
 use indexmap::IndexMap;
 use isoloom_plan::addressing::{address, names_of};
-use isoloom_plan::{Controller, Environment, Step};
+use isoloom_plan::{Controller, Environment, Step, Vm};
 use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_KEY, Vars, vars};
 use isoloom_render::{controller, steps};
 use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::model::Winrm;
 
 use super::provisioner::{Connection, Provisioner, Upload};
-use super::{Shell, linux, vms, windows};
+use super::{Shell, linux, windows};
 use crate::module::{ident, resource};
 
 /// The controller's OS.
@@ -35,7 +35,7 @@ pub(crate) const OWNER_ONLY: &str = "0600";
 /// Whether the environment needs a controller: its playbooks, or its checks when no Linux
 /// machine can run them (a Windows-only environment).
 pub(crate) fn needed(env: &Environment) -> bool {
-    let linux = vms(env).any(|(_, mp)| !mp.is_windows());
+    let linux = env.vms().any(|vm| !vm.plan.is_windows());
     env.controller.is_some() || (!env.checks.is_empty() && !linux)
 }
 
@@ -181,8 +181,8 @@ pub(crate) fn cloud_access<'a>(linux_user: impl Fn(&str) -> String + 'a, windows
     Access::new(
         vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
         isoloom_over_winrm(windows_password, auth),
-        move |h| match h.machine.os.as_deref() {
-            Some(os) if !h.machine.is_windows() => vec![("ansible_user".to_owned(), linux_user(os))],
+        move |h| match Vm::of(h.name, h.machine) {
+            Some(vm) if !vm.plan.is_windows() => vec![("ansible_user".to_owned(), linux_user(vm.os))],
             _ => Vars::new(),
         },
     )
@@ -263,20 +263,20 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
             },
         ],
         parts: vec![cmds.into_iter().map(Template::into_expression).collect()],
-        depends_on: vms(env).map(|(n, _)| reference(&format!("terraform_data.{}", ident(n)))).collect(),
+        depends_on: env.vms().map(|Vm { name: n, .. }| reference(&format!("terraform_data.{}", ident(n)))).collect(),
         announce: None,
     }
 }
 
 /// Each Linux machine's own set-up must be done (its ready file says `ready`) before the
-/// playbooks run: its name, and the wait, over SSH with the controller's key as `user(mp)` at the
+/// playbooks run: its name, and the wait, over SSH with the controller's key as `user` of its OS at the
 /// machine's first address.
-pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&isoloom_plan::MachinePlan) -> String) -> Vec<(String, String)> {
-    vms(env)
-        .filter(|(_, mp)| !mp.is_windows())
-        .filter_map(|(name, mp)| {
+pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&str) -> String) -> Vec<(String, String)> {
+    env.vms()
+        .filter(|vm| !vm.plan.is_windows())
+        .filter_map(|Vm { name, plan: mp, os }| {
             let a = mp.addresses.values().next()?;
-            let u = user(mp);
+            let u = user(os);
             let ready = isoloom_render::steps::READY_FILE;
             // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
             let wait = format!(
@@ -291,9 +291,9 @@ pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&isoloom_plan::Machin
 /// (the inventory's own connection), before the playbooks run: a Windows machine set up at its
 /// first boot (cloudbase-init) has no set-up of Terraform's to wait for.
 pub(crate) fn windows_waits(env: &Environment) -> Vec<String> {
-    vms(env)
-        .filter(|(_, mp)| mp.is_windows())
-        .map(|(name, _)| {
+    env.vms()
+        .filter(|vm| vm.plan.is_windows())
+        .map(|Vm { name, .. }| {
             format!(
                 "i=0; until /opt/ansible/bin/ansible -i {CONTROLLER_INVENTORY} {name} -m raw -a 'if (-not (Test-Path {ready})) {{ exit 1 }}' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 10; done",
                 ready = isoloom_spec::windows::READY_FILE

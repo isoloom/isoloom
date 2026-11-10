@@ -5,7 +5,7 @@
 //! single-Linux-VM labs and refuses the rest.
 
 use crate::hcl_builder::{Block, Expression, Module, list, reference, string};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::{Way, rule, ssh_key, vpc};
 use crate::cloud::Cloud;
@@ -15,7 +15,6 @@ use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Need, Networks, OsImage
 use crate::cloud::vm::{Driver, disks, gpus::GpuSizes, hooks, outputs, own_image, published};
 use crate::limits::Limits;
 use crate::machine::user_data::Capped;
-use crate::machine::vms;
 use crate::module::{ident, providers, resource};
 
 /// What DigitalOcean takes.
@@ -111,8 +110,8 @@ pub(crate) const DRIVER: Driver = Driver {
 /// The module after its providers: the VPC, the droplet, its firewall and set-up, the outputs.
 fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     network(env, m);
-    for (name, mp) in vms(env) {
-        droplet(env, name, mp, m)?;
+    for vm in env.vms() {
+        droplet(env, vm, m)?;
     }
     outputs::write_as(env, super::BASE.user, &public_ip, m);
     Ok(())
@@ -138,9 +137,8 @@ fn network(env: &Environment, m: &mut Module) {
 /// # Errors
 ///
 /// [`crate::Error::Refused`] when its user data is over [`CAP`].
-fn droplet(env: &Environment, name: &str, mp: &MachinePlan, m: &mut Module) -> crate::Result<()> {
+fn droplet(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, m: &mut Module) -> crate::Result<()> {
     let id = ident(name);
-    let os = mp.os.as_deref().unwrap_or_default();
     let slug = own_image::of(mp, own_image::digitalocean).unwrap_or_else(|| image(os).unwrap_or_default());
     m.blocks(disks::digitalocean(env, name, &mp.disks));
     let mut droplet = resource("digitalocean_droplet", &id)

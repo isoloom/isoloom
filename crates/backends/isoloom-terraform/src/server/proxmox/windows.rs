@@ -5,11 +5,10 @@
 //! a full clone of it, with a virtual TPM when it gets one, set up by cloudbase-init from its
 //! configuration drive (`crate::machine::cloudbase_init`).
 
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, Vm};
 use isoloom_spec::images::is_windows;
 
 use super::machine::Boot;
-use crate::machine::vms;
 use crate::module::ident;
 use crate::module::variable::Variable;
 
@@ -20,7 +19,7 @@ fn template_variable(os: &str) -> String {
 
 /// One variable per Windows OS the machines use: its template's VM id.
 pub(crate) fn variables(env: &Environment) -> Vec<Variable> {
-    let mut oses: Vec<&str> = vms(env).filter_map(|(_, mp)| mp.os.as_deref()).filter(|o| is_windows(o)).collect();
+    let mut oses: Vec<&str> = env.vms().map(|vm| vm.os).filter(|o| is_windows(o)).collect();
     oses.sort_unstable();
     oses.dedup();
     oses.into_iter()
@@ -43,11 +42,10 @@ fn ostype(os: &str) -> &'static str {
 }
 
 /// A Windows machine's VM boots a full clone of its OS's template.
-pub(crate) fn boot(mp: &MachinePlan) -> Boot {
-    let o = mp.os.as_deref().unwrap_or_default();
+pub(crate) fn boot(vm: Vm<'_>) -> Boot {
     Boot::Template {
-        variable: template_variable(o),
-        ostype: ostype(o),
-        disk: mp.resources.disk_gb,
+        variable: template_variable(vm.os),
+        ostype: ostype(vm.os),
+        disk: vm.plan.resources.disk_gb,
     }
 }

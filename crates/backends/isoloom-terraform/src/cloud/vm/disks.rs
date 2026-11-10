@@ -7,12 +7,11 @@
 //! find.
 
 use crate::hcl_builder::{Block, Expression, boolean, call, list, number, reference, string};
-use isoloom_plan::{DataDisk, Environment};
+use isoloom_plan::{DataDisk, Environment, Vm};
 
 use super::rules::Volumes;
 use crate::cloud::Cloud;
 use crate::cloud::instance::{labels, name_with, tag_list};
-use crate::machine::vms;
 use crate::module::{ident, resource};
 
 /// The resource name of machine `id`'s disk `d`.
@@ -176,7 +175,7 @@ pub(crate) const AWS_MAX_DISKS: usize = 11;
 /// smallest volume, or a machine has more than the most it attaches.
 pub(crate) fn too_small(env: &Environment, cloud: Cloud, volumes: Volumes) -> Option<String> {
     let Volumes { smallest_gb, most } = volumes;
-    vms(env).find_map(|(name, mp)| {
+    env.vms().find_map(|Vm { name, plan: mp, .. }| {
         if mp.disks.len() > most {
             return Some(format!("machine `{name}`: {cloud} attaches at most {most} data disks to a VM"));
         }

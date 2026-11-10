@@ -35,14 +35,14 @@ pub(crate) mod windows;
 use std::net::Ipv4Addr;
 
 use crate::hcl_builder::{Expression, Module};
-use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
+use isoloom_plan::{Capabilities, Environment, Feature, Vm};
 use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::{Backend, Files, Placed};
 use isoloom_spec::model::Target;
 
 use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
-use crate::machine::{self, controller, vms};
+use crate::machine::{self, controller};
 use crate::module::providers::{self, Provider, TLS};
 use crate::module::variable::Variable;
 use crate::module::{self, ProjectCopy};
@@ -92,18 +92,18 @@ pub(crate) fn own_variables(env: &Environment, driver: &Driver) -> Vec<Variable>
 
 /// Each VM with its first network and its address there, the one its instance's interface is on
 /// (a VM on no network has none).
-pub(crate) fn at_first_address(env: &Environment) -> impl Iterator<Item = ((&str, &MachinePlan), (&str, Ipv4Addr))> {
-    vms(env).filter_map(|(name, mp)| mp.addresses.first().map(|(net, a)| ((name, mp), (net.as_str(), *a))))
+pub(crate) fn at_first_address(env: &Environment) -> impl Iterator<Item = (Vm<'_>, (&str, Ipv4Addr))> {
+    env.vms().filter_map(|vm| vm.plan.addresses.first().map(|(net, a)| (vm, (net.as_str(), *a))))
 }
 
 /// How a cloud's module writes a Windows VM.
-pub(crate) type WriteWindows = fn(&Environment, (&str, &MachinePlan), &mut Module);
+pub(crate) type WriteWindows = fn(&Environment, Vm<'_>, &mut Module);
 
 /// How a cloud's module writes its machines: a Linux VM, a Windows VM, the controller.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Machines {
     /// A Linux VM's resources and set-up.
-    pub(crate) linux: fn(&Environment, (&str, &MachinePlan), &mut Module) -> Result<()>,
+    pub(crate) linux: fn(&Environment, Vm<'_>, &mut Module) -> Result<()>,
     /// A Windows VM's resources and set-up (its user data is fixed: the administrator, WinRM, the
     /// auto-stop, nothing a cap could refuse); `None` on a cloud whose refusal declines Windows.
     pub(crate) windows: Option<WriteWindows>,
@@ -118,11 +118,11 @@ impl Machines {
     ///
     /// The first machine that can't be written ([`crate::Error::Refused`]).
     pub(crate) fn write(&self, env: &Environment, m: &mut Module) -> Result<()> {
-        for (name, mp) in vms(env) {
-            match (mp.is_windows(), self.windows) {
-                (true, Some(windows)) => windows(env, (name, mp), m),
+        for vm in env.vms() {
+            match (vm.plan.is_windows(), self.windows) {
+                (true, Some(windows)) => windows(env, vm, m),
                 (true, None) => {}
-                (false, _) => (self.linux)(env, (name, mp), m)?,
+                (false, _) => (self.linux)(env, vm, m)?,
             }
         }
         if controller::needed(env) {

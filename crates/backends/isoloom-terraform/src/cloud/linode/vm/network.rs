@@ -6,13 +6,12 @@
 //! networks; the rest (its own network, the internet) is accepted. Replies come back either way.
 
 use crate::hcl_builder::{Block, Expression, Module, Template, list, reference, string};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::linode::{Action, Way, rule};
 use crate::cloud::vm::reach::{self, Rule};
 use crate::cloud::vm::{published, seal};
-use crate::machine::vms;
 use crate::module::{ident, resource};
 
 /// The VPC and a subnet per network.
@@ -33,7 +32,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                 .build(),
         );
     }
-    for (name, mp) in vms(env) {
+    for Vm { name, plan: mp, .. } in env.vms() {
         let Some((net, plan)) = mp.addresses.keys().next().and_then(|n| env.networks.get_key_value(n)) else {
             continue;
         };

@@ -4,7 +4,7 @@
 //! controller runs the playbooks once every machine is set up.
 
 use crate::hcl_builder::{Expression, Module, reference, string};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 use isoloom_render::router;
 
 use super::SERVICE_OS;
@@ -12,7 +12,7 @@ use super::guest::{Guest, Nic};
 use crate::machine::cloud_init::CloudConfig;
 use crate::machine::controller::{self, Ssh};
 use crate::machine::linux;
-use crate::machine::{Remote, cloudbase_init, vms};
+use crate::machine::{Remote, cloudbase_init};
 use crate::module::ident;
 use crate::server::router::is_default_gateway;
 
@@ -54,8 +54,8 @@ fn nics(env: &Environment, mp: &MachinePlan) -> Vec<Nic> {
 
 /// The machines, each set up through the router, then the controller.
 pub(super) fn guests(env: &Environment, m: &mut Module) {
-    for (i, (name, mp)) in (0..).zip(vms(env)) {
-        machine(env, (name, mp), i, m);
+    for (i, vm) in (0..).zip(env.vms()) {
+        machine(env, vm, i, m);
     }
     if controller::needed(env) {
         controller(env, m);
@@ -63,12 +63,11 @@ pub(super) fn guests(env: &Environment, m: &mut Module) {
 }
 
 /// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.
-fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), i: u64, m: &mut Module) {
+fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, m: &mut Module) {
     let id = ident(name);
     let dns = env.spec().machines.get(name).and_then(|sm| sm.dns.as_ref());
     let servers = crate::server::resolvers(env, Some(name));
     let windows = mp.is_windows();
-    let os = mp.os.as_deref().unwrap_or_default();
     let guest = Guest {
         id: id.clone(),
         name: name.to_owned(),
@@ -161,8 +160,9 @@ fn controller(env: &Environment, m: &mut Module) {
     };
     let mut setup = controller::provisioner_waiting(ssh, &controller::windows_waits(env));
     // A Windows machine has no Terraform set-up: its VM, and the wait above, stand for it.
-    setup.depends_on = vms(env)
-        .map(|(n, mp)| {
+    setup.depends_on = env
+        .vms()
+        .map(|Vm { name: n, plan: mp, .. }| {
             let kind = if mp.is_windows() { "esxi_guest" } else { "terraform_data" };
             reference(&format!("{kind}.{}", ident(n)))
         })

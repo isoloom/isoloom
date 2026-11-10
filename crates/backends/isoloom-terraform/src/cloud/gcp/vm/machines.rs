@@ -7,7 +7,7 @@ use crate::cloud::user_data_limit::Limit;
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, list, number, object, reference, string};
 use crate::machine::controller::WinrmAuth;
 use indexmap::IndexMap;
-use isoloom_plan::{Environment, MachinePlan, NetworkPlan};
+use isoloom_plan::{Environment, MachinePlan, NetworkPlan, Vm};
 
 use super::network::vpc;
 use super::{RULES, image, user};
@@ -38,7 +38,7 @@ fn at_boot(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>) -> Vec<Tem
 }
 
 /// A Linux machine: what may reach it, its instance, set up by its startup script.
-pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
+pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, m: &mut Module) -> Result<()> {
     let id = ident(name);
     if mp.addresses.is_empty() {
         return Ok(());
@@ -48,7 +48,6 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
         m.commented(&format!("Machine `{name}`: what may reach it."), first.clone());
         m.blocks(rest.iter().cloned());
     }
-    let os = mp.os.as_deref().unwrap_or_default();
     m.blocks(disks::gcp(env, name, &mp.disks));
     let setup = hooks::user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses), CAP)?;
     let mut vm = instance(&Instance {
@@ -282,7 +281,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     m.block(firewall(who, ("ssh", first), list([reference("var.allowed_cidr")]), vec![allow("tcp", &[22])]));
     let (_, _, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| user(os).to_owned(), WinrmAuth::Basic);
-    let who_logs_in = |mp: &MachinePlan| user(mp.os.as_deref().unwrap_or_default()).to_owned();
+    let who_logs_in = |os: &str| user(os).to_owned();
     let setup = controller_setup::set_up(env, &who_logs_in, inventory, &at_boot(env, &addresses));
     m.block(instance(&Instance {
         env,

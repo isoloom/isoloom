@@ -76,27 +76,21 @@ pub(crate) const FEATURES: [Feature; 17] = [
     Feature::RawDisks,
 ];
 
-/// The VMs of the environment, in start order (the plan's [`Environment::vms`], whose OS the
-/// callers that need it read there).
-pub(crate) fn vms(env: &Environment) -> impl Iterator<Item = (&str, &MachinePlan)> {
-    env.vms().map(|vm| (vm.name, vm.plan))
-}
-
 /// Where a position's checks run, the one rule of every Terraform target: on its machine when
 /// that is a Linux VM (a Windows one has no `sh` for the runner to pipe the checks into), else on
 /// the controller when there is one, else on the first Linux VM. `None` when there is none of
 /// them.
 pub(crate) fn check_machine<'a>(env: &'a Environment, p: &isoloom_plan::checks::Position) -> Option<&'a str> {
-    let linux = || vms(env).filter(|(_, mp)| !mp.is_windows());
+    let linux = || env.vms().filter(|vm| !vm.plan.is_windows());
     if let isoloom_plan::checks::Position::Machine(m) = p
-        && let Some((own, _)) = linux().find(|(n, _)| n == m)
+        && let Some(own) = linux().find(|vm| vm.name == m)
     {
-        return Some(own);
+        return Some(own.name);
     }
     if controller::needed(env) {
         return Some(controller::NAME);
     }
-    linux().next().map(|(n, _)| n)
+    linux().next().map(|vm| vm.name)
 }
 
 /// Whether a step sets up something a restart undoes (interfaces and routes are not kept): a

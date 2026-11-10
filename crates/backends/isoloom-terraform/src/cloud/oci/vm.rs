@@ -25,7 +25,7 @@ mod published;
 use std::net::Ipv4Addr;
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::{SHAPE, availability_domain, availability_domains, owned, ubuntu_images};
 use crate::cloud::Cloud;
@@ -35,7 +35,6 @@ use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Need, Netwo
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::user_data::Capped;
-use crate::machine::vms;
 use crate::module::{ident, providers, resource};
 
 /// What Oracle Cloud takes: Ubuntu, and Debian on the newest Ubuntu LTS (it has no Debian image).
@@ -150,7 +149,7 @@ const MOST: (u32, u32) = (64, 1024);
 /// Why a machine can't have its size on the shape, if one can't: more OCPUs or memory than it
 /// takes.
 fn size_refusal(env: &Environment) -> Option<String> {
-    vms(env).find_map(|(name, mp)| {
+    env.vms().find_map(|Vm { name, plan: mp, .. }| {
         let (ocpus, gb) = sizing(&Need::of(mp));
         let (most_ocpus, most_gb) = MOST;
         (ocpus > most_ocpus || gb > most_gb).then(|| {
@@ -224,14 +223,15 @@ fn images(env: &Environment, m: &mut Module) {
 /// # Errors
 ///
 /// [`crate::Error::Refused`] when its user data is over [`CAP`].
-fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
+fn machine(env: &Environment, vm: Vm<'_>, (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
+    let Vm { name, plan: mp, .. } = vm;
     let group = published::group(name, mp, m);
     let mut at_boot = interfaces::up_found(env, &mp.addresses, &|_, a| metadata::mac(a));
     at_boot.extend(ipv6::at_boot(env, mp));
     let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
     m.commented(
         &format!("Machine `{name}`, at its fixed address {address}."),
-        instance(env, (name, mp), (net, &address.to_string()), (group, setup)),
+        instance(env, vm, (net, &address.to_string()), (group, setup)),
     );
     vnics(env, (name, mp), m);
     addresses::blocks((name, mp), m);
@@ -240,7 +240,7 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
 
 /// Machine `name`'s instance, its first VNIC on network `net` at `address` (with its published
 /// ports' `group`), set up by `setup` (its user data, which cloud-init runs).
-fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, &str), (group, setup): (Option<Expression>, Expression)) -> Block {
+fn instance(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, (net, address): (&str, &str), (group, setup): (Option<Expression>, Expression)) -> Block {
     // A gateway forwards traffic that isn't its own; a machine on several networks answers from
     // the interface its default route leaves by.
     let forwards = mp.is_gateway || mp.addresses.len() > 1;
@@ -249,10 +249,7 @@ fn instance(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address):
         .add_attribute(("ocpus", number(u64::from(ocpus))))
         .add_attribute(("memory_in_gbs", number(u64::from(memory_gb))))
         .build();
-    let images = reference(&format!(
-        "data.oci_core_images.{}.images",
-        image_source(ubuntu(mp.os.as_deref().unwrap_or_default()))
-    ));
+    let images = reference(&format!("data.oci_core_images.{}.images", image_source(ubuntu(os))));
     // OCI boot volumes start at 50 GB.
     let boot = mp.size().disk_gb.max(50);
     let source = Block::builder("source_details")

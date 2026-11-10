@@ -12,7 +12,7 @@ use isoloom_render::steps;
 use super::machine::{Boot, Vm, ip_config, nic, snippet};
 use crate::machine::cloud_init::{self, CloudConfig, file};
 use crate::machine::controller::OWNER_ONLY;
-use crate::machine::{Shell, controller, vms};
+use crate::machine::{Shell, controller};
 use crate::module::ident;
 
 /// The controller's snippet and VM.
@@ -30,7 +30,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     }
     let (cpus, memory, disk) = controller::size(env);
     let mut depends_on = vec![reference("proxmox_virtual_environment_vm.isoloom_router")];
-    depends_on.extend(vms(env).map(|(n, _)| reference(&format!("proxmox_virtual_environment_vm.{}", ident(n)))));
+    depends_on.extend(env.vms().map(|vm| reference(&format!("proxmox_virtual_environment_vm.{}", ident(vm.name)))));
     let vm = Vm {
         id: "isoloom_controller".to_owned(),
         snippet: ident(controller::NAME),

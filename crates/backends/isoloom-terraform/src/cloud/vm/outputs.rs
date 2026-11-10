@@ -8,7 +8,7 @@ use isoloom_render::run_manifest::RUNNER;
 use isoloom_spec::model::Target;
 
 use crate::checks::{Invocation, Runner, output_block};
-use crate::machine::{controller, vms};
+use crate::machine::controller;
 use crate::module::output;
 
 /// How the operator reaches the machines, for the outputs.
@@ -54,7 +54,7 @@ pub(crate) fn write_named(env: &Environment, user: fn(&str) -> &'static str, pub
 /// `ssh_user_<m>` (what the run manifest reads), `ssh_users` (for an operator reading
 /// `terraform output`), `ip`, `ready_file`, `checks` and `published`.
 pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
-    let machines: Vec<(&str, Expression)> = vms(env).map(|(n, _)| (n, (reach.public_ip)(n))).collect();
+    let machines: Vec<(&str, Expression)> = env.vms().map(|Vm { name: n, .. }| (n, (reach.public_ip)(n))).collect();
     let users: Vec<(&str, Expression)> = env.vms().map(|vm| (vm.name, string(reach.user_of(vm)))).collect();
     m.block(output("machines", object(machines)));
     for vm in env.vms() {
@@ -77,8 +77,9 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
             checks,
         );
     }
-    let published: Vec<(String, Expression)> = vms(env)
-        .filter_map(|(n, _)| Some((n, env.spec().machines.get(n)?)))
+    let published: Vec<(String, Expression)> = env
+        .vms()
+        .filter_map(|Vm { name: n, .. }| Some((n, env.spec().machines.get(n)?)))
         .flat_map(|(n, sm)| {
             sm.ports.iter().filter_map(move |sv| {
                 let h = sv.publish?;
@@ -95,7 +96,7 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
 /// Where a user stands (checks, a session): the access machine, else the first Linux machine,
 /// else the controller.
 fn stand_at(env: &Environment, reach: &Reach) -> Expression {
-    let linux: Vec<&str> = vms(env).filter(|(_, mp)| !mp.is_windows()).map(|(n, _)| n).collect();
+    let linux: Vec<&str> = env.vms().filter(|vm| !vm.plan.is_windows()).map(|Vm { name: n, .. }| n).collect();
     let access = linux
         .iter()
         .rev()

@@ -7,10 +7,10 @@
 //! ready marker over WinRM before running the playbooks (`controller::windows_waits`).
 
 use crate::hcl_builder::{Expression, Template, call, for_list, reference, string};
-use isoloom_plan::{Environment, MachinePlan, Step};
+use isoloom_plan::{Environment, MachinePlan, Step, Vm};
 use isoloom_render::steps;
 
-use super::{vms, windows};
+use super::windows;
 
 /// Where the set-up records that it is done (a later boot runs nothing).
 const DONE: &str = "C:\\ProgramData\\isoloom\\done";
@@ -18,7 +18,7 @@ const DONE: &str = "C:\\ProgramData\\isoloom\\done";
 /// What a Windows machine set up this way can't have on `platform` (Proxmox, ESXi): what no
 /// Windows VM set up at its own boot has, and inputs. Each reason after "machine `<name>`: ".
 pub(crate) fn refusal(env: &Environment, platform: &str) -> Option<String> {
-    vms(env).filter(|(_, mp)| mp.is_windows()).find_map(|(name, mp)| {
+    env.vms().filter(|vm| vm.plan.is_windows()).find_map(|Vm { name, plan: mp, .. }| {
         isoloom_render::windows::set_up_at_boot_refusal(env, name)
             .or_else(|| (!mp.inputs.is_empty()).then(|| format!("machine `{name}`: {platform} delivers no inputs to a Windows machine")))
     })

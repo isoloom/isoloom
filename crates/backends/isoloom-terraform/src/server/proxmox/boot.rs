@@ -3,16 +3,15 @@
 //! a kernel, a firmware file or a network boot of the machine's own are refused, with why.
 
 use crate::hcl_builder::{Block, BlockBuilder, boolean, list, reference, string};
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Vm};
 use isoloom_spec::model::{Boot, BootDevice, Firmware};
 
-use crate::machine::vms;
 use crate::server::boot::{Field, HOST_FILES, first_set};
 
 /// Why Proxmox can't boot a machine its own way, if it can't: the first field it has no
 /// setting for.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    vms(env).find_map(|(name, mp)| {
+    env.vms().find_map(|Vm { name, plan: mp, .. }| {
         let b = mp.boot.as_ref()?;
         if let Some(field) = first_set(b, HOST_FILES.into_iter().chain([Field::Network])) {
             return Some(format!(

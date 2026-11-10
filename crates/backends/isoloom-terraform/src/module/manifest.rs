@@ -11,10 +11,9 @@ use isoloom_manifest::{
     Action, Argv, Delivery, EnvName, Error as ManifestError, GoneError, HostArgv, Identity, Machine, Name, NonEmpty, OsName, Output, OutputRole, OutputSource,
     Param, Part, Placeholder, Program, PublishMode, RelPath, Role, RunVar, SetBy, SnakeName, StateOwner, Step, StepId, Template, TerraformIdentity, TfVarShape,
 };
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 use isoloom_render::run_manifest::{addresses, arch, noted, port, run};
 
-use crate::machine::vms;
 use crate::module::variable::Variable;
 
 /// How long a run lives when the embedder sets nothing, in minutes: the reaper's.
@@ -124,7 +123,8 @@ pub(crate) fn lab_machine(name: &str, mp: &MachinePlan, spec: &isoloom_spec::mod
     // The access machine keeps its role (where the user works from); every machine is made at `up`.
     let role = if spec.access { Role::Access } else { Role::Member };
     let mut m = machine(name, role, addresses(mp)?)?;
-    m.os = mp.os.as_deref().map(OsName::parse).transpose()?;
+    // A VM's OS; a container (an LXC one on Proxmox) runs its image's.
+    m.os = Vm::of(name, mp).map(|vm| OsName::parse(vm.os)).transpose()?;
     m.windows = mp.is_windows();
     m.arch = Some(arch(mp.arch));
     m.resources = Some(isoloom_render::run_manifest::resources(mp));
@@ -203,9 +203,9 @@ pub(crate) fn seal_param(name: &str, closed_at: &str) -> Result<Param, ManifestE
 
 /// The VMs that read the launch-time input `name`, in start order (empty: none do).
 pub(crate) fn input_readers(env: &Environment, name: &str) -> Result<Vec<Name>, ManifestError> {
-    vms(env)
-        .filter(|(_, mp)| mp.inputs.iter().any(|i| i == name))
-        .map(|(n, _)| Name::parse(n))
+    env.vms()
+        .filter(|Vm { plan: mp, .. }| mp.inputs.iter().any(|i| i == name))
+        .map(|Vm { name: n, .. }| Name::parse(n))
         .collect()
 }
 

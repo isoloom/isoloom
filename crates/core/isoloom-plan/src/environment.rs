@@ -186,9 +186,10 @@ pub struct MachinePlan {
     pub depends_on: Vec<String>,
     /// The set-up steps of a VM, in order (empty for the other shapes).
     pub lifecycle: MachineLifecycle,
-    /// The OS of its VM implementation (`debian-12`, `windows-server-2022`...), whatever the
-    /// target: an existing host keeps the OS its `vm:` names.
-    pub os: Option<String>,
+    /// The OS its `vm:` form names (`debian-12`, `windows-server-2022`...), whatever the target:
+    /// a VM's always ([`crate::Vm::os`]), an existing host's or a container's when it has that
+    /// form. Private, so a VM's OS is read through [`crate::Vm`], never defaulted.
+    os: Option<String>,
     /// How its Windows VM answers WinRM (`None` off Windows, and on a box reached over OpenSSH).
     pub winrm: Option<Winrm>,
     /// Whether its Windows VM's box is reached over OpenSSH instead (`vm.image.winssh`).

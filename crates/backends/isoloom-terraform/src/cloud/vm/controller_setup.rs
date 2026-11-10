@@ -4,7 +4,7 @@
 //! SSH, a Windows machine's marker over WinRM) before the playbooks run.
 
 use crate::hcl_builder::{Expression, Template, call};
-use isoloom_plan::{Environment, MachinePlan, Step};
+use isoloom_plan::{Environment, Step};
 use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::steps;
 use isoloom_spec::linux::CONFIG_DIR;
@@ -23,7 +23,7 @@ fn written(path: &str, content: Expression) -> Template {
 /// The controller's set-up: `at_boot` first (its interfaces after the first), then the project,
 /// its key and `inventory`, the constraints and certificate authorities, the hosts file, Ansible, each machine's set-up awaited (as
 /// `user(mp)` over SSH), the playbooks, the health check.
-pub(crate) fn set_up(env: &Environment, user: &dyn Fn(&MachinePlan) -> String, inventory: Template, at_boot: &[Template]) -> SetUp {
+pub(crate) fn set_up(env: &Environment, user: &dyn Fn(&str) -> String, inventory: Template, at_boot: &[Template]) -> SetUp {
     let mut part: Vec<Tracked> = at_boot.iter().map(|c| Tracked::new("the controller's interfaces", c.clone())).collect();
     part.push(project_wait());
     part.push(Tracked::new(

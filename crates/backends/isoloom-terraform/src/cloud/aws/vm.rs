@@ -34,7 +34,7 @@ use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
 use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::limits::Limits;
-use crate::machine::{controller, vms};
+use crate::machine::controller;
 use crate::module::ident;
 use crate::module::providers;
 
@@ -262,9 +262,10 @@ fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
 
 /// An AMI lookup per OS (the controller's among them).
 fn amis(env: &Environment) -> Vec<Block> {
-    let mut oses: Vec<&str> = vms(env)
-        .filter(|(_, mp)| own_image::of(mp, own_image::aws).is_none())
-        .filter_map(|(_, mp)| mp.os.as_deref())
+    let mut oses: Vec<&str> = env
+        .vms()
+        .filter(|vm| own_image::of(vm.plan, own_image::aws).is_none())
+        .map(|vm| vm.os)
         .collect();
     if controller::needed(env) {
         oses.push(controller::OS);

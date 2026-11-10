@@ -7,7 +7,7 @@ use isoloom_plan::Environment;
 
 use super::{SERVICE_OS, default_image};
 use crate::machine::credentials;
-use crate::machine::{vms, windows};
+use crate::machine::windows;
 use crate::module::providers;
 use crate::module::variable::{self, Variable};
 use crate::server::PinnedImage;
@@ -28,7 +28,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
 
 /// The OSes the module deploys, the router's and the controller's among them, sorted.
 fn oses(env: &Environment) -> Vec<&str> {
-    let mut all: Vec<&str> = vms(env).filter_map(|(_, mp)| mp.os.as_deref()).collect();
+    let mut all: Vec<&str> = env.vms().map(|vm| vm.os).collect();
     all.push(SERVICE_OS);
     all.sort_unstable();
     all.dedup();

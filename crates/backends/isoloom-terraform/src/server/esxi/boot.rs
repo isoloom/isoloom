@@ -2,16 +2,15 @@
 //! ESXi boots the VM's disk through that firmware and nothing else: a kernel, a firmware file,
 //! a boot order or a network boot of the machine's own are refused, with why.
 
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 use isoloom_spec::model::Firmware;
 
-use crate::machine::vms;
 use crate::server::boot::{Field, HOST_FILES, first_set};
 
 /// Why ESXi can't boot a machine its own way, if it can't: the first field it has no setting
 /// for.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    vms(env).find_map(|(name, mp)| {
+    env.vms().find_map(|Vm { name, plan: mp, .. }| {
         let b = mp.boot.as_ref()?;
         let field = first_set(b, HOST_FILES.into_iter().chain([Field::FirmwareFormat, Field::Order, Field::Network]))?;
         Some(format!(

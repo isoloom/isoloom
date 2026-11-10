@@ -7,7 +7,7 @@
 //!   holding the machine's IPv4 address there, at every boot.
 
 use crate::hcl_builder::{Block, BlockBuilder, Template, boolean, string};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 use isoloom_spec::model::Ipv6Addresses;
 use isoloom_spec::net::IPV6_PREFIX;
 
@@ -57,7 +57,7 @@ fn put(v4: &str, address: &str) -> Template {
 /// Why a machine's derived address can't be had, if one can't: Oracle Cloud keeps the first four
 /// addresses of a subnet's prefix (and its last four, which no octet reaches).
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    crate::machine::vms(env).find_map(|(name, mp)| {
+    env.vms().find_map(|Vm { name, plan: mp, .. }| {
         let (net, a) = mp.addresses6.iter().find(|(_, a)| u128::from(**a) & u128::from(u64::MAX) <= 3)?;
         Some(format!(
             "machine `{name}`: Oracle Cloud keeps the first four IPv6 addresses of a subnet's prefix, and {a} on `{net}` is one of them"

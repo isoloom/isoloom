@@ -4,7 +4,7 @@
 
 use std::ops::RangeInclusive;
 
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 use isoloom_spec::model::{Ipv6Addresses, Machine};
 use isoloom_spec::windows::Tpm;
 
@@ -12,7 +12,7 @@ use super::gpus::{self, GpuSizes};
 use super::{disks, gateways, nested, own_image};
 use crate::cloud::Cloud;
 use crate::limits::Limits;
-use crate::machine::{controller, vms};
+use crate::machine::controller;
 
 /// Why the clouds refuse Ansible checks (`.yml`): no cloud runs them.
 pub(crate) const PLAYBOOK_CHECKS: &str = "Ansible checks (.yml) don't run in the cloud";
@@ -474,9 +474,10 @@ impl Rules {
     /// size has ([`Sizes::short`]; a GPU type's size is its own), or the controller, on every
     /// network, does.
     pub(crate) fn size(&self, env: &Environment) -> Option<String> {
-        let machine = vms(env)
-            .filter(|(_, mp)| self.gpus.of(mp).is_none())
-            .find_map(|(name, mp)| self.sizes_of(mp)?.short(self.cloud, &format!("machine `{name}`"), &(self.need)(mp)));
+        let machine = env
+            .vms()
+            .filter(|Vm { plan: mp, .. }| self.gpus.of(mp).is_none())
+            .find_map(|Vm { name, plan: mp, .. }| self.sizes_of(mp)?.short(self.cloud, &format!("machine `{name}`"), &(self.need)(mp)));
         machine.or_else(|| {
             controller::needed(env)
                 .then_some(self.sizes?)?
@@ -528,7 +529,7 @@ impl Rules {
         if let Some(why) = self.networks_refusal(env) {
             return Some(why);
         }
-        if vms(env).any(|(_, mp)| mp.is_windows()) {
+        if env.vms().any(|vm| vm.plan.is_windows()) {
             return Some(format!("{cloud} cloud-vm is Linux only"));
         }
         if controller::needed(env) {
@@ -537,7 +538,7 @@ impl Rules {
         if let Some(why) = self.features(env) {
             return Some(why);
         }
-        if let Some((name, _)) = vms(env).find(|(_, mp)| mp.tpm == Some(Tpm::Required)).filter(|_| !self.tpm) {
+        if let Some(Vm { name, .. }) = env.vms().find(|vm| vm.plan.tpm == Some(Tpm::Required)).filter(|_| !self.tpm) {
             return Some(format!(
                 "machine `{name}` asks for a virtual TPM (`hardware.tpm: required`): {cloud} gives none"
             ));
@@ -550,12 +551,13 @@ impl Rules {
     fn networks_refusal(&self, env: &Environment) -> Option<String> {
         let cloud = self.cloud;
         match self.networks {
-            Networks::OneVm if env.networks.len() != 1 || vms(env).count() > 1 => Some(format!(
+            Networks::OneVm if env.networks.len() != 1 || env.vms().count() > 1 => Some(format!(
                 "{cloud} cloud-vm takes one machine on one network: an instance joins one VPC, at a private address {cloud} picks, so other machines couldn't reach it at its spec address"
             )),
-            Networks::OnePerMachine => vms(env)
-                .find(|(_, mp)| mp.addresses.len() > 1)
-                .map(|(name, _)| format!("machine `{name}` is on several networks: a {cloud} instance has one VPC interface")),
+            Networks::OnePerMachine => env
+                .vms()
+                .find(|Vm { plan: mp, .. }| mp.addresses.len() > 1)
+                .map(|Vm { name, .. }| format!("machine `{name}` is on several networks: a {cloud} instance has one VPC interface")),
             _ => None,
         }
     }

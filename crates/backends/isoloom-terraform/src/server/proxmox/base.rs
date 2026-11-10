@@ -9,8 +9,8 @@ use isoloom_plan::Environment;
 use isoloom_spec::linux::PROJECT_DIR;
 
 use super::pinned;
+use crate::machine::controller;
 use crate::machine::credentials;
-use crate::machine::{controller, vms};
 use crate::module::providers;
 use crate::module::variable::{self, Variable};
 use crate::module::{ident, resource};
@@ -253,8 +253,11 @@ fn locals(env: &Environment) -> Block {
 /// A cloud image per OS (the router's and the controller's Debian among them), per environment:
 /// a shared file would go with whichever environment is destroyed first.
 fn images(env: &Environment, m: &mut Module) {
-    let own = || vms(env).filter(|(_, mp)| !super::image::has_own(mp));
-    let mut oses: Vec<(&str, bool)> = own().filter_map(|(_, mp)| Some((mp.os.as_deref()?, super::arch::is_arm(mp)))).collect();
+    let mut oses: Vec<(&str, bool)> = env
+        .vms()
+        .filter(|vm| !super::image::has_own(vm.plan))
+        .map(|vm| (vm.os, super::arch::is_arm(vm.plan)))
+        .collect();
     oses.push((controller::OS, false));
     oses.sort_unstable();
     oses.dedup();

@@ -8,9 +8,7 @@
 //! ESXi's) applies a sealed ruleset it keeps from its first boot (`crate::server::router`), over
 //! SSH (`crate::server::manifest`).
 
-use isoloom_plan::{Environment, MachinePlan};
-
-use crate::machine::vms;
+use isoloom_plan::{Environment, MachinePlan, Vm};
 
 /// The run's seal switch: the cloud modules' Terraform variable, and on a server the runner's
 /// recorded flag.
@@ -30,7 +28,7 @@ pub(crate) fn sealed(env: &Environment, mp: &MachinePlan) -> bool {
 
 /// Whether the run has anything to seal.
 pub(crate) fn any(env: &Environment) -> bool {
-    vms(env).any(|(_, mp)| sealed(env, mp))
+    env.vms().any(|Vm { plan: mp, .. }| sealed(env, mp))
 }
 
 #[cfg(test)]
@@ -46,7 +44,7 @@ mod tests {
             Target::Proxmox,
         );
         assert!(any(&env));
-        let sealed_names: Vec<&str> = vms(&env).filter(|(_, mp)| sealed(&env, mp)).map(|(n, _)| n).collect();
+        let sealed_names: Vec<&str> = env.vms().filter(|vm| sealed(&env, vm.plan)).map(|vm| vm.name).collect();
         assert_eq!(sealed_names, ["cache"]);
         let open = crate::testing::planned(
             "version: 1\nname: o\nnetworks:\n  front: { cidr: 10.61.10.0/24 }\nmachines:\n  web: { os: debian@12, networks: { front: 10 } }\n",

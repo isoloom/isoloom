@@ -15,17 +15,15 @@ pub struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    /// Machine `name` planned as `plan`, when it is a VM.
+    /// Machine `name` planned as `plan`, when it is a VM. The plan makes a machine a VM only
+    /// from its `vm:` form, whose OS it keeps, and only the plan builds a [`MachinePlan`] (its
+    /// OS is private): every VM it made is one here.
     #[must_use]
     pub fn of(name: &'a str, plan: &'a MachinePlan) -> Option<Vm<'a>> {
-        if plan.shape != MachineShape::Vm {
-            return None;
+        match (plan.shape, plan.os.as_deref()) {
+            (MachineShape::Vm, Some(os)) => Some(Vm { name, plan, os }),
+            _ => None,
         }
-        Some(Vm {
-            name,
-            plan,
-            os: plan.os.as_deref()?,
-        })
     }
 }
 

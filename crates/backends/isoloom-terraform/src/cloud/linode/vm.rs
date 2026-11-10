@@ -10,7 +10,7 @@ mod network;
 use std::net::Ipv4Addr;
 
 use crate::hcl_builder::{Block, Expression, Module, Template, boolean, call, list, reference, string};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, Vm};
 
 use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
@@ -128,7 +128,7 @@ fn public_ip(name: &str) -> Expression {
 /// # Errors
 ///
 /// [`crate::Error::Refused`] when the Linode's user data is over Linode's cap ([`CAP`]).
-fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
+fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
     let id = ident(name);
     m.block(module::password(&id));
     let at_boot = std::iter::once(Template::text(SUDO)).chain(network::routes(env, net)).collect();
@@ -142,7 +142,6 @@ fn machine(env: &Environment, (name, mp): (&str, &MachinePlan), (net, address): 
     if let Some(more) = mp.more_addresses.get(net) {
         vpc = vpc.add_attribute(("ip_ranges", list(more.iter().map(|a| string(format!("{a}/32"))))));
     }
-    let os = mp.os.as_deref().unwrap_or_default();
     m.block(
         resource("linode_instance", &id)
             .add_attribute(("label", name_with(&format!("-{name}"))))

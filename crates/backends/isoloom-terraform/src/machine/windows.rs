@@ -9,7 +9,7 @@ use isoloom_render::steps;
 use isoloom_spec::model::Port;
 
 use super::provisioner::{Connection, Provisioner, Upload};
-use super::{Remote, linux, vms};
+use super::{Remote, linux};
 use crate::module::{self, ident, resource};
 
 /// The Terraform expression of the Windows machines' password.
@@ -17,7 +17,7 @@ pub(crate) const PASSWORD: &str = "random_password.windows.result";
 
 /// Whether the environment has a Windows VM: its module then generates their password.
 pub(crate) fn any(env: &Environment) -> bool {
-    vms(env).any(|(_, mp)| mp.is_windows())
+    env.vms().any(|vm| vm.plan.is_windows())
 }
 
 /// The Windows machines' administrator password (user `isoloom`), for WinRM, when a VM runs

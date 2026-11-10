@@ -10,13 +10,13 @@ use std::net::IpAddr;
 
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_manifest::{CheckRunner, Error as ManifestError, Machine, Name, Output, OutputRole, Placeholder, Role, SecretSlot, SnakeName, Template};
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Vm};
 use isoloom_render::run_manifest::{outputs_with, timeout_s};
 
 use crate::module::manifest::terraform_output as state;
 use isoloom_spec::model::Target;
 
-use super::{Driver, vms};
+use super::Driver;
 use crate::cloud::manifest::{Frame, Guest, connection, steps};
 use crate::cloud::{Cloud, operator};
 use crate::machine::controller;
@@ -80,7 +80,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Resu
 /// public address; then the controller.
 fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError> {
     let mut out = Vec::new();
-    for (name, mp) in vms(env) {
+    for Vm { name, plan: mp, .. } in env.vms() {
         let Some(spec) = env.spec().machines.get(name) else { continue };
         out.push(manifest::lab_machine(name, mp, spec, &at(name)?)?);
     }
@@ -110,7 +110,7 @@ fn outputs(env: &Environment, machines: &[Machine]) -> Result<Vec<Output>, Manif
             "Where each Linux machine's set-up says how far it got (isoloom-ready/1).",
         )?,
     ];
-    let named = vms(env).map(|(n, _)| n).chain(controller::needed(env).then_some(CONTROLLER));
+    let named = env.vms().map(|Vm { name: n, .. }| n).chain(controller::needed(env).then_some(CONTROLLER));
     for name in named {
         out.push(state(
             &address_output(name),
@@ -154,9 +154,10 @@ fn inputs(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
     let mut out = Vec::new();
     for input in &spec.inputs {
         let env_readers = manifest::input_readers(env, input)?;
-        let file_readers: Vec<Name> = vms(env)
-            .filter(|(_, mp)| mp.reads_input_file(input))
-            .map(|(n, _)| Name::parse(n))
+        let file_readers: Vec<Name> = env
+            .vms()
+            .filter(|Vm { plan: mp, .. }| mp.reads_input_file(input))
+            .map(|Vm { name: n, .. }| Name::parse(n))
             .collect::<Result<_, _>>()?;
         let sensitive = !spec.plain_inputs.contains(input);
         out.extend(connection::input(input, sensitive, &env_readers, &file_readers)?);
@@ -175,9 +176,10 @@ fn machine_secrets(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> 
         let Some(source) = isoloom_render::run_manifest::secret_source(source) else {
             continue;
         };
-        let readers: Vec<Name> = vms(env)
-            .filter(|(_, mp)| mp.secrets.iter().any(|s| &s.name == name))
-            .map(|(n, _)| Name::parse(n))
+        let readers: Vec<Name> = env
+            .vms()
+            .filter(|Vm { plan: mp, .. }| mp.secrets.iter().any(|s| &s.name == name))
+            .map(|Vm { name: n, .. }| Name::parse(n))
             .collect::<Result<_, _>>()?;
         if readers.is_empty() {
             continue;

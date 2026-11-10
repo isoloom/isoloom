@@ -6,7 +6,7 @@ use std::net::Ipv4Addr;
 use crate::boxes::{self, VagrantBox};
 use isoloom_manifest as manifest;
 use isoloom_plan::checks::Position;
-use isoloom_plan::{Environment, MachinePlan, PublishedPort};
+use isoloom_plan::{Environment, MachinePlan, PublishedPort, Vm};
 use isoloom_render::GeneratedFile;
 use isoloom_spec::model::Arch;
 
@@ -30,9 +30,9 @@ pub(crate) fn has_vm(env: &Environment, name: &str) -> bool {
 /// has no Vagrant box (refused before rendering).
 pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let env = ctx.env;
-    let mp = env.machines.get(name)?;
-    let vm = env.spec().machines.get(name)?.vm.as_ref()?;
-    let image = boxes::vagrant(vm)?;
+    let planned = env.vm(name)?;
+    let mp = planned.plan;
+    let image = boxes::vagrant(env.spec().machines.get(name)?.vm.as_ref()?)?;
     let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
@@ -54,7 +54,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         for (p, host) in &published {
             r.call(vagrantfile::forwarded_port("m", p.port, host.clone(), p.protocol));
         }
-        let mut guest = guest(env, name, mp, &image, link);
+        let mut guest = guest(env, planned, &image, link);
         guest.hyperv.published = relays(&published);
         providers::blocks(r, &guest);
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
@@ -148,7 +148,7 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
 
 /// The machine as its providers see it, but for Hyper-V's relays of its published ports
 /// ([`relays`]), which take the host numbers of its forwards.
-fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a VagrantBox, link: &'a Link) -> Guest<'a> {
+fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, image: &'a VagrantBox, link: &'a Link) -> Guest<'a> {
     let os = Os::of(mp);
     // No cloud-init on Windows: its lab address is set from PowerShell.
     let prefix = |net: &str| env.block(net).prefix();
@@ -179,7 +179,7 @@ fn guest<'a>(env: &'a Environment, name: &str, mp: &'a MachinePlan, image: &'a V
         },
         hyperv,
         tpm: mp.tpm,
-        esxi_guestos: mp.os.as_deref().and_then(isoloom_render::esxi::guest_os),
+        esxi_guestos: isoloom_render::esxi::guest_os(vm_os),
         esxi_box: None,
         nested: mp.hardware.nested_virtualization,
         disks: mp.disks.iter().map(|d| (d.name.as_str(), d.size_gb)).collect(),

@@ -3,10 +3,9 @@
 //! machine boots its OS's template (`windows`), so its own image is refused.
 
 use crate::hcl_builder::{Block, Expression, Module, boolean};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::machine::Boot;
-use crate::machine::vms;
 use crate::module::ident;
 
 /// A machine's own Proxmox image.
@@ -51,7 +50,7 @@ pub(super) fn clone(vm_id: Expression) -> Block {
 /// Why a machine's own image can't be used, if it can't: a Windows machine boots its OS's
 /// template.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    vms(env).find(|(_, mp)| mp.is_windows() && has_own(mp)).map(|(name, _)| {
+    env.vms().find(|vm| vm.plan.is_windows() && has_own(vm.plan)).map(|Vm { name, .. }| {
         format!(
             "machine `{name}` sets `overrides.proxmox.machines.{name}.image`: a Windows machine boots its OS's template (the module's `template_<os>` variable)"
         )
@@ -60,7 +59,7 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
 
 /// One download per machine with a cloud image of its own, named after the machine.
 pub(super) fn downloads(env: &Environment, m: &mut Module) {
-    for (name, mp) in vms(env) {
+    for Vm { name, plan: mp, .. } in env.vms() {
         let Some(Own::Url(url)) = own(mp) else { continue };
         m.commented(
             &format!("Machine `{name}`'s own cloud image (`overrides.proxmox`)."),

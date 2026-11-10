@@ -4,10 +4,9 @@
 //! `isoloom_render::disks`): the module only makes and attaches them.
 
 use crate::hcl_builder::{Expression, Module, number, reference, string};
-use isoloom_plan::{DataDisk, Environment};
+use isoloom_plan::{DataDisk, Environment, Vm};
 
 use super::guest::MAX_DISKS;
-use crate::machine::vms;
 use crate::module::{ident, resource};
 use crate::server::slotted;
 
@@ -39,7 +38,7 @@ pub(super) fn blocks(name: &str, disks: &[DataDisk], m: &mut Module) -> Vec<Expr
 
 /// Why a machine's disks don't fit its VM, if they don't: more than its free SCSI slots.
 pub(super) fn refusal(env: &Environment) -> Option<String> {
-    vms(env)
-        .find(|(_, mp)| mp.disks.len() > MAX_DISKS)
-        .map(|(name, _)| format!("machine `{name}`: an ESXi VM takes at most {MAX_DISKS} data disks (SCSI slots 0:1 to 0:15, but 0:7)"))
+    env.vms()
+        .find(|Vm { plan: mp, .. }| mp.disks.len() > MAX_DISKS)
+        .map(|Vm { name, .. }| format!("machine `{name}`: an ESXi VM takes at most {MAX_DISKS} data disks (SCSI slots 0:1 to 0:15, but 0:7)"))
 }

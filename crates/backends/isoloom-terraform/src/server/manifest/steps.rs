@@ -7,10 +7,10 @@ use isoloom_manifest::{
     Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Part, PathTemplate, Placeholder, RelPath, RunVar, Seal, SnakeName,
     Step, Template,
 };
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Vm};
 use isoloom_render::run_manifest::timeout_s;
 
-use crate::machine::{controller, vms};
+use crate::machine::controller;
 use crate::module::manifest::{self, PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, secs, terraform, words};
 use crate::server::router::check_host;
 use crate::ssh::Login;
@@ -88,7 +88,7 @@ pub(super) fn ready(env: &Environment, applied: &str, log: Option<&str>) -> Resu
         step: id("apply")?,
         means: Some(applied.into()),
     }];
-    for (_, mp) in vms(env).filter(|(_, mp)| !mp.is_windows()) {
+    for Vm { plan: mp, .. } in env.vms().filter(|vm| !vm.plan.is_windows()) {
         if let Some(a) = mp.addresses.values().next() {
             out.push(ready_file(&a.to_string(), log, SETUP_S)?);
         }

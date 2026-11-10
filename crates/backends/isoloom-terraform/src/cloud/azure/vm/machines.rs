@@ -7,7 +7,7 @@ use crate::cloud::user_data_limit::Limit;
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, reference, string};
 use crate::machine::controller::WinrmAuth;
 use indexmap::IndexMap;
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{RULES, USER, image, public_ip as address_of};
@@ -26,7 +26,7 @@ const CAP: Capped = Capped {
 };
 
 /// A Linux machine: its security group, public IP, interfaces and VM, set up from its custom data.
-pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) -> Result<()> {
+pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, m: &mut Module) -> Result<()> {
     let id = ident(name);
     m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
     m.block(public_ip(&id, name));
@@ -39,13 +39,7 @@ pub(super) fn linux(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut
     let own = own_image::of(mp, own_image::azure);
     let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
     let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
-    m.block(linux_vm(
-        &id,
-        name,
-        (mp.os.as_deref().unwrap_or_default(), own),
-        (RULES.size_of(mp), disk, mp.tpm.is_some()),
-        (list(ids), setup),
-    ));
+    m.block(linux_vm(&id, name, (os, own), (RULES.size_of(mp), disk, mp.tpm.is_some()), (list(ids), setup)));
     m.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
     Ok(())
 }
@@ -192,12 +186,12 @@ fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> 
 
 /// A Windows machine: its security group, public IP, interface and VM (its name, the
 /// administrator and a WinRM listener set at creation), its set-up over WinRM.
-pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+pub(super) fn windows(env: &Environment, vm @ Vm { name, plan: mp, .. }: Vm<'_>, m: &mut Module) {
     let id = ident(name);
     m.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, (name, mp), true));
     m.block(public_ip(&id, name));
     m.blocks(nics(&id, name, mp));
-    m.block(windows_vm(name, mp));
+    m.block(windows_vm(vm));
     m.blocks(disks::azure(name, "azurerm_windows_virtual_machine", &mp.disks));
     m.blocks(windows::blocks(windows::Machine {
         remote: Remote {
@@ -217,7 +211,7 @@ pub(super) fn windows(env: &Environment, (name, mp): (&str, &MachinePlan), m: &m
     }));
 }
 
-fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
+fn windows_vm(Vm { name, plan: mp, os }: Vm<'_>) -> Block {
     let id = ident(name);
     // Azure's Windows images are a 127 GB disk.
     let disk = mp.size().disk_gb.max(127);
@@ -233,12 +227,7 @@ fn windows_vm(name: &str, mp: &MachinePlan) -> Block {
         .add_attribute(("network_interface_ids", list(ids)))
         .add_block(Block::builder("winrm_listener").add_attribute(("protocol", string("Http"))).build())
         .add_block(os_disk(disk));
-    with_image(
-        vm,
-        (mp.os.as_deref().unwrap_or_default(), own_image::of(mp, own_image::azure)),
-        mp.tpm.is_some(),
-    )
-    .build()
+    with_image(vm, (os, own_image::of(mp, own_image::azure)), mp.tpm.is_some()).build()
 }
 
 /// The auto-stop on Windows, a scheduled task registered over WinRM (Azure runs no user data

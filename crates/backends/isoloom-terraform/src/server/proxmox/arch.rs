@@ -5,7 +5,7 @@
 //! aarch64 UEFI firmware (the `pve-edk2-firmware-aarch64` package).
 
 use crate::hcl_builder::{Block, BlockBuilder, number, reference, string};
-use isoloom_plan::{Environment, MachinePlan};
+use isoloom_plan::{Environment, MachinePlan, Vm};
 use isoloom_spec::model::Arch;
 
 use crate::module::ident;
@@ -49,9 +49,9 @@ pub(super) fn is_arm(mp: &MachinePlan) -> bool {
 }
 
 /// The resource name of an OS's cloud image for the machine's architecture.
-pub(super) fn image_res(mp: &MachinePlan) -> String {
-    let o = ident(mp.os.as_deref().unwrap_or_default());
-    if is_arm(mp) { format!("{o}_arm64") } else { o }
+pub(super) fn image_res(vm: Vm<'_>) -> String {
+    let o = ident(vm.os);
+    if is_arm(vm.plan) { format!("{o}_arm64") } else { o }
 }
 
 /// Why an arm64 machine can't run here, if one can't: Windows, or an OS with no arm64 image of

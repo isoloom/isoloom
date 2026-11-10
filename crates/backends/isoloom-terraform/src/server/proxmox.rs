@@ -51,7 +51,7 @@ use isoloom_spec::model::Target;
 
 use super::{Parts, PinnedImage};
 use crate::limits::Limits;
-use crate::machine::{cloudbase_init, controller as core_controller, vms};
+use crate::machine::{cloudbase_init, controller as core_controller};
 use crate::module::{ProjectCopy, Usage};
 
 /// What Proxmox can't host.
@@ -209,8 +209,8 @@ const PARTS: Parts = Parts {
 
 /// The VMs, the LXC containers, then the controller.
 fn guests(env: &Environment, m: &mut Module) {
-    for (name, mp) in vms(env) {
-        machine::blocks(env, name, mp, m);
+    for vm in env.vms() {
+        machine::blocks(env, vm, m);
     }
     lxc::blocks(env, m);
     if core_controller::needed(env) {
