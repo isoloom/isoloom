@@ -374,6 +374,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   `/var/lib/isoloom/setup.sh` under the default umask, readable by every account on the machine,
   and it holds the sensitive inputs in base64 (and, on the controller, its private key and the
   inventory with the Windows password). It is now a fresh file written under umask 077.
+- **`docker-vm`'s VM gets only the outputs Compose reads.** Its project step copied every one of
+  Isoloom's outputs into `/opt/isoloom`, other targets' folders included, with what the tools
+  write there: a Terraform state (the secrets Terraform saw) and a cloud machine's login
+  (`.isoloom-reach/`). It now copies the `docker` target's folder and `.isoloom/configure/` only;
+  the Vagrant project step's `generated:` option is gone, and `extra:` takes folders.
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

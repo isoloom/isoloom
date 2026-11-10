@@ -2,9 +2,11 @@
 //! `.isoloom/docker-vm/Vagrantfile` (a VM on this machine, or on an ESXi host).
 //!
 //! - One Debian VM, sized for every container together (and Docker itself).
-//! - Docker from Docker's own repository; the project copied to /opt/isoloom; then the lab started
-//!   with `.isoloom/docker/compose.yml`, the `docker` target's Compose file, rendered with it by
-//!   the Compose backend: the commands Compose's backend gives ([`GuestCompose`]).
+//! - Docker from Docker's own repository; the project copied to /opt/isoloom, with the `docker`
+//!   target's folder and the configuration files of Isoloom's outputs (no other target's, nor the
+//!   tools' state); then the lab started with `.isoloom/docker/compose.yml`, the `docker` target's
+//!   Compose file, rendered with it by the Compose backend: the commands Compose's backend gives
+//!   ([`GuestCompose`]).
 //! - When everything answers: /var/lib/isoloom/ready, for runners to poll.
 //! - Checks on demand: `vagrant provision --provision-with checks` (every runner of the Compose
 //!   `check` profile).
@@ -203,9 +205,9 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
     if let Some(sh) = steps::linux(env, "", &isoloom_plan::Step::Prelude) {
         r.provision(named(vagrantfile::CONSTRAINTS, "shell").kw("inline", Value::str(&sh)));
     }
-    // The project, its generated Compose file included: first, so the certificate authorities
-    // it holds are trusted before Docker downloads.
-    r.provision(named(PROJECT, "isoloom_project").kw("generated", true));
+    // The project, with the outputs Compose reads: first, so the certificate authorities it holds
+    // are trusted before Docker downloads.
+    r.provision(named(PROJECT, "isoloom_project").kw("extra", compose_outputs()));
     if let Some(sh) = steps::trust_authorities(env) {
         r.provision(named(CA_CERTIFICATES, "shell").kw("inline", Value::str(&sh)));
     }
@@ -222,6 +224,15 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
     if let Some(script) = &scripts.checks {
         checks(r, env, script);
     }
+}
+
+/// What of Isoloom's outputs the VM gets with the project: the `docker` target's folder (its
+/// Compose file, check scripts and builds) and the configuration files its images copy. Never
+/// another target's folder, nor what the tools write beside them (a Terraform state, a cloud
+/// machine's login).
+fn compose_outputs() -> Value {
+    let docker = format!("{OUTPUT_DIR}/{}", Target::Docker.id());
+    Value::array([Value::str(&docker), Value::str(isoloom_render::configure::DIR)])
 }
 
 /// The size on the providers of this machine (VirtualBox, VMware, Parallels, UTM, QEMU,

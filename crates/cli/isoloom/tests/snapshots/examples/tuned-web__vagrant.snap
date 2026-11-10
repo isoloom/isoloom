@@ -219,13 +219,13 @@ module IsoloomProject
   # Never copied, at any depth: version control and the tools' own state.
   SKIP = [".git", ".vagrant", ".terraform"].freeze
 
-  # Writes the archive of `root` to `io`, gzipped. `generated`: whether Isoloom's outputs (the
-  # top-level `.isoloom*` folders) go in; `extra`: files in them that go in anyway (paths from
-  # `root`, with `/`). What `.isoloomignore` lists stays out.
-  def self.write(root, io, generated: false, extra: [])
+  # Writes the archive of `root` to `io`, gzipped. Isoloom's outputs (the top-level `.isoloom*`
+  # folders) stay out but `extra`: files or folders in them that go in, a folder with all it holds
+  # (paths from `root`, with `/`). What `.isoloomignore` lists stays out.
+  def self.write(root, io, extra: [])
     gz = Zlib::GzipWriter.new(io)
     rules = ignore_rules(root)
-    walk(root, nil, generated, extra, rules) { |rel, st| entry(gz, root, rel, st) }
+    walk(root, nil, extra, rules) { |rel, st| entry(gz, root, rel, st) }
     gz.write("\0" * 1024)
     gz.finish
   end
@@ -261,7 +261,7 @@ module IsoloomProject
   end
 
   # Every entry under `dir` (relative to `root`), parents first, in name order.
-  def self.walk(root, dir, generated, extra, rules, &block)
+  def self.walk(root, dir, extra, rules, &block)
     names = begin
       Dir.children(dir ? File.join(root, dir) : root).sort
     rescue Errno::ENOENT, Errno::ENOTDIR
@@ -270,8 +270,8 @@ module IsoloomProject
     names.each do |name|
       next if SKIP.include?(name)
       rel = dir ? "#{dir}/#{name}" : name
-      if !generated && rel.start_with?(".isoloom")
-        next unless extra.any? { |e| e == rel || e.start_with?("#{rel}/") }
+      if rel.start_with?(".isoloom")
+        next unless extra.any? { |e| e == rel || e.start_with?("#{rel}/") || rel.start_with?("#{e}/") }
       end
       st = begin
         File.lstat(File.join(root, rel))
@@ -282,7 +282,7 @@ module IsoloomProject
       out = ignored?(rules, folder ? "#{rel}/" : rel)
       yield rel, st unless out
       # An ignored folder is skipped, unless a `!` pattern may bring back something in it.
-      walk(root, rel, generated, extra, rules, &block) if folder && (!out || rules.any? { |_, keep| keep })
+      walk(root, rel, extra, rules, &block) if folder && (!out || rules.any? { |_, keep| keep })
     end
   end
 
@@ -343,18 +343,16 @@ end
 if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
   module IsoloomProject
     class Config < Vagrant.plugin("2", :config)
-      attr_accessor :name, :generated, :extra
+      attr_accessor :name, :extra
 
       def initialize
         super
         @name = UNSET_VALUE
-        @generated = UNSET_VALUE
         @extra = UNSET_VALUE
       end
 
       def finalize!
         @name = nil if @name == UNSET_VALUE
-        @generated = false if @generated == UNSET_VALUE
         @extra = [] if @extra == UNSET_VALUE
       end
     end
@@ -366,7 +364,7 @@ if defined?(Vagrant) && Vagrant.respond_to?(:plugin)
         windows = %w[winrm winssh].include?(@machine.config.vm.communicator.to_s)
         Tempfile.create(["isoloom-project", ".tgz"]) do |f|
           f.binmode
-          IsoloomProject.write(ROOT, f, generated: config.generated, extra: config.extra)
+          IsoloomProject.write(ROOT, f, extra: config.extra)
           f.close
           dest = windows ? "C:\\isoloom" : "/opt/isoloom"
           @machine.ui.info("The project, #{(File.size(f.path) / 1024.0).ceil} KB compressed, to #{dest}")
