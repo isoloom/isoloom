@@ -132,14 +132,18 @@ fn a_public_network_is_a_bridged_network() -> Outcome {
         "bento/debian-12",
         r#"{"name":"network","args":["public_network",{"use_dhcp_assigned_default_route":true}]}"#,
     )?;
-    let d = draft(&dhcp, "lab", "Vagrantfile")?;
-    assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
-    let drafted = spec(&d)?;
-    let bridged = drafted.networks["lan"].bridged.as_ref().ok_or("not bridged")?;
-    assert!(bridged.dhcp && bridged.default_route && bridged.interface.is_none(), "{}", d.yaml);
-    assert_eq!(drafted.machines["web"].networks["lan"], Octets::One(0));
-    assert!(has(&d, NoteKind::Changed, "define web.vm.network", "set it to the LAN's"), "{:?}", d.notes);
-    assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", d.notes);
+    let by_dhcp = draft(&dhcp, "lab", "Vagrantfile")?;
+    assert_eq!(validate(&by_dhcp)?, Vec::<String>::new(), "{}", by_dhcp.yaml);
+    let leased = spec(&by_dhcp)?;
+    let lease = leased.networks["lan"].bridged.as_ref().ok_or("not bridged")?;
+    assert!(lease.dhcp && lease.default_route && lease.interface.is_none(), "{}", by_dhcp.yaml);
+    assert_eq!(leased.machines["web"].networks["lan"], Octets::One(0));
+    assert!(
+        has(&by_dhcp, NoteKind::Changed, "define web.vm.network", "set it to the LAN's"),
+        "{:?}",
+        by_dhcp.notes
+    );
+    assert!(!by_dhcp.notes.iter().any(|n| n.kind == NoteKind::NotYet), "{:?}", by_dhcp.notes);
     Ok(())
 }
 
@@ -178,8 +182,12 @@ fn a_synced_folder_is_a_host_folder() -> Outcome {
     assert!(has(&d, NoteKind::Equivalent, at, "the project: Isoloom copies it"), "{:?}", d.notes);
     // A Windows machine has none: left out, and said.
     let windows = one_machine("gusztavvargadr/windows-server", r#"{"name":"synced_folder","args":["data","C:/data"]}"#)?;
-    let d = draft(&windows, "lab", "Vagrantfile")?;
-    assert!(spec(&d)?.machines["web"].host_folders.is_empty(), "{}", d.yaml);
-    assert!(has(&d, NoteKind::Changed, at, "a Windows machine has no host folders"), "{:?}", d.notes);
+    let on_windows = draft(&windows, "lab", "Vagrantfile")?;
+    assert!(spec(&on_windows)?.machines["web"].host_folders.is_empty(), "{}", on_windows.yaml);
+    assert!(
+        has(&on_windows, NoteKind::Changed, at, "a Windows machine has no host folders"),
+        "{:?}",
+        on_windows.notes
+    );
     Ok(())
 }

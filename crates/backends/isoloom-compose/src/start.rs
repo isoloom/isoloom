@@ -44,12 +44,13 @@ impl StartPlan {
     /// given), then each job attached, its exit code failing the line.
     pub(crate) fn command(&self, compose: &str, wait_timeout: Option<u32>) -> String {
         let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
-        let services: String = self.wait.iter().map(|s| format!(" {s}")).collect();
-        let jobs: String = self
+        let services = self.wait.iter().map(|s| format!(" {s}")).collect::<Vec<_>>().concat();
+        let jobs = self
             .jobs
             .iter()
             .map(|j| format!(" && {compose} up --no-deps --exit-code-from {j} {j}"))
-            .collect();
+            .collect::<Vec<_>>()
+            .concat();
         format!("{compose} up -d --build --wait{timeout}{services}{jobs}")
     }
 }

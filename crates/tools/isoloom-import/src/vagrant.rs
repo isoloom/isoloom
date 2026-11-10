@@ -253,16 +253,15 @@ impl<'a> Import<'a> {
             dhcp,
             default_route: dhcp && c.opt("use_dhcp_assigned_default_route").and_then(Value::as_bool) == Some(true),
         };
-        let (cidr, octet) = match fixed {
-            Some(ip) => (block(ip, text(c.opt("netmask")).as_deref()).0, ip.octets()[3]),
-            None => {
-                self.notes.add(
-                    &at,
-                    NoteKind::Changed,
-                    format!("by DHCP from the LAN, whose block the Vagrantfile doesn't say: `cidr` is {LAN_PLACEHOLDER}, set it to the LAN's"),
-                );
-                (LAN_PLACEHOLDER, 0)
-            }
+        let (cidr, octet) = if let Some(ip) = fixed {
+            (block(ip, text(c.opt("netmask")).as_deref()).0, ip.octets()[3])
+        } else {
+            self.notes.add(
+                &at,
+                NoteKind::Changed,
+                format!("by DHCP from the LAN, whose block the Vagrantfile doesn't say: `cidr` is {LAN_PLACEHOLDER}, set it to the LAN's"),
+            );
+            (LAN_PLACEHOLDER, 0)
         };
         let key = format!("bridged {}", if dhcp { interface.unwrap_or_default() } else { cidr.to_string() });
         self.nets.entry(key.clone()).or_insert_with(|| Net {
