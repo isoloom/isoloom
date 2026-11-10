@@ -31,7 +31,7 @@
 //! let files = VagrantBackend.render(&env)?;
 //! let vagrantfile = files.iter().find(|f| f.path == ".isoloom/vagrant/Vagrantfile").ok_or("no Vagrantfile")?;
 //! assert!(vagrantfile.contents.contains("config.vm.define \"web\" do |m|"));
-//! assert_eq!(provider_refusal(&spec, "virtualbox"), None);
+//! assert_eq!(provider_refusal(&env, "virtualbox"), None);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 

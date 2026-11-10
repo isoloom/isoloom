@@ -9,7 +9,7 @@ pub(crate) mod providers;
 mod usage;
 pub(crate) mod variable;
 
-use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, number};
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, number};
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_render::{GeneratedFile, project};
 use isoloom_spec::model::Target;
@@ -32,6 +32,24 @@ pub(crate) fn resource(kind: &str, name: &str) -> BlockBuilder {
 /// An `output` block.
 pub(crate) fn output(name: &str, value: Expression) -> Block {
     Block::builder("output").add_label(name).add_attribute(("value", value)).build()
+}
+
+/// The `published` output's entries, `"<machine>/<port>" = "<address>:<host port>"`, for each port
+/// `machines` publish (the plan's [`isoloom_plan::PublishedPort`]s, named as the run manifest and
+/// the message name them), `at` giving the expression of the address a machine is reached at:
+/// the one rule of the servers' and the clouds' `published` outputs.
+pub(crate) fn published<'a>(
+    machines: impl IntoIterator<Item = (&'a str, &'a isoloom_plan::MachinePlan)>,
+    at: impl Fn(&str) -> Expression,
+) -> Vec<(String, Expression)> {
+    let mut out = Vec::new();
+    for (name, mp) in machines {
+        for p in &mp.ports {
+            let address = Template::new().with_expr(at(name)).with_text(format!(":{}", p.publish));
+            out.push((format!("{name}/{}", p.name), address.into_expression()));
+        }
+    }
+    out
 }
 
 /// A generated password, `random_password.<name>`: 24 letters and digits, two of each kind at

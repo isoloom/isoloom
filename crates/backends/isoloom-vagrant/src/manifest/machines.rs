@@ -55,7 +55,7 @@ fn machine(env: &Environment, d: &Define, boot_digest: &str) -> Result<Machine> 
         }
         Kind::Controller => {
             out.addresses = on_every_network(env, |c| Some(c.controller()))?;
-            out.resources = Some(Size::controller(env.spec()).resources());
+            out.resources = Some(Size::controller(env.controller.as_ref()).resources());
             out.keep_running = keeps_controller(env);
         }
     }

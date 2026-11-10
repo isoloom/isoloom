@@ -3,7 +3,7 @@
 //! controller are made of too.
 
 use crate::hcl_builder::{Block, Expression, Module, boolean, list, number, reference, string};
-use isoloom_plan::checks::{Position, Probe, by_position};
+use isoloom_plan::checks::{Position, Probe};
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
 
 use super::windows;
@@ -93,7 +93,8 @@ pub(super) fn depends_on(env: &Environment, mp: &MachinePlan) -> Vec<Expression>
 /// Whether the machine gets the project: its steps read it, or a check runner runs a script there.
 fn needs_project(env: &Environment, (name, mp): (&str, &MachinePlan)) -> bool {
     let runs = isoloom_plan::machine_files::reads_project(&mp.lifecycle);
-    let scripts = by_position(env.spec(), &env.checks)
+    let scripts = env
+        .checks_by_position()
         .into_iter()
         .any(|(p, g)| p == Position::Machine(name.to_owned()) && g.iter().any(|c| matches!(c.probe, Probe::Script { .. })));
     runs || scripts

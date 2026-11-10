@@ -221,6 +221,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   every `ip route replace`, and `isoloom_render::trunks::of_machines` keeps machines by name and
   spec. `isoloom_manifest::Cidr` converts from `isoloom_spec::net::Cidr` (`From`, through
   `Cidr::ipv4`) instead of through text.
+- **Breaking (library): `isoloom_vagrant::provider_refusal` takes the planned `Environment`**
+  (was the spec, which it planned again on every call). The plan's `Controller` has
+  `keep_running`, and `Environment::default_position` and `checks_by_position` group the checks
+  by the plan's roles.
 - **Breaking (library): the plan carries what the backends read of the spec**: the inputs, the
   secrets, each machine's role, the tools with their addresses and the constraints
   (`Environment::{inputs, secrets, tools, constraints}`, `MachinePlan::role`);

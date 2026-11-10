@@ -6,7 +6,7 @@
 use indexmap::IndexMap;
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
+use isoloom_plan::checks::{Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, UTILITY_IMAGE, exec_runner, init_names};
@@ -22,8 +22,7 @@ const PROFILE: &str = "check";
 
 /// Adds each position's runner to `services`; returns their scripts.
 pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Service>) -> Vec<GeneratedFile> {
-    let spec = env.spec();
-    let default_pos = checks::default_position(spec);
+    let default_pos = env.default_position();
     let host = |h: &Host, _: &Position| isoloom_render::checks::address_of(env, h);
     let run_script = |path: &str| isoloom_render::checks::script_command_in("/isoloom/project", path);
     let render = Render {
@@ -32,7 +31,7 @@ pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Servic
         playbook: None,
     };
     let mut files = Vec::new();
-    for (pos, group) in checks::by_position(spec, &env.checks) {
+    for (pos, group) in env.checks_by_position() {
         let id = pos.id().to_owned();
         // `exec` checks run inside the machine itself, not in the runner beside it (which shares
         // only its network): their own script, piped to `docker compose exec -T <machine> sh -s`.

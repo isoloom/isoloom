@@ -62,7 +62,10 @@ fn no_cloud_rule_lets_the_whole_internet_in_but_path_mtu_discovery() -> Outcome 
             if !lab.possible().contains(&target) || refusal(&lab, target).is_some() {
                 continue;
             }
-            for f in generate(&lab, target)?.iter().filter(|f| std::path::Path::new(&f.path).extension().is_some_and(|e| e == "tf")) {
+            for f in generate(&lab, target)?
+                .iter()
+                .filter(|f| std::path::Path::new(&f.path).extension().is_some_and(|e| e == "tf"))
+            {
                 for rule in inbound_rules(&f.contents) {
                     rules += 1;
                     let anywhere = [

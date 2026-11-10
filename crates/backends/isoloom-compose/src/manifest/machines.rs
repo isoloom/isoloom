@@ -8,7 +8,7 @@ use std::num::NonZeroU16;
 use isoloom_manifest::{
     Error as ManifestError, GuestPath, Machine, Name, Native, Placeholder, Port, PortKind, PortName, Publish, PublishMode, Role, Template, Volume,
 };
-use isoloom_plan::checks::{self, Position};
+use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Lifetime, MachinePlan};
 use isoloom_render::router;
 use isoloom_render::run_manifest::{addresses, arch, port};
@@ -88,9 +88,9 @@ fn isoloom_own(env: &Environment, name: &str) -> Option<(Role, Option<String>)> 
 
 /// A check runner, belonging to the machine whose namespace it runs in.
 fn runner(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, Option<String>)> {
-    let spec = env.spec();
-    let default = checks::default_position(spec);
-    let (pos, _) = checks::by_position(spec, &env.checks)
+    let default = env.default_position();
+    let (pos, _) = env
+        .checks_by_position()
         .into_iter()
         .find(|(pos, _)| check_runner_service(pos, &default) == name)?;
     let of = match pos {

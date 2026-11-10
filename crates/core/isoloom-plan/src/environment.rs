@@ -310,6 +310,9 @@ pub struct Controller {
     pub memory_mb: u32,
     /// Disk in GB, when the spec sets one (else its image's own).
     pub disk_gb: Option<u32>,
+    /// Whether it stays on once the environment is built (`controller.keep_running`), rather
+    /// than halting until the checks need it.
+    pub keep_running: bool,
 }
 
 impl Controller {
@@ -327,6 +330,7 @@ impl Controller {
             cpus: r.and_then(|r| r.cpus).unwrap_or(Controller::CPUS),
             memory_mb: r.and_then(|r| r.memory_mb).unwrap_or(Controller::MEMORY_MB),
             disk_gb: r.and_then(|r| r.disk_gb),
+            keep_running: spec.controller.as_ref().is_some_and(|c| c.keep_running),
         }
     }
 
@@ -611,15 +615,17 @@ mod tests {
             Some(Controller {
                 cpus: 1,
                 memory_mb: 512,
-                disk_gb: None
+                disk_gb: None,
+                keep_running: false
             })
         );
         assert_eq!(
-            controller("controller: { resources: { cpus: 2, memory_mb: 768, disk_gb: 10 } }\n"),
+            controller("controller: { resources: { cpus: 2, memory_mb: 768, disk_gb: 10 }, keep_running: true }\n"),
             Some(Controller {
                 cpus: 2,
                 memory_mb: 768,
-                disk_gb: Some(10)
+                disk_gb: Some(10),
+                keep_running: true
             })
         );
     }

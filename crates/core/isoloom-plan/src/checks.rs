@@ -291,9 +291,15 @@ fn declared_tcp(d: &Declared, target: &str) -> Option<DeclaredProbe> {
 /// The checks grouped by position: the default position first, then machines in spec order.
 #[must_use]
 pub fn by_position<'a>(spec: &Spec, checks: &'a [Resolved]) -> Vec<(Position, Vec<&'a Resolved>)> {
-    let mut order: Vec<Position> = vec![default_position(spec)];
-    for m in spec.machines.keys() {
-        let p = Position::Machine(m.clone());
+    grouped(default_position(spec), spec.machines.keys().map(String::as_str), checks)
+}
+
+/// `checks` grouped by position: `default` first, then each of `machines` in order, then the
+/// networks; a position with no check left out.
+fn grouped<'a, 'm>(default: Position, machines: impl Iterator<Item = &'m str>, checks: &'a [Resolved]) -> Vec<(Position, Vec<&'a Resolved>)> {
+    let mut order: Vec<Position> = vec![default];
+    for m in machines {
+        let p = Position::Machine(m.to_owned());
         if !order.contains(&p) {
             order.push(p);
         }
@@ -308,6 +314,25 @@ pub fn by_position<'a>(spec: &Spec, checks: &'a [Resolved]) -> Vec<(Position, Ve
             (!group.is_empty()).then_some((p, group))
         })
         .collect()
+}
+
+impl crate::Environment {
+    /// The position a check without `from` runs from: the access machine (the plan's
+    /// [`crate::MachineRole::Access`]), else the networks.
+    #[must_use]
+    pub fn default_position(&self) -> Position {
+        match self.machines.iter().find(|(_, mp)| mp.is_access()) {
+            Some((name, _)) => Position::Machine(name.clone()),
+            None => Position::Networks,
+        }
+    }
+
+    /// Its checks grouped by position: [`Self::default_position`] first, then its machines in
+    /// spec order, then the networks; a position with no check left out.
+    #[must_use]
+    pub fn checks_by_position(&self) -> Vec<(Position, Vec<&Resolved>)> {
+        grouped(self.default_position(), self.machines.keys().map(String::as_str), &self.checks)
+    }
 }
 
 #[cfg(test)]

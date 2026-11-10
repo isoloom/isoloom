@@ -2,8 +2,9 @@
 //! (Proxmox, ESXi, each cloud) declares its limits, each with the reason it gives, and adds the
 //! checks only it has (its images, its address rules) after them.
 
-use isoloom_plan::Environment;
-use isoloom_spec::model::{Arch, Spec};
+use isoloom_plan::checks::Probe;
+use isoloom_plan::{Environment, MachineShape};
+use isoloom_spec::model::Arch;
 
 /// The features a VM target lacks, each with its reason (`None`: the target has it).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -24,14 +25,16 @@ impl Limits {
     /// The first of the limits the environment runs into, in this order: arm64, gateways,
     /// playbook checks, link impairment, IPv6.
     pub(crate) fn refusal(&self, env: &Environment) -> Option<String> {
-        let spec = env.spec();
-        if let (Some(why), Some(name)) = (self.arm64, arm64_machine(spec)) {
+        if let (Some(why), Some(name)) = (self.arm64, arm64_machine(env)) {
             return Some(format!("machine `{name}`: {why}"));
         }
         if let Some(why) = self.gateways.filter(|_| env.networks.values().any(|n| n.gateway.is_some())) {
             return Some(why.to_owned());
         }
-        if let Some(why) = self.playbook_checks.filter(|_| spec.checks.iter().any(isoloom_spec::Check::is_playbook)) {
+        if let Some(why) = self
+            .playbook_checks
+            .filter(|_| env.checks.iter().any(|c| matches!(c.probe, Probe::Playbook { .. })))
+        {
             return Some(why.to_owned());
         }
         if let Some(why) = self.tc.filter(|_| env.networks.values().any(|n| n.tc.is_some())) {
@@ -44,14 +47,14 @@ impl Limits {
 
 /// The first machine the target builds on arm64, if any: the cloud targets and ESXi refuse
 /// these (x86-64 images and instance types; ESXi runs x86-64 VMs only), and Proxmox emulates
-/// them (`server::proxmox`). Only machines that declare a container or a VM count: an access
-/// machine with neither isn't built, so its arch is moot, but one that declares a form is, and
-/// must not silently get an x86 image.
-pub(crate) fn arm64_machine(spec: &Spec) -> Option<&str> {
-    spec.machines
+/// them (`server::proxmox`). Only machines the plan builds, as a container or a VM, count: an
+/// access machine the runner supplies isn't built, so its arch is moot, but one with a form is,
+/// and must not silently get an x86 image.
+pub(crate) fn arm64_machine(env: &Environment) -> Option<&str> {
+    env.machines
         .iter()
-        .filter(|(_, m)| m.docker.is_some() || m.vm.is_some())
-        .find(|(_, m)| m.arch == Arch::Arm64)
+        .filter(|(_, mp)| matches!(mp.shape, MachineShape::Container | MachineShape::Vm))
+        .find(|(_, mp)| mp.arch == Arch::Arm64)
         .map(|(n, _)| n.as_str())
 }
 

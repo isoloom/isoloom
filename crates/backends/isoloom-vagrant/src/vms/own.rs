@@ -185,7 +185,7 @@ const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add
 pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let env = ctx.env;
     let (bx, version) = controller_box(env.spec());
-    let size = Size::controller(env.spec());
+    let size = Size::controller(env.controller.as_ref());
     let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
     let mut guest = helper(env, CONTROLLER, size, addresses(env, |c| Some(c.controller())), link);
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
@@ -264,7 +264,7 @@ fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     }
     // Done: it halts (its disk kept) unless the spec keeps it running. Detached, so that the
     // provisioner returns before the VM goes; the runner's `check` boots it again for the checks.
-    if !spec.controller.as_ref().is_some_and(|c| c.keep_running) {
+    if !env.controller.as_ref().is_some_and(|c| c.keep_running) {
         shell(r, "halt", &format!("touch {HALTING}; (sleep 5; poweroff) >/dev/null 2>&1 &"));
     }
 }

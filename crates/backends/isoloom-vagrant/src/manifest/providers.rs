@@ -27,7 +27,6 @@ fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<
 /// The providers the Vagrantfile has a block for ([`Vagrant::runs_vms`]: all but UTM), with
 /// this lab's refusal on each, and Vagrant's state folder for the run.
 pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
-    let spec = env.spec();
     let providers = Vagrant::ALL
         .iter()
         .filter(|k| k.provider.runs_vms())
@@ -35,7 +34,7 @@ pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Iden
             // Hyper-V takes management commands from an administrator only.
             let elevation = if k.manifest == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None };
             let name = k.provider.id();
-            provider(k, elevation, provider_refusal(spec, name))
+            provider(k, elevation, provider_refusal(env, name))
         })
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {

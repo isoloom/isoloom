@@ -4,7 +4,7 @@
 //! runner of their own (`kubectl exec -i deploy/<machine> -- sh -s`), which the Jobs don't run.
 
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
+use isoloom_plan::checks::{Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, check_runner, exec_runner};
@@ -35,8 +35,8 @@ pub(crate) struct Checks {
 /// The environment's checks, grouped by position.
 pub(crate) fn plan(env: &Environment) -> Checks {
     let mut out = Checks::default();
-    let default = checks::default_position(env.spec());
-    for (pos, group) in checks::by_position(env.spec(), &env.checks) {
+    let default = env.default_position();
+    for (pos, group) in env.checks_by_position() {
         let job = check_runner(&pos, &default);
         position(env, &pos, &job, group, &mut out);
     }

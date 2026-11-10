@@ -4,7 +4,7 @@
 
 use isoloom_manifest::{HostOs, Provider as ManifestProvider};
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_spec::model::{Arch, Spec, Target};
+use isoloom_spec::model::Arch;
 
 use super::{boot, bridged, hyperv, qemu, windows};
 
@@ -159,16 +159,15 @@ impl<'a> Provider<'a> {
     }
 }
 
-/// Why this environment's VMs can't all run under Vagrant's `provider` (as `vagrant up
-/// --provider` names it), if they can't: a provider the target has no block for (UTM,
-/// [`Provider::runs_vms`]), a machine requiring a TPM the provider doesn't give, then QEMU's
+/// Why the VMs of `env`, planned for the `vagrant` target, can't all run under Vagrant's
+/// `provider` (as `vagrant up --provider` names it), if they can't: a provider the target has no
+/// block for (UTM, which gives a VM no private network), a machine requiring a TPM the provider doesn't give, then QEMU's
 /// networks, Hyper-V's boxes and libvirt's bridged networks, then a machine's own boot, which
 /// only libvirt (and QEMU, for UEFI's format) boots, then a machine's host folders, which Hyper-V
 /// and ESXi don't share (nor QEMU read-only), then a machine of another architecture than ESXi's
 /// on ESXi, then a machine's data disks, which QEMU's and Parallels' plugins don't attach.
 #[must_use]
-pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
-    let env = Environment::build(spec, Target::Vagrant, None);
+pub fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     let provider = Provider::from(provider);
     if !provider.runs_vms() {
         return Some(format!(
@@ -176,12 +175,12 @@ pub fn provider_refusal(spec: &Spec, provider: &str) -> Option<String> {
             provider.id()
         ));
     }
-    windows::tpm_refusal(&env, provider)
-        .or_else(|| networks_refusal(&env, provider))
-        .or_else(|| boot::refusal(&env, provider))
-        .or_else(|| crate::host_folders::refusal(&env, provider))
-        .or_else(|| arch_refusal(&env, provider))
-        .or_else(|| disk_refusal(spec, provider))
+    windows::tpm_refusal(env, provider)
+        .or_else(|| networks_refusal(env, provider))
+        .or_else(|| boot::refusal(env, provider))
+        .or_else(|| crate::host_folders::refusal(env, provider))
+        .or_else(|| arch_refusal(env, provider))
+        .or_else(|| disk_refusal(env, provider))
 }
 
 /// A VM ESXi can't run: one of another architecture than the ESXi host's ([`ESXI_ARCH`]).
@@ -197,11 +196,11 @@ fn arch_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
 
 /// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's and
 /// Parallels' plugins attach none.
-fn disk_refusal(spec: &Spec, provider: Provider<'_>) -> Option<String> {
+fn disk_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
     if provider.attaches_disks() {
         return None;
     }
-    let (name, _) = spec.machines.iter().find(|(_, m)| m.vm.is_some() && !m.disks.is_empty())?;
+    let (name, _) = env.machines.iter().find(|(_, mp)| mp.shape == MachineShape::Vm && !mp.disks.is_empty())?;
     Some(format!(
         "machine `{name}` has data disks (`disks`), which the `{}` provider doesn't attach",
         provider.id()

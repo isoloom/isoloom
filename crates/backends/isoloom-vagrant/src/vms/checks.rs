@@ -25,7 +25,6 @@ impl<'a> Checks<'a> {
     /// The checks of `env`, `in_their_place` standing in for the derived checks no Linux VM can
     /// run here (see [`in_their_place`]).
     pub(crate) fn of(env: &'a Environment, in_their_place: &'a [Resolved]) -> Checks<'a> {
-        let spec = env.spec();
         let controller = env
             .checks
             .iter()
@@ -33,7 +32,7 @@ impl<'a> Checks<'a> {
             .chain(in_their_place)
             .collect();
         Checks {
-            groups: checks::by_position(spec, &env.checks),
+            groups: env.checks_by_position(),
             controller,
         }
     }

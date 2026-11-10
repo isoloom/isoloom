@@ -58,7 +58,7 @@ pub fn network_name(environment: &str, network: &str) -> String {
 use indexmap::IndexMap;
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::checks::{Position, Resolved};
-use isoloom_plan::{Controller, Environment, MachineShape};
+use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header, router, steps};
 use isoloom_spec::model::{Spec, Target};
@@ -232,7 +232,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
 /// QEMU's helpers ([`qemu::QEMU_RB`]) and its networks' hubs, when a VM needs them.
 fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu::Link>) {
     let machines = env.machines.values().any(|m| m.shape == MachineShape::Vm && m.resources.disk_gb.is_some());
-    let controller = links.contains_key(CONTROLLER) && Controller::of(env.spec()).disk_gb.is_some();
+    let controller = links.contains_key(CONTROLLER) && env.controller.as_ref().is_some_and(|c| c.disk_gb.is_some());
     let sized = machines || controller;
     if !qemu::needs_ruby(links, sized) {
         return;

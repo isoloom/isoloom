@@ -66,13 +66,7 @@ fn reach_rules(way: Way, rules: &[Rule<'_>]) -> Vec<Block> {
         let ports = r.ports.iter().map(ToString::to_string).collect::<Vec<_>>().join(",");
         for protocol in ["TCP", "UDP"] {
             let l = format!("{label}-{}", protocol.to_lowercase());
-            out.push(rule(
-                (way, Action::Accept),
-                &l,
-                protocol,
-                Some(ports.clone()),
-                list([string(r.cidr.as_str())]),
-            ));
+            out.push(rule((way, Action::Accept), &l, protocol, Some(ports.clone()), list([string(r.cidr.as_str())])));
         }
     }
     out

@@ -169,14 +169,14 @@ pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Decisi
         (Some(lack), Some((_, reason))) => refused(Code::Capability(lack.requirement.feature()), None, reason),
         (Some(lack), None) => refused(Code::Capability(lack.requirement.feature()), None, lack.to_string()),
         (None, Some((code, reason))) => refused(code, None, reason),
-        (None, None) => provider_refusal(&spec, &env, target, variant).map_or(Decision::Generated, |r| refused(Code::Provider, None, r)),
+        (None, None) => provider_refusal(&env, target, variant).map_or(Decision::Generated, |r| refused(Code::Provider, None, r)),
     }
 }
 
 /// Why `target`'s `provider` can't run the environment it otherwise generates, if it can't.
-fn provider_refusal(spec: &isoloom_spec::model::Spec, env: &Environment, target: Target, provider: Option<&str>) -> Option<String> {
+fn provider_refusal(env: &Environment, target: Target, provider: Option<&str>) -> Option<String> {
     match (target, provider?) {
-        (Target::Vagrant, p) => isoloom_vagrant::provider_refusal(spec, p),
+        (Target::Vagrant, p) => isoloom_vagrant::provider_refusal(env, p),
         (Target::DockerVm, crate::composite::PROXMOX) => crate::composite::docker_vm_proxmox_refusal(env),
         (Target::DockerVm, p) => isoloom_vagrant::docker_vm_refusal(env, p),
         _ => None,

@@ -7,7 +7,7 @@ use std::num::NonZeroU32;
 
 use isoloom_manifest::{Action, CheckRunner, Failure, Name, PathTemplate, RelPath, SnakeName, Step, StepId, Template};
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{self, Position, Probe, Resolved};
+use isoloom_plan::checks::{Position, Probe, Resolved};
 use isoloom_render::container::{exec_runner, exec_runner_name};
 use isoloom_render::run_manifest::{DERIVED, check, timeout_s};
 
@@ -67,9 +67,8 @@ pub(super) fn inside(machine: &str) -> String {
 
 /// Every position's checks, in the order the runner's `check` runs them.
 pub(super) fn planned(env: &Environment) -> Vec<Planned<'_>> {
-    let spec = env.spec();
-    let default = checks::default_position(spec);
-    checks::by_position(spec, &env.checks)
+    let default = env.default_position();
+    env.checks_by_position()
         .into_iter()
         .map(|(pos, group)| {
             let (execs, others): (Vec<&Resolved>, Vec<&Resolved>) = group.into_iter().partition(|c| matches!(c.probe, Probe::Exec { .. }));

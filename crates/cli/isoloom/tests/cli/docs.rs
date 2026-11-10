@@ -322,3 +322,40 @@ fn the_backends_read_the_blocks_and_the_router_from_the_plan() -> Outcome {
     assert!(found.is_empty(), "{found:#?}");
     Ok(())
 }
+
+/// The backends read what the plan holds from the plan, not the spec: a VM and its OS
+/// (`Environment::vm`, `Vm`; the spec's `vm` block only for the provisioning steps it writes),
+/// the checks and where each runs (`Environment::checks`, `checks_by_position`,
+/// `default_position`) and whether the controller keeps running (`Controller::keep_running`).
+#[test]
+fn the_backends_read_vms_checks_and_the_controller_from_the_plan() -> Outcome {
+    let mut files = Vec::new();
+    sources(&root().join("crates/backends"), &mut files)?;
+    let is_test = |p: &Path| p.components().any(|c| c.as_os_str() == "tests") || p.file_name().is_some_and(|n| n == "tests.rs" || n == "testing.rs");
+    let from_the_spec = [
+        ".vm.is_some()",
+        "spec.checks",
+        "spec().checks",
+        "checks::by_position(",
+        "checks::default_position(",
+        "spec.controller.as_ref().is_some_and",
+        "spec().controller.as_ref().is_some_and",
+    ];
+    let mut found = Vec::new();
+    for file in files.iter().filter(|f| !is_test(f)) {
+        let text = std::fs::read_to_string(file)?;
+        for (n, line) in outside_tests(&text).lines().enumerate() {
+            let vm_block = line.contains(".vm.as_ref()") && !line.contains("provision");
+            if let Some(what) = from_the_spec
+                .iter()
+                .find(|w| line.contains(**w))
+                .copied()
+                .or(vm_block.then_some(".vm.as_ref()"))
+            {
+                found.push(format!("{}:{}: `{what}`", file.display(), n + 1));
+            }
+        }
+    }
+    assert!(found.is_empty(), "{found:#?}");
+    Ok(())
+}

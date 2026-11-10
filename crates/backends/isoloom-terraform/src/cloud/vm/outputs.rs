@@ -1,7 +1,7 @@
 //! The outputs every cloud module gives: every machine's public address and SSH user, where to
 //! stand, the ready marker, the checks, the published services.
 
-use crate::hcl_builder::{Expression, Module, Template, null, object, string};
+use crate::hcl_builder::{Expression, Module, null, object, string};
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Vm};
 use isoloom_render::run_manifest::RUNNER;
@@ -78,17 +78,7 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
             checks,
         );
     }
-    let published: Vec<(String, Expression)> = env
-        .vms()
-        .filter_map(|Vm { name: n, .. }| Some((n, env.spec().machines.get(n)?)))
-        .flat_map(|(n, sm)| {
-            sm.ports.iter().filter_map(move |sv| {
-                let h = sv.publish?;
-                let at = Template::new().with_expr((reach.public_ip)(n)).with_text(format!(":{h}"));
-                Some((format!("{n}/{}", sm.port_label(sv)), at.into_expression()))
-            })
-        })
-        .collect();
+    let published = crate::module::published(env.vms().map(|vm| (vm.name, vm.plan)), |n| (reach.public_ip)(n));
     if !published.is_empty() {
         m.block(output("published", object(published)));
     }

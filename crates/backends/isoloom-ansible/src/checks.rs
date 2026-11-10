@@ -3,7 +3,7 @@
 //! (an existing host has no copy of the project), so the runners hold probes only.
 
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{self, Host, Position};
+use isoloom_plan::checks::{Host, Position};
 use isoloom_render::checks::{Render, script};
 
 /// Each runner: its path in the target's folder (`checks/<machine>.sh`) and its script.
@@ -14,7 +14,7 @@ pub(crate) fn runners(env: &Environment) -> Vec<(String, String)> {
         script: None,
         playbook: None,
     };
-    checks::by_position(env.spec(), &env.checks)
+    env.checks_by_position()
         .into_iter()
         .filter_map(|(pos, group)| {
             let Position::Machine(m) = &pos else { return None };

@@ -5,7 +5,7 @@
 use crate::hcl_builder::{Block, Expression, list, object, string};
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
-use isoloom_plan::checks::{self, Host, Position};
+use isoloom_plan::checks::{Host, Position};
 use isoloom_render::GeneratedFile;
 use isoloom_render::checks::{Render, address_of, script, script_command};
 
@@ -20,7 +20,7 @@ pub(crate) fn runners(env: &Environment, dir: &str) -> Vec<GeneratedFile> {
         script: Some(&script_command),
         playbook: None,
     };
-    checks::by_position(env.spec(), &env.checks)
+    env.checks_by_position()
         .into_iter()
         .map(|(pos, group)| GeneratedFile {
             path: format!("{OUTPUT_DIR}/{dir}/checks/{}.sh", pos.id()),
@@ -52,7 +52,8 @@ pub(crate) enum Invocation {
 /// The `checks` output: each position's runner, on the machine `at` says (a position it gives
 /// none for is left out). `None` when no runner runs anywhere.
 pub(crate) fn output_block(env: &Environment, dir: &str, how: Invocation, at: &dyn Fn(&Position) -> Option<Runner>) -> Option<Block> {
-    let entries: Vec<Expression> = checks::by_position(env.spec(), &env.checks)
+    let entries: Vec<Expression> = env
+        .checks_by_position()
         .into_iter()
         .filter_map(|(pos, _)| {
             let r = at(&pos)?;

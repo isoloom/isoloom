@@ -311,7 +311,7 @@ pub(crate) fn check_runners(
     step: impl Fn(&isoloom_plan::checks::Position, &str, &[&isoloom_plan::checks::Resolved]) -> Result<Option<isoloom_manifest::Step>, ManifestError>,
 ) -> Result<Vec<isoloom_manifest::CheckRunner>, ManifestError> {
     let mut out = Vec::new();
-    for (pos, group) in isoloom_plan::checks::by_position(env.spec(), &env.checks) {
+    for (pos, group) in env.checks_by_position() {
         let Some(machine) = crate::machine::check_machine(env, &pos) else { continue };
         let Some(step) = step(&pos, machine, &group)? else { continue };
         out.push(isoloom_manifest::CheckRunner {

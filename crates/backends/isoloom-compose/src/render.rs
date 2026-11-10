@@ -63,7 +63,7 @@ pub(crate) fn render(target: ComposeTarget, env: &Environment) -> Result<Files> 
             "{}{}{}{}{}\n{yaml}",
             header("#"),
             usage(&file),
-            secrets::usage(&file),
+            secrets::usage(env, &file),
             configs::usage(env),
             Moved(env)
         ),

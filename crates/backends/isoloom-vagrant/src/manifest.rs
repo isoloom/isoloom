@@ -79,5 +79,5 @@ fn on_provider(args: &[&str], after: &[&str]) -> Result<HostArgv> {
 
 /// Whether the controller stays on once the lab is built: then nothing halts it.
 fn keeps_controller(env: &Environment) -> bool {
-    env.spec().controller.as_ref().is_some_and(|c| c.keep_running)
+    env.controller.as_ref().is_some_and(|c| c.keep_running)
 }

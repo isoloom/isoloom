@@ -96,7 +96,7 @@ impl Driver {
 /// cloud's reason named.
 #[must_use]
 pub fn refusal(env: &Environment) -> Option<String> {
-    crate::limits::arm64_machine(env.spec())
+    crate::limits::arm64_machine(env)
         .map(|name| format!("machine `{name}`: arm64, and every cloud's Docker host is x86-64 (its module picks x86-64 sizes and images)"))
         .or_else(|| super::none_takes(refusals(env)))
 }

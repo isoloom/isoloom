@@ -7,7 +7,7 @@
 
 use crate::hcl_builder::{Block, Expression, Module, Template, object, reference, string};
 use isoloom_plan::checks::Position;
-use isoloom_plan::{Environment, Join, MachinePlan, OutsideAddress};
+use isoloom_plan::{Environment, Join, MachinePlan, MachineShape, OutsideAddress};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
 
@@ -118,12 +118,12 @@ fn rules(env: &Environment, sealed: bool) -> String {
     let blocks = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", "));
     let mut forward: Vec<String> = router::forward_rules(env.spec());
     let mut dnat = Vec::new();
-    for (name, m) in &env.spec().machines {
-        let Some(addr) = env.machines.get(name).and_then(|mp| mp.addresses.values().next()) else {
+    for mp in env.machines.values() {
+        let Some(addr) = mp.addresses.values().next() else {
             continue;
         };
-        for (sv, host) in m.ports.iter().filter_map(|s| Some((s, s.publish?))) {
-            let (proto, port) = (sv.protocol.id(), sv.port);
+        for p in &mp.ports {
+            let (proto, port, host) = (p.protocol.id(), p.port, p.publish);
             forward.push(format!("ip daddr {addr} {proto} dport {port} ct status dnat accept"));
             dnat.push(format!("    ip saddr != {blocks} {proto} dport {host} dnat ip to {addr}:{port}\n"));
         }
@@ -182,27 +182,15 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
         "Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).",
         output("ready_file", string(isoloom_render::steps::READY_FILE)),
     );
-    let published: Vec<(String, Expression)> = env
-        .spec()
-        .machines
-        .iter()
-        .filter(|(_, machine)| !machine.networks.is_empty())
-        .flat_map(|(name, machine)| {
-            machine.ports.iter().filter_map(move |sv| {
-                let h = sv.publish?;
-                let at = Template::new().with_expr(reference("local.router_address")).with_text(format!(":{h}"));
-                Some((format!("{name}/{}", machine.port_label(sv)), at.into_expression()))
-            })
-        })
-        .collect();
+    let on_networks = env.machines.iter().filter(|(_, mp)| !mp.addresses.is_empty()).map(|(n, mp)| (n.as_str(), mp));
+    let published = crate::module::published(on_networks, |_| reference("local.router_address"));
     if !published.is_empty() {
         m.commented("Published services, from the router's uplink address.", output("published", object(published)));
     }
     let machines: Vec<(String, Expression)> = env
-        .spec()
         .machines
         .iter()
-        .filter(|(_, machine)| machine.vm.is_some())
+        .filter(|(_, mp)| mp.shape == MachineShape::Vm)
         .filter_map(|(n, _)| first_address(env, n).map(|a| (n.clone(), string(a))))
         .collect();
     m.commented(

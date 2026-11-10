@@ -5,6 +5,7 @@
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
 use isoloom_render::run_manifest::RUNNER;
+use isoloom_spec::model::SecretSource;
 
 use crate::file::{ComposeFile, Secret, ServiceSecret};
 
@@ -23,11 +24,11 @@ pub(super) fn of_machine(mp: &MachinePlan) -> Vec<ServiceSecret> {
         .collect()
 }
 
-/// The file's secrets: every one a container gets, in the order the spec declares them.
+/// The file's secrets: every one a container gets, in the order the plan holds them (the
+/// spec's).
 pub(super) fn of_file(env: &Environment) -> IndexMap<String, Secret> {
     let containers: Vec<&MachinePlan> = env.machines.values().filter(|m| m.shape == MachineShape::Container).collect();
-    env.spec()
-        .secrets
+    env.secrets
         .keys()
         .filter(|name| containers.iter().any(|m| m.secrets.iter().any(|s| &s.name == *name)))
         .map(|name| {
@@ -39,12 +40,12 @@ pub(super) fn of_file(env: &Environment) -> IndexMap<String, Secret> {
 
 /// The usage line saying where the secrets' values come from, when the file has any: a
 /// secret's from its store, an input's given at each start.
-pub(super) fn usage(file: &ComposeFile) -> String {
+pub(super) fn usage(env: &Environment, file: &ComposeFile) -> String {
     if file.secrets.is_empty() {
         return String::new();
     }
     let vars: Vec<&str> = file.secrets.values().map(|s| s.environment.as_str()).collect();
-    let inputs = file.secrets.values().any(|s| !s.environment.starts_with("ISOLOOM_SECRET_"));
+    let inputs = file.secrets.keys().any(|n| matches!(env.secrets.get(n), Some(SecretSource::Input { .. })));
     if inputs {
         format!(
             "# Secrets and inputs, delivered as files: set {} for `up` (each value, never in the file).\n",
