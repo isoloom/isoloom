@@ -103,17 +103,18 @@ use isoloom_manifest::contract::RESERVED_PREFIX;
 pub const MACHINE_NAME_MAX: usize = 63 - RESERVED_PREFIX.len();
 const RESERVED_NAME: &str = "names starting with `isoloom-` are Isoloom's own (its controller, router and tool VM, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs): choose another";
 
-/// The machine's name (a DNS label short enough for Kubernetes), and a network to be on.
+/// The machine's name (a DNS label short enough for Kubernetes, its length checked first), and a
+/// network to be on.
 fn name_and_networks(s: &Subject, p: &mut Problems) {
-    if !dns_label(s.name) {
-        p.add(&s.at, "machine names are DNS names: kebab-case, starting with a letter");
-    } else if s.name.starts_with(RESERVED_PREFIX) {
-        p.add(&s.at, RESERVED_NAME);
-    } else if s.name.len() > MACHINE_NAME_MAX {
+    if s.name.len() > MACHINE_NAME_MAX {
         p.add(
             &s.at,
             format!("at most {MACHINE_NAME_MAX} characters: its published ports are the Kubernetes Service `isoloom-<name>`"),
         );
+    } else if !dns_label(s.name) {
+        p.add(&s.at, "machine names are DNS names: kebab-case, starting with a letter");
+    } else if s.name.starts_with(RESERVED_PREFIX) {
+        p.add(&s.at, RESERVED_NAME);
     }
     // A LAN's switch takes its ports from the LAN (checked with the networks).
     if s.m.networks.is_empty() && crate::vlans::switched_by(s.spec, s.name).is_none() {

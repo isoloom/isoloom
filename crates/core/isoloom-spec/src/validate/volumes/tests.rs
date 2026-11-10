@@ -33,6 +33,14 @@ fn a_volume_name_fits_its_kubernetes_claim_and_seed_container() {
             "v".repeat(59)
         )]
     );
+    // One past any kebab-case name is told its length, not to use kebab-case.
+    assert_eq!(
+        mounting("w", &format!("{{ {}: /data }}", "v".repeat(64))),
+        [format!(
+            "machines.w.volumes.{}: machine name and volume name together are at most 62 characters: the Kubernetes claim is `<machine>-<volume>`",
+            "v".repeat(64)
+        )]
+    );
     assert_eq!(
         mounting("abcdefghij", &format!("{{ {}: /data }}", "v".repeat(53))),
         [format!(

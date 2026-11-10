@@ -1,23 +1,30 @@
 //! The top level of the spec: `version`, `name`, the declared `inputs` and the `tags` (the
 //! `message`'s placeholders are the placeholder grammar's, [`crate::syntax::placeholder`]).
 
+use isoloom_manifest::contract::RESERVED_PREFIX;
 use isoloom_manifest::is_kebab;
 
 use super::{Problems, is_variable};
 use crate::model::Spec;
 use crate::tags;
 
-/// The format version this isoloom reads, and a name every target can carry.
+/// The longest environment name: it becomes the Kubernetes namespace `isoloom-<name>`, a
+/// 63-character DNS label.
+pub(crate) const NAME_MAX: usize = 63 - RESERVED_PREFIX.len();
+
+/// The format version this isoloom reads, and a name every target can carry: its length is
+/// checked before its characters, so a long name is told its limit.
 pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
     if spec.version != 1 {
         p.add("version", format!("unsupported version {}; this isoloom reads version 1", spec.version));
     }
-    if !is_kebab(&spec.name) {
+    if spec.name.len() > NAME_MAX {
+        p.add(
+            "name",
+            format!("at most {NAME_MAX} characters: it becomes the Kubernetes namespace `isoloom-<name>`"),
+        );
+    } else if !is_kebab(&spec.name) {
         p.add("name", "use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)");
-    } else if spec.name.len() > 55 {
-        // The name becomes the Kubernetes namespace `isoloom-<name>`, which must be a 63-character
-        // DNS label; 8 characters are the prefix.
-        p.add("name", "at most 55 characters: it becomes the Kubernetes namespace `isoloom-<name>`");
     }
 }
 
@@ -66,10 +73,13 @@ mod tests {
     #[test]
     fn a_name_is_kebab_case_and_fits_a_kubernetes_namespace() {
         assert_eq!(named(&"a".repeat(55)), Vec::<String>::new());
-        assert_eq!(
-            named(&"a".repeat(56)),
-            ["name: at most 55 characters: it becomes the Kubernetes namespace `isoloom-<name>`"]
-        );
+        // A name too long for any rule is told its length, not to use kebab-case.
+        for long in ["a".repeat(56), "a".repeat(64)] {
+            assert_eq!(
+                named(&long),
+                ["name: at most 55 characters: it becomes the Kubernetes namespace `isoloom-<name>`"]
+            );
+        }
         assert_eq!(
             named("Portal"),
             ["name: use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)"]

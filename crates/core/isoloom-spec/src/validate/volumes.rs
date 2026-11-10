@@ -148,16 +148,17 @@ fn subpath(s: &Subject, v: &str, sub: &str, at: &str, p: &mut Problems) {
     }
 }
 
-/// What is wrong with volume `v`'s name on machine `machine`, if anything.
+/// What is wrong with volume `v`'s name on machine `machine`, if anything: its length first, so a
+/// long name is told its limit.
 fn name_problem(machine: &str, v: &str) -> Option<&'static str> {
-    if !is_kebab(v) {
-        Some("volume names are kebab-case: lowercase letters, digits and dashes")
-    } else if machine.len() + 1 + v.len() > 63 {
+    if machine.len() + 1 + v.len() > 63 {
         // The volume's Kubernetes claim is named `<machine>-<volume>`, a 63-character label.
         Some("machine name and volume name together are at most 62 characters: the Kubernetes claim is `<machine>-<volume>`")
     } else if v.len() > 58 {
         // Its Kubernetes init container is `seed-<volume>`, a 63-character label too.
         Some("volume names are at most 58 characters: the Kubernetes init container seeding it is `seed-<volume>`")
+    } else if !is_kebab(v) {
+        Some("volume names are kebab-case: lowercase letters, digits and dashes")
     } else {
         None
     }

@@ -75,6 +75,27 @@ fn the_schema_catches_what_editors_should_flag() -> Outcome {
     Ok(())
 }
 
+/// The editor refuses a name `isoloom validate` refuses as too long (its own tests hold it to
+/// these lengths), and takes the longest it accepts: the environment's (55), a machine's (55) and
+/// a network's (63).
+#[test]
+fn the_schema_holds_names_to_the_lengths_validate_does() -> Outcome {
+    let v = validator()?;
+    let spec = |name: &str, machine: &str, network: &str| -> Outcome<serde_json::Value> {
+        let text = format!(
+            "version: 1\nname: {name}\nnetworks: {{ {network}: {{ cidr: 10.0.0.0/24 }} }}\nmachines: {{ {machine}: {{ networks: {{ {network}: 5 }}, os: debian@12 }} }}\n"
+        );
+        Ok(serde_yaml_ng::from_str(&text)?)
+    };
+    let (n55, n56, n63, n64) = ("n".repeat(55), "n".repeat(56), "n".repeat(63), "n".repeat(64));
+    assert!(v.is_valid(&spec(&n55, &n55, &n63)?));
+    for (name, machine, network) in [(&n56, &n55, &n63), (&n55, &n56, &n63), (&n55, &n55, &n64)] {
+        let doc = spec(name, machine, network)?;
+        assert!(!v.is_valid(&doc), "should be flagged: {doc}");
+    }
+    Ok(())
+}
+
 #[test]
 fn examples_point_editors_to_the_schema() -> Outcome {
     for (name, text) in examples()? {

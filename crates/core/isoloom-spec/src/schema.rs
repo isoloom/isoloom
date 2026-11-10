@@ -42,12 +42,16 @@ fn set(s: &mut Value, path: &[&str], key: &str, v: Value) {
     }
 }
 
-/// The patterns of the environment's, networks' and machines' names.
+/// The patterns and longest lengths of the environment's, networks' and machines' names, as
+/// `isoloom validate` checks them.
 fn names(s: &mut Value) {
     let kebab = "^[a-z][a-z0-9]*(-[a-z0-9]+)*$";
     set(s, &["properties", "name"], "pattern", json!("^[a-z0-9]+(-[a-z0-9]+)*$"));
-    set(s, &["properties", "networks"], "propertyNames", json!({ "pattern": kebab }));
-    set(s, &["properties", "machines"], "propertyNames", json!({ "pattern": kebab }));
+    set(s, &["properties", "name"], "maxLength", json!(crate::validate::NAME_MAX));
+    let network = json!({ "pattern": kebab, "maxLength": isoloom_manifest::KEBAB_MAX });
+    set(s, &["properties", "networks"], "propertyNames", network);
+    let machine = json!({ "pattern": kebab, "maxLength": crate::validate::MACHINE_NAME_MAX });
+    set(s, &["properties", "machines"], "propertyNames", machine);
 }
 
 /// The networks' blocks: a network is a /24 to /29; a LAN split into VLANs may be larger (from

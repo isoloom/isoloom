@@ -1,6 +1,8 @@
 //! `tools`: the helpers Isoloom adds on every network (a shell, a browser...), at the addresses
 //! just below the controller.
 
+use isoloom_manifest::KEBAB_MAX;
+
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Spec, TOOL_RECIPES};
 use crate::net::NetworkBlock;
@@ -32,7 +34,9 @@ pub(super) fn reserved(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
 pub(super) fn each(spec: &Spec, p: &mut Problems) {
     for (name, t) in &spec.tools {
         let at = format!("tools.{name}");
-        if !dns_label(name) {
+        if name.len() > KEBAB_MAX {
+            p.add(&at, format!("tool names are at most {KEBAB_MAX} characters: a DNS label"));
+        } else if !dns_label(name) {
             p.add(&at, "tool names are kebab-case and start with a letter");
         }
         if spec.machines.contains_key(name) || spec.groups.contains_key(name) {

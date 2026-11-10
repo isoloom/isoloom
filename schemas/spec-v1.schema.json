@@ -8,7 +8,8 @@
     "name": {
       "type": "string",
       "description": "The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs,\nnetworks and cloud resources.",
-      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 55
     },
     "networks": {
       "type": "object",
@@ -18,7 +19,8 @@
       "description": "The environment's networks, by name: each an address block the machines on it share.",
       "default": {},
       "propertyNames": {
-        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+        "maxLength": 63
       }
     },
     "reach": {
@@ -61,7 +63,8 @@
       },
       "description": "The environment's machines, by name, started in the order written (after their\n`depends_on`). Names starting with `isoloom-` are Isoloom's own (its controller, router\nand tool VM, the containers' VM, the check stand-in and runners, the route sidecars, the\ninit jobs) and refused.",
       "propertyNames": {
-        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+        "maxLength": 55
       }
     },
     "common": {

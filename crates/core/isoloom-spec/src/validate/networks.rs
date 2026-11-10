@@ -1,6 +1,8 @@
 //! `networks`: blocks (valid, private, /24 to /29, not overlapping), gateways, a LAN's switch,
 //! the appliances' management network, link impairment, and the blocks on Docker.
 
+use isoloom_manifest::KEBAB_MAX;
+
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Network, Spec, Tc};
 use crate::net::{Cidr, DOCKER_BLOCK, NetworkBlock, PRIVATE};
@@ -17,7 +19,9 @@ pub(super) fn blocks(spec: &Spec, p: &mut Problems) -> Blocks {
     let mut blocks: Blocks = Vec::new();
     for (name, net) in &spec.networks {
         let at = format!("networks.{name}");
-        if !dns_label(name) {
+        if name.len() > KEBAB_MAX {
+            p.add(&at, format!("network names are at most {KEBAB_MAX} characters: a DNS label"));
+        } else if !dns_label(name) {
             p.add(&at, "network names are kebab-case and start with a letter");
         }
         let Some(c) = Cidr::parse(&net.cidr) else {

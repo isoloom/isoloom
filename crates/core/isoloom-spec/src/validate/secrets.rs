@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use isoloom_manifest::is_kebab;
+use isoloom_manifest::{KEBAB_MAX, is_kebab};
 
 use super::{Problems, is_variable};
 use crate::model::{MachineSecret, SecretSource, Spec, after_drive};
@@ -12,7 +12,9 @@ use crate::model::{MachineSecret, SecretSource, Spec, after_drive};
 pub(super) fn check(spec: &Spec, p: &mut Problems) {
     for (name, source) in &spec.secrets {
         let at = format!("secrets.{name}");
-        if !is_kebab(name) {
+        if name.len() > KEBAB_MAX {
+            p.add(&at, format!("secret names are at most {KEBAB_MAX} characters"));
+        } else if !is_kebab(name) {
             p.add(&at, "secret names are kebab-case: lowercase letters, digits and dashes (e.g. db-password)");
         }
         if let Some(why) = source_problem(source) {

@@ -60,6 +60,14 @@ fn machine_and_network_names_are_dns_labels_starting_with_a_letter() {
             "machines.Db: machine names are DNS names: kebab-case, starting with a letter",
         ]
     );
+    // A network name past any DNS label is told its length, not to use kebab-case.
+    let long = "n".repeat(64);
+    assert_eq!(
+        problems(&format!(
+            "version: 1\nname: t\nnetworks:\n  {long}: {{ cidr: 10.0.0.0/24 }}\nmachines:\n  web: {{ networks: {{ {long}: 10 }}, docker: {{ image: nginx }} }}\n"
+        )),
+        [format!("networks.{long}: network names are at most 63 characters: a DNS label")]
+    );
 }
 
 #[test]

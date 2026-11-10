@@ -62,13 +62,14 @@ fn a_machine_has_a_form_unless_the_runner_supplies_it() {
 fn a_machine_name_is_a_dns_label_short_enough_for_kubernetes() {
     let name = |n: &str| of(&format!("  {n}: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }} }}\n"));
     assert_eq!(name(&"a".repeat(55)), Vec::<String>::new());
-    assert_eq!(
-        name(&"a".repeat(56)),
-        [format!(
-            "machines.{}: at most 55 characters: its published ports are the Kubernetes Service `isoloom-<name>`",
-            "a".repeat(56)
-        )]
-    );
+    for long in ["a".repeat(56), "a".repeat(64)] {
+        assert_eq!(
+            name(&long),
+            [format!(
+                "machines.{long}: at most 55 characters: its published ports are the Kubernetes Service `isoloom-<name>`"
+            )]
+        );
+    }
     assert_eq!(name("Web"), ["machines.Web: machine names are DNS names: kebab-case, starting with a letter"]);
     assert_eq!(
         of("  web: { docker: { image: nginx } }\n"),
