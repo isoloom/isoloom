@@ -1,4 +1,4 @@
-//! One generated Ansible role per machine (`isoloom_machine_<m>`): its `tasks/main.yml` (the
+//! One generated Ansible role per machine (`isoloom_machine_<m>`, `-` as `_`): its `tasks/main.yml` (the
 //! recipe's steps in order), its `handlers/main.yml` (one restart handler per enabled service) and
 //! its `files/rendered/<from>` (each template filled in at generation). The role reaches the state
 //! the shell library reaches; `cargo xtask conformance --renderer ansible` proves it.
@@ -10,10 +10,12 @@ use isoloom_render::{GeneratedFile, header};
 use super::task::{Task, restart, yaml};
 use super::tasks::{rendered, step_tasks};
 
-/// A machine's role name (`isoloom_machine_web`).
+/// A machine's role name (`isoloom_machine_web`, `isoloom_machine_web_front` for `web-front`):
+/// an identifier, as Ansible wants a role's name and Jinja a variable's, which prefixes the
+/// variables the role registers. A machine's name has no `_`, so each keeps its own.
 #[must_use]
 pub(crate) fn role_name(machine: &str) -> String {
-    format!("isoloom_machine_{machine}")
+    format!("isoloom_machine_{}", machine.replace('-', "_"))
 }
 
 /// The files of machine `c`'s role, under `dir` (its role folder): the tasks, the handlers (when it

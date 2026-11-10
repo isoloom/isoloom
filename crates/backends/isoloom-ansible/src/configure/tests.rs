@@ -197,6 +197,25 @@ overrides:
 }
 
 #[test]
+fn a_hyphenated_machine_gets_a_role_and_variables_jinja_reads_as_names() {
+    let files = external_project(
+        "machines:
+  web-front: { networks: { lab: 5 }, os: debian@12, app: { steps: [{ run: setup/web.sh }, { packages: [nginx] }] } }
+overrides:
+  external: { machines: { web-front: { ssh: { address: 10.0.0.5 } } } }
+",
+    );
+    let site = file(&files, ".isoloom/external/site.yml");
+    assert!(site.contains("hosts: web-front") && site.contains("- isoloom_machine_web_front"), "{site}");
+    let tasks = file(&files, ".isoloom/external/roles/isoloom_machine_web_front/tasks/main.yml");
+    // `{{ isoloom_machine_web-front_file }}` would be a subtraction.
+    assert!(tasks.contains("{{ isoloom_machine_web_front_file }}"), "{tasks}");
+    assert!(tasks.contains("isoloom_machine_web_front_file: setup/web.sh"), "{tasks}");
+    assert!(!tasks.contains("web-front_"), "{tasks}");
+    assert_eq!(role_name("web-front"), "isoloom_machine_web_front");
+}
+
+#[test]
 fn a_firewall_recipe_pins_ansible_posix_in_requirements() {
     let files = external_project(
         "machines:

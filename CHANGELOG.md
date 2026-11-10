@@ -393,6 +393,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
   hybrid's host, its Compose file), version control, Terraform's cache, state, lock and crash
   logs, Vagrant's machine folders and the runner's logins out at any depth. The Vagrant project
   step takes `rules:` (the lines to follow) in place of `generated:` and `extra:`.
+- **Ansible: a machine named with a `-` works.** Its role's variables were
+  `isoloom_machine_web-front_file`, which Jinja reads as a subtraction, so every task naming a
+  project file failed. A role's name, and the variables it registers, now take `_` for `-`
+  (`isoloom_machine_web_front`).
 - **The message's `.published` and `.url` name a published port**: validation took them on a
   port without `publish:`, which `isoloom message` then refused, and its fix suggested one; a
   fix is now a placeholder that resolves (a published port's `.published`, else a port's `.port`,

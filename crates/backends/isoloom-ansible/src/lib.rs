@@ -7,7 +7,7 @@
 //! - `inventory.ini`: every machine with its `external` address, user, port and key, in the
 //!   `linux` / `windows` groups and the inventory groups, for `provision:` playbooks run from
 //!   there ([`isoloom_render::inventory`] with [`Access::external`]).
-//! - `site.yml` and `roles/isoloom_machine_<m>/`: each configured machine's recipe as a play and
+//! - `site.yml` and `roles/isoloom_machine_<m>/` (`-` in `<m>` as `_`): each configured machine's recipe as a play and
 //!   a role of native tasks ([`configure`]), and `requirements.yml` when a role needs a pinned
 //!   collection.
 //! - `checks/<machine>.sh`: the check runner of each machine that has an address (declared and

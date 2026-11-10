@@ -46,7 +46,7 @@ pub(super) fn rendered(from: &str) -> String {
 /// first.
 pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], seq: usize) -> Result<Vec<Value>> {
     // Registers a task sets are prefixed with the role's name (`ansible-lint`'s `var-naming`).
-    let vars = format!("isoloom_machine_{}", c.machine());
+    let vars = super::role_name(c.machine());
     Ok(match r {
         Resource::Repository(p) => repository(p, notify),
         Resource::Packages(ps) => packages(c, ps, notify, &vars, seq)?,
