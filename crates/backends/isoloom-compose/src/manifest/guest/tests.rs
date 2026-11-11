@@ -65,14 +65,13 @@ fn a_root_way_in_runs_every_command_without_sudo() {
 #[test]
 fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
     let g = guest_of(WITH_SECRET);
-    let start = g.start[0].command.to_string();
+    let start = g.start[1].command.to_string();
     assert!(start.starts_with("cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600"), "{start}");
-    assert_eq!(g.start[0].id.as_str(), "start");
-    // Web's set-up job runs attached once the rest is up.
-    let jobs: Vec<&str> = g.start.iter().skip(1).map(|c| c.id.as_str()).collect();
-    assert_eq!(jobs, ["job-isoloom-init-web-1"]);
+    // Each `up` after the pull of its images; web's set-up job runs attached once the rest is up.
+    let ids: Vec<&str> = g.start.iter().map(|c| c.id.as_str()).collect();
+    assert_eq!(ids, ["pull-start", "start", "pull-job-isoloom-init-web-1", "job-isoloom-init-web-1"]);
     assert!(
-        g.start[1]
+        g.start[3]
             .command
             .to_string()
             .ends_with("up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1")
@@ -96,12 +95,55 @@ fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
 fn a_published_build_pulls_first_in_the_vm_as_on_the_host_its_failure_tolerated() {
     let g = guest_of("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/example/lab-web:1\n      build: { context: web }\n");
     let ids: Vec<&str> = g.start.iter().map(|c| c.id.as_str()).collect();
-    assert_eq!(ids, ["pull", "start"]);
+    assert_eq!(ids, ["pull", "pull-start", "start"]);
     assert!(g.start[0].command.to_string().ends_with("pull --ignore-pull-failures"));
     assert_eq!(g.start[0].failure, Failure::Tolerate);
     assert_eq!(g.start[0].note.as_deref(), Some("Pulling the environment's published images in the VM…"));
-    assert!(!g.start[1].command.to_string().contains("--build"));
-    assert_eq!(g.start[1].failure, Failure::Fail);
+    assert!(!g.start[0].download, "a best effort, not the start's download");
+    assert!(!g.start[2].command.to_string().contains("--build"));
+    assert_eq!(g.start[2].failure, Failure::Fail);
+}
+
+#[test]
+fn each_up_in_the_vm_pulls_its_images_first_in_a_download_of_its_own() {
+    let g = guest_of(WITH_SECRET);
+    let (pull, up) = (&g.start[0], &g.start[1]);
+    // The same project, file, folder and variables as the `up`; its policy and services, the
+    // images a service builds left to the `up`.
+    let prefix = "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml ";
+    assert_eq!(
+        pull.command.to_string(),
+        format!("{prefix}pull --policy missing --ignore-buildable --include-deps cache isoloom-routes-cache web isoloom-routes-web isoloom-probe-amd64")
+    );
+    assert!(up.command.to_string().starts_with(&format!("{prefix}up ")));
+    assert!(pull.download && !up.download);
+    assert_eq!((pull.timeout_s, pull.failure), (900, Failure::Fail));
+    assert_eq!(pull.note.as_deref(), Some("Pulling the environment's images in the VM…"));
+    // A set-up job: its own service, no dependency.
+    assert!(
+        g.start[2]
+            .command
+            .to_string()
+            .ends_with("pull --policy missing --ignore-buildable isoloom-init-web-1")
+    );
+    assert!(g.start[2].download);
+}
+
+#[test]
+fn only_an_up_that_pulls_is_pulled_for() {
+    let pulled = |line: &str| pull_args(&line.split(' ').map(str::to_owned).collect::<Vec<_>>()).map(|a| a.join(" "));
+    assert_eq!(
+        pulled("up --detach --pull always --wait --wait-timeout 600 db web").as_deref(),
+        Some("pull --policy always --ignore-buildable --include-deps db web")
+    );
+    for not in [
+        "up --detach --pull never web",
+        "up --pull build web",
+        "pull --ignore-pull-failures",
+        "up --pull",
+    ] {
+        assert_eq!(pulled(not), None, "{not}");
+    }
 }
 
 #[test]

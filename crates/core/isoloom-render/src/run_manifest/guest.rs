@@ -34,6 +34,9 @@ pub struct GuestCommand {
     pub timeout_s: u32,
     /// What its failure does: the run stops, or it is only logged (a clean-up).
     pub failure: Failure,
+    /// Whether it is a download (the images a start pulls): its step says so, so a runner gives
+    /// it a download's rule ([`Step::download`]).
+    pub download: bool,
 }
 
 impl GuestCommand {
@@ -49,6 +52,7 @@ impl GuestCommand {
         s.note.clone_from(&self.note);
         s.timeout_s = NonZeroU32::new(self.timeout_s);
         s.failure = self.failure;
+        s.download = self.download;
         Ok(s)
     }
 
@@ -232,6 +236,7 @@ mod tests {
             command: Template::text(text),
             timeout_s: 60,
             failure: Failure::Fail,
+            download: false,
         }
     }
 

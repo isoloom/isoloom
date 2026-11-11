@@ -660,6 +660,18 @@ output "ssh_user" {
         "timeout_s": 60
       },
       {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "admin"
+        },
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "start",
         "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
@@ -1546,6 +1558,18 @@ output "ssh_user" {
         "timeout_s": 60
       },
       {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "start",
         "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
@@ -2320,6 +2344,18 @@ output "ssh_user" {
           "user": "root"
         },
         "timeout_s": 60
+      },
+      {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "start",
@@ -3203,6 +3239,18 @@ output "ssh_user" {
         "timeout_s": 60
       },
       {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "admin"
+        },
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "start",
         "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
@@ -3953,6 +4001,18 @@ output "ssh_user" {
           "user": "root"
         },
         "timeout_s": 60
+      },
+      {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "root"
+        },
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "start",
@@ -4780,6 +4840,18 @@ output "ssh_user" {
           "user": "ubuntu"
         },
         "timeout_s": 60
+      },
+      {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "ubuntu"
+        },
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "start",

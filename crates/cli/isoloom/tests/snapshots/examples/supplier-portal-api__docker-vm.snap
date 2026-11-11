@@ -664,6 +664,7 @@ systemctl enable --now isoloom-published.service
 LAUNCH_TOKEN=\"$(printenv LAUNCH_TOKEN | base64 -d; printf x)\"; LAUNCH_TOKEN=\"${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN
 i=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$i\" -gt 0 ] || echo 'the Docker host: waiting for its secrets, which the runner (run.json) delivers'; i=$((i+5)); if [ \"$i\" -gt 1800 ]; then echo 'the Docker host: its secrets never came; start the environment with the runner (run.json), which reads them from their stores and delivers them' >&2; exit 1; fi; sleep 5; done
 LAUNCH_TOKEN=\"$(cat /var/lib/isoloom/secrets/LAUNCH_TOKEN; printf x)\"; LAUNCH_TOKEN=\"${LAUNCH_TOKEN%x}\"; export LAUNCH_TOKEN
+cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps || exit 1
 cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 || exit 1
 mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready", env: { "API_URL" => isoloom_b64(INPUTS["API_URL"]), "LAUNCH_TOKEN" => isoloom_b64(INPUTS["LAUNCH_TOKEN"]) }
   config.vm.provision "shell", name: "checks", run: "never", inline: "API_URL=\"$(printenv API_URL | base64 -d; printf x)\"; API_URL=\"${API_URL%x}\"; export API_URL
@@ -1374,6 +1375,18 @@ output "ssh_user" {
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
+      },
+      {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "start",
@@ -2199,6 +2212,20 @@ systemctl enable --now isoloom-published.service
           "nat-route,project,docker,accept-env"
         ],
         "timeout_s": 3600
+      },
+      {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "argv": [
+          "vagrant",
+          "ssh",
+          "--no-tty",
+          "--command",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name supplier-portal-api --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "default"
+        ],
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "start",

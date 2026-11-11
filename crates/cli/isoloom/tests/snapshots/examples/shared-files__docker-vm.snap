@@ -649,8 +649,11 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now isoloom-published.service
 "
-  config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 writer reader || exit 1
+  config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps writer reader || exit 1
+cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 writer reader || exit 1
+cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable isoloom-init-writer-1 || exit 1
 cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-writer-1 isoloom-init-writer-1 || exit 1
+cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable isoloom-init-reader-1 || exit 1
 cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml up --no-deps --exit-code-from isoloom-init-reader-1 isoloom-init-reader-1 || exit 1
 mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   config.vm.provision "shell", name: "checks", run: "never", inline: "failed=0
@@ -1305,6 +1308,18 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps writer reader",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "start",
         "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
@@ -1316,6 +1331,18 @@ output "ssh_user" {
         "timeout_s": 1800
       },
       {
+        "id": "pull-job-isoloom-init-writer-1",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable isoloom-init-writer-1",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "action": "ssh.run",
@@ -1325,6 +1352,18 @@ output "ssh_user" {
           "user": "isoloom"
         },
         "timeout_s": 600
+      },
+      {
+        "id": "pull-job-isoloom-init-reader-1",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable isoloom-init-reader-1",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "job-isoloom-init-reader-1",
@@ -2096,6 +2135,20 @@ systemctl enable --now isoloom-published.service
         "timeout_s": 3600
       },
       {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "argv": [
+          "vagrant",
+          "ssh",
+          "--no-tty",
+          "--command",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps writer reader",
+          "default"
+        ],
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "start",
         "note": "Starting the environment's containers in the VM…",
         "argv": [
@@ -2109,6 +2162,20 @@ systemctl enable --now isoloom-published.service
         "timeout_s": 1800
       },
       {
+        "id": "pull-job-isoloom-init-writer-1",
+        "note": "Pulling the environment's images in the VM…",
+        "argv": [
+          "vagrant",
+          "ssh",
+          "--no-tty",
+          "--command",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable isoloom-init-writer-1",
+          "default"
+        ],
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "job-isoloom-init-writer-1",
         "note": "Running writer's set-up script…",
         "argv": [
@@ -2120,6 +2187,20 @@ systemctl enable --now isoloom-published.service
           "default"
         ],
         "timeout_s": 600
+      },
+      {
+        "id": "pull-job-isoloom-init-reader-1",
+        "note": "Pulling the environment's images in the VM…",
+        "argv": [
+          "vagrant",
+          "ssh",
+          "--no-tty",
+          "--command",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shared-files --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable isoloom-init-reader-1",
+          "default"
+        ],
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "job-isoloom-init-reader-1",

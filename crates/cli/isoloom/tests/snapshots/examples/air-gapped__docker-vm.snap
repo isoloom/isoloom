@@ -645,7 +645,8 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now isoloom-published.service
 "
-  config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name air-gapped --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 || exit 1
+  config.vm.provision "shell", name: "environment", inline: "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name air-gapped --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps || exit 1
+cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name air-gapped --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 || exit 1
 mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   config.vm.provision "shell", name: "checks", run: "never", inline: "failed=0
   cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name air-gapped --file .isoloom/docker/compose.yml --profile check run --rm --no-deps --env ISOLOOM_DERIVED=\"$ISOLOOM_DERIVED\" isoloom-check-store || failed=1
@@ -1282,6 +1283,18 @@ output "ssh_user" {
         },
         "stdin": "setup.sh",
         "timeout_s": 1800
+      },
+      {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name air-gapped --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "start",
@@ -2010,6 +2023,20 @@ systemctl enable --now isoloom-published.service
           "nat-route,project,docker"
         ],
         "timeout_s": 3600
+      },
+      {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "argv": [
+          "vagrant",
+          "ssh",
+          "--no-tty",
+          "--command",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name air-gapped --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps",
+          "default"
+        ],
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "start",

@@ -258,6 +258,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Added
 
+- **A download is a step of its own, marked so in the run manifest** (`"download": true` on a
+  step): a runner lets it run while it makes progress, with no ceiling, stops it once it shows none
+  for its `timeout_s`, and reports that and its failure as a download's. Compose in a VM
+  (`docker-vm`, on Vagrant and on Proxmox, and `cloud-docker`) pulls each start's images in such
+  a step before the `up` (`pull-<step>`: the same project, file and pull policy, `pull --policy
+  missing --ignore-buildable`, the `up`'s services and their dependencies), as Isothrum does for
+  a Compose start on this computer; the `up` keeps its own limit, with nothing left to pull. Before,
+  a slow image pull inside the VM ran under the start's 30-minute limit.
 - **Graphical consoles in the run manifest.** A VM's machine lists its consoles
   (`machines[].consoles`): the protocol (`vnc`, `rdp`, or `none` with why), and where a runner
   finds each (`source`: libvirt's display, QEMU's monitor, VirtualBox's remote display, a port and

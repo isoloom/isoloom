@@ -74,6 +74,7 @@ fn command(id: &str, note: Option<String>, command: Template, timeout_s: u32) ->
         command,
         timeout_s,
         failure: Failure::Fail,
+        download: false,
     })
 }
 
@@ -117,20 +118,67 @@ pub(crate) fn guest(env: &Environment, file: &ComposeFile, as_root: AsRoot) -> R
 /// The start step's id.
 const START: &str = "start";
 
+/// How long pulling a start's images in the VM may go without progress: the limit of a download,
+/// which has no other (a slow connection still moving runs as long as it moves).
+const PULL_STALL_S: u32 = 900;
+
+/// `up`'s options that take a value, as the start writes them.
+const UP_VALUED: [&str; 3] = ["--pull", "--wait-timeout", "--exit-code-from"];
+
 /// The project's start ([`super::lifecycle::start`]), the project files Compose reads from its
-/// environment read from the VM's copy first.
+/// environment read from the VM's copy first. Each `up` that pulls comes after a step of its own
+/// pulling its images ([`pull_args`], `pull-<step>`), a download, so a runner gives the download
+/// a download's rule and the `up` its own limit with nothing left to pull.
 fn start(env: &Environment, vm: &InVm, plan: &StartPlan, members: &[Member]) -> Result<Vec<GuestCommand>> {
     let files = host_environment(env);
-    lifecycle::start(env, plan, members, START, " in the VM")
-        .into_iter()
-        .map(|s| {
-            let mut c = command(&s.id, Some(s.note), vm.compose(&files, &text(&s.args.join(" "))), s.timeout_s)?;
-            if s.tolerated {
-                c.failure = Failure::Tolerate;
+    let mut out = Vec::new();
+    for s in lifecycle::start(env, plan, members, START, " in the VM") {
+        if let Some(pull) = pull_args(&s.args) {
+            let note = Some("Pulling the environment's images in the VM…".to_owned());
+            let mut c = command(&format!("pull-{}", s.id), note, vm.compose(&files, &text(&pull.join(" "))), PULL_STALL_S)?;
+            c.download = true;
+            out.push(c);
+        }
+        let mut c = command(&s.id, Some(s.note), vm.compose(&files, &text(&s.args.join(" "))), s.timeout_s)?;
+        if s.tolerated {
+            c.failure = Failure::Tolerate;
+        }
+        out.push(c);
+    }
+    Ok(out)
+}
+
+/// The pull an `up` of the start (`args`, after `docker compose …`) makes first: `pull --policy
+/// <its --pull, else missing> --ignore-buildable`, `--include-deps` unless it has `--no-deps`,
+/// then its services; the images a service builds are left to the `up`. `None` for another
+/// command, or an `up` that pulls nothing (`--pull never`, `build`).
+fn pull_args(args: &[String]) -> Option<Vec<String>> {
+    let (up, rest) = args.split_first()?;
+    if up != "up" {
+        return None;
+    }
+    let mut policy = "missing";
+    let mut services = Vec::new();
+    let mut words = rest.iter();
+    while let Some(arg) = words.next() {
+        if UP_VALUED.contains(&arg.as_str()) {
+            let value = words.next()?;
+            if arg == "--pull" {
+                policy = value;
             }
-            Ok(c)
-        })
-        .collect()
+        } else if !arg.starts_with('-') {
+            services.push(arg.clone());
+        }
+    }
+    if !matches!(policy, "missing" | "always") {
+        return None;
+    }
+    let mut pull: Vec<String> = ["pull", "--policy", policy, "--ignore-buildable"].map(String::from).into();
+    if !rest.iter().any(|a| a == "--no-deps") {
+        pull.push("--include-deps".into());
+    }
+    pull.extend(services);
+    Some(pull)
 }
 
 /// Each position's runner (`compose run` of its `check` service, `ISOLOOM_DERIVED` passed on),

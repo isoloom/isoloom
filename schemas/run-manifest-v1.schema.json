@@ -2112,6 +2112,10 @@
           },
           "description": "The same limit on these Vagrant providers, in seconds, in place of `timeout_s` there only (`{\"vmware_esxi\": 120}`), counted the same way."
         },
+        "download": {
+          "type": "boolean",
+          "description": "`true`: a download (the images a start pulls). A runner lets it run as long as it makes progress, with no ceiling, stops it once it shows none for its limit (`timeout_s`), and reports that stall and its failure as a download's. Default `false`."
+        },
         "when": {
           "$ref": "#/$defs/When",
           "description": "`if_ok` (default): skipped once a step of the operation failed. `always`: a clean-up that runs anyway."

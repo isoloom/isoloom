@@ -43,7 +43,16 @@ fn vagrant_brings_the_vm_up_then_compose_starts_in_it_over_vagrant_ssh() -> Outc
     let (_, m, _) = manifests()?;
     assert_eq!(
         up(&m),
-        ["reconcile", "discard-saved", "forwarded-ports", "up", "start", "job-isoloom-init-web-1"]
+        [
+            "reconcile",
+            "discard-saved",
+            "forwarded-ports",
+            "up",
+            "pull-start",
+            "start",
+            "pull-job-isoloom-init-web-1",
+            "job-isoloom-init-web-1"
+        ]
     );
     let vm = m.lifecycle.up.iter().find(|s| s.id.as_str() == "up").unwrap();
     let Run::Argv(HostArgv::Every(argv)) = &vm.run else { panic!() };
@@ -60,6 +69,18 @@ fn vagrant_brings_the_vm_up_then_compose_starts_in_it_over_vagrant_ssh() -> Outc
         piped[3]
     );
     assert_eq!(piped[4], "default");
+    // Its images pulled first, over the same way in, as a download: a runner lets it run while
+    // it makes progress, and gives the start its own limit.
+    let pull = m.lifecycle.up.iter().find(|s| s.id.as_str() == "pull-start").unwrap();
+    let Run::Argv(HostArgv::Every(pull_argv)) = &pull.run else { panic!() };
+    let pulled: Vec<String> = pull_argv.args().iter().map(ToString::to_string).collect();
+    assert!(
+        pulled[3].contains("docker compose --project-name flagged --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps"),
+        "{}",
+        pulled[3]
+    );
+    assert!(pull.download && !start.download, "only the pull is a download");
+    assert_eq!(pull.timeout_s.map(std::num::NonZeroU32::get), Some(900));
     // A forwarded port is checked free first, except where nothing is forwarded (ESXi).
     let ports = m.lifecycle.up.iter().find(|s| s.id.as_str() == "forwarded-ports").unwrap();
     assert!(matches!(
@@ -85,7 +106,18 @@ fn proxmox_makes_the_vm_then_copies_the_project_sets_it_up_and_starts_compose_ov
     let (_, _, m) = manifests()?;
     assert_eq!(
         up(&m),
-        ["clear-lock", "init", "apply", "archive", "project", "docker", "start", "job-isoloom-init-web-1"]
+        [
+            "clear-lock",
+            "init",
+            "apply",
+            "archive",
+            "project",
+            "docker",
+            "pull-start",
+            "start",
+            "pull-job-isoloom-init-web-1",
+            "job-isoloom-init-web-1"
+        ]
     );
     let step = |id: &str| m.lifecycle.up.iter().find(|s| s.id.as_str() == id).unwrap();
     assert_eq!(step("docker").stdin.as_ref().map(ToString::to_string).as_deref(), Some("setup.sh"));
@@ -104,7 +136,8 @@ fn proxmox_makes_the_vm_then_copies_the_project_sets_it_up_and_starts_compose_ov
         step("project").stdin.as_ref().map(ToString::to_string).as_deref(),
         Some("${run.state_dir}/project.tgz")
     );
-    for id in ["docker", "project", "start", "job-isoloom-init-web-1"] {
+    assert!(step("pull-start").download, "the pull over SSH is a download too");
+    for id in ["docker", "project", "pull-start", "start", "job-isoloom-init-web-1"] {
         let Run::Action {
             action: Action::SshRun,
             with: args,

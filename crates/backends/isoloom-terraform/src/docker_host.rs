@@ -65,6 +65,7 @@ pub(crate) fn accept_env(guest: &GuestCompose, as_root: AsRoot) -> Result<Option
         command: Template::text(&format!("{}sh -c '{}'", as_root.prefix(), steps::accept_env(&forwarded))),
         timeout_s: 60,
         failure: Failure::Fail,
+        download: false,
     }))
 }
 
@@ -110,6 +111,7 @@ pub(crate) fn into_vm(login: &Login, setup: &RelPath, root: &str) -> Result<Vec<
         command: Template::text(&format!("{sudo}sh -s")),
         timeout_s: SETUP_S,
         failure: Failure::Fail,
+        download: false,
     };
     let mut docker = docker.step(&way_in)?;
     docker.stdin = Some(PathTemplate::relative(setup));
@@ -120,6 +122,7 @@ pub(crate) fn into_vm(login: &Login, setup: &RelPath, root: &str) -> Result<Vec<
         command: Template::text(&format!("{sudo}sh -c '{}'", steps::project_unpack(steps::Archive::Stdin, false))),
         timeout_s: 600,
         failure: Failure::Fail,
+        download: false,
     };
     let mut copy = copy.step(&way_in)?;
     copy.stdin = Some(PathTemplate::project_archive());
@@ -160,6 +163,7 @@ mod tests {
             command: Template::text("docker compose ps"),
             timeout_s: 60,
             failure: Failure::Fail,
+            download: false,
         };
         GuestCompose {
             slots,

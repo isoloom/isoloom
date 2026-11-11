@@ -470,6 +470,18 @@
         "timeout_s": 1800
       },
       {
+        "id": "pull-start",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps db isoloom-routes-db web isoloom-routes-web isoloom-probe-amd64",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
+      },
+      {
         "id": "start",
         "note": "Starting the environment's containers in the VM…",
         "action": "ssh.run",
@@ -479,6 +491,18 @@
           "user": "isoloom"
         },
         "timeout_s": 1800
+      },
+      {
+        "id": "pull-job-isoloom-init-web-1",
+        "note": "Pulling the environment's images in the VM…",
+        "action": "ssh.run",
+        "with": {
+          "command": "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable isoloom-init-web-1",
+          "host": "${outputs.ip}",
+          "user": "isoloom"
+        },
+        "timeout_s": 900,
+        "download": true
       },
       {
         "id": "job-isoloom-init-web-1",

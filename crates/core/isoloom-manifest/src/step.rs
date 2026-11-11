@@ -151,6 +151,11 @@ pub struct Step {
     /// the same way: a provider whose tool is slower (`vmware_esxi` asks the ESXi host once per
     /// VM).
     pub provider_timeout_s: BTreeMap<Provider, NonZeroU32>,
+    /// A download (the images a start pulls): a runner lets it run as long as it makes progress,
+    /// with no ceiling, stops it once it shows none for its limit (`timeout_s`), and reports that
+    /// and its failure as a download's, so it can tell a slow or stuck connection from a broken
+    /// step.
+    pub download: bool,
     /// When it runs.
     pub when: When,
     /// What its failure does.
@@ -186,6 +191,7 @@ impl Step {
             stdin: None,
             timeout_s: None,
             provider_timeout_s: BTreeMap::new(),
+            download: false,
             when: When::IfOk,
             failure: Failure::Fail,
             hosts: BTreeSet::new(),
@@ -246,6 +252,11 @@ struct StepFields {
     /// (`{"vmware_esxi": 120}`), counted the same way.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     provider_timeout_s: BTreeMap<Provider, NonZeroU32>,
+    /// `true`: a download (the images a start pulls). A runner lets it run as long as it makes
+    /// progress, with no ceiling, stops it once it shows none for its limit (`timeout_s`), and
+    /// reports that stall and its failure as a download's. Default `false`.
+    #[serde(default, skip_serializing_if = "is_default")]
+    download: bool,
     /// `if_ok` (default): skipped once a step of the operation failed. `always`: a clean-up that
     /// runs anyway.
     #[serde(default, skip_serializing_if = "is_default")]
@@ -286,6 +297,7 @@ impl TryFrom<StepFields> for Step {
             stdin: f.stdin,
             timeout_s: f.timeout_s,
             provider_timeout_s: f.provider_timeout_s,
+            download: f.download,
             when: f.when,
             failure: f.failure,
             hosts: f.hosts,
@@ -312,6 +324,7 @@ impl From<Step> for StepFields {
             stdin: s.stdin,
             timeout_s: s.timeout_s,
             provider_timeout_s: s.provider_timeout_s,
+            download: s.download,
             when: s.when,
             failure: s.failure,
             hosts: s.hosts,
@@ -351,6 +364,17 @@ mod tests {
         assert!(!serde_json::to_string(&plain).unwrap().contains("provider_timeout_s"));
         assert!(serde_json::from_str::<Step>(r#"{"id":"s","argv":["v"],"provider_timeout_s":{"vmware_esxi":0}}"#).is_err());
         assert!(serde_json::from_str::<Step>(r#"{"id":"s","argv":["v"],"provider_timeout_s":{"esx":60}}"#).is_err());
+    }
+
+    #[test]
+    fn a_download_says_so_and_a_step_that_isnt_leaves_it_out() {
+        let text = r#"{"id":"pull-start","argv":["vagrant","ssh"],"timeout_s":900,"download":true}"#;
+        let s: Step = serde_json::from_str(text).unwrap();
+        assert!(s.download);
+        assert_eq!(serde_json::to_string(&s).unwrap(), text);
+        let plain: Step = serde_json::from_str(r#"{"id":"up","argv":["vagrant","up"]}"#).unwrap();
+        assert!(!plain.download);
+        assert!(!serde_json::to_string(&plain).unwrap().contains("download"));
     }
 
     #[test]

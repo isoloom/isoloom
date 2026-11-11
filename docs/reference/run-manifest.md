@@ -88,6 +88,18 @@ A runner keeps each run's state (its record, the values it set, the host ports i
 the environment folder. A secret or input value reaches only the steps its delivery names, and a runner
 never writes a sensitive value to a log or an error.
 
+### Downloads
+
+A step's `timeout_s` is how long it may go without progress (a new line of output), and a step
+that keeps making progress still stops at a ceiling. A step marked `"download": true` fetches
+something whose size and speed nobody knows in advance: the images a Compose start in a VM pulls
+(`pull-<step>`, before the `up` it pulls for, with the same project, files and pull policy, the
+images a service builds left out). A runner lets a download run as long as it makes progress,
+with no ceiling, stops it once it shows none for its `timeout_s` (900 s, the 15 minutes a stalled
+download is given), and reports the stall and the failure as a download's, so a slow or broken
+connection isn't taken for a broken environment. The step after it then runs under its own limit
+with nothing left to fetch.
+
 ### What a VM takes only when it boots
 
 Vagrant applies some of a VM's settings only when it boots it (`vagrant up` of a stopped VM,
