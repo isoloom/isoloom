@@ -221,7 +221,8 @@ const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0807c
 /// pinned SHA-256 as the apt branch's is. The apt branch fails closed (a `set -e` subshell, the
 /// key verified before use). On a non-x86 host (an Apple Silicon Mac's VM, an Arm cloud VM) the
 /// apt branch adds QEMU's user-mode emulation (`qemu-user-static`, registered with binfmt for
-/// every container), since an environment's images are x86 unless its spec says otherwise.
+/// every container), for the containers pinned to x86 (their spec's `hardware.arch`, or an image
+/// published for x86 only); the others run on the host's own architecture.
 #[must_use]
 pub fn install_docker() -> String {
     // The engine's version as `apt-cache madison` writes it, after an optional epoch.
@@ -247,9 +248,10 @@ pub fn install_docker() -> String {
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:){madison}/ {{ print $3; exit }}')
   [ -n "$v" ] || {{ echo "docker-ce {DOCKER_VERSION} is not in Docker's apt repository" >&2; exit 1; }}
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin={COMPOSE_VERSION}-*"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else

@@ -6,10 +6,17 @@
 
 use std::net::Ipv4Addr;
 
-use isoloom_spec::model::Spec;
+use isoloom_spec::model::{Machine, Spec};
 
 use crate::addressing::address;
 use crate::requirements::Requirement;
+
+/// Machine `name`'s (`m`) names: its own, then its aliases, then (with `dns.private`) each under
+/// the private zone's domain.
+pub(crate) fn names(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
+    let own = std::iter::once(name).chain(m.aliases.iter().map(String::as_str)).map(String::from).collect();
+    with_domain(spec, own)
+}
 
 /// The zone, as every target serves it.
 #[derive(Debug, Clone, PartialEq, Eq)]

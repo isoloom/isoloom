@@ -113,7 +113,7 @@ fn each_up_in_the_vm_pulls_its_images_first_in_a_download_of_its_own() {
     let prefix = "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml ";
     assert_eq!(
         pull.command.to_string(),
-        format!("{prefix}pull --policy missing --ignore-buildable --include-deps cache isoloom-routes-cache web isoloom-routes-web isoloom-probe-amd64")
+        format!("{prefix}pull --policy missing --ignore-buildable --include-deps cache isoloom-routes-cache web isoloom-routes-web isoloom-probe")
     );
     assert!(up.command.to_string().starts_with(&format!("{prefix}up ")));
     assert!(pull.download && !up.download);

@@ -14,7 +14,7 @@ use crate::kustomize::{SCRIPTS, SCRIPTS_DIR, run_script};
 use crate::machine::{Machine, udp};
 use crate::network::MACHINE_LABEL;
 use crate::objects::{
-    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Image, Labels, Limits, NameValue, PodAffinity, PodSpec, Resources,
+    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Image, Limits, NameValue, PodAffinity, PodSpec, Resources,
     SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
 };
 use crate::process;
@@ -61,8 +61,14 @@ pub(crate) fn spec(m: &Machine) -> PodSpec {
         share_process_namespace: runs_supervisor(m),
         init_containers: init_containers(m),
         containers,
-        // Scheduled on a node of the machine's architecture.
-        node_selector: Labels::from([("kubernetes.io/arch".to_owned(), m.plan.arch.id().to_owned())]),
+        // Scheduled on a node of the architecture the machine is pinned to, when it is: else on
+        // any node, its image pulled for that node's.
+        node_selector: m
+            .plan
+            .platform
+            .map(|a| ("kubernetes.io/arch".to_owned(), a.id().to_owned()))
+            .into_iter()
+            .collect(),
         // A resolver of its own (the lab's domain controller), or the cluster's with the
         // machine's search domains and options.
         dns_policy,
@@ -325,5 +331,22 @@ pub(crate) fn config_map_volume(name: &str) -> VolumeSource {
     VolumeSource::ConfigMap {
         name: name.into(),
         default_mode: 0o755,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::objects::Labels;
+    use crate::testing::environment;
+
+    #[test]
+    fn a_pod_is_scheduled_on_a_nodes_architecture_only_when_its_machine_is_pinned_to_one() {
+        let env = environment(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.1.0.0/24 } }\nmachines:\n  any: { networks: { lan: 10 }, app: { image: nginx } }\n  x86: { networks: { lan: 11 }, hardware: { arch: amd64 }, app: { image: nginx } }\n  arm: { networks: { lan: 12 }, hardware: { arch: arm64 }, app: { image: nginx } }\n",
+        );
+        let selectors: Vec<(&str, Labels)> = Machine::all(&env).iter().map(|m| (m.name, spec(m).node_selector)).collect();
+        let arch = |a: &str| Labels::from([("kubernetes.io/arch".to_owned(), a.to_owned())]);
+        assert_eq!(selectors, [("any", Labels::new()), ("x86", arch("amd64")), ("arm", arch("arm64"))]);
     }
 }

@@ -415,7 +415,6 @@
     {
       "name": "db",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -447,7 +446,6 @@
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -524,11 +522,11 @@
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -580,7 +578,7 @@
           "ssh",
           "--no-tty",
           "--command",
-          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps db isoloom-routes-db web isoloom-routes-web isoloom-probe-amd64",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml pull --policy missing --ignore-buildable --include-deps db isoloom-routes-db web isoloom-routes-web isoloom-probe",
           "default"
         ],
         "timeout_s": 900,
@@ -594,7 +592,7 @@
           "ssh",
           "--no-tty",
           "--command",
-          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db isoloom-routes-db web isoloom-routes-web isoloom-probe-amd64",
+          "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name web-portal --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600 db isoloom-routes-db web isoloom-routes-web isoloom-probe",
           "default"
         ],
         "timeout_s": 1800

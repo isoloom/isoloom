@@ -175,8 +175,11 @@ pub struct MachinePlan {
     /// Its size as the spec gives it (`resources`, each field it leaves out `None`); the size
     /// it runs at is [`MachinePlan::size`].
     pub resources: Resources,
-    /// Its CPU architecture.
+    /// Its CPU architecture: what its VM, box or cloud instance is built for.
     pub arch: Arch,
+    /// The architecture its container is pinned to, when its spec asks for one or its catalogue
+    /// image has one only (see [`isoloom_spec::model::Machine::platform`]); `None`: the host's.
+    pub platform: Option<Arch>,
     /// The bandwidth cap on each of its links (`rate_limit`, a `tc` rate such as `10mbit`).
     pub rate_limit: Option<Rate>,
     /// What it runs from, on this target.
@@ -517,7 +520,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<Machi
         addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
         more_addresses: crate::more_addresses::of(spec, m),
         addresses6: ipv6::addresses(spec, m),
-        names: names(spec, name, m),
+        names: crate::private_dns::names(spec, name, m),
         lifecycle: if shape == MachineShape::Vm {
             lifecycle::of(spec, name, m, recipe.as_ref(), &routing)
         } else {
@@ -543,6 +546,7 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<Machi
         secrets: m.secrets.iter().map(|s| SecretFile::of(spec, s)).collect(),
         resources: m.resources.unwrap_or_default(),
         arch: m.arch,
+        platform: m.platform,
         rate_limit: rate_limit(name, m)?,
         image: image::of(spec, shape, name, m, recipe.as_ref()),
         vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
@@ -559,13 +563,6 @@ fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<Machi
         hardware: Hardware::of(m),
         recipe,
     })
-}
-
-/// Machine `name`'s (`m`) names: its own, then its aliases, then (with `dns.private`) each under
-/// the private zone's domain.
-fn names(spec: &Spec, name: &str, m: &Machine) -> Vec<String> {
-    let own = std::iter::once(name).chain(m.aliases.iter().map(String::as_str)).map(String::from).collect();
-    crate::private_dns::with_domain(spec, own)
 }
 
 fn published(m: &Machine) -> Vec<PublishedPort> {

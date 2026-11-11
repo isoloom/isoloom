@@ -306,7 +306,6 @@ name: supplier-portal-api
 services:
   database:
     image: mysql:8.0
-    platform: linux/amd64
     hostname: database
     networks:
       lab:
@@ -316,7 +315,7 @@ services:
       MYSQL_TCP_PORT: '8207'
       API_URL: ${API_URL:-}
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     secrets:
     - source: input-launch-token
       target: /run/lab/launch-token
@@ -333,7 +332,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     deploy:
       resources:
@@ -377,7 +376,6 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: supplier-portal-api
     image: localhost/isoloom/supplier-portal-api-web
-    platform: linux/amd64
     hostname: web
     networks:
       lab:
@@ -385,7 +383,7 @@ services:
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:8206:8206
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -398,7 +396,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
       database:
         condition: service_healthy
@@ -476,16 +474,15 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
@@ -500,7 +497,7 @@ networks:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
 volumes:
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: supplier-portal-api
@@ -670,7 +667,6 @@ secrets:
     {
       "name": "database",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -702,7 +698,6 @@ secrets:
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -754,11 +749,11 @@ secrets:
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],

@@ -1182,7 +1182,7 @@ What it asks of the hardware: `arch`, `tpm`, `gpus`, `devices`, `nested_virtuali
 
 ### `machines.*.hardware.arch`
 
-The CPU architecture: `amd64` (the default) or `arm64`.
+The CPU architecture: `amd64` or `arm64`. A VM or a cloud machine without one is `amd64`. A container without one runs on the Docker host's own architecture (its image pulled or built for it), unless its catalogue image is published for one only; with one, it is pinned to it, and a host of the other architecture runs it only through emulation (Docker Desktop's, or QEMU's registered with binfmt on Linux).
 
 - **Type:** string
 - **Default:** `amd64`

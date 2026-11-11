@@ -61,13 +61,21 @@ struct Membership<'a> {
 impl<'a> Membership<'a> {
     /// The groups and machines of a parsed spec.
     fn of_spec(spec: &'a Spec) -> Membership<'a> {
+        Membership::new(spec.groups.iter().map(|(name, g)| (name, &g.members)), spec.machines.keys())
+    }
+
+    /// The groups and machines of a spec as written.
+    fn of_syntax(spec: &'a crate::syntax::Spec) -> Membership<'a> {
+        Membership::new(spec.groups.iter().map(|(name, g)| (name, &g.members)), spec.machines.keys())
+    }
+
+    /// `groups`, each with its members as written, and the `machines`.
+    fn new(groups: impl Iterator<Item = (&'a String, &'a Vec<String>)>, machines: impl Iterator<Item = &'a String>) -> Membership<'a> {
         Membership {
-            groups: spec
-                .groups
-                .iter()
-                .map(|(name, g)| (name.as_str(), g.members.iter().map(String::as_str).collect()))
+            groups: groups
+                .map(|(name, members)| (name.as_str(), members.iter().map(String::as_str).collect()))
                 .collect(),
-            machines: spec.machines.keys().map(String::as_str).collect(),
+            machines: machines.map(String::as_str).collect(),
         }
     }
 
@@ -130,6 +138,31 @@ impl<'a> Membership<'a> {
 #[must_use]
 pub fn members(spec: &Spec, group: &str) -> Vec<String> {
     Membership::of_spec(spec).machines_of(group).into_iter().map(str::to_owned).collect()
+}
+
+/// Whether `spec` writes `field` (a dotted path inside a machine: `hardware.arch`) for machine
+/// `machine`: on the machine itself (or on the one it is a clone of), on a group it is in, or in
+/// `common:`. The machine's own fields are read from the spec's spans, so a spec built in code
+/// writes a machine's field only through `common:` or a group.
+pub(crate) fn writes(spec: &crate::syntax::Spec, machine: &str, field: &str) -> bool {
+    let base = spec
+        .clones
+        .iter()
+        .find(|(_, clones)| clones.iter().any(|c| c == machine))
+        .map_or(machine, |(base, _)| base.as_str());
+    let path = field.split('.').fold(FieldPath::new("machines").key(base), |at, key| at.key(key));
+    let shared = |fields: &crate::syntax::Shared| {
+        let mut keys = field.split('.');
+        let first = keys.next().and_then(|k| fields.0.get(k));
+        keys.try_fold(first, |at, key| Some(at?.get(key))).flatten().is_some()
+    };
+    let membership = Membership::of_syntax(spec);
+    spec.spans.contains(&path)
+        || spec.common.as_ref().is_some_and(shared)
+        || spec
+            .groups
+            .iter()
+            .any(|(g, group)| shared(&group.shared) && membership.machines_of(g).iter().any(|m| *m == machine || *m == base))
 }
 
 /// Folds `common:` and `groups:` into the machines of a spec document (the YAML, parsed): a
@@ -268,6 +301,21 @@ mod tests {
         let mut doc: Value = serde_yaml_ng::from_str(yaml).unwrap();
         expand(&mut doc).unwrap();
         doc
+    }
+
+    #[test]
+    fn a_field_is_written_on_the_machine_its_clones_a_group_or_common_else_left_to_its_default() {
+        let parsed = |yaml: &str| crate::syntax::parse(&format!("version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.1.0.0/24 }} }}\n{yaml}")).unwrap();
+        let spec = parsed(
+            "groups:\n  arm: { members: [db*], hardware: { arch: arm64 } }\nmachines:\n  web: { networks: { lan: 10 }, hardware: { arch: amd64 }, app: { image: nginx } }\n  db: { networks: { lan: 20 }, app: { image: postgres } }\n  cache: { networks: { lan: 30 }, count: 2, hardware: { arch: amd64, tpm: none }, app: { image: redis } }\n  plain: { networks: { lan: 40 }, hardware: { tpm: none }, app: { image: nginx } }\n",
+        );
+        for machine in ["web", "db", "cache-01", "cache-02"] {
+            assert!(spec.writes(machine, "hardware.arch"), "{machine}");
+        }
+        assert!(!spec.writes("plain", "hardware.arch"), "`hardware` is written, not its `arch`");
+        assert!(spec.writes("plain", "hardware.tpm"));
+        let common = parsed("common: { hardware: { arch: amd64 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n");
+        assert!(common.writes("web", "hardware.arch"));
     }
 
     #[test]

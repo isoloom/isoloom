@@ -1,7 +1,6 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 44
-expression: example(&name).spec()
+expression: example(&name).unwrap().spec()
 ---
 version: 1
 name: segmented

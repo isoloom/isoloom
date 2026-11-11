@@ -341,7 +341,9 @@ pub struct Machine {
     /// It runs Windows.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub windows: bool,
-    /// Its CPU architecture, for the environment's own machines.
+    /// Its CPU architecture, for the environment's own machines, when it is pinned to one: a
+    /// VM's, a box's or a cloud instance's always; a container's only when its spec asks for one or
+    /// its image is published for one only (absent: the container runs on the Docker host's own).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arch: Option<Arch>,
     /// Its size: an environment's machine's as it runs on this target, its `resources` each field they leave

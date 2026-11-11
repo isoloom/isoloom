@@ -24,7 +24,7 @@ use crate::{labels, networks, outside, sidecars, storage};
 pub(super) fn machine(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk], out: &mut Out) {
     let mut svc = base(env, m, ts);
     appliance(env, m, &mut svc, &mut out.files);
-    waits(env, m, &mut svc, &mut out.probe_archs);
+    waits(env, m, &mut svc, &mut out.probes);
     svc.deploy = limits(m.plan);
     svc.labels.extend(labels::ports(m.spec));
     hardware::machine(&m.plan.hardware, &mut svc);
@@ -52,7 +52,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
     let (spec, plan) = (m.spec, m.plan);
     let (tmpfs, long_tmpfs) = storage::tmpfs(spec);
     let mut svc = Service {
-        platform: Some(plan.arch.docker_platform().to_owned()),
+        platform: platform(plan),
         privileged: spec.privileged,
         read_only: spec.read_only,
         sysctls: plan.settings.sysctls.clone(),
@@ -115,6 +115,12 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         svc.sysctls.extend(crate::ipv6::forwarding(env));
     }
     svc
+}
+
+/// The platform a machine's containers (its own, its `init:` jobs) are pinned to, when it is
+/// pinned to one: else Docker runs them on the host's architecture.
+fn platform(plan: &isoloom_plan::MachinePlan) -> Option<String> {
+    plan.platform.map(|a| a.docker_platform().to_owned())
 }
 
 /// The machine's DNS, when the spec sets it: its servers, options, search list and domain.
@@ -290,16 +296,18 @@ fn pull_from(env: &Environment, dockerfile: &str) -> String {
 
 /// The healthcheck (the port probe and the machine's own) and what the machine waits for before
 /// it starts.
-fn waits(env: &Environment, m: Machine<'_>, svc: &mut Service, archs: &mut Vec<model::Arch>) {
+fn waits(env: &Environment, m: Machine<'_>, svc: &mut Service, probes: &mut super::Probes) {
     let plan = m.plan;
     if let Some(healthcheck) = process::healthcheck(m.spec, plan) {
         svc.healthcheck = Some(healthcheck);
-        // Isoloom's own probe, copied into a volume before the machine starts.
-        let probe_svc = probe_service(plan.arch);
+        // Isoloom's own probe, built for the machine's architecture, copied into a volume
+        // before the machine starts.
+        let probe_svc = probe_service(plan.platform);
         svc.volumes.push(format!("{probe_svc}:{PROBE_DIR}:ro").into());
         svc.after(probe_svc, Condition::CompletedSuccessfully);
-        if !archs.contains(&plan.arch) {
-            archs.push(plan.arch);
+        match probes.iter_mut().find(|(p, _)| *p == plan.platform) {
+            Some((_, machines)) => machines.push(m.name.to_owned()),
+            None => probes.push((plan.platform, vec![m.name.to_owned()])),
         }
     }
     for dep in plan.depends_on.iter().filter_map(|d| Machine::of(env, d)) {
@@ -344,6 +352,7 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
         // steps have it, so one `setup:` script finds its files at the same path on every target.
         let mut j = Service {
             image: image.clone(),
+            platform: platform(plan),
             user: Some("root".into()),
             privileged: m.spec.privileged,
             cap_add: if plan.is_gateway { vec!["NET_ADMIN".into()] } else { Vec::new() },
@@ -373,6 +382,64 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The Compose file of the spec `machines` (YAML under `machines:`), on one network.
+    fn file_of(machines: &str) -> crate::file::ComposeFile {
+        let env = crate::testing::environment(&format!("version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\n{machines}"));
+        crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).unwrap().file
+    }
+
+    fn yaml<T: serde::Serialize>(value: &T) -> String {
+        serde_yaml_ng::to_string(value).unwrap()
+    }
+
+    #[test]
+    fn a_container_runs_on_the_hosts_architecture_unless_its_spec_asks_for_one() {
+        let file = file_of(
+            "machines:\n  web: { networks: { lan: 10 }, ports: { http: 80 }, setup: [seed.sh], app: { image: nginx } }\n  db: { networks: { lan: 20 }, ports: { pg: 5432 }, app: { build: { context: db } } }\n",
+        );
+        for service in ["web", "isoloom-init-web-1", "db", "isoloom-probe"] {
+            assert_eq!(file.services[service].platform, None, "{service}");
+        }
+        assert_eq!(file.services["isoloom-probe"].entrypoint, ["/bin/cp", "/bin/busybox", "/probe/busybox"]);
+        assert!(!file.services.keys().any(|s| s.starts_with("isoloom-probe-")), "{:?}", file.services.keys());
+        assert!(yaml(&file.services["web"].volumes).contains("isoloom-probe:/.isoloom-probe:ro"));
+    }
+
+    #[test]
+    fn a_container_pinned_by_its_spec_and_its_probe_run_on_that_architecture_and_say_how_a_host_that_cant_could() {
+        let file = file_of(
+            "common: { hardware: { arch: amd64 } }\nmachines:\n  web: { networks: { lan: 10 }, ports: { http: 80 }, setup: [seed.sh], app: { image: nginx } }\n  api: { networks: { lan: 20 }, ports: { http: 80 }, hardware: { arch: arm64 }, app: { image: nginx } }\n",
+        );
+        let platform = |s: &str| file.services[s].platform.as_deref();
+        assert_eq!((platform("web"), platform("isoloom-init-web-1")), (Some("linux/amd64"), Some("linux/amd64")));
+        assert_eq!(platform("api"), Some("linux/arm64"));
+        let probe = &file.services["isoloom-probe-amd64"];
+        assert_eq!(probe.platform.as_deref(), Some("linux/amd64"));
+        assert_eq!(probe.entrypoint[..3], ["/isoloom-host-probe/busybox", "sh", "-c"]);
+        let script = &probe.entrypoint[3];
+        for wanted in [
+            "if /bin/busybox true 2>/dev/null; then exec /bin/busybox cp /bin/busybox /probe/busybox; fi",
+            "can't run linux/amd64 programs, which machine web needs",
+            "$$(/isoloom-host-probe/busybox uname -m)",
+            "tonistiigi/binfmt --install amd64",
+            "exit 1",
+        ] {
+            assert!(script.contains(wanted), "{wanted}: {script}");
+        }
+        assert!(yaml(probe).contains("isoloom-probe:/isoloom-host-probe:ro"), "{}", yaml(probe));
+        assert!(
+            yaml(&probe.depends_on).contains("isoloom-probe"),
+            "after the host's probe: {}",
+            yaml(&probe.depends_on)
+        );
+        // The host's own probe is there for the pinned one to run, unpinned.
+        assert_eq!(file.services["isoloom-probe"].platform, None);
+        assert!(file.services["isoloom-probe-arm64"].entrypoint[3].contains("which machine api needs"));
+        assert!(yaml(&file.services["web"].volumes).contains("isoloom-probe-amd64:/.isoloom-probe:ro"));
+        let volumes: Vec<&String> = file.volumes.keys().collect();
+        assert_eq!(volumes, ["isoloom-probe", "isoloom-probe-amd64", "isoloom-probe-arm64"]);
+    }
 
     #[test]
     fn a_gateway_keeps_its_own_kernel_parameters_beside_forwarding() {

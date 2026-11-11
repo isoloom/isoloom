@@ -279,7 +279,6 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: udp-dns
     image: localhost/isoloom/udp-dns-dns
-    platform: linux/amd64
     hostname: dns
     networks:
       servers:
@@ -289,7 +288,7 @@ services:
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+10053}:53/udp
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -302,7 +301,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     labels:
       isoloom.port.dns-udp: udp:53
@@ -344,7 +343,6 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: udp-dns
     image: localhost/isoloom/udp-dns-client
-    platform: linux/amd64
     profiles:
     - access
     init: true
@@ -480,16 +478,15 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
@@ -512,7 +509,7 @@ networks:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
 volumes:
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns
@@ -652,7 +649,6 @@ volumes:
     {
       "name": "dns",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -695,7 +691,6 @@ volumes:
     {
       "name": "client",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -755,11 +750,11 @@ volumes:
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],

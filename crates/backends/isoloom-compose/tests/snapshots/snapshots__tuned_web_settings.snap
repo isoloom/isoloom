@@ -12,7 +12,6 @@ name: tuned-web
 services:
   web:
     image: nginx:1.27-alpine
-    platform: linux/amd64
     sysctls:
       net.core.somaxconn: '4096'
     ulimits:
@@ -27,7 +26,7 @@ services:
       APP_MODE: production
     volumes:
     - web-cache:/var/cache/web
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -40,7 +39,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     labels:
       isoloom.port.web: http:80
@@ -63,16 +62,15 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: tuned-web
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: tuned-web
@@ -91,7 +89,7 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: tuned-web
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: tuned-web

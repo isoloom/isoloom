@@ -2379,7 +2379,7 @@
       "properties": {
         "arch": {
           "$ref": "#/$defs/Arch",
-          "description": "The CPU architecture: `amd64` (the default) or `arm64`.",
+          "description": "The CPU architecture: `amd64` or `arm64`. A VM or a cloud machine without one is\n`amd64`. A container without one runs on the Docker host's own architecture (its image\npulled or built for it), unless its catalogue image is published for one only; with one,\nit is pinned to it, and a host of the other architecture runs it only through emulation\n(Docker Desktop's, or QEMU's registered with binfmt on Linux).",
           "default": "amd64"
         },
         "tpm": {
@@ -2423,7 +2423,7 @@
           "description": "64-bit ARM (aarch64)."
         }
       ],
-      "description": "A machine's CPU architecture. Every target has one: a container platform, a box\narchitecture, a cloud instance family. Defaults to x86-64."
+      "description": "A machine's CPU architecture: a box architecture, a cloud instance family, a container\nplatform. Defaults to x86-64 where a target has to pick one (a VM, a cloud instance); a\ncontainer is pinned to one only when its spec asks for one, or its image has one only."
     },
     "Tpm": {
       "oneOf": [

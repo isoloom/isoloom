@@ -139,7 +139,6 @@
     {
       "name": "db",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -171,7 +170,6 @@
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -248,11 +246,11 @@
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -297,7 +295,7 @@
           "isoloom-routes-db",
           "web",
           "isoloom-routes-web",
-          "isoloom-probe-amd64"
+          "isoloom-probe"
         ],
         "timeout_s": 1800
       },

@@ -44,7 +44,7 @@ pub(crate) struct PodSpec {
     pub(crate) init_containers: Vec<Container>,
     /// What runs.
     pub(crate) containers: Vec<Container>,
-    /// The node labels it needs (its architecture).
+    /// The node labels it needs (the architecture it is pinned to).
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     pub(crate) node_selector: Labels,
     /// `None` when it has its own resolver.

@@ -263,7 +263,6 @@ services:
     restart: unless-stopped
   web:
     image: nginx:1.27-alpine
-    platform: linux/amd64
     hostname: web
     networks:
       back:
@@ -272,7 +271,7 @@ services:
     extra_hosts:
     - user:10.67.10.10
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -285,7 +284,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     labels:
       isoloom.port.web: http:80
@@ -320,7 +319,6 @@ services:
     restart: unless-stopped
   user:
     image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858}
-    platform: linux/amd64
     profiles:
     - access
     init: true
@@ -452,16 +450,15 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: dual-stack
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: dual-stack
@@ -492,7 +489,7 @@ networks:
       isoloom.managed: 'true'
       isoloom.environment: dual-stack
 volumes:
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: dual-stack
@@ -600,7 +597,6 @@ volumes:
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -632,7 +628,6 @@ volumes:
     {
       "name": "user",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -692,11 +687,11 @@ volumes:
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],

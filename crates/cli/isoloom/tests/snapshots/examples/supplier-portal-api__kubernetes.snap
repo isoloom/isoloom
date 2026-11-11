@@ -498,8 +498,6 @@ spec:
           subPath: input-launch-token
         - name: scripts
           mountPath: /isoloom/scripts
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: scripts
         configMap:
@@ -629,8 +627,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: isoloom-probe
         emptyDir: {}
@@ -1589,8 +1585,6 @@ spec:
           subPath: input-launch-token
         - name: scripts
           mountPath: /isoloom/scripts
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: scripts
         configMap:
@@ -1720,8 +1714,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: isoloom-probe
         emptyDir: {}

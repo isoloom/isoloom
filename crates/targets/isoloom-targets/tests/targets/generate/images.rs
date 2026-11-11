@@ -19,7 +19,7 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
     // (its table image the fallback) and it sits in the `access` profile, so the initial `up` skips it.
     assert!(
         compose
-            .contains("  user:\n    image: ${ISOLOOM_ACCESS_IMAGE:-registry.example.com/workstation:1}\n    platform: linux/amd64\n    profiles:\n    - access\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"),
+            .contains("  user:\n    image: ${ISOLOOM_ACCESS_IMAGE:-registry.example.com/workstation:1}\n    profiles:\n    - access\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"),
         "{compose}"
     );
     // A check that runs from its position can't depend on it (it is on demand, in the `access`

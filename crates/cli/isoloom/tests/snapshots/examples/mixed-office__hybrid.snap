@@ -975,9 +975,10 @@ crash.*.log
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n \"$v\" ] || { echo \"docker-ce 29.9.0 is not in Docker's apt repository\" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades \"docker-ce=$v\" \"docker-ce-cli=$v\" containerd.io docker-buildx-plugin \"docker-compose-plugin=5.6.0-*\"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ \"$(dpkg --print-architecture)\" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
@@ -1113,7 +1114,6 @@ name: mixed-office
 services:
   intranet:
     image: nginx:1.27
-    platform: linux/amd64
     hostname: intranet
     networks:
       office:
@@ -1125,7 +1125,7 @@ services:
     ports:
     - 8083:80
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -1138,23 +1138,22 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     labels:
       isoloom.port.web: http:80
       isoloom.managed: 'true'
       isoloom.environment: mixed-office
     restart: unless-stopped
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: mixed-office
@@ -1165,7 +1164,7 @@ networks:
     external: true
     name: isoloom-mixed-office-office
 volumes:
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: mixed-office

@@ -461,8 +461,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: vol-data
         persistentVolumeClaim:
@@ -623,8 +621,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: isoloom-probe
         emptyDir: {}
@@ -702,8 +698,6 @@ spec:
           limits:
             cpu: '1'
             memory: 512Mi
-      nodeSelector:
-        kubernetes.io/arch: amd64
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1637,8 +1631,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: vol-data
         persistentVolumeClaim:
@@ -1799,8 +1791,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: isoloom-probe
         emptyDir: {}
@@ -1878,8 +1868,6 @@ spec:
           limits:
             cpu: '1'
             memory: 512Mi
-      nodeSelector:
-        kubernetes.io/arch: amd64
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

@@ -10,6 +10,26 @@ stable spec format.
 
 ## [Unreleased]
 
+### Changed
+
+- **A container runs on the Docker host's own architecture unless its spec pins one.** Every
+  container, and the job that copies Isoloom's probe into it (`isoloom-probe-amd64`), was pinned
+  to `linux/amd64`, so an Arm host without x86 emulation (an Arm Linux runner, a VM on an Apple
+  Silicon Mac without Docker Desktop) ran nothing: `exec format error` on the probe before any
+  machine started, and a multi-architecture image was pulled for the wrong CPU. A container is now
+  pinned to a `platform` only when its spec writes `hardware.arch` (on the machine, a group or
+  `common:`), or when its catalogue image is published for one architecture only; every other one
+  carries no `platform:`, and Docker pulls or builds the host's own. The probe job is the host's
+  (`isoloom-probe`); a pinned architecture's (`isoloom-probe-<arch>`) runs the host's busybox
+  first and, on a host that can't run it, fails saying which machines need `linux/<arch>` and how
+  to turn its emulation on (Docker Desktop has it; on Linux, QEMU's registered with binfmt),
+  instead of the engine's `exec format error`. Kubernetes selects a node's architecture only for
+  a pinned machine, and the run manifest's `arch` of a container is absent when it isn't pinned
+  (the contract's field was already optional). A VM, a box and a cloud instance still default to
+  `amd64`. `isoloom_spec::model::Machine::platform` and `isoloom_plan::MachinePlan::platform`
+  carry the pin; `isoloom_spec::syntax::Spec::writes` and `Spans::contains` say whether a spec
+  writes a field. The `segmented` example no longer pins its cache to `amd64`.
+
 ### Fixed
 
 - A read-write `host_folders` folder in a VirtualBox VM is group-writable (`dmode=0775`,

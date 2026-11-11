@@ -109,12 +109,12 @@ pub(crate) fn compose_file(target: ComposeTarget, env: &Environment) -> Result<R
     let mut file = ComposeFile {
         name: env.name.clone(),
         networks: networks::declared(env, &ts),
-        volumes: volumes(env, &out.probe_archs),
+        volumes: volumes(env, &out.probes),
         secrets: secrets::of_file(env),
         configs: configs::declared(env),
         ..ComposeFile::default()
     };
-    probes(env, &out.probe_archs, &mut out.services);
+    probes(env, &out.probes, &mut out.services);
     file.services = out.services;
     labels::mark(env, &mut file);
     // Existing networks aren't the environment's: unlabelled, so nothing collects them.
@@ -139,9 +139,14 @@ struct Out {
     services: IndexMap<String, Service>,
     /// Appliance configurations and Dockerfiles, next to the Compose file.
     files: Vec<GeneratedFile>,
-    /// The architectures of machines that need the probe: one copy job (and volume) each.
-    probe_archs: Vec<Arch>,
+    /// The machines that need the probe, by the architecture they are pinned to (`None`: the
+    /// host's): one copy job (and volume) each.
+    probes: Probes,
 }
+
+/// The machines that need the probe, by the architecture they are pinned to (`None`: the
+/// host's), in the order first met.
+type Probes = Vec<(Option<Arch>, Vec<String>)>;
 
 /// The comment saying which networks moved to their Docker block, a line each.
 struct Moved<'a>(&'a Environment);
@@ -191,26 +196,69 @@ fn tools(env: &Environment, services: &mut IndexMap<String, Service>) {
     }
 }
 
-/// The one-shot services that copy the probe, one per architecture.
-fn probes(env: &Environment, archs: &[Arch], services: &mut IndexMap<String, Service>) {
-    for arch in archs {
-        let name = probe_service(*arch);
-        let p = Service {
-            image: Some(env.images.pull(PROBE_IMAGE)),
-            platform: Some(arch.docker_platform().to_owned()),
-            entrypoint: vec!["/bin/cp".into(), "/bin/busybox".into(), "/probe/busybox".into()],
-            volumes: vec![format!("{name}:/probe").into()],
-            network_mode: Some(NetworkMode::None),
-            restart: Some(Restart::No),
-            ..Service::default()
-        };
+/// Where a pinned architecture's probe job finds the host's busybox.
+const HOST_PROBE: &str = "/isoloom-host-probe";
+
+/// The one-shot services that copy the probe into a volume each: the host's own busybox for the
+/// machines that run on the host's architecture, and one built for each architecture machines
+/// are pinned to. A pinned one runs the host's busybox first (an architecture the host can't run
+/// can't even say so), to say exactly what is missing rather than the engine's "exec format
+/// error".
+fn probes(env: &Environment, probes: &Probes, services: &mut IndexMap<String, Service>) {
+    if probes.is_empty() {
+        return;
+    }
+    let host = probe_service(None);
+    let job = |name: &str| Service {
+        image: Some(env.images.pull(PROBE_IMAGE)),
+        entrypoint: vec!["/bin/cp".into(), "/bin/busybox".into(), "/probe/busybox".into()],
+        volumes: vec![format!("{name}:/probe").into()],
+        network_mode: Some(NetworkMode::None),
+        restart: Some(Restart::No),
+        ..Service::default()
+    };
+    services.insert(host.clone(), job(&host));
+    for (arch, machines) in probes.iter().filter_map(|(a, m)| Some(((*a)?, m))) {
+        let name = probe_service(Some(arch));
+        let mut p = job(&name);
+        p.platform = Some(arch.docker_platform().to_owned());
+        p.entrypoint = vec![
+            format!("{HOST_PROBE}/busybox"),
+            "sh".into(),
+            "-c".into(),
+            crate::interpolation::literal(&unrunnable(arch, machines)),
+        ];
+        p.volumes.push(format!("{host}:{HOST_PROBE}:ro").into());
+        p.after(host.clone(), crate::file::Condition::CompletedSuccessfully);
         services.insert(name, p);
     }
 }
 
-/// The named volumes: the machines' (and their disks'), then the probes'.
-fn volumes(env: &Environment, archs: &[Arch]) -> IndexMap<String, Volume> {
+/// The pinned probe's script: its own busybox copied when the host runs `arch`, else what to do
+/// about it, naming the `machines` pinned to it.
+fn unrunnable(arch: Arch, machines: &[String]) -> String {
+    let platform = arch.docker_platform();
+    let id = arch.id();
+    let who = match machines {
+        [one] => format!("machine {one} needs"),
+        _ => format!("machines {} need", machines.join(", ")),
+    };
+    format!(
+        "if /bin/busybox true 2>/dev/null; then exec /bin/busybox cp /bin/busybox /probe/busybox; fi\n\
+         echo \"isoloom: this Docker host ($({HOST_PROBE}/busybox uname -m)) can't run {platform} programs, which {who} (pinned by the spec's hardware.arch, or an image published for {id} only). \
+         Turn on {id} emulation: Docker Desktop has it; on Linux, register QEMU's with binfmt (docker run --privileged --rm tonistiigi/binfmt --install {id}, or the qemu-user-static package). \
+         Or run the environment on a {platform} host.\" >&2\n\
+         exit 1\n"
+    )
+}
+
+/// The named volumes: the machines' (and their disks'), then the probes' (the host's beside a
+/// pinned one: its job runs the host's busybox).
+fn volumes(env: &Environment, probes: &Probes) -> IndexMap<String, Volume> {
     let mut out = storage::declared(env);
-    out.extend(archs.iter().map(|a| (probe_service(*a), Volume::default())));
+    if !probes.is_empty() {
+        out.insert(probe_service(None), Volume::default());
+    }
+    out.extend(probes.iter().filter(|(a, _)| a.is_some()).map(|(a, _)| (probe_service(*a), Volume::default())));
     out
 }

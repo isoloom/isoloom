@@ -186,7 +186,6 @@ name: cisco-qemu
 services:
   vios:
     image: vrnetlab/cisco_vios:15.9.3M6
-    platform: linux/amd64
     privileged: true
     sysctls:
       net.ipv4.ip_forward: '1'
@@ -249,7 +248,6 @@ services:
     restart: unless-stopped
   csr:
     image: vrnetlab/cisco_csr1000v:17.03.08
-    platform: linux/amd64
     privileged: true
     sysctls:
       net.ipv4.ip_forward: '1'
@@ -311,7 +309,6 @@ services:
     restart: unless-stopped
   host-a:
     image: alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
-    platform: linux/amd64
     init: true
     entrypoint:
     - sleep
@@ -355,7 +352,6 @@ services:
     restart: unless-stopped
   host-b:
     image: nginx:1.27-alpine
-    platform: linux/amd64
     hostname: host-b
     networks:
       site-b:
@@ -364,7 +360,7 @@ services:
     - vios:10.92.1.1
     - host-a:10.92.1.10
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -377,7 +373,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     labels:
       isoloom.port.web: http:80
@@ -436,16 +432,15 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
@@ -483,7 +478,7 @@ networks:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
 volumes:
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
@@ -585,7 +580,6 @@ volumes:
     {
       "name": "vios",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -610,7 +604,6 @@ volumes:
     {
       "name": "csr",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -635,7 +628,6 @@ volumes:
     {
       "name": "host-a",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -659,7 +651,6 @@ volumes:
     {
       "name": "host-b",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -698,11 +689,11 @@ volumes:
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],

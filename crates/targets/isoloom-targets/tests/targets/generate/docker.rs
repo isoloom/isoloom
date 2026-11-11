@@ -15,7 +15,7 @@ fn compose_has_addresses_healthchecks_init_and_checks() -> Outcome {
     // The healthcheck runs Isoloom's own busybox (exec form): no shell needed in the image.
     assert!(compose.contains("/.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379"));
     assert!(compose.contains("- CMD\n"));
-    assert!(compose.contains("isoloom-probe-amd64:/.isoloom-probe:ro"));
+    assert!(compose.contains("isoloom-probe:/.isoloom-probe:ro"));
     assert!(compose.contains("image: busybox:1.37.0-musl"));
     assert!(compose.contains("isoloom-init-cache-1:"));
     assert!(compose.contains("condition: service_completed_successfully"));
@@ -147,7 +147,7 @@ fn an_idle_container_is_kept_running() -> Outcome {
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(
         compose.contains(&format!(
-            "  box:\n    image: {image}\n    platform: linux/amd64\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"
+            "  box:\n    image: {image}\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"
         )),
         "{compose}"
     );
@@ -190,7 +190,7 @@ machines:
     let compose = generated(&spec, Target::Docker, "docker/compose.yml")?;
     let dc = "docker compose -f .isoloom/docker/compose.yml";
     let start = format!(
-        "# Start:  {dc} up -d --build --wait db isoloom-init-db-1 web isoloom-probe-amd64 \
+        "# Start:  {dc} up -d --build --wait db isoloom-init-db-1 web isoloom-probe \
          && {dc} up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1 \
          && {dc} up --no-deps --exit-code-from isoloom-init-web-2 isoloom-init-web-2\n"
     );

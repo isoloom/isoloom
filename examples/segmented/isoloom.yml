@@ -19,7 +19,6 @@ machines:
   cache:
     os: debian@12
     networks: { back: 20 }
-    hardware: { arch: amd64 }
     ports: { redis: 6379 }
     resources: { cpus: 1, memory_mb: 1024, disk_gb: 10 }
     volumes: { data: /data }

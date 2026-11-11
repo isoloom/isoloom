@@ -198,8 +198,6 @@ spec:
           readOnly: true
         - name: scripts
           mountPath: /isoloom/scripts
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: vol-data
         persistentVolumeClaim:
@@ -363,8 +361,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: isoloom-probe
         emptyDir: {}

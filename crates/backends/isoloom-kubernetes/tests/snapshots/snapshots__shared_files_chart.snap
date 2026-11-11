@@ -205,8 +205,6 @@ spec:
           mountPath: /srv/data
         - name: scripts
           mountPath: /isoloom/scripts
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: vol-shared
         persistentVolumeClaim:
@@ -363,8 +361,6 @@ spec:
           mountPath: /data/shared
         - name: scripts
           mountPath: /isoloom/scripts
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: vol-shared
         persistentVolumeClaim:

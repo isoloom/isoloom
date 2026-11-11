@@ -52,6 +52,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     out.aliases.clone_from(&m.aliases);
     out.os = m.os.map(|o| o.to_string());
     out.arch = m.hardware.arch;
+    out.platform = platform(l.source, name, m, service, official);
     out.rate_limit.clone_from(&m.rate_limit);
     out.privileged = m.privileged;
     out.seal = m.seal;
@@ -91,6 +92,22 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
         machine: out,
         inputs,
         problems,
+    }
+}
+
+/// The architecture machine `name`'s container is pinned to: the one its spec asks for, else the
+/// only one its catalogue image is published for (`official`: its container is that image).
+/// `None`: it runs on the host's own.
+fn platform(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, official: bool) -> Option<model::Arch> {
+    // An architecture other than the default is asked for, wherever it was written (a spec
+    // built in code has no spans).
+    if m.hardware.arch != model::Arch::default() || source.writes(name, "hardware.arch") {
+        return Some(m.hardware.arch);
+    }
+    let Some(Ok(resolved)) = service else { return None };
+    match resolved.first()?.image.as_ref()?.platforms.as_slice() {
+        [only] if official => Some(*only),
+        _ => None,
     }
 }
 

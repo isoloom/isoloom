@@ -272,3 +272,20 @@ fn the_configuration_model_renders_on_each_form() {
         "a Linux existing host runs every step through Ansible"
     );
 }
+
+#[test]
+fn a_container_is_pinned_to_the_architecture_its_spec_asks_for_and_otherwise_to_none() {
+    let spec = syntax::parse(
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.1.0.0/24 } }\ngroups:\n  x86: { members: [legacy], hardware: { arch: amd64 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n  db: { networks: { lan: 11 }, service: postgres }\n  legacy: { networks: { lan: 12 }, app: { image: nginx } }\n  pinned: { networks: { lan: 13 }, hardware: { arch: amd64 }, app: { image: nginx } }\n  arm: { networks: { lan: 14 }, hardware: { arch: arm64 }, app: { image: nginx } }\n",
+    )
+    .unwrap();
+    let l = lower(&spec, built_in(), Scope::Target(Target::Docker));
+    let platform = |m: &str| (l.spec.machines[m].arch, l.spec.machines[m].platform);
+    let (amd64, arm64) = (model::Arch::Amd64, model::Arch::Arm64);
+    // Unwritten: amd64 for a VM or a cloud machine, the host's for a container, its catalogue
+    // image published for both.
+    assert_eq!((platform("web"), platform("db")), ((amd64, None), (amd64, None)));
+    assert_eq!(platform("legacy"), (amd64, Some(amd64)), "through its group");
+    assert_eq!(platform("pinned"), (amd64, Some(amd64)), "written, though the default");
+    assert_eq!(platform("arm"), (arm64, Some(arm64)));
+}

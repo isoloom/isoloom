@@ -87,6 +87,12 @@ impl Spans {
             .find_map(|p| self.0.get(&p).copied())
     }
 
+    /// Whether `path` itself is written (a parent written around it isn't enough).
+    #[must_use]
+    pub fn contains(&self, path: &FieldPath) -> bool {
+        self.0.contains_key(path)
+    }
+
     /// `problem`, placed (unless it already is).
     #[must_use]
     pub fn place(&self, mut problem: Problem) -> Problem {
@@ -127,6 +133,8 @@ list:
         assert_eq!(at("machines.web.files[1].path"), Some((7, 9)));
         // A field that isn't written takes its nearest written parent's place.
         assert_eq!(at("machines.web.resources.cpus"), Some((3, 3)));
+        assert!(spans.contains(&FieldPath::new("machines.web.files[0].input")));
+        assert!(!spans.contains(&FieldPath::new("machines.web.resources.cpus")), "placed, but not written");
         assert_eq!(at("machines.nope.deep"), Some((2, 1)));
         assert_eq!(at("checks"), None);
     }

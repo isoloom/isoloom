@@ -19,9 +19,13 @@ pub(crate) fn routes_service(machine: &str) -> String {
     format!("isoloom-routes-{machine}")
 }
 
-/// The one-shot service that copies the probe for machines of this architecture.
-pub(crate) fn probe_service(arch: Arch) -> String {
-    format!("isoloom-probe-{}", arch.id())
+/// The one-shot service that copies the probe for the machines pinned to `platform`, or for those
+/// that run on the host's own architecture (`None`): `isoloom-probe-<arch>`, `isoloom-probe`.
+pub(crate) fn probe_service(platform: Option<Arch>) -> String {
+    match platform {
+        Some(arch) => format!("isoloom-probe-{}", arch.id()),
+        None => "isoloom-probe".to_owned(),
+    }
 }
 
 /// The service of a tool (`tools:`).
@@ -45,6 +49,12 @@ mod tests {
         let user = Position::Machine("user".into());
         assert_eq!(check_runner_service(&user, &user), "isoloom-check");
         assert_eq!(check_runner_service(&Position::Networks, &user), "isoloom-check-isoloom-networks");
+    }
+
+    #[test]
+    fn the_hosts_probe_and_each_pinned_architectures_have_names_of_their_own() {
+        let names = [None, Some(Arch::Amd64), Some(Arch::Arm64)].map(probe_service);
+        assert_eq!(names, ["isoloom-probe", "isoloom-probe-amd64", "isoloom-probe-arm64"]);
     }
 
     #[test]

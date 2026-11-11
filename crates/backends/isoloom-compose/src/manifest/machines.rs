@@ -82,7 +82,11 @@ fn isoloom_own(env: &Environment, name: &str) -> Option<(Role, Option<String>)> 
         return Some((Role::Tool, None));
     }
     let switch = || trunks::containers(spec).iter().any(|t| trunks::switch_name(&t.lan) == name);
-    let probe = || [model::Arch::Amd64, model::Arch::Arm64].into_iter().any(|a| probe_service(a) == name);
+    let probe = || {
+        [None, Some(model::Arch::Amd64), Some(model::Arch::Arm64)]
+            .into_iter()
+            .any(|a| probe_service(a) == name)
+    };
     (name == router::NAME || name == FOLDERS_JOB || switch() || probe()).then_some((Role::Infra, None))
 }
 
@@ -116,7 +120,8 @@ fn machine(env: &Environment, file: &ComposeFile, member: &Member, project: &Pro
     let spec = env.spec();
     if let (Some(mp), Some(m)) = (env.machines.get(&member.name), spec.machines.get(&member.name)) {
         out.on_demand = mp.is_access();
-        out.arch = Some(arch(mp.arch));
+        // A container runs on the host's architecture unless it is pinned to one.
+        out.arch = mp.platform.map(arch);
         out.resources = Some(isoloom_render::run_manifest::resources(mp));
         out.addresses = addresses(mp)?;
         out.volumes = volumes(mp, project)?;

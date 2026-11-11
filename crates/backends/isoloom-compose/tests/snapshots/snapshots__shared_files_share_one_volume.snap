@@ -12,7 +12,6 @@ name: shared-files
 services:
   writer:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
-    platform: linux/amd64
     init: true
     entrypoint:
     - sleep
@@ -49,7 +48,6 @@ services:
     restart: no
   reader:
     image: debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
-    platform: linux/amd64
     init: true
     entrypoint:
     - sleep

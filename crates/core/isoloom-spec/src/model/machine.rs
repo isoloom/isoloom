@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{CommandLine, Disk, Dns, DockerImpl, External, Healthcheck, HostFolder, MachineFile, MachineSecret, Mount, Tmpfs, Ulimit, VmImpl};
 
-/// A machine's CPU architecture. Every target has one: a container platform, a box
-/// architecture, a cloud instance family. Defaults to x86-64.
+/// A machine's CPU architecture: a box architecture, a cloud instance family, a container
+/// platform. Defaults to x86-64 where a target has to pick one (a VM, a cloud instance); a
+/// container is pinned to one only when its spec asks for one, or its image has one only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Arch {
@@ -100,9 +101,16 @@ pub struct Machine {
     /// (`vm: { os }`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub os: Option<String>,
-    /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`.
+    /// The machine's CPU architecture (`amd64` or `arm64`). Defaults to `amd64`: what a VM, a
+    /// box or a cloud instance is built for. A container runs on [`platform`](Self::platform).
     #[serde(default)]
     pub arch: Arch,
+    /// The architecture the machine's container is pinned to: the one its spec asks for
+    /// (`hardware.arch`, on the machine, a group or `common:`), or the only one its catalogue
+    /// image is published for. `None`: the container runs on the Docker host's (or the
+    /// Kubernetes node's) own architecture, from a multi-architecture image or a build there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<Arch>,
     /// A bandwidth cap on each of the machine's network links, in both directions, as `tc`
     /// writes a rate (`10mbit`, `512kbit`): a machine on a slow line, while `networks.*.tc`
     /// slows a whole network down on its router.

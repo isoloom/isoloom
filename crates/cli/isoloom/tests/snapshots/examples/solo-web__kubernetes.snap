@@ -239,8 +239,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: isoloom-probe
         emptyDir: {}
@@ -709,8 +707,6 @@ spec:
         - name: isoloom-probe
           mountPath: /.isoloom-probe
           readOnly: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: isoloom-probe
         emptyDir: {}

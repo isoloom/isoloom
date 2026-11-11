@@ -227,13 +227,12 @@ name: air-gapped
 services:
   store:
     image: redis:7-alpine
-    platform: linux/amd64
     hostname: store
     networks:
       lab:
         ipv4_address: 10.62.0.20
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -246,7 +245,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     labels:
       isoloom.port.redis: tcp:6379
@@ -255,13 +254,12 @@ services:
     restart: unless-stopped
   app:
     image: nginx:1.27-alpine
-    platform: linux/amd64
     hostname: app
     networks:
       lab:
         ipv4_address: 10.62.0.10
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -274,7 +272,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
       store:
         condition: service_healthy
@@ -319,16 +317,15 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
@@ -344,7 +341,7 @@ networks:
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
 volumes:
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: air-gapped
@@ -435,7 +432,6 @@ volumes:
     {
       "name": "store",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -458,7 +454,6 @@ volumes:
     {
       "name": "app",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -497,11 +492,11 @@ volumes:
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],

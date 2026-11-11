@@ -49,9 +49,8 @@ machines:
     let files = generate(&spec, Target::Hybrid)?;
     let vagrantfile = file(&files, "hybrid/Vagrantfile")?;
     let dc = "docker compose -f .isoloom/hybrid/compose.yml";
-    let start = format!(
-        "{dc} up -d --build --wait --wait-timeout 900 web isoloom-probe-amd64 && {dc} up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1"
-    );
+    let start =
+        format!("{dc} up -d --build --wait --wait-timeout 900 web isoloom-probe && {dc} up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1");
     assert!(vagrantfile.contains(&start), "{vagrantfile}");
     Ok(())
 }

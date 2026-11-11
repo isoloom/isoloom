@@ -17,6 +17,7 @@ machines:
     networks:
       lab: 10
     arch: arm64
+    platform: arm64
     privileged: true
     read_only: true
     tmpfs:

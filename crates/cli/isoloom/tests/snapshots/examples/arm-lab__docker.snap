@@ -186,16 +186,37 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: arm-lab
-  isoloom-probe-arm64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/arm64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
+    - isoloom-probe:/probe
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: arm-lab
+    restart: no
+  isoloom-probe-arm64:
+    image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
+    platform: linux/arm64
+    entrypoint:
+    - /isoloom-host-probe/busybox
+    - sh
+    - -c
+    - |
+      if /bin/busybox true 2>/dev/null; then exec /bin/busybox cp /bin/busybox /probe/busybox; fi
+      echo "isoloom: this Docker host ($$(/isoloom-host-probe/busybox uname -m)) can't run linux/arm64 programs, which machine web needs (pinned by the spec's hardware.arch, or an image published for arm64 only). Turn on arm64 emulation: Docker Desktop has it; on Linux, register QEMU's with binfmt (docker run --privileged --rm tonistiigi/binfmt --install arm64, or the qemu-user-static package). Or run the environment on a linux/arm64 host." >&2
+      exit 1
+    network_mode: none
+    volumes:
     - isoloom-probe-arm64:/probe
+    - isoloom-probe:/isoloom-host-probe:ro
+    depends_on:
+      isoloom-probe:
+        condition: service_completed_successfully
     labels:
       isoloom.managed: 'true'
       isoloom.environment: arm-lab
@@ -210,6 +231,10 @@ networks:
       isoloom.managed: 'true'
       isoloom.environment: arm-lab
 volumes:
+  isoloom-probe:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: arm-lab
   isoloom-probe-arm64:
     labels:
       isoloom.managed: 'true'
@@ -363,6 +388,14 @@ volumes:
       "addresses": {},
       "native": {
         "service": "isoloom-check"
+      }
+    },
+    {
+      "name": "isoloom-probe",
+      "role": "infra",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-probe"
       }
     },
     {

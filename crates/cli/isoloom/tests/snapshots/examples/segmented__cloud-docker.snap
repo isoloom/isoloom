@@ -457,7 +457,6 @@ output "ssh_user" {
     {
       "name": "cache",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -496,7 +495,6 @@ output "ssh_user" {
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -534,7 +532,6 @@ output "ssh_user" {
     {
       "name": "user",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -603,11 +600,11 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -1007,9 +1004,10 @@ command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
@@ -1432,7 +1430,6 @@ output "ssh_user" {
     {
       "name": "cache",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -1471,7 +1468,6 @@ output "ssh_user" {
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -1509,7 +1505,6 @@ output "ssh_user" {
     {
       "name": "user",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -1578,11 +1573,11 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -1982,9 +1977,10 @@ command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
@@ -2292,7 +2288,6 @@ output "ssh_user" {
     {
       "name": "cache",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -2331,7 +2326,6 @@ output "ssh_user" {
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -2369,7 +2363,6 @@ output "ssh_user" {
     {
       "name": "user",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -2438,11 +2431,11 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -2842,9 +2835,10 @@ command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
@@ -3262,7 +3256,6 @@ output "ssh_user" {
     {
       "name": "cache",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -3301,7 +3294,6 @@ output "ssh_user" {
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -3339,7 +3331,6 @@ output "ssh_user" {
     {
       "name": "user",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -3408,11 +3399,11 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -3812,9 +3803,10 @@ command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
@@ -4103,7 +4095,6 @@ output "ssh_user" {
     {
       "name": "cache",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -4142,7 +4133,6 @@ output "ssh_user" {
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -4180,7 +4170,6 @@ output "ssh_user" {
     {
       "name": "user",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -4249,11 +4238,11 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -4653,9 +4642,10 @@ command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else
@@ -5010,7 +5000,6 @@ output "ssh_user" {
     {
       "name": "cache",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 1024
@@ -5049,7 +5038,6 @@ output "ssh_user" {
     {
       "name": "web",
       "role": "member",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -5087,7 +5075,6 @@ output "ssh_user" {
     {
       "name": "user",
       "role": "access",
-      "arch": "amd64",
       "resources": {
         "cpus": 1,
         "memory_mb": 512
@@ -5156,11 +5143,11 @@ output "ssh_user" {
       }
     },
     {
-      "name": "isoloom-probe-amd64",
+      "name": "isoloom-probe",
       "role": "infra",
       "addresses": {},
       "native": {
-        "service": "isoloom-probe-amd64"
+        "service": "isoloom-probe"
       }
     }
   ],
@@ -5560,9 +5547,10 @@ command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
   v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:)29[.]9[.]0/ { print $3; exit }')
   [ -n "$v" ] || { echo "docker-ce 29.9.0 is not in Docker's apt repository" >&2; exit 1; }
   apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin=5.6.0-*"
-  # An environment's images are built for x86 unless it says otherwise: on another CPU (an Apple Silicon
-  # Mac's VM, an Arm cloud VM) the engine runs them through QEMU's user-mode emulation, which
-  # Debian registers with binfmt for every container (Docker Desktop does the same on its own).
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
   [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
 )
 else

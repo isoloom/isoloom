@@ -12,14 +12,13 @@ name: hello-stack
 services:
   cache:
     image: redis:7-alpine
-    platform: linux/amd64
     hostname: cache
     networks:
       app:
         ipv4_address: 10.60.0.20
     volumes:
     - cache-data:/data
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -32,7 +31,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
     labels:
       isoloom.port.redis: tcp:6379
@@ -90,7 +89,6 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: hello-stack
     image: localhost/isoloom/hello-stack-web
-    platform: linux/amd64
     hostname: web
     networks:
       app:
@@ -98,7 +96,7 @@ services:
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+8080}:80
     volumes:
-    - isoloom-probe-amd64:/.isoloom-probe:ro
+    - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
       test:
       - CMD
@@ -111,7 +109,7 @@ services:
       retries: 60
       start_period: 10s
     depends_on:
-      isoloom-probe-amd64:
+      isoloom-probe:
         condition: service_completed_successfully
       cache:
         condition: service_healthy
@@ -226,16 +224,15 @@ services:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
-  isoloom-probe-amd64:
+  isoloom-probe:
     image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
-    platform: linux/amd64
     entrypoint:
     - /bin/cp
     - /bin/busybox
     - /probe/busybox
     network_mode: none
     volumes:
-    - isoloom-probe-amd64:/probe
+    - isoloom-probe:/probe
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
@@ -254,7 +251,7 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack
-  isoloom-probe-amd64:
+  isoloom-probe:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: hello-stack

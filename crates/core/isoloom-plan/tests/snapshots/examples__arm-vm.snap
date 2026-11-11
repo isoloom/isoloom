@@ -1,6 +1,5 @@
 ---
 source: crates/core/isoloom-plan/tests/examples.rs
-assertion_line: 62
 expression: example(&name).unwrap().spec()
 ---
 version: 1
@@ -19,6 +18,7 @@ machines:
       lab: 10
     os: ubuntu@24.04
     arch: arm64
+    platform: arm64
     privileged: false
     read_only: false
     tmpfs: []

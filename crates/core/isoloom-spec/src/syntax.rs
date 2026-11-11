@@ -148,3 +148,14 @@ pub struct Spec {
     #[schemars(skip)]
     pub spans: Spans,
 }
+
+impl Spec {
+    /// Whether the spec writes `field` (a dotted path inside a machine: `hardware.arch`) for
+    /// machine `machine`: on the machine itself (or on the one it is a clone of), on a group it
+    /// is in, or in `common:`, rather than leaving it to its default. A spec built in code, with
+    /// no spans, writes a machine's field only through `common:` or a group.
+    #[must_use]
+    pub fn writes(&self, machine: &str, field: &str) -> bool {
+        crate::groups::writes(self, machine, field)
+    }
+}
