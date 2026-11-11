@@ -126,7 +126,10 @@ mod tests {
     fn every_provider_says_whether_a_vm_has_a_console_and_how() {
         let cs = consoles();
         assert_eq!(cs.len(), Provider::ALL.iter().filter(|k| k.provider.runs_vms()).count());
-        assert!(!cs.iter().any(|c| c.providers.contains(&ManifestProvider::Utm)), "the Vagrantfile has no UTM block");
+        assert!(
+            !cs.iter().any(|c| c.providers.contains(&ManifestProvider::Utm)),
+            "the Vagrantfile has no UTM block"
+        );
         let of = |p: ManifestProvider| cs.iter().find(|c| c.providers.contains(&p)).unwrap();
         assert_eq!(of(ManifestProvider::Libvirt).source, Some(ConsoleSource::Libvirt {}));
         assert_eq!(of(ManifestProvider::Qemu).source, Some(ConsoleSource::QemuMonitor {}));
@@ -134,11 +137,7 @@ mod tests {
         let vbox = of(ManifestProvider::Virtualbox);
         assert_eq!((vbox.protocol, &vbox.source), (ConsoleProtocol::Rdp, &Some(ConsoleSource::Vrde {})));
         assert!(vbox.note.as_deref().is_some_and(|n| n.contains("Extension Pack")));
-        for p in [
-            ManifestProvider::Hyperv,
-            ManifestProvider::Parallels,
-            ManifestProvider::VmwareEsxi,
-        ] {
+        for p in [ManifestProvider::Hyperv, ManifestProvider::Parallels, ManifestProvider::VmwareEsxi] {
             let c = of(p);
             assert_eq!(c.protocol, ConsoleProtocol::None, "{p:?}");
             assert!(c.note.is_some() && c.source.is_none(), "{p:?}");

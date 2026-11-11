@@ -220,3 +220,29 @@ fn a_vms_route_steps_are_its_plans_routes() {
     }
     assert!(seen > 0);
 }
+
+/// Every machine the plan runs as a VM is a `Vm`, with its OS, on every example and target: the
+/// plan makes a machine a VM only from its `vm:` form, whose OS it keeps beside the shape, so
+/// `Vm::of` never leaves a VM out.
+#[test]
+fn every_vm_of_the_plan_has_its_os() {
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
+    let mut vms = 0;
+    for entry in std::fs::read_dir(examples).unwrap() {
+        let dir = entry.unwrap().path();
+        if !dir.join("isoloom.yml").is_file() {
+            continue;
+        }
+        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).unwrap());
+        for target in Target::ALL {
+            let Ok(env) = Environment::build(&lab.for_target(target), target, None) else {
+                continue;
+            };
+            for (name, _) in env.machines.iter().filter(|(_, mp)| mp.shape == MachineShape::Vm) {
+                assert!(env.vm(name).is_some_and(|vm| !vm.os.is_empty()), "{}: {name} on {}", dir.display(), target.id());
+                vms += 1;
+            }
+        }
+    }
+    assert!(vms > 0);
+}
