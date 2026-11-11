@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-11-11
+
 ### Changed
 
 - **A container runs on the Docker host's own architecture unless its spec pins one.** Every
