@@ -45,7 +45,9 @@ pub(super) fn first_address(vm: &str, own: &[String]) -> Expression {
 }
 
 /// The IPv4 addresses `vm` (`self`, or a resource address) reports that are neither the loopback
-/// nor one of `own` (its lab addresses).
+/// nor one of `own` (its lab addresses); none while the provider reports none at all (`null`
+/// before the guest agent answers), so the postcondition fails with its own message rather than
+/// Terraform's "Invalid function argument" from `flatten(null)`.
 pub(super) fn addresses(vm: &str, own: &[String]) -> Expression {
     let a = || reference("a");
     let mut cond = binary(a(), BinaryOperator::NotEq, string("127.0.0.1"));
@@ -53,7 +55,8 @@ pub(super) fn addresses(vm: &str, own: &[String]) -> Expression {
         let own = list(own.iter().map(|o| string(o.as_str())));
         cond = binary(cond, BinaryOperator::And, not(call("contains", [own, a()])));
     }
-    for_list("a", call("flatten", [reference(&format!("{vm}.ipv4_addresses"))]), a(), Some(cond))
+    let reported = call("try", [call("flatten", [reference(&format!("{vm}.ipv4_addresses"))]), list(std::iter::empty())]);
+    for_list("a", reported, a(), Some(cond))
 }
 
 /// The `lifecycle` block failing the apply, with the reason, when the VM reported no uplink

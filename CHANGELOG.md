@@ -499,6 +499,10 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`proxmox`: a router that reported no address yet fails with its own message**: the uplink
+  postcondition read `flatten(self.ipv4_addresses)`, which Terraform refuses on `null` (no guest
+  agent answer yet), so the apply failed with "Invalid function argument" instead of saying the
+  router got no IPv4 address on its uplink bridge.
 - **A Linux VM keeps its addresses where NetworkManager runs** (Kali, Fedora, desktop Ubuntu):
   NetworkManager took each environment card Vagrant had given a static address, asked DHCP (the
   networks have none) and dropped the address when that timed out, so nothing on the network

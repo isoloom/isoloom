@@ -46,3 +46,16 @@ fn proxmox_without_environment_provisioning_has_no_controller() -> Outcome {
     assert!(tf.contains("= var.ssh_public_key == \"\" ? [] : [{"), "{tf}");
     Ok(())
 }
+
+#[test]
+fn an_uplink_check_reads_no_address_when_the_provider_reports_none_yet() -> Outcome {
+    // Regression: a router whose guest agent hadn't answered left `ipv4_addresses` null, and the
+    // postcondition's `flatten(null)` failed the apply with Terraform's "Invalid function
+    // argument" instead of its own message ("got no IPv4 address on its uplink bridge").
+    let spec = example("solo-web")?;
+    let files = generate(&spec, Target::Proxmox).expect("solo-web runs on Proxmox");
+    let tf = &files[0].contents;
+    assert!(tf.contains("try(flatten(self.ipv4_addresses), [])"), "{tf}");
+    assert!(!tf.contains("in flatten(self.ipv4_addresses) :"), "a bare flatten left: {tf}");
+    Ok(())
+}

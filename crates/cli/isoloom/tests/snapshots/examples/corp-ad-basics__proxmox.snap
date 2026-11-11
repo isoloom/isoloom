@@ -561,7 +561,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_router" {
   stop_on_destroy = true
   lifecycle {
     postcondition {
-      condition     = length([for a in flatten(self.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], a)]) > 0
+      condition     = length([for a in try(flatten(self.ipv4_addresses), []) : a if a != "127.0.0.1" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], a)]) > 0
       error_message = "VM `isoloom-router` got no IPv4 address on its uplink bridge `${var.uplink_bridge}` within 8m: the bridge has no DHCP, or no DNS or internet to install qemu-guest-agent, which reports the address (an IPv6 address alone isn't enough: the uplink needs IPv4 from DHCP). Give it an uplink bridge with DHCP and internet (`uplink_bridge`)."
     }
   }
@@ -1200,7 +1200,7 @@ resource "proxmox_virtual_environment_vm" "isoloom_controller" {
 }
 
 locals {
-  router_address = try([for a in flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses) : a if a != "127.0.0.1" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], a)][0], "")
+  router_address = try([for a in try(flatten(proxmox_virtual_environment_vm.isoloom_router.ipv4_addresses), []) : a if a != "127.0.0.1" && !contains(["10.40.10.254", "10.40.20.254", "10.40.99.254"], a)][0], "")
 }
 
 # The router's uplink address: the environment's way in.
