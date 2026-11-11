@@ -344,6 +344,15 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
         Some(Image::Container { reference, .. }) => Some(reference.clone()),
         _ => None,
     };
+    // A job runs the image the machine builds, when it builds one: as buildable as the
+    // machine's, so a pull that leaves built images out (`pull --ignore-buildable`) leaves it
+    // out too, instead of asking a registry for a name only this build gives. `pull_policy`
+    // wouldn't do: `pull --policy` overrides it. The build is the machine's, so BuildKit runs
+    // it once for both.
+    let build = match &plan.image {
+        Some(Image::Container { build: Some(b), .. }) => Some(build_of(env, m.name, b)),
+        _ => None,
+    };
     let mut previous: Option<String> = None;
     for (job, script) in init_names(m.name, m.spec).into_iter().zip(&d.init) {
         let mounted = format!("/isoloom/init/{}", file_name(script));
@@ -352,6 +361,7 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
         // steps have it, so one `setup:` script finds its files at the same path on every target.
         let mut j = Service {
             image: image.clone(),
+            build: build.clone(),
             platform: platform(plan),
             user: Some("root".into()),
             privileged: m.spec.privileged,
@@ -391,6 +401,21 @@ mod tests {
 
     fn yaml<T: serde::Serialize>(value: &T) -> String {
         serde_yaml_ng::to_string(value).unwrap()
+    }
+
+    #[test]
+    fn an_init_job_of_a_machine_that_builds_its_image_builds_it_too_so_no_pull_asks_a_registry_for_it() {
+        let file = file_of(
+            "machines:\n  database:\n    networks: { lan: 10 }\n    ports: { pg: 5432 }\n    setup: [db/seed.sh]\n    app: { build: { context: db, args: { V: '1' } } }\n  web: { networks: { lan: 20 }, setup: [seed.sh], app: { image: nginx } }\n",
+        );
+        let (db, job) = (&file.services["database"], &file.services["isoloom-init-database-1"]);
+        assert_eq!(job.image, db.image, "the image the machine builds");
+        assert!(db.build.is_some());
+        // `pull --ignore-buildable` skips a service with a `build`; `pull_policy` wouldn't do, as
+        // `pull --policy` overrides it.
+        assert_eq!(yaml(&job.build), yaml(&db.build), "the machine's own build");
+        let web = &file.services["isoloom-init-web-1"];
+        assert!(web.build.is_none() && web.image.as_deref() == Some("nginx"), "a pulled image is pulled");
     }
 
     #[test]

@@ -32,6 +32,12 @@ stable spec format.
 
 ### Fixed
 
+- **A Compose start no longer asks a registry for an image the environment builds.** A machine's
+  `setup:` jobs (`isoloom-init-<machine>-<n>`) ran the image the machine builds with `image:`
+  alone, so the start's `docker compose pull --ignore-buildable`, which leaves the machine itself
+  out, asked a registry for that name and failed the start (`Get "http://localhost/v2/":
+  connection refused`, or `pull access denied`). A job now carries the machine's `build:` too, so
+  the pull leaves it out and `up --build` builds the image once for both.
 - A read-write `host_folders` folder in a VirtualBox VM is group-writable (`dmode=0775`,
   `fmode=0664`): Vagrant mounts it as the VM's SSH user with the folder's mode on the computer
   (a home folder's 0755), so no other account of the VM could write there.
