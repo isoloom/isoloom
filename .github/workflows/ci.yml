@@ -114,6 +114,31 @@ jobs:
       - run: cargo machete
 
   # Spelling, in code and docs (.typos.toml lists the words that are right here).
+  hooks:
+    name: Git hooks
+    # The hooks (.githooks/, CONTRIBUTING.md "Git hooks"): shellcheck over them, then their test in
+    # a throwaway repository, with the gitleaks the pre-push runs.
+    runs-on: ubuntu-24.04
+    env:
+      GITLEAKS_VERSION: "8.30.0"
+      GITLEAKS_SHA256: "79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The pinned release tarball, its sha256 checked before it runs (from the release's
+      # gitleaks_<version>_checksums.txt). Bump the version and the checksum together.
+      - name: gitleaks
+        run: |
+          tarball="$RUNNER_TEMP/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$tarball" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${tarball}" | sha256sum -c -
+          tar -xzf "$tarball" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - run: shellcheck -x .githooks/* scripts/setup-hooks.sh
+      - run: .githooks/test.sh
+
   typos:
     name: Spelling
     runs-on: ubuntu-24.04

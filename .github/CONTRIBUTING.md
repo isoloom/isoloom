@@ -42,6 +42,24 @@ cd examples/hello-stack && isoloom generate
 (cd .isoloom/docker && docker compose up -d --build --wait && docker compose down)
 ```
 
+## Git hooks
+
+`.githooks/` holds the repository's git hooks; `scripts/setup-hooks.sh` turns them on
+(`git config core.hooksPath .githooks`, once per clone; the clone's worktrees share it). They are
+POSIX sh and quick:
+
+- `commit-msg` refuses a message with an assistant's attribution (`Co-Authored-By`,
+  `Claude-Session`, "Generated with", 🤖): the history carries none.
+- `pre-commit` refuses a staged file over 5 MB that Git LFS doesn't hold, and runs rustfmt over
+  the staged Rust.
+- `pre-push` runs [gitleaks](https://github.com/gitleaks/gitleaks) over the commits being pushed
+  (`brew install gitleaks`; without it the push is refused, not left unscanned), the attribution
+  check over them, then `cargo fmt --all --check` and `typos`, in a few seconds. The other gates
+  stay in CI.
+
+`.githooks/test.sh` tests them in a throwaway repository; CI's `hooks` job runs it.
+`git commit --no-verify` skips a hook when you must; the push still checks the commits.
+
 ## Conventions
 
 - **Layout:** crates sit in groups under `crates/` — `core/`, `backends/`, `tools/`, `targets/`
