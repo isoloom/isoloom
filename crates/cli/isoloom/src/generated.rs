@@ -5,8 +5,8 @@
 //! lists in [`LIST`]: only those can go stale. A file it wrote and no longer writes (a target the
 //! lab no longer allows, a machine renamed) is removed by `generate` and reported by `check`;
 //! anything else there is left alone: what a runner or the tools it starts write beside the
-//! generated files (`.terraform.lock.hcl`, `.isoloom-reach/`, a Vagrant `.vagrant/` folder, a
-//! Terraform crash log), and files a program embedding Isoloom wrote without the list. A folder
+//! generated files (`.terraform.lock.hcl`, a Vagrant `.vagrant/` folder, a Terraform crash
+//! log), and files a program embedding Isoloom wrote without the list. A folder
 //! is removed only once removing Isoloom's files left it empty.
 //!
 //! The list is a file in the project, so it is read as untrusted: a line that isn't a plain path

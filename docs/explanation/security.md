@@ -44,8 +44,8 @@ archive, the runner's `project.archive`) leaves out what the project's `.isoloom
 then, whatever that file says: Isoloom's outputs but those the machine reads (a Compose VM, the
 `docker` target's folder and `.isoloom/configure/`), `.isoloomignore` itself (every top-level
 `.isoloom*` entry is left out, and a machine has no use for the file), version control, and what the tools write at
-any depth: Terraform's cache, state, lock and crash logs, Vagrant's machine folders (their private
-keys) and the runner's logins (`.isoloom-reach/`). One rule,
+any depth: Terraform's cache, state, lock and crash logs, and Vagrant's machine folders (their
+private keys). One rule,
 `isoloom_manifest::ignore::copy_rules`, which `.isoloom/.gitignore` shares.
 
 ## Published ports
