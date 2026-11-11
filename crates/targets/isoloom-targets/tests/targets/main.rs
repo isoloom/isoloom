@@ -20,6 +20,7 @@ mod constraints;
 mod defaults;
 mod determinism;
 mod disk;
+mod docker_host_boxes;
 mod docker_vm_manifest;
 mod every_example;
 mod external;

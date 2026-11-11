@@ -524,7 +524,7 @@ require "json"
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/debian12"
+  config.vm.box = "bento/debian-12"
   config.vm.hostname = "slow-link"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
@@ -550,6 +550,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
+    o.vm.box_version = ">= 0"
     v.name = "slow-link - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -564,7 +565,10 @@ Vagrant.configure("2") do |config|
     v.ssh_port = ISOLOOM_HOSTPORTS.fetch("isoloom-docker-host/ssh", 50022)
     v.ssh_auto_correct = true
   end
-  config.vm.provider "libvirt" do |v|
+  config.vm.provider "libvirt" do |v, o|
+    o.vm.box = "generic/debian12"
+    o.vm.box_version = ">= 0"
+    o.vm.box_architecture = :auto
     v.cpus = 2
     v.memory = 2048
     v.memorybacking :access, mode: "shared"
@@ -1929,7 +1933,7 @@ systemctl enable --now isoloom-published.service
           "utm": "slow-link - isoloom-docker-host",
           "vmware_esxi": "slow-link-isoloom-docker-host"
         },
-        "boot_digest": "sha256:942cb6cceb13d872f5f9e07dc7c2abee8bbaccf9acd5f97004f062882cd38be3"
+        "boot_digest": "sha256:4750e4c94acfeddedcfeccc63cb8c3a7ffb10300ce9b5825583b38a27481ffe2"
       }
     },
     {

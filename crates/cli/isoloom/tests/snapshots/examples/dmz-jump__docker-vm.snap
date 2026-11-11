@@ -530,7 +530,7 @@ require "json"
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/debian12"
+  config.vm.box = "bento/debian-12"
   config.vm.hostname = "dmz-jump"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
@@ -556,6 +556,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
+    o.vm.box_version = ">= 0"
     v.name = "dmz-jump - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -570,7 +571,10 @@ Vagrant.configure("2") do |config|
     v.ssh_port = ISOLOOM_HOSTPORTS.fetch("isoloom-docker-host/ssh", 50022)
     v.ssh_auto_correct = true
   end
-  config.vm.provider "libvirt" do |v|
+  config.vm.provider "libvirt" do |v, o|
+    o.vm.box = "generic/debian12"
+    o.vm.box_version = ">= 0"
+    o.vm.box_architecture = :auto
     v.cpus = 4
     v.memory = 3072
     v.memorybacking :access, mode: "shared"
@@ -2215,7 +2219,7 @@ systemctl enable --now isoloom-published.service
           "utm": "dmz-jump - isoloom-docker-host",
           "vmware_esxi": "dmz-jump-isoloom-docker-host"
         },
-        "boot_digest": "sha256:53ed7962b064f08be0388f99f98063735daeaadc712ddcafbd6d47812ec21869"
+        "boot_digest": "sha256:735e35a6847da8fc3a4174b607f730fdb62df920ba7db6853fa80ff433a6beb2"
       }
     },
     {

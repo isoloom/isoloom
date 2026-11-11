@@ -528,7 +528,7 @@ require "json"
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/debian12"
+  config.vm.box = "bento/debian-12"
   config.vm.hostname = "segmented"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
@@ -554,6 +554,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
+    o.vm.box_version = ">= 0"
     v.name = "segmented - isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
@@ -568,7 +569,10 @@ Vagrant.configure("2") do |config|
     v.ssh_port = ISOLOOM_HOSTPORTS.fetch("isoloom-docker-host/ssh", 50022)
     v.ssh_auto_correct = true
   end
-  config.vm.provider "libvirt" do |v|
+  config.vm.provider "libvirt" do |v, o|
+    o.vm.box = "generic/debian12"
+    o.vm.box_version = ">= 0"
+    o.vm.box_architecture = :auto
     v.cpus = 3
     v.memory = 3072
     v.memorybacking :access, mode: "shared"
@@ -2099,7 +2103,7 @@ systemctl enable --now isoloom-published.service
           "utm": "segmented - isoloom-docker-host",
           "vmware_esxi": "segmented-isoloom-docker-host"
         },
-        "boot_digest": "sha256:9edde567a702ded80a4efcba75ca3f9b7ff7ef945757dc1754927b3a339b5961"
+        "boot_digest": "sha256:f39d070cc2ca4cbb25227dd14e9b1dad20d42ec7ca8ff724aa3671000f5bc60f"
       }
     },
     {

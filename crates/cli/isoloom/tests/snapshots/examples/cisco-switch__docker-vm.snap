@@ -534,7 +534,7 @@ require "json"
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/debian12"
+  config.vm.box = "bento/debian-12"
   config.vm.hostname = "cisco-switch"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
@@ -560,6 +560,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
+    o.vm.box_version = ">= 0"
     v.name = "cisco-switch - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -574,7 +575,10 @@ Vagrant.configure("2") do |config|
     v.ssh_port = ISOLOOM_HOSTPORTS.fetch("isoloom-docker-host/ssh", 50022)
     v.ssh_auto_correct = true
   end
-  config.vm.provider "libvirt" do |v|
+  config.vm.provider "libvirt" do |v, o|
+    o.vm.box = "generic/debian12"
+    o.vm.box_version = ">= 0"
+    o.vm.box_architecture = :auto
     v.cpus = 4
     v.memory = 3072
     v.memorybacking :access, mode: "shared"
@@ -2008,7 +2012,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-switch - isoloom-docker-host",
           "vmware_esxi": "cisco-switch-isoloom-docker-host"
         },
-        "boot_digest": "sha256:bf7a6767ed27861393f838dad64543f9c040f7d4daf7759e901f5e42eb238646"
+        "boot_digest": "sha256:d550f49bfaea4ce7950193c8b060acf14651b2fd1368a3f0d20e67bdc1e1044d"
       }
     },
     {

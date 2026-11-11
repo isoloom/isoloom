@@ -64,6 +64,7 @@ use isoloom_render::{GeneratedFile, header, router, steps};
 use isoloom_spec::model::{Spec, Target};
 
 use crate::backend::capabilities;
+use crate::boxes::ARM_HOST;
 use crate::error::{Error, Result};
 use crate::ruby::{BootStatements, Call, Ruby, Value};
 use crate::settings;
@@ -76,8 +77,6 @@ const DIR: &str = "vagrant";
 /// ever a machine's.
 pub(crate) const CONTROLLER: &str = isoloom_manifest::contract::CONTROLLER;
 const TOOL_SHELL: &str = "isoloom-tool-shell";
-/// Whether the host is an ARM one, in Ruby.
-const ARM_HOST: &str = "RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/";
 
 /// The Ruby that copies the project into a VM (`vagrant_project.rb`): a tar.gz built when the
 /// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`, leaving out

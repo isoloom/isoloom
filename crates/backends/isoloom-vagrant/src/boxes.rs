@@ -2,8 +2,12 @@
 //! (`vm.image.vagrant`) winning, and the boxes a provider boots instead of the main one
 //! (libvirt, QEMU, Hyper-V) where the main one has no build for it.
 
+mod choice;
+
 use isoloom_plan::Vm;
 use isoloom_spec::images::is_windows;
+
+pub(crate) use choice::{ARM_HOST, Choice, MainBox};
 
 /// A Vagrant box: its name, a pinned version when known-good, and the libvirt, QEMU and Hyper-V
 /// boxes when the main one has no build for them.
@@ -47,6 +51,10 @@ pub(crate) const HYPERV_DEBIAN_12: (&str, &str) = ("generic/debian12", ROBOXES);
 /// containers' host) boot too.
 pub(crate) const DEBIAN_12: &str = "bento/debian-12";
 
+/// Debian 12 for UTM (`vagrant_utm`), which bento's and roboxes' boxes have no build for: an
+/// amd64 and an arm64 one. The containers' host boots it there.
+pub(crate) const UTM_DEBIAN_12: &str = "utm/bookworm";
+
 /// The last version of the roboxes `generic/*` boxes, which have Hyper-V builds.
 const ROBOXES: &str = "4.3.12";
 
@@ -88,6 +96,15 @@ fn no_hyperv(mut b: VagrantBox) -> VagrantBox {
     b
 }
 
+/// Debian 12's built-in boxes: an environment machine's on `debian@12`, and the containers' host's.
+pub(crate) fn debian_12() -> VagrantBox {
+    with_hyperv(
+        with_qemu(boxed(DEBIAN_12, None, Some("generic/debian12")), QEMU_DEBIAN_12),
+        HYPERV_DEBIAN_12.0,
+        HYPERV_DEBIAN_12.1,
+    )
+}
+
 /// The built-in Vagrant boxes, by OS name.
 fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
     if is_windows(os) {
@@ -96,11 +113,7 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
     let (b, h) = (boxed, with_hyperv);
     Some(match os {
         "debian-11" => h(b("bento/debian-11", None, Some("generic/debian11")), "generic/debian11", ROBOXES),
-        "debian-12" => h(
-            with_qemu(b(DEBIAN_12, None, Some("generic/debian12")), QEMU_DEBIAN_12),
-            HYPERV_DEBIAN_12.0,
-            HYPERV_DEBIAN_12.1,
-        ),
+        "debian-12" => debian_12(),
         "debian-13" => no_hyperv(b("bento/debian-13", None, None)),
         // End of life: for labs about older systems. No cloud or Proxmox image is mapped for
         // these, so those targets decline them.
@@ -125,6 +138,25 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "kali" => b("kalilinux/rolling", None, None),
         _ => return None,
     })
+}
+
+impl VagrantBox {
+    /// The boxes one of Isoloom's own VMs boots when it boots this one: the computer's build on
+    /// every provider, libvirt's and QEMU's own where it has them, `utm` on UTM; no Hyper-V block.
+    pub(crate) fn own_vm<'a>(&'a self, utm: Option<&'a str>) -> Choice<'a> {
+        Choice {
+            main: MainBox {
+                version: self.version.as_deref(),
+                ..MainBox::plain(&self.name)
+            },
+            libvirt: self.libvirt.as_deref(),
+            qemu: self.qemu.as_deref(),
+            cpu: None,
+            hyperv: None,
+            esxi: None,
+            utm,
+        }
+    }
 }
 
 /// The built-in Windows boxes: each has a Hyper-V build at its pinned version, but

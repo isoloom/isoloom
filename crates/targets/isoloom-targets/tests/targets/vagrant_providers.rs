@@ -109,8 +109,8 @@ const CONTAINERS: &str = "version: 1\nname: c\nnetworks:\n  lab: { cidr: 10.9.0.
 #[test]
 fn docker_vm_boots_the_cloud_image_on_qemu_with_room_for_docker() -> Outcome {
     let vf = generated(&lab(CONTAINERS)?, Target::DockerVm, "Vagrantfile")?;
-    // generic/debian12, the helper's box elsewhere, never comes up under vagrant-qemu: QEMU takes
-    // the Debian cloud image the Vagrant target's VMs take there, its 10 GB disk grown for Docker.
+    // generic/debian12, libvirt's box, never comes up under vagrant-qemu: QEMU takes the Debian
+    // cloud image the Vagrant target's VMs take there, its 10 GB disk grown for Docker.
     let qemu = between(&vf, "config.vm.provider \"qemu\"", "\n  end\n")?;
     assert!(qemu.contains("do |v, o|"), "{qemu}");
     assert!(qemu.contains("o.vm.box = \"cloud-image/debian-12\""), "{qemu}");
@@ -120,7 +120,7 @@ fn docker_vm_boots_the_cloud_image_on_qemu_with_room_for_docker() -> Outcome {
     );
     assert!(qemu.contains("v.disk_resize = IsoloomQemu.disk(\"cloud-image/debian-12\", 40)"), "{qemu}");
     assert!(vf.contains("module IsoloomQemu"), "the disk helper is in the Vagrantfile");
-    assert!(vf.contains("config.vm.box = \"generic/debian12\""), "the other providers keep their box");
+    assert!(vf.contains("config.vm.box = \"bento/debian-12\""), "the other providers keep their box");
     Ok(())
 }
 

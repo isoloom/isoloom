@@ -530,7 +530,7 @@ require "json"
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/debian12"
+  config.vm.box = "bento/debian-12"
   config.vm.hostname = "vlan-office"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
@@ -556,6 +556,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
+    o.vm.box_version = ">= 0"
     v.name = "vlan-office - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -570,7 +571,10 @@ Vagrant.configure("2") do |config|
     v.ssh_port = ISOLOOM_HOSTPORTS.fetch("isoloom-docker-host/ssh", 50022)
     v.ssh_auto_correct = true
   end
-  config.vm.provider "libvirt" do |v|
+  config.vm.provider "libvirt" do |v, o|
+    o.vm.box = "generic/debian12"
+    o.vm.box_version = ">= 0"
+    o.vm.box_architecture = :auto
     v.cpus = 4
     v.memory = 3072
     v.memorybacking :access, mode: "shared"
@@ -2153,7 +2157,7 @@ systemctl enable --now isoloom-published.service
           "utm": "vlan-office - isoloom-docker-host",
           "vmware_esxi": "vlan-office-isoloom-docker-host"
         },
-        "boot_digest": "sha256:912acebfd74e59b8ebe3349bddb6a799bb4bb7cc7fe0d44c364115fd48b5a6cd"
+        "boot_digest": "sha256:0a111c4a9c0ff8b67c856c42d8412ba2b9f6b4ed1da334718c1dc5225543cdd2"
       }
     },
     {

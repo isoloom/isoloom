@@ -378,7 +378,7 @@
           "utm": "web-portal - isoloom-docker-host",
           "vmware_esxi": "web-portal-isoloom-docker-host"
         },
-        "boot_digest": "sha256:cbdf81b7dc8bc0d4bfce020378b0335c7cf166d3edf70b4b300cb2317c34b758"
+        "boot_digest": "sha256:5287ee9cf9a9dbf65c880529e7d490c7e0fb5036ee8fd50eb57f16502ef18e44"
       }
     },
     {

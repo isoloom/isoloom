@@ -580,6 +580,15 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **`docker-vm` runs on an Apple Silicon Mac with VirtualBox, VMware Fusion and Parallels**:
+  its VM booted `generic/debian12` on every provider but UTM and QEMU, whatever the computer's
+  architecture, and that box has x86-64 builds only for those three, so VirtualBox refused to
+  start it ("platform architecture x86 is not supported on ARM") and the others would have too.
+  It now boots Debian 12's boxes as a `debian@12` machine of the `vagrant` target does, each
+  provider's build for the computer's architecture: `bento/debian-12` on VirtualBox, VMware,
+  Parallels and ESXi, `generic/debian12` on libvirt, `cloud-image/debian-12` on QEMU and
+  `utm/bookworm` on UTM, each with an amd64 and an arm64 build. A test holds every provider the
+  VM is offered on, on either architecture, to a box with that build.
 - **`proxmox`: a router that reported no address yet fails with its own message**: the uplink
   postcondition read `flatten(self.ipv4_addresses)`, which Terraform refuses on `null` (no guest
   agent answer yet), so the apply failed with "Invalid function argument" instead of saying the

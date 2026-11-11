@@ -524,7 +524,7 @@ require "json"
 ISOLOOM_HOSTPORTS = (JSON.parse(ENV.fetch("ISOLOOM_HOSTPORTS", "{}")) rescue {})
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/debian12"
+  config.vm.box = "bento/debian-12"
   config.vm.hostname = "workbench"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.boot_timeout = 600
@@ -550,6 +550,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
+    o.vm.box_version = ">= 0"
     v.name = "workbench - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -564,7 +565,10 @@ Vagrant.configure("2") do |config|
     v.ssh_port = ISOLOOM_HOSTPORTS.fetch("isoloom-docker-host/ssh", 50022)
     v.ssh_auto_correct = true
   end
-  config.vm.provider "libvirt" do |v|
+  config.vm.provider "libvirt" do |v, o|
+    o.vm.box = "generic/debian12"
+    o.vm.box_version = ">= 0"
+    o.vm.box_architecture = :auto
     v.cpus = 2
     v.memory = 2048
     v.memorybacking :access, mode: "shared"
@@ -1823,7 +1827,7 @@ systemctl enable --now isoloom-published.service
           "utm": "workbench - isoloom-docker-host",
           "vmware_esxi": "workbench-isoloom-docker-host"
         },
-        "boot_digest": "sha256:35d18d7f2d4f92c09e6aced2c89912f7e35f31b553a281aebb7b7f31bcc41c06"
+        "boot_digest": "sha256:7e54025de385f1fed208620b22ebba258c361fa72c71104cc6788974422624cf"
       }
     },
     {

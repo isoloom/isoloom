@@ -26,7 +26,7 @@
 //! `docker` target's Compose file (first) and the Proxmox module, and refuses what the Compose
 //! file can't run: its capabilities are Compose's.
 
-use crate::boxes;
+use crate::boxes::{self, Choice, VagrantBox};
 use crate::error::Result;
 use crate::settings;
 use isoloom_manifest::contract::OUTPUT_DIR;
@@ -137,9 +137,12 @@ fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
 /// then its provisioners in order: the system constraints, the project, the certificate
 /// authorities, Docker, SSH accepting the values given at launch, the environment and the checks.
 fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Scripts) {
-    // generic/debian12 has a build for the providers here but UTM and QEMU (VirtualBox, VMware,
-    // Parallels, libvirt); those two are given their own box below. Hyper-V isn't offered here.
-    r.assign("config.vm.box", Value::str("generic/debian12"));
+    // Debian 12's boxes, as a `debian@12` machine boots them, each provider's build for this
+    // computer's architecture ([`host_boxes`]); the providers that boot another box say so in
+    // their blocks. Hyper-V isn't offered here.
+    let debian = boxes::debian_12();
+    let choice = host_boxes(&debian);
+    choice.main.render(r, "config", None);
     r.assign("config.vm.hostname", Value::str(&env.name));
     r.call(
         Call::new("config.vm.synced_folder")
@@ -164,7 +167,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
         }
     }
     let size = host_size(env);
-    desktop_providers(r, &crate::vms::label(env, VM), size, docker::HostSize::of(env).disk_gb);
+    desktop_providers(r, &choice, &crate::vms::label(env, VM), size, docker::HostSize::of(env).disk_gb);
     esxi(r, &crate::vms::vm_name(env, VM), size);
     // The containers' host folders, shared read-write where Compose finds them (a read-only one
     // is bound read-only into its container).
@@ -190,9 +193,25 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
     }
 }
 
+/// The boxes of the containers' host: Debian 12's ([`boxes::debian_12`]), as one of Isoloom's own
+/// VMs boots them, the computer's build on every provider, and UTM's own Debian 12
+/// ([`boxes::UTM_DEBIAN_12`]), the others having no UTM build. Its Vagrantfile is written from
+/// it, and its run manifest lists it.
+pub(crate) fn host_boxes(debian: &VagrantBox) -> Choice<'_> {
+    debian.own_vm(Some(boxes::UTM_DEBIAN_12))
+}
+
+/// A provider's own box (`o.vm.box`), at its newest version (the main box's pin isn't one of
+/// its versions).
+fn own_box(r: &mut Ruby, name: &str) {
+    r.assign("o.vm.box", Value::str(name));
+    r.assign("o.vm.box_version", Value::str(">= 0"));
+}
+
 /// The size on the providers of this machine (VirtualBox, VMware, Parallels, UTM, QEMU,
-/// libvirt), named `label` where the provider shows a name.
-fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb: u32) {
+/// libvirt), named `label` where the provider shows a name, and the box of each that boots its
+/// own (`choice`'s).
+fn desktop_providers(r: &mut Ruby, choice: &Choice, label: &str, (cpus, mem): (u32, u32), disk_gb: u32) {
     let provider = |name: &str| Call::new("config.vm.provider").arg(Value::str(name));
     let named = |v: &mut Ruby| {
         v.assign("v.name", Value::str(label));
@@ -214,19 +233,23 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
         r.assign(&format!("v.vmx[{}]", Value::str("memsize")), Value::str(&mem.to_string()));
     });
     r.block(provider("parallels"), "v", named);
-    // Apple Silicon Macs: UTM and QEMU, as for the VMs of the Vagrant target. UTM has no
-    // generic/debian12 build, so it takes a UTM box of the same Debian 12.
+    // Apple Silicon Macs: UTM and QEMU, as for the VMs of the Vagrant target. UTM takes a UTM
+    // box of the same Debian 12.
     r.block(provider("utm"), "v, o", |r| {
-        r.assign("o.vm.box", Value::str("utm/bookworm"));
+        if let Some(b) = choice.utm {
+            own_box(r, b);
+        }
         named(r);
         crate::vms::utm::override_in_block(r);
     });
     r.block(provider("qemu"), "v, o", |r| {
         // vagrant-qemu boots the Debian cloud image, as the VMs of the Vagrant target do on QEMU
         // (generic/debian12's libvirt build never comes up under it: the box is found, the VM
-        // starts, SSH never answers). The main box's version pin isn't one of this box's.
-        r.assign("o.vm.box", Value::str(boxes::QEMU_DEBIAN_12));
-        r.assign("o.vm.box_version", Value::str(">= 0"));
+        // starts, SSH never answers).
+        let qemu_box = choice.qemu.unwrap_or(choice.main.name);
+        if let Some(b) = choice.qemu {
+            own_box(r, b);
+        }
         r.assign("v.smp", Value::str(&format!("cpus={cpus}")));
         r.assign("v.memory", Value::str(&format!("{mem}M")));
         // The cloud image's disk is 10 GB, little for Docker's images and the lab's volumes: an
@@ -234,10 +257,7 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
         // sparse, so it costs what it holds), which the image's cloud-init
         // grows the root file system into. `IsoloomQemu.disk` keeps the box's own size when
         // that is already larger.
-        r.assign(
-            "v.disk_resize",
-            Value::raw(format!("IsoloomQemu.disk({}, {disk_gb})", Value::str(boxes::QEMU_DEBIAN_12))),
-        );
+        r.assign("v.disk_resize", Value::raw(format!("IsoloomQemu.disk({}, {disk_gb})", Value::str(qemu_box))));
         // vagrant-qemu forwards the VM's SSH (guest 22) to one fixed host port (50022) with weak
         // auto-correct, so two local docker-vm labs — or a half-created VM left by a failed start —
         // collide on it. Take the free host port the runner chose for this VM (the way published
@@ -245,7 +265,14 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
         r.assign("v.ssh_port", vagrantfile::chosen_host(&format!("{VM}/ssh"), 50022));
         r.assign("v.ssh_auto_correct", true);
     });
-    r.block(provider("libvirt"), "v", |r| {
+    let libvirt_params = if choice.libvirt.is_some() { "v, o" } else { "v" };
+    r.block(provider("libvirt"), libvirt_params, |r| {
+        if let Some(b) = choice.libvirt {
+            // A roboxes box, with a build for each architecture: the computer's, as for
+            // Isoloom's own VMs.
+            own_box(r, b);
+            r.assign("o.vm.box_architecture", Value::sym("auto"));
+        }
         r.assign("v.cpus", cpus);
         r.assign("v.memory", mem);
         // Shared from the start: a machine with host folders can be added to the environment
@@ -368,7 +395,8 @@ mod tests {
         // with the shared folder) reloaded the host, and libvirt refused to attach the folder
         // ("'virtiofs' requires shared memory"): the host had been created without any.
         let mut r = Ruby::new();
-        desktop_providers(&mut r, "env_vm", (2, 2048), 20);
+        let debian = boxes::debian_12();
+        desktop_providers(&mut r, &host_boxes(&debian), "env_vm", (2, 2048), 20);
         crate::host_folders::render(
             &mut r,
             "config",
@@ -380,7 +408,7 @@ mod tests {
             crate::host_folders::LibvirtMemory::Always,
         );
         let out = r.finish();
-        let (_, libvirt) = out.split_once("config.vm.provider \"libvirt\" do |v|").unwrap_or_default();
+        let (_, libvirt) = out.split_once("config.vm.provider \"libvirt\" do |v, o|").unwrap_or_default();
         let (libvirt, _) = libvirt.split_once("\nend").unwrap_or_default();
         assert!(
             libvirt.contains("v.memorybacking :access, mode: \"shared\"") && libvirt.contains("v.memorybacking :source, type: \"memfd\""),
