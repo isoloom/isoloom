@@ -53,7 +53,7 @@ pub fn hyperv_ports_note(r: &Value) -> Option<String> {
             entries(v, "ports").filter_map(move |(_, s)| {
                 let port = s.get("port").and_then(Value::as_u64).unwrap_or(0);
                 let udp = s.get("protocol").and_then(Value::as_str) == Some("udp");
-                let publish = s.get("published").or_else(|| s.get("publish")).and_then(Value::as_u64);
+                let publish = s.get("published").and_then(Value::as_u64);
                 publish.filter(|_| udp).map(|p| format!("127.0.0.1:{p}/udp ({m}:{port})"))
             })
         })
