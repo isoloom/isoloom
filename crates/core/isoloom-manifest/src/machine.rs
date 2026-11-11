@@ -195,9 +195,10 @@ pub enum Native {
 }
 
 /// A Vagrant box a machine's VM boots under one provider, as a runner downloads it before `vagrant
-/// up`, in a step of its own with a download's rule: `vagrant box add <box> --provider <provider>
-/// [--box-version <version>] [--architecture <architecture>]`, skipped when that box, provider,
-/// version and build are there already.
+/// up`, in a step of its own with a download's rule: `vagrant box add <box> --provider <format>
+/// [--box-version <version>] [--architecture <architecture>]`, skipped when that box, format,
+/// version and build are there already. The format is the one the provider boots: its own name,
+/// but `libvirt` for `qemu` (vagrant-qemu boots libvirt-format boxes).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VagrantBox {

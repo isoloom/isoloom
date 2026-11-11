@@ -104,8 +104,11 @@ with nothing left to fetch.
 
 Each Vagrant machine's `native.boxes` lists the box its VM boots under each provider, so a runner
 can download them in a step of its own, with a download's rule, before `vagrant up` (which would
-otherwise download a box inside its own time limit): `vagrant box add <box> --provider <provider>
-[--box-version <version>] [--architecture <architecture>]`, skipping a box already there.
+otherwise download a box inside its own time limit): `vagrant box add <box> --provider <format>
+[--box-version <version>] [--architecture <architecture>]`, skipping a box already there. The
+format is the one the provider boots: its own name, but `libvirt` for `qemu` (vagrant-qemu boots
+libvirt-format boxes; a `qemu` build would be downloaded for nothing, then the libvirt one again by
+`vagrant up`).
 
 ```json
 "boxes": [

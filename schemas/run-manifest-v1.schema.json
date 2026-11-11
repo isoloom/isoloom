@@ -1614,7 +1614,7 @@
         "provider",
         "box"
       ],
-      "description": "A Vagrant box a machine's VM boots under one provider, as a runner downloads it before `vagrant up`, in a step of its own with a download's rule: `vagrant box add <box> --provider <provider> [--box-version <version>] [--architecture <architecture>]`, skipped when that box, provider, version and build are there already."
+      "description": "A Vagrant box a machine's VM boots under one provider, as a runner downloads it before `vagrant up`, in a step of its own with a download's rule: `vagrant box add <box> --provider <format> [--box-version <version>] [--architecture <architecture>]`, skipped when that box, format, version and build are there already. The format is the one the provider boots: its own name, but `libvirt` for `qemu` (vagrant-qemu boots libvirt-format boxes)."
     },
     "BoxName": {
       "type": "string",
