@@ -263,7 +263,8 @@ fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Out
     if !out.status.success() {
         return Err(format!("ruby failed: {}", String::from_utf8_lossy(&out.stderr)).into());
     }
-    Ok(String::from_utf8(out.stdout)?)
+    // Ruby's standard output is in text mode on Windows: each line ends in "\r\n" there.
+    Ok(String::from_utf8(out.stdout)?.replace("\r\n", "\n"))
 }
 
 /// On Hyper-V the run's URL is the port the runner chose: Hyper-V ignores `forwarded_port`, so
