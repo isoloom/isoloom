@@ -807,16 +807,20 @@ fn example_copy(name: &str, into: &str) -> Outcome<Scratch> {
 fn generate_fails_on_a_template_or_check_script_it_cant_read_with_the_read_error() -> Outcome {
     let dir = example_copy("configured-app", "missing-template")?;
     std::fs::remove_file(dir.join("conf/site.conf"))?;
+    // The system's own words for a missing file: "No such file or directory" on Unix, "The
+    // system cannot find the file specified." on Windows.
+    let missing = std::fs::read(dir.join("conf/site.conf")).map_or_else(|e| e.to_string(), |_| String::new());
+    assert!(missing.contains("os error"), "the file is gone: {missing}");
     let o = isoloom(&dir, &[&"generate", &dir, &"--target", &"docker"])?;
     assert_ne!(o.code, Some(0), "{o:?}");
-    assert!(o.stderr.contains("conf/site.conf") && o.stderr.contains("No such file"), "{}", o.stderr);
+    assert!(o.stderr.contains("conf/site.conf") && o.stderr.contains(&missing), "{}", o.stderr);
     assert!(!dir.join(".isoloom/docker").exists(), "nothing is written");
 
     let no_script = example_copy("configured-app", "missing-check-script")?;
     std::fs::remove_file(no_script.join("checks/api-answers.sh"))?;
     let k = isoloom(&no_script, &[&"generate", &no_script, &"--target", &"kubernetes"])?;
     assert_ne!(k.code, Some(0), "{k:?}");
-    assert!(k.stderr.contains("checks/api-answers.sh") && k.stderr.contains("No such file"), "{}", k.stderr);
+    assert!(k.stderr.contains("checks/api-answers.sh") && k.stderr.contains(&missing), "{}", k.stderr);
     // `validate` still lists it as a problem of the spec, not as an error.
     let v = isoloom(&no_script, &[&"validate", &no_script])?;
     assert_eq!(v.code, Some(1), "{v:?}");
