@@ -615,6 +615,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "tempfile",
  "thiserror",
 ]
 
@@ -725,6 +726,7 @@ dependencies = [
  "proptest",
  "serde_json",
  "serde_yaml_ng",
+ "tempfile",
  "thiserror",
 ]
 
@@ -742,6 +744,7 @@ dependencies = [
  "serde_json",
  "serde_yaml_ng",
  "sha2",
+ "tempfile",
  "thiserror",
 ]
 
@@ -760,6 +763,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_yaml_ng",
+ "tempfile",
  "thiserror",
 ]
 
@@ -783,6 +787,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "tempfile",
  "thiserror",
 ]
 
@@ -799,6 +804,7 @@ dependencies = [
  "isoloom-spec",
  "proptest",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
@@ -814,6 +820,7 @@ dependencies = [
  "isoloom-spec",
  "proptest",
  "sha2",
+ "tempfile",
  "thiserror",
 ]
 
@@ -1770,6 +1777,7 @@ dependencies = [
  "sha1",
  "sha2",
  "tar",
+ "tempfile",
  "toml",
  "xtask-quality",
 ]
@@ -1780,6 +1788,7 @@ version = "1.0.9"
 dependencies = [
  "clap",
  "serde_json",
+ "tempfile",
  "toml",
 ]
 

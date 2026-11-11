@@ -334,13 +334,10 @@ machines:
 #[cfg(unix)]
 mod hosts_in_a_real_shell {
     use std::net::Ipv4Addr;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use proptest::prelude::*;
 
     use super::super::network::hosts;
-
-    static RUN: AtomicUsize = AtomicUsize::new(0);
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(32))]
@@ -352,14 +349,14 @@ mod hosts_in_a_real_shell {
                 (Ipv4Addr::new(10, 0, 0, 2), vec!["  lead".to_owned(), r"back\slash".to_owned(), "trail ".to_owned()]),
             ];
             let script = hosts(&entries).expect("a step").replace("/etc/hosts", "\"$HOSTS\"");
-            let file = std::env::temp_dir().join(format!("isoloom-hosts-{}-{}", std::process::id(), RUN.fetch_add(1, Ordering::Relaxed)));
-            std::fs::write(&file, "127.0.0.1 localhost\n").expect("a stand-in hosts file");
+            let hosts_file = tempfile::Builder::new().prefix("isoloom-hosts-").tempfile().expect("a stand-in hosts file");
+            let file = hosts_file.path();
+            std::fs::write(file, "127.0.0.1 localhost\n").expect("a stand-in hosts file");
             for _ in 0..2 {
-                let status = std::process::Command::new("sh").arg("-c").arg(&script).env("HOSTS", &file).status().expect("sh runs");
+                let status = std::process::Command::new("sh").arg("-c").arg(&script).env("HOSTS", file).status().expect("sh runs");
                 prop_assert!(status.success());
             }
-            let written = std::fs::read_to_string(&file).expect("the hosts file");
-            std::fs::remove_file(&file).ok();
+            let written = std::fs::read_to_string(file).expect("the hosts file");
             let lines: Vec<String> = entries.iter().map(|(a, n)| format!("{a} {}", n.join(" "))).collect();
             prop_assert_eq!(written, format!("127.0.0.1 localhost\n{}\n", lines.join("\n")));
         }
@@ -389,9 +386,8 @@ fn a_docker_host_gets_the_engine_and_compose_at_their_pinned_versions() {
 
 #[test]
 fn a_mark_wait_ends_when_the_mark_is_there_and_gives_up_with_its_message_after_the_timeout() {
-    let dir = std::env::temp_dir().join(format!("isoloom-mark-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let mark = dir.join("delivered");
+    let dir = tempfile::Builder::new().prefix("isoloom-mark-").tempdir().unwrap();
+    let mark = dir.path().join("delivered");
     let at = crate::test_support::sh_path(&mark);
     let run = |timeout_s| {
         let line = wait_for_mark(&at, timeout_s, "waiting for it", "it never came");
@@ -406,7 +402,6 @@ fn a_mark_wait_ends_when_the_mark_is_there_and_gives_up_with_its_message_after_t
     std::fs::write(&mark, "").unwrap();
     let there = run(0).unwrap();
     assert!(there.status.success() && there.stdout.is_empty(), "{there:?}");
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
@@ -426,14 +421,13 @@ fn a_project_script_with_a_space_in_its_path_runs() {
         Target::Vagrant,
     );
     let line = rendered(&env, "m", |s| matches!(s, Step::Run { .. }));
-    let dir = std::env::temp_dir().join(format!("isoloom-spaced-{}", std::process::id()));
+    let dir = tempfile::Builder::new().prefix("isoloom-spaced-").tempdir().unwrap();
+    let dir = dir.path();
     std::fs::create_dir_all(dir.join("provision")).unwrap();
     std::fs::write(dir.join("provision/my setup.sh"), "touch ran\n").unwrap();
     let script = line.replace(super::PROJECT_DIR, &dir.to_string_lossy());
     let status = std::process::Command::new("sh").arg("-c").arg(&script).status().expect("sh runs");
-    let ran = dir.join("ran").exists();
-    std::fs::remove_dir_all(&dir).ok();
-    assert!(status.success() && ran, "{script}");
+    assert!(status.success() && dir.join("ran").exists(), "{script}");
 }
 
 #[test]
@@ -474,9 +468,8 @@ fn the_windows_project_unpack_reads_the_uploaded_archive_into_the_project_folder
 #[test]
 fn a_tracked_step_writes_lines_of_the_ready_grammar() {
     use isoloom_manifest::ReadyLine;
-    let dir = std::env::temp_dir().join(format!("isoloom-tracked-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let ready = dir.join("ready");
+    let dir = tempfile::Builder::new().prefix("isoloom-tracked-").tempdir().unwrap();
+    let ready = dir.path().join("ready");
     let run = |command: &str| {
         let script = super::tracked("a step's 'name'", command, &|mark| format!("{{ {mark}; }}")).replace(super::READY_FILE, &ready.display().to_string());
         let ok = std::process::Command::new("sh").args(["-c", &script]).status().unwrap().success();
@@ -487,5 +480,4 @@ fn a_tracked_step_writes_lines_of_the_ready_grammar() {
     let done = super::ready_mark(&ReadyLine::Ready).replace(super::READY_FILE, &ready.display().to_string());
     assert!(std::process::Command::new("sh").args(["-c", &done]).status().unwrap().success());
     assert_eq!(ReadyLine::parse(&std::fs::read_to_string(&ready).unwrap()), Some(ReadyLine::Ready));
-    std::fs::remove_dir_all(&dir).ok();
 }

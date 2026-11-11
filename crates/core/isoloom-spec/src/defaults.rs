@@ -415,14 +415,14 @@ mod tests {
 
     #[test]
     fn layers_merge_in_order_and_each_leaf_names_the_last_that_set_it() -> Outcome {
-        let home = folder("defaults-layers-home")?;
-        let project = folder("defaults-layers-project")?;
+        let (home, project) = (folder("defaults-layers-home")?, folder("defaults-layers-project")?);
+        let (home, project) = (home.path(), project.path());
         std::fs::write(home.join("defaults.yml"), "cloud: { aws: { region: from-user }, gcp: { region: from-user } }\n")?;
         std::fs::write(project.join(PROJECT_FILE), "cloud: { aws: { region: from-project } }\n")?;
         let home_text = home.to_string_lossy().into_owned();
         let sets = ["defaults.vagrant.provider=libvirt".to_owned(), "machines.web.os=alpine".to_owned()];
         let resolved = load(&Sources {
-            project: &project,
+            project,
             images_file: None,
             profile: None,
             sets: &sets,
@@ -451,6 +451,7 @@ mod tests {
     #[test]
     fn a_layer_file_that_cant_be_read_is_an_error_unlike_a_missing_one() -> Outcome {
         let project = folder("defaults-unreadable")?;
+        let project = project.path();
         let sources = |folder| Sources {
             project: folder,
             images_file: None,
@@ -458,9 +459,9 @@ mod tests {
             sets: &[],
             host: host(&[("ISOLOOM_HOME", "/nonexistent/isoloom")]),
         };
-        assert_eq!(load(&sources(&project))?.defaults, Defaults::default(), "no file, no layer");
+        assert_eq!(load(&sources(project))?.defaults, Defaults::default(), "no file, no layer");
         std::fs::create_dir(project.join(PROJECT_FILE))?;
-        assert!(matches!(load(&sources(&project)), Err(Error::Read { path, .. }) if path == project.join(PROJECT_FILE)));
+        assert!(matches!(load(&sources(project)), Err(Error::Read { path, .. }) if path == project.join(PROJECT_FILE)));
         Ok(())
     }
 

@@ -7,8 +7,6 @@
 // The helpers run on the Linux controller: their tests run where `sh` is the host's.
 #![cfg(unix)]
 
-use std::path::{Path, PathBuf};
-
 use isoloom_spec::shell::quote;
 
 use super::{ATTEMPTS, RETRY_DIR, TRANSIENT, helpers, provision_script};
@@ -64,14 +62,15 @@ struct Outcome {
     calls: Vec<String>,
     /// The hosts in the limit file, as each retry saw them.
     limits: Vec<String>,
-    dir: PathBuf,
+    /// The folder the run wrote in, removed when the outcome goes.
+    dir: tempfile::TempDir,
 }
 
 /// Runs `run_play fake -i inv site.yml` under `sh -e` with no pauses; the fake answers each run
 /// with the next of `runs` (then succeeds).
 fn play(runs: &[Run]) -> Outcome {
-    let dir = std::env::temp_dir().join(format!("isoloom-playbooks-{}-{}", std::process::id(), unique()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let scratch = tempfile::Builder::new().prefix("isoloom-playbooks-").tempdir().unwrap();
+    let dir = scratch.path();
     let cases: String = runs
         .iter()
         .enumerate()
@@ -87,7 +86,7 @@ fn play(runs: &[Run]) -> Outcome {
         .arg("-c")
         .arg(&body)
         .env("ISOLOOM_RETRY_PAUSE", "0")
-        .env("ANSIBLE_RETRY_FILES_SAVE_PATH", &dir)
+        .env("ANSIBLE_RETRY_FILES_SAVE_PATH", dir)
         .output()
         .unwrap();
     let lines = |f: &str| -> Vec<String> {
@@ -102,18 +101,8 @@ fn play(runs: &[Run]) -> Outcome {
         out: String::from_utf8_lossy(&out.stdout).into_owned(),
         calls: lines("calls"),
         limits: lines("limits"),
-        dir,
+        dir: scratch,
     }
-}
-
-fn unique() -> u64 {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static N: AtomicU64 = AtomicU64::new(0);
-    N.fetch_add(1, Ordering::Relaxed)
-}
-
-fn cleanup(dir: &Path) {
-    std::fs::remove_dir_all(dir).ok();
 }
 
 const FIRST: &str = "-i inv site.yml";
@@ -141,7 +130,6 @@ fn unreachable_hosts_alone_are_run_again_on_their_own_after_a_pause() {
         o.out
     );
     assert!(o.out.trim_end().ends_with("after"), "{}", o.out);
-    cleanup(&o.dir);
 }
 
 #[test]
@@ -155,7 +143,6 @@ fn hosts_that_stay_unreachable_stop_the_setup_after_four_runs() {
         o.out
     );
     assert!(!o.out.contains("after\n"), "set -e stops the setup: {}", o.out);
-    cleanup(&o.dir);
 }
 
 #[test]
@@ -167,12 +154,10 @@ fn a_failed_task_is_not_retried_even_with_a_host_unreachable() {
     assert_eq!((o.code, o.calls.len()), (4, 1), "{}", o.out);
     assert!(o.out.contains("isoloom: site.yml: a task failed on web: not retried"), "{}", o.out);
     assert!(!o.out.contains("running it again"), "{}", o.out);
-    cleanup(&o.dir);
     // A task that failed on its own (exit 2) isn't either.
     let own = play(&[run(&[fatal("dc01", "no such user")], &[("web", 0, 0), ("dc01", 0, 1)], 2), ok()]);
     assert_eq!((own.code, own.calls.len()), (2, 1), "{}", own.out);
     assert!(!own.out.contains("after"));
-    cleanup(&own.dir);
 }
 
 #[test]
@@ -186,7 +171,6 @@ fn a_playbook_that_does_not_parse_is_not_retried() {
     assert_eq!((o.code, o.calls.len()), (4, 1), "{}", o.out);
     assert!(o.out.contains("with no unreachable host or dropped connection: not retried"), "{}", o.out);
     assert!(!o.out.contains("running it again") && !o.out.contains("after"), "{}", o.out);
-    cleanup(&o.dir);
 }
 
 /// A message of each kind the list knows, as Ansible and pywinrm word it.
@@ -220,7 +204,6 @@ fn a_task_cut_by_a_dropped_connection_runs_again_on_its_host_whatever_the_messag
             "{msg}: {}",
             o.out
         );
-        cleanup(&o.dir);
     }
 }
 
@@ -231,7 +214,6 @@ fn a_play_cut_twice_finishes_on_the_third_run() {
     assert_eq!(o.code, 0, "{}", o.out);
     assert_eq!(o.calls, [FIRST, AGAIN, AGAIN]);
     assert!(o.out.contains("(3/4)") && o.out.trim_end().ends_with("after"), "{}", o.out);
-    cleanup(&o.dir);
 }
 
 #[test]
@@ -244,7 +226,6 @@ fn a_host_with_a_real_failure_beside_a_dropped_connection_is_not_retried() {
     );
     let o = play(&[both, ok()]);
     assert_eq!((o.code, o.calls.len()), (2, 1), "{}", o.out);
-    cleanup(&o.dir);
 }
 
 #[test]
@@ -268,8 +249,6 @@ fn mixed_hosts_retry_only_the_cut_and_unreachable_ones() {
     let o2 = play(&[real, ok()]);
     assert_eq!((o2.code, o2.calls.len()), (2, 1), "{}", o2.out);
     assert!(o2.out.contains("a task failed on web: not retried"), "{}", o2.out);
-    cleanup(&o.dir);
-    cleanup(&o2.dir);
 }
 
 #[test]
@@ -281,7 +260,6 @@ fn an_ignored_failure_doesnt_count() {
     );
     let o = play(&[ignored, ok()]);
     assert_eq!((o.code, o.calls.len()), (0, 2), "{}", o.out);
-    cleanup(&o.dir);
 }
 
 #[test]
@@ -294,15 +272,13 @@ fn the_output_is_read_through_colors_and_delegation() {
     let o = play(&[colored, ok()]);
     assert_eq!((o.code, o.calls.len()), (0, 2), "{}", o.out);
     assert_eq!(o.limits, ["dc01"]);
-    cleanup(&o.dir);
 }
 
 #[test]
 fn the_retry_file_is_removed_once_the_play_succeeds() {
     let o = play(&[unreachable(), ok()]);
     assert_eq!(o.code, 0, "{}", o.out);
-    assert!(!o.dir.join("site.retry").exists());
-    cleanup(&o.dir);
+    assert!(!o.dir.path().join("site.retry").exists());
 }
 
 #[test]

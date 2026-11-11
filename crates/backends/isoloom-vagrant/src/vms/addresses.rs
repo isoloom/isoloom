@@ -85,14 +85,12 @@ mod tests {
         let parsed = std::process::Command::new("sh").args(["-n", "-c", SCRIPT]).status().unwrap();
         assert!(parsed.success(), "not valid sh");
         // No nmcli on PATH: nothing is touched, and it succeeds.
-        let empty = std::env::temp_dir().join(format!("isoloom-no-nmcli-{}", std::process::id()));
-        std::fs::create_dir_all(&empty).unwrap();
+        let empty = tempfile::Builder::new().prefix("isoloom-no-nmcli-").tempdir().unwrap();
         let out = std::process::Command::new("/bin/sh")
             .args(["-c", SCRIPT, "addresses", "10.80.0.249/24"])
-            .env("PATH", &empty)
+            .env("PATH", empty.path())
             .output()
             .unwrap();
-        std::fs::remove_dir_all(&empty).unwrap();
         assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     }
 }

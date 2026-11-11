@@ -93,19 +93,16 @@ fn new_keys_are_validated() -> Outcome {
 
 #[test]
 fn a_before_step_must_exist_in_the_project() -> Outcome {
-    let dir = std::env::temp_dir().join(format!("isoloom-cloud-before-{}", std::process::id()));
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir)?;
-    }
+    let dir = tempfile::Builder::new().prefix("isoloom-cloud-before-").tempdir()?;
+    let dir = dir.path();
     std::fs::create_dir_all(dir.join("tf")).unwrap();
     std::fs::write(dir.join("tf/main.tf"), "").unwrap();
     let s = spec("  before: [keys.sh, ../out.sh]\n")?;
-    let found: Vec<String> = s.problems_with_files(&dir).iter().map(isoloom_spec::syntax::Problem::line).collect();
+    let found: Vec<String> = s.problems_with_files(dir).iter().map(isoloom_spec::syntax::Problem::line).collect();
     assert!(found.iter().any(|p| p.contains("cloud.before[0]") && p.contains("doesn't exist")), "{found:?}");
     assert!(
         found.iter().any(|p| p.contains("cloud.before[1]") && p.contains("inside the project")),
         "{found:?}"
     );
-    std::fs::remove_dir_all(&dir)?;
     Ok(())
 }

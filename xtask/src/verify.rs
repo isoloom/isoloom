@@ -314,12 +314,9 @@ mod tests {
         }
     }
 
-    /// A fresh folder for one test.
-    fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("isoloom-xtask-verify-{}-{name}", std::process::id()));
-        let _gone = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+    /// A fresh folder for one test, removed when it goes out of scope.
+    fn scratch(name: &str) -> tempfile::TempDir {
+        tempfile::Builder::new().prefix(&format!("isoloom-xtask-verify-{name}-")).tempdir().unwrap()
     }
 
     /// An archive holding `summary.txt` (`text`).
@@ -336,6 +333,7 @@ mod tests {
     #[test]
     fn the_results_unpack_and_an_empty_archive_is_no_results() {
         let dir = scratch("whole");
+        let dir = dir.path();
         std::fs::write(dir.join("out.tar"), results(b"all clean\n")).unwrap();
         unpack(&dir.join("out.tar"), &dir.join("out"), 0).unwrap();
         assert_eq!(std::fs::read_to_string(dir.join("out/summary.txt")).unwrap(), "all clean\n");
@@ -347,6 +345,7 @@ mod tests {
     #[test]
     fn results_cut_off_halfway_are_an_error_with_the_runners_status() {
         let dir = scratch("cut");
+        let dir = dir.path();
         let whole = results(&[b'x'; 2048]);
         std::fs::write(dir.join("out.tar"), &whole[..1024]).unwrap();
         let e = unpack(&dir.join("out.tar"), &dir.join("out"), 3).unwrap_err().to_string();

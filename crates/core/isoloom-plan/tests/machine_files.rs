@@ -89,13 +89,13 @@ fn an_appliance_has_no_files() {
 
 #[test]
 fn a_source_is_a_file_of_the_project() {
-    let dir = std::env::temp_dir().join(format!("isoloom-machine-files-{}", std::process::id()));
+    let dir = tempfile::Builder::new().prefix("isoloom-machine-files-").tempdir().unwrap();
+    let dir = dir.path();
     std::fs::create_dir_all(dir.join("conf/sub")).unwrap();
     std::fs::write(dir.join("conf/a.ini"), "a=1\n").unwrap();
     let yaml =
         container("[{ path: /a, source: conf/a.ini }, { path: /b, source: conf/missing.ini }, { path: /c, source: conf/sub }, { path: /d, source: ../x }]");
-    let found: Vec<String> = lab(&yaml).unwrap().problems_with_files(&dir).iter().map(Problem::line).collect();
-    std::fs::remove_dir_all(&dir).unwrap();
+    let found: Vec<String> = lab(&yaml).unwrap().problems_with_files(dir).iter().map(Problem::line).collect();
     assert_eq!(found.len(), 3, "{found:#?}");
     assert!(
         found[0].starts_with("machines.m.files[1]: ") && found[0].contains("doesn't exist"),

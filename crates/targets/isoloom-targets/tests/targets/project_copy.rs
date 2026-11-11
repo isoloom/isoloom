@@ -78,14 +78,9 @@ fn archive(dir: &Path, root: &Path, outputs: &[&str], out: &str) -> Outcome<Stri
     Ok(String::from_utf8_lossy(&list.stdout).into_owned())
 }
 
-/// A fresh folder for one test.
-fn scratch(name: &str) -> Outcome<PathBuf> {
-    let dir = std::env::temp_dir().join(format!("isoloom-{name}-{}", std::process::id()));
-    match std::fs::remove_dir_all(&dir) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
-        _ => std::fs::create_dir_all(&dir)?,
-    }
-    Ok(dir)
+/// A fresh folder for one test, removed when it goes out of scope.
+fn scratch(name: &str) -> Outcome<tempfile::TempDir> {
+    Ok(tempfile::Builder::new().prefix(&format!("isoloom-{name}-")).tempdir()?)
 }
 
 /// A project under `dir` with what the archive must keep (links, a loop of links, an empty
@@ -138,8 +133,9 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
         return Ok(());
     }
     let dir = scratch("project-tar")?;
-    let (root, long) = tricky_project(&dir)?;
-    let run = |outputs: &[&str], out: &str| archive(&dir, &root, outputs, out);
+    let dir = dir.path();
+    let (root, long) = tricky_project(dir)?;
+    let run = |outputs: &[&str], out: &str| archive(dir, &root, outputs, out);
 
     let list = run(&[".isoloom/hybrid/compose.yml"], "project.tgz")?;
     let has = |l: &str, entry: &str| l.lines().any(|x| x.ends_with(entry));
@@ -159,8 +155,7 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
     for gone in [".isoloom/vagrant/", ".isoloom/hybrid/", ".isoloom/cloud-vm/", "tfstate", "private_key"] {
         assert!(!compose.contains(gone), "{gone} went in: {compose}");
     }
-    unpacks_as_packed(&dir, &long)?;
-    std::fs::remove_dir_all(&dir)?;
+    unpacks_as_packed(dir, &long)?;
     Ok(())
 }
 
@@ -183,6 +178,7 @@ fn isoloomignore_leaves_paths_out() -> Outcome {
         return Ok(());
     }
     let dir = scratch("isoloomignore")?;
+    let dir = dir.path();
     let root = dir.join("project");
     let files = [
         "a.txt",
@@ -212,7 +208,7 @@ fn isoloomignore_leaves_paths_out() -> Outcome {
         "# not copied into the VMs\n\nlogs/\n!logs/keep.txt\nbuild/\n/x.tmp\nsub/*.tmp\nvendor/big\n.env\ndocs/**\nsrc/*.py\ndata.js?n\nw/a+b.txt   \r\n",
     )
     .unwrap();
-    let list = archive(&dir, &root, &[], "project.tgz")?;
+    let list = archive(dir, &root, &[], "project.tgz")?;
     let went: Vec<&str> = files.iter().copied().filter(|f| list.lines().any(|l| l.ends_with(&format!(" {f}")))).collect();
     // `src/*.py` is anchored (a `/` in the middle): `src/deeper/z.py` stays; `.env` matches at any
     // depth; `!logs/keep.txt` brings back a file of an ignored folder.
@@ -224,7 +220,6 @@ fn isoloomignore_leaves_paths_out() -> Outcome {
     walk(&root, "", &rules, &mut entries)?;
     let own: Vec<&str> = files.iter().copied().filter(|f| entries.iter().any(|e| e == f)).collect();
     assert_eq!(own, went);
-    std::fs::remove_dir_all(&dir)?;
     Ok(())
 }
 
@@ -280,6 +275,7 @@ fn the_windows_extractor_unpacks_the_archive() -> Outcome {
         return Ok(());
     }
     let dir = scratch("untar")?;
+    let dir = dir.path();
     let root = dir.join("project");
     let long = format!("{}/{}.txt", "d".repeat(120), "f".repeat(110));
     for (f, text) in [
@@ -294,13 +290,13 @@ fn the_windows_extractor_unpacks_the_archive() -> Outcome {
     }
     std::fs::create_dir_all(root.join("empty")).unwrap();
     std::fs::write(root.join(".isoloomignore"), "*.log\n").unwrap();
-    archive(&dir, &root, &[], "ruby.tgz")?;
+    archive(dir, &root, &[], "ruby.tgz")?;
     // A host's tar, as the cloud modules run it (GNU tar's long names, here).
     let st = Command::new("tar")
         .arg("-czf")
         .arg(dir.join("host.tgz"))
         .arg("-C")
-        .arg(&dir)
+        .arg(dir)
         .arg("project")
         .status()
         .unwrap();
@@ -323,7 +319,6 @@ fn the_windows_extractor_unpacks_the_archive() -> Outcome {
         assert_eq!(dest.join("skip.log").exists(), name == "host", "{name}: .isoloomignore");
         assert!(!dir.join(format!("{name}.tgz")).exists(), "{name}: the archive stays");
     }
-    std::fs::remove_dir_all(&dir)?;
     Ok(())
 }
 

@@ -160,8 +160,8 @@ fn run_tracked(command: &str, ready: &std::path::Path) -> (bool, String) {
 #[cfg(unix)]
 #[test]
 fn a_tracked_step_marks_its_progress_best_effort_and_its_failure_always() {
-    let dir = std::env::temp_dir().join(format!("isoloom-tracked-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("a folder");
+    let dir = tempfile::Builder::new().prefix("isoloom-tracked-").tempdir().expect("a folder");
+    let dir = dir.path();
     let ready = dir.join("ready");
     // It runs: the progress is marked, and stays the last word.
     assert_eq!(run_tracked("true", &ready), (true, "running: step\n".to_owned()));
@@ -171,7 +171,6 @@ fn a_tracked_step_marks_its_progress_best_effort_and_its_failure_always() {
     let ran = dir.join("ran");
     let (ok, _) = run_tracked(&format!("touch {}", ran.display()), &dir.join("missing/ready"));
     assert!(ok && ran.exists(), "a progress mark that can't be written doesn't skip the step");
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]

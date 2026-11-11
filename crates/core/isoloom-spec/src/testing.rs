@@ -14,14 +14,10 @@ pub(crate) fn lab(rest: &str) -> String {
     format!("version: 1\nname: t\nnetworks:\n  lan: {{ cidr: 10.0.0.0/24 }}\n{rest}")
 }
 
-/// A fresh, empty folder for test `name` under the system's temporary folder.
-pub(crate) fn folder(name: &str) -> std::io::Result<std::path::PathBuf> {
-    let dir = std::env::temp_dir().join(format!("isoloom-spec-{}-{name}", std::process::id()));
-    match std::fs::remove_dir_all(&dir) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e),
-        _ => {}
-    }
-    std::fs::create_dir_all(&dir).map(|()| dir)
+/// A fresh, empty folder for test `name` under the system's temporary folder, removed when it
+/// goes out of scope (by a failed assertion's panic too).
+pub(crate) fn folder(name: &str) -> std::io::Result<tempfile::TempDir> {
+    tempfile::Builder::new().prefix(&format!("isoloom-spec-{name}-")).tempdir()
 }
 
 /// What validation finds in the lowered spec `yaml` describes, each as `path: message`.
@@ -145,3 +141,13 @@ fn resolve_os(spec: &mut Spec) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests;
+
+#[test]
+fn a_test_folder_is_gone_once_it_goes_out_of_scope() -> std::io::Result<()> {
+    let dir = folder("gone")?;
+    std::fs::write(dir.path().join("a-file"), "")?;
+    let path = dir.path().to_path_buf();
+    drop(dir);
+    assert!(!path.exists(), "{} is left", path.display());
+    Ok(())
+}

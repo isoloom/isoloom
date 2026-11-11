@@ -134,21 +134,20 @@ fn the_inputs_file_quotes_every_value() {
     // `sh` reads a `-c` script's backslashes before quotes otherwise than it was written, and a
     // Windows path has no `/`, so `.` would look it up on PATH.
     let script = lines.concat().replace("/tmp/isoloom-inputs.env", "\"$OUT\"");
-    let dir = std::env::temp_dir().join(format!("isoloom-inputs-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("a temporary folder");
+    let dir = tempfile::Builder::new().prefix("isoloom-inputs-").tempdir().expect("a temporary folder");
+    let dir = dir.path();
     let read_back = "set -a; . \"$OUT\"; set +a; printf %s \"$TOKEN\" > \"$OUT.read\"\n";
     std::fs::write(dir.join("inputs.sh"), format!("{script}{read_back}")).expect("the script written");
     let tricky = "it's $(not run) \"quoted\" `nor this`";
     let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
     let status = posix
         .arg("inputs.sh")
-        .current_dir(&dir)
+        .current_dir(dir)
         .env("OUT", "./inputs.env")
         .env("TOKEN", isoloom_spec::shell::base64(tricky.as_bytes()))
         .status()
         .expect("sh runs");
     let read = std::fs::read_to_string(dir.join("inputs.env.read")).unwrap_or_default();
-    std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
     assert!(status.success());
     assert_eq!(read, tricky);
 }

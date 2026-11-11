@@ -34,6 +34,7 @@ insta.workspace = true
 proptest.workspace = true
 jsonschema.workspace = true
 criterion.workspace = true
+tempfile.workspace = true
 
 # The hot paths of generation, measured by `cargo xtask bench` (criterion, its own main).
 [[bench]]

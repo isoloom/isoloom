@@ -81,17 +81,16 @@ pub fn load_profiled(dir: &Path, profile: Option<&profile::Profile>, sets: &[Str
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
 
     const SPEC: &str = "version: 1\nname: shop\nnetworks: { lab: { cidr: 10.1.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 } }\n";
 
-    /// A fresh folder for test `name`, holding `files` (name, text).
-    fn folder(name: &str, files: &[(&str, &str)]) -> PathBuf {
+    /// A fresh folder for test `name`, holding `files` (name, text), removed when it goes out of
+    /// scope.
+    fn folder(name: &str, files: &[(&str, &str)]) -> tempfile::TempDir {
         let dir = crate::testing::folder(&format!("load-{name}")).unwrap();
         for (file, text) in files {
-            std::fs::write(dir.join(file), text).unwrap();
+            std::fs::write(dir.path().join(file), text).unwrap();
         }
         dir
     }
@@ -108,26 +107,27 @@ mod tests {
     #[test]
     fn a_folder_has_one_spec_file() {
         let none = folder("none", &[]);
-        assert!(matches!(find(&none), Err(Error::NotFound(d)) if d == none));
+        assert!(matches!(find(none.path()), Err(Error::NotFound(d)) if d == none.path()));
         let yaml = folder("yaml", &[("isoloom.yaml", SPEC)]);
-        assert_eq!(find(&yaml).unwrap(), yaml.join("isoloom.yaml"));
+        assert_eq!(find(yaml.path()).unwrap(), yaml.path().join("isoloom.yaml"));
         let both = folder("both", &[("isoloom.yml", SPEC), ("isoloom.yaml", SPEC)]);
-        assert!(matches!(find(&both), Err(Error::Ambiguous(d)) if d == both));
+        assert!(matches!(find(both.path()), Err(Error::Ambiguous(d)) if d == both.path()));
     }
 
     #[test]
     fn a_folder_reads_into_its_spec_and_overrides_apply_first() {
         let dir = folder("overrides", &[("isoloom.yml", SPEC)]);
-        assert_eq!(load(&dir).unwrap().machines["web"].os.map(|os| os.to_string()), Some("debian@12".to_owned()));
-        let set = load_profiled(&dir, None, &["machines.web.os=alpine".to_owned(), "defaults.cloud.aws.region=x".to_owned()]).unwrap();
+        let dir = dir.path();
+        assert_eq!(load(dir).unwrap().machines["web"].os.map(|os| os.to_string()), Some("debian@12".to_owned()));
+        let set = load_profiled(dir, None, &["machines.web.os=alpine".to_owned(), "defaults.cloud.aws.region=x".to_owned()]).unwrap();
         assert_eq!(set.machines["web"].os.map(|os| os.to_string()), Some("alpine@3.19".to_owned()));
-        assert!(matches!(load_profiled(&dir, None, &["nonsense".to_owned()]), Err(Error::SetShape { .. })));
+        assert!(matches!(load_profiled(dir, None, &["nonsense".to_owned()]), Err(Error::SetShape { .. })));
     }
 
     #[test]
     fn problems_name_the_file_they_are_in() {
         let dir = folder("named", &[("isoloom.yaml", "version: 1\nname: shop\nmachines:\n  web: { vm: {} }\n")]);
-        match load(&dir) {
+        match load(dir.path()) {
             Err(Error::Invalid { file, .. }) => assert_eq!(file, "isoloom.yaml"),
             other => panic!("{other:?}"),
         }

@@ -102,11 +102,11 @@ mod tests {
 
     type Outcome = std::result::Result<(), Box<dyn std::error::Error>>;
 
-    /// A fresh folder for one test, with the recorder and `vagrantfile` in it.
-    fn folder(name: &str, vagrantfile: &str) -> std::io::Result<(PathBuf, PathBuf, PathBuf)> {
-        let dir = std::env::temp_dir().join(format!("isoloom-record-{name}-{}", std::process::id()));
-        std::fs::create_dir_all(&dir)?;
-        let (script, file) = (dir.join("record.rb"), dir.join("Vagrantfile"));
+    /// A fresh folder for one test, removed when it goes out of scope, with the recorder and
+    /// `vagrantfile` in it.
+    fn folder(name: &str, vagrantfile: &str) -> std::io::Result<(tempfile::TempDir, PathBuf, PathBuf)> {
+        let dir = tempfile::Builder::new().prefix(&format!("isoloom-record-{name}-")).tempdir()?;
+        let (script, file) = (dir.path().join("record.rb"), dir.path().join("Vagrantfile"));
         std::fs::write(&script, RECORDER)?;
         std::fs::write(&file, vagrantfile)?;
         Ok((dir, script, file))
@@ -131,6 +131,7 @@ mod tests {
     #[test]
     fn the_first_ruby_that_starts_decides_and_a_missing_one_is_passed_over() -> Outcome {
         let (dir, script, file) = folder("first", "")?;
+        let dir = dir.path();
         let failing = program(&dir.join("failing-ruby"), "echo 'undefined method' >&2; exit 1", true)?;
         let working = program(&dir.join("working-ruby"), "echo '{\"settings\":{},\"children\":{},\"calls\":[]}'", true)?;
         let missing = dir.join("no-such-ruby").to_string_lossy().into_owned();
@@ -144,25 +145,23 @@ mod tests {
         record_with(&[&missing, &working], &script, &file)?;
         let none = error(record_with(&[&missing], &script, &file))?;
         assert!(matches!(none, CliError::ToolMissing { .. }), "{none:?}");
-        std::fs::remove_dir_all(&dir)?;
         Ok(())
     }
 
     #[test]
     fn a_ruby_that_cant_start_is_the_error_not_skipped() -> Outcome {
         let (dir, script, file) = folder("start", "")?;
+        let dir = dir.path();
         let unrunnable = program(&dir.join("unrunnable-ruby"), "exit 0", false)?;
         let e = error(record_with(&[&unrunnable, "ruby"], &script, &file))?;
         assert!(matches!(&e, CliError::ToolStart { program, .. } if *program == unrunnable), "{e:?}");
-        std::fs::remove_dir_all(&dir)?;
         Ok(())
     }
 
     #[test]
     fn what_a_vagrantfile_prints_never_reaches_the_recording() -> Outcome {
-        let (dir, script, file) = folder("puts", "puts \"hello\"\nVagrant.configure(\"2\") { |c| c.vm.box = \"debian/bookworm64\" }\n")?;
+        let (_dir, script, file) = folder("puts", "puts \"hello\"\nVagrant.configure(\"2\") { |c| c.vm.box = \"debian/bookworm64\" }\n")?;
         let recorded = record_with(&["ruby"], &script, &file);
-        std::fs::remove_dir_all(&dir)?;
         match recorded {
             Err(CliError::ToolMissing { .. }) => eprintln!("skipped: needs ruby"),
             other => assert!(other.is_ok(), "{other:?}"),

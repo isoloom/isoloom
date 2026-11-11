@@ -1,7 +1,7 @@
 //! What the commands print and the exit code they give: validation, targets, generation with
 //! a refused cloud, and profiles.
 
-use crate::testing::{Outcome, example, isoloom, isoloom_with, project, scratch, validate_json};
+use crate::testing::{Outcome, Scratch, example, isoloom, isoloom_with, project, scratch, validate_json};
 
 #[test]
 fn an_example_validates() -> Outcome {
@@ -244,7 +244,7 @@ machines:
 ";
 
 /// A project with [`PROFILED`] and the given profiles.
-fn profiled(name: &str, profiles: &[(&str, &str)]) -> Outcome<std::path::PathBuf> {
+fn profiled(name: &str, profiles: &[(&str, &str)]) -> Outcome<Scratch> {
     let dir = project(name, PROFILED)?;
     std::fs::write(dir.join("setup.sh"), "apt-get install -y nginx\n")?;
     std::fs::create_dir_all(dir.join("profiles"))?;
@@ -523,7 +523,7 @@ fn generating_one_target_leaves_the_others_files_alone() -> Outcome {
 }
 
 /// A one-VM project `name` with its `docker` files generated: its folder.
-fn generated(name: &str) -> Outcome<std::path::PathBuf> {
+fn generated(name: &str) -> Outcome<Scratch> {
     let home = scratch(&format!("{name}-home"))?;
     let dir = project(name, &one_vm("debian@12"))?;
     std::fs::write(dir.join("p.sh"), "true\n")?;
@@ -532,7 +532,7 @@ fn generated(name: &str) -> Outcome<std::path::PathBuf> {
 }
 
 /// A generated project whose list also names `entry`, and the file under `dir` it would reach.
-fn listing(name: &str, entry: &str) -> Outcome<std::path::PathBuf> {
+fn listing(name: &str, entry: &str) -> Outcome<Scratch> {
     let dir = generated(name)?;
     let list = dir.join(".isoloom/.generated");
     let text = std::fs::read_to_string(&list)?;
@@ -571,7 +571,8 @@ fn generate_refuses_a_listed_path_that_climbs_out_of_the_output() -> Outcome {
 
 #[test]
 fn generate_refuses_a_listed_absolute_path() -> Outcome {
-    let outside = scratch("list-absolute-outside")?.join("outside.txt");
+    let elsewhere = scratch("list-absolute-outside")?;
+    let outside = elsewhere.join("outside.txt");
     std::fs::write(&outside, "someone else's\n")?;
     let entry = outside.to_string_lossy().into_owned();
     let dir = listing("list-absolute", &entry)?;
@@ -608,7 +609,7 @@ fn generate_refuses_to_remove_through_a_linked_output_folder() -> Outcome {
 /// A generated project (`docker`) whose `.isoloom/docker/<file>` is replaced by a link to
 /// `outside`; its folder.
 #[cfg(unix)]
-fn with_linked_output(name: &str, file: &str, outside: &std::path::Path) -> Outcome<std::path::PathBuf> {
+fn with_linked_output(name: &str, file: &str, outside: &std::path::Path) -> Outcome<Scratch> {
     let dir = generated(name)?;
     let linked = dir.join(".isoloom/docker").join(file);
     std::fs::remove_file(&linked)?;
@@ -619,7 +620,8 @@ fn with_linked_output(name: &str, file: &str, outside: &std::path::Path) -> Outc
 #[cfg(unix)]
 #[test]
 fn generate_and_check_refuse_to_write_through_a_linked_generated_file() -> Outcome {
-    let victim = scratch("linked-file-victim")?.join("keys");
+    let elsewhere = scratch("linked-file-victim")?;
+    let victim = elsewhere.join("keys");
     std::fs::write(&victim, "someone else's\n")?;
     let dir = with_linked_output("linked-file", "run.json", &victim)?;
     let home = scratch("linked-file-refused-home")?;
@@ -779,7 +781,7 @@ fn every_command_judges_the_lab_generate_writes() -> Outcome {
 
 /// A copy of example `name` in a fresh folder: its project files, none of the outputs a local
 /// generation left there.
-fn example_copy(name: &str, into: &str) -> Outcome<std::path::PathBuf> {
+fn example_copy(name: &str, into: &str) -> Outcome<Scratch> {
     let dir = scratch(into)?;
     let from = example(name);
     let mut stack = vec![std::path::PathBuf::new()];

@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::testing::{Outcome, isoloom_with, project};
+use crate::testing::{Outcome, Scratch, isoloom_with, project};
 
 const ENV_VALUE: &str = "env-sentinel-7f3a9c";
 const FILE_VALUE: &str = "file-sentinel-41b2e8";
@@ -97,7 +97,7 @@ machines:
 const SECRET_INPUTS: [&str; 3] = ["DEMO_SECRET", "DEMO_SECRET_API", "DEMO_SECRET_KEY"];
 
 /// A project holding `spec` and the files it names, the file secret's value among them.
-fn secret_project(spec: &str, tag: &str) -> Outcome<PathBuf> {
+fn secret_project(spec: &str, tag: &str) -> Outcome<Scratch> {
     let dir = project(&format!("secrets-{tag}"), spec)?;
     std::fs::write(dir.join("api.key"), FILE_VALUE)?;
     std::fs::write(dir.join("db.sh"), "true\n")?;

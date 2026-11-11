@@ -230,7 +230,8 @@ $ps.each { |s| puts "ps #{s}" }
 /// `ISOLOOM_HOSTPORTS` set to `hostports` (unset when `None`). The Vagrantfile loads from its
 /// rendered outputs, the example's folder its project.
 fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Outcome<String> {
-    let dir = std::env::temp_dir().join(format!("isoloom-hyperv-ports-{}", std::process::id()));
+    let scratch = tempfile::Builder::new().prefix("isoloom-hyperv-ports-").tempdir()?;
+    let dir = scratch.path();
     let mut vagrantfile = None;
     for f in render(example)? {
         let path = dir.join(&f.path);
@@ -248,7 +249,7 @@ fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Out
     std::fs::create_dir_all(dir.join("vagrant/util"))?;
     std::fs::write(dir.join("vagrant/util/is_port_open.rb"), "")?;
     let mut ruby = Command::new("ruby");
-    ruby.arg("-I").arg(&dir).arg("-e").arg(HYPERV_TRIGGERS_RB);
+    ruby.arg("-I").arg(dir).arg("-e").arg(HYPERV_TRIGGERS_RB);
     ruby.arg(vagrantfile.ok_or("no Vagrantfile")?).arg(machine);
     ruby.env(
         "ISOLOOM_TEST_ROOT",
@@ -259,7 +260,6 @@ fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Out
         None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
     };
     let out = ruby.output()?;
-    std::fs::remove_dir_all(&dir)?;
     if !out.status.success() {
         return Err(format!("ruby failed: {}", String::from_utf8_lossy(&out.stderr)).into());
     }

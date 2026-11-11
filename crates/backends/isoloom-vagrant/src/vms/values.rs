@@ -201,8 +201,8 @@ machines:
         // Vagrant writes `NAME="value"` into the shell that runs the script: only base64 keeps a
         // `$(...)` in a secret from running as root in the guest.
         let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[]);
-        let dir = std::env::temp_dir().join(format!("isoloom-values-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("a temporary folder");
+        let dir = tempfile::Builder::new().prefix("isoloom-values-").tempdir().expect("a temporary folder");
+        let dir = dir.path();
         // The kept folder as a relative path, the shell in the test's folder: a Windows path in a
         // shell script (Git's `sh` on Windows) loses its backslashes.
         let script = script
@@ -218,12 +218,11 @@ machines:
         let status = posix
             .arg("-c")
             .arg(format!("V=\"{encoded}\" sh -c '{}'", script.replace('\'', "'\\''")))
-            .current_dir(&dir)
+            .current_dir(dir)
             .status()
             .expect("sh runs");
         let kept = std::fs::read_to_string(dir.join("input-demo-secret")).unwrap_or_default();
         let injected = dir.join("injected").exists();
-        std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
         assert!(status.success() && !injected);
         assert_eq!(kept, tricky);
     }
@@ -232,8 +231,8 @@ machines:
     fn a_reprovision_given_no_value_keeps_the_value_kept() {
         // A runner re-provisions a VM lab without its launch values (it keeps none).
         let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[]);
-        let dir = std::env::temp_dir().join(format!("isoloom-values-keep-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("a temporary folder");
+        let dir = tempfile::Builder::new().prefix("isoloom-values-keep-").tempdir().expect("a temporary folder");
+        let dir = dir.path();
         let script: String = script
             .replace("/var/lib/isoloom/secrets", ".")
             .lines()
@@ -248,7 +247,7 @@ machines:
                 .unwrap()
                 .arg("-c")
                 .arg(&script)
-                .current_dir(&dir)
+                .current_dir(dir)
                 .env("V", isoloom_spec::shell::base64(value.as_bytes()))
                 .status()
                 .expect("sh runs")
@@ -257,7 +256,6 @@ machines:
         let first = run("secret{1}");
         let again = run("");
         let kept = std::fs::read_to_string(dir.join("input-demo-secret")).unwrap_or_default();
-        std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
         assert!(first && again);
         assert_eq!(kept, "secret{1}");
     }
@@ -282,20 +280,19 @@ machines:
     #[test]
     fn a_value_decoded_in_place_is_read_as_given_and_never_run() {
         let tricky = "it's $(touch ran) \"quoted\" `touch ran`\n\n";
-        let dir = std::env::temp_dir().join(format!("isoloom-decode-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("a temporary folder");
+        let dir = tempfile::Builder::new().prefix("isoloom-decode-").tempdir().expect("a temporary folder");
+        let dir = dir.path();
         let script = format!("{}printf %s \"$TOKEN\" > read\n", linux_decode(&["TOKEN".to_owned()]));
         std::fs::write(dir.join("decode.sh"), script).expect("the script written");
         let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
         let status = posix
             .arg("decode.sh")
-            .current_dir(&dir)
+            .current_dir(dir)
             .env("TOKEN", isoloom_spec::shell::base64(tricky.as_bytes()))
             .status()
             .expect("sh runs");
         let read = std::fs::read_to_string(dir.join("read")).unwrap_or_default();
         let ran = dir.join("ran").exists();
-        std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
         assert!(status.success());
         assert_eq!(read, tricky);
         assert!(!ran, "a command in the value ran");

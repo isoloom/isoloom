@@ -300,15 +300,15 @@ mod tests {
         if posix_sh().is_none() {
             return;
         }
-        let dir = std::env::temp_dir().join(format!("isoloom-setup-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = tempfile::Builder::new().prefix("isoloom-setup-").tempdir().unwrap();
+        let dir = dir.path();
         let log = sh_path(&dir.join("log"));
         let set_up = SetUp {
             each_boot: vec![Template::text(format!("echo boot >> {log}"))],
             parts: vec![vec![Tracked::new("step", format!("echo step >> {log}"))]],
             again: vec![Template::text(format!("echo again >> {log}"))],
         };
-        let sh = text(&body(&set_up)).replace(DIR, &sh_path(&dir));
+        let sh = text(&body(&set_up)).replace(DIR, &sh_path(dir));
         let boot = || {
             let out = posix_sh().unwrap().arg("-c").arg(&sh).output().unwrap();
             assert!(out.status.success(), "{out:?}");
@@ -317,7 +317,6 @@ mod tests {
         boot();
         boot();
         let got = std::fs::read_to_string(dir.join("log")).unwrap();
-        std::fs::remove_dir_all(&dir).ok();
         assert_eq!(got, "boot\nstep\nboot\nagain\nboot\nagain\n");
     }
 
@@ -378,8 +377,8 @@ mod tests {
     #[test]
     fn the_set_up_script_is_readable_by_root_alone() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("isoloom-setup-mode-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("a temporary folder");
+        let dir = tempfile::Builder::new().prefix("isoloom-setup-mode-").tempdir().expect("a temporary folder");
+        let dir = dir.path();
         // A file left from an earlier write, readable by anyone, isn't reused.
         std::fs::write(dir.join("setup.sh.new"), "old").expect("a stale file");
         std::fs::set_permissions(dir.join("setup.sh.new"), std::fs::Permissions::from_mode(0o644)).expect("its mode");
@@ -392,7 +391,6 @@ mod tests {
             .status()
             .expect("sh runs");
         let mode = std::fs::metadata(dir.join("setup.sh.new")).expect("the script").permissions().mode();
-        std::fs::remove_dir_all(&dir).expect("the temporary folder goes");
         assert!(status.success());
         assert_eq!(mode & 0o777, 0o600);
     }

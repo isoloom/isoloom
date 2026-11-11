@@ -191,16 +191,15 @@ mod tests {
         Args { update, table: false, init }
     }
 
-    /// A fresh folder for one test.
-    fn folder(name: &str) -> Res<PathBuf> {
-        let dir = std::env::temp_dir().join(format!("xtask-quality-{name}-{}", std::process::id()));
-        std::fs::create_dir_all(&dir)?;
-        Ok(dir)
+    /// A fresh folder for one test, removed when it goes out of scope.
+    fn folder(name: &str) -> Res<tempfile::TempDir> {
+        Ok(tempfile::Builder::new().prefix(&format!("xtask-quality-{name}-")).tempdir()?)
     }
 
     #[test]
     fn a_missing_baseline_fails_unless_init_writes_it() -> Res<()> {
         let dir = folder("missing")?;
+        let dir = dir.path();
         let file = dir.join("baseline.json");
         let mut counts = Counts::new();
         add(&mut counts, "clippy/x", "a");
@@ -217,7 +216,6 @@ mod tests {
         add(&mut counts, "clippy/x", "a");
         assert!(!against_baseline(&args(true, false), &file, &counts, &CONFIG)?.success);
         assert!(!against_baseline(&args(false, false), &file, &counts, &CONFIG)?.success, "a count went up");
-        std::fs::remove_dir_all(&dir)?;
         Ok(())
     }
 }

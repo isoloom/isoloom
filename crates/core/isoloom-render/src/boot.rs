@@ -177,14 +177,12 @@ mod tests {
     #[test]
     fn it_runs_under_sh() {
         let Some(mut posix) = crate::test_support::posix_sh() else { return };
-        let dir = std::env::temp_dir().join(format!("isoloom-boot-{}", std::process::id()));
-        let at = crate::test_support::sh_path(&dir);
+        let scratch = tempfile::Builder::new().prefix("isoloom-boot-").tempdir().expect("a temporary folder");
+        let at = crate::test_support::sh_path(&scratch.path().join("etc"));
         // Only the file part: a test can't enable a systemd unit.
         let sh = at_boot("t", "test", "echo ok\n", Trigger::Boot, &[]).replace("/etc/isoloom", &at);
         let file_part = sh.split("if command -v systemctl").next().unwrap_or_default().to_owned();
-        let out = posix.arg("-c").arg(format!("{file_part}{at}/t.sh")).output();
-        std::fs::remove_dir_all(&dir).ok();
-        let out = out.expect("sh runs");
+        let out = posix.arg("-c").arg(format!("{file_part}{at}/t.sh")).output().expect("sh runs");
         assert_eq!(String::from_utf8_lossy(&out.stdout), "ok\n");
         assert!(out.status.success());
     }

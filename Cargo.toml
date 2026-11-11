@@ -46,6 +46,8 @@ hcl = { package = "hcl-rs", version = "0.19" }
 thiserror = "2"
 insta = { version = "1", features = ["yaml"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
+# A test's scratch folder, removed when the test ends, even by a panic.
+tempfile = "3"
 serde_path_to_error = "0.1"
 # Benchmarks (`cargo xtask bench`): the statistics only, no plots and no thread pool.
 criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }

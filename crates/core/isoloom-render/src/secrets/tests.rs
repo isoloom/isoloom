@@ -39,12 +39,13 @@ fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFi
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
 #[cfg(unix)]
-/// `script` run by `sh` with the kept folder moved to a temporary one, `input` on its standard
-/// input; what it did, and the folder.
-fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path::PathBuf) {
+/// `script` run by `sh` with the kept folder moved into a temporary one, `input` on its standard
+/// input; what it did, the kept folder (which the script makes), and the temporary folder that
+/// holds it, removed when it goes.
+fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path::PathBuf, tempfile::TempDir) {
     use std::io::Write as _;
-    let dir = std::env::temp_dir().join(format!("isoloom-secrets-{tag}-{}", std::process::id()));
-    std::fs::remove_dir_all(&dir).ok();
+    let scratch = tempfile::Builder::new().prefix(&format!("isoloom-secrets-{tag}-")).tempdir().unwrap();
+    let dir = scratch.path().join("kept");
     let script = script.replace(KEPT_DIR, &dir.display().to_string());
     let mut child = std::process::Command::new("sh")
         .arg("-c")
@@ -55,7 +56,7 @@ fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path
         .spawn()
         .unwrap();
     child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
-    (child.wait_with_output().unwrap(), dir)
+    (child.wait_with_output().unwrap(), dir, scratch)
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
@@ -77,7 +78,7 @@ fn delivery_keeps_each_value_as_sent_then_marks_it() {
     let names = vec!["db-password".to_owned(), "api-key".to_owned(), "empty".to_owned()];
     let values = ["p@ss 'word'\n", "line1\nline2", ""];
     let input: String = values.iter().map(|v| b64(v) + "\n").collect();
-    let (out, dir) = run(&receive(&names, &[]), &input, "receive");
+    let (out, dir, _scratch) = run(&receive(&names, &[]), &input, "receive");
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     for (n, v) in names.iter().zip(values) {
         assert_eq!(std::fs::read_to_string(dir.join(n)).unwrap(), v);
@@ -89,7 +90,6 @@ fn delivery_keeps_each_value_as_sent_then_marks_it() {
         assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
         assert_eq!(std::fs::metadata(dir.join("api-key")).unwrap().permissions().mode() & 0o777, 0o600);
     }
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
@@ -97,10 +97,9 @@ fn delivery_keeps_each_value_as_sent_then_marks_it() {
 #[test]
 fn a_missing_value_fails_the_delivery_without_the_mark() {
     let names = vec!["a".to_owned(), "b".to_owned()];
-    let (out, dir) = run(&receive(&names, &[]), &format!("{}\n", b64("x")), "missing");
+    let (out, dir, _scratch) = run(&receive(&names, &[]), &format!("{}\n", b64("x")), "missing");
     assert!(!out.status.success());
     assert!(!dir.join(".delivered").exists());
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
@@ -129,10 +128,9 @@ fn the_step_waits_then_places_at_every_boot() {
 #[cfg(unix)]
 #[test]
 fn the_wait_passes_once_delivered() {
-    let (out, dir) = run(&format!("mkdir -p {KEPT_DIR} && touch {DELIVERED} && {}", wait("web")), "", "wait");
+    let (out, _, _scratch) = run(&format!("mkdir -p {KEPT_DIR} && touch {DELIVERED} && {}", wait("web")), "", "wait");
     assert!(out.status.success());
     assert!(out.stdout.is_empty(), "no waiting line once delivered");
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
@@ -146,10 +144,9 @@ fn a_docker_host_reads_each_kept_value_into_its_variable() {
         "mkdir -p {KEPT_DIR} && printf 'v\\n\\n' > {KEPT_DIR}/db-password && touch {DELIVERED}\n{}printf '%s|' \"$ISOLOOM_SECRET_DB_PASSWORD\"",
         host_environment(&env, &names)
     );
-    let (out, dir) = run(&script, "", "host");
+    let (out, _, _scratch) = run(&script, "", "host");
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(String::from_utf8_lossy(&out.stdout), "v\n\n|");
-    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
@@ -182,19 +179,17 @@ fn values_from_the_environment_are_kept_and_an_empty_one_keeps_the_kept_value() 
     let (keeping, placing) = script.split_once(&format!("touch {DELIVERED}\n")).expect("the mark");
     assert!(placing.contains("systemctl enable isoloom-apply-secrets.service"), "{placing}");
     let first = format!("export PW_B64={}; {keeping}touch {DELIVERED}\n", b64("p@ss 'word'\n"));
-    let (fresh, fresh_dir) = run(&first, "", "env-first");
+    let (fresh, fresh_dir, _fresh) = run(&first, "", "env-first");
     assert!(fresh.status.success(), "{}", String::from_utf8_lossy(&fresh.stderr));
     assert_eq!(std::fs::read_to_string(fresh_dir.join("db")).unwrap(), "p@ss 'word'\n");
     let unset = std::fs::read_to_string(fresh_dir.join("api")).unwrap();
     assert_eq!(unset, "", "an unset variable writes an empty value the first time");
     assert!(fresh_dir.join(".delivered").exists());
-    std::fs::remove_dir_all(&fresh_dir).ok();
     // Again with no value: the kept one stays (`run` starts from an empty folder, so seed it).
     let again = format!("mkdir -p {KEPT_DIR} && printf kept > {KEPT_DIR}/db && {keeping}");
-    let (kept, kept_dir) = run(&again, "", "env-again");
+    let (kept, kept_dir, _kept) = run(&again, "", "env-again");
     assert!(kept.status.success(), "{}", String::from_utf8_lossy(&kept.stderr));
     assert_eq!(std::fs::read_to_string(kept_dir.join("db")).unwrap(), "kept");
-    std::fs::remove_dir_all(&kept_dir).ok();
 }
 
 #[test]

@@ -88,11 +88,8 @@ fn tcp_checks_read_a_greeting_and_send_a_line() -> Outcome {
 /// runner where curl, or wget, is all there is.
 fn run_with_only(script: &str, tools: &[(&str, &str)]) -> Outcome<String> {
     let first = tools.first().map_or("none", |(name, _)| *name);
-    let dir = std::env::temp_dir().join(format!("isoloom-path-{}-{first}", std::process::id()));
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir)?;
-    }
-    std::fs::create_dir_all(&dir)?;
+    let dir = tempfile::Builder::new().prefix(&format!("isoloom-path-{first}-")).tempdir()?;
+    let dir = dir.path();
     for t in ["sh", "sed", "head", "tail", "grep", "mktemp", "rm", "date", "sleep", "cat", "tr"] {
         let found = which(t)?.ok_or_else(|| format!("no {t} on this host"))?;
         std::os::unix::fs::symlink(found, dir.join(t))?;
@@ -100,8 +97,7 @@ fn run_with_only(script: &str, tools: &[(&str, &str)]) -> Outcome<String> {
     for (name, target) in tools {
         std::os::unix::fs::symlink(target, dir.join(name))?;
     }
-    let out = std::process::Command::new(dir.join("sh")).arg("-c").arg(script).env("PATH", &dir).output()?;
-    std::fs::remove_dir_all(&dir)?;
+    let out = std::process::Command::new(dir.join("sh")).arg("-c").arg(script).env("PATH", dir).output()?;
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 

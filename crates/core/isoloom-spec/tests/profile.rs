@@ -24,19 +24,17 @@ machines:
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
-/// A project holding SPEC and the given profiles, in a fresh folder.
-fn project(name: &str, profiles: &[(&str, &str)]) -> Outcome<PathBuf> {
-    let dir = std::env::temp_dir().join(format!("isoloom-profile-{}-{name}", std::process::id()));
-    match std::fs::remove_dir_all(&dir) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
-        _ => {}
-    }
+/// A project holding SPEC and the given profiles, in a fresh folder removed when it goes out of
+/// scope.
+fn project(name: &str, profiles: &[(&str, &str)]) -> Outcome<tempfile::TempDir> {
+    let scratch = tempfile::Builder::new().prefix(&format!("isoloom-profile-{name}-")).tempdir()?;
+    let dir = scratch.path();
     std::fs::create_dir_all(dir.join(profile::DIR))?;
     std::fs::write(dir.join("isoloom.yml"), SPEC)?;
     for (n, text) in profiles {
         std::fs::write(dir.join(profile::DIR).join(format!("{n}.yml")), text)?;
     }
-    Ok(dir)
+    Ok(scratch)
 }
 
 /// A profile read from `text`.
@@ -57,11 +55,12 @@ fn web_size(spec: &isoloom_spec::Spec) -> Option<(Option<u32>, Option<u32>)> {
 #[test]
 fn a_profile_changes_the_spec_and_set_still_wins() -> Outcome {
     let dir = project("merge", &[("big", "spec:\n  machines: { web: { resources: { cpus: 4, memory_mb: 8192 } } }\n")])?;
-    let p = profile::load(&dir, "big")?;
-    assert_eq!(web_size(&load_profiled(&dir, Some(&p), &[])?), Some((Some(4), Some(8192))));
-    let set = load_profiled(&dir, Some(&p), &["machines.web.resources.cpus=2".into()])?;
+    let dir = dir.path();
+    let p = profile::load(dir, "big")?;
+    assert_eq!(web_size(&load_profiled(dir, Some(&p), &[])?), Some((Some(4), Some(8192))));
+    let set = load_profiled(dir, Some(&p), &["machines.web.resources.cpus=2".into()])?;
     assert_eq!(web_size(&set), Some((Some(2), Some(8192))), "-s wins over the profile, leaf by leaf");
-    let plain = load_profiled(&dir, None, &[])?;
+    let plain = load_profiled(dir, None, &[])?;
     assert_eq!(web_size(&plain), None, "without the profile, the spec as written");
     Ok(())
 }
@@ -72,14 +71,15 @@ fn a_profile_is_a_defaults_layer_between_the_project_file_and_set() -> Outcome {
         "defaults",
         &[("site", "defaults:\n  cloud: { linode: { region: se-sto }, oci: { region: eu-stockholm-1 } }\n")],
     )?;
+    let dir = dir.path();
     std::fs::write(
         dir.join(defaults::PROJECT_FILE),
         "cloud: { linode: { region: us-east }, oci: { region: us-ashburn-1 } }\n",
     )?;
-    let p = profile::load(&dir, "site")?;
+    let p = profile::load(dir, "site")?;
     let sets = ["defaults.cloud.oci.region=eu-paris-1".to_owned()];
     let r = defaults::load(&defaults::Sources {
-        project: &dir,
+        project: dir,
         images_file: None,
         profile: Some(&p),
         sets: &sets,
@@ -108,8 +108,9 @@ fn a_profile_names_only_what_the_spec_has() -> Outcome {
     assert!(lines[2].contains("input `NOPE`"), "{lines:?}");
 
     let dir = project("unknown", &[("bad", "spec:\n  machines: { webz: { resources: { cpus: 2 } } }\n")])?;
-    let bad = profile::load(&dir, "bad")?;
-    let refused = load_profiled(&dir, Some(&bad), &[]).unwrap_err().to_string();
+    let dir = dir.path();
+    let bad = profile::load(dir, "bad")?;
+    let refused = load_profiled(dir, Some(&bad), &[]).unwrap_err().to_string();
     assert!(refused.contains("no machine `webz`"), "loading refuses it too: {refused}");
     Ok(())
 }
@@ -145,21 +146,22 @@ fn a_profile_pins_its_target() -> Outcome {
 #[test]
 fn profiles_are_listed_and_found_by_name() -> Outcome {
     let dir = project("list", &[("b-site", "{}\n"), ("a-site", "{}\n")])?;
+    let dir = dir.path();
     std::fs::write(dir.join(profile::DIR).join("Not_A_Name.yml"), "{}\n")?;
     std::fs::write(dir.join(profile::DIR).join("notes.txt"), "")?;
-    let listed = profile::list(&dir)?;
+    let listed = profile::list(dir)?;
     assert_eq!(listed.names, ["a-site", "b-site"]);
     assert_eq!(listed.skipped, [dir.join(profile::DIR).join("Not_A_Name.yml")], "said, not dropped");
-    let missing = profile::load(&dir, "c-site").unwrap_err().to_string();
+    let missing = profile::load(dir, "c-site").unwrap_err().to_string();
     assert!(missing.contains("no profile `c-site`") && missing.contains("a-site, b-site"), "{missing}");
-    assert!(profile::load(&dir, "../etc").unwrap_err().to_string().contains("kebab-case"));
+    assert!(profile::load(dir, "../etc").unwrap_err().to_string().contains("kebab-case"));
     for wrong in ["a--b", "-a", "a-", "A-site", &"a".repeat(64)] {
-        let e = profile::load(&dir, wrong).unwrap_err().to_string();
+        let e = profile::load(dir, wrong).unwrap_err().to_string();
         assert!(e.contains("kebab-case"), "{wrong}: {e}");
     }
-    assert!(profile::load(&dir, &"a".repeat(63)).unwrap_err().to_string().contains("no profile"));
+    assert!(profile::load(dir, &"a".repeat(63)).unwrap_err().to_string().contains("no profile"));
     std::fs::write(dir.join(profile::DIR).join("a-site.yaml"), "{}\n")?;
-    assert!(profile::load(&dir, "a-site").unwrap_err().to_string().contains("keep one"));
+    assert!(profile::load(dir, "a-site").unwrap_err().to_string().contains("keep one"));
     assert_eq!(profile::list(Path::new("/nonexistent"))?, profile::Listed::default());
     Ok(())
 }
@@ -169,9 +171,10 @@ fn profiles_are_listed_and_found_by_name() -> Outcome {
 fn a_profiles_folder_that_cant_be_read_is_an_error_not_no_profiles() -> Outcome {
     use std::os::unix::fs::PermissionsExt;
     let dir = project("unreadable", &[("a-site", "{}\n")])?;
+    let dir = dir.path();
     let folder = dir.join(profile::DIR);
     std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o000))?;
-    let listed = profile::list(&dir);
+    let listed = profile::list(dir);
     std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755))?;
     // Root reads any folder: nothing to show there.
     let Err(e) = listed else { return Ok(()) };

@@ -131,7 +131,8 @@ mod tests {
     /// A run of the script in a scratch folder: stand-ins on a `PATH` holding nothing else but the
     /// text tools it uses, what they were asked (one call a line), and its networkd folder.
     struct Run {
-        dir: std::path::PathBuf,
+        /// The scratch folder, removed when the run goes.
+        dir: tempfile::TempDir,
     }
 
     impl Run {
@@ -144,40 +145,37 @@ mod tests {
 
         /// As [`Run::new`], with a stand-in `ping` that answers when `reaches`.
         fn reaching(name: &str, routes: &str, reaches: bool) -> Result<Run, Box<dyn std::error::Error>> {
-            let dir = std::env::temp_dir().join(format!("isoloom-nat-route-{}-{name}", std::process::id()));
-            if dir.exists() {
-                std::fs::remove_dir_all(&dir)?;
-            }
-            std::fs::create_dir_all(dir.join("bin"))?;
-            std::fs::write(dir.join("routes"), routes)?;
+            let dir = tempfile::Builder::new().prefix(&format!("isoloom-nat-route-{name}-")).tempdir()?;
+            std::fs::create_dir_all(dir.path().join("bin"))?;
+            std::fs::write(dir.path().join("routes"), routes)?;
             let run = Run { dir };
             run.stand_in(
                 "ip",
                 &format!(
                     "if [ \"$3\" = show ]; then\n  shift 4\n  awk -v want=\"$*\" 'BEGIN {{ n = split(want, w, \" \") }} {{ ok = 1; for (i = 1; i < n; i += 2) if (index($0, w[i] \" \" w[i + 1] \" \") == 0) ok = 0; if (ok) print }}' {}\nelse\n  echo \"ip $*\" >> {}\nfi\n",
-                    run.dir.join("routes").display(),
+                    run.dir.path().join("routes").display(),
                     run.log().display(),
                 ),
             )?;
             run.stand_in("ping", if reaches { "exit 0\n" } else { "exit 1\n" })?;
             for tool in ["awk", "grep", "sed", "mkdir", "cat"] {
                 let found = Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
-                std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), run.dir.join("bin").join(tool))?;
+                std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), run.dir.path().join("bin").join(tool))?;
             }
             Ok(run)
         }
 
         fn log(&self) -> std::path::PathBuf {
-            self.dir.join("log")
+            self.dir.path().join("log")
         }
 
         fn networkd(&self) -> std::path::PathBuf {
-            self.dir.join("networkd")
+            self.dir.path().join("networkd")
         }
 
         /// A stand-in `name` running the shell `body`.
         fn stand_in(&self, name: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
-            let path = self.dir.join("bin").join(name);
+            let path = self.dir.path().join("bin").join(name);
             std::fs::write(&path, format!("#!/bin/sh\n{body}"))?;
             Command::new("chmod").arg("+x").arg(&path).status()?;
             Ok(())
@@ -201,7 +199,7 @@ mod tests {
                 .arg("-c")
                 .arg(NAT_ROUTE_SH)
                 .env_clear()
-                .env("PATH", self.dir.join("bin"))
+                .env("PATH", self.dir.path().join("bin"))
                 .env("ISOLOOM_NETWORKD_DIR", self.networkd())
                 .output()?;
             assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));

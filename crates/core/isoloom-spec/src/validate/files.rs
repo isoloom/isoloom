@@ -188,20 +188,19 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
     /// What `validate_files` finds for the lowered spec `yaml` in a fresh project folder (named
     /// after `test`) holding `files`, each written empty; a name ending in `/` is a folder.
     fn found(test: &str, files: &[&str], yaml: &str) -> Outcome<Vec<String>> {
-        let dir = crate::testing::folder(&format!("files-{test}"))?;
+        let scratch = crate::testing::folder(&format!("files-{test}"))?;
+        let dir = scratch.path();
         for f in files {
             let path = dir.join(f);
             if f.ends_with('/') {
                 fs::create_dir_all(&path)?;
             } else {
-                fs::create_dir_all(path.parent().unwrap_or(&dir))?;
+                fs::create_dir_all(path.parent().unwrap_or(dir))?;
                 fs::write(&path, "")?;
             }
         }
         let spec = model(yaml)?;
-        let problems = validate_files(&spec, &dir).iter().map(ToString::to_string).collect();
-        fs::remove_dir_all(&dir)?;
-        Ok(problems)
+        Ok(validate_files(&spec, dir).iter().map(ToString::to_string).collect())
     }
 
     #[test]

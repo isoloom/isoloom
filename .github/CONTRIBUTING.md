@@ -10,7 +10,7 @@ Every change passes these, locally and in CI. CI runs every one of them on each 
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings   # as CI runs it: any warning fails
 cargo xtask quality                            # the ratchet: no per-crate count may go up
-cargo xtask test                               # the tests under cargo-nextest, then the doctests
+cargo xtask test                               # the tests under cargo-nextest, then the doctests; fails if they leave anything in the temporary folder
 cargo deny check                               # advisories, licenses, bans, sources
 RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps
 cargo machete                                  # no unused dependencies
@@ -66,7 +66,10 @@ cd examples/hello-stack && isoloom generate
 - **Deterministic output:** ordered maps (`IndexMap`, `BTreeMap`) in everything written, no
   timestamps or random names in generated files. A test renders every example twice.
 - **Tests:** a unit test per behavior, named for the behavior; `insta` snapshots for whole
-  rendered files only; `proptest` for parsing and quoting.
+  rendered files only; `proptest` for parsing and quoting. A test's scratch folder is a
+  `tempfile::TempDir`, removed when the test ends (by a panic too): `cargo xtask test` runs the
+  tests in a temporary folder of their own and fails when they leave anything in it
+  (`ISOLOOM_KEEP_TEMP=1` keeps that folder to look at).
 - **Comment style:** plain sentences, colons to introduce detail, no em dashes.
 - **Lints** live in the root `Cargo.toml` `[lints]` table and are inherited by every crate
   (`lints.workspace = true`). Don't add an exception there; silence one locally only where the

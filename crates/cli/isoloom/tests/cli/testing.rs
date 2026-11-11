@@ -7,18 +7,37 @@ use std::process::Command;
 /// A test's outcome: a failure is the report.
 pub(crate) type Outcome<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-/// A fresh, empty folder under the system's temporary folder, unique to this test.
-pub(crate) fn scratch(name: &str) -> Outcome<PathBuf> {
-    let dir = std::env::temp_dir().join(format!("isoloom-cli-{}-{name}", std::process::id()));
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir)?;
+/// A test's own folder under the system's temporary folder, removed when it goes out of scope,
+/// by a failed assertion's panic too: a run leaves nothing behind. It reads as the folder's path.
+pub(crate) struct Scratch(tempfile::TempDir);
+
+impl std::ops::Deref for Scratch {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        self.0.path()
     }
-    std::fs::create_dir_all(&dir)?;
-    Ok(dir)
+}
+
+impl AsRef<Path> for Scratch {
+    fn as_ref(&self) -> &Path {
+        self.0.path()
+    }
+}
+
+impl AsRef<std::ffi::OsStr> for Scratch {
+    fn as_ref(&self) -> &std::ffi::OsStr {
+        self.0.path().as_os_str()
+    }
+}
+
+/// A fresh, empty folder for test `name`, named after it.
+pub(crate) fn scratch(name: &str) -> Outcome<Scratch> {
+    Ok(Scratch(tempfile::Builder::new().prefix(&format!("isoloom-cli-{name}-")).tempdir()?))
 }
 
 /// A fresh project folder holding `yaml` as its isoloom.yml.
-pub(crate) fn project(name: &str, yaml: &str) -> Outcome<PathBuf> {
+pub(crate) fn project(name: &str, yaml: &str) -> Outcome<Scratch> {
     let dir = scratch(name)?;
     std::fs::write(dir.join("isoloom.yml"), yaml)?;
     Ok(dir)
@@ -61,4 +80,23 @@ pub(crate) fn validate_json(home: &Path, target: &dyn AsRef<std::ffi::OsStr>) ->
     let run = isoloom(home, &[&"validate", target, &"--json"])?;
     let report = serde_json::from_str(&run.stdout)?;
     Ok((run, report))
+}
+
+#[test]
+fn a_scratch_folder_is_gone_once_its_test_ends_by_a_panic_too() -> Outcome {
+    let dir = scratch("gone")?;
+    std::fs::write(dir.join("a-file"), "")?;
+    let path = dir.to_path_buf();
+    drop(dir);
+    assert!(!path.exists(), "{} is left", path.display());
+    let seen = std::sync::Mutex::new(None);
+    let failed = std::panic::catch_unwind(|| {
+        let panicked = scratch("panicked").unwrap_or_else(|e| panic!("{e}"));
+        *seen.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(panicked.to_path_buf());
+        panic!("a failed assertion");
+    });
+    assert!(failed.is_err());
+    let made = seen.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner).ok_or("no folder made")?;
+    assert!(!made.exists(), "{} is left", made.display());
+    Ok(())
 }

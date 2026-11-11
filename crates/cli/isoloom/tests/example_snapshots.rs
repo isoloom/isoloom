@@ -208,10 +208,7 @@ fn examples() -> Outcome<Vec<PathBuf>> {
 
 #[test]
 fn every_example_on_every_target() -> Outcome {
-    let scratch = std::env::temp_dir().join(format!("isoloom-example-snapshots-{}", std::process::id()));
-    if scratch.exists() {
-        std::fs::remove_dir_all(&scratch)?;
-    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-example-snapshots-").tempdir()?;
     let dirs = examples()?;
     assert!(!dirs.is_empty(), "no example found");
     // One thread per example (each runs the binary once per target); snapshots are asserted in
@@ -220,7 +217,7 @@ fn every_example_on_every_target() -> Outcome {
         let handles: Vec<_> = dirs
             .iter()
             .map(|dir| {
-                let work = scratch.join(dir.file_name().unwrap_or_default());
+                let work = scratch.path().join(dir.file_name().unwrap_or_default());
                 s.spawn(move || generate_example(dir, &work))
             })
             .collect();
@@ -229,7 +226,7 @@ fn every_example_on_every_target() -> Outcome {
             .map(|h| h.join().map_err(|_| "an example's thread panicked")?)
             .collect::<Outcome<Vec<_>>>()
     })?;
-    std::fs::remove_dir_all(&scratch)?;
+    drop(scratch);
     let mut settings = insta::Settings::clone_current();
     settings.set_snapshot_path("snapshots/examples");
     settings.set_prepend_module_to_snapshot(false);

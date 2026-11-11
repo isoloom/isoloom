@@ -544,16 +544,16 @@ mod tests {
 
     #[test]
     fn a_copy_step_takes_a_file_of_the_project_that_exists() {
-        let dir = std::env::temp_dir().join(format!("isoloom-plan-copy-{}", std::process::id()));
+        let dir = tempfile::Builder::new().prefix("isoloom-plan-copy-").tempdir().expect("a project folder");
+        let dir = dir.path();
         std::fs::create_dir_all(dir.join("site")).expect("a project folder");
         let lab = testing::lab(
             "version: 1\nname: t\nmachines:\n  web: { os: debian@12, app: { steps: [{ copy: { from: site, to: /srv } }, { copy: { from: missing, to: /m } }] } }\n",
         );
-        let found: Vec<(String, String)> = steps::step_files(lab.source(), &dir)
+        let found: Vec<(String, String)> = steps::step_files(lab.source(), dir)
             .into_iter()
             .map(|p| (p.path.to_string(), p.reason))
             .collect();
-        std::fs::remove_dir_all(&dir).ok();
         assert_eq!(
             found,
             [(

@@ -44,13 +44,12 @@ fn a_windows_machine_restarts_from_the_playbooks() -> Outcome {
 #[test]
 fn reboot_is_a_step_not_a_file() -> Outcome {
     let spec = lab(SPEC)?;
-    let dir = std::env::temp_dir().join(format!("isoloom-reboot-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = tempfile::Builder::new().prefix("isoloom-reboot-").tempdir()?;
+    let dir = dir.path();
     for f in ["kernel.sh", "middle.sh", "last.sh"] {
         std::fs::write(dir.join(f), "true\n").unwrap();
     }
-    let problems = spec.problems_with_files(&dir);
-    std::fs::remove_dir_all(&dir).unwrap();
+    let problems = spec.problems_with_files(dir);
     assert_eq!(problems, vec![]);
     Ok(())
 }

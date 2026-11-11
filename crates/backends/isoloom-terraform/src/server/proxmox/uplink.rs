@@ -81,13 +81,10 @@ mod tests {
     /// The command run with a stand-in `ip` printing `addresses` (one `ip -o` line each), a
     /// `sleep` that counts, and a `systemctl` that logs: the waits, then the calls.
     fn run(addresses: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
-        let dir = std::env::temp_dir().join(format!("isoloom-uplink-{}-{}", std::process::id(), addresses.len()));
-        let bin = dir.join("bin");
-        if dir.exists() {
-            std::fs::remove_dir_all(&dir)?;
-        }
+        let dir = tempfile::Builder::new().prefix("isoloom-uplink-").tempdir()?;
+        let bin = dir.path().join("bin");
         std::fs::create_dir_all(&bin)?;
-        let log = dir.join("log");
+        let log = dir.path().join("log");
         let lines = addresses
             .iter()
             .map(|a| format!("echo '2: eth0    inet {a}/24 brd x scope global eth0'"))

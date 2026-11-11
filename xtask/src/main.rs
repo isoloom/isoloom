@@ -81,7 +81,8 @@ enum Task {
     /// one goes up, or when the baseline is missing (`--update` writes them when they only went
     /// down, `--init` the first baseline).
     Quality(quality::Args),
-    /// The workspace's tests under cargo-nextest (`.config/nextest.toml`), then the doctests.
+    /// The workspace's tests under cargo-nextest (`.config/nextest.toml`), then the doctests, in a
+    /// temporary folder of their own that must be empty after (`ISOLOOM_KEEP_TEMP=1` keeps it).
     Test(test::Args),
     /// Every crate checked with the toolchain its `rust-version` names (cargo-hack).
     Msrv,
