@@ -4,9 +4,9 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
 ---
     # This computer's folders (`host_folders`), both ways: each provider's own shared folder.
     m.vm.provider "virtualbox" do |_, o|
-      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "virtualbox", create: true
+      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "virtualbox", create: true, mount_options: ["dmode=0775", "fmode=0664"]
       o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", type: "virtualbox", create: true, mount_options: ["ro"]
-      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "virtualbox", create: true
+      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "virtualbox", create: true, mount_options: ["dmode=0775", "fmode=0664"]
     end
     m.vm.provider "vmware_desktop" do |_, o|
       o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "vmware", create: true

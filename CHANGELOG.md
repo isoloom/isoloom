@@ -10,6 +10,12 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- A read-write `host_folders` folder in a VirtualBox VM is group-writable (`dmode=0775`,
+  `fmode=0664`): Vagrant mounts it as the VM's SSH user with the folder's mode on the computer
+  (a home folder's 0755), so no other account of the VM could write there.
+
 ## [2.0.0] — 2026-11-11
 
 **2.0.0** removes library API and refuses a few specs 1.x took.

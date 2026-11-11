@@ -4,7 +4,10 @@
 //! reason before creating the VM (and the run manifest's provider says it can't run the environment),
 //! rather than fall back to a one-way copy (rsync).
 //!
-//! - VirtualBox: `virtualbox` (vboxsf, the box's Guest Additions).
+//! - VirtualBox: `virtualbox` (vboxsf, the box's Guest Additions). Vagrant mounts it as the VM's
+//!   SSH user and group with the folder's own mode on the computer (a home folder's 0755: only
+//!   that user writes); a read-write one is mounted group-writable (`dmode=0775`, `fmode=0664`), so
+//!   another account of the VM writes there once in that group, as on the other providers.
 //! - VMware Workstation and Fusion: `vmware` (HGFS, the box's VMware Tools).
 //! - Parallels: `parallels` (the box's Parallels Tools).
 //! - UTM (`vagrant_utm` 0.1.3 or later): `utm` (QEMU's 9p shares).
@@ -111,8 +114,11 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: Libvir
     refuse_elsewhere(r, scope, read_only);
 }
 
+/// VirtualBox's mount of a read-write folder: its group writes too ([`synced_folder`]).
+const VIRTUALBOX_GROUP_WRITES: [&str; 2] = ["dmode=0775", "fmode=0664"];
+
 /// `o.vm.synced_folder <the folder>, <guest>, type: <kind>, create: true`, read-only as the
-/// provider's mount takes it.
+/// provider's mount takes it; VirtualBox's read-write one group-writable.
 fn synced_folder(p: Provider<'_>, kind: &str, s: &Share) -> Call {
     let call = Call::new("o.vm.synced_folder")
         .arg(Value::raw(format!("File.expand_path({}, ROOT)", Value::str(&s.from))))
@@ -120,6 +126,7 @@ fn synced_folder(p: Provider<'_>, kind: &str, s: &Share) -> Call {
         .kw("type", Value::str(kind))
         .kw("create", true);
     match (s.read_only, p) {
+        (false, Provider::VirtualBox) => call.kw("mount_options", Value::array(VIRTUALBOX_GROUP_WRITES.map(Value::str))),
         (false, _) => call,
         (true, Provider::Libvirt) => call.kw("mount_opts", Value::str("ro")),
         (true, _) => call.kw("mount_options", Value::array([Value::str("ro")])),
@@ -196,8 +203,13 @@ mod tests {
     #[test]
     fn each_provider_shares_both_ways_with_its_own_kind_and_the_others_refuse() {
         let out = ruby(&[share("shared", "/srv/shared", false), share("~/notes", "/notes", false)]);
+        assert!(
+            out.contains(
+                "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", type: \"virtualbox\", create: true, mount_options: [\"dmode=0775\", \"fmode=0664\"]\n"
+            ),
+            "VirtualBox's read-write mount is group-writable: {out}"
+        );
         for (provider, kind) in [
-            ("virtualbox", "virtualbox"),
             ("vmware_desktop", "vmware"),
             ("parallels", "parallels"),
             ("utm", "utm"),

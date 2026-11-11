@@ -604,7 +604,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -2850,7 +2850,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -2991,7 +2991,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
