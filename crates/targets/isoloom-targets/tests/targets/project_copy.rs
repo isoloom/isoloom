@@ -4,7 +4,9 @@
 //! `tar` are on the PATH (CI has both), on a project with a symlink loop. Every output leaves
 //! out what `.isoloomignore` lists.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(unix)]
+use std::path::PathBuf;
 use std::process::Command;
 
 use isoloom_render::project::ignore::{self, Rules};
