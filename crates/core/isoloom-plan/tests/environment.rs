@@ -190,18 +190,26 @@ fn secrets_come_before_what_reads_them_on_linux_and_windows() -> Outcome {
     Ok(())
 }
 
+/// Every example of the repository, as its folder and its lab.
+fn example_labs() -> Result<Vec<(std::path::PathBuf, isoloom_plan::Lab)>, Box<dyn std::error::Error>> {
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(examples)? {
+        let dir = entry?.path();
+        if dir.join("isoloom.yml").is_file() {
+            let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir)?);
+            out.push((dir, lab));
+        }
+    }
+    Ok(out)
+}
+
 /// A VM's `Routes` and `Ipv6` steps carry the routes its plan holds, worked out once: they were
 /// worked out a second time for the steps.
 #[test]
-fn a_vms_route_steps_are_its_plans_routes() {
-    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
+fn a_vms_route_steps_are_its_plans_routes() -> Result<(), Box<dyn std::error::Error>> {
     let mut seen = 0;
-    for entry in std::fs::read_dir(examples).unwrap() {
-        let dir = entry.unwrap().path();
-        if !dir.join("isoloom.yml").is_file() {
-            continue;
-        }
-        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).unwrap());
+    for (dir, lab) in example_labs()? {
         for target in [Target::Vagrant, Target::Proxmox, Target::CloudVm] {
             let env = Environment::build(&lab.for_target(target), target, None).unwrap();
             for (name, mp) in &env.machines {
@@ -219,21 +227,16 @@ fn a_vms_route_steps_are_its_plans_routes() {
         }
     }
     assert!(seen > 0);
+    Ok(())
 }
 
 /// Every machine the plan runs as a VM is a `Vm`, with its OS, on every example and target: the
 /// plan makes a machine a VM only from its `vm:` form, whose OS it keeps beside the shape, so
 /// `Vm::of` never leaves a VM out.
 #[test]
-fn every_vm_of_the_plan_has_its_os() {
-    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
+fn every_vm_of_the_plan_has_its_os() -> Result<(), Box<dyn std::error::Error>> {
     let mut vms = 0;
-    for entry in std::fs::read_dir(examples).unwrap() {
-        let dir = entry.unwrap().path();
-        if !dir.join("isoloom.yml").is_file() {
-            continue;
-        }
-        let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir).unwrap());
+    for (dir, lab) in example_labs()? {
         for target in Target::ALL {
             let Ok(env) = Environment::build(&lab.for_target(target), target, None) else {
                 continue;
@@ -245,4 +248,5 @@ fn every_vm_of_the_plan_has_its_os() {
         }
     }
     assert!(vms > 0);
+    Ok(())
 }

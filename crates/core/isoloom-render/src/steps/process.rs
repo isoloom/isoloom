@@ -206,10 +206,15 @@ machines:
     healthcheck: { test: [python, check.py] }
 ";
 
-    fn env() -> Environment {
-        let lab = Lab::parse(SPEC).expect("the test spec parses");
+    /// The valid spec `yaml`, planned for `vagrant`.
+    fn planned(yaml: &str) -> Environment {
+        let lab = Lab::parse(yaml).expect("the test spec parses");
         assert_eq!(lab.problems(), [], "the test spec is valid");
         Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
+    }
+
+    fn env() -> Environment {
+        planned(SPEC)
     }
 
     fn step(env: &Environment, machine: &str, pick: impl Fn(&Step) -> bool) -> Step {
@@ -307,9 +312,7 @@ machines:
 ";
 
     fn kept() -> Environment {
-        let lab = Lab::parse(KEPT).expect("the test spec parses");
-        assert_eq!(lab.problems(), [], "the test spec is valid");
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
+        planned(KEPT)
     }
 
     #[test]

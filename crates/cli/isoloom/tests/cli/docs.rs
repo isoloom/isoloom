@@ -293,6 +293,21 @@ fn what_the_code_says_states_facts_not_a_roadmap() -> Outcome {
     Ok(())
 }
 
+/// Each line of the `files` that aren't tests (outside their test module) that `finds` names
+/// something in, each as its file, its line and what it found.
+fn scanned(files: &[PathBuf], is_test: impl Fn(&Path) -> bool, finds: impl Fn(&str) -> Option<&'static str>) -> Outcome<Vec<String>> {
+    let mut found = Vec::new();
+    for file in files.iter().filter(|f| !is_test(f)) {
+        let text = std::fs::read_to_string(file)?;
+        for (n, line) in outside_tests(&text).lines().enumerate() {
+            if let Some(what) = finds(line) {
+                found.push(format!("{}:{}: `{what}`", file.display(), n + 1));
+            }
+        }
+    }
+    Ok(found)
+}
+
 /// The backends and the renderers they share read each network's block, a machine's address and
 /// the router's from the plan (`Environment::block`, `address_on`, `router6_on`, a machine's
 /// `addresses`), as `isoloom_plan::addressing::cidr`'s doc says: none works them out again from
@@ -310,15 +325,7 @@ fn the_backends_read_the_blocks_and_the_router_from_the_plan() -> Outcome {
         "router::address(",
         "router_address(",
     ];
-    let mut found = Vec::new();
-    for file in files.iter().filter(|f| !is_test(f)) {
-        let text = std::fs::read_to_string(file)?;
-        for (n, line) in outside_tests(&text).lines().enumerate() {
-            if let Some(what) = from_the_spec.iter().find(|w| line.contains(**w)) {
-                found.push(format!("{}:{}: `{what}`", file.display(), n + 1));
-            }
-        }
-    }
+    let found = scanned(&files, is_test, |line| from_the_spec.iter().find(|w| line.contains(**w)).copied())?;
     assert!(found.is_empty(), "{found:#?}");
     Ok(())
 }
@@ -341,21 +348,14 @@ fn the_backends_read_vms_checks_and_the_controller_from_the_plan() -> Outcome {
         "spec.controller.as_ref().is_some_and",
         "spec().controller.as_ref().is_some_and",
     ];
-    let mut found = Vec::new();
-    for file in files.iter().filter(|f| !is_test(f)) {
-        let text = std::fs::read_to_string(file)?;
-        for (n, line) in outside_tests(&text).lines().enumerate() {
-            let vm_block = line.contains(".vm.as_ref()") && !line.contains("provision");
-            if let Some(what) = from_the_spec
-                .iter()
-                .find(|w| line.contains(**w))
-                .copied()
-                .or(vm_block.then_some(".vm.as_ref()"))
-            {
-                found.push(format!("{}:{}: `{what}`", file.display(), n + 1));
-            }
-        }
-    }
+    let found = scanned(&files, is_test, |line| {
+        let vm_block = line.contains(".vm.as_ref()") && !line.contains("provision");
+        from_the_spec
+            .iter()
+            .find(|w| line.contains(**w))
+            .copied()
+            .or(vm_block.then_some(".vm.as_ref()"))
+    })?;
     assert!(found.is_empty(), "{found:#?}");
     Ok(())
 }

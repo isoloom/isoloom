@@ -15,6 +15,23 @@ fn root() -> PathBuf {
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
+/// Every file under `dir` with the extension `ext`, at any depth.
+fn files_under(dir: &Path, ext: &str) -> Outcome<Vec<PathBuf>> {
+    let mut out = Vec::new();
+    let mut dirs = vec![dir.to_path_buf()];
+    while let Some(next) = dirs.pop() {
+        for entry in std::fs::read_dir(&next)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == ext) {
+                out.push(path);
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// The README, the contributor and community guides, the pull request template, and every page
 /// under docs/.
 fn pages() -> Outcome<Vec<PathBuf>> {
@@ -26,17 +43,7 @@ fn pages() -> Outcome<Vec<PathBuf>> {
         ".github/pull_request_template.md",
     ];
     let mut out: Vec<PathBuf> = top.iter().map(|p| root().join(p)).collect();
-    let mut dirs = vec![root().join("docs")];
-    while let Some(dir) = dirs.pop() {
-        for entry in std::fs::read_dir(&dir)? {
-            let path = entry?.path();
-            if path.is_dir() {
-                dirs.push(path);
-            } else if path.extension().is_some_and(|e| e == "md") {
-                out.push(path);
-            }
-        }
-    }
+    out.extend(files_under(&root().join("docs"), "md")?);
     out.sort();
     Ok(out)
 }
@@ -119,30 +126,19 @@ fn config_problem(first: &str, body: &str) -> Option<Result<(), String>> {
 /// The YAML blocks of the spec crate's own docs (`//!` and `///` comments), as a page's.
 fn rustdoc_blocks() -> Outcome<Vec<(String, usize, String)>> {
     let mut out = Vec::new();
-    let mut dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("src")];
-    while let Some(dir) = dirs.pop() {
-        for entry in std::fs::read_dir(&dir)? {
-            let path = entry?.path();
-            if path.is_dir() {
-                dirs.push(path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                let docs: String = std::fs::read_to_string(&path)?
-                    .lines()
-                    .map(|l| {
-                        let l = l.trim_start();
-                        l.strip_prefix("//! ")
-                            .or_else(|| l.strip_prefix("/// "))
-                            .unwrap_or(if l == "//!" || l == "///" { "" } else { "\u{0}" })
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                out.extend(
-                    blocks(&docs)
-                        .into_iter()
-                        .map(|(info, line, body)| (info, line, format!("{}: {body}", shown(&path)))),
-                );
-            }
-        }
+    for path in files_under(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), "rs")? {
+        let docs: String = std::fs::read_to_string(&path)?
+            .lines()
+            .map(|l| {
+                let l = l.trim_start();
+                l.strip_prefix("//! ")
+                    .or_else(|| l.strip_prefix("/// "))
+                    .unwrap_or(if l == "//!" || l == "///" { "" } else { "\u{0}" })
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let label = |(info, line, body): (String, usize, String)| (info, line, format!("{}: {body}", shown(&path)));
+        out.extend(blocks(&docs).into_iter().map(label));
     }
     Ok(out)
 }
