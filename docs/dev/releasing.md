@@ -94,7 +94,7 @@ and the schema's source, waiting for the deploy.
 All crates share one version. They are published in dependency order, and the workflow skips any
 crate whose version is already on crates.io, so re-running it after a partial failure is safe:
 
-1. `isoloom-spec`, 2. `isoloom-manifest`, 3. `isoloom-catalogue`, 4. `isoloom-plan`,
+1. `isoloom-manifest`, 2. `isoloom-spec`, 3. `isoloom-catalogue`, 4. `isoloom-plan`,
 5. `isoloom-render`, 6. `isoloom-compose`, 7. `isoloom-kubernetes`, 8. `isoloom-terraform`,
 9. `isoloom-vagrant`, 10. `isoloom-ansible`, 11. `isoloom-targets`, 12. `isoloom-import`,
 13. `isoloom` (the command line).
@@ -121,11 +121,10 @@ it points at, and `build.rs` reads that copy when the repository's isn't there.
 ### Dry run
 
 ```sh
-cargo publish --dry-run -p isoloom-spec
 cargo publish --dry-run -p isoloom-manifest
 ```
 
-The other crates depend on sibling crates that are not on crates.io at the new version until they
+The other crates (`isoloom-spec` included: it builds on `isoloom-manifest`) depend on sibling crates that are not on crates.io at the new version until they
 are published: point those at
 the checkout with a `[patch.crates-io]` table passed to cargo
 (`cargo --config patch.toml publish --dry-run -p <crate>`).

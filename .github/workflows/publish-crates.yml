@@ -51,8 +51,8 @@ jobs:
           set -euo pipefail
           # Leaf crates first: every crate's dependencies are published before it.
           crates=(
-            isoloom-spec
             isoloom-manifest
+            isoloom-spec
             isoloom-catalogue
             isoloom-plan
             isoloom-render
